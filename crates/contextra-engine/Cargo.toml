@@ -20,6 +20,7 @@ contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-store = { workspace = true }
+contextra-erasure = { path = "../contextra-erasure" }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-rank = { workspace = true }
@@ -32,13 +33,13 @@ parking_lot = { workspace = true }
 tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
-bincode = { workspace = true }
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"
 
 [dev-dependencies]
 contextra-testkit = { workspace = true }
+contextra-testmacros = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"
@@ -48,8 +49,4 @@ contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
 default = []
-reranking = []
 experimental-diskann = ["contextra-vector/experimental-diskann"]
-background-maintenance = []
-entity-extraction = []
-auto-extraction-opt-out = []

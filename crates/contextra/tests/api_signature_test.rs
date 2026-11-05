@@ -41,6 +41,86 @@ fn test_api_types_and_traits() {
     let _defaults = system_defaults();
 }
 
+/// SPEC: T-API-1
+#[test]
+fn test_facade_method_signatures_exist() {
+    // Compile-time assertion of all method signatures from SPEC §7.1 and §7.2
+    fn _check_signatures(
+        ctx: &Contextra,
+        tenant: &Tenant,
+        coll: &Collection,
+        req: EraseRequest,
+        doc_ref: DocRef,
+        doc: Document,
+        restricted_acc: &RestrictedAccess,
+    ) {
+        let _ = async {
+            let _ = ctx.tenant(TenantContext::try_new("t").unwrap()).await;
+            let _ = ctx.erase(req).await;
+            let _ = ctx.erase_status(ErasureId::new([0u8; 16])).await;
+            let _ = ctx.report(ErasureId::new([0u8; 16])).await;
+            let _ = ctx
+                .lift_restriction(
+                    ErasureId::new([0u8; 16]),
+                    RetentionAttestation {
+                        code: RetentionCode::NoObligation,
+                        attested_by: contextra_types::refs::OperatorRef::try_new(b"op").unwrap(),
+                        attested_at: contextra_types::ids::Timestamp::now(),
+                    },
+                )
+                .await;
+            let _ = ctx
+                .acknowledge_ledger_reset(contextra::OperatorAttestation {
+                    operator: contextra_types::refs::OperatorRef::try_new(b"op").unwrap(),
+                    attested_at: contextra_types::ids::Timestamp::now(),
+                    reason: "test".to_string(),
+                })
+                .await;
+            let sec = Secret::new(vec![0u8; 16]);
+            let _ = ctx.change_passphrase(&sec, &sec).await;
+            let _health: HealthReport = ctx.health();
+
+            let _coll = tenant
+                .collection("test", CollectionOptions::default())
+                .await;
+
+            let _ = coll.insert(doc_ref.clone(), doc.clone()).await;
+            let _ = coll.update(doc_ref.clone(), doc.clone()).await;
+            let _ = coll.get(doc_ref.clone(), None).await;
+            let _ = coll.soft_delete(doc_ref.clone()).await;
+            let _ = coll.scan(ScanRange::All).await;
+            let _ = coll.search_text("q", 10, None).await;
+            let _ = coll.search_vector(vec![0.0; 768], 10, None).await;
+            let _ = coll.search_hybrid("q", vec![0.0; 768], 10, None).await;
+            let _ = coll.load(DocHandle::from_raw([0u8; 32])).await;
+            let _ = coll.snapshot().await;
+            let _ = coll
+                .update_with(
+                    doc_ref.clone(),
+                    doc.clone(),
+                    UpdateOptions {
+                        supersede: Supersede::Keep,
+                    },
+                )
+                .await;
+            let _ = coll
+                .replace_erasing(
+                    doc_ref.clone(),
+                    doc_ref.clone(),
+                    doc.clone(),
+                    RetentionAttestation {
+                        code: RetentionCode::NoObligation,
+                        attested_by: contextra_types::refs::OperatorRef::try_new(b"op").unwrap(),
+                        attested_at: contextra_types::ids::Timestamp::now(),
+                    },
+                )
+                .await;
+            let _ = coll.get_restricted(doc_ref.clone(), restricted_acc).await;
+            let _ = coll.scan_restricted(ScanRange::All, restricted_acc).await;
+        };
+    }
+}
+
 /// SPEC: T-API-2
 #[test]
 fn test_retention_attestation_code_variants() {

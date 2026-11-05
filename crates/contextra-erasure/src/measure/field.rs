@@ -6,6 +6,7 @@
 
 use crate::error::ErasureError;
 use contextra_ports::vfs::{Vfs, VfsOpenOptions};
+use contextra_types::erasure::{LayerId, MeasureClass};
 use std::path::{Path, PathBuf};
 
 /// Art der Leseverifikation gemäß SPEC D-113.
@@ -27,6 +28,115 @@ impl VerifiedVia {
             Self::CacheDropped => "CacheDropped",
             Self::Cached => "Cached",
         }
+    }
+}
+
+/// Strukturdecoder-Schnittstelle zur Prüfung schichtspezifischer Strukturen (SPEC 12.1, AR-3).
+///
+/// Ermöglicht die Injektion von Decodern für Manifeste, SSTable-Indizes, Segmentwörterbücher
+/// und Slot-Tabellen, ohne dass `contextra-erasure` von `store`, `text` oder `vector` abhängt.
+pub trait StructureDecoder: Send + Sync {
+    /// Name oder Typ des Decoders für Berichte/Traceability.
+    fn name(&self) -> &str;
+
+    /// Prüft, ob dieser Decoder für die angegebene Datei zuständig ist.
+    fn can_decode(&self, path: &Path) -> bool;
+
+    /// Decodiert und prüft den Dateiinhalt auf Einträge des gesuchten Ziels.
+    ///
+    /// Gibt die Anzahl der gefundenen Treffer zurück (0 im fehlerfreien Zustand).
+    fn decode_and_check(
+        &self,
+        path: &Path,
+        content: &[u8],
+        target_pattern: &[u8],
+    ) -> Result<u64, ErasureError>;
+}
+
+/// Konfiguration für einen verifizierten Mess-Scan mit Positivkontrolle (SPEC 12.1, 12.2, D-72).
+#[derive(Clone)]
+pub struct ScanPlan {
+    /// ID der zu scannenden Schicht.
+    pub layer: LayerId,
+    /// Messklasse (MK1, MK2 oder MK3).
+    pub class: MeasureClass,
+    /// Numerische Methoden-ID.
+    pub method_id: u16,
+    /// Wurzelverzeichnis der zu prüfenden Daten.
+    pub root_dir: PathBuf,
+    /// Kontrollmuster für die Positivkontrolle (muss zwingend nachgewiesen werden).
+    pub control_pattern: Vec<u8>,
+    /// Optionaler expliziter Pfad zu einer Kontrolldatei im VFS (falls vorhanden).
+    pub control_file: Option<PathBuf>,
+    /// Zielmuster / Needles (z. B. Betreiber-Klartext, Tag-Bytes, Envelope-Header).
+    pub target_patterns: Vec<Vec<u8>>,
+    /// Status für MK3-Schlüsselabwesenheitsprüfung (falls MK3).
+    pub mk3_status: Option<Mk3StatusInput>,
+    /// Injizierte Strukturdecoder für MK1.
+    pub decoders: Vec<std::sync::Arc<dyn StructureDecoder>>,
+}
+
+/// Eingabewerte für MK3-Schlüsselprüfung.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mk3StatusInput {
+    /// Slot der höchsten Ebene genullt.
+    pub top_slot_zeroed: bool,
+    /// DEK-Ableitung gescheitert.
+    pub dek_derivation_fails: bool,
+    /// F-Slots der Zieldateien nicht mehr vorhanden.
+    pub file_slots_absent: bool,
+}
+
+impl ScanPlan {
+    /// Erzeugt einen neuen ScanPlan.
+    pub fn new(
+        layer: LayerId,
+        class: MeasureClass,
+        method_id: u16,
+        root_dir: impl Into<PathBuf>,
+        control_pattern: impl Into<Vec<u8>>,
+    ) -> Self {
+        Self {
+            layer,
+            class,
+            method_id,
+            root_dir: root_dir.into(),
+            control_pattern: control_pattern.into(),
+            control_file: None,
+            target_patterns: Vec::new(),
+            mk3_status: None,
+            decoders: Vec::new(),
+        }
+    }
+
+    /// Setzt einen expliziten Pfad zu einer Kontrolldatei.
+    pub fn with_control_file(mut self, path: impl Into<PathBuf>) -> Self {
+        self.control_file = Some(path.into());
+        self
+    }
+
+    /// Fügt ein Zielmuster hinzu.
+    pub fn with_target_pattern(mut self, pattern: impl Into<Vec<u8>>) -> Self {
+        self.target_patterns.push(pattern.into());
+        self
+    }
+
+    /// Fügt mehrere Zielmuster hinzu.
+    pub fn with_target_patterns(mut self, patterns: impl IntoIterator<Item = Vec<u8>>) -> Self {
+        self.target_patterns.extend(patterns);
+        self
+    }
+
+    /// Setzt MK3 Statuswerte.
+    pub fn with_mk3_status(mut self, status: Mk3StatusInput) -> Self {
+        self.mk3_status = Some(status);
+        self
+    }
+
+    /// Fügt einen Strukturdecoder hinzu.
+    pub fn with_decoder(mut self, decoder: std::sync::Arc<dyn StructureDecoder>) -> Self {
+        self.decoders.push(decoder);
+        self
     }
 }
 
@@ -123,7 +233,7 @@ pub fn read_file_verified(
 }
 
 /// Rekursives Sammeln aller Dateipfade über Vfs (ohne Verzeichnisse selbst als Dateien einzufügen).
-fn collect_all_files(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<PathBuf>, ErasureError> {
+pub fn collect_all_files(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<PathBuf>, ErasureError> {
     let mut result = Vec::new();
     let entries = match vfs.list_dir(dir) {
         Ok(list) => list,

@@ -12,9 +12,10 @@
 use super::cx::PurgeCx;
 use super::reserve::{check_disk_reserve, ReserveCheck};
 use crate::error::ErasureError;
+use crate::saga::core::ErasureCore;
 
 /// Ergebnis eines Purge-Fensters.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WindowOutcome {
     /// Anzahl erfolgreich gelöschter Einheiten.
     pub purged_units: u64,
@@ -44,15 +45,22 @@ impl WindowOutcome {
 
 /// Führt ein Purge-Fenster durch (ER-20).
 ///
-/// Stub-Implementierung: Die vollständige Koordination über alle Schichten
-/// erfolgt in WP-4.2 über den `ErasureCore`.
+/// Quellkompatible Signatur für bestehende Aufrufer: prüft Plattenreserve.
+/// Schlägt fehl mit `DiskReserve`, falls kein ausreichender Platz vorhanden ist,
+/// oder liefert `NotImplemented`, falls kein `ErasureCore` konfiguriert ist,
+/// um Scheinerfolge zu verhindern (P1, HR-10).
 pub fn run_window(cx: &PurgeCx) -> Result<WindowOutcome, ErasureError> {
-    // Plattenreserve prüfen (ER-22)
     let reserve = check_disk_reserve(cx.min_free_bytes, 0)?;
     if let ReserveCheck::Insufficient { .. } = reserve {
         return Err(ErasureError::DiskReserve);
     }
 
-    // Stub: kein echter Purge ohne Schicht-Implementierungen
-    Ok(WindowOutcome::empty())
+    Err(ErasureError::NotImplemented(
+        "run_window requires active ErasureCore orchestrator; use run_core_window".into(),
+    ))
+}
+
+/// Führt ein vollständiges Purge-Fenster über den `ErasureCore` aus (SPEC §11.2, §11.4).
+pub async fn run_core_window(core: &ErasureCore) -> Result<WindowOutcome, ErasureError> {
+    core.run_purge_window().await
 }
