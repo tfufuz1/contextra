@@ -76,8 +76,10 @@ pub mod report;
 
 /// Deterministische Pseudozufalls-Generatoren (SPEC §8.15, V-RNG).
 pub mod det_rng {
+    pub use contextra_ports::rng::SeededRng as DetRng;
     pub use contextra_ports::rng::{Rng, SeededRng};
 }
+pub use contextra_ports::rng::SeededRng as DetRng;
 
 /// In-Memory-Port-Doppelgänger (SPEC §8.15, WP-7.1).
 pub mod mem_ports {
@@ -94,5 +96,8 @@ pub use in_memory_store::InMemoryStorageEngine;
 pub use in_memory_text::InMemoryTextIndex;
 pub use in_memory_vector::InMemoryVectorIndex;
 pub use manual_clock::ManualClock;
-pub use mocks::*;
+pub use mocks::{
+    InMemoryErasureObserver, InMemoryPurgeBarrier, InMemoryReportSigner, MockEmbedder,
+    TestMetricsSink,
+};
 pub use reference_model::{RefOp, ReferenceModel};
