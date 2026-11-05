@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Campaign J-23: Comprehensive Audit and Verification Test Suite for `contextra-vector`.
 //! Tests cover HNSW, DiskANN, ACORN, Adaptive ef, Rebuild/Swap, Arena Node Reuse, Partial Rebuild, Recall Suite, Limits & MVCC.
 

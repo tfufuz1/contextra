@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT: v3 format, HOTSPOTS: [benches/hnsw_bench.rs]
 // Hot Path HNSW Insertion, Search, and Quantized Search Benchmarks for ADR-031 Regressions.
 

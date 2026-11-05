@@ -228,7 +228,7 @@ mod tests {
 
         let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 0, -1, 64, 64, 1);
         let header_bytes = header.to_bytes();
-        std::fs::write(&file_path, &header_bytes)
+        std::fs::write(&file_path, header_bytes)
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
         let index = BufferIndex::open(&file_path)?;

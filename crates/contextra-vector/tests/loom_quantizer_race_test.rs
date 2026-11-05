@@ -1,4 +1,11 @@
-#![allow(unexpected_cfgs)]
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 
 //! Loom-basierter Nebenläufigkeitsbeweis für AGT-INDEX-b2c3d4e5.
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p contextra-index -- loom

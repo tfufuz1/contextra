@@ -1,3 +1,4 @@
+use zeroize::Zeroize;
 // FILE-CONTEXT
 // ZWECK: ErasureLayer trait implementation for HNSW vector index.
 // INVARIANTEN: Cryptographic erasure layer scope resolution and purged state witnessing.
@@ -8,7 +9,6 @@ use contextra_ports::{
     PurgeCx, PurgeOutcome, Scanner,
 };
 use contextra_types::DocId;
-use zeroize::Zeroize;
 
 use super::deletion::GhostFreeVectorIndex;
 use super::types::{HnswIndex, VectorData};
@@ -63,7 +63,7 @@ impl ErasureLayer for HnswIndex {
                         u64::MAX
                     };
 
-                    for (&raw_id, _) in doc_map.iter() {
+                    for &raw_id in doc_map.keys() {
                         #[cfg(not(feature = "docid-128"))]
                         let doc_u64 = raw_id;
                         #[cfg(feature = "docid-128")]
@@ -90,13 +90,15 @@ impl ErasureLayer for HnswIndex {
         let this = self.clone();
         let units = scope.affected_units().to_vec();
         Box::pin(async move {
+            let dim = this.inner.cold.config.dimension;
+            let m = this.inner.cold.config.m;
             let buffer_node_count = this
                 .inner
                 .cold
                 .buffer_index
                 .read()
                 .as_ref()
-                .map(|m| m.header.node_count() as usize)
+                .map(|b| b.header.node_count() as usize)
                 .unwrap_or(0);
 
             let ep_vector = {
@@ -118,22 +120,55 @@ impl ErasureLayer for HnswIndex {
             let doc_map = this.inner.hot.doc_to_node.read();
             let mut nodes_write = this.inner.hot.nodes.write();
 
-            for doc_raw in units {
-                #[cfg(not(feature = "docid-128"))]
-                let node_idx_opt = doc_map.get(&doc_raw).copied();
-                #[cfg(feature = "docid-128")]
-                let node_idx_opt = doc_map.get(&(doc_raw as u128)).copied();
-
-                if let Some(target_idx) = node_idx_opt {
+            let target_limit = 4096;
+            for doc_raw in units.into_iter().take(target_limit) {
+                if let Some(target_idx) = doc_map.get(&doc_raw).copied() {
                     if target_idx >= buffer_node_count {
                         let ram_idx = target_idx - buffer_node_count;
+
+                        let mut neighbor_vecs = Vec::new();
+                        let conns = this.inner.hot.arena.get_ram_node_connections(ram_idx, 0, m);
+                        for &neighbor in &conns {
+                            let n_idx = neighbor as usize;
+                            if n_idx >= buffer_node_count
+                                && n_idx - buffer_node_count < nodes_write.len()
+                            {
+                                let n_ram = n_idx - buffer_node_count;
+                                if n_ram != ram_idx {
+                                    if let Some(node) = nodes_write.get(n_ram) {
+                                        if let VectorData::F32(ref v) = node.vector {
+                                            neighbor_vecs.push(v.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        let surrogate = if !neighbor_vecs.is_empty() {
+                            let count = neighbor_vecs.len() as f32;
+                            let mut mean = vec![0.0f32; dim];
+                            for v in &neighbor_vecs {
+                                for (i, &val) in v.iter().enumerate() {
+                                    mean[i] += val;
+                                }
+                            }
+                            for val in &mut mean {
+                                *val /= count;
+                            }
+                            Some(mean)
+                        } else {
+                            ep_vector.clone()
+                        };
+
                         if let Some(node) = nodes_write.get_mut(ram_idx) {
                             match &mut node.vector {
                                 VectorData::F32(v) => {
                                     v.zeroize();
-                                    if let Some(ref surrogate) = ep_vector {
-                                        if surrogate.len() == v.len() {
-                                            v.copy_from_slice(surrogate);
+                                    this.inner.hot.arena.zeroize_vector(ram_idx, dim);
+                                    if let Some(ref s) = surrogate {
+                                        if s.len() == v.len() {
+                                            v.copy_from_slice(s);
+                                            this.inner.hot.arena.store_vector(ram_idx, dim, s);
                                         }
                                     }
                                 }
@@ -180,7 +215,8 @@ impl ErasureLayer for HnswIndex {
 
                 if let Some(idx) = target_idx {
                     let mut mut_self = this.clone();
-                    if let Ok(_stats) = mut_self.remove_with_graph_repair(doc_id) {
+                    let res = mut_self.remove_with_graph_repair(doc_id);
+                    if let Ok(_stats) = res {
                         purged_count += 1;
                         if idx >= buffer_node_count {
                             let ram_idx = idx - buffer_node_count;
@@ -278,6 +314,6 @@ impl ErasureLayer for HnswIndex {
     }
 
     fn key_coverage(&self) -> KeyCoverage {
-        KeyCoverage::Unlinked
+        KeyCoverage::None
     }
 }

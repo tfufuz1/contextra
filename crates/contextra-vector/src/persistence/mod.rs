@@ -15,3 +15,9 @@ mod tests;
 pub use buffer::BufferIndex;
 pub use header::{HnswHeader, HNSW_MAGIC, HNSW_VERSION};
 pub use node::NodeRecord;
+
+pub mod snapshot;
+pub use snapshot::{
+    load_snapshot_vfs, save_snapshot_vfs, VectorSnapshotHeader, SNAPSHOT_FORMAT_VERSION,
+    SNAPSHOT_KIND_VECTOR, SNAPSHOT_MAGIC,
+};

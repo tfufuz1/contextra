@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Integration test for DiskANN Vamana graph build and Recall@10 accuracy (BEFUND 1).
 //! Verifies that DiskANN achieves Recall@10 >= 0.95 on synthetic dataset.
 //! Ground-truth top-10 neighbors are computed via an independent brute-force reference implementation.

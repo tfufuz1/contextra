@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT
 // ZWECK: Criterion-Benchmark zur Messung des Recall-Abfalls und der Latenz von search_filtered_internal
 //        bei unterschiedlichen Prädikat-Selektivitätsstufen (50%, 20%, 5%, 1%) gegen Brute-Force Ground Truth.

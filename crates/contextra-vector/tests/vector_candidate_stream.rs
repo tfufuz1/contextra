@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 use contextra_ports::{VectorIndex, VectorIndexStats};
 use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};

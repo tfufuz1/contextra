@@ -1,7 +1,14 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT
 // ZWECK: Fault-Injection Test for DiskANN rebuild failures (Pflichttest 1).
 // INVARIANTEN: Simulates interrupted/failed DiskANN rebuild mid-write and verifies that the previous functional index state remains valid, loadable, and searchable.
-
 #![cfg(feature = "experimental-diskann")]
 
 use contextra_ports::VectorIndex;

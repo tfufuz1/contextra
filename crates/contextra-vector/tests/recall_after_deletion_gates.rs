@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Recall regression gates, zeroize verification, and deterministic rebuild under deletion.
 //! Tests correspond to SPEC §9.8, D-18, D-77, D-86, T-VEC-DEL-1, T-VEC-DEL-2, T-VEC-REBUILD-INDEP.
 

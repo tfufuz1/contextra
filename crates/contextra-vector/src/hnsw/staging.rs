@@ -12,14 +12,9 @@ use parking_lot::RwLock;
 #[derive(Debug, Clone)]
 pub enum LocalVectorOp {
     /// Einfügen eines Vektors.
-    Insert {
-        doc_id: DocId,
-        data: Vec<f32>,
-    },
+    Insert { doc_id: DocId, data: Vec<f32> },
     /// Löschen eines Dokuments.
-    Delete {
-        doc_id: DocId,
-    },
+    Delete { doc_id: DocId },
 }
 
 /// Indexlokaler Transaktions-Puffer.

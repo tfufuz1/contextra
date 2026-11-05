@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Proptest-Suite für ScalarQuantizer und compute_distance.
 //! Verifiziert mathematische Invarianten über zufällige Eingaben.
 

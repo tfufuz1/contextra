@@ -88,11 +88,35 @@ impl HnswIndexCore {
     /// Uhrzeit und Zufall im Produktionscode muessen ausschliesslich über injizierte
     /// Ports (`Rng` aus `contextra-ports`) bezogen werden. Diese Methode bezieht den
     /// Pseudozufallswert direkt ueber `self.cold.rng.read()`.
+    pub fn deterministic_layer_for_doc(doc_raw: u64, chunk: u32) -> usize {
+        let key = [0x42u8; 32]; // K_idx key derivation context
+        let mut hasher = blake3::Hasher::new_keyed(&key);
+        hasher.update(b"ctx/hnsw-level/v1");
+        hasher.update(&doc_raw.to_le_bytes());
+        hasher.update(&chunk.to_le_bytes());
+        let hash = hasher.finalize();
+        let bytes = hash.as_bytes();
+
+        let mut leading_zeros = 0usize;
+        for &byte in bytes {
+            let high_nibble = (byte >> 4) & 0x0F;
+            if high_nibble == 0 {
+                leading_zeros += 1;
+            } else {
+                break;
+            }
+            let low_nibble = byte & 0x0F;
+            if low_nibble == 0 {
+                leading_zeros += 1;
+            } else {
+                break;
+            }
+        }
+        leading_zeros.min(15)
+    }
+
     pub(super) fn random_layer(&self) -> usize {
-        let r = self.cold.rng.next_unit_f64() as f32;
-        let r_clamped = r.max(f32::EPSILON);
-        let layer = (-(r_clamped.ln()) as f64 * self.hot.ml) as usize;
-        layer.min(32)
+        Self::deterministic_layer_for_doc(self.hot.nodes.read().len() as u64, 0)
     }
 
     fn compute_distance_with_data(
@@ -854,14 +878,15 @@ impl HnswIndexCore {
                             let q_guard = self.cold.quantizer.read();
                             let q = q_guard.as_ref().ok_or_else(|| {
                                 ContextraError::Index(
-                                    "Quantizer missing during rebuild phase 2 delta replay"
-                                        .into(),
+                                    "Quantizer missing during rebuild phase 2 delta replay".into(),
                                 )
                             })?;
                             q.dequantize(v)?
                         }
                     };
-                    new_index.inner.do_insert(node.doc_id, &f32_vec, node.committed_tx)?;
+                    new_index
+                        .inner
+                        .do_insert(node.doc_id, &f32_vec, node.committed_tx)?;
                 }
             }
 
@@ -870,7 +895,13 @@ impl HnswIndexCore {
                     let ram_idx = (del_idx as usize) - buffer_count;
                     if let Some(node) = nodes.get(ram_idx) {
                         if node.committed_tx > snapshot_tx {
-                            if new_index.inner.hot.doc_to_node.read().contains_key(&node.doc_id.inner()) {
+                            if new_index
+                                .inner
+                                .hot
+                                .doc_to_node
+                                .read()
+                                .contains_key(&node.doc_id.inner())
+                            {
                                 new_index.inner.do_delete(node.doc_id)?;
                             }
                         }
@@ -949,6 +980,7 @@ impl HnswIndexCore {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::hnsw::config::HnswConfig;

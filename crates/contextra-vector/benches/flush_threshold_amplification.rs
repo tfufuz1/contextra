@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT: Benchmark für Write-Amplification und p95-Latenz in DiskANN
 // ZWECK: Quantifizierung von Schreibvolumen und Latenz-Trade-offs für PENDING_FLUSH_THRESHOLD (50 / 200 / 1.000)
 // STAND: TS:2026-09-07T00:00:00Z

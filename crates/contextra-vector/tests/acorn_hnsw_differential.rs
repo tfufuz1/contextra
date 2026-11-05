@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT
 // ZWECK: Differential-Testing & Recall-Regressionstests für HnswIndex::search_knn_acorn (Spec §8.5, §22.4).
 // INVARIANTEN: Zero Panic; Zero Cross-Contamination; Differential vs. NaiveReferenceIndex >= 95% Recall@k.

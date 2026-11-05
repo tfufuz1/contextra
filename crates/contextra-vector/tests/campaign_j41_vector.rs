@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Campaign J-41 hypothesis test suite for contextra-vector.
 //! Tests static scan findings: neighbor count u8 truncation, distance score casting, index bounds.
 

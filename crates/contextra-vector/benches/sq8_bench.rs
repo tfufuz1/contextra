@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 use contextra_types::DistanceMetric;
 use contextra_vector::quantize::ScalarQuantizer;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

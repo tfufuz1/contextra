@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT
 // ZWECK: Criterion Benchmark für ACORN Naive-Reference Search vs. Post-Filtering Baseline.
 // INVARIANTEN: O(n) Reference Benchmark für Recall & Latency Baselines.

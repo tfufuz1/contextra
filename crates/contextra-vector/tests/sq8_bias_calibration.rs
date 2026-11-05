@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // Testpflicht AK-12 (docs/specs/CONTEXTRA_SPEC_v2.md / Spec §15.2)
 
 use contextra_types::DistanceMetric;

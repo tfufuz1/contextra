@@ -45,7 +45,9 @@ pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SI
 pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
-pub use hnsw::{DeletionStats, GhostFreeVectorIndex, HnswConfig, HnswIndex, RebuildStatus};
+pub use hnsw::{
+    DeletionStats, GhostFreeVectorIndex, HnswConfig, HnswConfigBuilder, HnswIndex, RebuildStatus,
+};
 pub use persistence::{BufferIndex, HnswHeader};
 pub use quantize::ScalarQuantizer;
 #[cfg(feature = "experimental-rabitq")]

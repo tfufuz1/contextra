@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Regressionstest für AGT-INDEX-006: Snapshot-Isolation bei Soft-Delete.
 //! Sichert: search_at(seq) gibt Nodes zurück die NACH seq gelöscht wurden.
 

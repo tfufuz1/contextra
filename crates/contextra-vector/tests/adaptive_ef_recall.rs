@@ -1,8 +1,14 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT
 // ZWECK: Integrationstests für adaptives ef_search (Ada-ef) Recall, Determinismus, Performance- und Lösch-Invarianten.
 // INVARIANTEN: Zero-Panic in Produktion; Lints in Tests freigegeben.
-
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};

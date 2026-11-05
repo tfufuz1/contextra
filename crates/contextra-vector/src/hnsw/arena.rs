@@ -50,7 +50,6 @@ impl BacklinkTable {
 }
 
 /// Contiguous 64-byte aligned arena allocator for HNSW node connections with free-list slot reuse.
-#[derive(Debug)]
 pub struct HnswArena {
     pub arena: RwLock<Vec<u32>>,
     pub offsets: RwLock<Vec<usize>>,
@@ -59,8 +58,9 @@ pub struct HnswArena {
     pub counts: RwLock<Vec<u8>>,
     pub free_list: RwLock<Vec<usize>>,
     pub total_allocated: AtomicU64,
+    pub vector_storage: RwLock<Vec<f32>>,
+    pub arena_guard: Option<std::sync::Arc<dyn contextra_ports::ArenaGuard>>,
 }
-
 impl Default for HnswArena {
     fn default() -> Self {
         Self::new()
@@ -78,6 +78,8 @@ impl HnswArena {
             counts: RwLock::new(Vec::new()),
             free_list: RwLock::new(Vec::new()),
             total_allocated: AtomicU64::new(0),
+            vector_storage: RwLock::new(Vec::new()),
+            arena_guard: None,
         }
     }
 
@@ -295,6 +297,41 @@ impl HnswArena {
 
     /// Zeroizes connection memory for a node slot across all layers, clears counts,
     /// and then marks the node's slot as free in the free_list.
+    /// Stores vector payload in a contiguous slot within the arena.
+    pub fn store_vector(&self, ram_idx: usize, dim: usize, vec: &[f32]) {
+        let mut storage = self.vector_storage.write();
+        let required = (ram_idx + 1) * dim;
+        if storage.len() < required {
+            storage.resize(required, 0.0);
+        }
+        let start = ram_idx * dim;
+        let end = start + dim;
+        storage[start..end].copy_from_slice(vec);
+    }
+
+    /// Reads vector payload from a contiguous slot within the arena.
+    pub fn get_vector_slice(&self, ram_idx: usize, dim: usize) -> Option<Vec<f32>> {
+        let storage = self.vector_storage.read();
+        let start = ram_idx * dim;
+        let end = start + dim;
+        if end <= storage.len() {
+            Some(storage[start..end].to_vec())
+        } else {
+            None
+        }
+    }
+
+    /// Zeroizes vector payload in the arena for a freed slot.
+    pub fn zeroize_vector(&self, ram_idx: usize, dim: usize) {
+        use zeroize::Zeroize;
+        let mut storage = self.vector_storage.write();
+        let start = ram_idx * dim;
+        let end = start + dim;
+        if end <= storage.len() {
+            storage[start..end].zeroize();
+        }
+    }
+
     pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();

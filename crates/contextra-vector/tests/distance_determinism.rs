@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 use contextra_types::DistanceMetric;
 use contextra_vector::distance::{
     compute_distance, cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,

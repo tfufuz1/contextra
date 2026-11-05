@@ -1,7 +1,14 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 // FILE-CONTEXT
 // ZWECK: Audit-Testsuite für SQ8 Kendall-Tau Rangkorrelation, Persistence Roundtrips und Buffer Fault-Tolerance
 // STAND: TS:2026-08-31T00:00:00Z
-
 #![cfg(feature = "experimental-diskann")]
 
 use contextra_ports::VectorIndex;

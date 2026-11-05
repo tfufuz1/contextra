@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Campaign J-24 Test Suite — contextra-vector
 //! Covers Hypotheses H1 - H10 for Product 3 Vector Index Deep Audit.
 

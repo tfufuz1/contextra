@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Robustheitstests für BufferIndex gegen beschädigte/manipulierte Dateien.
 //! Sichert: try_from_bytes() und BufferIndex::open() paniken NIEMALS —
 //! auch bei abgeschnittenen, korrumpierten oder übergroßen Headern.

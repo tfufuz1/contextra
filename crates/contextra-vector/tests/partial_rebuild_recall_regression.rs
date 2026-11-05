@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 #![cfg(feature = "partial-index-rebuild")]
 
 use contextra_ports::VectorIndex;

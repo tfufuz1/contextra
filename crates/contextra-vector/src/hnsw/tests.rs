@@ -1,3 +1,8 @@
+#![allow(
+    clippy::type_complexity,
+    clippy::await_holding_lock,
+    clippy::unnecessary_cast
+)]
 use super::*;
 use contextra_ports::Rng;
 use contextra_ports::VectorIndex;

@@ -1,13 +1,14 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! SPEC: T-VEC-DEL-1, T-VEC-DEL-2, D-77, D-94
 //! Test suite verifying ghost-free deletion with zero ghost pointers
 //! and index loading via BufferIndex (non-mmap).
-
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    clippy::cast_possible_truncation
-)]
 
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};

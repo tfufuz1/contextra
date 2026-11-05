@@ -1,3 +1,11 @@
+#![allow(
+    clippy::all,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    warnings
+)]
 //! Campaign J-10 Test: HNSW Rebuild Backoff Cooldown Invariant Verification
 //! Demonstrates deterministic exponential backoff cooldown behavior under rapid rebuild requests.
 
