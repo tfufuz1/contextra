@@ -6,27 +6,40 @@ pub mod record;
 pub mod reduce;
 
 pub use crate::saga::SagaState;
-pub use appendlog::AppendLog;
-pub use epoch::Epoch;
-pub use record::JournalEntry;
+pub use appendlog::{AppendLog, DurableJournal};
+pub use epoch::{compute_commitment, Epoch, EpochKeys};
+pub use record::{JournalEntry, JournalRecord, RecordCode, TargetType};
 pub use reduce::reduce;
 
+use crate::error::ErasureError;
 use crate::saga::EraseSaga;
+use contextra_ports::vfs::Vfs;
 use contextra_types::ids::ErasureId;
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::sync::Arc;
 
-/// In-Memory-Abstraktion des Journals (Appendlog nach F.9).
+/// In-Memory- und Disk-Abstraktion des Journals (Appendlog nach F.9).
 #[derive(Debug, Default)]
 pub struct ErasureJournal {
     entries: Vec<JournalEntry>,
 }
 
 impl ErasureJournal {
-    /// Erstellt ein neues leeres Journal.
+    /// Erstellt ein neues leeres In-Memory-Journal.
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
         }
+    }
+
+    /// Öffnet ein dauerhaftes Journal auf Vfs.
+    pub fn open_durable(
+        vfs: Arc<dyn Vfs>,
+        path: &Path,
+        derived_key: &[u8; 32],
+    ) -> Result<DurableJournal, ErasureError> {
+        DurableJournal::open_or_create(vfs, path, derived_key)
     }
 
     /// Fügt einen neuen Eintrag an.
