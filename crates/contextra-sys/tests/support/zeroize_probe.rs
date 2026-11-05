@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
 // ZWECK: Child probe helper for verifying dead-store optimization resistance of secure_zero_volatile
 // INVARIANTEN: Zero panic, fixed exit codes
 
