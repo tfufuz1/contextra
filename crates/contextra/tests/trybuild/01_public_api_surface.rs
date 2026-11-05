@@ -13,12 +13,13 @@ async fn main() {
     let secret = Secret::new(b"sehr-sichere-passphrase-123".to_vec());
     let rt = tokio::runtime::Handle::current();
 
-    let _builder: EngineBuilder<Missing, Missing, Missing> = Contextra::builder();
-    let _configured_builder: EngineBuilder<Set, Set, Set> = Contextra::builder()
+    let _builder: EngineBuilder<Missing, Missing, Missing, Missing> = Contextra::builder();
+    let _configured_builder: EngineBuilder<Set, Set, Set, Set> = Contextra::builder()
         .data_dir("./target/trybuild_test_db")
         .passphrase(secret.clone())
         .runtime(rt)
         .backup_retention(Duration::from_secs(365 * 86400))
+        .dimension(768)
         .erase_sla(Duration::from_secs(86400));
 
     let _sys = system_defaults();

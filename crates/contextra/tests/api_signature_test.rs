@@ -27,15 +27,16 @@ fn test_api_types_and_traits() {
     assert_send_sync::<HealthReport>();
     assert_send_sync::<Error>();
 
-    let builder: EngineBuilder<Missing, Missing, Missing> = Contextra::builder();
+    let builder: EngineBuilder<Missing, Missing, Missing, Missing> = Contextra::builder();
     let secret = Secret::new(b"sehr-geheime-passphrase-mindestens-12".to_vec());
     let rt = tokio::runtime::Handle::current();
 
-    let _configured: EngineBuilder<Set, Set, Set> = builder
+    let _configured: EngineBuilder<Set, Set, Set, Set> = builder
         .data_dir("./target/test_data_dir")
         .passphrase(secret)
         .runtime(rt)
         .backup_retention(Duration::from_secs(365 * 86400))
+        .dimension(768)
         .erase_sla(Duration::from_secs(86400));
 
     let _defaults = system_defaults();

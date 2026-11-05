@@ -180,6 +180,12 @@ fn test_error_golden_strings_and_codes() {
             13000,
             "Interner Systemfehler. Systemzustand prüfen und Vorgang wiederholen.",
         ),
+        (
+            Error::NotImplemented("erase"),
+            ErrorCode::NotImplemented,
+            14000,
+            "Funktion noch nicht implementiert: erase.",
+        ),
     ];
 
     for (err, expected_code, expected_u32, expected_msg) in cases {

@@ -29,6 +29,7 @@ fn test_errors_do_not_leak_secrets() {
         Error::Cancelled,
         Error::Refused,
         Error::Internal,
+        Error::NotImplemented("test_feature"),
     ];
 
     for err in errors {

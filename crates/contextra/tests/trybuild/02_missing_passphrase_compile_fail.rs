@@ -9,7 +9,8 @@ async fn main() {
     let builder = Contextra::builder()
         .data_dir("./target/trybuild_test_db")
         .runtime(rt)
-        .backup_retention(Duration::from_secs(86400));
+        .backup_retention(Duration::from_secs(86400))
+        .dimension(768);
 
     let _db = builder.open().await;
 }

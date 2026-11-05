@@ -22,4 +22,5 @@ fn test_missing_mandatory_params_compile_fail() {
     t.compile_fail("tests/trybuild/04_missing_tenant_context_compile_fail.rs");
     t.compile_fail("tests/trybuild/05_missing_backup_retention_compile_fail.rs");
     t.compile_fail("tests/trybuild/06_missing_retention_attestation_compile_fail.rs");
+    t.compile_fail("tests/trybuild/07_missing_dimension_compile_fail.rs");
 }
