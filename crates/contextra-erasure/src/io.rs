@@ -43,8 +43,22 @@ pub fn read_exact_at(f: &dyn VfsFile, buf: &mut [u8], offset: u64) -> Result<(),
     Ok(())
 }
 
-/// Schreibt Nullen an eine Dateiposition.
+/// Puffergröße für Nullen-Schreibschleife ohne dynamische Dauer-Allokation (SPEC §8.12, §11.5).
+const ZERO_BUFFER_CHUNK_SIZE: usize = 4096;
+/// Statischer Null-Puffer zur Vermeidung wiederholter Heap-Allokationen bei Slot- und Block-Zeroizing.
+const ZERO_BLOCK: [u8; ZERO_BUFFER_CHUNK_SIZE] = [0u8; ZERO_BUFFER_CHUNK_SIZE];
+
+/// Schreibt Nullen an eine Dateiposition ohne Heap-Allokation in einer Block-Schleife.
+///
+/// Alle I/O-Fehler sind typisiert und enthalten keine Dateipfade oder Kennungen (P13).
 pub fn zero_at(f: &dyn VfsFile, offset: u64, len: usize) -> Result<(), ErasureError> {
-    let zeros = vec![0u8; len];
-    write_all_at(f, &zeros, offset)
+    let mut written = 0usize;
+    while written < len {
+        let remaining = len - written;
+        let chunk_size = remaining.min(ZERO_BUFFER_CHUNK_SIZE);
+        let slice = ZERO_BLOCK.get(..chunk_size).unwrap_or(&[]);
+        write_all_at(f, slice, offset + written as u64)?;
+        written += chunk_size;
+    }
+    Ok(())
 }

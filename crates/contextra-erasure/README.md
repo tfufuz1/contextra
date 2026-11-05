@@ -2,7 +2,7 @@ Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.
 
 ## Status
 
-Ring 3. Skelett nach D-96 mit WP-3.1; Workspace-Mitglied. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
+Ring 3. Skelett nach D-96 mit WP-3.1; Workspace-Mitglied. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1, 8.12 und 11 (64-Byte-Slots, 16 Shards, Sonderziele replace, supersede, restricted).
 
 ## Abhängigkeiten
 
