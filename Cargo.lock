@@ -586,7 +586,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
- "windows-sys",
  "zeroize",
 ]
 
