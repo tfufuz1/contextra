@@ -21,7 +21,13 @@
 // ZWECK: Mock implementations for testing (MockEmbedder, TestMetricsSink, MetricEvent).
 // INVARIANTEN: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
 
+use contextra_ports::barrier::{CompactionPermit, PurgeBarrier, PurgePermit};
+use contextra_ports::observer::{ErasureEvent, ErasureObserver, ObserverError};
+use contextra_ports::report_signer::{ReportSignature, ReportSigner, SignerError, SignerId};
 use contextra_ports::{BoxFuture, MetricsSink};
+use parking_lot::RwLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 /// Error types encountered during embedding operations.
 #[derive(Debug, thiserror::Error)]
 pub enum EmbeddingError {
@@ -372,5 +378,154 @@ mod tests {
 
         sink.clear();
         assert!(sink.events().is_empty());
+    }
+}
+
+// ============================================================================
+// IN-MEMORY DOUBLES FÜR DIE LÖSCHKETTE (SPEC §8.2, §11, D-118, D-130, I-16)
+// ============================================================================
+
+/// In-Memory-Doppelgänger für [`contextra_ports::observer::ErasureObserver`] (SPEC D-118, T-OBS-1..3).
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryErasureObserver {
+    events: Arc<RwLock<Vec<ErasureEvent>>>,
+    injected_error: Arc<RwLock<Option<ObserverError>>>,
+}
+
+impl InMemoryErasureObserver {
+    /// Erstellt einen neuen, leeren `InMemoryErasureObserver`.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Konfiguriert einen Fehler, der bei den nächsten Zustellungen zurückgegeben wird.
+    pub fn set_injected_error(&self, error: Option<ObserverError>) {
+        *self.injected_error.write() = error;
+    }
+
+    /// Liefert eine Momentaufnahme aller zugestellten Ereignisse.
+    pub fn events(&self) -> Vec<ErasureEvent> {
+        self.events.read().clone()
+    }
+
+    /// Leert die Liste aller zugestellten Ereignisse.
+    pub fn clear(&self) {
+        self.events.write().clear();
+    }
+}
+
+impl ErasureObserver for InMemoryErasureObserver {
+    fn on_erased(
+        &self,
+        ev: ErasureEvent,
+    ) -> BoxFuture<'static, std::result::Result<(), ObserverError>> {
+        let events = self.events.clone();
+        let error_opt = self.injected_error.read().clone();
+        Box::pin(async move {
+            if let Some(err) = error_opt {
+                return Err(err);
+            }
+            events.write().push(ev);
+            Ok(())
+        })
+    }
+}
+
+/// In-Memory-Doppelgänger für [`contextra_ports::report_signer::ReportSigner`] (SPEC D-130, F.10, T-SIG-1).
+#[derive(Debug, Clone)]
+pub struct InMemoryReportSigner {
+    signer_id: SignerId,
+    key_fail: Arc<AtomicBool>,
+}
+
+impl Default for InMemoryReportSigner {
+    fn default() -> Self {
+        Self::new(0)
+    }
+}
+
+impl InMemoryReportSigner {
+    /// Erstellt einen neuen `InMemoryReportSigner` mit gegebener Signer-ID.
+    #[must_use]
+    pub fn new(signer_id: SignerId) -> Self {
+        Self {
+            signer_id,
+            key_fail: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Schaltet Fehlerinjektion für Signierversuche ein oder aus.
+    pub fn set_key_fail(&self, fail: bool) {
+        self.key_fail.store(fail, Ordering::SeqCst);
+    }
+}
+
+impl ReportSigner for InMemoryReportSigner {
+    fn signer_id(&self) -> SignerId {
+        self.signer_id
+    }
+
+    fn sign_report<'a>(
+        &'a self,
+        canonical_report_bytes: &'a [u8],
+    ) -> BoxFuture<'a, std::result::Result<ReportSignature, SignerError>> {
+        Box::pin(async move {
+            if self.key_fail.load(Ordering::SeqCst) {
+                return Err(SignerError::KeyUnavailable(
+                    "simulated key unavailable in test double".to_string(),
+                ));
+            }
+
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(b"ctx/report/v1");
+            hasher.update(canonical_report_bytes);
+            let digest = hasher.finalize();
+
+            let sig_b64 = format!("mock_sig_{}", digest.to_hex());
+            let fp = format!("mock_fp_{:02x}", self.signer_id);
+
+            Ok(ReportSignature {
+                signer_id: self.signer_id,
+                signature_base64: sig_b64,
+                pub_fingerprint: fp,
+            })
+        })
+    }
+}
+
+/// In-Memory-Doppelgänger für [`contextra_ports::barrier::PurgeBarrier`] (SPEC §11.3, §11.4, I-16, L-7).
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryPurgeBarrier {
+    purge_waiting: Arc<AtomicBool>,
+    token: Arc<()>,
+}
+
+impl InMemoryPurgeBarrier {
+    /// Erstellt eine neue `InMemoryPurgeBarrier`.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Setzt oder hebt das `purge_waiting`-Flag manuell für Tests auf.
+    pub fn set_purge_waiting(&self, waiting: bool) {
+        self.purge_waiting.store(waiting, Ordering::SeqCst);
+    }
+}
+
+impl PurgeBarrier for InMemoryPurgeBarrier {
+    fn compaction(&self) -> BoxFuture<'_, CompactionPermit> {
+        let token = Arc::clone(&self.token);
+        Box::pin(async move { CompactionPermit::new(Some(token)) })
+    }
+
+    fn purge(&self) -> BoxFuture<'_, PurgePermit> {
+        let token = Arc::clone(&self.token);
+        Box::pin(async move { PurgePermit::new(Some(token)) })
+    }
+
+    fn purge_waiting(&self) -> bool {
+        self.purge_waiting.load(Ordering::SeqCst)
     }
 }

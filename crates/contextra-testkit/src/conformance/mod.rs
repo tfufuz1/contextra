@@ -70,8 +70,12 @@ pub mod text_index;
 /// Konformitätssuite für den `VectorIndex`-Port (erweitert).
 pub mod vector_index;
 
+/// Konformitätssuite für den `ErasureLayer`-Port (SPEC §8.2, §11, PO-05).
+pub mod erasure_layer;
+
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
+pub use erasure_layer::run as run_erasure_layer_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
 pub use file_keyring::run as run_file_keyring_suite;
 pub use ledger_sink::run as run_ledger_sink_suite;
