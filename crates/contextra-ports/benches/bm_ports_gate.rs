@@ -52,6 +52,7 @@ impl ReadGate for MockReadGate {
     }
 }
 
+/// SPEC: BM-ERASE-O1
 #[test]
 fn bm_gate_check_iface_scaling() {
     run_benchmark_series();

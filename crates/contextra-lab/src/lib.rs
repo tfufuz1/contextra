@@ -11,12 +11,14 @@
 //!
 //! # Architektur-Rolle: Ring dev (Unabhängige Prüfinstanz)
 //!
-//! Gemäß SPEC §8.16, §12.3, Anhang F sowie AR-4 und TY-14:
+//! Gemäß SPEC §8.16, §12.3, Anhang F sowie AR-4:
 //! - Unabhängige Neuimplementierung aller Byte-Formate (Anhang F.1 bis F.10).
-//! - Unabhängige Kryptografie-Aufrufe über externe, geprüfte Crates.
+//! - Unabhängige Kryptografie-Aufrufe über externe, geprüfte Crates (`crypto_ref`).
 //! - Null Abhängigkeiten zu Workspace-Crates (kein types, ports, store, engine, erasure).
 //! - Typisierte Messlogik für MK1 (Struktur), MK2 (Rohscan) und MK3 (Schlüsselprobe).
 
+pub mod crypto_ref;
 pub mod error;
+pub mod fixture;
 pub mod format;
 pub mod scanner;

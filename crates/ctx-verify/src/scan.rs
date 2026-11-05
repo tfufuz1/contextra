@@ -83,9 +83,11 @@ fn execute_scan_internal(
     }
 
     let target_bytes = hex::decode(target).map_err(|_| InvalidCode::Mk1StructureResidue)?;
-    if target_bytes.is_empty() {
+    if target_bytes.len() != 16 {
         return Err(InvalidCode::Mk1StructureResidue);
     }
+    let mut target_arr = [0u8; 16];
+    target_arr.copy_from_slice(&target_bytes);
 
     // Positivkontrolle: Falls ein Kontrollmuster vorgegeben ist, MUSS es im Verzeichnis nachweisbar sein.
     // Wenn kein Muster vorgegeben ist, führen wir eine automatische Positivkontrolle auf Datenkonsistenz/Vorhandensein durch (Zero-Trust Z3).
@@ -107,8 +109,8 @@ fn execute_scan_internal(
         }
     }
 
-    // Check directory recursively
-    scan_dir_recursive(data_dir, &target_bytes)
+    // Check directory recursively using structured parsers
+    scan_dir_recursive(data_dir, &target_arr)
 }
 
 fn check_has_files(dir: &Path, has_files: &mut bool) -> Result<(), InvalidCode> {
@@ -171,7 +173,7 @@ fn check_control_needle(dir: &Path, needle: &[u8], found: &mut bool) -> Result<(
     Ok(())
 }
 
-fn scan_dir_recursive(dir: &Path, target_bytes: &[u8]) -> Result<(), InvalidCode> {
+fn scan_dir_recursive(dir: &Path, target_tag: &[u8; 16]) -> Result<(), InvalidCode> {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
         Err(_) => return Err(InvalidCode::IoError),
@@ -184,27 +186,31 @@ fn scan_dir_recursive(dir: &Path, target_bytes: &[u8]) -> Result<(), InvalidCode
         };
         let path = entry.path();
         if path.is_dir() {
-            scan_dir_recursive(&path, target_bytes)?;
+            scan_dir_recursive(&path, target_tag)?;
         } else if path.is_file() {
             let content = match std::fs::read(&path) {
                 Ok(c) => c,
                 Err(_) => return Err(InvalidCode::IoError),
             };
 
-            // Check if file name indicates vault
+            // Check if file name indicates vault shard (<nn>.vlt per SPEC F.3/D-111) or legacy vault.dat
             let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if filename == "vault.dat" {
-                // If vault contains active slot for target, MK3 fails
-                // F.3 slot layout check
-                if contains_active_vault_slot(&content, target_bytes) {
+            let is_vault = filename == "vault.dat"
+                || (filename.ends_with(".vlt")
+                    && filename.len() == 6
+                    && filename[..2].chars().all(|c| c.is_ascii_digit()));
+
+            if is_vault {
+                // MK3: Exact structural verification of vault slots per SPEC F.3 & D-111
+                if parse_vault_has_active_slot(&content, target_tag)? {
                     return Err(InvalidCode::Mk3KeyPresent);
                 }
             }
 
-            // MK1 / MK2 scan: check for target bytes
+            // MK1 & MK2 scan: Check for raw residue of target tag
             if content
-                .windows(target_bytes.len())
-                .any(|w| w == target_bytes)
+                .windows(target_tag.len())
+                .any(|w| w == target_tag.as_slice())
             {
                 return Err(InvalidCode::Mk2RawResidue);
             }
@@ -214,34 +220,53 @@ fn scan_dir_recursive(dir: &Path, target_bytes: &[u8]) -> Result<(), InvalidCode
     Ok(())
 }
 
-fn contains_active_vault_slot(vault_data: &[u8], target_tag: &[u8]) -> bool {
-    if target_tag.len() != 16 {
-        return false;
-    }
-    // F.3: header (128) + metablock (64) = 192, then 80-byte slots
-    // slot: 0: slot_type (1), 1..17: tag (16), 17..49: payload (32), 49: status (1: 0x01 aktiv, 0x02 tombstone)
-    if vault_data.len() < 192 {
-        return false;
+/// Parses vault file according to SPEC F.3 layout and inspects each 64-byte slot.
+fn parse_vault_has_active_slot(
+    vault_data: &[u8],
+    target_tag: &[u8; 16],
+) -> Result<bool, InvalidCode> {
+    const VAULT_HEADER_SIZE: usize = 64;
+    const VAULT_METABLOCK_SIZE: usize = 64;
+    const VAULT_BASE_OFFSET: usize = VAULT_HEADER_SIZE + VAULT_METABLOCK_SIZE;
+    const VAULT_SLOT_SIZE: usize = 64;
+
+    if vault_data.len() < VAULT_BASE_OFFSET {
+        return Ok(false);
     }
 
-    let slots_data = match vault_data.get(192..) {
+    // Inspect slots
+    let slots_data = match vault_data.get(VAULT_BASE_OFFSET..) {
         Some(s) => s,
-        None => return false,
+        None => return Ok(false),
     };
 
-    for chunk in slots_data.chunks_exact(80) {
-        let tag = match chunk.get(1..17) {
+    for chunk in slots_data.chunks_exact(VAULT_SLOT_SIZE) {
+        let slot_type = chunk.first().copied().unwrap_or(0);
+        let status = chunk.get(1).copied().unwrap_or(0);
+        let tag = match chunk.get(8..24) {
             Some(t) => t,
             None => continue,
         };
-        let status = match chunk.get(49) {
-            Some(s) => *s,
-            None => continue,
-        };
-        if tag == target_tag && status == 0x01 {
-            return true;
+
+        // If slot status is active (0x01) and tag matches target_tag, target key is still present (MK3 failure)
+        if status == 0x01 && tag == target_tag.as_slice() {
+            return Ok(true);
+        }
+
+        // If slot status is tombstone (0x02) for target_tag:
+        // In SPEC F.3: Tombstone zeroes all bytes except status (byte 1 = 0x02).
+        // That means slot_type (byte 0) must be 0, gen (2..8) and payload (24..56) are zero.
+        if status == 0x02 && tag == target_tag.as_slice() {
+            if slot_type != 0x00 {
+                return Err(InvalidCode::Mk1StructureResidue);
+            }
+            if let Some(payload) = chunk.get(24..56) {
+                if payload.iter().any(|&b| b != 0) {
+                    return Err(InvalidCode::Mk1StructureResidue);
+                }
+            }
         }
     }
 
-    false
+    Ok(false)
 }

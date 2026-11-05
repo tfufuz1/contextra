@@ -183,7 +183,10 @@ pub trait Vfs: Send + Sync + 'static {
     /// Reads data from byte offset `offset` into `buf` for file at `path`.
     ///
     /// # Fehler
-    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei I/O-Fehlern.
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei I/O-Fehlern oder Leseproblemen.
+    ///
+    /// # Crash
+    /// Reiner positioneller Lesezugriff; modifiziert keine persistenten Dateiinhalte oder Metadaten.
     fn read_at(&self, path: &Path, offset: u64, buf: &mut [u8]) -> Result<usize> {
         let file = self.open(path, &VfsOpenOptions::read_only())?;
         file.read_at(buf, offset).map_err(crate::ContextraError::Io)
@@ -195,6 +198,9 @@ pub trait Vfs: Send + Sync + 'static {
     ///
     /// # Fehler
     /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei Lesefehlern.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff zur Medien- und Cache-Verifikation; keine Modifikation auf dem Speichermedium.
     fn read_verified(
         &self,
         path: &Path,
@@ -249,6 +255,13 @@ pub trait Vfs: Send + Sync + 'static {
     fn remove_file(&self, path: &Path) -> Result<()>;
 
     /// Canonical alias for removing a file (SPEC D-113 / Purge-Primitive).
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
+    /// falls das Entfernen fehlschlägt oder die Datei fehlt.
+    ///
+    /// # Crash
+    /// Entfernt Verzeichniseintrag; Persistenz erfordert `sync_dir` des übergeordneten Verzeichnisses.
     fn unlink(&self, path: &Path) -> Result<()> {
         self.remove_file(path)
     }
@@ -309,6 +322,12 @@ pub trait Vfs: Send + Sync + 'static {
     fn list_dir(&self, path: &Path) -> Result<Vec<String>>;
 
     /// Canonical alias for listing entries in directory `path` (SPEC 3.1).
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei Lesefehlern des Verzeichnisses.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff auf Verzeichniseinträge; keine Seiteneffekte.
     fn list(&self, path: &Path) -> Result<Vec<String>> {
         self.list_dir(path)
     }

@@ -16,6 +16,7 @@ use contextra_lab::format::file_header::{
 use contextra_lab::format::header_ab::HeaderAb;
 use contextra_lab::format::record_envelope::RecordEnvelopeV2;
 use contextra_lab::format::report::{ClassStatus, ErasureReport};
+use contextra_lab::format::scope::{ScopeEntry, ScopeFile};
 use contextra_lab::format::sstable::{SsTableEntry, SsTableFile, SSTABLE_FOOTER_MAGIC};
 use contextra_lab::format::text_segment::{TermEntry, TextSegmentFile};
 use contextra_lab::format::vault::{VaultFile, VaultSlotStatus, VaultSlotType};
@@ -339,4 +340,41 @@ fn t_fmt_1_f10_erasure_report_golden() {
     report
         .verify_signature(canonical_json_without_sig, &pub_bytes)
         .expect("Verify Ed25519");
+}
+
+/// SPEC: T-FMT-1 (F.1 Scope-Datei, kind = 9)
+#[test]
+fn t_fmt_1_f9_scope_file_golden() {
+    let file_key = [0x5cu8; 32];
+    let file_id = [0x33u8; 16];
+    let created_seq = 2024u64;
+
+    let scopes = vec![
+        ScopeEntry {
+            layer_id: [0x01; 16],
+            unit_count: 2,
+            units: vec![101, 102],
+        },
+        ScopeEntry {
+            layer_id: [0x02; 16],
+            unit_count: 1,
+            units: vec![999],
+        },
+    ];
+
+    let bytes = ScopeFile::create_bytes(file_id, created_seq, &scopes, &file_key)
+        .expect("Create Scope File");
+
+    let parsed = ScopeFile::parse(&bytes, &file_key).expect("Parse Scope File");
+    assert_eq!(parsed.header.kind, FileKind::ScopeFile);
+    assert_eq!(parsed.header.file_id, file_id);
+    assert_eq!(parsed.header.created_seq, created_seq);
+    assert_eq!(parsed.scopes.len(), 2);
+    assert_eq!(parsed.scopes[0].unit_count, 2);
+    assert_eq!(parsed.scopes[0].units, vec![101, 102]);
+    assert_eq!(parsed.scopes[1].units, vec![999]);
+
+    // Manipulation am Schlüssel oder Datei führt zu Fehler
+    let wrong_key = [0x00u8; 32];
+    assert!(ScopeFile::parse(&bytes, &wrong_key).is_err());
 }

@@ -123,6 +123,7 @@ mod tests {
 
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_seeded_rng_reproducibility() {
         let rng1 = SeededRng::new(12345);
@@ -133,6 +134,7 @@ mod tests {
         }
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_seeded_rng_different_seeds() {
         let rng1 = SeededRng::new(100);
@@ -143,6 +145,7 @@ mod tests {
         assert_ne!(s1, s2, "Different seeds must produce different sequences");
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_seeded_rng_golden_sequence() {
         let rng = SeededRng::new(42);
@@ -158,6 +161,7 @@ mod tests {
         assert_eq!(rng_reset.next_u64(), second_draw);
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_next_unit_f64_in_bounds() {
         let rng = SeededRng::new(42);
@@ -167,6 +171,7 @@ mod tests {
         }
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_fill_bytes_lengths() {
         let rng = SeededRng::new(999);
@@ -178,6 +183,7 @@ mod tests {
         }
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_arc_dyn_rng() {
         let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(777));

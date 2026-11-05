@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-ROOT]
 //! # Snapshot-Registry (`SnapshotRegistry`) für MVCC-sichere Leseoperationen
 //!
 //! Die `SnapshotRegistry` verwaltet alle aktuell aktiven Lese-Snapshots nach Mandanten (`TenantTag`)
@@ -50,7 +49,6 @@ struct TenantState {
     total_active: usize,
 }
 
-// ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-STRUCT]
 /// Zentrale Registrierung für aktive Lese-Snapshots im System.
 pub struct SnapshotRegistry {
     tenants: Mutex<BTreeMap<TenantTag, TenantState>>,
@@ -79,7 +77,6 @@ impl Default for SnapshotRegistry {
 }
 
 impl SnapshotRegistry {
-    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-NEW]
     /// Erstellt eine neue, leere Snapshot-Registry mit Standard-[`SystemClock`].
     pub fn new() -> Self {
         Self::with_clock(Arc::new(SystemClock::new()))
@@ -449,7 +446,6 @@ impl SnapshotRegistry {
     }
 }
 
-// ANCHOR[contextra-mvcc:SNAPSHOT-HANDLE]
 /// RAII-Handle für einen aktiven Lese-Snapshot eines Mandanten.
 #[derive(Debug)]
 pub struct SnapshotHandle {
@@ -487,7 +483,6 @@ impl Drop for SnapshotHandle {
     }
 }
 
-// ANCHOR[contextra-mvcc:SNAPSHOT-GUARD]
 /// Veralteter RAII-Guard für Abwärtskompatibilität.
 pub struct SnapshotGuard {
     registry: Arc<SnapshotRegistry>,

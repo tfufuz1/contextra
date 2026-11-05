@@ -3,16 +3,17 @@
 //! SPEC §6.4 & §7: Fehlertypen dürfen niemals sensible Parameter (wie Passphrasen,
 //! Master-Keys oder Seed-Bytes) über `Display` oder `Debug` preisgeben.
 
+use contextra::error::{ConfigDetails, ConflictDetails, LimitDetails};
 use contextra::Error;
 
+/// SPEC: T-API-4
+/// SPEC: T-LOG-1
 #[test]
 fn test_errors_do_not_leak_secrets() {
     let test_secret = "super_secret_plant_passphrase_xyz123";
 
     let errors = vec![
-        Error::Config {
-            message: "Ungültige Konfiguration".to_string(),
-        },
+        Error::Config(ConfigDetails::Other("Ungültige Konfiguration".to_string())),
         Error::MissingParameter {
             parameter: "passphrase",
         },
@@ -22,10 +23,13 @@ fn test_errors_do_not_leak_secrets() {
         Error::Erased,
         Error::Restricted,
         Error::NotFound,
+        Error::Conflict(ConflictDetails::IdCollision),
+        Error::Limit(LimitDetails::Capacity),
         Error::SnapshotRevoked,
         Error::Cancelled,
         Error::Refused,
         Error::Internal,
+        Error::NotImplemented("test_feature"),
     ];
 
     for err in errors {

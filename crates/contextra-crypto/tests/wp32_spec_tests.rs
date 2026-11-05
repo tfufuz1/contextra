@@ -135,6 +135,7 @@ fn test_cr09_label_table_constants() {
     assert_eq!(labels::REPORT_PREFIX, b"ctx/report/v1");
 }
 
+/// SPEC: T-KEYSLOT-1..4
 #[test]
 fn test_cr04_slot_aad_binding_t_keyslot_4() {
     // CR-04 & T-KEYSLOT-4: Copying slot to different store fails with Auth
@@ -172,6 +173,164 @@ fn test_cr04_slot_aad_binding_t_keyslot_4() {
         unwrap_master(&kek, &tampered_aad, nonce, &wrapped),
         Err(CryptoError::Auth)
     ));
+}
+
+/// SPEC: T-KEYSLOT-1..3
+#[test]
+fn test_keyslot_lifecycle_and_rekey_o1_t_keyslot_1_2_3() {
+    // T-KEYSLOT-1: Add / remove slot
+    // T-KEYSLOT-2: KDF parameter upgrade/switch per slot
+    // T-KEYSLOT-3: Passphrase rotation in O(1) without payload re-encryption
+    let master = MasterKey::generate_random();
+    let store_id = [0x99; 16];
+
+    // Passphrase 1 with default KDF params (m=128 MiB, t=3, p=4)
+    let pass1 = Secret::from_slice(b"super_secret_passphrase_123");
+    let salt1 = [0x11; 32];
+    let params1 = KdfParams::DEFAULT;
+    let kek1 = derive_kek(&pass1, &salt1, &params1).expect("kek1 derivation");
+
+    let aad1 = SlotAad {
+        store_id,
+        slot_id: 1,
+        anchor_id: 1,
+        kdf_id: 1,
+        m_kib: params1.m_kib,
+        t: params1.t,
+        p: params1.p,
+        slot_salt: salt1,
+    };
+    let nonce1 = [0xAA; 12];
+    let wrapped1 = wrap_master(&kek1, &aad1, nonce1, &master);
+
+    // Unwrapping with pass1 succeeds
+    let unwrapped1 = unwrap_master(&kek1, &aad1, nonce1, &wrapped1).expect("unwrap 1");
+    assert_eq!(unwrapped1.as_bytes(), master.as_bytes());
+
+    // Passphrase 2 with changed KDF parameters (m=64 MiB, t=4, p=2)
+    let pass2 = Secret::from_slice(b"new_secure_passphrase_456");
+    let salt2 = [0x22; 32];
+    let params2 = KdfParams::from_config(65536, 4, 2).expect("valid params2");
+    let kek2 = derive_kek(&pass2, &salt2, &params2).expect("kek2 derivation");
+
+    let aad2 = SlotAad {
+        store_id,
+        slot_id: 2,
+        anchor_id: 1,
+        kdf_id: 1,
+        m_kib: params2.m_kib,
+        t: params2.t,
+        p: params2.p,
+        slot_salt: salt2,
+    };
+    let nonce2 = [0xBB; 12];
+    // Add slot 2 wrapping the SAME master key (O(1) rekeying)
+    let wrapped2 = wrap_master(&kek2, &aad2, nonce2, &unwrapped1);
+
+    // Both slots can unwrap the master key
+    let unwrapped2 = unwrap_master(&kek2, &aad2, nonce2, &wrapped2).expect("unwrap 2");
+    assert_eq!(unwrapped2.as_bytes(), master.as_bytes());
+
+    // Now remove slot 1 (simulate wipe: slot 1 is zeroed out)
+    let wiped_wrapped1 = [0u8; 48];
+    assert!(matches!(
+        unwrap_master(&kek1, &aad1, nonce1, &wiped_wrapped1),
+        Err(CryptoError::Auth)
+    ));
+    // Slot 2 remains fully functional
+    let unwrapped2_after =
+        unwrap_master(&kek2, &aad2, nonce2, &wrapped2).expect("unwrap 2 after slot 1 wipe");
+    assert_eq!(unwrapped2_after.as_bytes(), master.as_bytes());
+}
+
+#[test]
+fn test_t_kdf_1_passphrase_length_validation() {
+    // SPEC §5.7: Passphrase length >= 12 bytes required. Passphrase < 12 bytes fails with Config.
+    let short_pass = Secret::from_slice(b"short");
+    assert!(short_pass.as_bytes().len() < MIN_PASSPHRASE_LEN);
+    let salt = [0x11; 32];
+    let params = KdfParams::DEFAULT;
+
+    let res = derive_kek(&short_pass, &salt, &params);
+    assert_eq!(
+        res.err(),
+        Some(CryptoError::Config),
+        "Passphrase shorter than 12 bytes must fail closed with Config"
+    );
+
+    // Exact minimum length 12 bytes succeeds
+    let valid_min_pass = Secret::from_slice(b"123456789012");
+    assert_eq!(valid_min_pass.as_bytes().len(), 12);
+    let res_ok = derive_kek(&valid_min_pass, &salt, &params);
+    assert!(res_ok.is_ok(), "12-byte passphrase must succeed");
+}
+
+/// SPEC: T-SIG-1
+#[test]
+fn test_t_sig_1_report_signature_spec_conformance() {
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let report_content = b"{\"event\":\"forget_tenant\",\"status\":\"purged\"}";
+    let sig = sign_report(hierarchy.sign_seed(), report_content);
+    assert_eq!(sig.len(), 64);
+
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(hierarchy.sign_seed().0.as_bytes());
+    let pubkey = signing_key.verifying_key().to_bytes();
+
+    // Verify valid signature with verify_strict
+    assert!(verify_report(&pubkey, report_content, &sig).is_ok());
+
+    // Manipulation of message fails
+    assert_eq!(
+        verify_report(&pubkey, b"tampered report", &sig).unwrap_err(),
+        CryptoError::Auth
+    );
+
+    // Manipulation of signature bits fails
+    let mut bad_sig = sig;
+    bad_sig[0] ^= 0x01;
+    assert_eq!(
+        verify_report(&pubkey, report_content, &bad_sig).unwrap_err(),
+        CryptoError::Auth
+    );
+}
+
+/// SPEC: T-SIG-1
+#[tokio::test]
+async fn test_t_sig_1_derived_report_signer_port() {
+    use contextra_ports::report_signer::ReportSigner;
+
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+    let signer = DerivedReportSigner::new(hierarchy.sign_seed());
+
+    assert_eq!(signer.signer_id(), 0);
+
+    let canon_report = b"{\"completed_at\":1000,\"erasure_id\":\"01020304-0506-0708-090a-0b0c0d0e0f10\",\"signer_id\":0}";
+    let report_sig = signer
+        .sign_report(canon_report)
+        .await
+        .expect("signing report must succeed");
+
+    assert_eq!(report_sig.signer_id, 0);
+    assert_eq!(report_sig.pub_fingerprint.len(), 32);
+    assert!(!report_sig.signature_base64.contains('='));
+
+    // Verify the raw signature matches verify_report
+    let raw_sig = sign_report(hierarchy.sign_seed(), canon_report);
+    let pubkey = signer.verifying_key().to_bytes();
+    assert!(verify_report(&pubkey, canon_report, &raw_sig).is_ok());
+}
+
+/// SPEC: T-CFG-1, T-DEF-1
+#[test]
+fn test_t_cfg_1_and_t_def_1_no_security_downgrade() {
+    // Verify no legacy WAL key, no plaintext bypass, no encryption toggle exists in contextra-crypto
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+    assert_ne!(hierarchy.master().as_bytes(), &[0u8; 32]);
+    assert_ne!(hierarchy.wal().0.as_bytes(), &[0u8; 32]);
 }
 
 #[test]

@@ -66,6 +66,7 @@ fn run_static_dispatch<P: StaticHotPort>(port: &P, key: &[u8], iters: usize) -> 
     sum
 }
 
+/// SPEC: BM-GET
 #[test]
 fn bm_dispatch_overhead_measurement() {
     let store = FastStore { val: 42 };

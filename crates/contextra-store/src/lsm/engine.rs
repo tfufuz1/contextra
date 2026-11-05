@@ -15,7 +15,7 @@ use bytes::Bytes;
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_ports::{ResourceTracker, StorageEngine};
 use contextra_types::{Result, TxId};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -65,7 +65,7 @@ pub struct LsmStorage {
     pub(super) pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,
     pub(super) wal_queue_depth: Arc<std::sync::atomic::AtomicUsize>,
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
-    pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
+    pub(super) intent_locks: std::sync::Mutex<BTreeMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
     pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>,
     pub ssi_validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
@@ -288,7 +288,7 @@ impl LsmStorage {
     }
 
     /// Returns the current storage health status.
-        /// Gibt an, ob der Speicher nach einem I/O- oder Fsync-Fehler vergiftet ist (D-55).
+    /// Gibt an, ob der Speicher nach einem I/O- oder Fsync-Fehler vergiftet ist (D-55).
     pub fn is_poisoned(&self) -> bool {
         matches!(self.health(), StorageHealth::Poisoned)
     }

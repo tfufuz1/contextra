@@ -4,13 +4,17 @@
 
 use contextra::{Contextra, Secret};
 use criterion::{criterion_group, criterion_main, Criterion};
+use std::time::Duration;
 use tempfile::TempDir;
 
 fn bm_facade_open(c: &mut Criterion) {
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let rt = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .expect("tokio rt");
+    {
+        Ok(r) => r,
+        Err(_) => return,
+    };
 
     c.bench_function("BM-KDF-passphrase-derivation", |b| {
         b.iter(|| {
@@ -21,14 +25,19 @@ fn bm_facade_open(c: &mut Criterion) {
 
     c.bench_function("BM-OPEN-facade-overhead", |b| {
         b.to_async(&rt).iter(|| async {
-            let tmp = TempDir::new().expect("tempdir");
+            let tmp = match TempDir::new() {
+                Ok(t) => t,
+                Err(_) => return,
+            };
             let secret = Secret::new(b"sehr-sichere-passphrase-12345".to_vec());
             let handle = tokio::runtime::Handle::current();
 
             let builder = Contextra::builder()
                 .data_dir(tmp.path())
                 .passphrase(secret)
-                .runtime(handle);
+                .runtime(handle)
+                .backup_retention(Duration::from_secs(86400))
+                .dimension(768);
 
             std::hint::black_box(builder);
         });

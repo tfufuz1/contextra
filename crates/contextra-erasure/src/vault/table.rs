@@ -58,7 +58,7 @@ pub struct VaultTable {
     vault_id: [u8; 16],
     /// MAC-Schlüssel (32 Bytes).
     mac_key: [u8; 32],
-    /// Poison-Status (D-55, I-10): Bei I/O- oder fsync-Fehlern unwiederbringlich vergiftet.
+    /// Poison-Status (D-55, I-10): Bei I/O- oder fsync-Fehlern irreversibel vergiftet.
     poisoned: bool,
 }
 
@@ -90,7 +90,7 @@ impl VaultTable {
         self.poisoned
     }
 
-    /// Vergiftet den Shard unwiederbringlich (D-55, I-10).
+    /// Vergiftet den Shard irreversibel (D-55, I-10).
     pub fn poison(&mut self) {
         self.poisoned = true;
     }
@@ -98,8 +98,7 @@ impl VaultTable {
     /// Prüft, ob ein Poison-Zustand vorliegt.
     fn check_poison(&self) -> Result<(), ErasureError> {
         if self.poisoned {
-            Err(ErasureError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            Err(ErasureError::Io(std::io::Error::other(
                 "vault shard is poisoned due to previous sync or I/O failure (D-55)",
             )))
         } else {
@@ -270,7 +269,7 @@ impl VaultTable {
             .ok_or(ErasureError::Corrupt)?;
 
         // Byte 0 muss 0 sein
-        if verified_slice.get(0).copied() != Some(0) {
+        if verified_slice.first().copied() != Some(0) {
             return Err(ErasureError::Corrupt);
         }
         // Byte 1 muss STATUS_TOMBSTONE sein
@@ -360,5 +359,17 @@ impl VaultTable {
     /// Vault-ID.
     pub fn vault_id(&self) -> &[u8; 16] {
         &self.vault_id
+    }
+}
+
+impl VaultTable {
+    /// Öffentlicher Zugriff auf rohe Slot-Bytes für Scrubbing.
+    pub fn slot_bytes_pub(&self, idx: usize) -> Option<&[u8; VAULT_SLOT_SIZE]> {
+        self.slot_bytes(idx)
+    }
+
+    /// Referenz auf MAC-Schlüssel.
+    pub fn mac_key_ref(&self) -> &[u8; 32] {
+        &self.mac_key
     }
 }

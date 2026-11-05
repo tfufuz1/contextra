@@ -10,11 +10,9 @@
 
 use core::fmt;
 
-// ANCHOR[contextra-types:RETRIEVAL-001]
 /// Semantische Retrieval-Strategie für Signal-Fusion (§8/§9).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-types:RET-001]
 /// Semantische Retrieval-Strategie für Signal-Fusion (§8/§9).
 pub enum RetrievalStrategy {
     /// Vektorbasiertes semantisches Signal.
@@ -36,7 +34,6 @@ pub enum RetrievalStrategy {
 }
 
 impl fmt::Display for RetrievalStrategy {
-    // ANCHOR[contextra-types:RETRIEVAL-002]
     /// Formatiert die Retrieval-Strategie für Logging und Diagnosen.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

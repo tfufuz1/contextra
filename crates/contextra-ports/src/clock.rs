@@ -86,6 +86,7 @@ mod tests {
 
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_system_clock_monotonic_non_decreasing() {
         let clock = SystemClock::new();
@@ -95,6 +96,7 @@ mod tests {
         assert!(t2 >= t1);
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_system_clock_now_unix_nanos() {
         let clock = SystemClock::default();
@@ -102,6 +104,7 @@ mod tests {
         assert!(nanos > 0);
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_arc_dyn_clock() {
         let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());

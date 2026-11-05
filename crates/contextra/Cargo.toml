@@ -15,7 +15,6 @@ contextra-durable-fs = { workspace = true }
 contextra-engine = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
-bincode = { workspace = true }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 
 [dev-dependencies]

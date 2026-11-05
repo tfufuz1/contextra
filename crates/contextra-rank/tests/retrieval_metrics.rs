@@ -1,6 +1,6 @@
 //! Retrieval-Metriken (nDCG@k, Recall@k, MRR) als Prüfwerkzeug für Such- und RRF-Rankings.
 //!
-//! SPEC: AGENTS.md (Fachprofil: Metriken nDCG, Recall@k, MRR als Prüfwerkzeug, T-EVAL-1).
+//! SPEC: AGENTS.md (Fachprofil: Metriken nDCG, Recall@k, MRR als Prüfwerkzeug, T-RANK-1).
 //! Alle Metriken arbeiten rein auf Rängen ohne Score-Skalenannahmen zwischen BM25 und Vektor.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
@@ -106,12 +106,14 @@ fn make_doc(id: u8) -> DocHandle {
 fn make_fused(id: u8) -> Fused {
     Fused {
         handle: make_doc(id),
+        chunk: 0,
         score: contextra_rank::RrfScore(0),
     }
 }
 
-/// SPEC: T-EVAL-1
+/// SPEC: T-RANK-1
 /// Prüft Recall@k gegen exakte mathematische Referenzwerte.
+/// SPEC: T-RANK-1
 #[test]
 fn t_eval_1_recall_at_k_reference_values() {
     let _d1 = make_doc(1);
@@ -148,8 +150,9 @@ fn t_eval_1_recall_at_k_reference_values() {
     assert_eq!(recall_at_k(&[], &relevant, 4), 0.0);
 }
 
-/// SPEC: T-EVAL-1
+/// SPEC: T-RANK-1
 /// Prüft MRR gegen exakte mathematische Referenzwerte.
+/// SPEC: T-RANK-1
 #[test]
 fn t_eval_1_mrr_reference_values() {
     let d1 = make_doc(1);
@@ -185,8 +188,9 @@ fn t_eval_1_mrr_reference_values() {
     assert_eq!(mrr_at_k(&ranked, &rel_r1, 0), 0.0);
 }
 
-/// SPEC: T-EVAL-1
+/// SPEC: T-RANK-1
 /// Prüft nDCG@k gegen deterministische Referenzwerte (perfektes vs. invertiertes Ranking).
+/// SPEC: T-RANK-1
 #[test]
 fn t_eval_1_ndcg_reference_values() {
     let d1 = make_doc(1);

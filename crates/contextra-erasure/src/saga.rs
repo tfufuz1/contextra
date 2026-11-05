@@ -2,15 +2,21 @@
 //!
 //! Definiert die Zustandsmaschine des Löschablaufs und deren Koordination.
 
+pub mod core;
 pub mod driver;
 pub mod idempotency;
 pub mod machine;
 pub mod retention;
+pub mod seams;
 
-pub use driver::{SagaDriver, StepOutcome};
-pub use idempotency::is_same_request;
+pub use core::{EraseExecutionRequest, ErasureConfig, ErasureCore, ErasureCoreStatus, ErasureDeps};
+pub use driver::{SagaDriver, SagaEvent, StepOutcome};
+pub use idempotency::{derive_open_key, is_same_request};
 pub use machine::{EraseRequest, EraseSaga, SagaState};
 pub use retention::{is_restrict_allowed, is_retention_active};
+pub use seams::{
+    SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
+};
 
 pub use contextra_types::erasure::{
     EraseMode, EraseTarget, PendingReason, RetentionAttestation, RetentionCode, Timing,

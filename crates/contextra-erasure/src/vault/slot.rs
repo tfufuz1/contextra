@@ -1,4 +1,15 @@
-//! Tresor-Slot-Layout, Validierung und Slot-Nullung (SPEC §11.5, Anhang F.3, D-111, D-125, I-23).
+//! Tresor-Slot-Layout, Validierung und Slot-Nullung (SPEC §11.5, Anhang F.1, F.3, D-111, D-125, I-23).
+//!
+//! F.1 Dateikopf für Tresor-Shards (64 Bytes):
+//!   0..8   magic ("CTXFILE\0")
+//!   8..10  format_version (u16 = 1)
+//!   10     kind (u8 = 10, Tresor)
+//!   11..15 alg_ids ([1, 0, 1, 1])
+//!   15..31 file_id (16 B, zufällig)
+//!   31..39 created_seq (u64 be)
+//!   39     key_mode (u8 = 1, abgeleitet)
+//!   40..48 reserved (8 B = 0)
+//!   48..64 header_tag (16 B: HMAC-SHA256(K_vm, Bytes[0..48))[0..16], Ausnahme nach F.3)
 //!
 //! Slot-Layout (64 Bytes, big-endian):
 //!   Byte  0      – slot_type (1 B): 0x01 T, 0x02 C, 0x03 S, 0x04 D, 0x05 F, 0x06 E; 0x00 leer
@@ -11,6 +22,21 @@
 use crate::error::ErasureError;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+
+/// Größe des F.1-Dateikopfs in Bytes.
+pub const VAULT_HEADER_SIZE: usize = 64;
+
+/// F.1 Magic-Bytes für Contextra-Dateien.
+pub const CTX_FILE_MAGIC: &[u8; 8] = b"CTXFILE\0";
+
+/// F.1 Format-Version (v1 = 1).
+pub const CTX_FORMAT_VERSION: u16 = 1;
+
+/// Dateityp (kind) für Tresor nach SPEC F.1: 10.
+pub const VAULT_FILE_KIND: u8 = 10;
+
+/// Standard-Algorithmen-Satz v1: [aead=1, kdf=0, mac=1, hash=1].
+pub const VAULT_ALG_IDS: [u8; 4] = [1, 0, 1, 1];
 
 /// Größe eines Tresor-Slots in Bytes (F.3, D-111, I-23).
 pub const VAULT_SLOT_SIZE: usize = 64;
@@ -84,7 +110,154 @@ pub struct SlotData {
     pub gen: u64,
 }
 
-/// Serialisiert einen aktiven Slot in 64 Bytes (ohne MAC-Feld).
+/// Berechnet den 16-Byte Header-Tag für einen Tresor-Shard-Kopf nach SPEC F.1 / F.3:
+/// `HMAC-SHA256(K_vm, Bytes[0..48))[0..16]`.
+pub fn compute_header_tag(mac_key: &[u8; 32], header_pre_tag: &[u8]) -> [u8; 16] {
+    let mut out = [0u8; 16];
+    if let Ok(mut hmac) = <Hmac<Sha256> as Mac>::new_from_slice(mac_key) {
+        <Hmac<Sha256> as Mac>::update(&mut hmac, header_pre_tag);
+        let full = <Hmac<Sha256> as Mac>::finalize(hmac).into_bytes();
+        if let (Some(src), Some(dest)) = (full.get(..16), out.get_mut(..16)) {
+            dest.copy_from_slice(src);
+        }
+    }
+    out
+}
+
+/// Encodiert einen F.1-Dateikopf (64 Bytes) für einen Tresor-Shard (kind = 10, key_mode = 1) nach SPEC F.1 / F.3.
+pub fn encode_vault_header(
+    file_id: &[u8; 16],
+    created_seq: u64,
+    mac_key: &[u8; 32],
+) -> [u8; VAULT_HEADER_SIZE] {
+    let mut buf = [0u8; VAULT_HEADER_SIZE];
+    if let Some(dest) = buf.get_mut(0..8) {
+        dest.copy_from_slice(CTX_FILE_MAGIC);
+    }
+    if let Some(dest) = buf.get_mut(8..10) {
+        dest.copy_from_slice(&CTX_FORMAT_VERSION.to_be_bytes());
+    }
+    buf[10] = VAULT_FILE_KIND;
+    if let Some(dest) = buf.get_mut(11..15) {
+        dest.copy_from_slice(&VAULT_ALG_IDS);
+    }
+    if let Some(dest) = buf.get_mut(15..31) {
+        dest.copy_from_slice(file_id);
+    }
+    if let Some(dest) = buf.get_mut(31..39) {
+        dest.copy_from_slice(&created_seq.to_be_bytes());
+    }
+    buf[39] = 1; // key_mode = 1 (abgeleitet)
+                 // 40..48 reserved (bereits 0)
+    let pre = &buf[0..48];
+    let tag = compute_header_tag(mac_key, pre);
+    if let Some(dest) = buf.get_mut(48..64) {
+        dest.copy_from_slice(&tag);
+    }
+    buf
+}
+
+/// Prüft einen F.1-Dateikopf (64 Bytes) für einen Tresor-Shard.
+pub fn verify_vault_header(
+    header_bytes: &[u8],
+    mac_key: &[u8; 32],
+) -> Result<([u8; 16], u64), ErasureError> {
+    if header_bytes.len() < VAULT_HEADER_SIZE {
+        return Err(ErasureError::Corrupt);
+    }
+    if header_bytes.get(0..8) != Some(CTX_FILE_MAGIC) {
+        return Err(ErasureError::Corrupt);
+    }
+    let ver_bytes = header_bytes.get(8..10).ok_or(ErasureError::Corrupt)?;
+    let ver = u16::from_be_bytes(ver_bytes.try_into().map_err(|_| ErasureError::Corrupt)?);
+    if ver != CTX_FORMAT_VERSION {
+        return Err(ErasureError::Corrupt);
+    }
+    if header_bytes.get(10).copied() != Some(VAULT_FILE_KIND) {
+        return Err(ErasureError::Corrupt);
+    }
+    if header_bytes.get(11..15) != Some(&VAULT_ALG_IDS) {
+        return Err(ErasureError::Corrupt);
+    }
+    let mut file_id = [0u8; 16];
+    if let (Some(dest), Some(src)) = (file_id.get_mut(..), header_bytes.get(15..31)) {
+        dest.copy_from_slice(src);
+    }
+    let seq_bytes = header_bytes.get(31..39).ok_or(ErasureError::Corrupt)?;
+    let created_seq = u64::from_be_bytes(seq_bytes.try_into().map_err(|_| ErasureError::Corrupt)?);
+    if header_bytes.get(39).copied() != Some(1) {
+        return Err(ErasureError::Corrupt);
+    }
+    let res = header_bytes.get(40..48).ok_or(ErasureError::Corrupt)?;
+    if res.iter().any(|&b| b != 0) {
+        return Err(ErasureError::Corrupt);
+    }
+
+    let pre = header_bytes.get(0..48).ok_or(ErasureError::Corrupt)?;
+    let expected_tag = compute_header_tag(mac_key, pre);
+    let actual_tag = header_bytes.get(48..64).ok_or(ErasureError::Corrupt)?;
+    if actual_tag != expected_tag {
+        return Err(ErasureError::Corrupt);
+    }
+
+    Ok((file_id, created_seq))
+}
+
+/// Maskiert oder demaskiert einen Epochenschlüssel (Slot-Typ E) nach SPEC D-125 / F.3:
+/// `payload = K_epoch ⊕ HKDF-Expand(K_enc, "ctx/emask/v1" ‖ epoch_id, 32)`
+pub fn mask_epoch_key(raw_key: &[u8; 32], epoch_id: &[u8; 16], k_enc: &[u8; 32]) -> [u8; 32] {
+    let mut info = Vec::with_capacity(29);
+    info.extend_from_slice(b"ctx/emask/v1");
+    info.extend_from_slice(epoch_id);
+
+    let mut okm = [0u8; 32];
+    if contextra_crypto::hkdf_expand(k_enc, &info, &mut okm).is_err() {
+        let hash = blake3::keyed_hash(k_enc, &info);
+        if let (Some(dest), Some(src)) = (okm.get_mut(..), hash.as_bytes().get(..)) {
+            dest.copy_from_slice(src);
+        }
+    }
+
+    let mut masked = [0u8; 32];
+    for (i, (&k, &m)) in raw_key.iter().zip(okm.iter()).enumerate() {
+        if let Some(dest) = masked.get_mut(i) {
+            *dest = k ^ m;
+        }
+    }
+    masked
+}
+
+/// Serialisiert einen aktiven Slot in 64 Bytes inkl. MAC (F.3, D-111).
+pub fn encode_slot(
+    vault_id: &[u8; 16],
+    slot_type: SlotType,
+    status: u8,
+    gen: u64,
+    tag: &[u8; 16],
+    payload: &[u8; 32],
+    mac_key: &[u8; 32],
+) -> [u8; VAULT_SLOT_SIZE] {
+    let mut buf = [0u8; VAULT_SLOT_SIZE];
+    buf[off::SLOT_TYPE] = slot_type as u8;
+    buf[off::STATUS] = status;
+    let gen_bytes = gen.to_be_bytes();
+    if let (Some(dest), Some(src)) = (buf.get_mut(off::GEN..off::GEN + 6), gen_bytes.get(2..8)) {
+        dest.copy_from_slice(src);
+    }
+    if let Some(dest) = buf.get_mut(off::TAG..off::TAG + 16) {
+        dest.copy_from_slice(tag);
+    }
+    if let Some(dest) = buf.get_mut(off::PAYLOAD..off::PAYLOAD + 32) {
+        dest.copy_from_slice(payload);
+    }
+    let mac = compute_slot_mac(mac_key, vault_id, &buf[0..56]);
+    if let Some(dest) = buf.get_mut(off::MAC..off::MAC + 8) {
+        dest.copy_from_slice(&mac);
+    }
+    buf
+}
+
+/// Serialisiert die Nutzlast eines aktiven Slots (ohne MAC).
 pub fn encode_slot_body(sd: &SlotData) -> [u8; VAULT_SLOT_SIZE] {
     let mut buf = [0u8; VAULT_SLOT_SIZE];
     buf[off::SLOT_TYPE] = sd.slot_type as u8;

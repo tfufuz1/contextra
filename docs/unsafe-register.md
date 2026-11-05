@@ -28,3 +28,36 @@ Gesamtanzahl `unsafe`-Blöcke: **19** (Basislimit: <= 57).
 | `crates/contextra-sys/src/hardening.rs:228` | `ensure_fd_limit` | `rlim` Stack-Speicher | `getrlimit`/`setrlimit` für `RLIMIT_NOFILE`; `assume_init()` nach Return 0. |
 | `crates/contextra-sys/src/hardening.rs:263` | `set_fd_limit` | `rlim` Stack-Speicher | `libc::setrlimit(RLIMIT_NOFILE, &rlim)` setzt Limit. |
 | `crates/contextra-sys/src/perm.rs:55` | `verify_owner_only` | Keine Parameter | `libc::geteuid()` ist seiteneffektfreier POSIX-Syscall. |
+
+# Unsafe-Register: contextra-simd
+
+Das Unsafe-Register erfasst alle `unsafe`-Blöcke in `crates/contextra-simd/src` (SIMD-Hardware-Instruktionen).
+Jede Stelle ist durch Laufzeit-Feature-Erkennung in `dispatch.rs` gekapselt und gegen die Skalar-Referenz geprüft.
+
+Gesamtanzahl `unsafe`-Blöcke: **28**
+
+## Tabelle der Unsafe-Blöcke (contextra-simd)
+
+| Datei:Zeile | Funktion / Kontext | Vorbedingung | Begründung / Sicherheit |
+|---|---|---|---|
+| `crates/contextra-simd/src/dispatch.rs` | `cosine_distance` (avx512/avx2/neon) | `a.len() == b.len()`, CPU-Feature aktiv | Längen sind geprüft, CPU-Feature durch `is_x86_feature_detected!` verifiziert. |
+| `crates/contextra-simd/src/dispatch.rs` | `euclidean_distance` (avx512/avx2/neon) | `a.len() == b.len()`, CPU-Feature aktiv | Längen sind geprüft, CPU-Feature durch `is_x86_feature_detected!` verifiziert. |
+| `crates/contextra-simd/src/dispatch.rs` | `dot_product_distance` (avx512/avx2/neon) | `a.len() == b.len()`, CPU-Feature aktiv | Längen sind geprüft, CPU-Feature durch `is_x86_feature_detected!` verifiziert. |
+| `crates/contextra-simd/src/dispatch.rs` | `cosine_distance_f32_bytes` (avx512/avx2) | `b_bytes.len() >= a.len() * 4`, CPU-Feature aktiv | Byte-Puffergröße geprüft, CPU-Feature verifiziert. |
+| `crates/contextra-simd/src/dispatch.rs` | `euclidean_distance_f32_bytes` (avx512/avx2) | `b_bytes.len() >= a.len() * 4`, CPU-Feature aktiv | Byte-Puffergröße geprüft, CPU-Feature verifiziert. |
+| `crates/contextra-simd/src/dispatch.rs` | `dot_product_distance_f32_bytes` (avx512/avx2) | `b_bytes.len() >= a.len() * 4`, CPU-Feature aktiv | Byte-Puffergröße geprüft, CPU-Feature verifiziert. |
+| `crates/contextra-simd/src/kernels/avx2.rs` | `cosine_distance_avx2` | `a.len() == b.len()`, `avx2` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/avx2.rs` | `euclidean_distance_avx2` | `a.len() == b.len()`, `avx2` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/avx2.rs` | `dot_product_avx2` | `a.len() == b.len()`, `avx2` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/avx2.rs` | `cosine_distance_f32_bytes_avx2` | `b_bytes.len() >= a.len() * 4`, `avx2` aktiv | Pointer-Offsets liegen in den validierten Puffergrenzen. |
+| `crates/contextra-simd/src/kernels/avx2.rs` | `euclidean_distance_f32_bytes_avx2` | `b_bytes.len() >= a.len() * 4`, `avx2` aktiv | Pointer-Offsets liegen in den validierten Puffergrenzen. |
+| `crates/contextra-simd/src/kernels/avx2.rs` | `dot_product_f32_bytes_avx2` | `b_bytes.len() >= a.len() * 4`, `avx2` aktiv | Pointer-Offsets liegen in den validierten Puffergrenzen. |
+| `crates/contextra-simd/src/kernels/avx512.rs` | `cosine_distance_avx512` | `a.len() == b.len()`, `avx512f` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/avx512.rs` | `euclidean_distance_avx512` | `a.len() == b.len()`, `avx512f` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/avx512.rs` | `dot_product_avx512` | `a.len() == b.len()`, `avx512f` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/avx512.rs` | `cosine_distance_f32_bytes_avx512` | `b_bytes.len() >= a.len() * 4`, `avx512f` aktiv | Pointer-Offsets liegen in den validierten Puffergrenzen. |
+| `crates/contextra-simd/src/kernels/avx512.rs` | `euclidean_distance_f32_bytes_avx512` | `b_bytes.len() >= a.len() * 4`, `avx512f` aktiv | Pointer-Offsets liegen in den validierten Puffergrenzen. |
+| `crates/contextra-simd/src/kernels/avx512.rs` | `dot_product_f32_bytes_avx512` | `b_bytes.len() >= a.len() * 4`, `avx512f` aktiv | Pointer-Offsets liegen in den validierten Puffergrenzen. |
+| `crates/contextra-simd/src/kernels/neon.rs` | `cosine_distance_neon` | `a.len() == b.len()`, `neon` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/neon.rs` | `euclidean_distance_neon` | `a.len() == b.len()`, `neon` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |
+| `crates/contextra-simd/src/kernels/neon.rs` | `dot_product_neon` | `a.len() == b.len()`, `neon` aktiv | Pointer-Offsets [i, i+16) liegen in den validierten Slice-Grenzen. |

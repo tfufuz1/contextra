@@ -41,7 +41,7 @@ pub struct HeaderSlot {
     pub slot_id: u8,
     /// Anker-ID.
     pub anchor_id: u8,
-    /// KDF-ID.
+    /// KDF-Algorithmus-ID (SPEC D-42, F.2).
     pub kdf_id: u8,
     /// Status: 0 leer, 1 aktiv, 2 entfernt.
     pub status: u8,

@@ -9,10 +9,11 @@
 
 use contextra_mvcc::seq_log::SequenceLog;
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer};
+use contextra_testmacros::ctx_test;
 use contextra_types::{DocId, TxId};
 use std::time::Duration;
 
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn mv_07_duration_saturation_no_sentinel() {
     let mut log = SequenceLog::new().with_max_pin_duration(Duration::MAX);
     let now_nanos = 1_000_000_000u64;
@@ -32,7 +33,7 @@ fn mv_07_duration_saturation_no_sentinel() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn mv_09_tombstone_zero_vlen_not_bit() {
     let op_insert = IndexOp::Insert {
         doc_id: DocId::new(1),
@@ -56,7 +57,7 @@ fn mv_09_tombstone_zero_vlen_not_bit() {
     }
 }
 
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn mv_08_lock_order_documentation_and_contract() {
     let buffer = TxBuffer::<Vec<u8>>::new();
     let tx = TxId::new(42);

@@ -36,3 +36,10 @@ tempfile = { workspace = true }
 proptest = "1.4"
 loom = "0.7"
 tokio = { workspace = true, features = ["test-util"] }
+
+[[test]]
+name = "t_observer"
+
+[[bench]]
+name = "bm_erase"
+harness = false

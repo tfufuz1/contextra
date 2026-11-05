@@ -12,14 +12,6 @@ description = "LSM-Speicher: WAL, Memtable, SSTables, Manifest, Kompaktion, Purg
 [package.metadata.contextra]
 ring = "2"
 
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_Security_Authorization",
-    "Win32_System_Threading",
-] }
-
 [features]
 default = []
 test-hooks = []
@@ -27,7 +19,6 @@ test-utils = ["test-hooks"]
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
-sieve-cache = []
 docid-128 = ["contextra-types/docid-128"]
 
 [dependencies]
@@ -61,8 +52,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
-contextra-testmacros = { workspace = true }
-contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }

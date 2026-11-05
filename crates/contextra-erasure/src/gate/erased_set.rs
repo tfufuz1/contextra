@@ -57,7 +57,7 @@ struct PrefixSeqEntry {
 
 impl PrefixSeqEntry {
     fn matches_78(&self, raw: &[u8; 78]) -> bool {
-        if &raw[0..65] != &self.prefix {
+        if raw[0..65] != self.prefix {
             return false;
         }
         // commit_seq aus Bytes 70..78 extrahieren (!commit_seq komplementiert im Suffix, D-74, D-123)
@@ -279,9 +279,10 @@ impl ErasedSet {
 
     /// Bereichsrichtlinie für Kompaktion (I-18): Restricted > Erased > Open.
     pub fn variant_for_range(&self, r: &KeyRange) -> RangeGate {
-        let has_restricted = self.restricted.iter().any(|e| {
-            e.lo < r.end && r.start < e.hi
-        });
+        let has_restricted = self
+            .restricted
+            .iter()
+            .any(|e| e.lo < r.end && r.start < e.hi);
         if has_restricted {
             return RangeGate::RestrictedNeverDiscard;
         }

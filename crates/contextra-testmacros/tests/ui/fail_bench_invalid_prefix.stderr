@@ -1,7 +1,5 @@
 error: invalid benchmark ID `T-NOT-BM-1`: must start with prefix `BM-` (e.g. `BM-WRITE-1`)
- --> tests/ui/fail_bench_invalid_prefix.rs:3:1
+ --> tests/ui/fail_bench_invalid_prefix.rs:3:18
   |
 3 | #[ctx_bench(id = "T-NOT-BM-1")]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `ctx_bench` (in Nightly builds, run with -Z macro-backtrace for more info)
+  |                  ^^^^^^^^^^^^

@@ -83,7 +83,7 @@ pub(super) fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[
                     }
                 }
 
-                if claimed_len < 30 && claimed_len < 49 {
+                if claimed_len < 30 {
                     return false;
                 }
 

@@ -213,7 +213,11 @@ impl Wal {
     ///
     /// If slice reading or scanning encounters any error, it logs a warning (`tracing::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
-    pub async fn scan_entries_buffer<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
+    pub async fn scan_entries_buffer<F>(
+        &self,
+        file_size: u64,
+        mut callback: F,
+    ) -> Result<WalVersion>
     where
         F: FnMut(u64, WalEntry, u64) -> bool,
     {
@@ -271,15 +275,14 @@ impl Wal {
         _using_legacy_key: &mut bool,
     ) -> Result<()> {
         // D-05: Kein Legacy-Key-Fallback. WAL-Integrität ist nicht abschwächbar.
-        let verify_res = match version {
+        match version {
             WalVersion::V3 => verifier.verify_and_update_v3(snapshot, chunk_start_pos),
             WalVersion::V2 => verifier.verify_and_update_v2(snapshot, chunk_start_pos),
             WalVersion::V1 => {
                 verifier.skip_hmac_verify_legacy(snapshot);
                 Ok(())
             }
-        };
-        verify_res.map_err(|e| e.into())
+        }
     }
 
     fn scan_entries_from_slice<F>(

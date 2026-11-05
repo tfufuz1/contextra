@@ -20,6 +20,8 @@
 //! - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control).
 //! - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`).
 //! - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, VFS, etc.).
+//! - [`det_rng`]: Deterministischer Zufallszahlengenerator (`SeededRng`).
+//! - [`mem_ports`]: Gebündelte In-Memory-Referenz-Ports.
 //!
 //! ## Abhängigkeiten
 //! - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`.
@@ -72,11 +74,30 @@ pub mod bench;
 /// Report-Modul für Testergebnisse und Konformitätsberichte.
 pub mod report;
 
+/// Deterministische Pseudozufalls-Generatoren (SPEC §8.15, V-RNG).
+pub mod det_rng {
+    pub use contextra_ports::rng::SeededRng as DetRng;
+    pub use contextra_ports::rng::{Rng, SeededRng};
+}
+pub use contextra_ports::rng::SeededRng as DetRng;
+
+/// In-Memory-Port-Doppelgänger (SPEC §8.15, WP-7.1).
+pub mod mem_ports {
+    pub use crate::in_memory_store::InMemoryStorageEngine;
+    pub use crate::in_memory_text::InMemoryTextIndex;
+    pub use crate::in_memory_vector::InMemoryVectorIndex;
+    pub use crate::manual_clock::ManualClock;
+    pub use crate::mocks::{MockEmbedder, TestMetricsSink};
+}
+
 // Re-Exports der zentralen Typen für bequemen Zugriff in Testsuiten
 pub use fault_vfs::{FaultConfig, FaultVfs};
 pub use in_memory_store::InMemoryStorageEngine;
 pub use in_memory_text::InMemoryTextIndex;
 pub use in_memory_vector::InMemoryVectorIndex;
 pub use manual_clock::ManualClock;
-pub use mocks::*;
+pub use mocks::{
+    InMemoryErasureObserver, InMemoryPurgeBarrier, InMemoryReportSigner, MockEmbedder,
+    TestMetricsSink,
+};
 pub use reference_model::{RefOp, ReferenceModel};

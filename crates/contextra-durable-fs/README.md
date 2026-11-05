@@ -2,7 +2,7 @@ Dateisystem-Implementierung `RealVfs` mit dauerhaften Schreib- und Austauschoper
 
 ## Status
 
-Ring 1. Ist-Zustand: vorhanden; das zweite `Vfs`-Trait ist entfernt (F-29); Startprobe (D-56) und `scrub` (D-83) nicht nachgewiesen; das Crate hat im Ist-Zustand keinen Verbraucher. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
+Ring 1. Ist-Zustand: Produktionsreif gemäß SPEC 5.1.0 (§8.5, DF-01 bis DF-12); das zweite `Vfs`-Trait ist entfernt (D-04); Startprobe (D-56, D-114) und bedingter `scrub` (D-83) sind vollständig nachgewiesen und getestet. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
 ## Abhängigkeiten
 

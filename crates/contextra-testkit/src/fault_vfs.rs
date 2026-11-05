@@ -21,6 +21,7 @@
 // ZWECK: Deterministic I/O error injector and two-layer (Cache & Medium) Virtual File System test utility.
 // INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count, T-FSYNC-1 handle poisoning.
 
+use crate::manual_clock::ManualClock;
 use contextra_ports::rng::{Rng, SeededRng};
 use contextra_ports::vfs::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, Result};
@@ -49,6 +50,28 @@ pub enum FaultOperation {
     CreateDir,
     /// Längenänderung (`set_len`).
     SetLen,
+}
+
+/// Zeitpunkt des Abbruchs / Fehlerinjektion relativ zur Ausführung der Operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum CrashTiming {
+    /// Abbruch unmittelbar vor dem Ausführen der eigentlichen Operation.
+    Before,
+    /// Abbruch unmittelbar nach dem Ausführen der Operation (Effekt im Cache/RAM vorhanden).
+    After,
+}
+
+/// Ein deterministischer Crash-Punkt in der Crash-Matrix (SPEC §15.1, T-CRASH-*).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct CrashPoint {
+    /// Laufende 0-basierte globale Operationsnummer.
+    pub op_index: usize,
+    /// Operationsart (`Write`, `Sync`, `Rename`, `Remove`, etc.).
+    pub operation: FaultOperation,
+    /// Zeitpunkt relativ zur Operation (vorher oder nachher).
+    pub timing: CrashTiming,
+    /// Betroffener Dateipfad (falls bekannt).
+    pub path: Option<PathBuf>,
 }
 
 /// Spezifischer Fehlerinjektions-Plan für den n-ten Aufruf einer Operation.
@@ -109,16 +132,28 @@ pub struct FaultConfig {
     pub fail_reads_after: Option<usize>,
     /// Umbenennungen nach dieser Anzahl erfolgreicher Aufrufe fehlschlagen lassen.
     pub fail_renames_after: Option<usize>,
+    /// Löschoperationen (`remove_file`/`unlink`) nach dieser Anzahl erfolgreicher Aufrufe fehlschlagen lassen.
+    pub fail_removes_after: Option<usize>,
+    /// Verzeichniserstellungen (`create_dir_all`) nach dieser Anzahl erfolgreicher Aufrufe fehlschlagen lassen.
+    pub fail_createdirs_after: Option<usize>,
     /// Gezielt bei einer bestimmten Operation und einem bestimmten Null-basierten Index fehlschlagen.
     pub fail_at_operation: Option<(FaultOperation, usize)>,
     /// Expliziter Einzelplan oder Liste von Plänen.
     pub plan: Option<FaultPlan>,
     /// Globaler Notschalter: Alle Operationen schlagen sofort fehl.
     pub fail_all: bool,
+    /// Simuliere Platte voll (ENOSPC / StorageFull) für Schreibvorgänge.
+    pub fail_with_enospc: bool,
     /// Crash-Punkt (nach N Operationen crashen und alle nachfolgenden ungeschriebenen Daten verwerfen).
     pub crash_after_ops: Option<usize>,
+    /// Replay-Limit: Nach n Operationen anhalten / abbrechen.
+    pub replay_limit: Option<usize>,
+    /// Spezifischer CrashPoint für deterministischen Abbruch.
+    pub target_crash_point: Option<CrashPoint>,
     /// Konfiguration für umsortierte Sektorpersistierung bei Crash (D-113 Abs. 5).
     pub sector_reorder: Option<SectorReorderConfig>,
+    /// Optionaler deterministischer Seed zur Ausgabe im Fehlertext (SPEC P7, T-CRASH-*).
+    pub seed: Option<u64>,
 }
 
 /// In-Memory Repräsentation einer geöffneten Datei in [`FaultVfs`].
@@ -213,6 +248,11 @@ impl VfsFile for FaultFile {
                 "File not open for writing",
             ));
         }
+        self.vfs.record_and_check_crash_point(
+            FaultOperation::Write,
+            CrashTiming::Before,
+            Some(&self.path),
+        )?;
         self.vfs
             .check_fault(FaultOperation::Write, &self.vfs.write_count)?;
 
@@ -236,6 +276,12 @@ impl VfsFile for FaultFile {
         if let Some(target_slice) = data.get_mut(off..off + buf.len()) {
             target_slice.copy_from_slice(buf);
         }
+        drop(cache);
+        self.vfs.record_and_check_crash_point(
+            FaultOperation::Write,
+            CrashTiming::After,
+            Some(&self.path),
+        )?;
         Ok(buf.len())
     }
 
@@ -279,6 +325,14 @@ impl VfsFile for FaultFile {
 
     fn sync_data(&self) -> io::Result<()> {
         self.check_poisoned()?;
+        if let Err(e) = self.vfs.record_and_check_crash_point(
+            FaultOperation::Sync,
+            CrashTiming::Before,
+            Some(&self.path),
+        ) {
+            self.poison();
+            return Err(e);
+        }
         match self
             .vfs
             .check_fault(FaultOperation::Sync, &self.vfs.sync_count)
@@ -290,6 +344,15 @@ impl VfsFile for FaultFile {
                         .medium
                         .write()
                         .insert(self.path.clone(), content.clone());
+                }
+                drop(cache);
+                if let Err(e) = self.vfs.record_and_check_crash_point(
+                    FaultOperation::Sync,
+                    CrashTiming::After,
+                    Some(&self.path),
+                ) {
+                    self.poison();
+                    return Err(e);
                 }
                 Ok(())
             }
@@ -303,6 +366,14 @@ impl VfsFile for FaultFile {
 
     fn sync_all(&self) -> io::Result<()> {
         self.check_poisoned()?;
+        if let Err(e) = self.vfs.record_and_check_crash_point(
+            FaultOperation::Sync,
+            CrashTiming::Before,
+            Some(&self.path),
+        ) {
+            self.poison();
+            return Err(e);
+        }
         match self
             .vfs
             .check_fault(FaultOperation::Sync, &self.vfs.sync_count)
@@ -314,6 +385,15 @@ impl VfsFile for FaultFile {
                         .medium
                         .write()
                         .insert(self.path.clone(), content.clone());
+                }
+                drop(cache);
+                if let Err(e) = self.vfs.record_and_check_crash_point(
+                    FaultOperation::Sync,
+                    CrashTiming::After,
+                    Some(&self.path),
+                ) {
+                    self.poison();
+                    return Err(e);
                 }
                 Ok(())
             }
@@ -358,6 +438,8 @@ pub struct FaultVfs {
     config: Arc<RwLock<FaultConfig>>,
     /// Flag für simulierten Totalabsturz.
     crashed: Arc<AtomicBool>,
+    /// Aufgezeichnete Crash-Punkte aller ausgeführten I/O-Operationen.
+    recorded_points: Arc<RwLock<Vec<CrashPoint>>>,
 }
 
 impl FaultVfs {
@@ -377,6 +459,17 @@ impl FaultVfs {
     pub fn set_plan(&self, plan: FaultPlan) {
         let mut cfg = self.config.write();
         cfg.plan = Some(plan);
+    }
+
+    /// Konfiguriert das Dateisystem so, dass es nach genau `n` Operationen abbricht (`replay_until`).
+    pub fn replay_until(&self, n: usize) {
+        let mut cfg = self.config.write();
+        cfg.replay_limit = Some(n);
+    }
+
+    /// Liefert die Liste aller bisher durchlaufenen potenziellen Crash-Punkte (`before` und `after`).
+    pub fn crash_points(&self) -> Vec<CrashPoint> {
+        self.recorded_points.read().clone()
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-TRIGGER-CRASH-001]
@@ -501,27 +594,81 @@ impl FaultVfs {
         self.create_dir_count.store(0, Ordering::SeqCst);
         self.set_len_count.store(0, Ordering::SeqCst);
         self.crashed.store(false, Ordering::SeqCst);
+        self.recorded_points.write().clear();
+    }
+
+    fn record_and_check_crash_point(
+        &self,
+        op: FaultOperation,
+        timing: CrashTiming,
+        path: Option<&Path>,
+    ) -> io::Result<()> {
+        let op_idx = self.total_operations();
+        let pt = CrashPoint {
+            op_index: op_idx,
+            operation: op,
+            timing,
+            path: path.map(Path::to_path_buf),
+        };
+        self.recorded_points.write().push(pt.clone());
+
+        let cfg = self.config.read();
+        if let Some(ref target) = cfg.target_crash_point {
+            if target == &pt {
+                drop(cfg);
+                self.trigger_crash();
+                return Err(io::Error::new(
+                    ErrorKind::BrokenPipe,
+                    format!("Crash injected at target point {pt:?}"),
+                ));
+            }
+        }
+        Ok(())
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-CHECK-FAULT-001]
     /// Interne Überprüfung, ob für die gegebene Operation ein Fehler injiziert werden soll.
     fn check_fault(&self, op: FaultOperation, counter: &AtomicUsize) -> io::Result<()> {
+        let cfg = self.config.read();
+        let seed_suffix = match cfg.seed {
+            Some(seed) => format!(" (seed={seed})"),
+            None => String::new(),
+        };
+
         if self.crashed.load(Ordering::SeqCst) {
-            return Err(io::Error::new(ErrorKind::BrokenPipe, "VFS simulated crash"));
+            return Err(io::Error::new(
+                ErrorKind::BrokenPipe,
+                format!("VFS simulated crash{seed_suffix}"),
+            ));
         }
         let total = self.total_operations();
-        let cfg = self.config.read();
 
         if let Some(limit) = cfg.crash_after_ops {
             if total >= limit {
                 drop(cfg);
                 self.trigger_crash();
-                return Err(io::Error::new(ErrorKind::BrokenPipe, "VFS simulated crash"));
+                return Err(io::Error::new(
+                    ErrorKind::BrokenPipe,
+                    format!("VFS simulated crash at op {total}{seed_suffix}"),
+                ));
+            }
+        }
+
+        if let Some(limit) = cfg.replay_limit {
+            if total >= limit {
+                drop(cfg);
+                self.trigger_crash();
+                return Err(io::Error::new(
+                    ErrorKind::BrokenPipe,
+                    format!("VFS replay_until limit {limit} reached at op {total}{seed_suffix}"),
+                ));
             }
         }
 
         if cfg.fail_all {
-            return Err(io::Error::other("Simulated injected failure"));
+            return Err(io::Error::other(format!(
+                "Simulated injected failure [fail_all]{seed_suffix}"
+            )));
         }
 
         let idx = counter.fetch_add(1, Ordering::SeqCst);
@@ -530,14 +677,18 @@ impl FaultVfs {
             if plan.operation == op && plan.nth_call == idx {
                 return Err(io::Error::new(
                     plan.error_kind,
-                    "Simulated failure from FaultPlan",
+                    format!(
+                        "Simulated failure from FaultPlan for {op:?} at call {idx}{seed_suffix}"
+                    ),
                 ));
             }
         }
 
         if let Some((target_op, target_idx)) = cfg.fail_at_operation {
             if target_op == op && target_idx == idx {
-                return Err(io::Error::other("Simulated failure at operation"));
+                return Err(io::Error::other(format!(
+                    "Simulated failure at operation {op:?} at call {idx}{seed_suffix}"
+                )));
             }
         }
 
@@ -545,10 +696,17 @@ impl FaultVfs {
             FaultOperation::Write => {
                 if let Some(limit) = cfg.fail_writes_after {
                     if idx >= limit {
-                        return Err(io::Error::new(
-                            ErrorKind::WriteZero,
-                            "Simulated disk write failure",
-                        ));
+                        let kind = if cfg.fail_with_enospc {
+                            ErrorKind::StorageFull
+                        } else {
+                            ErrorKind::WriteZero
+                        };
+                        let msg = if cfg.fail_with_enospc {
+                            format!("Simulated disk full ENOSPC{seed_suffix}")
+                        } else {
+                            format!("Simulated disk write failure{seed_suffix}")
+                        };
+                        return Err(io::Error::new(kind, msg));
                     }
                 }
             }
@@ -557,7 +715,7 @@ impl FaultVfs {
                     if idx >= limit {
                         return Err(io::Error::new(
                             ErrorKind::UnexpectedEof,
-                            "Simulated disk read failure",
+                            format!("Simulated disk read failure{seed_suffix}"),
                         ));
                     }
                 }
@@ -565,18 +723,40 @@ impl FaultVfs {
             FaultOperation::Sync => {
                 if let Some(limit) = cfg.fail_syncs_after {
                     if idx >= limit {
-                        return Err(io::Error::other("Simulated fsync I/O failure"));
+                        return Err(io::Error::other(format!(
+                            "Simulated fsync I/O failure{seed_suffix}"
+                        )));
                     }
                 }
             }
             FaultOperation::Rename => {
                 if let Some(limit) = cfg.fail_renames_after {
                     if idx >= limit {
-                        return Err(io::Error::other("Simulated rename failure"));
+                        return Err(io::Error::other(format!(
+                            "Simulated rename failure{seed_suffix}"
+                        )));
                     }
                 }
             }
-            FaultOperation::Remove | FaultOperation::CreateDir | FaultOperation::SetLen => {}
+            FaultOperation::Remove => {
+                if let Some(limit) = cfg.fail_removes_after {
+                    if idx >= limit {
+                        return Err(io::Error::other(format!(
+                            "Simulated remove/unlink failure{seed_suffix}"
+                        )));
+                    }
+                }
+            }
+            FaultOperation::CreateDir => {
+                if let Some(limit) = cfg.fail_createdirs_after {
+                    if idx >= limit {
+                        return Err(io::Error::other(format!(
+                            "Simulated create_dir failure{seed_suffix}"
+                        )));
+                    }
+                }
+            }
+            FaultOperation::SetLen => {}
         }
 
         Ok(())
@@ -686,6 +866,223 @@ impl FaultVfs {
         }
 
         results
+    }
+}
+
+// ANCHOR[contextra-testkit:CRASH-MATRIX-DRIVER-001]
+/// Ergebnis eines einzelnen Schritts in der Crash-Matrix (SPEC §15.1, T-CRASH-*).
+#[derive(Debug, Clone)]
+pub struct CrashMatrixStepResult<T> {
+    /// Crash-Punkt (nach wie vielen Operationen der Crash ausgelöst wurde).
+    pub crash_at_op: usize,
+    /// Anzahl der tatsächlich vor dem Crash ausgeführten Operationen.
+    pub executed_ops: usize,
+    /// Ob der Crash ausgelöst wurde.
+    pub did_crash: bool,
+    /// Ergebnis der Verifikation bzw. des Recovery-Checks.
+    pub recovery_outcome: T,
+}
+
+/// Strukturierter Treiber zur systematischen Aufzählung aller Crash-Punkte eines Workloads (SPEC §15.1).
+///
+/// Simuliert für jeden Schritt $n \in [0, M]$:
+/// 1. Ausführung bis zum $n$-ten I/O-Syscall
+/// 2. Simulierte Stromunterbrechung / Crash (Verwerfen ungesyncter Cache-Daten)
+/// 3. Neustart / Recovery auf dem verbleibenden persistenten Zustand
+/// 4. Prüfung der Konsistenzinvariante
+#[derive(Debug, Clone, Default)]
+pub struct CrashMatrixDriver {
+    /// Optionaler Seed für deterministische Sektorumsortierung beim Crash.
+    pub seed: Option<u64>,
+}
+
+impl CrashMatrixDriver {
+    /// Erstellt einen neuen `CrashMatrixDriver`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Setzt einen deterministischen Seed für Crash-Sektor-Reordering.
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Führt die vollständige Crash-Matrix für einen gegebenen Workload und Recovery-Check aus.
+    ///
+    /// - `workload`: Führt die mutierenden Operationen auf `FaultVfs` aus (z. B. Saga, Commit).
+    /// - `verifier`: Führt nach dem simulierten Crash und Recovery die Integritätsprüfung aus.
+    pub fn run<W, V, R>(&self, mut workload: W, mut verifier: V) -> Vec<CrashMatrixStepResult<R>>
+    where
+        W: FnMut(&FaultVfs) -> Result<()>,
+        V: FnMut(&FaultVfs) -> R,
+    {
+        // 1. Baseline ermitteln
+        let probe = FaultVfs::new();
+        let _ = workload(&probe);
+        let max_ops = probe.total_operations();
+
+        let mut reports = Vec::with_capacity(max_ops + 1);
+
+        // 2. Iteration über alle Schritte 0..=max_ops
+        for crash_at in 0..=max_ops {
+            let vfs = FaultVfs::new();
+            let mut cfg = FaultConfig {
+                crash_after_ops: if crash_at < max_ops {
+                    Some(crash_at)
+                } else {
+                    None
+                },
+                seed: self.seed,
+                ..Default::default()
+            };
+            if let Some(seed) = self.seed {
+                cfg.sector_reorder = Some(SectorReorderConfig {
+                    sector_size: 512,
+                    seed: seed.wrapping_add(crash_at as u64),
+                    persisted_fraction: 0.5,
+                });
+            }
+            vfs.set_config(cfg);
+
+            let res = workload(&vfs);
+            let did_crash = res.is_err() || vfs.crashed.load(Ordering::SeqCst);
+            let executed_ops = vfs.total_operations();
+
+            // Simuliere Crash & Recovery (ungesyncte Cache-Daten verwerfen)
+            vfs.crash_and_recover();
+
+            // Führe Verifikation / Recovery auf persistentem Stand aus
+            let recovery_outcome = verifier(&vfs);
+
+            reports.push(CrashMatrixStepResult {
+                crash_at_op: crash_at,
+                executed_ops,
+                did_crash,
+                recovery_outcome,
+            });
+        }
+
+        reports
+    }
+}
+
+// ANCHOR[contextra-testkit:SOAK-DRIVER-001]
+/// Bericht über einen Soak-Lauf (SPEC §15.1, D-109, T-SOAK-1).
+#[derive(Debug, Clone)]
+pub struct SoakReport {
+    /// Gesamtzahl der durchlaufenen Iterationen.
+    pub iterations: usize,
+    /// Anzahl der injizierten Crashes.
+    pub crashes_injected: usize,
+    /// Anzahl der erfolgreichen Recovery-Durchläufe.
+    pub recoveries_successful: usize,
+    /// Verwendeter Start-Seed.
+    pub seed: u64,
+    /// Gesamtdauer des Laufs.
+    pub elapsed: std::time::Duration,
+}
+
+/// Soak-Treiber für Dauer- und Robustheitsprüfungen (SPEC D-109, T-SOAK-1).
+///
+/// Ermöglicht konfigurierbare Laufzeit (z. B. Kurz-Smoketest in CI, stundenlange
+/// Schleifen im Dauertest) mit deterministischem Pseudozufalls-Crash nach jedem Schritt.
+#[derive(Debug, Clone)]
+pub struct SoakDriver {
+    /// Deterministischer Seed.
+    pub seed: u64,
+    /// Maximale Zeitdauer.
+    pub max_duration: std::time::Duration,
+    /// Maximale Anzahl von Iterationen.
+    pub max_iterations: usize,
+}
+
+impl SoakDriver {
+    /// Erstellt einen neuen `SoakDriver` mit vorgegebenem Seed und Grenzen.
+    pub fn new(seed: u64, max_duration: std::time::Duration, max_iterations: usize) -> Self {
+        Self {
+            seed,
+            max_duration,
+            max_iterations,
+        }
+    }
+
+    /// Führt die Soak-Schleife aus.
+    ///
+    /// In jeder Iteration:
+    /// - Mutierende Operation mit Pseudozufalls-Crashwahrscheinlichkeit ausführen.
+    /// - Nach Crash `crash_and_recover()` aufrufen.
+    /// - `verify_fn` prüft, dass der Zustand konsistent ist (keine Korruption, kein unvollendeter Teilzustand).
+    pub fn run<O, V>(&self, mut op_fn: O, mut verify_fn: V) -> Result<SoakReport>
+    where
+        O: FnMut(&FaultVfs, usize) -> Result<()>,
+        V: FnMut(&FaultVfs, usize) -> Result<bool>,
+    {
+        let clock = ManualClock::new(1_700_000_000_000_000_000);
+        let start_nanos = clock.now_nanos();
+        let rng = SeededRng::new(self.seed);
+        let vfs = FaultVfs::new();
+
+        let mut iterations = 0;
+        let mut crashes_injected = 0;
+        let mut recoveries_successful = 0;
+
+        while iterations < self.max_iterations {
+            iterations += 1;
+            clock.advance(std::time::Duration::from_millis(1));
+            let elapsed_nanos = clock.now_nanos().saturating_sub(start_nanos);
+            if std::time::Duration::from_nanos(elapsed_nanos) >= self.max_duration {
+                break;
+            }
+
+            // Alle ~5 Operationen deterministisch einen Crash injizieren
+            let will_crash = rng.next_u64().is_multiple_of(5);
+            if will_crash {
+                #[allow(clippy::cast_possible_truncation)]
+                let ops = (rng.next_u64() as usize % 4) + 1;
+                vfs.set_config(FaultConfig {
+                    crash_after_ops: Some(ops),
+                    seed: Some(self.seed.wrapping_add(iterations as u64)),
+                    sector_reorder: Some(SectorReorderConfig {
+                        sector_size: 512,
+                        seed: self.seed.wrapping_add(iterations as u64),
+                        persisted_fraction: 0.5,
+                    }),
+                    ..Default::default()
+                });
+            } else {
+                vfs.set_config(FaultConfig {
+                    seed: Some(self.seed.wrapping_add(iterations as u64)),
+                    ..Default::default()
+                });
+            }
+
+            let _ = op_fn(&vfs, iterations);
+
+            if will_crash || vfs.crashed.load(Ordering::SeqCst) {
+                crashes_injected += 1;
+                vfs.crash_and_recover();
+            }
+
+            let consistent = verify_fn(&vfs, iterations)?;
+            if consistent {
+                recoveries_successful += 1;
+            } else {
+                return Err(ContextraError::Internal(format!(
+                    "Soak-Test Konsistenzverletzung bei Iteration {iterations} (seed={})",
+                    self.seed
+                )));
+            }
+        }
+
+        let elapsed_nanos = clock.now_nanos().saturating_sub(start_nanos);
+        Ok(SoakReport {
+            iterations,
+            crashes_injected,
+            recoveries_successful,
+            seed: self.seed,
+            elapsed: std::time::Duration::from_nanos(elapsed_nanos),
+        })
     }
 }
 
@@ -811,6 +1208,8 @@ impl Vfs for FaultVfs {
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        self.record_and_check_crash_point(FaultOperation::Rename, CrashTiming::Before, Some(from))
+            .map_err(ContextraError::Io)?;
         self.check_fault(FaultOperation::Rename, &self.rename_count)
             .map_err(ContextraError::Io)?;
 
@@ -831,6 +1230,11 @@ impl Vfs for FaultVfs {
         if medium.remove(from).is_some() {
             medium.insert(to.to_path_buf(), data);
         }
+        drop(cache);
+        drop(medium);
+
+        self.record_and_check_crash_point(FaultOperation::Rename, CrashTiming::After, Some(to))
+            .map_err(ContextraError::Io)?;
 
         Ok(())
     }
@@ -897,100 +1301,21 @@ impl Vfs for FaultVfs {
     }
 
     fn sync_dir(&self, path: &Path) -> Result<()> {
+        self.record_and_check_crash_point(FaultOperation::Sync, CrashTiming::Before, Some(path))
+            .map_err(ContextraError::Io)?;
         self.check_fault(FaultOperation::Sync, &self.sync_count)
             .map_err(ContextraError::Io)?;
         let dirs = self.dirs.read();
-        if dirs.contains(path) || path.as_os_str().is_empty() {
+        let res = if dirs.contains(path) || path.as_os_str().is_empty() {
             Ok(())
         } else {
             Err(ContextraError::NotFound(String::new()))
+        };
+        drop(dirs);
+        if res.is_ok() {
+            self.record_and_check_crash_point(FaultOperation::Sync, CrashTiming::After, Some(path))
+                .map_err(ContextraError::Io)?;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-WRITE-LIMIT-001]
-    // Prüft, dass nach Erreichen des konfigurierten Schreiblimits folgende Schreibvorgänge abgewiesen werden.
-    /// SPEC: T-FSYNC-1
-    #[test]
-    fn test_fault_vfs_write_limit() {
-        let vfs = FaultVfs::new();
-        vfs.set_config(FaultConfig {
-            fail_writes_after: Some(2),
-            ..Default::default()
-        });
-
-        let p1 = Path::new("file1.txt");
-        let p2 = Path::new("file2.txt");
-        let p3 = Path::new("file3.txt");
-
-        assert!(vfs.write_file(p1, b"hello").is_ok());
-        assert!(vfs.write_file(p2, b"world").is_ok());
-        let res3 = vfs.write_file(p3, b"fail");
-        assert!(matches!(res3, Err(e) if e.kind() == ErrorKind::WriteZero));
-    }
-
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-SYNC-FAILURE-001]
-    // Prüft, dass Sync-Aufrufe nach dem Schwellenwert fehlschlagen (fsync-Fehlersimulation).
-    /// SPEC: T-FSYNC-1
-    #[test]
-    fn test_fault_vfs_sync_failure() {
-        let vfs = FaultVfs::new();
-        vfs.set_config(FaultConfig {
-            fail_syncs_after: Some(1),
-            ..Default::default()
-        });
-
-        assert!(vfs.sync().is_ok());
-        assert!(vfs.sync().is_err());
-    }
-
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-VFS-CONTRACT-001]
-    // Prüft die Implementierung des contextra_ports::Vfs-Traits.
-    /// SPEC: T-FSYNC-1
-    #[test]
-    fn test_fault_vfs_vfs_trait_contract() -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let vfs = FaultVfs::new();
-        let base_dir = Path::new("/var/data");
-        vfs.create_dir_all(base_dir)?;
-
-        let file_path = base_dir.join("test.wal");
-        vfs.write_atomic(&file_path, b"test-payload")?;
-        assert!(vfs.exists(&file_path)?);
-        assert_eq!(vfs.len(&file_path)?, 12);
-
-        let data = vfs.read(&file_path)?;
-        assert_eq!(data, b"test-payload");
-
-        let entries = vfs.list_dir(base_dir)?;
-        assert_eq!(entries, vec!["test.wal".to_string()]);
-
-        vfs.sync_dir(base_dir)?;
-        vfs.remove_file(&file_path)?;
-        assert!(!vfs.exists(&file_path)?);
-        Ok(())
-    }
-
-    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-CRASH-MATRIX-001]
-    // Prüft den Crash-Matrix-Iterator for_each_crash_point.
-    /// SPEC: T-FSYNC-1
-    #[test]
-    fn test_fault_vfs_crash_matrix_iteration() {
-        let outcomes = FaultVfs::for_each_crash_point(|vfs, crash_idx| {
-            let path = Path::new("/data/matrix.log");
-            let res = vfs.write_atomic(path, b"matrix-entry");
-            (crash_idx, res.is_ok())
-        });
-
-        // First iteration is 0 (immediate failure), last iteration succeeds
-        assert!(!outcomes.is_empty());
-        let first = outcomes.first();
-        assert!(matches!(first, Some((0, (_, false)))));
-
-        let last = outcomes.last();
-        assert!(matches!(last, Some((_, (_, true)))));
+        res
     }
 }

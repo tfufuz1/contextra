@@ -13,7 +13,7 @@ use std::sync::Arc;
 // Lokale In-Memory Vfs für Tests
 #[derive(Default)]
 struct LocalMemVfs {
-    files: std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Vec<u8>>>,
+    files: std::sync::Mutex<std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>>,
 }
 
 impl contextra_ports::vfs::Vfs for LocalMemVfs {
@@ -53,6 +53,7 @@ impl contextra_ports::vfs::Vfs for LocalMemVfs {
     }
 }
 
+/// SPEC: T-RESTORE-1
 #[test]
 fn test_t_restore_1_finalize_sequence_and_ledger_failure() {
     let vfs = Arc::new(LocalMemVfs::default());
@@ -87,7 +88,11 @@ fn test_t_restore_1_finalize_sequence_and_ledger_failure() {
     // Prüfen ob Ledger-Eintrag existiert
     let entries = ledger.read_all().unwrap();
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].commitment, [0x88; 32]);
+    if let Some(first) = entries.first() {
+        assert_eq!(first.commitment, [0x88; 32]);
+    } else {
+        panic!("entries empty");
+    }
 
     // Wenn Ledger-Ziel fehlt -> MUSS zu Io-Fehler führen (Completed ohne Ledger ist verboten!)
     let outcome_no_ledger = finalize_erasure(&*vfs, None, &params);
@@ -98,4 +103,39 @@ fn test_t_restore_1_finalize_sequence_and_ledger_failure() {
         }
         other => panic!("Erwartet Io(NotFound), erhalten: {:?}", other),
     }
+}
+
+/// SPEC: T-RESTORE-2, T-RESTORE-3
+#[test]
+fn test_t_restore_2_and_3_guard_monotonic_sequence() {
+    use contextra_erasure::ledger::sink::InMemoryLedger;
+    use contextra_erasure::restore::guard::{FileRestoreChecker, GuardOutcome};
+
+    let mut ledger = InMemoryLedger::new([0x33; 32]);
+    ledger
+        .append([0xaa; 32], vec![0x01; 65], 500, 1000)
+        .unwrap();
+
+    let checker = FileRestoreChecker::new(&ledger);
+
+    // T-RESTORE-1 / 2: Zeitregression erkennen
+    let regression = checker.check(400);
+    assert_eq!(
+        regression,
+        GuardOutcome::TimeRegression {
+            store_seq: 400,
+            ledger_floor: 500,
+        }
+    );
+
+    // Saubere Sequenz > ledger_floor
+    let clean = checker.check(600);
+    assert_eq!(clean, GuardOutcome::Clean);
+
+    // T-RESTORE-3 (I-20): next_seq = max(current_seq, ledger_floor) + 1
+    let next_seq = checker.next_safe_seq(400);
+    assert_eq!(next_seq, 501);
+
+    let next_seq_high = checker.next_safe_seq(600);
+    assert_eq!(next_seq_high, 601);
 }

@@ -166,3 +166,20 @@ fn sy_platform_invalid_mode_and_unsupported() {
     let err_000 = set_mode(&file_path, 0o000);
     assert_eq!(err_000, Err(SysError::InvalidInput));
 }
+
+/// SPEC: T-FSYNC-1
+/// Validiert, dass ungültige Handles einen direkten Fehler (EBADF/NotFound/PermissionDenied)
+/// liefern und niemals wiederholt oder ignoriert werden (D-55, I-10).
+#[test]
+fn t_fsync_1_error_handling_and_no_retry_on_invalid_handle() {
+    let non_existent = Path::new("/proc/invalid_path_for_contextra_fsync_probe_test");
+    let err = flush_dir_sync(non_existent)
+        .expect_err("flush_dir_sync auf ungültigem Pfad muss fehlschlagen");
+    assert!(
+        matches!(
+            err,
+            SyncFailure::NotFound | SyncFailure::PermissionDenied | SyncFailure::OsError(_)
+        ),
+        "Unerwarteter Fehler: {err:?}"
+    );
+}

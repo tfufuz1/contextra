@@ -78,14 +78,16 @@ impl ManifestEntry {
                 payload.extend_from_slice(&max_tx.to_le_bytes());
                 let path_str = path.to_string_lossy();
                 let path_bytes = path_str.as_bytes();
-                payload.extend_from_slice(&(path_bytes.len() as u32).to_le_bytes());
+                let path_len = u32::try_from(path_bytes.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&path_len.to_le_bytes());
                 payload.extend_from_slice(path_bytes);
             }
             ManifestEntry::Remove { path } => {
                 payload.push(1u8); // op_tag = 1
                 let path_str = path.to_string_lossy();
                 let path_bytes = path_str.as_bytes();
-                payload.extend_from_slice(&(path_bytes.len() as u32).to_le_bytes());
+                let path_len = u32::try_from(path_bytes.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&path_len.to_le_bytes());
                 payload.extend_from_slice(path_bytes);
             }
             ManifestEntry::RollbackComplete { target_tx } => {
@@ -103,13 +105,16 @@ impl ManifestEntry {
                 payload.extend_from_slice(&0u64.to_le_bytes()); // Abgekündigtes rank-Feld (S-01): stets 0u64
                 let added_str = added.to_string_lossy();
                 let added_bytes = added_str.as_bytes();
-                payload.extend_from_slice(&(added_bytes.len() as u32).to_le_bytes());
+                let added_len = u32::try_from(added_bytes.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&added_len.to_le_bytes());
                 payload.extend_from_slice(added_bytes);
-                payload.extend_from_slice(&(removed.len() as u32).to_le_bytes());
+                let removed_len = u32::try_from(removed.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&removed_len.to_le_bytes());
                 for p in removed {
                     let p_str = p.to_string_lossy();
                     let p_bytes = p_str.as_bytes();
-                    payload.extend_from_slice(&(p_bytes.len() as u32).to_le_bytes());
+                    let p_len = u32::try_from(p_bytes.len()).unwrap_or(u32::MAX);
+                    payload.extend_from_slice(&p_len.to_le_bytes());
                     payload.extend_from_slice(p_bytes);
                 }
             }
@@ -125,7 +130,8 @@ impl ManifestEntry {
                 payload.push(OP_TAG_WAL_FLOOR); // op_tag = 0x03
                 payload.extend_from_slice(&seq.to_le_bytes());
                 payload.extend_from_slice(tail_mac);
-                payload.extend_from_slice(&(removed_file_ids.len() as u32).to_le_bytes());
+                let count = u32::try_from(removed_file_ids.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&count.to_le_bytes());
                 for fid in removed_file_ids {
                     payload.extend_from_slice(&fid.as_u64().to_le_bytes());
                 }
@@ -147,31 +153,36 @@ impl ManifestEntry {
                         payload.extend_from_slice(&0u64.to_le_bytes());
                     }
                 }
-                payload.extend_from_slice(&(remove.len() as u32).to_le_bytes());
+                let count = u32::try_from(remove.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&count.to_le_bytes());
                 for fid in remove {
                     payload.extend_from_slice(&fid.as_u64().to_le_bytes());
                 }
             }
             ManifestEntry::SstSwap { add, remove } => {
                 payload.push(OP_TAG_SST_SWAP); // op_tag = 0x07 (SPEC-Änderung SL-1 ausstehend)
-                payload.extend_from_slice(&(add.len() as u32).to_le_bytes());
+                let add_count = u32::try_from(add.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&add_count.to_le_bytes());
                 for p in add {
                     let p_str = p.to_string_lossy();
                     let p_bytes = p_str.as_bytes();
-                    payload.extend_from_slice(&(p_bytes.len() as u32).to_le_bytes());
+                    let p_len = u32::try_from(p_bytes.len()).unwrap_or(u32::MAX);
+                    payload.extend_from_slice(&p_len.to_le_bytes());
                     payload.extend_from_slice(p_bytes);
                 }
-                payload.extend_from_slice(&(remove.len() as u32).to_le_bytes());
+                let count = u32::try_from(remove.len()).unwrap_or(u32::MAX);
+                payload.extend_from_slice(&count.to_le_bytes());
                 for p in remove {
                     let p_str = p.to_string_lossy();
                     let p_bytes = p_str.as_bytes();
-                    payload.extend_from_slice(&(p_bytes.len() as u32).to_le_bytes());
+                    let p_len = u32::try_from(p_bytes.len()).unwrap_or(u32::MAX);
+                    payload.extend_from_slice(&p_len.to_le_bytes());
                     payload.extend_from_slice(p_bytes);
                 }
             }
         }
 
-        let total_payload_size = (4 + payload.len()) as u32;
+        let total_payload_size = u32::try_from(4 + payload.len()).unwrap_or(u32::MAX);
         if total_payload_size > MAX_MANIFEST_ENTRY_SIZE {
             return Err(ContextraError::Serialization(format!(
                 "Manifest entry exceeds max size: {} bytes",

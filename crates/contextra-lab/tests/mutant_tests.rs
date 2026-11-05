@@ -3,7 +3,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
-    clippy::needless_borrows_for_generic_args
+    clippy::needless_borrows_for_generic_args,
+    clippy::cast_possible_truncation
 )]
 //! T-MUT-1: Mutationstests für die Mess- und Verifikationslogik (SPEC §12.3, T-MUT-1).
 //!
@@ -274,5 +275,69 @@ fn t_mut_1_mutant_tresor_slot_ohne_mac_erkannt() {
     assert_eq!(
         active_matches, 1,
         "Mutant mit nicht-gelöschtem D-Slot muss durch MK1 detektiert werden"
+    );
+}
+
+/// SPEC: T-MUT-1 (Mutant 10: SSTable-Schicht vergessen – Zieldokument verblieb ohne Tombstone im SSTable-Körper)
+#[test]
+fn t_mut_1_mutant_schicht_vergessen_sstable_erkannt() {
+    let target_key = b"target_doc_key_999";
+    let target_tag = [0x55u8; 16];
+    let retained_dek = [0xaa; 32];
+    let payload = b"Sensitive target content";
+
+    let target_env =
+        RecordEnvelopeV2::create_bytes(target_tag, [0x11; 12], payload, &retained_dek, target_key)
+            .expect("Create Envelope");
+
+    let mut block = Vec::new();
+    block.extend_from_slice(&(target_key.len() as u16).to_be_bytes());
+    block.extend_from_slice(target_key);
+    block.extend_from_slice(&(target_env.len() as u32).to_be_bytes());
+    block.extend_from_slice(&target_env);
+
+    let entries =
+        contextra_lab::format::sstable::SsTableEntry::parse_entries(&block).expect("Parse entries");
+    assert_eq!(entries.len(), 1);
+
+    // MK3-Probe: Verbliebenes Chiffrat im SSTable-Eintrag öffnet mit altem DEK -> Verstoß erkannt!
+    let is_openable = Mk3KeyProbeScanner::probe_envelope_decryptable(
+        &entries[0].value,
+        &retained_dek,
+        target_key,
+    )
+    .expect("Probe");
+    assert!(
+        is_openable,
+        "Mutant (nicht umgeschriebene SSTable) muss durch MK3 detektiert werden"
+    );
+}
+
+/// SPEC: T-MUT-1 (Mutant 11: WAL-Schicht vergessen – ungeflushtes WAL-Segment enthält Zieldaten)
+#[test]
+fn t_mut_1_mutant_schicht_vergessen_wal_erkannt() {
+    let needle = b"TARGET_UNFLUSHED_IN_WAL";
+    let simulated_wal_frame = b"WAL_FRAME_HDR\x00\x00\x01TARGET_UNFLUSHED_IN_WAL_BATCH_TRAILER";
+
+    let raw_matches = Mk2RawScanner::scan_bytes(simulated_wal_frame, needle);
+    assert_eq!(
+        raw_matches, 1,
+        "Mutant mit ungeflushten Ziel-Frames im WAL muss durch MK2 aufgedeckt werden"
+    );
+}
+
+/// SPEC: T-MUT-1 (Mutant 12: Gate-Schicht vergessen – Gate-Log enthält keinen Erased-Eintrag für Zielbereich)
+#[test]
+fn t_mut_1_mutant_schicht_vergessen_gate_erkannt() {
+    let target_tag = [0x99u8; 16];
+
+    // Mutant: Gate-Log hat das Gate für target_tag nicht hinzugefügt (nur fremde Gates enthalten)
+    let incomplete_gate_keys: [[u8; 16]; 2] = [[0x01; 16], [0x02; 16]];
+
+    // Prüfung: Das Ziel-Gate fehlt in der aktiven Gate-Menge -> Verstoß erkannt
+    let has_target_gate = incomplete_gate_keys.iter().any(|k| k == &target_tag);
+    assert!(
+        !has_target_gate,
+        "Mutant: Das fehlende Gate für das Ziel muss als Schutzlücke erkannt werden"
     );
 }

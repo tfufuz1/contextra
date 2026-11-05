@@ -404,7 +404,7 @@ fn t_alice_missing_parent_dir_fsync_detected() {
     struct AliceCrashSimVfs {
         inner: FaultVfs,
         uncommitted_files:
-            std::sync::Arc<parking_lot::RwLock<std::collections::HashSet<std::path::PathBuf>>>,
+            std::sync::Arc<parking_lot::RwLock<std::collections::BTreeSet<std::path::PathBuf>>>,
     }
 
     impl AliceCrashSimVfs {
@@ -412,7 +412,7 @@ fn t_alice_missing_parent_dir_fsync_detected() {
             Self {
                 inner: FaultVfs::new(),
                 uncommitted_files: std::sync::Arc::new(parking_lot::RwLock::new(
-                    std::collections::HashSet::new(),
+                    std::collections::BTreeSet::new(),
                 )),
             }
         }
@@ -462,11 +462,14 @@ fn t_alice_missing_parent_dir_fsync_detected() {
     // 1. Ehrliches Programm: Schreibt Datei, ruft sync_data() und sync_dir() auf.
     // Nach Crash & Recovery muss die Datei vorhanden sein.
     let honest_sim = AliceCrashSimVfs::new();
-    honest_sim.inner.create_dir_all(dir).unwrap();
+    honest_sim
+        .inner
+        .create_dir_all(dir)
+        .expect("create_dir_all must succeed");
     let honest_file = dir.join("honest.dat");
     honest_sim
         .open_and_write(&honest_file, b"HONEST_DATA")
-        .unwrap();
+        .expect("write honest_file must succeed");
     honest_sim
         .sync_dir(dir)
         .expect("Honest program syncs parent directory");
@@ -479,11 +482,14 @@ fn t_alice_missing_parent_dir_fsync_detected() {
     // 2. Fehlerhaftes Programm (ALICE-Bug): Schreibt Datei, ruft sync_data() auf, vergisst aber sync_dir().
     // Nach Crash & Recovery MUSS der Datenverlust auffallen (Datei ist weg!).
     let buggy_sim = AliceCrashSimVfs::new();
-    buggy_sim.inner.create_dir_all(dir).unwrap();
+    buggy_sim
+        .inner
+        .create_dir_all(dir)
+        .expect("create_dir_all must succeed");
     let buggy_file = dir.join("buggy.dat");
     buggy_sim
         .open_and_write(&buggy_file, b"BUGGY_DATA")
-        .unwrap();
+        .expect("write buggy_file must succeed");
     // ALICE-Bug: buggy_sim.sync_dir(dir) wird unterlassen!
     buggy_sim.simulate_power_cut_crash();
 
@@ -492,4 +498,78 @@ fn t_alice_missing_parent_dir_fsync_detected() {
         !recovered,
         "ALICE positive control: Missing parent directory sync MUST cause file loss across power-cut crash"
     );
+}
+
+/// SPEC: T-CRASH-1 / D-55
+/// T-ID: T-CRASH-1
+/// Verifiziert, dass replay_until und crash_points eine deterministische Crash-Matrix ermöglichen.
+#[test]
+fn t_crash_matrix_replay_until_and_points() {
+    let vfs = contextra_testkit::FaultVfs::new();
+    let opts = VfsOpenOptions {
+        read: true,
+        write: true,
+        create: true,
+        ..Default::default()
+    };
+
+    let p = Path::new("crash_test.dat");
+    let file = vfs.open(p, &opts).expect("open ok");
+    let _ = file.write_at(b"block1", 0);
+    let _ = file.sync_data();
+    let _ = file.write_at(b"block2", 6);
+    let _ = file.sync_data();
+
+    let pts = vfs.crash_points();
+    assert!(!pts.is_empty(), "FaultVfs must record crash points");
+
+    // Replay until op 1 (vor dem ersten Sync)
+    let replay_vfs = contextra_testkit::FaultVfs::new();
+    replay_vfs.replay_until(1);
+    let replay_file = replay_vfs.open(p, &opts).expect("open ok");
+    let _ = replay_file.write_at(b"block1", 0);
+    let sync_res = replay_file.sync_data();
+    assert!(sync_res.is_err(), "Replay limit must trigger crash");
+}
+
+/// SPEC: T-SLA-1 / D-30 / D-83
+/// T-ID: T-SLA-1
+/// Verifiziert SLA-Zeitsprünge in ManualClock für Fristprüfungen.
+#[test]
+fn t_sla_manual_clock_jumps() {
+    let clock = contextra_testkit::ManualClock::new(1_000_000_000);
+    let sla = std::time::Duration::from_secs(3600);
+    clock.advance_sla_window(sla);
+    assert_eq!(clock.now_nanos(), 1_000_000_000 + 3600 * 1_000_000_000);
+
+    clock.jump_past_sla(std::time::Duration::from_secs(60));
+    assert_eq!(
+        clock.now_nanos(),
+        1_000_000_000 + 3600 * 1_000_000_000 + 61 * 1_000_000_000
+    );
+}
+
+/// SPEC: T-OBS-1 / D-118
+/// T-ID: T-OBS-1
+/// Verifiziert InMemoryErasureObserver Verhalten und Fehlerzustellung.
+#[tokio::test]
+async fn t_obs_in_memory_observer() {
+    use contextra_ports::observer::{
+        ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind,
+    };
+    use contextra_types::ids::ErasureId;
+
+    let obs = contextra_testkit::InMemoryErasureObserver::new();
+    let ev = ErasureEvent {
+        id: ErasureId::new([1u8; 16]),
+        target_kind: TargetKind::Document,
+        phase: ObservedPhase::Gated,
+        at: 100,
+    };
+
+    assert!(obs.on_erased(ev.clone()).await.is_ok());
+    assert_eq!(obs.events().len(), 1);
+
+    obs.set_injected_error(Some(ObserverError::Transient("network error".into())));
+    assert!(obs.on_erased(ev).await.is_err());
 }
