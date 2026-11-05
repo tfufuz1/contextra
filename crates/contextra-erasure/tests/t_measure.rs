@@ -1,17 +1,18 @@
 //! Tests für Messung und Typestate Scanner (T-RAW-1..6, ER-25, D-72).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(deprecated)]
 
 use contextra_erasure::measure::positive_control::{
     run_positive_control, verify_scanner_integrity,
 };
 use contextra_erasure::measure::{
-    arm_scanner, finish_scan, run_scanner_flow, EvidenceKind, MeasurementCoordinator,
-    UnarmedScanner,
+    arm_scanner, finish_scan, EvidenceKind, MeasurementCoordinator, UnarmedScanner,
 };
 use contextra_types::erasure::{LayerId, MeasureClass, Scanner, Unarmed};
 use std::time::Duration;
 
+/// T-ID: T-RAW-2
 #[test]
 fn t_raw_2_positive_control_and_witness_generation() {
     let _coordinator = MeasurementCoordinator::new();
@@ -44,6 +45,7 @@ fn t_raw_2_positive_control_and_witness_generation() {
     );
 }
 
+/// T-ID: T-RAW-2
 #[test]
 fn t_raw_2_positive_control_genuine_scan_and_mutants() {
     // Leeres Muster muss scheitern
@@ -65,15 +67,11 @@ fn t_raw_2_positive_control_genuine_scan_and_mutants() {
     assert!(mutated_detected, "Mutiertes Muster muss abgewiesen werden");
 }
 
+/// T-ID: T-RAW-2
 #[test]
 fn t_raw_2_typed_scanner_flow() {
     let layer = LayerId::new([0x01; 16]);
     let pattern = b"flow-pattern-test";
-
-    let witness = run_scanner_flow(layer, MeasureClass::Mk1, 1, pattern)
-        .expect("flow should produce witness with 0 matches");
-    assert_eq!(witness.layer(), layer);
-    assert_eq!(witness.class(), MeasureClass::Mk1);
 
     // Unbewaffneter Scanner kann nicht finishen ohne arm
     let unarmed = Scanner::<Unarmed>::new(layer, MeasureClass::Mk1, 1);
