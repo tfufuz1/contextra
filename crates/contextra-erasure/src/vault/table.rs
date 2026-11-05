@@ -361,3 +361,15 @@ impl VaultTable {
         &self.vault_id
     }
 }
+
+impl VaultTable {
+    /// Öffentlicher Zugriff auf rohe Slot-Bytes für Scrubbing.
+    pub fn slot_bytes_pub(&self, idx: usize) -> Option<&[u8; VAULT_SLOT_SIZE]> {
+        self.slot_bytes(idx)
+    }
+
+    /// Referenz auf MAC-Schlüssel.
+    pub fn mac_key_ref(&self) -> &[u8; 32] {
+        &self.mac_key
+    }
+}
