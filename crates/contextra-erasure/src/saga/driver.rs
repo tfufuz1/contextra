@@ -7,40 +7,55 @@ use crate::error::ErasureError;
 use crate::saga::machine::{EraseSaga, SagaState};
 use contextra_types::erasure::PendingReason;
 use contextra_types::ids::ErasureId;
+use std::sync::Arc;
 
-/// Ereignis der Treiber-Pipeline.
-#[derive(Debug)]
+/// Ereignis der Treiber-Pipeline (SPEC §11.2).
+#[derive(Debug, Clone)]
 pub enum SagaEvent {
     /// Nächsten Schritt ausführen.
     Advance(ErasureId),
-    /// Zurück in Pending versetzen.
+    /// Zurück in Pending versetzen mit Grund.
     SetPending(ErasureId, PendingReason),
+    /// Saga abschließen.
+    Complete(ErasureId),
 }
 
 /// Ergebnis eines Treiberschritts.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StepOutcome {
     /// Zustand erfolgreich gewechselt.
     Advanced(SagaState),
     /// Zustand bleibt Pending (mit Grund).
     Pending(PendingReason),
-    /// Saga ist abgeschlossen.
+    /// Saga ist abgeschlossen oder verweigert.
     Terminal(SagaState),
 }
 
 /// Treiber-Kontext für einen einzelnen Saga-Schritt.
-pub struct SagaDriver;
+#[derive(Default)]
+pub struct SagaDriver {
+    core: Option<Arc<super::core::ErasureCore>>,
+}
 
 impl SagaDriver {
     /// Erstellt einen neuen Treiber.
     pub fn new() -> Self {
-        Self
+        Self { core: None }
+    }
+
+    /// Erstellt einen Treiber mit Anbindung an den `ErasureCore`.
+    pub fn with_core(core: Arc<super::core::ErasureCore>) -> Self {
+        Self { core: Some(core) }
+    }
+
+    /// Liefert die Core-Referenz, falls vorhanden.
+    pub fn core(&self) -> Option<&Arc<super::core::ErasureCore>> {
+        self.core.as_ref()
     }
 
     /// Führt den nächsten Schritt der Saga durch (idempotent, ER-18).
     ///
-    /// In der Produktionsimplementierung (WP-4.2) ruft dieser Methode die
-    /// Gate-, Journal- und Purge-Operationen auf.
+    /// Validiert den Übergang und vollzieht den Schritt in der Zustandsmaschine.
     pub fn step(&self, saga: &mut EraseSaga) -> Result<StepOutcome, ErasureError> {
         if saga.is_terminal() {
             return Ok(StepOutcome::Terminal(saga.state()));
@@ -70,10 +85,49 @@ impl SagaDriver {
         saga.transition_to(next)?;
         Ok(StepOutcome::Advanced(saga.state()))
     }
-}
 
-impl Default for SagaDriver {
-    fn default() -> Self {
-        Self::new()
+    /// Asynchrone Ausführung des nächsten Treiberschritts unter Nutzung des `ErasureCore`.
+    pub async fn step_async(&self, saga: &mut EraseSaga) -> Result<StepOutcome, ErasureError> {
+        if let Some(core) = &self.core {
+            let id = saga.erasure_id();
+            if let Ok(st) = core.status(id).await {
+                saga.transition_to(st.state)?;
+                if saga.is_terminal() {
+                    return Ok(StepOutcome::Terminal(st.state));
+                }
+                return Ok(StepOutcome::Advanced(st.state));
+            }
+        }
+        self.step(saga)
+    }
+
+    /// Verarbeitet ein Ereignis aus der Treiber-Pipeline (SPEC §11.2).
+    pub fn process_event(
+        &self,
+        saga: &mut EraseSaga,
+        event: SagaEvent,
+    ) -> Result<StepOutcome, ErasureError> {
+        match event {
+            SagaEvent::Advance(id) => {
+                if id != saga.erasure_id() {
+                    return Err(ErasureError::Internal("erasure id mismatch".into()));
+                }
+                self.step(saga)
+            }
+            SagaEvent::SetPending(id, reason) => {
+                if id != saga.erasure_id() {
+                    return Err(ErasureError::Internal("erasure id mismatch".into()));
+                }
+                saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+                Ok(StepOutcome::Pending(reason))
+            }
+            SagaEvent::Complete(id) => {
+                if id != saga.erasure_id() {
+                    return Err(ErasureError::Internal("erasure id mismatch".into()));
+                }
+                saga.transition_to(SagaState::Completed)?;
+                Ok(StepOutcome::Terminal(SagaState::Completed))
+            }
+        }
     }
 }

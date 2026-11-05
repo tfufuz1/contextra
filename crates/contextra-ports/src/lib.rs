@@ -1,7 +1,7 @@
 //! Schnittstellen (Traits) zwischen den Schichten: Speicher, Index, Dateisystem, Zeit, Zufall, Löschschicht.
 //!
 //! Ring 0 Komponente laut SPEC 5.1a, 5.2, 5.3 und 8.2.
-//! Erlaubte Abhängigkeiten: types.
+//! Erlaubte Abhängigkeiten laut SPEC §3.1 und §5.3: contextra-types (Ring 0).
 //!
 //! Diese Traits definieren die abstrakten Schnittstellen (Ports) zwischen
 //! den Schichten zur Realisierung einer hexagonalen Architektur.
