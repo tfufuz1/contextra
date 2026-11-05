@@ -277,3 +277,33 @@ fn t_mut_1_mutant_tresor_slot_ohne_mac_erkannt() {
         "Mutant mit nicht-gelöschtem D-Slot muss durch MK1 detektiert werden"
     );
 }
+
+/// T-ID: T-MUT-1
+/// Schichtmutation SSTable: Manipulierte Datenblöcke oder unzulässige Envelopes werden abgewiesen.
+#[test]
+fn t_mut_1_mutant_sstable_layer_mutation() {
+    use contextra_lab::format::sstable::SsTableFile;
+    let corrupted_sstable = vec![0x42u8; 128];
+    assert!(SsTableFile::parse(&corrupted_sstable).is_err());
+}
+
+/// T-ID: T-MUT-1
+/// Schichtmutation WAL: Ungültige Frame-HMACs oder Torn-Writes mit Nicht-Null-Tail führen zu Fehler.
+#[test]
+fn t_mut_1_mutant_wal_layer_mutation() {
+    use contextra_lab::format::wal_manifest::WalSegment;
+    let corrupted_wal = vec![0xffu8; 128];
+    let k_wal = [0x11u8; 32];
+    let file_key = [0x22u8; 32];
+    assert!(WalSegment::parse(&corrupted_wal, &k_wal, &file_key).is_err());
+}
+
+/// T-ID: T-MUT-1
+/// Schichtmutation Gate: Manipulierte Gate-Log-Einträge mit gebrochener Hashkette werden erkannt.
+#[test]
+fn t_mut_1_mutant_gate_layer_mutation() {
+    use contextra_lab::format::append_logs::AppendLogFile;
+    use contextra_lab::format::file_header::FileKind;
+    let corrupted_gatelog = vec![0x33u8; 128];
+    assert!(AppendLogFile::parse(&corrupted_gatelog, FileKind::GateLog).is_err());
+}

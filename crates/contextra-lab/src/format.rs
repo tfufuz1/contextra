@@ -5,6 +5,7 @@ pub mod file_header;
 pub mod header_ab;
 pub mod record_envelope;
 pub mod report;
+pub mod scope;
 pub mod sstable;
 pub mod text_segment;
 pub mod vault;

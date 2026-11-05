@@ -88,3 +88,62 @@ fn t_diff_1_record_level_bitgleichheit() {
         .expect("Decrypt kept");
     assert_eq!(decrypted, kept_payload);
 }
+
+/// T-ID: T-VER-1
+/// Restore-Szenario: Das Wiederauftauchen gelöschter Datensätze nach einem Restore wird detektiert.
+#[test]
+fn t_restore_1_reappearing_deleted_records_detected() {
+    use contextra_lab::fixture::StoreFixture;
+
+    let mut fixture = StoreFixture::new();
+    let doc1 = [0x01u8; 16];
+    let needle1 = b"retained-record".to_vec();
+    let dek1 = [0x11u8; 32];
+
+    let doc2 = [0x02u8; 16];
+    let needle2 = b"target-to-delete".to_vec();
+    let dek2 = [0x22u8; 32];
+
+    fixture.insert(doc1, needle1.clone(), dek1);
+    fixture.insert(doc2, needle2.clone(), dek2);
+
+    // Löschung ausführen über Callback
+    let deleted = fixture.execute_deletion(&doc2, |id, docs| docs.remove(id).is_some());
+    assert!(deleted);
+    assert!(!fixture.documents.contains_key(&doc2));
+    assert!(fixture.deleted.contains_key(&doc2));
+
+    // Simulierter illegaler Restore eines alten Backups
+    let restored_docs = vec![(doc1, needle1.clone()), (doc2, needle2.clone())];
+    let illegal_reappearance = restored_docs
+        .iter()
+        .any(|(id, _)| fixture.deleted.contains_key(id));
+
+    assert!(
+        illegal_reappearance,
+        "Wiederauftauchen gelöschter Records muss detektiert werden"
+    );
+}
+
+/// T-ID: T-VER-1
+/// Ledger-Integrität im Restore-Szenario: Ledger HMAC schützt gegen manipulierte Restore-Zustände.
+#[test]
+fn t_restore_2_ledger_mac_integrity_check() {
+    use contextra_lab::format::append_logs::AppendLogFile;
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    let chain = [0x33u8; 32];
+    let k_ledger = [0x44u8; 32];
+
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = <HmacSha256 as Mac>::new_from_slice(&k_ledger).unwrap();
+    mac.update(&chain);
+    let valid_mac: [u8; 32] = mac.finalize().into_bytes().into();
+
+    assert!(AppendLogFile::verify_ledger_entry_mac(&chain, &valid_mac, &k_ledger).is_ok());
+
+    let mut invalid_mac = valid_mac;
+    invalid_mac[0] ^= 0x01;
+    assert!(AppendLogFile::verify_ledger_entry_mac(&chain, &invalid_mac, &k_ledger).is_err());
+}

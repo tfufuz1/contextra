@@ -340,3 +340,19 @@ fn t_fmt_1_f10_erasure_report_golden() {
         .verify_signature(canonical_json_without_sig, &pub_bytes)
         .expect("Verify Ed25519");
 }
+
+/// T-ID: T-FMT-1
+#[test]
+fn t_fmt_1_f9_scope_file_golden() {
+    use contextra_lab::format::scope::ScopeFile;
+
+    let file_id = [0x5au8; 16];
+    let file_key = [0x7bu8; 32];
+    let payload = b"scope:tenant=1,coll=2,doc=3";
+
+    let serialized = ScopeFile::serialize(file_id, payload, &file_key).expect("serialize scope");
+    let parsed = ScopeFile::parse(&serialized, &file_key).expect("parse scope");
+
+    assert_eq!(parsed.header.file_id, file_id);
+    assert_eq!(parsed.payload, payload);
+}
