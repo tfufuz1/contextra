@@ -1,7 +1,6 @@
 //! Conformance integration test for ErasureLayer port (SPEC §8.2, §11, PO-05, P1, P12, D-69, HR-10).
 //! Tests reference implementation and ensures 100% detection of mutants.
 /// T-ID: T-ISO-1
-
 use contextra_testkit::conformance::erasure_layer;
 
 /// T-ID: T-ISO-1

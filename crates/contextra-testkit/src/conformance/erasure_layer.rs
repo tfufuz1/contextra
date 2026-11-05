@@ -227,13 +227,15 @@ pub async fn run_on_layer<L: ErasureLayer + ?Sized>(layer: &L) -> ConformanceRes
 // REFERENCE IMPLEMENTATION (IN-MEMORY)
 // ============================================================================
 
+type RecordMap = BTreeMap<Vec<u8>, (u64, Vec<u8>)>;
+
 /// In-Memory Reference Implementation of [`ErasureLayer`].
 #[derive(Clone)]
 pub struct ReferenceErasureLayer {
     id: LayerId,
     coverage: KeyCoverage,
     /// Store items: doc_id -> (unit_id, payload)
-    data: Arc<RwLock<BTreeMap<Vec<u8>, (u64, Vec<u8>)>>>,
+    data: Arc<RwLock<RecordMap>>,
     /// Units: unit_id -> count of active items
     units: Arc<RwLock<BTreeMap<u64, usize>>>,
     gated_scopes: Arc<RwLock<BTreeMap<[u8; 16], bool>>>,
@@ -364,7 +366,7 @@ impl ErasureLayer for ReferenceErasureLayer {
         let data_guard = self.data.read();
 
         // Check if any residue exists for affected units
-        for (_k, (unit_id, _)) in data_guard.iter() {
+        for (unit_id, _) in data_guard.values() {
             if affected.contains(unit_id) {
                 return Box::pin(async move {
                     Err("Residue detected in affected units (PO-05)".to_string())
@@ -470,9 +472,12 @@ impl ErasureLayer for MutantNonIdempotentPurgeLayer {
         self.0.on_gate(s)
     }
     fn purge(&self, s: &LayerScope, cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>> {
-        let _ = self.0.purge(s, cx);
+        let inner_fut = self.0.purge(s, cx);
         // DEFECT: Always returns purged_count = 10, never stabilizes at 0 on repeat
-        Box::pin(async move { Ok(PurgeOutcome::new(10, 100)) })
+        Box::pin(async move {
+            let _ = inner_fut.await;
+            Ok(PurgeOutcome::new(10, 100))
+        })
     }
     fn witness(
         &self,
@@ -557,7 +562,7 @@ pub async fn run_mutant_tests() -> std::result::Result<(), String> {
         return Err("MutantNonIdempotentPurgeLayer escaped detection!".to_string());
     }
 
-    let res4 = run(|| MutantInconsistentKeyCoverageLayer::default()).await;
+    let res4 = run(MutantInconsistentKeyCoverageLayer::default).await;
     if res4.is_ok() {
         return Err("MutantInconsistentKeyCoverageLayer escaped detection!".to_string());
     }
