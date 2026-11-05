@@ -559,7 +559,6 @@ dependencies = [
  "contextra-crypto",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-store",
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
