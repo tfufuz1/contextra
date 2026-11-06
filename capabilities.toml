@@ -413,3 +413,15 @@ may_depend_on = []
 ci_class = 'pr'
 spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-wire --locked"
+
+[crates.contextra-erasure]
+ring = 'Ring 3'
+maturity = 'beta'
+description = 'Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.'
+capabilities = ['erasure', 'vault', 'journal', 'report']
+path = "crates/contextra-erasure"
+unsafe_island = false
+may_depend_on = ['contextra-crypto', 'contextra-ports', 'contextra-types']
+ci_class = 'pr'
+spec = ['5.1', '11']
+test = "cargo test -p contextra-erasure --locked"

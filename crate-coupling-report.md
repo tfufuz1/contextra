@@ -1,8 +1,8 @@
 # Crate-Kopplungsbericht
 
-- Erzeugt: 2026-11-06 16:30
-- Workspace-Root: `/home/freddy/Projekte/contextra`
-- Analysierte Crates: 35 · Komponenten-Tiefe: 1 · Zeilen (ohne Leerzeilen): 329.247
+- Erzeugt: 2026-11-06 16:04
+- Workspace-Root: `/app`
+- Analysierte Crates: 37 · Komponenten-Tiefe: 1 · Zeilen (ohne Leerzeilen): 344.744
 - Legende: **prod** = src/bin/build ohne `cfg(test)`; **dev** = tests/benches/examples/fuzz und `cfg(test)`-Code.
 - Hinweis: Textuelle Analyse ohne Compiler. Glob-Importe (`*`) sind nicht auflösbar. Siehe Kopf des Skripts für Grenzen.
 
@@ -10,7 +10,7 @@
 
 | Crate | Ring | Zeilen | Fan-out prod | Fan-in prod | Cargo-Deps intern (n/d/b) | Pub-Items | API-Lecks | Zyklus |
 |---|---|---:|---:|---:|---|---:|---:|---|
-| [contextra](#contextra) | 4 | 4156 | 6 | 1 | 10/2/0 | 20 | 12 | – |
+| [contextra](#contextra) | 4 | 4156 | 7 | 1 | 11/2/0 | 20 | 12 | – |
 | [contextra-adapt](#contextra-adapt) | 0 | 6493 | 2 | 3 | 2/0/0 | 55 | 3 | – |
 | [contextra-agent](#contextra-agent) | 3 | 9181 | 5 | 0 | 7/3/0 | 51 | 8 | – |
 | [contextra-audit-export](#contextra-audit-export) | 0 | 1229 | 1 | 0 | 2/0/0 | 15 | 1 | – |
@@ -19,19 +19,21 @@
 | [contextra-checkpoint](#contextra-checkpoint) | 1 | 8374 | 2 | 2 | 3/2/0 | 1 | 0 | – |
 | [contextra-cognition](#contextra-cognition) | 3 | 9382 | 5 | 1 | 6/2/0 | 59 | 24 | – |
 | [contextra-core](#contextra-core) | 0 | 515 | 4 | 1 | 4/0/0 | 0 | 14 | – |
-| [contextra-crypto](#contextra-crypto) | 0 | 15200 | 2 | 6 | 2/2/0 | 84 | 10 | – |
+| [contextra-crypto](#contextra-crypto) | 0 | 15200 | 2 | 7 | 2/2/0 | 84 | 10 | – |
 | [contextra-db](#contextra-db) | 3 | 13322 | 8 | 3 | 13/2/0 | 13 | 23 | – |
 | [contextra-durable-fs](#contextra-durable-fs) | 0 | 2327 | 1 | 0 | 1/0/0 | 29 | 1 | – |
 | [contextra-engine](#contextra-engine) | 3 | 26428 | 12 | 3 | 14/2/0 | 80 | 28 | – |
+| [contextra-erasure](#contextra-erasure) | 3 | 12879 | 3 | 0 | 3/0/0 | 194 | 24 | – |
 | [contextra-graph](#contextra-graph) | 0 | 26905 | 2 | 3 | 3/2/0 | 122 | 23 | – |
 | [contextra-infer-candle](#contextra-infer-candle) | 2 | 7268 | 4 | 3 | 4/1/0 | 38 | 3 | – |
 | [contextra-infer-ollama](#contextra-infer-ollama) | 2 | 5493 | 3 | 1 | 3/0/0 | 36 | 5 | – |
 | [contextra-infer-onnx](#contextra-infer-onnx) | 2 | 2738 | 2 | 2 | 3/0/0 | 10 | 5 | – |
 | [contextra-ingest](#contextra-ingest) | 4 | 25186 | 2 | 0 | 2/0/0 | 133 | 0 | – |
 | [contextra-kvcache](#contextra-kvcache) | 1 | 7306 | 3 | 0 | 3/0/0 | 48 | 4 | – |
-| [contextra-mcp](#contextra-mcp) | 4 | 8706 | 10 | 0 | 11/0/0 | 34 | 12 | – |
+| [contextra-license](#contextra-license) | 4 | 2618 | 2 | 1 | 2/0/0 | 15 | 2 | – |
+| [contextra-mcp](#contextra-mcp) | 4 | 8706 | 10 | 0 | 12/0/0 | 34 | 12 | – |
 | [contextra-mvcc](#contextra-mvcc) | 0 | 5446 | 2 | 5 | 2/1/0 | 21 | 1 | – |
-| [contextra-ports](#contextra-ports) | 0 | 4291 | 1 | 21 | 1/0/0 | 75 | 2 | – |
+| [contextra-ports](#contextra-ports) | 0 | 4291 | 1 | 23 | 1/0/0 | 75 | 2 | – |
 | [contextra-privacy](#contextra-privacy) | 3 | 7209 | 3 | 2 | 3/2/0 | 69 | 6 | – |
 | [contextra-py](#contextra-py) | 4 | 3157 | 4 | 0 | 6/0/0 | 36 | 3 | – |
 | [contextra-rank](#contextra-rank) | 0 | 6508 | 1 | 7 | 2/1/0 | 20 | 2 | – |
@@ -42,7 +44,7 @@
 | [contextra-sys](#contextra-sys) | 0 | 1640 | 0 | 4 | 0/0/0 | 23 | 0 | – |
 | [contextra-testkit](#contextra-testkit) | tooling | 4320 | 2 | 0 | 2/0/0 | 22 | 8 | – |
 | [contextra-text](#contextra-text) | 0 | 13329 | 1 | 1 | 2/0/0 | 50 | 5 | – |
-| [contextra-types](#contextra-types) | 0 | 7968 | 0 | 27 | 0/0/0 | 66 | 0 | – |
+| [contextra-types](#contextra-types) | 0 | 7968 | 0 | 29 | 0/0/0 | 66 | 0 | – |
 | [contextra-vector](#contextra-vector) | 0 | 22182 | 6 | 2 | 6/0/0 | 33 | 1 | – |
 | [contextra-wire](#contextra-wire) | 0 | 5089 | 0 | 2 | 0/0/0 | 19 | 0 | – |
 
@@ -85,6 +87,7 @@
 | `contextra-graph` | `contextra-adapt` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-graph` | `contextra-testkit` | dev | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-infer-onnx` | `contextra-ports` | normal | nur in Tests/Benches genutzt, aber als normale Abhängigkeit deklariert → dev-dependency? |
+| `contextra-mcp` | `contextra-license` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-mcp` | `contextra-wire` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-py` | `contextra-adapt` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
 | `contextra-py` | `contextra-store` | normal | kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen) |
@@ -118,6 +121,7 @@ Kanten im prod-Code mit höchstens 3 verschiedenen Symbolen. Reihenfolge: wenigs
 | `contextra-mvcc` | `contextra-types` | 1 | 1 | 1 | `*` |
 | `contextra-engine` | `contextra-mvcc` | 1 | 1 | 1 | `tx_buffer::TxBuffer` |
 | `contextra-avv-generator` | `contextra-types` | 1 | 1 | 1 | `TenantId` |
+| `contextra-license` | `contextra-types` | 1 | 1 | 1 | `TenantId` |
 | `contextra-core` | `contextra-ports` | 1 | 2 | 1 | `*`×2 |
 | `contextra-vector` | `contextra-sys` | 1 | 2 | 2 | `mmap_readonly`×2 |
 | `contextra-checkpoint` | `contextra-mvcc` | 1 | 2 | 2 | `SnapshotRegistry`×2 |
@@ -135,12 +139,14 @@ Kanten im prod-Code mit höchstens 3 verschiedenen Symbolen. Reihenfolge: wenigs
 | `contextra-durable-fs` | `contextra-sys` | 2 | 2 | 2 | `FlushKind`, `rename_durable` |
 | `contextra-db` | `contextra-types` | 2 | 2 | 2 | `DistanceMetric`, `MAX_SEARCH_K` |
 | `contextra-bench` | `contextra-infer-candle` | 2 | 2 | 1 | `CandleEmbedClient::from_dir`, `model_registry::CandleQuantization::Q4KM` |
+| `contextra` | `contextra-license` | 2 | 2 | 1 | `SignedLicenseGate`, `signed_gate::VerifyingKey::from_bytes` |
 | `contextra` | `contextra-store` | 2 | 2 | 2 | `kv::delete_mode::KvDeleteMode`, `lsm::config` |
 | `contextra-adapt` | `contextra-ports` | 2 | 2 | 1 | `SeededRng::new`, `Rng::next_u64` |
 | `contextra-engine` | `contextra-infer-onnx` | 2 | 2 | 1 | `ensure_onnx_model_download`, `OnnxEmbedder::load` |
 | `contextra-store` | `contextra-sys` | 2 | 3 | 2 | `mmap_readonly`×2, `set_restrictive_file_acl` |
 | `contextra-vector` | `contextra-simd` | 2 | 3 | 3 | `validate_vector`×2, `kernels::scalar` |
 | `contextra-privacy` | `contextra-avv-generator` | 2 | 3 | 1 | `AvvContext`×2, `render_avv_markdown` |
+| `contextra-license` | `contextra-ports` | 2 | 3 | 2 | `license`×2, `clock` |
 | `contextra-ingest` | `contextra-types` | 2 | 3 | 3 | `DocId`×2, `ContextraError` |
 | `contextra-mcp` | `contextra-crypto` | 2 | 4 | 1 | `CryptoKey`×3, `CryptoKey::try_new` |
 | `contextra-simd` | `contextra-types` | 2 | 5 | 2 | `Result`×4, `ContextraError` |
@@ -339,43 +345,45 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 | `contextra-engine` | `temporal_filter` | `struct ValidityWindow` | `contextra-types` | `src/temporal_filter.rs:25` |
 | `contextra-engine` | `temporal_filter` | `fn apply_temporal_validity_filter` | `contextra-types` | `src/temporal_filter.rs:166` |
 | `contextra-engine` | `transaction::db_transaction` | `struct DbTransaction` | `contextra-vector` | `src/transaction/db_transaction.rs:18` |
-| `contextra-graph` | `apprh::diffusion` | `fn run_apprh_push` | `contextra-types` | `src/apprh/diffusion.rs:23` |
-| `contextra-graph` | `apprh` | `fn apprh_local` | `contextra-types` | `src/apprh/mod.rs:35` |
-| `contextra-graph` | `apprh` | `fn forward_push_apprh` | `contextra-types` | `src/apprh/mod.rs:51` |
-| `contextra-graph` | `apprh::shadow` | `struct ApprhShadowComparison` | `contextra-types` | `src/apprh/shadow.rs:30` |
-| `contextra-graph` | `apprh::shadow` | `fn shadow_compare_forward_push_vs_apprh` | `contextra-types` | `src/apprh/shadow.rs:54` |
-| `contextra-graph` | `edge_reinforcement_buffer` | `struct CooccurrenceSignal` | `contextra-types` | `src/edge_reinforcement_buffer.rs:26` |
-| `contextra-graph` | `edge_reinforcement_buffer` | `struct TraversalSignal` | `contextra-types` | `src/edge_reinforcement_buffer.rs:36` |
-| `contextra-graph` | `error` | `pub use contextra_ports::graph::GraphMutationError` | `contextra-ports` | `src/error.rs:4` |
-| `contextra-graph` | `hyperedge_suggest` | `fn validate_candidates_with_llm` | `contextra-ports` | `src/hyperedge_suggest.rs:118` |
-| `contextra-graph` | `(crate-root)` | `trait GraphIndexExt` | `contextra-ports` | `src/lib.rs:123` |
-| `contextra-graph` | `path_rag::k_path` | `struct KPathResult` | `contextra-types` | `src/path_rag/k_path.rs:35` |
-| `contextra-graph` | `path_rag` | `struct GraphPath` | `contextra-types` | `src/path_rag/mod.rs:31` |
-| `contextra-graph` | `path_rag` | `fn forward_push_ppr` | `contextra-types` | `src/path_rag/mod.rs:96` |
-| `contextra-graph` | `path_rag` | `pub use contextra_types::EntityId` | `contextra-types` | `src/path_rag/mod.rs:25` |
-| `contextra-graph` | `percolation` | `fn find_rebonding_candidates` | `contextra-ports`, `contextra-types` | `src/percolation.rs:79` |
-| `contextra-graph` | `ppr::shadow_hook` | `fn log_tl_hfd_vs_baseline_discrepancy` | `contextra-types` | `src/ppr/shadow_hook.rs:10` |
-| `contextra-graph` | `ppr_stream` | `struct PprCandidateStream` | `contextra-ports` | `src/ppr_stream.rs:23` |
-| `contextra-graph` | `tl_hfd::diffusion` | `fn run_diffusion` | `contextra-types` | `src/tl_hfd/diffusion.rs:28` |
-| `contextra-graph` | `tl_hfd::lovasz` | `fn truncate_participants` | `contextra-types` | `src/tl_hfd/lovasz.rs:14` |
-| `contextra-graph` | `tl_hfd::lovasz` | `fn compute_lovasz_extension` | `contextra-types` | `src/tl_hfd/lovasz.rs:56` |
-| `contextra-graph` | `tl_hfd` | `fn tl_hfd_local` | `contextra-types` | `src/tl_hfd/mod.rs:31` |
-| `contextra-graph` | `tl_hfd::shadow` | `struct ShadowComparison` | `contextra-types` | `src/tl_hfd/shadow.rs:55` |
-| `contextra-graph` | `tl_hfd::shadow` | `fn shadow_compare_forward_push_vs_tl_hfd` | `contextra-types` | `src/tl_hfd/shadow.rs:79` |
+| `contextra-erasure` | `io` | `fn write_all_at` | `contextra-ports` | `src/io.rs:11` |
+| `contextra-erasure` | `io` | `fn read_exact_at` | `contextra-ports` | `src/io.rs:29` |
+| `contextra-erasure` | `io` | `fn zero_at` | `contextra-ports` | `src/io.rs:54` |
+| `contextra-erasure` | `ledger` | `struct FinalizeParams` | `contextra-types` | `src/ledger.rs:25` |
+| `contextra-erasure` | `ledger` | `fn finalize_erasure` | `contextra-ports` | `src/ledger.rs:67` |
+| `contextra-erasure` | `measure::field` | `fn read_file_verified` | `contextra-ports` | `src/measure/field.rs:202` |
+| `contextra-erasure` | `measure::field` | `fn collect_all_files` | `contextra-ports` | `src/measure/field.rs:236` |
+| `contextra-erasure` | `measure::field` | `fn scan_mk1_structures` | `contextra-ports` | `src/measure/field.rs:264` |
+| `contextra-erasure` | `measure::field` | `fn scan_mk2_raw` | `contextra-ports` | `src/measure/field.rs:312` |
+| `contextra-erasure` | `measure::positive_control` | `fn run_positive_control` | `contextra-types` | `src/measure/positive_control.rs:18` |
+| `contextra-erasure` | `measure::positive_control` | `fn run_positive_control_vfs` | `contextra-ports`, `contextra-types` | `src/measure/positive_control.rs:71` |
+| `contextra-erasure` | `measure::scanner_flow` | `fn scan_with_control` | `contextra-ports` | `src/measure/scanner_flow.rs:29` |
+| `contextra-erasure` | `report::build` | `fn build_report_with_options` | `contextra-types` | `src/report/build.rs:333` |
+| `contextra-erasure` | `report::build` | `fn build_report` | `contextra-types` | `src/report/build.rs:484` |
+| `contextra-erasure` | `restore::replay` | `fn replay_erasures` | `contextra-types` | `src/restore/replay.rs:21` |
+| `contextra-erasure` | `restricted` | `struct RestrictedReadAudit` | `contextra-types` | `src/restricted.rs:125` |
+| `contextra-erasure` | `saga::core` | `struct ErasureDeps` | `contextra-ports` | `src/saga/core.rs:74` |
+| `contextra-erasure` | `saga::driver` | `enum SagaEvent` | `contextra-types` | `src/saga/driver.rs:13` |
+| `contextra-erasure` | `saga::driver` | `enum StepOutcome` | `contextra-types` | `src/saga/driver.rs:24` |
+| `contextra-erasure` | `saga::machine` | `struct EraseRequest` | `contextra-ports` | `src/saga/machine.rs:18` |
+| `contextra-erasure` | `scope::file` | `fn store_scope_file` | `contextra-ports` | `src/scope/file.rs:30` |
+| `contextra-erasure` | `scope::file` | `fn load_scope_file` | `contextra-ports` | `src/scope/file.rs:112` |
+| `contextra-erasure` | `vault::durable` | `pub use contextra_ports::vfs::VerifiedVia` | `contextra-ports` | `src/vault/durable.rs:10` |
 
-… 79 weitere (siehe `--json`).
+… 105 weitere (siehe `--json`).
 
 ## 3. Kantenliste
 
 | Von | Nach | prod Fundstellen | prod Symbole | dev Fundstellen | Cargo-Art |
 |---|---|---:|---:|---:|---|
 | `contextra-engine` | `contextra-types` | 234 | 49 | 178 | normal |
+| `contextra-erasure` | `contextra-ports` | 56 | 25 | 92 | normal |
 | `contextra-vector` | `contextra-types` | 55 | 7 | 42 | normal |
 | `contextra-checkpoint` | `contextra-ports` | 47 | 7 | 9 | normal |
 | `contextra-graph` | `contextra-types` | 40 | 13 | 57 | normal |
 | `contextra-store` | `contextra-ports` | 39 | 11 | 144 | normal |
 | `contextra-crypto` | `contextra-types` | 35 | 14 | 18 | normal |
 | `contextra-engine` | `contextra-ports` | 33 | 18 | 22 | normal |
+| `contextra-erasure` | `contextra-types` | 32 | 12 | 30 | normal |
 | `contextra-adapt` | `contextra-types` | 30 | 9 | 1 | normal |
 | `contextra-agent` | `contextra-types` | 26 | 9 | 59 | normal |
 | `contextra-store` | `contextra-types` | 26 | 11 | 113 | normal |
@@ -400,6 +408,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 | `contextra-store` | `contextra-mvcc` | 10 | 6 | 6 | normal |
 | `contextra` | `contextra-types` | 9 | 6 | 25 | normal |
 | `contextra-bench` | `contextra-core` | 9 | 6 | 0 | – |
+| `contextra-erasure` | `contextra-crypto` | 9 | 5 | 0 | normal |
 | `contextra-mcp` | `contextra` | 9 | 6 | 10 | normal |
 | `contextra-infer-ollama` | `contextra-types` | 8 | 3 | 3 | normal |
 | `contextra-kvcache` | `contextra-crypto` | 8 | 5 | 3 | normal |
@@ -436,6 +445,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 | `contextra-agent` | `contextra-store` | 3 | 1 | 0 | normal |
 | `contextra-cognition` | `contextra-vector` | 3 | 1 | 16 | normal |
 | `contextra-ingest` | `contextra-types` | 3 | 2 | 3 | normal |
+| `contextra-license` | `contextra-ports` | 3 | 2 | 9 | normal |
 | `contextra-mcp` | `contextra-infer-ollama` | 3 | 3 | 0 | normal? |
 | `contextra-mcp` | `contextra-infer-onnx` | 3 | 3 | 0 | normal? |
 | `contextra-mcp` | `contextra-rank` | 3 | 3 | 0 | normal |
@@ -445,6 +455,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 | `contextra-py` | `contextra-types` | 3 | 3 | 0 | normal |
 | `contextra-store` | `contextra-sys` | 3 | 2 | 4 | normal |
 | `contextra-vector` | `contextra-simd` | 3 | 2 | 7 | normal |
+| `contextra` | `contextra-license` | 2 | 2 | 2 | normal |
 | `contextra` | `contextra-store` | 2 | 2 | 3 | normal |
 | `contextra-adapt` | `contextra-ports` | 2 | 2 | 1 | normal |
 | `contextra-audit-export` | `contextra-types` | 2 | 1 | 6 | normal |
@@ -472,6 +483,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 | `contextra-infer-candle` | `contextra-crypto` | 1 | 1 | 1 | dev/normal? |
 | `contextra-infer-candle` | `contextra-rank` | 1 | 1 | 0 | normal |
 | `contextra-infer-ollama` | `contextra-rank` | 1 | 1 | 0 | normal |
+| `contextra-license` | `contextra-types` | 1 | 1 | 6 | normal |
 | `contextra-mvcc` | `contextra-types` | 1 | 1 | 3 | normal |
 | `contextra-router` | `contextra-ports` | 1 | 1 | 18 | normal |
 | `contextra-router` | `contextra-types` | 1 | 1 | 16 | normal |
@@ -515,7 +527,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 ### contextra
 
 - Pfad: `crates/contextra` · Zeilen: 4156 · Rust-Dateien: 24 · Ring: 4
-- Interne Cargo-Abhängigkeiten: `contextra-crypto` (dev), `contextra-testkit` (dev), `contextra-audit-export` (normal/optional via audit-export), `contextra-avv-generator` (normal/optional via avv-generator), `contextra-crypto` (normal/optional), `contextra-db` (normal), `contextra-infer-candle` (normal/optional via candle), `contextra-ports` (normal), `contextra-privacy` (normal/optional), `contextra-rank` (normal), `contextra-store` (normal), `contextra-types` (normal)
+- Interne Cargo-Abhängigkeiten: `contextra-crypto` (dev), `contextra-testkit` (dev), `contextra-audit-export` (normal/optional via audit-export), `contextra-avv-generator` (normal/optional via avv-generator), `contextra-crypto` (normal/optional), `contextra-db` (normal), `contextra-infer-candle` (normal/optional via candle), `contextra-license` (normal), `contextra-ports` (normal), `contextra-privacy` (normal/optional), `contextra-rank` (normal), `contextra-store` (normal), `contextra-types` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
@@ -523,6 +535,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
 |---|---:|---:|---:|---|---|
 | `contextra-types` | 9 | 25 | 5 | `error::ContextraError`×3, `DistanceMetric`×2, `types::domain::AutoExtractionMode`, `types::domain`, `error::Result`, `ScoredEntry` | `Result`×2, `ContextraError`×2, `DocId`×2, `DocId::from_u64`×2, `RequestContext` … (+4) |
 | `contextra-ports` | 5 | 12 | 4 | `license`×2, `IdGen`, `license::LicenseGate`, `license::VectorDeleteMode` | `BoxFuture`×3, `license::GateToken`, `license::GateToken::for_test`, `SequentialIdGen`, `StorageEngine` … (+4) |
+| `contextra-license` | 2 | 2 | 1 | `SignedLicenseGate`, `signed_gate::VerifyingKey::from_bytes` | `OpenFastGate` |
 | `contextra-store` | 2 | 3 | 2 | `kv::delete_mode::KvDeleteMode`, `lsm::config` | `lsm::config::DurabilityMode`, `lsm::DurabilityMode` |
 | `contextra-db` | 1 | 4 | 1 | `QueryRewriter` | `engine::ProofKeyProvider`, `EmbeddingBackend`, `ContextraConfig` |
 | `contextra-infer-candle` | 1 | 0 | 1 | `(crate)` | – |
@@ -540,6 +553,7 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
   - → `contextra-ports`: prod: `IdGen`
   - → `contextra-types`: prod: `error::ContextraError`
 - `builder` (489 Zeilen)
+  - → `contextra-license`: prod: `SignedLicenseGate`, `signed_gate::VerifyingKey::from_bytes`
   - → `contextra-ports`: prod: `license`
   - → `contextra-types`: prod: `error::ContextraError`, `DistanceMetric`
 - `collection_profile` (172 Zeilen)
@@ -569,10 +583,12 @@ Symbole, die aus einem Nicht-Basis-Crate von mindestens 3 verschiedenen Crates i
   - → `contextra-types`: dev: `Result`×2, `RequestContext`, `TxId`
 - `tests/license_gate_always_enforced.rs` (200 Zeilen)
   - → `contextra-db`: dev: `ContextraConfig`
+  - → `contextra-license`: dev: `SignedLicenseGate`
   - → `contextra-ports`: dev: `license::FeatureRing`
   - → `contextra-store`: dev: `lsm::config::DurabilityMode`
   - → `contextra-types`: dev: `error::ContextraError`
 - `tests/license_gate_enforcement.rs` (141 Zeilen)
+  - → `contextra-license`: dev: `OpenFastGate`
   - → `contextra-ports`: dev: `license`
   - → `contextra-types`: dev: `error::ContextraError`
 - `tests/llm_query_rewriter.rs` (206 Zeilen)
@@ -1668,6 +1684,7 @@ Keine pub-Items erkannt (Bibliothek ohne lib.rs, nur Binary, oder alles intern).
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
+| `contextra-erasure` | `dek::Dek`×2, `secret::SecretKey`×2, `aead`×2, `hkdf_expand`×2, `SecretKey::new` | – |
 | `contextra-kvcache` | `KvCipher`×2, `KvSegmentCipher`×2, `CryptoError`×2, `CryptoKey`, `ModelFingerprint` | – |
 | `contextra-vector` | `wal_crypto::WalHmac::new`×6 | – |
 | `contextra-store` | `wal_crypto`×2, `verify_wal_chain_completeness`, `wal_crypto::WalHmac`, `crypto::KeyManager` | – |
@@ -2275,6 +2292,231 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 - contextra-sandbox: kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen)
 - contextra-sys: kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen)
+
+### contextra-erasure
+
+- Pfad: `crates/contextra-erasure` · Zeilen: 12879 · Rust-Dateien: 80 · Ring: 3
+- Interne Cargo-Abhängigkeiten: `contextra-crypto` (normal), `contextra-ports` (normal), `contextra-types` (normal)
+
+**Ausgehend (Importe aus anderen Workspace-Crates)**
+
+| Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
+|---|---:|---:|---:|---|---|
+| `contextra-ports` | 56 | 92 | 24 | `vfs::Vfs`×11, `ContextraError::Io`×6, `gate`×5, `BoxFuture`×4, `vfs`×3, `keys`×3, `gate::Seq`×2, `gate::KeyBuf::new`×2, `clock`×2, `observer`×2 … (+15) | `Result`×51, `ContextraError::NotFound`×4, `ledger::LedgerSink`, `report_signer::ReportSigner` |
+| `contextra-types` | 32 | 30 | 19 | `ids::ErasureId`×11, `erasure`×9, `erasure::LayerWitness`×2, `erasure::PendingReason`×2, `erasure::ControlEvidence`, `erasure::Residue`, `erasure::MeasureClass::Mk1`, `erasure::MeasureClass::Mk2`, `erasure::MeasureClass::Mk3`, `ids` … (+2) | `ContextraError::NotFound`×6, `erasure::RetentionAttestation`×2, `erasure::Scanner::new`, `erasure::LayerId::new`, `erasure::ControlEvidence::observed` … (+1) |
+| `contextra-crypto` | 9 | 0 | 5 | `dek::Dek`×2, `secret::SecretKey`×2, `aead`×2, `hkdf_expand`×2, `SecretKey::new` | – |
+
+**Pro Komponente**
+
+- `gate` (829 Zeilen)
+  - → `contextra-ports`: prod: `gate`×3, `gate::KeyBuf::new`×2, `barrier::CommitBarrier`, `gate::Seq`
+- `io` (59 Zeilen)
+  - → `contextra-ports`: prod: `vfs::VfsFile`
+- `journal` (835 Zeilen)
+  - → `contextra-crypto`: prod: `dek::Dek`, `secret::SecretKey`, `aead`
+  - → `contextra-ports`: prod: `vfs`, `ContextraError`, `vfs::Vfs`
+  - → `contextra-types`: prod: `ids::ErasureId`×2
+- `ledger` (320 Zeilen)
+  - → `contextra-ports`: prod: `vfs::Vfs`, `gate`, `ledger`
+  - → `contextra-types`: prod: `erasure::LayerWitness`, `ids::ErasureId`
+- `measure` (786 Zeilen)
+  - → `contextra-ports`: prod: `vfs::Vfs`×2, `vfs`, `clock`
+  - → `contextra-types`: prod: `erasure`×4, `erasure::ControlEvidence`, `erasure::Residue`
+- `purge` (199 Zeilen)
+  - → `contextra-ports`: prod: `clock`, `observer`
+- `replace` (126 Zeilen)
+  - → `contextra-types`: prod: `ids::ErasureId`
+- `report` (1166 Zeilen)
+  - → `contextra-ports`: prod: `vfs::Vfs`, `BoxFuture`, `report_signer`
+  - → `contextra-types`: prod: `erasure::LayerWitness`, `ids::ErasureId`, `erasure::MeasureClass::Mk1`, `erasure::MeasureClass::Mk2`, `erasure::MeasureClass::Mk3`
+- `restore` (107 Zeilen)
+  - → `contextra-ports`: prod: `gate::Seq`
+  - → `contextra-types`: prod: `ids::ErasureId`
+- `restricted` (190 Zeilen)
+  - → `contextra-types`: prod: `ids::ErasureId`
+- `saga` (1291 Zeilen)
+  - → `contextra-ports`: prod: `erasure`×2, `clock::Clock`, `id_gen::IdGen`, `barrier`, `observer`, `erasure::EraseTarget`, `gate::GateDecision`, `BoxFuture`
+  - → `contextra-types`: prod: `erasure`×5, `ids::ErasureId`×3, `erasure::PendingReason`×2, `ids`, `refs::OperatorRef::try_new`
+- `scope` (306 Zeilen)
+  - → `contextra-crypto`: prod: `dek::Dek`, `secret::SecretKey`, `aead`
+  - → `contextra-ports`: prod: `vfs::Vfs`, `keys`
+- `supersede` (153 Zeilen)
+  - → `contextra-types`: prod: `erasure::KeyCoverage`, `ids::ErasureId`
+- `vault` (2439 Zeilen)
+  - → `contextra-crypto`: prod: `hkdf_expand`×2, `SecretKey::new`
+  - → `contextra-ports`: prod: `ContextraError::Io`×6, `vfs::Vfs`×5, `BoxFuture`×2, `keys`×2, `vfs::VerifiedVia`, `vfs`, `vfs::VerifiedVia::Direct`, `vfs::VerifiedVia::CacheDropped`, `vfs::VerifiedVia::Cached`, `gate`
+- `tests/crash_matrix_recovery.rs` (250 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`, `gate::GateDecision`, `id_gen::IdGen`, `BoxFuture` … (+2)
+  - → `contextra-types`: dev: `erasure::RetentionAttestation`×2, `erasure::PendingReason`, `ids::ErasureId`
+- `tests/gate_linearization_test.rs` (190 Zeilen)
+  - → `contextra-ports`: dev: `BoxFuture`, `barrier`, `gate`
+- `tests/journal_durable_spec_tests.rs` (327 Zeilen)
+  - → `contextra-ports`: dev: `Result`×9, `ContextraError::NotFound`×2, `vfs`
+- `tests/ledger_spec_tests.rs` (124 Zeilen)
+  - → `contextra-ports`: dev: `Result`×8, `vfs::Vfs`×2, `ledger::LedgerSink`
+  - → `contextra-types`: dev: `ids::ErasureId`, `ContextraError::NotFound`
+- `tests/loom_gate.rs` (134 Zeilen)
+  - → `contextra-ports`: dev: `gate`
+- `tests/measure_real_scan_tests.rs` (301 Zeilen)
+  - → `contextra-ports`: dev: `Result`×9, `vfs`
+  - → `contextra-types`: dev: `ContextraError::NotFound`×2, `erasure`
+- `tests/measure_spec_tests.rs` (237 Zeilen)
+  - → `contextra-ports`: dev: `Result`×9, `vfs`
+  - → `contextra-types`: dev: `ContextraError::NotFound`×2, `erasure`
+- `tests/report_canonical_spec_tests.rs` (180 Zeilen)
+  - → `contextra-ports`: dev: `report_signer::ReportSigner`
+  - → `contextra-types`: dev: `ids::ErasureId`, `erasure::Scanner::new`, `erasure::LayerId::new`, `erasure::MeasureClass::Mk1` … (+1)
+- `tests/report_spec_tests.rs` (79 Zeilen)
+  - → `contextra-ports`: dev: `Result`×8, `vfs::Vfs`×2
+  - → `contextra-types`: dev: `ids::ErasureId`, `ContextraError::NotFound`
+- `tests/saga_core_orchestration.rs` (477 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`, `gate::GateDecision`, `id_gen::IdGen`, `BoxFuture` … (+3)
+  - → `contextra-types`: dev: `refs::OperatorRef`, `erasure`, `ids`
+- `tests/scope_codec_spec_tests.rs` (154 Zeilen)
+  - → `contextra-ports`: dev: `Result`×8, `ContextraError::NotFound`×2, `vfs::Vfs`, `BoxFuture` … (+1)
+- `tests/special_targets_test.rs` (247 Zeilen)
+  - → `contextra-types`: dev: `erasure::KeyCoverage`, `ids::ErasureId`
+- `tests/t_gate.rs` (61 Zeilen)
+  - → `contextra-ports`: dev: `gate`
+- `tests/t_measure.rs` (71 Zeilen)
+  - → `contextra-types`: dev: `erasure`
+- `tests/t_observer.rs` (58 Zeilen)
+  - → `contextra-ports`: dev: `BoxFuture`
+  - → `contextra-types`: dev: `ids::ErasureId`
+- `tests/t_report_ledger.rs` (63 Zeilen)
+  - → `contextra-ports`: dev: `gate`, `ledger`
+  - → `contextra-types`: dev: `ids::ErasureId`
+- `tests/t_saga_journal.rs` (155 Zeilen)
+  - → `contextra-types`: dev: `erasure::PendingReason`, `ids::ErasureId`
+- `tests/t_saga_spec_extensions.rs` (112 Zeilen)
+  - → `contextra-types`: dev: `ids::ErasureId`
+- `tests/t_sealer_keyring.rs` (43 Zeilen)
+  - → `contextra-ports`: dev: `gate`, `keys`
+- `tests/vault_spec_conformance.rs` (503 Zeilen)
+  - → `contextra-ports`: dev: `keys`, `vfs`
+
+**Öffentliche Schnittstelle** (erreichbar über `pub mod`-Kette oder `pub use`)
+
+- `error`
+  - 1 enum
+    - `enum ErasureError`
+- `gate`
+  - 2 enum, 3 fn, 6 struct
+    - `struct BatchGateRequest` · 2 Methoden
+    - `struct BatchGateOutcome`
+    - `struct GateBatchCoordinator` · 2 Methoden
+    - `fn bind_global_erased_set`
+    - `fn add_batch`
+    - `fn evaluate_restricted_access`
+    - `struct ErasedSet` · 19 Methoden
+    - `enum GatePredicate`
+    - `enum GateLogEntry`
+    - `struct GateLog` · 9 Methoden
+    - `struct GateGuard` · 3 Methoden
+- `io`
+  - 3 fn
+    - `fn write_all_at` ⚠ fremd: `contextra-ports`
+    - `fn read_exact_at` ⚠ fremd: `contextra-ports`
+    - `fn zero_at` ⚠ fremd: `contextra-ports`
+- `journal`
+  - 2 enum, 2 fn, 6 struct, 1 trait
+    - `struct DurableJournal` · 5 Methoden
+    - `struct AppendLog` · 6 Methoden
+    - `trait EpochKeys` · Methoden: commit_key
+    - `fn compute_commitment`
+    - `struct Epoch` · 2 Methoden
+    - `enum RecordCode` · 3 Methoden
+    - `enum TargetType` · 2 Methoden
+    - `struct JournalRecord` · 3 Methoden
+    - `struct JournalEntry` · 3 Methoden
+    - `fn reduce`
+    - `struct ErasureJournal` · 5 Methoden
+- `ledger`
+  - 1 const, 1 fn, 5 struct
+    - `struct LedgerEntry` · 2 Methoden
+    - `const GENESIS_HASH`
+    - `struct InMemoryLedger` · 8 Methoden
+    - `struct FinalizeParams` ⚠ fremd: `contextra-types`
+    - `struct FinalizeOutcome`
+    - `fn finalize_erasure` ⚠ fremd: `contextra-ports`
+    - `struct InMemoryLedger` · 1 Methoden
+- `measure`
+  - 2 enum, 12 fn, 10 struct, 1 trait
+    - `enum VerifiedVia` · 1 Methoden
+    - `trait StructureDecoder` · Methoden: name, can_decode, decode_and_check
+    - `struct ScanPlan` · 6 Methoden
+    - `struct Mk3StatusInput`
+    - `struct Mk1Result`
+    - `struct Mk2Result`
+    - `struct Mk3Result` · 1 Methoden
+    - `fn scan_mk3_keys`
+    - `fn read_file_verified` ⚠ fremd: `contextra-ports`
+    - `fn collect_all_files` ⚠ fremd: `contextra-ports`
+    - `fn scan_mk1_structures` ⚠ fremd: `contextra-ports`
+    - `fn scan_mk2_raw` ⚠ fremd: `contextra-ports`
+    - `fn run_positive_control` ⚠ fremd: `contextra-types`
+    - `fn run_positive_control_vfs` ⚠ fremd: `contextra-ports`, `contextra-types`
+    - `fn verify_scanner_integrity`
+    - `fn scan_with_control` ⚠ fremd: `contextra-ports`
+    - `fn run_scanner_flow`
+    - `fn arm_scanner`
+    - `fn finish_scan`
+    - `enum EvidenceKind`
+    - `struct LocalControlEvidence` · 1 Methoden
+    - `struct UnarmedScanner` · 3 Methoden
+    - `struct ArmedScanner` · 1 Methoden
+    - `struct TestWitness` · 1 Methoden
+    - `struct MeasurementCoordinator` · 1 Methoden
+- `purge`
+  - 1 enum, 4 fn, 4 struct
+    - `struct PurgeCx` · 4 Methoden
+    - `struct PurgePriority`
+    - `struct LayerPurgeOrder` · 1 Methoden
+    - `fn sort_by_priority`
+    - `enum ReserveCheck`
+    - `fn check_disk_reserve`
+    - `struct WindowOutcome` · 2 Methoden
+    - `fn run_window`
+    - `fn run_core_window`
+- `replace`
+  - 1 enum, 1 struct
+    - `enum ReplaceStep`
+    - `struct ReplacePlan` · 9 Methoden
+- `report`
+  - 2 enum, 11 fn, 11 struct, 1 type
+    - `enum ReachStatus` · 1 Methoden
+    - `struct LayerWitnessReport` · 1 Methoden
+    - `type WitnessEntry`
+    - `struct FieldMeasurementSection`
+    - `struct LayerKeyCoverage`
+    - `struct ProcessHardeningStatus`
+    - `struct ErasureReport` · 2 Methoden
+    - `struct ReportBuildOptions`
+    - `fn build_report_with_options` ⚠ fremd: `contextra-types`
+    - `fn build_report` ⚠ fremd: `contextra-types`
+    - `fn canonicalize_report`
+- `restore`
+  - 1 enum, 1 fn, 3 struct
+- `restricted`
+  - 2 enum, 3 struct
+- `saga`
+  - 4 enum, 4 fn, 8 struct, 7 trait
+- `scope`
+  - 5 fn, 2 struct, 1 type
+- `supersede`
+  - 1 enum, 2 struct
+- `vault`
+  - 19 const, 3 enum, 20 fn, 12 struct, 1 trait, 1 type
+  - … 114 weitere Items nicht aufgelistet (`--max-items`)
+- Zusätzlich 4 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
+- Interne Re-Exporte (`pub use`): `SagaState`, `SagaState`
+- ⚠ Re-Exporte **fremder Crates**: `contextra_ports::vfs::VerifiedVia`
+
+**Eingehend (wer nutzt dieses Crate)**
+
+Wird von keinem anderen analysierten Workspace-Crate importiert.
+
+**Nach außen ungenutzte öffentliche Items (Heuristik, 194 von 194)**: `ErasureError`, `BatchGateRequest`, `BatchGateOutcome`, `GateBatchCoordinator`, `bind_global_erased_set`, `add_batch`, `evaluate_restricted_access`, `ErasedSet`, `GatePredicate`, `GateLogEntry`, `GateLog`, `GateGuard`, `write_all_at`, `read_exact_at`, `zero_at`, `DurableJournal`, `AppendLog`, `EpochKeys`, `compute_commitment`, `Epoch`, `RecordCode`, `TargetType`, `JournalRecord`, `JournalEntry`, `reduce`, `ErasureJournal`, `LedgerEntry`, `GENESIS_HASH`, `InMemoryLedger`, `FinalizeParams` …
 
 ### contextra-graph
 
@@ -3117,10 +3359,84 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 **Nach außen ungenutzte öffentliche Items (Heuristik, 48 von 48)**: `StorageEngineKvBridge`, `EmbeddingProviderSemanticEmbedder`, `KvCachePluginConfig`, `KvCachePluginManifest`, `AttentionScoreSource`, `NullAttentionScoreSource`, `rank_for_eviction`, `rank_for_eviction_weighted`, `rank_for_eviction_weighted_for_tenant`, `EvictionWorker`, `emergency_wipe`, `DEFAULT_BYTE_BUDGET_PER_TENANT`, `TenantPrefixKvStore`, `KiviQuantizeConfig`, `KvTensorView`, `KiviBlockMeta`, `KiviQuantizedBlock`, `kivi_quantize`, `kivi_dequantize`, `unpack_kivi_block`, `pack_kivi_block`, `compress_bytes`, `decompress_bytes`, `KvReusePolicy`, `KvBlockGuard`, `PrefixMatch`, `PrefixRadixTree`, `KvSegmentRef`, `KvLookupResult`, `SemanticEmbedder` …
 
+### contextra-license
+
+- Pfad: `crates/contextra-license` · Zeilen: 2618 · Rust-Dateien: 15 · Ring: 4
+- Interne Cargo-Abhängigkeiten: `contextra-ports` (normal), `contextra-types` (normal)
+
+**Ausgehend (Importe aus anderen Workspace-Crates)**
+
+| Ziel | prod | dev | Dateien (prod) | Symbole (prod) | Symbole (nur dev) |
+|---|---:|---:|---:|---|---|
+| `contextra-ports` | 3 | 9 | 2 | `license`×2, `clock` | `clock::Clock`×9 |
+| `contextra-types` | 1 | 6 | 1 | `TenantId` | – |
+
+**Pro Komponente**
+
+- `(crate-root)` (37 Zeilen)
+  - → `contextra-ports`: prod: `license`
+- `signed_gate` (729 Zeilen)
+  - → `contextra-ports`: prod: `clock`, `license`
+  - → `contextra-types`: prod: `TenantId`
+- `tests/check_ring_order.rs` (222 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+- `tests/clock_expiration_boundary.rs` (122 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+- `tests/crypto_hygiene_payload.rs` (134 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+  - → `contextra-types`: dev: `TenantId`
+- `tests/installation_binding.rs` (246 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+  - → `contextra-types`: dev: `TenantId`
+- `tests/installation_binding_isolation.rs` (87 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+- `tests/key_rotation.rs` (181 Zeilen)
+  - → `contextra-types`: dev: `TenantId`
+- `tests/legacy_payload_compat.rs` (169 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+  - → `contextra-types`: dev: `TenantId`
+- `tests/negative_matrix_and_from_activation.rs` (266 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+  - → `contextra-types`: dev: `TenantId`
+- `tests/signed_activation_7_steps.rs` (154 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+- `tests/signed_gate.rs` (162 Zeilen)
+  - → `contextra-ports`: dev: `clock::Clock`
+  - → `contextra-types`: dev: `TenantId`
+
+**Öffentliche Schnittstelle** (erreichbar über `pub mod`-Kette oder `pub use`)
+
+- `signed_gate`
+  - 1 const, 1 enum, 9 fn, 4 struct
+    - `const MAX_PAYLOAD_BYTES`
+    - `fn constant_time_eq_32`
+    - `struct SignedLicenseOptions`
+    - `enum StepVerificationError` · 1 Methoden
+    - `struct SignedActivation` · 3 Methoden
+    - `fn derive_local_installation_id_hash`
+    - `struct LicensePayload` ⚠ fremd: `contextra-types`
+    - `fn verify_step_1_fast_ring`
+    - `fn verify_step_2_presence`
+    - `fn verify_step_3_installation`
+    - `fn verify_step_4_signature`
+    - `fn verify_step_5_expiration` ⚠ fremd: `contextra-ports`
+    - `fn verify_step_6_ring_permission`
+    - `fn verify_step_7_success`
+    - `struct SignedLicenseGate` · 18 Methoden
+- Zusätzlich 2 `pub`-Items in privaten Modulen ohne Re-Export (nicht Teil der echten API).
+
+**Eingehend (wer nutzt dieses Crate)**
+
+| Nutzer | Symbole prod | Symbole dev |
+|---|---|---|
+| `contextra` | `SignedLicenseGate`, `signed_gate::VerifyingKey::from_bytes` | `OpenFastGate` |
+
+**Nach außen ungenutzte öffentliche Items (Heuristik, 14 von 15)**: `MAX_PAYLOAD_BYTES`, `constant_time_eq_32`, `SignedLicenseOptions`, `StepVerificationError`, `SignedActivation`, `derive_local_installation_id_hash`, `LicensePayload`, `verify_step_1_fast_ring`, `verify_step_2_presence`, `verify_step_3_installation`, `verify_step_4_signature`, `verify_step_5_expiration`, `verify_step_6_ring_permission`, `verify_step_7_success`
+
 ### contextra-mcp
 
 - Pfad: `crates/contextra-mcp` · Zeilen: 8706 · Rust-Dateien: 36 · Ring: 4
-- Interne Cargo-Abhängigkeiten: `contextra` (normal), `contextra-crypto` (normal), `contextra-infer-candle` (normal/optional via candle), `contextra-infer-ollama` (normal/optional via ollama), `contextra-infer-onnx` (normal/optional via onnx), `contextra-ports` (normal), `contextra-privacy` (normal), `contextra-rank` (normal), `contextra-router` (normal), `contextra-types` (normal), `contextra-wire` (normal)
+- Interne Cargo-Abhängigkeiten: `contextra` (normal), `contextra-crypto` (normal), `contextra-infer-candle` (normal/optional via candle), `contextra-infer-ollama` (normal/optional via ollama), `contextra-infer-onnx` (normal/optional via onnx), `contextra-license` (normal), `contextra-ports` (normal), `contextra-privacy` (normal), `contextra-rank` (normal), `contextra-router` (normal), `contextra-types` (normal), `contextra-wire` (normal)
 
 **Ausgehend (Importe aus anderen Workspace-Crates)**
 
@@ -3283,6 +3599,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 **Auffälligkeiten**
 
+- contextra-license: kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen)
 - contextra-wire: kein Code-Zugriff gefunden (prüfen: Makro, Feature, cfg, oder entfernen)
 
 ### contextra-mvcc
@@ -3524,6 +3841,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 
 | Nutzer | Symbole prod | Symbole dev |
 |---|---|---|
+| `contextra-erasure` | `vfs::Vfs`×11, `ContextraError::Io`×6, `gate`×5, `BoxFuture`×4, `vfs`×3, `keys`×3, `gate::Seq`×2, `gate::KeyBuf::new`×2, `clock`×2, `observer`×2 … (+15) | `Result`×51, `ContextraError::NotFound`×4, `ledger::LedgerSink`, `report_signer::ReportSigner` |
 | `contextra-checkpoint` | `Clock`×19, `StorageEngine`×14, `MetricsSink`×6, `BoxFuture`×3, `SystemClock`×2, `Checkpoint`×2, `CheckpointCoordinator` | – |
 | `contextra-store` | `Clock`×7, `MetricsSink`×6, `MAX_SCAN_MERGE_ACCUMULATOR`×6, `StorageStats`×5, `scanner`×5, `StorageEngine`×3, `ResourceTracker`×2, `SystemClock::new`×2, `license::FeatureRing`, `license::FeatureRing::Sovereign` … (+1) | `ResourceBudget`×27, `ResourceTracker::new`×26, `clock::SystemClock`, `storage::StorageEngine` |
 | `contextra-engine` | `MetricsSink`×9, `StorageEngine`×5, `VectorIndexStats`×2, `Reranker`×2, `DriftStatusProvider`×2, `VectorIndex`, `Clock`, `SystemClock::new`, `SystemClock`, `scanner` … (+8) | `scanner::ScanTechnique` |
@@ -3539,6 +3857,7 @@ Wird von keinem anderen analysierten Workspace-Crate importiert.
 | `contextra` | `license`×2, `IdGen`, `license::LicenseGate`, `license::VectorDeleteMode` | `BoxFuture`×3, `license::GateToken`, `license::GateToken::for_test`, `SequentialIdGen` … (+5) |
 | `contextra-cognition` | `SegmentSynthesizer`×2, `LlmTextGenerator`, `StorageEngine`, `SeededRng::from_entropy` | `SeededRng`×2, `BoxFuture`×2, `ResponseGroundingValidator` |
 | `contextra-crypto` | `scanner::LayerWitness`, `Clock`, `scanner::ScanTechnique::NotMeasured`, `ScanTechnique`, `scanner` | `Result`×24, `SystemClock`×6, `scanner::ScanTechnique`×4 |
+| `contextra-license` | `license`×2, `clock` | `clock::Clock`×9 |
 | `contextra-mvcc` | `MetricsSink`×3 | – |
 | `contextra-privacy` | `Clock`×3 | – |
 | `contextra-adapt` | `SeededRng::new`, `Rng::next_u64` | `Clock` |
@@ -4964,6 +5283,7 @@ Keine Importe aus anderen Workspace-Crates.
 | `contextra-vector` | `ContextraError::invalid_input`×19, `MAX_SEARCH_K`×15, `Result`×8, `ContextraError::HnswConnectivityDegraded`×4, `ContextraError::Index`×4, `DocId`×3, `DistanceMetric`×2 | `ContextraError::InvalidInput`×6, `ContextraError::EmbeddingDimensionMismatch`×4, `DistanceMetric::Euclidean`×3, `ContextraError`×3 … (+3) |
 | `contextra-graph` | `EntityId`×16, `ContextraError::InvalidInput`×5, `ContextraError`×3, `Result`×3, `Edge`×2, `Edge::new`×2, `TxId`×2, `ContextraError::Internal`×2, `MemoryLink`, `LinkRelation::Supersedes` … (+3) | `Entity::new`×10, `TlHfdParams::default`×4, `PprAlgorithm::Auto`×4, `Entity`×2 |
 | `contextra-crypto` | `TenantId`×8, `Result`×7, `ScanMethod::FeatureDisabled`×3, `ContextraError::Crypto`×3, `TenantScoped`×2, `ScanMethod::Structural`×2, `ScanMethod::NotMeasured`×2, `ContextraError`×2, `RequestContext`, `SagaRecord` … (+4) | `ContextraError::Io`×4, `ContextraError::NotFound` |
+| `contextra-erasure` | `ids::ErasureId`×11, `erasure`×9, `erasure::LayerWitness`×2, `erasure::PendingReason`×2, `erasure::ControlEvidence`, `erasure::Residue`, `erasure::MeasureClass::Mk1`, `erasure::MeasureClass::Mk2`, `erasure::MeasureClass::Mk3`, `ids` … (+2) | `ContextraError::NotFound`×6, `erasure::RetentionAttestation`×2, `erasure::Scanner::new`, `erasure::LayerId::new` … (+2) |
 | `contextra-adapt` | `ContextraError::InvalidInput`×9, `RetrievalStrategy`×9, `ContextraError`×4, `ContextraError::Internal`×2, `RetrievalStrategy::Vector`×2, `TenantId`, `RetrievalStrategy::Text`, `RetrievalStrategy::Graph`, `RetrievalStrategy::Hybrid` | – |
 | `contextra-agent` | `ContextraError::InvalidInput`×10, `Result`×4, `TxId`×3, `WorkflowState`×3, `TokenBudget::new`×2, `ContextraError::Internal`, `DocId::from_key`, `types::budget`, `error` | `TokenBudget`×13, `TxId::new`×4, `ContextraError::Conflict`, `ContextraError::Serialization` … (+1) |
 | `contextra-store` | `ContextraError::Storage`×5, `TOMBSTONE_BIT`×4, `TxId`×4, `ContextraError::MemoryBudgetExceeded`×2, `ContextraError::Internal`×2, `Result`×2, `ContextraError`×2, `TxId::INTERNAL_BASE`×2, `ContextraError::Sandbox`, `ContextraError::DurabilityConfig` … (+1) | `CollectionId`×5, `DocId`×5, `ContextraError::InvalidInput`×2, `TenantId` … (+1) |
@@ -4984,6 +5304,7 @@ Keine Importe aus anderen Workspace-Crates.
 | `contextra-audit-export` | `TenantId`×2 | – |
 | `contextra-db` | `DistanceMetric`, `MAX_SEARCH_K` | `Result`×8, `TxId`×6, `DocId`×4, `FusionWeights`×3 … (+17) |
 | `contextra-avv-generator` | `TenantId` | – |
+| `contextra-license` | `TenantId` | – |
 | `contextra-mvcc` | `*` | `TxId`×2, `DocId` |
 | `contextra-router` | `RetrievalStrategy` | `ConfigFingerprint`×7, `TokenBudget`×4, `DocId::new`×3, `Result` |
 | `contextra-testkit` | `TxId` | – |
