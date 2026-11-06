@@ -308,7 +308,7 @@ mod tests {
     // ANCHOR[contextra-text:TEST-BM25-001]
     // Prüft, dass BM25 bei allen Grenzfällen niemals NaN oder Unendlich liefert.
     #[test]
-    fn bm25_no_nan_or_infinity() {
+    fn test_bm25_no_nan_or_infinity() {
         // Alle Grenzfall-Kombinationen
         let cases = [
             (0, 0, 0.0, 0, 0),               // alles null
@@ -371,7 +371,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn prop_bm25_idf_non_negative_for_high_df(
+        fn test_prop_bm25_idf_non_negative_for_high_df(
             n in 0..100_000u32,
             df_fraction in 0.0..1.0f64,
         ) {
@@ -388,7 +388,7 @@ mod tests {
         }
 
         #[test]
-        fn prop_bm25_score_term_finite_and_non_negative(
+        fn test_prop_bm25_score_term_finite_and_non_negative(
             tf in 0..10_000u32,
             doc_len in 0..10_000u32,
             avg_doc_len in 0.0..10_000.0f32,
@@ -401,7 +401,7 @@ mod tests {
         }
 
         #[test]
-        fn prop_bm25_score_term_bounded_across_df_relative_to_n(
+        fn test_prop_bm25_score_term_bounded_across_df_relative_to_n(
             tf in 0..100_000u32,
             doc_len in 0..100_000u32,
             avg_doc_len in 0.0..100_000.0f32,
@@ -448,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    fn score_term_case_exact_anti_mirroring_value() {
+    fn test_score_term_case_exact_anti_mirroring_value() {
         // Independent mathematical calculation:
         // tf = 1, doc_len = 10, avg_doc_len = 10.0, df = 1, n = 10, k1 = 1.5, b = 0.75
         // idf_arg = 1.0 + (10 - 1 + 0.5) / (1 + 0.5) = 1.0 + 9.5 / 1.5 = 22 / 3 = 7.3333333...
@@ -490,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    fn bm25_struct_score_term_case_matches_standalone_function() {
+    fn test_bm25_struct_score_term_case_matches_standalone_function() {
         let bm25 = BM25::default();
         let struct_score = bm25.score_term(2, 50, 50.0, 5, 100);
         let fn_score = score_term(2, 50, 50.0, 5, 100);
@@ -558,7 +558,7 @@ mod tests {
     }
 
     #[test]
-    fn bm25_handles_extreme_tf() {
+    fn test_bm25_handles_extreme_tf() {
         // tf = u32::MAX (4 billion occurrences)
         let score = score_term(u32::MAX, 1000, 500.0, 1, 1_000_000);
         assert!(
