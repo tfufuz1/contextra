@@ -1,4 +1,4 @@
-//! # Verifikation von Löschbeweisen (`deletion_proof/verification.rs`)
+//! # Verifikation von Attestationsbeweisen (`deletion_proof/verification.rs`)
 //!
 //! Prüft kryptographische Signaturen und BLAKE3-Digests fail-closed.
 // FILE-CONTEXT

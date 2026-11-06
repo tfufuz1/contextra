@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    fn file_keys_are_distinct_per_path() {
+    fn test_file_keys_are_distinct_per_path() {
         let km = KeyManager::try_new("secret", b"salt").expect("init"); // expect
         let key1 = km.derive_file_key(b"segment_001.sst").expect("k1"); // expect
         let key2 = km.derive_file_key(b"segment_002.sst").expect("k2"); // expect
@@ -532,7 +532,7 @@ mod tests {
     }
 
     #[test]
-    fn same_path_same_passphrase_same_key() {
+    fn test_same_path_same_passphrase_same_key() {
         let km1 = KeyManager::try_new("secret", b"salt").expect("km1"); // expect
         let km2 = KeyManager::try_new("secret", b"salt").expect("km2"); // expect
         let k1 = km1.derive_file_key(b"data.sst").expect("k1"); // expect
@@ -545,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn same_passphrase_salt_path_gives_same_key() {
+    fn test_same_passphrase_salt_path_gives_same_key() {
         let km1 = KeyManager::try_new("secret", b"salt").expect("km1"); // expect
         let km2 = KeyManager::try_new("secret", b"salt").expect("km2"); // expect
         assert_eq!(
@@ -560,7 +560,7 @@ mod tests {
     }
 
     #[test]
-    fn key_manager_field_zeroizes_on_drop() {
+    fn test_key_manager_field_zeroizes_on_drop() {
         use zeroize::Zeroize;
         let mut raw: [u8; 32] = [0xFF; 32];
         raw.zeroize();
@@ -568,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn key_manager_debug_redacts_key() {
+    fn test_key_manager_debug_redacts_key() {
         let (km, _) = KeyManager::try_new_random_salt("test-passphrase").unwrap(); // unwrap
         let debug_str = format!("{km:?}");
         assert!(!debug_str.contains("test-passphrase"));
