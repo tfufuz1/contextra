@@ -3,9 +3,9 @@
 audit_modular_building_blocks.py — Workspace-weiter Entkopplungs- und Baukasten-Audit.
 
 Generiert eine detaillierte architektonische Bestandsaufnahme für das gesamte Contextra-Projekt,
-prüft alle Crates auf Modularität, direkte Verdrahtungen, Schnittstellenabstraktion und
-verstreute Löschketten/DSGVO-Artefakte und schreibt einen aussagekräftigen Bericht
-nach docs/MODULAR_DECOUPLING_AUDIT.md.
+prüft alle Crates auf Modularität, direkte Verdrahtungen, Schnittstellenabstraktion,
+Dead-Code-Kandidaten und verstreute Löschketten/DSGVO-Artefakte und schreibt einen
+aussagekräftigen Bericht nach docs/MODULAR_DECOUPLING_AUDIT.md.
 """
 
 from __future__ import annotations
@@ -38,6 +38,8 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
     autarkic = [e for e in evaluations if e["dependencies_count"] == 0]
     high_priority = [e for e in evaluations if e["score"] < 60]
     total_erasure_leaks = sum(e["erasure_leaks_count"] for e in evaluations)
+    total_dead_code = sum(e.get("dead_code_count", 0) for e in evaluations)
+    total_missing_ports = sum(e.get("missing_ports_count", 0) for e in evaluations)
 
     md = []
     md.append("# Contextra Modularisierungs- & Entkopplungs-Audit")
@@ -64,14 +66,17 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
     md.append(f"- **Vollkommen autarke Bausteine:** {len(autarkic)} Crates")
     md.append(f"- **Dringender Entkopplungsbedarf (Score < 60):** {len(high_priority)} Crates")
     md.append(f"- **Verstreute Löschketten-/DSGVO-Relikte außerhalb `contextra-erasure`:** {total_erasure_leaks} Fundstellen")
+    md.append(f"- **Identifizierte Dead-Code-Kandidaten (ungenutzte interne Definitionen):** {total_dead_code} Stellen")
+    md.append(f"- **Fehlende Port-Abstraktionen (direkte Kernel-Importe):** {total_missing_ports} Stellen")
     md.append("")
 
-    md.append("| Crate | Modularitäts-Score | Status | LOC | Dateien | Interne Deps | DSGVO/Lösch-Relikte |")
-    md.append("|---|---:|---|---:|---:|---:|---:|")
+    md.append("| Crate | Modularitäts-Score | Status | LOC | Dateien | Interne Deps | Schnittstellen (T/S/E) | Pub/Gesamt Fns | Dead Code | DSGVO/Lösch-Relikte |")
+    md.append("|---|---:|---|---:|---:|---:|---:|---:|---:|---:|")
     for e in sorted(evaluations, key=lambda x: (x["score"], -x["loc"])):
         md.append(
             f"| `{e['crate']}` | **{e['score']}/100** | {e['status']} | {e['loc']:,} | {e['files']} | "
-            f"{e['dependencies_count']} | {e['erasure_leaks_count']} |"
+            f"{e['dependencies_count']} | {e.get('traits_count',0)}/{e.get('structs_count',0)}/{e.get('enums_count',0)} | "
+            f"{e.get('pub_functions_count',0)}/{e.get('functions_count',0)} | {e.get('dead_code_count',0)} | {e['erasure_leaks_count']} |"
         )
     md.append("")
 
@@ -81,10 +86,16 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
         md.append(f"### 📦 Crate: `{e['crate']}` (Score: {e['score']}/100)")
         md.append(f"- **Umfang:** {e['loc']:,} LOC ({e['files']} Quelldateien)")
         md.append(f"- **Abhängigkeiten ({e['dependencies_count']}):** `{', '.join(e['dependencies']) or 'keine'}`")
+        md.append(f"- **Funktionsinventar:** {e.get('pub_functions_count', 0)} pub-Funktionen von {e.get('functions_count', 0)} gesamt")
+        md.append(f"- **Schnittstellen:** {e.get('traits_count', 0)} Traits, {e.get('structs_count', 0)} Structs, {e.get('enums_count', 0)} Enums")
         if e["coupling_summary"]:
             md.append("- **Schnittstellen-Kopplung (importierte Fremdsymbole):**")
             for dep, c in e["coupling_summary"].items():
                 md.append(f"  - `{dep}`: {c} Symbole")
+        if e.get("missing_ports_count", 0) > 0:
+            md.append(f"- **⚠️ Direkte Kernel-Verdrahtung:** {e['missing_ports_count']} Importe müssen über `contextra-ports` entkoppelt werden.")
+        if e.get("dead_code_count", 0) > 0:
+            md.append(f"- **⚠️ Dead Code:** {e['dead_code_count']} ungenutzte interne Definitionen identifiziert.")
         if e["erasure_leaks_count"] > 0:
             md.append(f"- **⚠️ DSGVO-/Löschketten-Lecks:** {e['erasure_leaks_count']} Fundstellen müssen in `contextra-erasure` überführt werden.")
         if e["findings"]:
@@ -95,6 +106,10 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
             md.append("- **Handlungsschritte für Coding-Agenten:**")
             for r in e["recommendations"]:
                 md.append(f"  - [ ] {r}")
+        if e.get("dead_code_candidates"):
+            md.append("- **Dead-Code-Kandidaten (Auszug):**")
+            for dc in e["dead_code_candidates"][:5]:
+                md.append(f"  - `[{dc['kind']}] {dc['name']}` ({dc['file']}:{dc['line']})")
         md.append("")
 
     md.append("## 4. Löschketten- und DSGVO-Fundstelleninventar")
