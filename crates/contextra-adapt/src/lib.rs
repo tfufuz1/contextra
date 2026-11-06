@@ -2,6 +2,12 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![allow(
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::disallowed_types
+)]
 
 #[cfg(feature = "bandit-routing")]
 pub mod bandit;

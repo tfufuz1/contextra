@@ -125,7 +125,7 @@ mod tests {
     // Prüft, dass Whitespace-Komponenten abgewiesen werden (Namenskonvention CASE).
     #[allow(non_snake_case)]
     #[test]
-    fn checkpoint_manifest_CASE_whitespace_component_rejected() {
+    fn test_checkpoint_manifest_CASE_whitespace_component_rejected() {
         let meta = CheckpointMeta {
             name: "cp_ws".to_string(),
             collection_id: "col_ws".to_string(),
@@ -141,7 +141,7 @@ mod tests {
     // Prüft, dass die Verifikation fehlschlägt, wenn Komponenten nachträglich manipuliert wurden.
     #[allow(non_snake_case)]
     #[test]
-    fn checkpoint_manifest_CASE_tampered_manifest_fails_verify() {
+    fn test_checkpoint_manifest_CASE_tampered_manifest_fails_verify() {
         let meta = CheckpointMeta {
             name: "cp_tamper".to_string(),
             collection_id: "col_tamper".to_string(),
@@ -175,7 +175,7 @@ mod tests {
     // Property-basierter Test für die Konsistenz und Verifikation von Manifesten über diverse Eingabekombinationen.
     proptest::proptest! {
         #[test]
-        fn prop_manifest_roundtrip(
+        fn test_prop_manifest_roundtrip(
             name: String,
             col: String,
             seq_no: u64,

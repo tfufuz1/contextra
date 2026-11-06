@@ -14,7 +14,6 @@
 //!
 //! Verifiziert das Zurücksetzen von Speicherzuständen auf historische Checkpoint-Stände.
 
-
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{Result, TxId};
