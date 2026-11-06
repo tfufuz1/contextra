@@ -526,8 +526,9 @@ impl FlowCorrectedThompsonBandit {
     /// Aufrufe ohne `&Ring3Token` schlagen beim Kompilieren fehl:
     /// ```compile_fail
     /// use contextra_adapt::flow_thompson::{FcTsConfig, FlowCorrectedThompsonBandit};
-    /// let mut bandit = FlowCorrectedThompsonBandit::new(FcTsConfig::default()).unwrap();
+    /// let mut bandit = FlowCorrectedThompsonBandit::new(FcTsConfig::default())?;
     /// bandit.recompute_drift_rate_from_window(); // Error: missing token
+    /// # Ok::<(), contextra_adapt::flow_thompson::FcTsError>(())
     /// ```
     pub fn recompute_drift_rate_from_window(&mut self, _token: &Ring3Token) {
         let d = self.config.dim;
