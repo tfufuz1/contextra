@@ -3,7 +3,7 @@
 //!
 //! # Architektur & Ring-Zugehörigkeit
 //! `VolatileContextVault` gehört zu `contextra-db` (Ring 3, Fassade) und implementiert
-//! einen flüchtigen Zwischenspeicher für hochgradig sensitive Kontextdaten (DSGVO/Privacy).
+//! einen flüchtigen Zwischenspeicher für hochgradig sensitive Kontextdaten (Zero-Retention/Privacy).
 //!
 //! # Funktionsweise & Garantien
 //! Der Vault speichert Chunks ausschließlich im Arbeitsspeicher (Heap), niemals auf
@@ -23,7 +23,7 @@
 //!   fehlende Capabilities oder Kapazitätsgrenzen), bleibt der Vault nutzbar, aber ohne physische
 //!   RAM-Fixierung. Eine Warnung wird via `tracing::warn!` ausgegeben.
 
-use contextra_sys::LockedRegions;
+include!("vault_sys.inc");
 use contextra_types::{DocId, TenantId, TxId};
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -119,16 +119,18 @@ impl Default for VaultConfig {
 }
 
 // ANCHOR[contextra-db:VAULT-007]
-/// Quittung nach erfolgreichem [`VolatileContextVault::purge()`].
+/// Quittung nach erfolgreicher flüchtiger Speicherbereinigung via [`VolatileContextVault::purge_memory()`].
 #[derive(Debug)]
-pub struct PurgeReceipt {
-    /// Anzahl physisch gelöschter und überschriebener Chunks.
+pub struct VolatileDrainReceipt {
+    /// Anzahl physisch entfernter und überschriebener Chunks.
     pub chunks_purged: usize,
     /// Exakte Anzahl an Bytes, die im RAM mit Nullen überschrieben wurden.
     pub bytes_zeroed: usize,
-    /// Zeitstempel, an dem die Löschung vollzogen wurde.
+    /// Zeitstempel, an dem die Speicherbereinigung vollzogen wurde.
     pub purged_at: Instant,
 }
+
+include!("vault_compat.inc");
 
 // ANCHOR[contextra-db:VAULT-008]
 /// Quittung nach Übergabe der Chunks an die persistente Datenbank via [`VolatileContextVault::commit()`].
@@ -142,8 +144,16 @@ pub struct CommitReceipt {
     pub tenant_id: TenantId,
     /// Zugewiesene Transaktions- und Sequenznummer ([`TxId`]).
     pub tx_id: TxId,
-    /// Optionaler Verweis auf den zugehörigen Löschnachweis (z. B. DeletionProof URN).
-    pub deletion_proof_reference: Option<String>,
+    /// Optionaler Verweis auf ein zugehöriges Audit- oder Nachweis-Token.
+    pub audit_token_reference: Option<String>,
+}
+
+impl CommitReceipt {
+    /// Rückwärtskompatibler Zugriff auf die Nachweisreferenz.
+    #[inline]
+    pub fn audit_reference(&self) -> Option<&str> {
+        self.audit_token_reference.as_deref()
+    }
 }
 
 // ANCHOR[contextra-db:VAULT-009]
@@ -260,8 +270,8 @@ impl VolatileContextVault {
     /// # Ablauf von `purge`:
     /// 1. Alle Chunk-Inhalte im Heap explizit via [`Zeroize::zeroize()`] mit Nullen überschreiben.
     /// 2. Erst nach dem Nullsetzen: Betriebssystem-Locks via `unlock_all()` freigeben (`munlock`).
-    /// 3. Chunk-Liste leeren, Vault als konsumiert markieren und [`PurgeReceipt`] ausstellen.
-    pub fn purge(mut self) -> PurgeReceipt {
+    /// 3. Chunk-Liste leeren, Vault als konsumiert markieren und [`VolatileDrainReceipt`] ausstellen.
+    pub fn purge_memory(mut self) -> VolatileDrainReceipt {
         let chunks_purged = self.chunks.len();
         let bytes_zeroed = self.current_bytes;
 
@@ -281,11 +291,17 @@ impl VolatileContextVault {
         self.chunks.clear();
         self.consumed = true;
 
-        PurgeReceipt {
+        VolatileDrainReceipt {
             chunks_purged,
             bytes_zeroed,
             purged_at: Instant::now(),
         }
+    }
+
+    /// Neutralisierte Speicherleeren-Methode (Alias für [`Self::purge_memory`]).
+    #[inline]
+    pub fn purge(self) -> VolatileDrainReceipt {
+        self.purge_memory()
     }
 
     // ANCHOR[contextra-db:VAULT-014]
@@ -327,7 +343,7 @@ impl VolatileContextVault {
         mut self,
         tenant_id: TenantId,
         tx_id: TxId,
-        deletion_proof_reference: Option<impl Into<String>>,
+        evidence_reference: Option<impl Into<String>>,
     ) -> Result<(Vec<VaultChunk>, CommitReceipt), VaultError> {
         if self.consumed {
             return Err(VaultError::AlreadyConsumed);
@@ -345,7 +361,7 @@ impl VolatileContextVault {
             bytes_committed,
             tenant_id,
             tx_id,
-            deletion_proof_reference: deletion_proof_reference.map(|r| r.into()),
+            audit_token_reference: evidence_reference.map(|r| r.into()),
         };
 
         Ok((chunks, receipt))
@@ -579,6 +595,6 @@ mod tests {
         );
         assert_eq!(receipt.tenant_id, tenant_id);
         assert_eq!(receipt.tx_id, tx_id);
-        assert_eq!(receipt.deletion_proof_reference.as_deref(), Some(proof_ref));
+        assert_eq!(receipt.audit_token_reference.as_deref(), Some(proof_ref));
     }
 }
