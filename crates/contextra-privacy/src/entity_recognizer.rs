@@ -124,7 +124,10 @@ impl RuleBasedEntityRecognizer {
 
     // ANCHOR[contextra-privacy:ER-014]
     /// Führt die Erkennung mit strikter Längenprüfung aus und liefert `Err(EgressError::InvalidParams)` bei Überschreitung.
-    pub fn recognize_bounded(&self, text: &str) -> Result<Vec<(Range<usize>, String)>, EgressError> {
+    pub fn recognize_bounded(
+        &self,
+        text: &str,
+    ) -> Result<Vec<(Range<usize>, String)>, EgressError> {
         if text.len() > self.max_input_length {
             return Err(EgressError::invalid_params(format!(
                 "Payload size exceeds limit: {} > {}",
@@ -257,10 +260,12 @@ fn is_zero_width_or_control(c: char) -> bool {
         '\u{200B}' // Zero Width Space
         | '\u{200C}' // Zero Width Non-Joiner
         | '\u{200D}' // Zero Width Joiner
+        | '\u{2060}' // Word Joiner
         | '\u{FEFF}' // Zero Width No-Break Space / BOM
         | '\u{00AD}' // Soft Hyphen
         | '\u{200E}' // Left-to-Right Mark
         | '\u{200F}' // Right-to-Left Mark
+        | '\u{202A}'..='\u{202E}' // Bidi embedding & override controls
     )
 }
 
@@ -909,7 +914,8 @@ fn detect_bics(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
                     };
 
                     if next_ok {
-                        if let Some(byte_range) = norm.char_span_to_byte_range(i, i + bic_char_len) {
+                        if let Some(byte_range) = norm.char_span_to_byte_range(i, i + bic_char_len)
+                        {
                             results.push((byte_range, "BIC".to_string()));
                             i += bic_char_len;
                             continue;
@@ -989,7 +995,9 @@ fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<
 
             if !w2_chars.is_empty() {
                 let w2_str: String = w2_chars.iter().collect();
-                let is_capitalized = w2_chars.first().is_some_and(|&c| is_german_city_start_char(c));
+                let is_capitalized = w2_chars
+                    .first()
+                    .is_some_and(|&c| is_german_city_start_char(c));
                 let is_connector = matches!(
                     w2_str.to_lowercase().as_str(),
                     "am" | "an" | "der" | "dem" | "im" | "in"
@@ -1018,7 +1026,9 @@ fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<
                         }
 
                         if !w3_chars.is_empty() {
-                            let is_w3_cap = w3_chars.first().is_some_and(|&c| is_german_city_start_char(c));
+                            let is_w3_cap = w3_chars
+                                .first()
+                                .is_some_and(|&c| is_german_city_start_char(c));
                             if is_w3_cap {
                                 city_end = w3_curr;
                             }

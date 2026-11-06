@@ -15,8 +15,7 @@ use contextra_privacy::egress_gateway::{
     CloudQueryRequest, DefaultEgressGuard, EgressGateway, EgressGuardCheck,
 };
 use contextra_privacy::egress_vault::{
-    BlockReason, BoxFuture, EgressClassification, EgressClassifier,
-    SurrogateVault,
+    BlockReason, BoxFuture, EgressClassification, EgressClassifier, SurrogateVault,
 };
 use contextra_privacy::entity_recognizer::{Gazetteer, RuleBasedEntityRecognizer};
 use contextra_types::{TenantId, TenantScoped};
