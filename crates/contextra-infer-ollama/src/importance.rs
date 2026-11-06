@@ -9,13 +9,23 @@
 
 use crate::client::xml_escape;
 use crate::OllamaClient;
-use contextra_rank::IsotonicCalibrator;
 use contextra_types::{ContextraError, ImportanceScore, Result};
 use parking_lot::Mutex;
 use regex::Regex;
 use std::sync::{Arc, OnceLock};
 
-/// Evaluates importance for multiple text chunks in parallel using tokio::spawn.
+/// Abstract calibrator trait for post-hoc confidence calibration and outcome recording.
+///
+/// Allows decoupling of `contextra-infer-ollama` from concrete rankers or calibration crates.
+pub trait ImportanceCalibrator: Send + Sync {
+    /// Computes calibrated probability for a raw score in [0.0, 1.0], or returns `None` if warming up.
+    fn calibrated_probability(&self, raw_score: f32) -> Option<f32>;
+
+    /// Records outcome feedback for a raw score.
+    fn record_outcome(&mut self, raw_score: f32, was_useful: bool);
+}
+
+/// Evaluates importance for multiple text chunks in parallel using tokio::spawn with an optional dynamic calibrator.
 ///
 /// Returns a `Vec<ImportanceAssessment>` in the same order as `chunks`.
 /// Individual chunk errors return `ImportanceAssessment` with `Confidence::Unparseable`
@@ -27,7 +37,7 @@ use std::sync::{Arc, OnceLock};
 pub async fn score_importance_batch(
     client: &Arc<OllamaClient>,
     chunks: &[&str],
-    calibrator: Option<&Arc<Mutex<IsotonicCalibrator>>>,
+    calibrator: Option<&Arc<Mutex<dyn ImportanceCalibrator>>>,
     max_concurrent: usize,
 ) -> Vec<ImportanceAssessment> {
     use futures::stream::{self, StreamExt};
@@ -169,14 +179,14 @@ pub async fn score_importance(
     score_importance_with_calibrator(client, chunk_text, None).await
 }
 
-/// Evaluates importance of a text chunk with an optional shared `IsotonicCalibrator`.
+/// Evaluates importance of a text chunk with an optional shared `ImportanceCalibrator`.
 ///
 /// Populates `model_id` provenance from `client.config().model` and enriches
 /// `calibrated_confidence` when the calibrator has completed warmup.
 pub async fn score_importance_with_calibrator(
     client: &OllamaClient,
     chunk_text: &str,
-    calibrator: Option<&Arc<Mutex<IsotonicCalibrator>>>,
+    calibrator: Option<&Arc<Mutex<dyn ImportanceCalibrator>>>,
 ) -> Result<ImportanceAssessment> {
     if chunk_text.trim().is_empty() {
         return Err(ContextraError::InvalidInput(
@@ -220,12 +230,12 @@ pub async fn score_importance_with_calibrator(
     Ok(assessment)
 }
 
-/// Records outcome feedback for an importance score into an `IsotonicCalibrator`.
+/// Records outcome feedback for an importance score into an `ImportanceCalibrator`.
 ///
 /// Intended for downstream retrieval feedback loops evaluating whether a memory chunk
 /// assigned a given `raw_score` was actually useful during agent operations.
 pub fn record_importance_outcome(
-    calibrator: &Arc<Mutex<IsotonicCalibrator>>,
+    calibrator: &Arc<Mutex<dyn ImportanceCalibrator>>,
     raw_score: f32,
     was_useful: bool,
 ) {
@@ -546,8 +556,31 @@ mod tests {
             }
         });
 
+        struct MockCalibrator {
+            warmup: usize,
+            observations: usize,
+        }
+
+        impl ImportanceCalibrator for MockCalibrator {
+            fn calibrated_probability(&self, raw_score: f32) -> Option<f32> {
+                if self.observations >= self.warmup {
+                    Some(raw_score)
+                } else {
+                    None
+                }
+            }
+
+            fn record_outcome(&mut self, _raw_score: f32, _was_useful: bool) {
+                self.observations += 1;
+            }
+        }
+
         let client = OllamaClient::new(server_url);
-        let calibrator = Arc::new(Mutex::new(IsotonicCalibrator::new(5, 100)));
+        let calibrator: Arc<Mutex<dyn ImportanceCalibrator>> =
+            Arc::new(Mutex::new(MockCalibrator {
+                warmup: 5,
+                observations: 0,
+            }));
 
         // 1. Before warmup threshold (5 observations), calibrated_confidence should be None
         let assessment_before =
@@ -604,7 +637,7 @@ mod tests {
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(256))]
         #[test]
-        fn prop_score_importance_parse_formats(
+        fn test_prop_score_importance_parse_formats(
             prefix in "[a-zA-Z0-9 :\\-_/]{0,30}",
             score_str in "(0|1|0\\.[0-9]{1,4}|1\\.0{1,4}|\\.[0-9]{1,4})",
             suffix in "[a-zA-Z0-9 :\\-_/]{0,30}",
@@ -617,7 +650,7 @@ mod tests {
         }
 
         #[test]
-        fn prop_score_importance_arbitrary_garbage_never_panics(
+        fn test_prop_score_importance_arbitrary_garbage_never_panics(
             garbage in ".*",
         ) {
             let parsed = parse_importance_score_response(&garbage);

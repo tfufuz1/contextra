@@ -99,11 +99,6 @@ pub struct CascadeDeletionRecord {
     pub wal_seq: u64,
 }
 
-/// Deprecated alias for [`CascadeDeletionRecord`] to maintain backward compatibility.
-#[deprecated(note = "Use CascadeDeletionRecord instead")]
-// ANCHOR[contextra-graph:SRC-CASCADE-007]
-pub type DeletionProof = CascadeDeletionRecord;
-
 /// Ticket tracking persistent cascade invalidation status (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-graph:SRC-CASCADE-008]

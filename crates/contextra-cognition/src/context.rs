@@ -296,9 +296,9 @@ mod tests {
     use contextra_types::DocId;
 
 // ANCHOR[contextra-cognition:TEST-CONTEXT-001]
-// Prüft Testfall `context_manager_respects_token_budget`.
+// Prüft Testfall `test_context_manager_respects_token_budget`.
     #[test]
-    fn context_manager_respects_token_budget() {
+    fn test_context_manager_respects_token_budget() {
         let budget = TokenBudget::new(100, 0); // 100 max, 0 reserved => 100 available
         let manager = ContextManager::new(budget);
 

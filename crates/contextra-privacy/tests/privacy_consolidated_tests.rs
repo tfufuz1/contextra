@@ -1,11 +1,8 @@
-//! Konsolidierte Suite für Verarbeitungsverzeichnis (Art. 30 DSGVO), Audit-Ketten und AVV-Re-Exports.
-//! Consolidated tests for `contextra-privacy` resolving TenantId & AVV duplicates,
-//! verifying processing registry serialization, tenant separation, Art. 15 data subject searches,
-//! audit-chain manipulation detection with `ManualClock`, and AVV equivalence.
+//! Konsolidierte Suite für Verarbeitungsverzeichnis, Audit-Ketten und Egress-Schutz.
+//! Consolidated tests for `contextra-privacy` resolving TenantId duplicates,
+//! verifying processing registry serialization, tenant separation, data subject searches,
+//! and audit-chain manipulation detection with `ManualClock`.
 
-#![allow(deprecated)]
-
-use contextra_privacy::avv_generator::{generate_avv_draft, AvvContext};
 use contextra_privacy::context_edit_audit::{
     build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
     ContextEditInput, ContextEditKind,
@@ -351,56 +348,20 @@ fn test_13_render_audit_line_format() {
     assert!(line.contains("subgoal=3"));
 }
 
-// 14. AVV Generator Re-export Equivalence (Default)
-#[test]
-// ANCHOR[contextra-privacy:TEST-CONS-014]
-// Prüft: Prüft die Äquivalenz des AVV-Re-Exports mit Standardwerten.
-fn test_14_avv_reexport_default_equivalence() {
-    let mut ctx = AvvContext::default();
-    ctx.controller_name = "Kanzlei Schmidt".to_string();
-    ctx.processor_name = "Contextra Operations".to_string();
-
-    let draft = generate_avv_draft(&ctx);
-    assert!(draft.contains("Kanzlei Schmidt"));
-    assert!(draft.contains("Contextra Operations"));
-    assert!(draft.contains("Art. 28 DSGVO"));
-}
-
-// 15. AVV Generator Re-export Equivalence (Custom Date & Measures)
-#[test]
-// ANCHOR[contextra-privacy:TEST-CONS-015]
-// Prüft: Prüft die Äquivalenz des AVV-Re-Exports mit benutzerdefinierten Werten.
-fn test_15_avv_reexport_custom_context_equivalence() {
-    let ctx = AvvContext::new(
-        "Praxis Dr. Weber",
-        "Contextra Health AG",
-        TenantId::try_new(500).unwrap(),
-        vec![],
-        vec!["AWS Frankfurt".to_string()],
-        30,
-    )
-    .with_contract_date("2026-10-29")
-    .with_subprocessors_allowed(true);
-
-    let draft = generate_avv_draft(&ctx);
-    assert!(draft.contains("Praxis Dr. Weber"));
-    assert!(draft.contains("Contextra Health AG"));
-}
-
-// 16. ProcessorRole as_str
+// 14. ProcessorRole as_str
 #[test]
 // ANCHOR[contextra-privacy:TEST-CONS-016]
 // Prüft: Prüft die String-Repräsentationen von ProcessorRole.
-fn test_16_processor_role_as_str() {
+fn test_14_processor_role_as_str() {
     assert_eq!(ProcessorRole::Controller.as_str(), "Verantwortlicher");
     assert_eq!(ProcessorRole::Processor.as_str(), "Auftragsverarbeiter");
 }
 
-// 17. ProcessingRegistryExport Constructor
+// 15. ProcessingRegistryExport Constructor
 #[test]
 // ANCHOR[contextra-privacy:TEST-CONS-017]
 // Prüft: Prüft die Konstruktion eines ProcessingRegistryExport-Objekts.
-fn test_17_processing_registry_export_new() {
+fn test_15_processing_registry_export_new() {
     let export = ProcessingRegistryExport::new(vec![]);
     assert!(export.records.is_empty());
 }

@@ -7,7 +7,7 @@ Cloud Egress Security, Data Loss Prevention (DLP), Pseudonymisierung/Surrogate-V
 `contextra-privacy` liegt in **Ring 3** (Domain / Application Services). Es schützt ausgehende Datenflüsse (Cloud Egress) vor unbeabsichtigtem Datenabfluss und Exfiltration, pseudonymisiert sensible Entitäten über Surrogat-Token und stellt revisionssichere Audit-Spuren bereit.
 
 - **Eingehend:** Wird eingebunden von `contextra`, `contextra-mcp` und `contextra-router`.
-- **Ausgehend:** Basiert auf `contextra-types`, `contextra-ports` und `contextra-avv-generator`.
+- **Ausgehend:** Basiert auf `contextra-types`, `contextra-ports`.
 - **Sicherheitsdoktrin:** `#![forbid(unsafe_code)]`, Zero-Panic in Produktionspfaden, striktes Fail-Closed.
 
 ---
@@ -22,10 +22,9 @@ Cloud Egress Security, Data Loss Prevention (DLP), Pseudonymisierung/Surrogate-V
 | `egress_gateway` | `src/egress_gateway.rs` | Zentrales Schutzgateway (`EgressGateway`), das alle Prüfstufen bündelt und Anfragen vor Weiterleitung in externe Cloud-Dienste säubert (`CloudResponseRehydrator`). |
 | `bulk_exfiltration_detector` | `src/bulk_exfiltration_detector.rs` | Sitzungsbasiertes Rate-Limiting und Sliding-Window-Volumenzähler zur Erkennung von Massendatenabflüssen. |
 | `context_edit_audit` | `src/context_edit_audit.rs` | Kryptografisch mit BLAKE3 verkettete Audit-Protokolle von Kontextmodifikationen (`ContextEditAuditRecord`). |
-| `processing_registry` | `src/processing_registry.rs` | Verzeichnis von Verarbeitungstätigkeiten (VVT) nach Art. 30 DSGVO und Export nach Markdown. |
+| `processing_registry` | `src/processing_registry.rs` | Verzeichnis von Verarbeitungstätigkeiten (VVT) und Export nach Markdown. |
 | `guarded_payload` | `src/guarded_payload.rs` | Type-State-Muster (`Unsanitized` -> `Sanitized`), das unbereinigte Egress-Weiterleitungen zur Compile-Zeit verhindert. |
 | `audit_trace` | `src/audit_trace.rs` | Deterministische BLAKE3-Prüfsummenbildung für Audit-Traces ohne Klartext-PII-Leckage. |
-| `avv_generator` | `src/avv_generator.rs` | Re-Export und Brücke zur Erstellung von Auftragsverarbeitungsverträgen (AVV) nach Art. 28 DSGVO. |
 
 ---
 

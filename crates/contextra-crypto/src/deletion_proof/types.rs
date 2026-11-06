@@ -1,12 +1,12 @@
-//! # Datenstrukturen für Löschbeweise (`deletion_proof/types.rs`)
+//! # Datenstrukturen für Attestationsbeweise (`deletion_proof/types.rs`)
 //!
-//! Definiert den kanonischen Aufbau eines Löschzertifikats inklusive aller Schicht-Zeugen.
+//! Definiert den kanonischen Aufbau eines Attestationszertifikats inklusive aller Schicht-Zeugen.
 //!
 //! ## Invarianten
 //! - Deterministische BLAKE3-Prüfsummen über alle gelöschten Schlüssel.
 //! - Schicht-IDs (Layer IDs) sind eindeutig und aufsteigend geordnet.
 // FILE-CONTEXT
-// ZWECK: Structural types and data definitions for cryptographic deletion proofs (GDPR Art. 17).
+// ZWECK: Structural types and data definitions for cryptographic deletion proofs and attestations.
 // INVARIANTEN: INV-DELETION-1: Proof creation requires verified layer sanitization witnesses.
 
 #![forbid(unsafe_code)]
@@ -317,7 +317,7 @@ pub enum DeletionScope {
 /// Cryptographic proof of data deletion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 // ANCHOR[contextra-crypto:PROOF-001]
-/// Kryptographisches Löschzertifikat (Deletion Proof) nach Art. 17 DSGVO.
+/// Kryptographisches Attestationszertifikat (Deletion Proof) und Attestationsnachweis.
 pub struct DeletionProof {
     /// Version der Signatur-Payload-Konstruktion.
     #[serde(default = "default_signature_version")]
@@ -335,7 +335,7 @@ pub struct DeletionProof {
     pub signature: Vec<u8>,
     /// List of physically sanitized storage layers.
     pub covered_layers: Vec<DeletionLayer>,
-    /// Pflicht für DSGVO Art. 17-Compliance.
+    /// Dokumentation ausgeschlossener Gültigkeitsbereiche.
     pub excluded_scopes: Vec<ExcludedScope>,
     /// Attestierungen synchroner Nachbarschaftsreparaturen im HNSW-Graphen.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]

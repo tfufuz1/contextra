@@ -15,14 +15,15 @@ pub mod merge;
 pub mod sentence;
 pub mod split;
 
-use crate::canonical::CanonicalText;
-use crate::chunking::common::token_count;
-use crate::chunking::config::ChunkingConfig;
 use self::markdown_parse::{parse_markdown_blocks, ParsedBlockKind, ParsedListItem};
 use self::merge::merge_small_chunks;
 use self::split::{
-    split_oversized_code, split_oversized_list, split_oversized_paragraph, split_oversized_table, SplitContext,
+    split_oversized_code, split_oversized_list, split_oversized_paragraph, split_oversized_table,
+    SplitContext,
 };
+use crate::canonical::CanonicalText;
+use crate::chunking::common::token_count;
+use crate::chunking::config::ChunkingConfig;
 use crate::chunking::{ChunkDraft, IrChunker};
 use crate::error::IngestError;
 use crate::format::ChunkStrategy;
@@ -62,12 +63,26 @@ struct IntermediateBlock {
 #[derive(Debug, Clone)]
 enum InterKind {
     YamlFrontMatter,
-    Heading { level: u8, text: String },
+    Heading {
+        level: u8,
+        text: String,
+    },
     Paragraph,
-    List { items: Vec<ParsedListItem> },
-    Code { fence_head: String, fence_tail: String, body_lines: Vec<String> },
-    Table { header_lines: Vec<String>, body_lines: Vec<String> },
-    Note { kind_tag: String },
+    List {
+        items: Vec<ParsedListItem>,
+    },
+    Code {
+        fence_head: String,
+        fence_tail: String,
+        body_lines: Vec<String>,
+    },
+    Table {
+        header_lines: Vec<String>,
+        body_lines: Vec<String>,
+    },
+    Note {
+        kind_tag: String,
+    },
     Other,
 }
 
@@ -111,7 +126,10 @@ pub fn draft_prose(
 
             let start_span = block_drafts.first().map(|d| d.span.start).unwrap_or(0);
             let end_span = block_drafts.last().map(|d| d.span.end).unwrap_or(0);
-            let loc = block_drafts.first().map(|d| d.locator.clone()).unwrap_or_default();
+            let loc = block_drafts
+                .first()
+                .map(|d| d.locator.clone())
+                .unwrap_or_default();
 
             target.push(ChunkDraft {
                 text: combined_text,
@@ -241,7 +259,9 @@ pub fn draft_prose(
         let blk_tokens = token_count(&blk.text);
 
         if blk_tokens <= hard_limit {
-            if current_tokens.saturating_add(blk_tokens) > hard_limit && !current_block_drafts.is_empty() {
+            if current_tokens.saturating_add(blk_tokens) > hard_limit
+                && !current_block_drafts.is_empty()
+            {
                 flush_blocks(
                     &mut current_block_drafts,
                     &mut drafts,
@@ -283,36 +303,29 @@ pub fn draft_prose(
             };
 
             match blk.kind {
-                InterKind::Code { ref fence_head, ref fence_tail, ref body_lines } => {
+                InterKind::Code {
+                    ref fence_head,
+                    ref fence_tail,
+                    ref body_lines,
+                } => {
                     let body_refs: Vec<&str> = body_lines.iter().map(|s| s.as_str()).collect();
-                    let split_drafts = split_oversized_code(
-                        fence_head,
-                        fence_tail,
-                        &body_refs,
-                        &sctx,
-                    );
+                    let split_drafts =
+                        split_oversized_code(fence_head, fence_tail, &body_refs, &sctx);
                     drafts.extend(split_drafts);
                 }
-                InterKind::Table { ref header_lines, ref body_lines } => {
-                    let split_drafts = split_oversized_table(
-                        header_lines,
-                        body_lines,
-                        &sctx,
-                    );
+                InterKind::Table {
+                    ref header_lines,
+                    ref body_lines,
+                } => {
+                    let split_drafts = split_oversized_table(header_lines, body_lines, &sctx);
                     drafts.extend(split_drafts);
                 }
                 InterKind::List { ref items } => {
-                    let split_drafts = split_oversized_list(
-                        items,
-                        &sctx,
-                    );
+                    let split_drafts = split_oversized_list(items, &sctx);
                     drafts.extend(split_drafts);
                 }
                 _ => {
-                    let split_drafts = split_oversized_paragraph(
-                        &blk.text,
-                        &sctx,
-                    );
+                    let split_drafts = split_oversized_paragraph(&blk.text, &sctx);
                     drafts.extend(split_drafts);
                 }
             }
@@ -344,16 +357,35 @@ fn collect_intermediate_blocks(ir: &DocumentIr, canon: &CanonicalText) -> Vec<In
                 for p in parsed {
                     let inter_kind = match p.kind {
                         ParsedBlockKind::YamlFrontMatter => InterKind::YamlFrontMatter,
-                        ParsedBlockKind::Heading { level, text } => InterKind::Heading { level, text },
-                        ParsedBlockKind::FencedCode { fence_char, fence_len, lang, body } => {
-                            let head = format!("{}{}", fence_char.to_string().repeat(fence_len), lang.as_deref().unwrap_or(""));
+                        ParsedBlockKind::Heading { level, text } => {
+                            InterKind::Heading { level, text }
+                        }
+                        ParsedBlockKind::FencedCode {
+                            fence_char,
+                            fence_len,
+                            lang,
+                            body,
+                        } => {
+                            let head = format!(
+                                "{}{}",
+                                fence_char.to_string().repeat(fence_len),
+                                lang.as_deref().unwrap_or("")
+                            );
                             let tail = fence_char.to_string().repeat(fence_len);
                             let body_lines = body.lines().map(|s| s.to_string()).collect();
-                            InterKind::Code { fence_head: head, fence_tail: tail, body_lines }
+                            InterKind::Code {
+                                fence_head: head,
+                                fence_tail: tail,
+                                body_lines,
+                            }
                         }
-                        ParsedBlockKind::Table { header_lines, body_lines } => {
-                            InterKind::Table { header_lines, body_lines }
-                        }
+                        ParsedBlockKind::Table {
+                            header_lines,
+                            body_lines,
+                        } => InterKind::Table {
+                            header_lines,
+                            body_lines,
+                        },
                         ParsedBlockKind::Note { label, .. } => InterKind::Note { kind_tag: label },
                         ParsedBlockKind::Paragraph { .. } => InterKind::Paragraph,
                         ParsedBlockKind::List { items } => InterKind::List { items },
@@ -373,7 +405,10 @@ fn collect_intermediate_blocks(ir: &DocumentIr, canon: &CanonicalText) -> Vec<In
                     text: block_str.to_string(),
                     span,
                     locator: block.locator.clone(),
-                    kind: InterKind::Heading { level: *level, text: text.clone() },
+                    kind: InterKind::Heading {
+                        level: *level,
+                        text: text.clone(),
+                    },
                 });
             }
             BlockKind::Paragraph { .. } => {
@@ -384,7 +419,11 @@ fn collect_intermediate_blocks(ir: &DocumentIr, canon: &CanonicalText) -> Vec<In
                     kind: InterKind::Paragraph,
                 });
             }
-            BlockKind::ListItem { depth, ordered, text } => {
+            BlockKind::ListItem {
+                depth,
+                ordered,
+                text,
+            } => {
                 let item = ParsedListItem {
                     depth: *depth,
                     ordered: *ordered,
@@ -407,7 +446,11 @@ fn collect_intermediate_blocks(ir: &DocumentIr, canon: &CanonicalText) -> Vec<In
                     text: block_str.to_string(),
                     span,
                     locator: block.locator.clone(),
-                    kind: InterKind::Code { fence_head: head, fence_tail: tail, body_lines },
+                    kind: InterKind::Code {
+                        fence_head: head,
+                        fence_tail: tail,
+                        body_lines,
+                    },
                 });
             }
             BlockKind::Table(t) => {
@@ -433,7 +476,10 @@ fn collect_intermediate_blocks(ir: &DocumentIr, canon: &CanonicalText) -> Vec<In
                     text: block_str.to_string(),
                     span,
                     locator: block.locator.clone(),
-                    kind: InterKind::Table { header_lines, body_lines },
+                    kind: InterKind::Table {
+                        header_lines,
+                        body_lines,
+                    },
                 });
             }
             BlockKind::Note { kind, .. } => {
@@ -450,7 +496,9 @@ fn collect_intermediate_blocks(ir: &DocumentIr, canon: &CanonicalText) -> Vec<In
                     text: block_str.to_string(),
                     span,
                     locator: block.locator.clone(),
-                    kind: InterKind::Note { kind_tag: tag.to_string() },
+                    kind: InterKind::Note {
+                        kind_tag: tag.to_string(),
+                    },
                 });
             }
             _ => {

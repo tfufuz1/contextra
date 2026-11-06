@@ -197,9 +197,9 @@ pub async fn ensure_onnx_model_download_with_options(
 
     if !model_exists {
         let expected_sha256 = options.expected_model_sha256.as_deref().ok_or_else(|| {
-            ContextraError::InvalidInput(format!(
-                "Download von model.onnx verweigert: missing expected_model_sha256. Prüfsumme ist zwingend erforderlich."
-            ))
+            ContextraError::InvalidInput(
+                "Download von model.onnx verweigert: missing expected_model_sha256. Prüfsumme ist zwingend erforderlich.".to_string(),
+            )
         })?;
         download_onnx_file_secured(
             &client,
@@ -215,9 +215,9 @@ pub async fn ensure_onnx_model_download_with_options(
 
     if !tokenizer_exists {
         let expected_sha256 = options.expected_tokenizer_sha256.as_deref().ok_or_else(|| {
-            ContextraError::InvalidInput(format!(
-                "Download von tokenizer.json verweigert: missing expected_tokenizer_sha256. Prüfsumme ist zwingend erforderlich."
-            ))
+            ContextraError::InvalidInput(
+                "Download von tokenizer.json verweigert: missing expected_tokenizer_sha256. Prüfsumme ist zwingend erforderlich.".to_string(),
+            )
         })?;
         download_onnx_file_secured(
             &client,
@@ -507,7 +507,7 @@ impl EmbeddingProvider for TextEmbedder {
     // ANCHOR[contextra-infer-onnx:PROVIDER-NAME-001]
     /// Kennung des Providers: `"onnx"`.
     fn provider_name(&self) -> &str {
-        "onnx"
+        Self::DEFAULT_PROVIDER_NAME
     }
 
     // ANCHOR[contextra-infer-onnx:EMBED-TRAIT-001]
@@ -544,7 +544,7 @@ impl EmbeddingProvider for TextEmbedder {
     // ANCHOR[contextra-infer-onnx:EMBED-DIM-001]
     /// Gibt die konfigurierte Ausgabedimension zurück, oder `0` falls nicht gesetzt.
     fn embedding_dim(&self) -> usize {
-        self.expected_dim.unwrap_or(0)
+        self.expected_dimension()
     }
 
     // ANCHOR[contextra-infer-onnx:EMBED-BATCH-TRAIT-001]
@@ -690,6 +690,24 @@ impl TextEmbedder {
             .load(std::sync::atomic::Ordering::SeqCst)
     }
 
+    /// Default provider name used by [`TextEmbedder`].
+    pub const DEFAULT_PROVIDER_NAME: &'static str = "onnx";
+
+    /// Returns the provider name identifier.
+    pub fn provider_name(&self) -> &str {
+        Self::DEFAULT_PROVIDER_NAME
+    }
+
+    /// Returns the configured embedding dimension or `0` if unset.
+    pub fn expected_dimension(&self) -> usize {
+        self.expected_dim.unwrap_or(0)
+    }
+
+    /// Returns the embedding dimension. Alias for [`Self::expected_dimension`].
+    pub fn embedding_dim(&self) -> usize {
+        self.expected_dimension()
+    }
+
     /// Sets the expected embedding output dimension for post-inference validation.
     // ANCHOR[contextra-infer-onnx:WITH-EXPECTED-DIM-001]
     /// Konfiguriert die erwartete Dimension des Ausgabeverktors zur Validierung nach Inferenz.
@@ -818,13 +836,23 @@ impl TextEmbedder {
                 )));
             }
 
-            let hidden_size = shape[2] as usize;
+            let dim2 = *shape.get(2).ok_or_else(|| {
+                ContextraError::Internal(
+                    "Missing hidden_size dimension in output shape".to_string(),
+                )
+            })?;
+            let hidden_size = usize::try_from(dim2).map_err(|_| {
+                ContextraError::Internal(format!("Invalid hidden_size dimension: {dim2}"))
+            })?;
             let mut mean_vec = vec![0.0f32; hidden_size];
 
             for i in 0..seq_len {
-                if attention_mask[i] == 1 {
+                if attention_mask.get(i).copied() == Some(1) {
                     for j in 0..hidden_size {
-                        mean_vec[j] += data[i * hidden_size + j];
+                        let idx = i.saturating_mul(hidden_size).saturating_add(j);
+                        if let (Some(slot), Some(&val)) = (mean_vec.get_mut(j), data.get(idx)) {
+                            *slot += val;
+                        }
                     }
                 }
             }

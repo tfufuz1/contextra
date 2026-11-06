@@ -16,8 +16,6 @@ ring = "3"
 contextra-engine = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-store = { workspace = true }
-contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }
 bytes = { workspace = true }
 ahash = { workspace = true }
@@ -40,3 +38,5 @@ tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 contextra-infer-candle = { workspace = true }
 contextra-testkit = { workspace = true }
+contextra-store = { workspace = true }
+contextra-vector = { workspace = true }

@@ -145,12 +145,14 @@ async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dy
 #[tokio::test]
 // ANCHOR[contextra-privacy:TEST-ATT-005]
 // Prüft: Stellt sicher, dass sensible Klartext-PII niemals in Audit-Logs oder Traces lecken.
-async fn test_audit_trace_contains_zero_raw_pii_or_plaintext() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_audit_trace_contains_zero_raw_pii_or_plaintext(
+) -> Result<(), Box<dyn std::error::Error>> {
     let raw_email = "super_secret_user@example.com";
     let raw_iban = "DE89370400440532013000";
     let raw_steuer_id = "86095742116";
 
-    let sensitive_payload = format!("Nutzer {raw_email} Konto {raw_iban} Steuer-ID {raw_steuer_id}");
+    let sensitive_payload =
+        format!("Nutzer {raw_email} Konto {raw_iban} Steuer-ID {raw_steuer_id}");
 
     let trace_bytes = compute_audit_trace(&sensitive_payload, "R-001", 1_700_000_000);
     assert_eq!(trace_bytes.len(), 32);

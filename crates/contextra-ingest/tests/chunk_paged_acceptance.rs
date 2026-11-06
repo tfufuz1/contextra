@@ -6,7 +6,13 @@
 //!
 // FILE-CONTEXT
 // ZWECK: Akzeptanztests und Zitierbarkeitstests für PagedChunker (WP-ING-14).
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
 // INVARIANTEN: Zero-Panic, deterministisch, präzise Zitierbarkeit, Span-Konsistenz.
 // STAND: TS:2026-10-31T00:00:00Z
 
@@ -14,9 +20,7 @@ use contextra_ingest::chunking::config::ChunkingConfig;
 use contextra_ingest::chunking::paged::PagedChunker;
 use contextra_ingest::chunking::IrChunker;
 use contextra_ingest::format::FormatId;
-use contextra_ingest::ir::{
-    BlockKind, Boundary, DocumentIr, Locator, NoteKind, Table,
-};
+use contextra_ingest::ir::{BlockKind, Boundary, DocumentIr, Locator, NoteKind, Table};
 
 fn page_loc(page: u32) -> Locator {
     let mut loc = Locator::default();
@@ -135,10 +139,7 @@ fn test_pdf_6000_tokens_large_page_parts() {
     }
     let large_text = sentences.join(" ");
 
-    ir.push(
-        BlockKind::Paragraph { text: large_text },
-        page_loc(1),
-    );
+    ir.push(BlockKind::Paragraph { text: large_text }, page_loc(1));
 
     let canon = ir.canonical();
     let mut cfg = ChunkingConfig::default();

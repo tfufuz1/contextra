@@ -1,7 +1,8 @@
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
-use contextra::collection_profile::DeploymentTier;
+// Deployment tier
+use contextra::collection_profile;
 use serde_json::{json, Value};
 
 impl McpServer {
@@ -33,10 +34,12 @@ impl McpServer {
         };
 
         let tier = match tier_str {
-            "EdgeMinimal" => DeploymentTier::EdgeMinimal,
-            "PowerUserLocal" => DeploymentTier::PowerUserLocal,
-            "EnterpriseShared" => DeploymentTier::EnterpriseShared,
-            "EnterpriseRegulated" => DeploymentTier::EnterpriseRegulated,
+            "EdgeMinimal" => contextra::collection_profile::DeploymentTier::EdgeMinimal,
+            "PowerUserLocal" => contextra::collection_profile::DeploymentTier::PowerUserLocal,
+            "EnterpriseShared" => contextra::collection_profile::DeploymentTier::EnterpriseShared,
+            "EnterpriseRegulated" => {
+                contextra::collection_profile::DeploymentTier::EnterpriseRegulated
+            }
             invalid => {
                 return Err(McpError::invalid_params(format!(
                     "Invalid deployment_tier '{invalid}'. Valid options are: 'EdgeMinimal', 'PowerUserLocal', 'EnterpriseShared', 'EnterpriseRegulated'"
@@ -86,7 +89,7 @@ impl McpServer {
         }))
     }
 
-    /// Handler für `contextra_drop_collection` — Löscht eine gesamte Collection und stellt einen gemessenen collection-weiten Löschbeweis aus.
+    /// Handler für `contextra_drop_collection` — Entfernt eine gesamte Collection und stellt einen gemessenen collection-weiten Nachweis aus.
     pub(crate) async fn handle_drop_collection(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = match args.get("collection").or_else(|| args.get("name")) {
             Some(col_val) => {
@@ -227,7 +230,7 @@ impl McpServer {
             "collection": col_name,
             "id": id,
             "proof": null,
-            "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden",
+            "reason": "Schichteigene Messung für Einzel-Dokument-Entfernung nicht angebunden",
             "claim": "LogicalDeletionOnly",
             "erasure_measured": false
         }))

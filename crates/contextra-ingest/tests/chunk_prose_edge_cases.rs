@@ -8,7 +8,12 @@
 // ZWECK: Randfall- und Performance-Smoke-Tests für ProseChunker (WP M3 / SPEC C-11.7).
 // STAND: TS:2026-10-31T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 
 use contextra_ingest::chunking::config::ChunkingConfig;
 use contextra_ingest::chunking::draft_document;
@@ -21,14 +26,22 @@ use contextra_ingest::ir::{BlockKind, DocumentIr, Locator};
 fn test_heading_inside_tilde_fence_is_not_heading() {
     let md = "~~~rust\n# Heading inside fence\n~~~\n\n# Real Heading\nSome content.";
     let mut ir = DocumentIr::new(FormatId::Markdown);
-    ir.push(BlockKind::Raw { text: md.to_string() }, Locator::default());
+    ir.push(
+        BlockKind::Raw {
+            text: md.to_string(),
+        },
+        Locator::default(),
+    );
     let canon = ir.canonical();
 
     let cfg = ChunkingConfig::default();
     let drafts = draft_document(&ir, &canon, &cfg).unwrap();
 
     let fence_draft = drafts.iter().find(|d| d.text.contains("~~~rust")).unwrap();
-    assert_ne!(fence_draft.breadcrumb.as_deref(), Some("# Heading inside fence"));
+    assert_ne!(
+        fence_draft.breadcrumb.as_deref(),
+        Some("# Heading inside fence")
+    );
 }
 
 // ANCHOR[contextra-ingest:TST-0319]
@@ -45,7 +58,10 @@ fn test_5000_char_paragraph_without_punctuation() {
 
     let drafts = draft_document(&ir, &canon, &cfg).unwrap();
 
-    assert!(drafts.len() > 1, "5000-Zeichen-Absatz muss aufgeteilt werden");
+    assert!(
+        drafts.len() > 1,
+        "5000-Zeichen-Absatz muss aufgeteilt werden"
+    );
     for d in drafts {
         assert!(d.span.end <= 5000);
     }
@@ -72,10 +88,19 @@ fn test_code_block_3000_lines() {
 
     let drafts = draft_document(&ir, &canon, &cfg).unwrap();
 
-    assert!(drafts.len() > 1, "3000-Zeilen-Codeblock muss aufgeteilt werden");
+    assert!(
+        drafts.len() > 1,
+        "3000-Zeilen-Codeblock muss aufgeteilt werden"
+    );
     for d in drafts {
-        assert!(d.text.contains("```python"), "Jeder Teil muss Header-Fence enthalten");
-        assert!(d.text.contains("```"), "Jeder Teil muss Schluss-Fence enthalten");
+        assert!(
+            d.text.contains("```python"),
+            "Jeder Teil muss Header-Fence enthalten"
+        );
+        assert!(
+            d.text.contains("```"),
+            "Jeder Teil muss Schluss-Fence enthalten"
+        );
     }
 }
 
@@ -100,10 +125,19 @@ fn test_table_500_lines_header_repetition() {
 
     let drafts = draft_document(&ir, &canon, &cfg).unwrap();
 
-    assert!(drafts.len() > 1, "500-Zeilen-Tabelle muss aufgeteilt werden");
+    assert!(
+        drafts.len() > 1,
+        "500-Zeilen-Tabelle muss aufgeteilt werden"
+    );
     for d in drafts {
-        assert!(d.text.contains("| ID | Name | Role |"), "Tabellenkopf muss wiederholt werden");
-        assert!(d.text.contains("|---|---|---|"), "Trennzeile muss wiederholt werden");
+        assert!(
+            d.text.contains("| ID | Name | Role |"),
+            "Tabellenkopf muss wiederholt werden"
+        );
+        assert!(
+            d.text.contains("|---|---|---|"),
+            "Trennzeile muss wiederholt werden"
+        );
     }
 }
 
@@ -125,7 +159,12 @@ fn test_empty_ir_yields_no_drafts() {
 fn test_headings_only_document() {
     let md = "# Title\n## Section 1\n### Sub 1";
     let mut ir = DocumentIr::new(FormatId::Markdown);
-    ir.push(BlockKind::Raw { text: md.to_string() }, Locator::default());
+    ir.push(
+        BlockKind::Raw {
+            text: md.to_string(),
+        },
+        Locator::default(),
+    );
     let canon = ir.canonical();
 
     let cfg = ChunkingConfig::default();
@@ -142,7 +181,10 @@ fn test_performance_smoke_8mib_linear_time() {
     let count = (8 * 1024 * 1024) / paragraph_template.len() + 1;
     let big_md = paragraph_template.repeat(count);
 
-    assert!(big_md.len() >= 8 * 1024 * 1024, "Dokument muss mindestens 8 MiB groß sein");
+    assert!(
+        big_md.len() >= 8 * 1024 * 1024,
+        "Dokument muss mindestens 8 MiB groß sein"
+    );
 
     let mut ir = DocumentIr::new(FormatId::Markdown);
     ir.push(BlockKind::Raw { text: big_md }, Locator::default());
@@ -151,5 +193,8 @@ fn test_performance_smoke_8mib_linear_time() {
     let cfg = ChunkingConfig::default();
 
     let drafts = draft_document(&ir, &canon, &cfg).unwrap();
-    assert!(!drafts.is_empty(), "8 MiB Dokument muss erfolgreich in Drafts zerlegt werden");
+    assert!(
+        !drafts.is_empty(),
+        "8 MiB Dokument muss erfolgreich in Drafts zerlegt werden"
+    );
 }

@@ -88,7 +88,8 @@ pub fn parse_content(
                         }
                     }
                     b"conditional-text" => {
-                        let is_hidden = check_hidden_attr(&reader, &e) || check_condition_attr(&reader, &e);
+                        let is_hidden =
+                            check_hidden_attr(&reader, &e) || check_condition_attr(&reader, &e);
                         if is_hidden && !ctx.policy.include_hidden {
                             skip_depth = 1;
                             tag_stack.push(TagInfo::Other);
@@ -132,13 +133,16 @@ pub fn parse_content(
                     }
                     b"table-row" => {
                         current_row.clear();
-                        row_repeated = parse_attr_u64(&reader, &e, b"number-rows-repeated").unwrap_or(1);
+                        row_repeated =
+                            parse_attr_u64(&reader, &e, b"number-rows-repeated").unwrap_or(1);
                         tag_stack.push(TagInfo::TableRow);
                     }
                     b"table-cell" | b"covered-table-cell" => {
                         in_cell = true;
-                        cell_spanned = parse_attr_u64(&reader, &e, b"number-columns-spanned").unwrap_or(1);
-                        cell_repeated = parse_attr_u64(&reader, &e, b"number-columns-repeated").unwrap_or(1);
+                        cell_spanned =
+                            parse_attr_u64(&reader, &e, b"number-columns-spanned").unwrap_or(1);
+                        cell_repeated =
+                            parse_attr_u64(&reader, &e, b"number-columns-repeated").unwrap_or(1);
                         cell_text.clear();
                         tag_stack.push(TagInfo::TableCell);
                     }
@@ -239,7 +243,8 @@ pub fn parse_content(
                             let trimmed = txt.trim().to_string();
                             if !trimmed.is_empty() {
                                 if list_depth > 0 {
-                                    let ordered = list_ordered_stack.last().copied().unwrap_or(false);
+                                    let ordered =
+                                        list_ordered_stack.last().copied().unwrap_or(false);
                                     ir.push(
                                         BlockKind::ListItem {
                                             depth: list_depth,
@@ -322,7 +327,13 @@ pub fn parse_content(
                         if let Some(kind) = current_note_kind.take() {
                             let trimmed = note_text.trim().to_string();
                             if !trimmed.is_empty() {
-                                ir.push(BlockKind::Note { kind, text: trimmed }, Locator::default());
+                                ir.push(
+                                    BlockKind::Note {
+                                        kind,
+                                        text: trimmed,
+                                    },
+                                    Locator::default(),
+                                );
                             }
                         }
                     }
@@ -331,7 +342,13 @@ pub fn parse_content(
                         if let Some(kind) = current_note_kind.take() {
                             let trimmed = note_text.trim().to_string();
                             if !trimmed.is_empty() {
-                                ir.push(BlockKind::Note { kind, text: trimmed }, Locator::default());
+                                ir.push(
+                                    BlockKind::Note {
+                                        kind,
+                                        text: trimmed,
+                                    },
+                                    Locator::default(),
+                                );
                             }
                         }
                     }

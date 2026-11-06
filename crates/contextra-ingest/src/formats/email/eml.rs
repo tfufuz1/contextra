@@ -23,7 +23,7 @@ use crate::ir::{
     BlockKind, Boundary, DocumentIr, ExtractWarning, Locator, MessageHeader, WarningCode,
 };
 use mail_parser::{
-    Addr, Address, HeaderValue, Message, MessagePart, MessageParser, MimeHeaders, PartType,
+    Addr, Address, HeaderValue, Message, MessageParser, MessagePart, MimeHeaders, PartType,
 };
 
 /// Extrahiert eine einzelne EML-Nachricht.
