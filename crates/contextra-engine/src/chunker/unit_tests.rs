@@ -35,13 +35,13 @@ fn test_chunk_text_unicode_german_umlauts() {
 }
 
 #[test]
-fn chunker_empty_input() {
+fn test_chunker_empty_input() {
     let chunks = MarkdownChunker::with_defaults().chunk(DocId::new(1), "");
     assert!(chunks.is_empty());
 }
 
 #[test]
-fn chunker_single_chunk_no_split() {
+fn test_chunker_single_chunk_no_split() {
     let text = "Short text";
     let chunks = MarkdownChunker::with_defaults().chunk(DocId::new(1), text);
     assert_eq!(chunks.len(), 1);
@@ -49,7 +49,7 @@ fn chunker_single_chunk_no_split() {
 }
 
 #[test]
-fn chunker_respects_max_chunk_size() {
+fn test_chunker_respects_max_chunk_size() {
     let text = (0..50)
         .map(|_| "word ".repeat(20))
         .collect::<Vec<_>>()
@@ -329,7 +329,7 @@ fn test_chunker_unsplit_heading_level_ignored() {
 }
 
 #[test]
-fn chunker_handles_headingless_single_paragraph_document() {
+fn test_chunker_handles_headingless_single_paragraph_document() {
     let line =
         "This is a continuous sentence representing extracted PDF text with single line breaks.\n";
     let text = line.repeat(250);
@@ -357,7 +357,7 @@ fn chunker_handles_headingless_single_paragraph_document() {
 }
 
 #[test]
-fn chunk_text_with_overlap_produces_overlapping_windows() {
+fn test_chunk_text_with_overlap_produces_overlapping_windows() {
     let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let window_chars = 10;
     let overlap_chars = 3;
@@ -399,7 +399,7 @@ fn chunk_text_with_overlap_produces_overlapping_windows() {
 }
 
 #[test]
-fn chunk_text_with_overlap_respects_utf8_boundaries() {
+fn test_chunk_text_with_overlap_respects_utf8_boundaries() {
     let text = "Äpfel, Öle, Übermut und Straße sind wunderschön!! ".repeat(5);
     let windows = chunk_text_with_overlap(&text, 25, 5);
     assert!(!windows.is_empty());
