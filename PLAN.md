@@ -1,31 +1,31 @@
 # Contextra Baukasten – Refaktorisierungsplan
 
-Begleitdokument zur „Contextra Baukasten – Spezifikation v5“ · Stand 06.11.2026 · Basis: `tfufuz1/contextra`
+Begleitdokument zur „Contextra Baukasten – Spezifikation v3.0“ · Stand 06.11.2026 · Basis: `tfufuz1/contextra`
 
-Dieser Plan legt Reihenfolge, Arbeitspakete, Gates und Risiken fest. Aufwände sind als relative Größen (S/M/L/XL) angegeben, nicht als Zeitschätzung, weil weder Build noch Testlaufzeiten gemessen werden konnten.
+Dieser Plan legt Reihenfolge, Arbeitspakete, Gates und Risiken zur Transformation des Gesamtsystems in ein entkoppeltes, modulares Baukastensystem (Building Blocks) fest. Aufwände sind als relative Größen (S/M/L/XL) angegeben.
 
-## 1. Leitprinzipien
+## 1. Leitprinzipien des Baukastensystems
 
-1. **Immer baubar.** Jeder Merge hinterlässt einen grünen `cargo build --workspace` und grüne Tests. Große Schnitte werden in Teil-PRs zerlegt.
-2. **Von außen nach innen löschen.** Zuerst entfernen, was andere benutzen (Fassade, MCP, Engine), zuletzt, was nur noch intern hängt (Store-Compaction, Krypto). So bricht nie ein Verbraucher, dessen Lieferant schon weg ist.
-3. **Layout und DAG-Prüfung zuerst.** Die Ring-Struktur gilt vom ersten Tag an (Phase 1), alle späteren PRs entstehen schon im Zielzustand.
-4. **Messen vor Ändern.** Ohne Baseline (Phase 0) ist keine Performance-Aussage der Spezifikation prüfbar.
-5. **Feature-Flags nur als Brücke.** Flag `legacy-erasure` ist befristet (Phase 3) und muss am Ende der Phase vollständig entfernt sein. Hinweis: Cargo-Features sind additiv; ein dauerhaftes Gating destruktiver Pfade verdoppelt die `cfg`-Fläche in 16 Crates und ist ausdrücklich nicht gewollt.
+1. **Modulare Autarkie & Isolation:** Jeder Crate und jede Komponente muss architektonisch sauber entkoppelt sein und isoliert funktionieren, um Bausteine (z. B. Storage, Vector-Index, BM25-Text, MVCC, Crypto) ohne transitive Altlasten in Fremdprojekten einsetzen zu können.
+2. **Immer baubar:** Jeder Merge hinterlässt einen grünen `cargo build --workspace` und grüne Tests. Große Schnitte werden in wohldefinierte Teil-PRs zerlegt.
+3. **Entkopplung der Löschkette (Modularisierung in `contextra-erasure`):** Die historische Multi-Layer-Löschkette mit Deletion-Proofs, Audit-Ketten, DSGVO-/Gesetzesbezügen und Nachweislogik wird vollständig aus dem Speicherkern (Store, Vector, Text, Crypto, DB, MCP etc.) entfernt und als eigenständiger, isolierter Baustein im Crate `contextra-erasure` modularisiert. Kern-Datenhalter implementieren lediglich generische, schlanke Bereinigungs-Ports (`Purger`, `LayerScanner`).
+4. **Schnittstellen via Ports/Traits:** Direkte Abhängigkeiten zwischen konkreten Engines werden eliminiert. Abstraktionen liegen in `contextra-ports` oder generischen Parametern; interne Implementierungstypen lecken nicht über Modulgrenzen.
+5. **DAG-Architektur & Zero-Dead-Code:** Ring-Struktur (Ringe 0 bis 4) und Abhängigkeitsrichtung werden maschinell validiert. Unnötige Querabhängigkeiten und toter Code werden eliminiert.
 
-## 2. Überblick
+## 2. Überblick über die Phasen
 
 | Phase | Inhalt | Größe | Gate |
 | --- | --- | --- | --- |
-| 0 | Baseline: Build, Tests, Benchmarks, Tag | M | G0 |
-| 1 | Ring-Layout und DAG-Erzwingung | L | G1 |
-| 2 | Ports v2 entwerfen, erproben, einfrieren | L | G2 |
-| 3 | Löschung entfernen und Extensions abtrennen | XL | G3 |
-| 4 | Store, Graph, Vektor, Text auf append-only umbauen | XL | G4 |
-| 5 | Entkopplung und Zero-Copy-Härtung | L | G5 |
-| 6 | Produktschnitte und Beispiele | M | G6 |
-| 7 | Dokumentation und CI-Bereinigung | S | G7 |
+| 0 | Baseline: Build, Tests, Entkopplungs-Inventar, Tag | M | G0 |
+| 1 | Ring-Layout, DAG-Erzwingung und Entkopplungsprüfung | L | G1 |
+| 2 | Ports v2 konsolidieren (Vfs, Purger, Storage, Vector, Text, Graph) | L | G2 |
+| 3 | Löschkette entkoppeln & in `contextra-erasure` modularisieren | XL | G3 |
+| 4 | Kerne entkoppeln: Append-friendly Store, Vector, Text, Graph | XL | G4 |
+| 5 | Feingranulare Modularisierung, Abstraktion & Zero-Copy-Härtung | L | G5 |
+| 6 | Produktschnitte, Baustein-Export & isolierte Beispiele | M | G6 |
+| 7 | Dokumentation, Governance-Bereinigung und CI-Absicherung | S | G7 |
 
-Phase 3 und 4 sind die Hauptarbeit. Phase 4 darf erst starten, wenn G2 und G3 bestanden sind.
+Phase 3 und 4 vollziehen die zentrale Modularisierung: Sie befreien den Speicherkern von der monolithischen Löschkette und kapseln die DSGVO-/Proof-Verantwortung autark in `contextra-erasure`.
 
 ## 3. Phase 0 – Baseline
 
@@ -34,276 +34,223 @@ Phase 3 und 4 sind die Hauptarbeit. Phase 4 darf erst starten, wenn G2 und G3 be
 | WP | Arbeit | Ergebnis |
 | --- | --- | --- |
 | 0.1 | Rust-Toolchain installieren (`rust-toolchain.toml`, Min-Version 1.89), `cargo metadata` ausführen | nachweisen, ob D1 (`xtask`) noch gilt, beheben falls ja |
-| 0.2 | `cargo build --workspace --locked`, `cargo test --workspace --locked` | Liste roter Tests; die 20 `#[ignore]`-Stellen (D5) erfassen |
-| 0.3 | Befunde D2 bis D4 und D6 prüfen | jeder Befund: Ja/Nein und Behebung |
-| 0.4 | Benchmarks aus `benchmarks/contextra-bench` laufen lassen, p50/p99/p99,9 für Vektor, Text, Graph, Store | `baseline_20261106.json` im Repo |
-| 0.5 | Kompilierzeit und Binary-Größe je Crate messen (`cargo build --timings`, `cargo bloat`) | Baseline-Tabelle |
+| 0.2 | `cargo build --workspace --locked`, `cargo test --workspace --locked` | Liste roter Tests; die 20 `#[ignore]`-Stellen erfassen |
+| 0.3 | Befunde D2 bis D4 und D6 prüfen | jeder Befund: Status verifizieren und Behebung dokumentieren |
+| 0.4 | Benchmarks aus `benchmarks/contextra-bench` laufen lassen | `baseline_20261106.json` im Repo |
+| 0.5 | Kompilierzeit und Binary-Größe je Crate erfassen | Baseline-Metriken |
 | 0.6 | `git tag pre-baukasten`, Branch `baukasten/main` | Rückfalloption |
-| 0.7 | Lösch-Inventar erzeugen: alle Treffer für `tombstone`, `erasure`, `shred`, `purge`, `remove_with_graph_repair`, `delete_prefix`, `retention`, `forget`, `gdpr`, `dsgvo` nach Crate und Datei | `docs/refactor/erase-inventory.md` |
+| 0.7 | Lösch- und DSGVO-Inventar konsolidieren (Audit-Abgleich mit `docs/MODULAR_DECOUPLING_AUDIT.md`): Fundstellen außerhalb von `contextra-erasure` nach Crate und Datei erfassen | `docs/refactor/erase-inventory.md` |
 
-**Gate G0:** Build und Tests grün (oder rote Tests als bekannte, dokumentierte Liste), Baseline-Dateien eingecheckt.
-
-**Stand der statischen Voranalyse (zur Orientierung, noch nicht gegen Build geprüft):** Tombstone-Begriffe in 16 Crates (Spitze: `store` 41 Dateien, `graph` 31, `vector` 24, `text` 17); `remove_with_graph_repair` in 3 Dateien von `contextra-vector`; Erasure-Code in `engine/contextra_impl/erasure.rs`, `mcp` (3 Dateien), Löschnachweise in `crypto` (`deletion_proof/`, `ed25519_proof.rs`, `kv_shredding.rs`, `revocation_log.rs`).
+**Gate G0:** Build und Tests grün (oder dokumentierte Ausnahmeliste), Baseline-Dateien und Inventar eingecheckt.
 
 ## 4. Phase 1 – Ring-Layout und DAG-Erzwingung
 
-**Ziel:** Das Repository ist physisch nach Ringen geordnet und die Abhängigkeitsrichtung ist maschinell geprüft. Verstöße, die es heute gibt, stehen auf einer Ausnahmeliste, die nur kleiner werden darf.
+**Ziel:** Strikte Durchsetzung des 5-Ring-Schichtenmodells und maschinelle Prüfung der Abhängigkeitsrichtung.
 
 | WP | Arbeit |
 | --- | --- |
-| 1.1 | `git mv` der Crates in `ring0_foundation/`, `ring1_indices/`, `ring2_inference/`, `ring3_composition/`, `ring4_surface/`, `extensions/`, `tooling/` gemäß Spezifikation 3.1. `git mv` erhält die Historie. |
-| 1.2 | Alle Pfade nachziehen: `Cargo.toml` (`members`, `default-members`, `[workspace.dependencies]`), `capabilities.toml` (`path`, `ring`), `CODEOWNERS`, `justfile`, `flake.nix`, `scripts/`, `.github`-Workflows, `mcp.json`. |
-| 1.3 | `capabilities.toml`: `ring` und `may_depend_on` neu setzen; `contextra-durable-fs` eintragen (D6). |
-| 1.4 | `tooling/xtask` anlegen mit `check-dag`: liest `cargo metadata`, vergleicht Verzeichnisring, `capabilities.toml`-Ring und tatsächliche Kanten. Bricht bei jeder aufwärts gerichteten Kante und bei jeder Kante in `extensions/` aus dem Kern. |
-| 1.5 | `deny.toml` um Regel `deny` für Kante Kern → `extensions/` erweitern. |
-| 1.6 | `xtask/dag-exceptions.toml` mit den heutigen Verstößen (u. a. `graph` → `adapt` je nach Zuordnung, `router` → `privacy`, `mcp` → `license`). Einträge haben ein Ablaufdatum (Phase) und werden nur gelöscht, nie geändert. |
-| 1.7 | CI: `check-dag` als Pflicht-Check. |
-| 1.8 | `contextra-core` (deprecated, 256 Zeilen) entfernen, Abhängige umhängen. |
+| 1.1 | `capabilities.toml`: Ring, Klasse und `may_depend_on` für alle Crates sauber definieren; `contextra-durable-fs` und `contextra-erasure` normativ festlegen. |
+| 1.2 | Pfade und Workspace-Manifeste konsolidieren: `Cargo.toml`, `capabilities.toml`, `CODEOWNERS`, `justfile`, CI-Workflows. |
+| 1.3 | DAG-Prüfung (`check-dag`) in CI einbinden: verifiziert Ring-Regeln und `capabilities.toml`-Einschränkungen. Bricht bei aufwärts gerichteten Kanten und unzulässigen Querabhängigkeiten. |
+| 1.4 | `xtask/dag-exceptions.toml` für temporäre Übergangs-Ausnahmen anlegen (mit festem Ablauf-Meilenstein). |
+| 1.5 | `deny.toml` aktualisieren zur Absicherung der Kern- vs. Extension-Grenzen. |
 
-**Hinweis zur Verzeichnisstruktur:** Verzeichnisse allein erzwingen nichts, Cargo kennt keine Ringe. Die sichtbare Ordnung hilft dem Auge; die Erzwingung kommt aus 1.4 und 1.5.
+**Gate G1:** `check-dag` ist aktiv und schützt den Workspace; alle Kanten sind deklariert und legitimiert.
 
-**Gate G1:** `check-dag` grün mit Ausnahmeliste; Workspace baut und testet wie in G0; keine funktionale Änderung (Diff besteht nur aus Verschiebungen und Pfaden).
+## 5. Phase 2 – Ports v2 (Vertragsschicht der Bausteine)
 
-## 5. Phase 2 – Ports v2
-
-**Ziel:** Die Traits, an denen alle Ring-1-Crates hängen, sind final. Ohne diese Phase erzeugt der Index-Umbau Nacharbeit in jedem Index.
+**Ziel:** Die Schnittstellen-Traits in `contextra-ports`, an denen alle Subsysteme hängen, werden konsolidiert und als stabiler Vertrag eingefroren.
 
 | WP | Arbeit |
 | --- | --- |
-| 2.1 | Entwurf `Storage` v2 in `contextra-ports`: `append`, `get`, `get_at_seq`, `scan`, `with_value` (Callback), `PinnedBlock`-Guard (Spec P-4), Batch-Append. **Ohne** `delete*`. Native async-Methoden, kein `BoxFuture` (P-2). |
-| 2.2 | Entwurf `VectorIndex`, `TextIndex`, `GraphIndex` v2: `insert`, `search`, `supersede(old, new)`, ohne `delete`/`remove_*`. |
-| 2.3 | Alte Traits unverändert unter `ports::legacy` und `feature = "legacy-erasure"` belassen, damit alle Crates weiter bauen. |
-| 2.4 | **Spike:** Prototypische Implementierung der v2-Traits für `contextra-store` (nur Lesepfad) und je ein Mini-Konsument in `vector`, `text`, `graph`. Prüfen: Passen Lifetimes? Entsteht irgendwo eine Heap-Allokation? Messung mit zählendem Allokator. |
-| 2.5 | Contract-Tests (`ports/contract_tests.rs`, bereits vorhanden) auf v2 portieren. |
-| 2.6 | `dyn`-Adapter für Ring 3/4 (`DynStorage` mit `BoxFuture`), ausschließlich dort. |
-| 2.7 | Freeze: Version `contextra-ports 1.0.0`, Doku-Kommentar „Änderungen nur durch ADR“, `cargo-semver-checks` in CI. |
+| 2.1 | Konsolidierung des `Vfs`-Ports: Vereinheitlichung auf `contextra_ports::Vfs` mit Streaming/Handle-Operationen (`read_at`, `write_at`, `sync_data`, `sync_all`); `contextra-durable-fs` implementiert `RealFs` gegen diesen Standard-Trait. |
+| 2.2 | Bereinigungs- und Scan-Ports (`Purger`, `LayerScanner`) in `contextra-ports`: Datenhalter bieten rein mechanische Bereinigungsmethoden an, ohne Kenntnis von Sagas, DSGVO-Regelwerken oder Berichtsformaten. |
+| 2.3 | Core Storage & Index Ports: `StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex` bereinigen; Entkopplung von monolithischen Ausführungsannahmen; native async-Methoden bzw. sauber getrennte synchrone Kerne. |
+| 2.4 | Egress- und Security-Ports: Neuer Port `EgressPolicy` in `ports`, damit z. B. `contextra-router` ohne direkte Bindung an `contextra-privacy` agieren kann. |
+| 2.5 | Contract-Tests (`ports/contract_tests.rs`) aktualisieren und auf alle Ports erweitern. |
 
-**Gate G2:** Spike beweist: Lesepfad Store → Index ohne Kopie und ohne Allokation; Contract-Tests grün; `ports 1.0.0` getaggt. Fehlt der Nachweis, wird nicht eingefroren, sondern 2.1 bis 2.4 wiederholt.
+**Gate G2:** Contract-Tests grün; Ports v2 in `contextra-ports` abgenommen; keine Lecks interner Crate-Typen in Port-Signaturen.
 
-## 6. Phase 3 – Löschung entfernen und Extensions abtrennen
+## 6. Phase 3 – Löschkette entkoppeln & in `contextra-erasure` modularisieren
 
-**Ziel:** Kein Löschpfad im Kern (Spec B4). Von außen nach innen, jeweils ein PR pro Zeile.
+**Ziel:** Vollständige Entfernung des DSGVO-, Löschketten-, Nachweis- und Saga-Ballasts aus dem Speicherkern. Kapselung der gesamten Multi-Layer-Löschlogik in `contextra-erasure`.
 
-| Schritt | Crate | Entfernen / Verschieben | Größe |
+| Schritt | Crate | Entkopplung / Modularisierung | Größe |
 | --- | --- | --- | --- |
-| 3.1 | `contextra-license`, `-privacy`, `-avv-generator`, `-audit-export` | nach `extensions/` verschieben; Kanten aus `contextra`, `mcp`, `router` entfernen; Port `EgressPolicy` in `ports` (Router bleibt benutzbar ohne `privacy`) | M |
-| 3.2 | `contextra` (Fassade) | Features `compliance`, `audit-export`, `avv-generator` entfallen; Lösch-API entfernen | S |
-| 3.3 | `contextra-mcp` | 3 Dateien mit Erasure/`forget` bereinigen (12 `forget`-Treffer); Tool-Definitionen für Löschen entfernen; Lizenz-Gate herauslösen | M |
-| 3.4 | `contextra-py` | Lösch-Bindings entfernen (nur falls vorhanden; per Inventar 0.7 prüfen) | S |
-| 3.5 | `contextra-engine` | `contextra_impl/erasure.rs` nach `extensions/ext-erasure` verschieben oder streichen; `background_workers` auf Lösch-/Retention-Jobs prüfen; `decay_controller.rs` prüfen, ob Decay logisch löscht (dann ändern auf Gewichtung ohne Entfernung) | L |
-| 3.6 | `contextra-db`, `-agent`, `-cognition` | Löschbezogene Aufrufe entfernen (`db` 10, `cognition` 11 Dateien mit Tombstone-Bezug) | M |
-| 3.7 | `contextra-graph` | `cascade.rs`, `csr/graph_write/tombstone.rs`, `graph_persist::delete_edge_persistence`, `GraphIndex::{remove_edge, remove_entity}`, `provenance::remove_doc`, Kaskaden-Konstanten; „DeletedView“ in `ppr`-Pfaden ersetzen | L |
-| 3.8 | `contextra-vector` | `hnsw/deletion.rs`, `deleted_ratio`, `DiskAnn::delete`, `VectorIndex::delete`; 24 Dateien mit Tombstone-Bezug aufräumen | L |
-| 3.9 | `contextra-text` | Löschpfade, `purge`, 17 Dateien Tombstone | M |
-| 3.10 | `contextra-store` | `compaction/engine.rs` und `adaptive.rs` (tombstone-getriebene Zweige), `memtable.rs`, `kv/delete_mode.rs`, `lsm/scan.rs`, `lsm/ops/read.rs`, `kv/segment.rs`; `crypto_shred`-Pfade; `StorageEngine::delete*` | XL |
-| 3.11 | `contextra-mvcc` | Tombstone-Bit im `seq_no` **reservieren**, nicht entfernen (Spec 5.2); Reader lehnt gesetztes Bit ab | S |
-| 3.12 | `contextra-crypto` | Aufspaltung: `crypto-core` (WAL-HMAC, Cipher, KDF, Audit-Kette, Anti-Tamper) bleibt Ring 0; `kv_shredding`, `deletion_proof/`, `ed25519_proof.rs`, `revocation_log.rs` nach `extensions/ext-erasure` | L |
-| 3.13 | `contextra-ports` | `Purger`, `delete`-Methoden aus der v2-Linie sind bereits weg (Phase 2); `ports::legacy` löschen | S |
-| 3.14 | Alle | Flag `legacy-erasure` und alle `cfg`-Zweige löschen; `xtask check-no-delete` aktivieren | M |
+| 3.1 | `contextra-crypto` | Aufspaltung: `contextra-crypto` behält ausschließlich krypto-technische Grundbausteine (`wal_crypto`, `kdf`, `cipher`, `audit_chain`, `anti_tamper`). Alle Lösch- und Nachweiskomponenten (`deletion_proof/`, `ed25519_proof.rs`, `kv_shredding.rs`, `revocation_log.rs`) wandern vollständig in `contextra-erasure`. | L |
+| 3.2 | `contextra-store` | Löschketten- und DSGVO-Relikte entfernen: `compaction/engine.rs` und `adaptive.rs` entflechten; `kv/segment.rs` und `kv/delete_mode.rs` von `kv_shredding` entkoppeln; Store implementiert nur `Purger`/`LayerScanner` für `contextra-erasure`. | XL |
+| 3.3 | `contextra-vector` | DSGVO- und Deletion-Proof-Begriffe aus `hnsw/deletion.rs`, `DiskAnn::delete`, `VectorIndex` entfernen; `VectorScanner`/`Purger` implementieren; Entkopplung von `crypto::wal_crypto`. | L |
+| 3.4 | `contextra-text` | Bereinigung von 17 Dateien mit Löschketten-Bezug; `TextScanner`/`Purger` implementieren; Index-Bereinigung als autarker Baustein. | M |
+| 3.5 | `contextra-engine` | `contextra_impl/erasure.rs` vollständig aus der Engine entfernen und in `contextra-erasure` überführen; Background-Workers und Decay-Controller entkoppeln; Engine orchestriert Backends nur noch über Ports. | L |
+| 3.6 | `contextra-db`, `-agent`, `-cognition` | Entfernen monolithischer Löschkaskaden; DB fungiert als saubere Kompositionsreferenz ohne direkte Bindung an Löschketten-Interna. | M |
+| 3.7 | `contextra-mcp` | Löschwerkzeuge und Erasure-spezifische IPC-Handler herauslösen; Werkzeuge greifen bei Bedarf über den modularen `contextra-erasure`-Baustein zu; Lizenz-Gates entkoppeln. | M |
+| 3.8 | `contextra` (Fassade) | DSGVO- und Erasure-APIs (`erase`, `erase_status`, `report`) herauslösen oder als optionale Fassaden-Brücke zu `contextra-erasure` bereitstellen. | S |
+| 3.9 | `contextra-erasure` | Finalisierung des eigenständigen Löschkern-Bausteins: Kapselt Deletion Saga, Vault (16 Shards), GateLog, Ledger, Restore-Guard, Witness-Erfassung und kryptografisch signierte Deletion-Berichte. `contextra-erasure` steuert die Bereinigung der Datenhalter ausschließlich über `Purger` und `LayerScanner`. | L |
 
-**Verfahren je Schritt:**
+**Gate G3:** Alle 664 verstreuten DSGVO-/Löschketten-Fundstellen außerhalb von `contextra-erasure` bereinigt; Kern-Crates (`store`, `vector`, `text`, `crypto`, `engine`) sind frei von Deletion-Proof- und Rechtslogik; `contextra-erasure` baut und testet autark als eigenständiger Baustein.
 
-1. Aufrufer finden (`cargo check`, `grep`), Aufrufer zuerst bereinigen.
-2. Funktion hinter `legacy-erasure` stellen, Build grün.
-3. Tests, die Löschung prüfen, löschen oder in `ext-erasure` verschieben; Tests, die Löschung nur nebenbei nutzen (z. B. als Cleanup in Fixtures), umschreiben.
-4. Code entfernen, sobald nichts mehr referenziert.
+## 7. Phase 4 – Kerne entkoppeln: Append-friendly Store, Vector, Text, Graph
 
-**Gate G3:** `check-no-delete` grün (mit Allowlist nur für das reservierte seq-Bit); kein Kern-Crate hängt von `extensions/` ab; Ausnahmeliste aus 1.6 enthält keinen Lösch-Eintrag mehr; Tests grün.
-
-**Achtung bei Phase 3.5 und 3.7:** `decay_controller.rs` und das Graph-Modul `cascade.rs` behandeln neben Löschung auch **Aktualisierung** („Quelldokument gelöscht oder aktualisiert“). Aktualisierung bleibt als Supersession erhalten (Spec 5.1). Beim Entfernen darf diese Semantik nicht verloren gehen; dafür gibt es Regressionstests vorab (WP 3.0, siehe unten).
-
-**WP 3.0 (vor 3.5):** Charakterisierungstests für Update-Verhalten schreiben (Dokument wird ersetzt, abgeleitete Kanten und Chunks verhalten sich wie erwartet). Sie sind die Messlatte, dass der Umbau nur die Löschung trifft.
-
-## 7. Phase 4 – Append-only-Umbau
-
-**Ziel:** Die in Spezifikation 5 beschriebenen Strukturen, jetzt ohne Altlasten.
+**Ziel:** Autarke, hochperformante Speichermodule mit klarer Supersession- und Append-Semantik.
 
 | WP | Crate | Arbeit |
 | --- | --- | --- |
-| 4.1 | `store` | `KeepAllVersions` als Default; `DropSuperseded` hinter `gc-superseded`; Compaction nur noch Level-Merge; Memtable ohne Tombstone-Einträge; Dateiformat-Version erhöhen, falls Eintrags-Kodierung sich ändert (Migrationspfad: Reader beherrscht v1 und v2, Writer nur v2) |
-| 4.2 | `store` | Block-Cache: `PinnedBlock` implementieren (Phase 2); Messung, dass `with_value` allokationsfrei ist |
-| 4.3 | `sys` | `mmap`-Eigentümertyp `SealedMap` (`MAP_POPULATE`/`mlock`-Policy, keine `&mut`-Sicht); Fehlerpfad für abgeschnittene Dateien (`SIGBUS`-Vermeidung durch versiegelte, unveränderliche Dateien und Eigentümer-Lock) |
-| 4.4 | `graph` | CSR-Segmente: Delta-Puffer + Merge-Job + Epochenwechsel (`ArcSwap`-ähnlich, Workspace-Abhängigkeit prüfen); Lesepfad ohne `RwLock` (63 Treffer auditieren: welche bleiben, welche weg); Supersession als `valid_from_seq` |
-| 4.5 | `vector` | HNSW additiv; Bitmap `superseded: RoaringBitmap`; Nachverarbeitung im Suchpfad; Messung des Recall-Verlusts je Anteil abgelöster Vektoren (Tabelle in Dokumentation, damit Nutzer wissen, wann sich ein Neuaufbau lohnt) |
-| 4.6 | `vector` | Dateisystem-I/O (28 Treffer) über `Vfs`-Port (B5, D4) |
-| 4.7 | `text` | Supersession-Bitmap analog 4.5 |
-| 4.8 | `rank` | Anpassung, falls Rangfusion Tombstone-Informationen erwartete (per Inventar prüfen) |
-| 4.9 | `checkpoint` | Checkpoint-Inhalt ohne Löschmarken; Wiederanlauf-Tests |
+| 4.1 | `store` | LSM-Storage auf modularen Betrieb ausrichten: Compaction als entkoppelter Level-Merge; saubere Block-Cache-Abstraktion (`PinnedBlock`); allokationsfreier Lesepfad via `with_value`. |
+| 4.2 | `sys` | `mmap`-Abstraktion mit versiegelten Speicherbereichen (`SealedMap`), robuster Signal- und Fehlerbehandlung ohne Panics. |
+| 4.3 | `graph` | CSR-Graph vollständig entkoppeln: Delta-Puffer und lock-freier Lesepfad; `adapt`-Querabhängigkeit eliminieren; Dev-Abhängigkeit zu `store` entfernen. |
+| 4.4 | `vector` | HNSW-Index isolieren: Supersession-Bitmap (`RoaringBitmap`), Entkopplung von Dateisystem-Direktaufrufen via `Vfs`-Port. |
+| 4.5 | `text` | Inverted-Index autark machen: BM25/BM25F mit Block-Max-WAND; Datentyp `Language` nach `types` verlagern; keine Querkopplungen zu höheren Ringen. |
+| 4.6 | `checkpoint` | Backup- und Snapshot-Handling isolieren, Bereinigung von Legacy-Löschmarken, autarker Wiederanlauf-Test. |
 
-**Gate G4:** Benchmarks nicht schlechter als Baseline (Spec 8); Recovery- und Crash-Tests grün (`fault-injection`-Feature in `store`); Graph-Lesepfad lock-frei nachgewiesen; keine Datei in Ring 0/1 ruft `std::fs` direkt auf (außer `sys`, `durable-fs`).
+**Gate G4:** Alle Ring-1-Crates (`store`, `vector`, `text`, `graph`, `checkpoint`) bauen unabhängig; Benchmarks p50/p99 mindestens auf Baseline-Niveau; keine direkten `std::fs`-Aufrufe im Index-Kern (vollständig über `Vfs`).
 
-## 8. Phase 5 – Entkopplung und Zero-Copy-Härtung
+## 8. Phase 5 – Feingranulare Modularisierung, Abstraktion & Zero-Copy-Härtung
 
 | WP | Arbeit |
 | --- | --- |
-| 5.1 | `dyn`-Inventar für `engine` (60), `ports` (35), `store` (23), `mvcc` (16), `vector` (14), `graph` (11), `text` (9): je Stelle heiß oder kalt entscheiden, heiße auf Generics umstellen. |
-| 5.2 | Quer-Kanten aus Spec 7.2 schneiden: `graph` → `adapt`, `vector` → `mvcc`/`crypto`, `mcp` → `infer-*` per Feature, `engine` zerlegen, wo sinnvoll (Chunker, Fusion, Decay). |
-| 5.3 | `contextra-ingest` ohne `engine` baubar machen (heute hängt es vollständig daran). Voraussetzung für Produkt „Ingest“. |
-| 5.4 | `contextra-db` (Legacy-Fassade, 13 Abhängigkeiten) auflösen (Strangler): Aufrufer auf `contextra` oder direkte Crates umstellen. |
-| 5.5 | `unsafe`-Audit (B7): Zahlen nach `unsafe {`, `unsafe fn`, `unsafe impl` trennen; Inseln `infer-onnx` (5), `crypto` (5), `ingest` (10), `text` (8) deklarieren oder bereinigen. |
-| 5.6 | Kompilierzeit-/Binary-Vergleich gegen Phase-0-Baseline; bei Aufblähung durch Monomorphisierung: betroffene Seam wieder auf `dyn` oder einen `#[inline(never)]`-Rand setzen. |
+| 5.1 | Backend-Bündel in `contextra-engine`: Einführung von `trait Backends` (Storage, Vector, Text, Graph); Engine wird vollständig generisch und verzichtet auf feste Verdrahtung konkreter Index-Typen. |
+| 5.2 | Dynamische Abstraktion prüfen (`dyn` vs. Generics): Heißpfade (Storage-Read, Vektor-Scan) monomorphisieren, Kaltpfade (Sagas, Reporting, Worker) schlank über `dyn` halten. |
+| 5.3 | Quer-Kanten restlos schneiden: `graph` → `adapt`, `vector` → `mvcc`/`crypto`, `mcp` → Inferenz-Backends via Features entkoppeln. |
+| 5.4 | `contextra-ingest` autark machen: Abhängigkeit zu `engine` durch Extraktion von `contextra-chunker` auflösen. |
+| 5.5 | `contextra-core` (tote Kompatibilitätsfassade) vollständig dekommissionieren. |
+| 5.6 | Unsafe-Inseln auditieren: `forbid(unsafe_code)` in allen Crates bis auf die 3 genehmigten Ausnahmen (`simd`, `sys`, `wire`). |
 
-**Gate G5:** Keine Ring-Ausnahme außer solchen mit ADR; `contextra-store` allein ohne ONNX/Candle/CUDA (B6); Binary-Größe und Kompilierzeit ohne Verschlechterung.
+**Gate G5:** Keine verbotenen Querabhängigkeiten; Engine vollständig generisch über `Backends`-Trait; `ingest` baut eigenständig ohne `engine`.
 
-## 9. Phase 6 – Produktschnitte
+## 9. Phase 6 – Produktschnitte, Baustein-Export & isolierte Beispiele
 
 | WP | Arbeit |
 | --- | --- |
-| 6.1 | Für jedes Produkt der Tabelle in Spec 9 ein Verzeichnis `examples/product-<name>/` mit minimaler `Cargo.toml` und einem `main.rs`, der den Kern-Anwendungsfall zeigt. |
-| 6.2 | CI-Job `product-matrix`: baut jedes Beispiel isoliert (`cargo build -p ...`) in einem sauberen Verzeichnis, das nur die erlaubten Crates kopiert. Das beweist Z1 maschinell. |
-| 6.3 | Pro Produkt eine README mit Abhängigkeitsmenge und Garantien. |
-| 6.4 | Versionierung: Crate-Versionen entkoppeln (heute alle `0.1.0` über `workspace.package`); Ring 0 mit eigener SemVer-Linie, damit ein Produkt Ring 0 pinnen kann, ohne dass Ring 3 mitzieht. |
+| 6.1 | Erstellung isolierter Baustein-Beispiele unter `examples/`: <br>- `example-store`: Nutzung von `contextra-store` als autarker Key-Value-Speicher.<br>- `example-vector`: Autarker HNSW-Vektorindex mit `contextra-vector`.<br>- `example-text`: BM25-Volltextsuche mit `contextra-text`.<br>- `example-erasure`: Anbindung des modularen `contextra-erasure`-Bausteins an eigene Datenstrukturen.<br>- `example-rag`: Schlanke RAG-Pipeline mit entkoppelten Bausteinen. |
+| 6.2 | CI-Job `building-blocks-matrix`: Validiert, dass jeder Crate isoliert in einem sauberen Verzeichnis ohne Workspace-Monolith baut (`cargo build -p <crate> --no-default-features`). |
+| 6.3 | SemVer- und Versionierungs-Entkopplung: Crates erhalten eigenständige Versionslinien, um unabhängiges Einbinden in Drittprojekten zu ermöglichen. |
 
-**Gate G6:** Alle zehn Produkte bauen isoliert und laufen ihr Beispiel.
+**Gate G6:** Alle Baustein-Beispiele bauen und laufen isoliert; Building-Blocks-CI-Matrix grün.
 
-## 10. Phase 7 – Dokumentation und CI
+## 10. Phase 7 – Dokumentation, Governance-Bereinigung und CI-Absicherung
 
-- Alte Spezifikationen (`SPEC.md`, drei `CONTEXTRA_INTERFACE_SPECIFICATION*`) nach `docs/spec/archiv/` verschieben, Spezifikation v5 als einzige normative Quelle in `SOURCE_OF_TRUTH.md` eintragen.
-- `ARCHITECTURE.md` aus `capabilities.toml` generieren (heute von Hand gepflegt).
-- `CHANGELOG.md`: Breaking-Change-Eintrag „Löschung entfernt“.
-- `legal-matrix.toml`, `SECURITY.md`, `VETOES.md` auf Konsistenz prüfen (enthalten vermutlich Löschzusagen).
-- `reports.zip` und `crate-coupling-report_20261105.md` aktualisieren oder entfernen.
+- `docs/SPEC.md` als maßgebliche Baukasten-Spezifikation v3.0 führen; Veraltete Monolith-Zusagen in `docs/` archivieren.
+- `docs/ARCHITECTURE.md` auf den Baukasten-Zustand aktualisieren.
+- `CHANGELOG.md`: Dokumentation der Entkopplung und Ausgliederung der Löschkette in `contextra-erasure`.
+- `capabilities.toml`, `deny.toml` und Quality Gates final auf den modularen Zustand arretieren.
 
-**Gate G7:** `docs/` enthält keine Zusage über Löschung oder DSGVO-Konformität des Kerns mehr.
+**Gate G7:** Vollständige Dokumentationskonsistenz; keine irreführenden DSGVO- oder Löschzusagen im Speicherkern; saubere Baukasten-Dokumentation.
 
 ## 11. Risikoregister
 
 | ID | Risiko | Wirkung | Gegenmaßnahme |
 | --- | --- | --- | --- |
-| R1 | Baseline rot: Der Ist-Stand baut nicht (ARCHITECTURE nennt D1 bis D3) | Phase 0 dauert länger; alle Folgeaussagen schieben sich | G0 ist hartes Gate; kein Phase-1-Merge ohne Grün |
-| R2 | Update-Semantik geht mit der Löschung verloren (Cascade, Decay) | stille Fehler im Retrieval | WP 3.0 Charakterisierungstests vor 3.5 |
-| R3 | Falsch eingefrorene Ports | Nacharbeit in allen Indizes, Brechen der Entkopplung | Spike in 2.4 ist Gate-Bedingung |
-| R4 | Speicherwachstum ohne Löschung | Edge-Geräte laufen voll | `gc-superseded` als Option; Wachstumsmessung in 4.1; Kapazitäts-API in `store` |
-| R5 | Recall-Verlust im additiven HNSW durch viele abgelöste Vektoren | schlechtere Treffer | Messung 4.5; Neuaufbau-Empfehlung dokumentieren |
-| R6 | Monomorphisierung bläht Build und Binary auf | Gegenteil des Ziels | 5.6; `dyn`-Fallback an kalten Rändern |
-| R7 | Dateiformatänderung bricht vorhandene Daten | Datenverlust | Reader v1 + v2, Migrationstest mit Fixture-Dateien |
-| R8 | Pfad-Umzug (Phase 1) stört laufende Branches | Merge-Konflikte | Phase 1 in einem Tag mergen, Freeze-Fenster, `git mv` ohne Inhaltsänderung |
-| R9 | Rechtliche Folgen, wenn ein späteres Produkt personenbezogene Daten im EU-Raum speichert | Pflicht zur Löschung nicht erfüllbar | `ext-erasure` und DEK je Collection bleiben als Option (Spec 6); Entscheidung pro Produkt |
-| R10 | `ingest` lässt sich nicht vom `engine` lösen | Produkt „Ingest“ nicht eigenständig | 5.3; zur Not Zerlegung von `engine` |
+| R1 | Baseline rot (Ist-Stand baut nicht fehlerfrei) | Verzögerung bei Phase 0 | G0 ist hartes Gate; Baseline-Fehler vor Umbauten isolieren und beheben |
+| R2 | Semantikverlust bei Entflechtung von Update/Supersession und Erasure | Regressionen im Retrieval oder bei Dokument-Ersetzungen | Charakterisierungstests in Phase 2 vor Beginn der Schnittarbeiten |
+| R3 | Unzureichende Port-Abstraktion bricht Fremdnutzung | Baustein bleibt implizit verdrahtet | Spike-Implementierung in Phase 2 und Contract-Tests |
+| R4 | Erhöhte Kompilierzeit durch Generics in `engine` | Längere CI-Zyklen | Pragmatische Aufteilung: Heißpfade generisch, Kaltpfade über dyn Trait-Objekte |
+| R5 | Drittnutzer benötigen Löschfunktionalität | DSGVO-Anforderungen in Kundenprojekten | `contextra-erasure` ist als fertiger, modularer Baustein direkt zuschaltbar |
 
 ## 12. Definition of Done (gesamt)
 
-1. G0 bis G7 bestanden und dokumentiert (`docs/refactor/gates.md`).
-2. Zehn Produkte bauen isoliert (6.2 grün).
-3. `xtask check-dag`, `check-no-delete`, `cargo deny`, `cargo semver-checks` sind Pflicht-Checks.
-4. Baseline-Vergleich: keine Verschlechterung bei p99/p99,9, Kompilierzeit und Binary-Größe.
-5. `ext-erasure` baut als eigenständige Extension (auch wenn nicht benutzt), damit die Option erhalten bleibt.
-
-## 13. Empfohlener nächster Schritt
-
-Phase 0 beginnen: Toolchain installieren, `cargo build --workspace` und `cargo test --workspace` laufen lassen und die rote/grüne Liste liefern. Erst damit lässt sich Phase 1 verantwortungsvoll starten.
+1. Gates G0 bis G7 bestanden und in CI automatisiert überwacht.
+2. Jeder Kern-Crate (`store`, `vector`, `text`, `graph`, `crypto`, `mvcc`) baut und testet autark und kann isoliert in Drittprojekte eingebunden werden.
+3. Sämtliche DSGVO-, Löschketten-, Saga- und Audit-Logiken sind vollständig und exklusiv in `contextra-erasure` gekapselt.
+4. Öffentliche Schnittstellen lecken keine internen Fremdtypen (Modularitäts-Score >= 80 für alle Kernbausteine).
+5. Isolierte Produkt- und Baustein-Beispiele in `examples/` beweisen die universelle Verwendbarkeit.
 
 ---
 
 # Contextra Baukasten – Implementierungsspezifikation
 
-Stand 06.11.2026 · Basis `tfufuz1/contextra` Commit `f55c504` (06.11.2026) · ersetzt den Refaktorisierungsplan der Löschungs-Linie
+Stand 06.11.2026 · Basis `tfufuz1/contextra` · Refaktorisierung zur modularen Bausteinarchitektur
 
-## 0. Entscheidung und Verifikationsstatus
+## 0. Entscheidung und Architektur-Transformation
 
-**Entscheidung.** Die geplante Löschung entfällt vollständig. Lösch-, Tombstone- und Erasure-Pfade bleiben funktional und werden nicht umgebaut. Sie werden nur über Ports (`Purger`, `LayerScanner`) so geschnitten, dass sie mit ihrem Modul wandern. Gestrichen sind: alte Phase 3 (Löschung entfernen), Phase 4 (Append-only-Umbau), Ports v2 ohne `delete*`, Flag `legacy-erasure`, `check-no-delete`, Risiken R4, R5, R7, R9 und DoD-Punkt 5. Neu gefasst oder übernommen sind: Baseline, DAG-Erzwingung, Entkopplung, Ports-Freeze, Produktschnitte, Dokumentation.
+**Entscheidung:** Das Contextra-Ökosystem wird von einem monolithisch verknüpften Spezialsystem zu einem **hochgradig modularen Baukastensystem (Building Blocks)** umgebaut.
+- **Entkopplung aller Crates:** Jeder Crate wird als isolierter, in Fremdprojekten wiederverwendbarer Baustein realisiert. Direkte Abhängigkeiten zwischen den Modulen werden durch generische Typparameter oder Traits in `contextra-ports` ersetzt.
+- **Vollständige Kapselung der Löschkette in `contextra-erasure`:** Die Multi-Layer-Löschkette mit Deletion Proofs, AuditChains, Gesetzesbezügen (DSGVO Art. 17 etc.) und der Löschsaga wird vollständig aus den Speicher- und Index-Crates (`store`, `vector`, `text`, `crypto`, `engine`, `db`, `mcp`) entfernt. Die gesamte Nachweis- und Löschorchestrierung wird in `contextra-erasure` gekapselt. Datenhaltende Crates implementieren ausschließlich minimale, neutrale Bereinigungs-Ports (`Purger`, `LayerScanner`).
 
-**Verifikationsstatus.** Alle Zahlen stammen aus statischer Analyse des Klons: Manifeste per `tomllib`, Quelltext per `grep`, Git-Historie. Nichts wurde gebaut oder getestet, weil die Toolchain 1.89 in meiner Umgebung nicht erreichbar ist und `cargo 1.84` an einer Abhängigkeit mit `edition2024` scheitert. Trefferzahlen sind Wortvorkommen, keine Aufrufgraphen. Jede Zahl, auf der eine Entscheidung ruht, hat in Phase 0 oder im jeweiligen Spike einen Prüfschritt. Aufwände sind relative Größen (S/M/L/XL).
+## 1. Status der technischen Befunde
 
-**Nicht vorhanden.** Die „Spezifikation v5“ des alten Plans liegt weder im Repo noch im Anhang vor. Ihre Verweise (Spec 3.1, 5, 7.2, 9, B4–B7, Z1, P-2, P-4) sind durch die Regeln in §3 ersetzt. Der Produktkatalog in Phase 6 ist neu definiert und muss gegen Spec 9 abgeglichen werden, sobald sie vorliegt.
-
-## 1. Korrekturen am bisherigen Plan
-
-| ID | Alte Annahme | Ist-Stand | Folge |
+| ID | Befund | Analyse & Korrekturmaßnahme | Phase |
 | --- | --- | --- | --- |
-| D1 | `xtask` ist Workspace-Mitglied, Verzeichnis fehlt | `Cargo.toml` ist bereinigt. Aber `rust-ci.yml` (Zeilen 28, 118, 120) und `justfile` (Zeilen 24–29) rufen weiter `cargo xtask …`, die Schritte laufen ins Leere. `xtask/` wurde in Commit `068261abd` gelöscht und ist aus der Historie wiederherstellbar (inkl. `registry.toml`, `ring0-async-exceptions.toml`). | WP 0.2 |
-| D2, D3 | Features `onnx` und `adaptive-candidate-pool-sizing` ohne `dep:` | Beide Features haben jetzt `dep:`-Einträge. Statisch behoben, Build mit Features steht aus. | WP 0.3 |
-| D4 | Dateisystem-I/O in `vector` (28 Treffer) | Bestätigt: 28 Produktiv-Treffer (`diskann/build.rs` 11, `diskann/persistence.rs` 10, `hnsw/types.rs` 3, `diskann/types.rs` 3, `persistence/mmap.rs` 1), `diskann` ist experimentell. Größer ist der Fall `store` (Produktivcode u. a. `wal/mod.rs` 28, `wal/hmac.rs` 20, `lsm/recovery.rs` 17, `scanner/purge.rs` 11, `wal/replay.rs` 10) und `checkpoint` (`hardlink_cloner.rs` 11). | Phase 5 |
-| D5 | 20 `#[ignore]` | Bestätigt: `store` 11, `infer-candle` 4, `db` 2, `adapt` 1, `infer-ollama` 1, `text` 1. | WP 0.3 |
-| D6 | `durable-fs` fehlt in `capabilities.toml` | Bestätigt: 34 Einträge für 35 Crates. Das Manifest führt noch `spec = v4`. | WP 1.1 |
-| D7 neu | „I/O nur über `Vfs`“ | Es gibt **zwei verschiedene** `Vfs`-Traits. `contextra_ports::Vfs` arbeitet auf ganzen Dateien (`read`, `write_atomic`, `sync_dir`). `contextra_durable_fs::vfs::Vfs` liefert Datei-Handles mit `read_at`/`write_at`/`sync_all`. Einziger Konsument des Ports-Traits ist `crypto/revocation_log.rs`. `contextra-durable-fs` hat keinen Konsumenten. `store`, `vector` und `checkpoint` nutzen `std::fs` direkt. | Phase 3.1, Phase 5 |
-| D8 neu | Ringe stehen in `capabilities.toml` | Die Zuordnung steht zusätzlich als eigene Tabelle in `tests/layering.rs`. Die `LAYER_ALLOWLIST` hat 4 Einträge. Drei davon (`infer-onnx`→`infer-candle`, `infer-candle`→`store`, `infer-ollama`→`infer-onnx`) haben nach den Normal-Abhängigkeiten der Manifeste keine Kante mehr. | WP 1.2 |
-| D9 neu | – | Kandidaten für tote Abhängigkeiten (0 Treffer im `src/` der Crate): `contextra`→`audit-export`, `avv-generator`, `privacy`, `crypto` (alle optional); `mcp`→`license`; `db`→`crypto`; `engine`→`sys`; `py`→`adapt`, `store`; `bench`→`store`, `text`. Mit `cargo machete` und Build-Matrix zu bestätigen. | WP 2.1 |
-| D10 neu | `unsafe`-Audit in `infer-onnx` (5), `crypto` (5), `ingest` (10), `text` (8) | Das waren Wortvorkommen (Kommentare, `forbid`). Echter `unsafe`-Code: `simd` 272, `wire` 45, `sys` 21. 32 von 35 `lib.rs` tragen `forbid(unsafe_code)`, die drei Ausnahmen sind genau `simd`, `sys`, `wire`. | Altes WP 5.5 entfällt |
-| D11 neu | `contextra-core` entfernen und Abhängige umhängen | Außerhalb der Crate verweist nur `crates/contextra-db/fuzz/Cargo.toml` darauf. Entfernung ist klein. | WP 2.5 |
+| D1 | `xtask`-Integration | Workspace-Gates konsolidieren; sicherstellen, dass DAG- und Port-Checks in CI automatisiert greifen. | Phase 1 |
+| D2, D3 | Optionale Feature-Abhängigkeiten | Features sauber deklarieren; keine impliziten Schwergewichte in Default-Features. | Phase 1 |
+| D4 | Direkte I/O-Aufrufe in Indizes | Dateizugriffe in `vector` und `store` auf den `Vfs`-Port umstellen zur Gewährleistung von Sandbox- und In-Memory-Fähigkeit. | Phase 4 |
+| D5 | Ignorierte Tests (`#[ignore]`) | Auditieren, beheben oder dokumentieren; keine unklaren Lücken in der Testabdeckung. | Phase 0 |
+| D6 | `durable-fs` & `capabilities.toml` | Alle Crates inkl. `contextra-durable-fs` und `contextra-erasure` mit klar definierten Ring- und `may_depend_on`-Vorgaben erfassen. | Phase 1 |
+| D7 | Vfs-Konsolidierung | Vereinheitlichung der zwei historischen Vfs-Konzepte in `contextra-ports::Vfs` mit Streaming/Handle-Support. | Phase 2 |
+| D8 | Layering-Validierung | Statische Ring- und Schichtentests zur Durchsetzung der strikten Abwärtsabhängigkeiten. | Phase 1 |
+| D9 | Tote Abhängigkeiten | Unnötige Crate-Abhängigkeiten bereinigen (u. a. `crypto` in `db`, `sys` in `engine`). | Phase 5 |
+| D10 | Unsafe-Code-Disziplin | Strikte Beschränkung von `unsafe` auf `simd`, `sys` und `wire`; `#![forbid(unsafe_code)]` in allen anderen 32 Crates. | Phase 5 |
+| D11 | Dekommissionierung `contextra-core` | Legacy-Fassade auflösen und entfernen. | Phase 5 |
 
-## 2. Kopplungsmessung
+## 2. Baukasten-Kopplungsregeln & Entkopplungsziel
 
-Trefferzahlen und Dateien im `src/` der abhängigen Crate. Kanten zu `types` und `ports` sind weggelassen.
+Die statische Analyse (siehe `docs/MODULAR_DECOUPLING_AUDIT.md`) zeigte 664 verstreute Löschketten-/DSGVO-Relikte und 307 fehlende Port-Abstraktionen. Ziel ist das Erreichen eines Modularitäts-Scores von > 80 für alle Kernbausteine.
 
-| Kante | Treffer / Dateien | Benutzt wird | Bewertung |
-| --- | --- | --- | --- |
-| engine → store | 132 / 19 | `LsmStorage` 50, `LsmConfig` 45 | zentrale Verdrahtung, Phase 4 |
-| engine → vector | 131 / 18 | `HnswIndex` 55, `HnswConfig` 53, `hnsw_purger`, `hnsw_scanner` | Phase 4 |
-| engine → graph | 88 / 18 | `CsrGraph` 52, `hyperedge`, `percolation` | Phase 4, Trait-Abdeckung offen |
-| engine → text | 71 / 13 | `Language` 66, `text_purger`, `text_scanner` | `Language` ist ein Datentyp, Phase 2 |
-| cognition → engine | 27 / 11 | `collection`, `Language`, `ProvenanceRecord`, `decay_controller` | folgt Phase 4 |
-| cognition → graph, vector, store | 18, 8, 5 | `CsrGraph`, `HnswIndex`, `LsmStorage` | folgt Phase 4 |
-| ingest → engine | 3 / 2 | nur `chunker` | Extraktion, Phase 2 |
-| router → privacy | 4 / 1 | `guarded_payload` | `EgressPolicy`-Port, Phase 3 |
-| privacy → avv-generator | 6 / 1 | `render_avv_markdown` | Feature-Gate, Phase 2 |
-| graph → adapt | 1 / 1 | eine Fundstelle | trivial, Phase 2 |
-| vector → crypto | 8 / 3 | `wal_crypto::WalHmac`, Fundstellen u. a. in `diskann/` | optional machen, Phase 2 |
-| store → crypto | 9 / 8 | `wal_crypto` 4, `kv_shredding` 1 | WAL-Kante akzeptiert, Shredding optional |
-| store, vector, checkpoint → mvcc | 13, 7, 2 | `SsiValidator`, `SequenceLog`, `SnapshotRegistry` | akzeptiert (Fundament) |
-| router → adapt, infer-\* → rank | 16, 1–5 | Bandit-Code, Kalibratoren | akzeptiert (Fundament) |
-| infer-candle → crypto | 8 / 2 | `EncryptedKvLayer`, `KvSegment` | prüfen, ob `kv_segment` nach `kvcache` gehört |
-| mcp → contextra | 29 / 14 | Fassade | akzeptiert, Produktoberfläche |
-| db → 13 Crates | je 1–11 | Komposition | Referenzkomposition, Phase 6 |
+**Entkopplungs-Maßnahmen je Kernkomponente:**
+- **`contextra-store`:** Entfernen von `kv_shredding`, Deletion-Proof- und DSGVO-Referenzen. Fokus auf schnelles LSM, Append-Only, Block-Cache und WAL-Durability. Bereitstellung von `Purger`- und `LayerScanner`-Implementierungen.
+- **`contextra-vector`:** Entfernen von `wal_crypto::WalHmac` und Deletion-Proof-Logiken. Eigenständige HNSW- und Vektor-Primitive.
+- **`contextra-text`:** Vollständig entkoppelter BM25-Index; `Language`-Typ nach `contextra-types` auslagern.
+- **`contextra-graph`:** Lock-freier Lesepfad, CSR-Segmente; Entfernen harter Abhängigkeiten zu `store` und `adapt`.
+- **`contextra-crypto`:** Aufspaltung: Reine kryptografische Primitive (AEAD, KDF, Cipher, WAL-HMAC, Anti-Tamper) verbleiben in `contextra-crypto`. Alle Deletion-Proof-Strukturen (`deletion_proof/`, `ed25519_proof.rs`, `kv_shredding.rs`, `revocation_log.rs`) werden in `contextra-erasure` modularisiert.
+- **`contextra-engine`:** Umbau von statischer Bindung auf das generische `Backends`-Bündel. Beseitigung monolithischer Löschkaskaden (`contextra_impl/erasure.rs` wandert nach `contextra-erasure`).
+- **`contextra-erasure`:** Der zentrale, modulare Baustein für erweiterte Lösch-, Audit- und DSGVO-Anforderungen. Kapselt Saga-Orchestrierung, Vault, GateLog, Restore-Guard und Signierung.
 
-**Struktur der Engine.** `contextra-engine` hat 82 Dateien und 21.768 Zeilen: `collection/` 12.418, `contextra_impl/` 2.071, `transaction/` 1.652, `chunker/` 1.533, `background_workers/` 1.290, `extraction/` 642. `Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>` ist nur halb generisch: der Graph ist fest als `Arc<CsrGraph>` verdrahtet, der Textindex als `InvertedIndex<S>`, und die Defaults binden die konkreten Typen. Die Engine enthält keine `Arc<dyn …>` auf die vier Index-Ports. Die Ports wirken dort nur als Generics-Schranke. Das ist der Hauptpunkt der Entkopplung.
+## 3. Der Baukasten-Vertrag (Building Block Rules)
 
-## 3. Baukasten-Vertrag
+Jeder Baustein erfüllt folgende verbindliche Architekturregeln:
 
-Jedes Modul erfüllt diese Regeln. Sie ersetzen die Verweise auf die fehlende Spec v5 und werden von `xtask` geprüft (Phase 1).
+1. **M1 Strikte Abwärtsrichtung:** Abhängigkeiten zeigen ausschließlich auf niedrigere Ringe (`capabilities.toml`).
+2. **M2 Autarke Baubarkeit:** Jeder Baustein lässt sich via `cargo build -p <crate> --no-default-features` isoliert bauen und testen.
+3. **M3 Schnittstellenreinheit:** Öffentliche Signaturen nutzen ausschließlich Typen aus `types`, `ports` oder dem Crate selbst; keine internen Implementierungstypen fremder Crates.
+4. **M4 Invertierte Umweltabhängigkeiten:** Umweltinteraktionen laufen über standardisierte Ports: I/O über `Vfs`, Zeit über `Clock`, Entropie über `Rng`, Identifikatoren über `IdGen`, Metriken über `MetricsSink`.
+5. **M5 Schlanke Default-Features:** Additive Feature-Struktur; externe Runtimes und Frameworks (`onnx`, `candle`, `wasmtime`, `tokio`) sind niemals in Standard-Minimal-Builds erzwungen.
+6. **M6 Isolation von Test-Abhängigkeiten:** Keine Dev-Abhängigkeiten auf höhere Architekturschichten.
+7. **M7 Entkoppelte Bereinigung:** Datenhalter implementieren rein funktionale Bereinigung (`Purger`, `LayerScanner`). Kaskadierung, Nachweiserzeugung, DSGVO-Reporting und Auditierung liegen exklusiv in `contextra-erasure`.
+8. **M8 Asynchrone Neutralität im Fundament:** Fundamentbausteine (Ring 0) und Speicherkerne halten ihre Kernlogik synchron und frei von festen Async-Runtime-Zwängen.
+9. **M9 Isolierte Unsafe-Inseln:** Unsafe ist verboten (`forbid(unsafe_code)`), außer in den drei explizit deklarierten Low-Level-Inseln (`simd`, `sys`, `wire`), jeweils mit formalem `// SAFETY:`-Nachweis.
+10. **M10 SemVer-Autonomie:** Jeder Baustein ist unabhängig versionierbar.
+11. **M11 Integrations-Dokumentation:** Jeder Crate verfügt über eine README mit Entkopplungsprofil, Schnittstellenbeschreibung und Minimalbeispiel für den Einsatz in Fremdprojekten.
 
-1. **M1 Richtung.** Abhängigkeiten zeigen nur abwärts. Maßgeblich ist `may_depend_on` in `capabilities.toml`, geprüft gegen Normal-, Build- und Dev-Kanten.
-2. **M2 Eigenständig bauen.** `cargo build -p <modul> --no-default-features` benötigt nur die eigenen `may_depend_on`-Crates. Nachweis: Produktmatrix in sauberem Verzeichnis (Phase 6).
-3. **M3 Schnittstellen.** Öffentliche Signaturen enthalten nur Typen aus `types`, `ports` oder dem Modul selbst, keine konkreten Typen eines Geschwistermoduls.
-4. **M4 Umwelt injizieren.** Dateizugriff über `Vfs`, Zeit über `Clock`, Zufall über `Rng`, IDs über `IdGen`, Metriken über `MetricsSink`. Alle fünf Ports existieren bereits.
-5. **M5 Features additiv.** Defaults sind minimal. Schwergewichte (`onnx`, `candle`, `wasmtime`, `pyo3`, `reqwest`) stehen nie im Default.
-6. **M6 Tests ohne höhere Ringe.** Ein Modul testet sich mit `testkit` und eigenen Dev-Abhängigkeiten. Heute verletzt: `store` (Dev: `graph`, `vector`, `sandbox`), `graph` (Dev: `store`), `agent` (Dev: `text`, `vector`), `router` (Dev: `db`, `graph`, `text`, `vector`).
-7. **M7 Löschung gehört dem Datenhalter.** Wer Daten hält, implementiert `Purger` und `LayerScanner` selbst. Orchestrierung (Nachweis, Kaskade) liegt darüber und kennt nur die Ports.
-8. **M8 Runtime-Neutralität unten.** Fundament und Indizes ohne `tokio` in `[dependencies]`. Heute erfüllt in `types`, `ports`, `mvcc`, `vector`, `text`, `graph`, `crypto`, `rank`, `adapt`, `kvcache`, `sys`, `simd`, `wire`, `durable-fs`. Ausnahmen mit `tokio`: `store`, `checkpoint`.
-9. **M9 `unsafe` nur in Inseln.** Erlaubt in `simd`, `sys`, `wire`. Überall sonst `forbid(unsafe_code)`.
-10. **M10 Versionierung.** Jedes Modul hat eine eigene SemVer-Version. Path-Abhängigkeiten tragen `version`. Bezug von außen per Git-Tag `<crate>-vX.Y.Z`.
-11. **M11 Dokumentation.** Jedes Modul hat eine README mit Abhängigkeitsmenge, Features, Garantien und einem Einbettungsbeispiel.
+## 4. Modulkatalog des Baukastensystems (Zielzustand)
 
-## 4. Modulkatalog (Zielzustand)
+| Modul | Ring | Rolle im Baukastensystem | Ziel-Abhängigkeiten (intern) | Entkopplungs-Status |
+| --- | --- | --- | --- | --- |
+| `contextra-types` | 0 | Kanonische Grundtypen, IDs, Fehlerklassen | – | Autark |
+| `contextra-ports` | 0 | Zentrale Port- und Trait-Definitionen | `types` | Konsolidiert |
+| `contextra-sys` | 0 | Unsafe-Betriebssystemprimitive, mmap, Memory-Lock | – | Autarke Insel |
+| `contextra-simd` | 0 | SIMD-Vektorbeschleunigung (AVX2, AVX-512, NEON) | `types` | Autarke Insel |
+| `contextra-wire` | 0 | Zero-Copy-Serialisierung & FlatBuffers | – | Autarke Insel |
+| `contextra-durable-fs` | 0 | Fsync-, atomic-rename- und Flush-Dateisystemprimitive | `sys`, `ports` | Konsolidiert mit Vfs |
+| `contextra-mvcc` | 0 | Multi-Version Concurrency Control & SSI | `ports`, `types` | Autark |
+| `contextra-crypto` | 0 | Krypto-Kern: AEAD, KDF, WAL-HMAC, Anti-Tamper | `ports`, `types` | Bereinigt um Erasure |
+| `contextra-rank` | 0 | Rangfusion (RRF) & Score-Kalibrierung | `ports`, `types` | Autark |
+| `contextra-adapt` | 0 | Adaptive Algorithmen (Bandits, Drift-Watcher) | `ports`, `types` | Autark |
+| `contextra-store` | 1 | LSM-Tree Storage Engine & Write-Ahead Log | `ports`, `types`, `mvcc`, `crypto`, `sys`, `durable-fs` | Bereinigt um DSGVO/Erasure |
+| `contextra-vector` | 1 | HNSW-Vektorindex & Vektorsuche | `ports`, `types`, `mvcc`, `simd`, `sys` | Bereinigt um DSGVO/Erasure |
+| `contextra-text` | 1 | BM25/BM25F-Volltextindex | `ports`, `types` | Bereinigt um DSGVO/Erasure |
+| `contextra-graph` | 1 | CSR-Graphindex für semantische Netze | `ports`, `types` | Entkoppelt von Store/Adapt |
+| `contextra-checkpoint` | 1 | Point-in-Time-Snapshots & Restore-Guard | `ports`, `types`, `mvcc` | Autark |
+| `contextra-kvcache` | 1 | Verschlüsselter KV-Cache für LLM-Zustände | `ports`, `types`, `crypto` | Autark |
+| `contextra-infer-onnx` | 2 | ONNX-Embedding- & Reranking-Adapter | `ports`, `types`, `rank` | Autark |
+| `contextra-infer-candle` | 2 | Candle/GGUF-Embedding-Adapter | `ports`, `types`, `rank` | Autark |
+| `contextra-infer-ollama` | 2 | Ollama-Netzwerkadapter für Embeddings | `ports`, `types` | Autark |
+| `contextra-sandbox` | 2 | WASM-Sandbox (Wasmtime) für sichere Ausführung | – | Autark |
+| `contextra-engine` | 3 | Generische Orchestrierung über `Backends`-Trait | `ports`, `types` | Entkoppelt von konkreten Indizes |
+| `contextra-erasure` | 3 | **Modularer Löschkern:** Saga, Vault, GateLog, Nachweise, DSGVO-Reporting | `ports`, `types`, `crypto` | Vollständig modularisiert |
+| `contextra-cognition` | 3 | Konsolidierung & Langzeit-Gedächtnis | `engine`, `ports`, `types` | Basiert auf Ports |
+| `contextra-router` | 3 | Adaptives Query-Routing | `ports`, `types`, `wire`, `adapt` | Nutzt `EgressPolicy`-Port |
+| `contextra-privacy` | 3 | PII-Redaktion & Datenschutzfilter | `ports`, `types` | Implementiert `EgressPolicy` |
+| `contextra-ingest` | 3 | Dokumenten-Parsing & Text-Extraktion | `types` (via `contextra-chunker`) | Entkoppelt von Engine |
+| `contextra-agent` | 3 | Workflow- & Graph-Agenten | `engine`, `ports`, `types` | Komposition |
+| `contextra-db` | 3 | Referenz-Komposition für Single-Node-DB | diverse Bausteine via Ports | Referenzkomposition |
+| `contextra` | 4 | Öffentliche Hauptfassade (High-Level-API) | Bausteine nach Bedarf | Schlanke Fassade |
+| `contextra-mcp` | 4 | Model Context Protocol Server (stdio) | `contextra`, `types`, `ports` | Autarke Oberfläche |
+| `contextra-py` | 4 | Python-Bindings (PyO3) | `types`, `ports`, `contextra` | Autarke Oberfläche |
 
-Ringnamen folgen dem alten Plan: 0 Fundament, 1 Indizes und Speicher, 2 Inference, 3 Komposition, 4 Oberfläche, dazu Extensions.
+## 5. Detaillierte Schnittstellen-Spezifikation für die Entkopplung
 
-| Modul | Ring | Ziel-Abhängigkeiten (intern) | Maßnahme |
-| --- | --- | --- | --- |
-| `types` | 0 | – | – |
-| `ports` | 0 | `types` | Phase 3, Freeze nach Phase 4 |
-| `wire`, `sys` | 0 | – | – |
-| `simd` | 0 | `types` | – |
-| `durable-fs` | 0 | `sys`, `ports` | Vfs konsolidieren (3.1), in `capabilities.toml` eintragen |
-| `mvcc` | 0 | `ports`, `types` | – |
-| `crypto` | 0 | `ports`, `types` | Aufspaltung in Core und Erasure (5.5) |
-| `crypto-erasure` (neu) | 0 | `crypto`, `ports`, `types` | aus `crypto` ausgelagert, nichts entfällt |
-| `rank`, `adapt` | 0 | `ports`, `types` | – |
-| `chunker` (neu) | 1 | `types` | aus `engine/chunker/` (1.533 Zeilen) |
-| `text` | 1 | `ports`, `types` | bereits eigenständig; `Language` nach `types` |
-| `graph` | 1 | `ports`, `types` | `adapt`-Kante schneiden, Dev-Kante `store` entfernen |
-| `vector` | 1 | `ports`, `types`, `mvcc`, `simd`, `sys`; `crypto` optional | Phase 2 und 5 |
-| `store` | 1 | `ports`, `types`, `mvcc`, `crypto`, `sys`, `durable-fs`; `crypto-erasure` optional | Phase 5 |
-| `checkpoint` | 1 | `ports`, `types`, `mvcc` | Phase 5 |
-| `kvcache` | 1 | `ports`, `types`, `crypto` | `kv_segment`-Zuordnung prüfen |
-| `infer-onnx`, `-candle`, `-ollama` | 2 | `ports`, `types`, `rank` (candle: `crypto`) | – |
-| `sandbox` | 2 | – | – |
-| `engine` | 3 | `ports`, `types`; Backends per Feature `default-backends` | Phase 4 |
-| `cognition` | 3 | `engine`, `ports`, `types` | folgt Phase 4 |
-| `router` | 3 | `ports`, `types`, `wire`, `adapt` | `privacy` entfällt über `EgressPolicy` |
-| `privacy` | 3 | `ports`, `types`; `avv-generator` per Feature | Phase 2 |
-| `ingest` | 3 | `types`, `chunker` | ohne `engine` |
-| `agent`, `db` | 3 | wie heute | `db` ist Referenzkomposition, kein Baustein |
-| `contextra`, `mcp`, `py` | 4 | Produktoberflächen | tote Abhängigkeiten entfernen |
-| `license`, `audit-export`, `avv-generator` | Extension | `ports`, `types` | bleiben, nur optional eingebunden |
+### 5.1 Generisches Backend-Bündel in `contextra-engine`
 
-Physisches Verschieben in Ringverzeichnisse ist **nicht** Teil des Kerns (siehe Phase 7). Das Repo hat hohe Merge-Frequenz durch automatisierte Branches (zuletzt PR #5504); ein großer `git mv` bringt für die Entkopplung nichts, die Erzwingung kommt aus `check-dag`.
-
-## 5. Schnittstellen-Spezifikation
-
-### 5.1 Backend-Bündel in der Engine
-
-Entwurf, Details im Spike WP 3.3. Vier lose Typparameter würden die 12.400 Zeilen von `collection/` überfrachten, deshalb ein Bündel:
+Um zu verhindern, dass `contextra-engine` starre Abhängigkeiten auf konkrete Speicher- und Index-Crates erzwingt, wird das Backend-Bündel eingeführt:
 
 ```rust
 pub trait Backends: Send + Sync + 'static {
@@ -311,30 +258,71 @@ pub trait Backends: Send + Sync + 'static {
     type Vector: VectorIndex;
     type Text: TextIndex;
     type Graph: GraphIndex;
+
+    fn storage(&self) -> &Self::Storage;
+    fn vector(&self) -> &Self::Vector;
+    fn text(&self) -> &Self::Text;
+    fn graph(&self) -> &Self::Graph;
     fn purgers(&self) -> Vec<Arc<dyn Purger>>;
 }
 
-pub struct Collection<B: Backends = DefaultBackends> { /* ... */ }
+pub struct Collection<B: Backends = DefaultBackends> {
+    backends: Arc<B>,
+    // Weitere generische Komponenten...
+}
 ```
 
-`DefaultBackends` (`LsmStorage`, `HnswIndex`, `InvertedIndex`, `CsrGraph`) liegt hinter dem Feature `default-backends` der Engine, im Default aktiv. Da `InvertedIndex<S>` den Storage kennt, braucht das Bündel Konstruktorfunktionen. Für Altcode bleibt `Collection<S, V>` als Alias bestehen, bis `cognition`, `db`, `mcp`, `agent` und `bench` umgestellt sind. Fallback, falls `CsrGraph` zu viele Methoden außerhalb von `GraphIndex` benötigt: Graph bleibt vorerst konkret, entkoppelt werden nur Storage, Vektor und Text.
+Die Standard-Backends (`LsmStorage`, `HnswIndex`, `InvertedIndex`, `CsrGraph`) liegen hinter dem Feature `default-backends`. Andere Projekte können eigene Speicher- und Index-Kombinationen ohne `contextra-store` oder ohne Vektorindex instanziieren.
 
-### 5.2 Ein einziger Vfs
+### 5.2 Konsolidierter Vfs-Port (`contextra-ports`)
 
-`ports::Vfs` wird zur einzigen Definition. Es erhält die Handle-Operationen aus `durable-fs` (`open` → `VfsFile` mit `read_at`, `write_at`, `sync_data`, `sync_all`) zusätzlich zu den Ganzdatei-Methoden. `durable-fs` implementiert `RealFs` gegen diesen Trait, sein zweiter `Vfs` entfällt. Der Umbau ist billig: es gibt nur fünf Implementierungen (`RealFs`, `MemVfs` in `ports/contract_tests.rs`, drei Test-Vfs in `crypto`). `store`, `vector`, `checkpoint` bekommen den Vfs per Konstruktor, Default `RealFs`.
+Alle Subsysteme abstrahieren Dateisystemzugriffe über einen einzigen Port:
 
-### 5.3 EgressPolicy
+```rust
+#[async_trait::async_trait]
+pub trait Vfs: Send + Sync + 'static {
+    async fn open(&self, path: &Path, opts: OpenOptions) -> Result<Box<dyn VfsFile>, VfsError>;
+    async fn read(&self, path: &Path) -> Result<Vec<u8>, VfsError>;
+    async fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<(), VfsError>;
+    async fn remove(&self, path: &Path) -> Result<(), VfsError>;
+    async fn sync_dir(&self, path: &Path) -> Result<(), VfsError>;
+}
 
-Neuer Port in `ports`, nach dem Muster von `LicenseGate`. `router` kennt nur den Port und die Entscheidung `Allow`/`Redact`/`Deny`. `privacy` implementiert ihn, `mcp` verdrahtet beides. Die vier Treffer von `router` auf `guarded_payload` zeigen den Umfang.
+#[async_trait::async_trait]
+pub trait VfsFile: Send + Sync + 'static {
+    async fn read_at(&self, buf: &mut [u8], offset: u64) -> Result<usize, VfsError>;
+    async fn write_at(&self, buf: &[u8], offset: u64) -> Result<usize, VfsError>;
+    async fn sync_data(&self) -> Result<(), VfsError>;
+    async fn sync_all(&self) -> Result<(), VfsError>;
+}
+```
 
-### 5.4 Purger-Registry
+Damit entfällt die Kopplung an das Betriebssystem-Dateisystem; Speicher- und Indexbausteine sind in reinen In-Memory- oder WASM-Umgebungen lauffähig.
 
-`engine/contextra_impl/erasure.rs` importiert heute `hnsw_purger`, `hnsw_scanner`, `text_purger`, `text_scanner` direkt. Künftig liefert `Backends::purgers()` die Implementierungen als `Arc<dyn Purger>`, die Engine kennt nur `ports::scanner`. Verhalten und Nachweisformat (`deletion_proof`) bleiben unverändert.
+### 5.3 Neutrale Bereinigungs- und Scan-Ports (`Purger`, `LayerScanner`)
 
-### 5.5 Aufspaltung von `crypto`
+Speicher- und Index-Crates kennen weder DSGVO noch Nachweisketten. Sie bieten lediglich neutrale Schnittstellen an:
 
-`contextra-crypto` (Core) behält `wal_crypto`, `crypto`, `kdf`, `kv_cipher`, `kv_segment/`, `audit_chain`, `anti_tamper`, `wal_completeness`, `error`. `contextra-crypto-erasure` erhält `deletion_proof/`, `ed25519_proof.rs`, `kv_shredding.rs`, `revocation_log.rs`. Es gibt keine Rückkante, `crypto` kann `crypto-erasure` also nicht re-exportieren. Drei Importstellen sind umzuhängen: `engine` (`deletion_proof`, 4 Treffer), `mcp` (1 Treffer), `store` (`kv_shredding::KeyRegistry` in `kv/segment.rs`). In `store` wird daraus das Feature `crypto-shred`, **im Default aktiv**, damit sich das Verhalten nicht ändert; Produkte ohne Shredding schalten es ab. Die Dateiliste ist vor dem Schnitt gegen den Quelltext zu prüfen.
+```rust
+pub trait Purger: Send + Sync + 'static {
+    fn purge_scope(&self, scope: &KeyScope) -> Result<PurgeOutcome, PurgeError>;
+}
 
-### 5.6 Chunker und Language
+pub trait LayerScanner: Send + Sync + 'static {
+    fn scan_for_residual(&self, scope: &KeyScope) -> Result<ScanOutcome, ScanError>;
+}
+```
 
-`contextra-chunker` nimmt `engine/src/chunker/` auf. `engine` behält `pub use contextra_chunker as chunker`, bestehende Pfade `contextra_engine::chunker::…` funktionieren weiter. `ingest` hängt dann an `chunker` statt `engine` (3 Treffer in 2 Dateien: `chunking/fallback.rs`). Der Typ `Language` (66 Treffer in `engine`) wird nach `types` verschoben, falls er ein reiner Datentyp ist; `text` re-exportiert ihn für Kompatibilität.
+`contextra-erasure` konsumiert diese Traits, um Sagas auszuführen, Restbestände zu prüfen und kryptografische Deletion-Proof-Zertifikate auszustellen.
+
+### 5.4 Modularisierung von `contextra-erasure`
+
+`contextra-erasure` bündelt:
+- **`FileVault`:** 16 Shards, Verwahrung von Epochen- und Scope-Schlüsseln, physisches Schreddern von DEKs.
+- **`ReadGate` & `GateLog`:** Sofortige Lesesperren über RCU-Intervalle (`ErasedSet`).
+- **`ErasureJournal` & `DeletionSaga`:** Zustandssaga (`Requested -> Gated -> KeyDestroyed -> Purging -> Measured -> Completed`).
+- **`Scanner` & `Witness`:** Positive Canary-Kontrolle und Messung verbliebener Restdaten.
+- **`DeletionReport`:** Ed25519-signierte Nachweise mit kanonischem JSON-Export und vollständiger DSGVO-Nachweisführung.
+- **`RestoreGuard`:** Schutz gegen unbemerktes Wiederherstellen gelöschter Daten aus Alt-Backups.
+
+Damit ist die Löschkette ein hochspezialisierter, separat lizenzierbarer oder einspeisbarer Baustein, während die Kerne leichtgewichtig und maximal performant bleiben.
