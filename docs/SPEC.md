@@ -1,13 +1,17 @@
-# Contextra – Gesamtspezifikation 2.4 (eigenständige Fassung, Zielzustand v1.0)
+# Contextra Baukasten – Gesamtspezifikation v3.0 (Modulares Bausteinsystem)
 
-> **Fassung 2.4 (Entwurf, Löschpfad optimiert und quellenbereinigt):** Auf Basis von 2.3. Neu: Garantiebegriff als dreistufiger technischer Vertrag (§2.4a), Quellenbereinigung mit Begründungsbasis (§12.1.2a), KeyTable-Shards und ehrliche Flash-Härtung im Epoch Seal (§12.2.4), Planung, Koaleszenz, zweistufige Messung und Profile (§12.8.9), Heap-Canary (§12.7.11), Lösch-Mutationskatalog (§17.11), AC-34 bis AC-38; interne Widersprüche aus 2.3 sind behoben (§26.6).
-
-> **Fassung 2.3 (Entwurf, Löschpfad überarbeitet):** Auf Basis von 2.2.1. **§12 ist vollständig durch die überarbeitete Löschspezifikation ersetzt** (zehn Löschschichten, Wirkungsklassen L/P/C*/C1–C3/M, Schlüsselvernichtung als Ebene B, Destroy-Protokoll, Epoch Seal, Zwei-Spuren-Backup, Berichtsformat V5). Alle davon abhängigen Stellen in §0 bis §11 und §13 bis §26 sind angepasst; die Änderungen stehen in §26.5. Rechtsfragen bleiben in §25.1 offen.
+> **Fassung 3.0 (Baukasten-Architektur & Modulare Entkopplung):** Umbau von einem monolithisch verknüpften Spezialsystem zu einem **hochgradig modularen Baukastensystem (Building Blocks)**. Jeder Crate und jede Komponente ist architektonisch sauber entkoppelt und als isoliert funktionierendes Modul für die Einspeisung in Fremdprojekte konzipiert.
+>
+> **Wesentliche Neuerungen in v3.0:**
+> 1. **Modularer Baukasten:** Vollständige Entkopplung aller Subsysteme (`contextra-store`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-mvcc`, `contextra-crypto`, `contextra-engine`). Keine starren Querkopplungen; Schnittstellen ausschließlich über generische Abstraktionen oder Ports (`contextra-ports`).
+> 2. **Vollständige Kapselung der Löschkette in `contextra-erasure`:** Das bisherige Alleinstellungsmerkmal der Löschung über mehrere Ebenen mit kryptografischem Nachweis, DSGVO-Regelwerken (Art. 17 etc.), Audit-Chains und Löschsagas wird vollständig aus dem Speicherkern entfernt und als eigenständiger, modularer Baustein in `contextra-erasure` isoliert.
+> 3. **Neutrale Bereinigungs-Ports:** Datenhaltende Module implementieren lediglich neutrale, minimale Bereinigungs- und Scan-Ports (`Purger`, `LayerScanner`), ohne Kenntnis von Gesetzen, Sagas oder Deletion-Reports.
+> 4. **Runtime- und I/O-Neutralität:** Konsolidierung auf einen einzigen `Vfs`-Port in `contextra-ports`; I/O- und Async-Freiheit der Fundamentbausteine.
 
 ```
 Dokument:  Normative, eigenständige Gesamtspezifikation, Implementierungsspezifikation und Meta-Plan
-Fassung:   2.4 (Entwurf, baut auf 2.3 auf)
-Stand:     27.10.2026
+Fassung:   3.0 (Modulare Baukasten-Spezifikation)
+Stand:     06.11.2026
 Status:    Entwurf zur Freigabe
 Ablage:    docs/SPEC.md (nach Freigabe)
 Ersetzt:   die Fassungen 1.3, 2.0 und 2.1 vollständig. Alle früheren Fassungen sind obsolet und DÜRFEN NICHT mehr herangezogen werden.
@@ -22,7 +26,18 @@ Zielgruppe: Menschen und LLM-Agenten, die Contextra sofort und ohne weitere Unte
 
 ### 0.1 Was Contextra ist
 
-Contextra ist ein **lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust** (Single-Node, ein Prozess hält ein Datenverzeichnis). Er **speichert** Dokumente (Schlüssel-Wert-Speicher mit einem Write-Ahead-Log als einziger Wahrheit), **findet** sie hybrid (Vektorsuche HNSW + Volltext BM25, Fusion per RRF, mandantengetrennt, Rechteprüfung vor der Distanzberechnung) und **löscht gemessen** (physische Bereinigung über sechs Datenschichten, Messung am Speicher, Löschbericht mit ausgewiesenen Grenzen). Zugänge: Rust-API (`contextra`, `contextra-db`) und MCP-Server (stdio) mit genau drei Agentenwerkzeugen. Zielgruppe des Produkts (Hypothese, §25): Berufsgeheimnisträger (Kanzleien, Steuerbüros, Praxen); KI-Agenten sind ein zweiter Zugang zum selben Kern.
+Contextra ist ein **modulares Baukastensystem (Building Blocks) für lokale, eingebettete Speicher-, Retrieval- und Inferenzsysteme in Rust**. Anstelle eines fest verdrahteten Monolithen stellt Contextra eine Suite autarker, isoliert lauffähiger Bibliotheksbausteine bereit:
+- **`contextra-store`:** Robuste LSM-Storage-Engine mit Write-Ahead-Log, atomarer Durability und Block-Cache.
+- **`contextra-vector`:** Performanter HNSW-Vektorindex mit Skalarquantisierung (SQ8) und Filterung vor Distanzberechnung.
+- **`contextra-text`:** Leichtgewichtiger Inverted-Index mit BM25/BM25F und Block-Max-WAND.
+- **`contextra-graph`:** CSR-Graph für Wissensgraphen und semantische Relationen.
+- **`contextra-mvcc`:** Serializable Snapshot Isolation (SSI) und Snapshot-Registry.
+- **`contextra-crypto`:** Reiner Kryptografiekern (AEAD, KDF, Cipher, Anti-Tamper) ohne Löschlogik.
+- **`contextra-erasure`:** Vollständig entkoppelter, eigenständiger Löschkern für DSGVO-Löschketten, Deletion Sagas, FileVault, GateLog und kryptografisch signierte Deletion-Berichte.
+- **`contextra-engine`:** Generische Orchestrierungsschicht über das `Backends`-Trait-Bündel ohne harte Typkopplung.
+- **`contextra-ports`:** Einheitliche Vertragsschicht (Vfs, Clock, Rng, IdGen, MetricsSink, Purger, Scanner).
+
+Jeder Baustein kann unkompliziert und unabhängig in Drittprojekten eingesetzt werden.
 
 ### 0.2 Die zwölf Regeln für jede Änderung
 
@@ -43,20 +58,22 @@ Contextra ist ein **lokaler, eingebetteter Wissens- und Gedächtnisspeicher in R
 
 |Konzept|Crate (Ring)|Modul / Ort|
 |---|---|---|
-|IDs, Fehlerklassen, `RequestContext`, `LayerWitness`-Grundtypen|`types` (0)|–|
-|Alle Traits (Ports)|`ports` (0)|§5|
+|IDs, Fehlerklassen, `RequestContext`, Basis-Typen|`types` (0)|–|
+|Alle Traits (Ports: Vfs, Clock, Rng, Purger, Scanner, Engines)|`ports` (0)|§5|
 |Snapshots, SSI, Sequenzen|`mvcc` (0)|§8|
-|AEAD, KDF, Signatur, `KmsProvider`-Impl, Löschbericht, AuditChain, RevocationLog|`crypto` (0)|§12|
-|HNSW, SQ8, ACL-Bitset|`vector` (0)|§9|
-|BM25, Analyzer, Block-Max-WAND|`text` (0)|§10|
+|AEAD, KDF, Cipher, WAL-HMAC, Anti-Tamper (reine Krypto-Primitive)|`crypto` (0)|§12|
+|HNSW, SQ8, ACL-Bitset, `VectorScanner`, `Purger`|`vector` (1)|§9|
+|BM25, Analyzer, Block-Max-WAND, `TextScanner`, `Purger`|`text` (1)|§10|
+|CSR-Graph, semantische Kanten, `GraphScanner`, `Purger`|`graph` (1)|–|
 |RRF-Fusion, Normalisierung, Provenienz/Explain|`rank` (0, nur `fusion/`)|§11.5|
 |SIMD-Kernel / OS-Primitive / Wire-Layout|`simd` / `sys` / `wire` (0, Unsafe-Inseln)|§4.6|
-|WAL, Memtable, SSTable, Manifest, Kompaktion, `Vfs`, Journal|`store` (1)|§7|
-|Interne Checkpoints, Restore-Guard|`checkpoint` (1)|§12.9, §12.17, §13.8|
-|Planner, Chunking, Löschsaga, Epoch Seal, Lesesperre, Startsequenz|`engine` (3)|§11, §12.8, §12.2.4|
-|Collections, Transaktionen, Embedded-API|`db` (3)|§13.9|
-|MCP-Server, IPC-Proxy, CLI|`mcp` (4)|§13|
-|Composition Root, öffentliche Rust-API|`contextra` (4)|§13.4|
+|WAL, Memtable, SSTable, Manifest, Kompaktion, Block-Cache, `Purger`|`store` (1)|§7|
+|Interne Checkpoints, Point-in-Time-Snapshots|`checkpoint` (1)|§13.8|
+|Generischer Planner, Chunking, Query-Fusion (über `Backends`-Trait)|`engine` (3)|§11|
+|**Modularer Löschkern:** Multi-Layer-Löschung, Saga, Vault, GateLog, Nachweise, DSGVO-Reporting|`erasure` (3 / Baustein)|§12|
+|Collections, Transaktionen, Referenz-Komposition|`db` (3)|§13.9|
+|MCP-Server (stdio, JSON-RPC 2.0), IPC-Proxy, CLI|`mcp` (4)|§13|
+|Öffentliche Fassade und High-Level-Komposition|`contextra` (4)|§13.4|
 
 ### 0.4 Die zehn wichtigsten Begriffe
 
@@ -114,7 +131,7 @@ Zeilenbudgets sind **Code-Zeilen** (ohne Leer-/Kommentarzeilen, ohne Tests) aus 
 
 ### 2.1 Definition
 
-**Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust, der speichert, hybrid findet (Vektor + BM25 + Fusion, mandantengetrennt) und gemessen löscht.** Single-Node: ein Primärprozess hält ein Datenverzeichnis, weitere lokale Prozesse sprechen über IPC mit ihm. Kein Sharding, kein P2P, keine Replikation, kein Netz-Listener, keine Telemetrie nach außen.
+**Contextra ist ein modulares Baukastensystem (Building Blocks) in Rust für modulare Speicher-, Retrieval- und Inferenzsysteme.** Jeder Baustein ist isoliert nutzbar und implementiert klare Schnittstellen. Zusammengesetzt bietet Contextra mandantengetrennte Speicherung, hybrides Retrieval (Vektor + BM25 + Fusion) sowie optionalen Anschluss an den modularisierten Löschkern `contextra-erasure`. Kein Sharding, kein P2P, kein Netz-Listener, keine Telemetrie.
 
 **Designpunkt:** ≤ 10⁷ Vektoren und ≤ 10² Mandanten je Knoten. Aussagen darüber hinaus sind nicht belegt. **Arbeitsannahme (per Benchmark zu belegen):** Agentengedächtnis umfasst je Betroffenem 10³ bis 10⁶ Einträge; SQ8 mit exaktem Nachranking, sichere Standard-Kernel und Partitionierung je Betroffenem stützen sich darauf.
 
@@ -179,7 +196,13 @@ Was Contextra **normativ garantiert** (Zielzustand, Beleg nach INV-EVIDENCE-1), 
 
 ### 2.6 Ehrliche Grenzen des Löschversprechens
 
-Contextra garantiert Löschung **innerhalb seiner Kontrolle** und trennt dabei zwei Ebenen, die **nur gemeinsam** wirken: **Ebene A** bereinigt physisch alle Klartext-Strukturen (Arena-Slots, Caches, Postings, Antwort-Caches; Hygiene: Purge-Kompaktion, WAL-Scrub, Checkpoint-Rewrite, Graph-Neuaufbau), **Ebene B** vernichtet die Schlüssel (DocDek, ArtKey, über Epoch Seal auch die KEK-Epoche), die persistente Reste schützen, die Contextra nicht überschreiben kann (Flash, Copy-on-Write). Die Wirkung wird in Klassen **L, P, C\*, C1–C3, M** ausgewiesen (§12.5); jede Klasse nennt ihre Annahmen (A-FLASH, A-ALGO, A-KEYLEAK, A-RAM, A-EXTBACKUP, A-HOSTHIST, A-CLOCK). **Schlüsselvernichtung allein gilt nie als Löschung**; ob sie rechtlich als Löschung gilt, ist offen (P-01, P-02) und wird im Produkt nicht vorweggenommen (E44). **Nicht garantiert:** RAM-Kopien, Swap/Hibernation, Core-Dumps (A-RAM), in Modellparameter eingeflossenes Wissen, extern ausgeleitete Daten, historische Medienzustände (SSD, Journal; bei K1 Annahme A-FLASH), Backups außerhalb der Spuren D und K, Dateisystem-Snapshots, aktive ältere Snapshots. Diese Grenzen stehen im Bericht (`excluded`, nie leer, §12.20). **Verboten** in jeder Außenaussage: „100 % gelöscht“, „garantiert“, „DSGVO-konform“, „unwiederbringlich“, „Löschung nach Art. 17“, „kryptografisch gelöscht“ ohne Custody und Annahmen. Die verbindliche Formulierung entsteht aus der Satzbibliothek (§12.11).
+### 2.6 Entkopplung der Löschkette & Grenzen von Schutzversprechen
+
+Die Löschung über mehrere Ebenen mit kryptografischem Nachweis ist im Baukastensystem **vollständig in den eigenständigen Baustein `contextra-erasure` ausgelagert**. Die Speicher- und Index-Kerne (`contextra-store`, `contextra-vector`, `contextra-text`, `contextra-crypto`) enthalten weder Rechtszusagen noch Deletion-Proof- oder DSGVO-Logik. Sie stellen lediglich mechanische Bereinigungs-Ports (`Purger`, `LayerScanner`) bereit.
+
+Wenn `contextra-erasure` als modularer Löschbaustein angebunden wird, orchestriert dieser die Löschung über zwei Ebenen: **Ebene A** (physische Bereinigung von Klartext über die Purger-Ports der Datenhalter) und **Ebene B** (Schlüsselvernichtung und Epoch Seal im `FileVault`).
+
+**Klare Systemgrenzen:** Weder der Speicherkern noch `contextra-erasure` geben absolute oder rechtliche Garantien ab. Verboten in Außenaussagen der Kernkomponenten sind Marketing-Behauptungen wie „100 % gelöscht“, „garantiert“, „DSGVO-konform“ oder „unwiederbringlich“. Der Baustein `contextra-erasure` weist messbare Fakten und Ausschlüsse (z. B. Wear-Leveling auf Flash-Medien, RAM-Kopien, OS-Swap) transparent im strukturierten `DeletionReport` aus.
 
 ---
 
@@ -330,13 +353,13 @@ Spalten: ID · Klasse · Invariante · Mechanismus (Kürzel §1.4) · Anforderun
 `capabilities.toml` ist die **einzige** Quelle für Ring, Klasse (`class`: `kern`/`rand`/`experimentell`) und `maturity` je Crate sowie für deklarierte Dev-Ausnahmen; Skripte und Gates lesen nur dort (INV-DOC-SINGLE-SOURCE-1). Die Datei MUSS auf die Tabellen dieses Abschnitts gesetzt werden (WP 3.6). Richtung: Ring 4 → 3 → 2 → 1 → 0.
 
 ```
-Ring 4  Fassade/Schnittstellen   contextra (Composition Root)   contextra-mcp   [R] contextra-py   [E] contextra-license, audit-export, avv-generator
-Ring 3  Orchestrierung           contextra-engine   contextra-db   [R] contextra-privacy
-Ring 2  Isolation/Inferenz       [R] contextra-infer-candle   [R] contextra-sandbox
-Ring 1  Persistenz               contextra-store   contextra-checkpoint
-Ring 0  Fundament                types  ports  mvcc  crypto  vector  text  rank(nur fusion/)  | Inseln: sys  simd  wire
-Werkzeug                         xtask  testkit  bench  *-fuzz
-Außerhalb des Kerns (§4.9)       [R] contextra-ingest   [R] Tauri-App
+Ring 4  Oberflächen / Fassaden   contextra (High-Level Fassade)   contextra-mcp   [R] contextra-py
+Ring 3  Orchestrierung / Bausteine contextra-engine (generisch)   contextra-erasure (Löschkern)   contextra-db   contextra-cognition   [R] contextra-privacy, contextra-router
+Ring 2  Inferenz & Sandbox       [R] contextra-infer-candle, contextra-infer-onnx, contextra-infer-ollama   [R] contextra-sandbox
+Ring 1  Persistenz & Indizes     contextra-store   contextra-vector   contextra-text   contextra-graph   contextra-checkpoint   contextra-kvcache
+Ring 0  Fundament                types   ports   mvcc   crypto (rein)   rank   adapt   durable-fs   | Inseln: sys   simd   wire
+Werkzeuge / Testkit              testkit   bench   *-fuzz
+Extensions                       contextra-license   contextra-audit-export   contextra-avv-generator   contextra-ingest
 ```
 
 **Wirkung der Ringe:** Das Ring-Gate erlaubt jede Abwärtskante. Deshalb war z. B. `engine (R3) → infer-candle (R2)` nie ein Ringverstoß, wohl aber ein Klassenverstoß `[K] → [R]` (P30). Die Absicherung läuft über `may_depend_on` (§4.4) und das Klassen-Gate, nicht über Ringe allein.
@@ -347,25 +370,29 @@ Außerhalb des Kerns (§4.9)       [R] contextra-ingest   [R] Tauri-App
 
 Budgets sind Obergrenzen in Code-Zeilen (§1.3), gemessen auf Commit `c4f7299b6`; sie dürfen nur sinken, außer eine Phasenabnahme nennt ausdrücklich Zuwachs.
 
-|Crate|Ring|Kl.|Unsafe|Ist|Budget v1.0|Aufgabe der Umbauphase|
+|Crate|Ring|Kl.|Unsafe|Ist|Budget v3.0|Aufgabe als Baustein im Baukastensystem|
 |---|---|---|---|---|---|---|
-|`contextra-types`|0|K|nein|2.611|2.700|`RequestContext`, `LayerWitness`-Grundtypen, `ModelIdentity`, IDs, Fehlerklassen, `MemoryType` (Default `Semantic`)|
-|`contextra-ports`|0|K|nein|1.526|1.500|Ports archivierter Crates entfernen, Mocks raus (§5)|
-|`contextra-sys`|0|K|**ja**|428|450|SAFETY-Lücken schließen; mmap, madvise, Durability-Primitive, Dateisperren, Speicherdruck, `mem_lock`, Win32-ACL|
-|`contextra-simd`|0|K|**ja**|1.113|1.200|Kernel `pub(crate)`, SAFETY, Miri; Dispatch AVX-512 > AVX2 > NEON > skalar; **Skalarpfad ist Standard**, bis die Wiederholung von E2 einen Vorteil über 20 % zeigt (E33); skalare Referenz ist Orakel|
-|`contextra-wire`|0|K|**ja**|190 (+1.201 generiert)|200|Zero-Copy-Dekodierung/Layout-Casts; Lint-`allow` entfernen|
-|`contextra-mvcc`|0|K|nein|1.585|1.600|SequenceLog, SnapshotRegistry, TxBuffer, ReadSet, SSI-Validator; SSI-Nachweis (U-06)|
-|`contextra-crypto`|0|K|nein|2.992|3.200|AEAD, KDF, Signaturen, `KmsProvider`-Impl (K0/K1), Löschbericht (V5, §12.7.5), `EffaceableKeySlot`-Impl (K1), KeyTable-/Wrap-Logik, Padmé, AuditChain, RevocationLog; `KmsProvider` verdrahten; **I/O-frei und lock-frei** (Persistenz über Port `DurableLog`); kein Wissen über Cache-Segmente|
-|`contextra-vector`|0|K|nein|6.701|6.800|HNSW, SQ8, ACL-Bitset, `Metric`-Trait, Planner; DiskANN ausgliedern (Archiv), `async` entfernen (Ratchet, §6), `VectorScanner`|
-|`contextra-text`|0|K|nein|2.329|2.400|BM25/BM25F, Block-Max-WAND, `Analyzer`-Port; `async`/`unsafe`/Panic entfernen, `TextScanner`|
-|`contextra-rank`|0|K (reklass.)|nein|1.709 (`fusion/`)|1.750|nur `fusion/`: RRF, Normalisierung, Provenienz/Explain; Rest ins Archiv|
-|`contextra-store`|1|K|nein|13.066|13.400|LSM, WAL, Blob, Manifest, Kompaktion, Block-Cache, CDC; implementiert `Vfs`, `DurableLog`, `ErasureJournal`, Rohdatei-Scanner; Fehlerpropagation, `unsafe` raus, `LsmScanner`, Purge-Kompaktion|
-|`contextra-checkpoint`|1|K|nein|1.630|1.700|Snapshots, Backup-Export (ohne Keystore), verifizierte Wiederherstellung, Restore-Guard, `CheckpointScanner`|
-|`contextra-engine`|3|K|nein|10.114|8.500 Ziel / 10.200 Grenze|Planner, Fusion-Aufruf, Bounded-Compute-Pool, `as_of`, Chunking, Reaper, Saga, Lesesperre, Startsequenz; Entkopplung von Archiv-Crates, Stub-Löschung|
-|`contextra-db`|3|K|nein|585|600|Collections, Transaktionen, Tenant-Scoping; kennt **keine** Inferenz-Backends|
-|`contextra-mcp`|4|K|nein|3.314|3.400|MCP-Server (stdio, JSON-RPC 2.0), IPC-Proxy, CLI; 3-Werkzeug-Fassade; kein `unsafe`|
-|`contextra`|4|K|nein|729|800|**Fassade und einzige Composition Root**; öffentliche Rust-API; schlanker Default|
-|**Kern gesamt**||||**50.622**|**52.000 Obergrenze**||
+|`contextra-types`|0|K|nein|2.611|2.700|Kanonische IDs, Fehlerklassen, `RequestContext`, Basis-Datenmodelle|
+|`contextra-ports`|0|K|nein|1.526|1.600|Zentraler Trait-Vertrag: `Vfs`, `Clock`, `Rng`, `IdGen`, `StorageEngine`, `VectorIndex`, `TextIndex`, `Purger`, `LayerScanner`|
+|`contextra-sys`|0|K|**ja**|428|450|Autarke OS-Primitive, mmap, Memory-Locking, Datei-Locks|
+|`contextra-simd`|0|K|**ja**|1.113|1.200|Autarke SIMD-Beschleunigung (AVX2, AVX-512, NEON) mit Fallback auf Skalar|
+|`contextra-wire`|0|K|**ja**|190 (+1.201)|200|Zero-Copy-Serialisierung und FlatBuffers-Wire-Format|
+|`contextra-durable-fs`|0|K|nein|860|900|Dateisystemhärtung, atomare Flushes und Sync-Primitive|
+|`contextra-mvcc`|0|K|nein|1.585|1.650|Multi-Version Concurrency Control und Serializable Snapshot Isolation (SSI)|
+|`contextra-crypto`|0|K|nein|2.992|3.200|Reiner Kryptografiekern: AEAD, KDF, WAL-HMAC, Anti-Tamper (ohne Lösch-/DSGVO-Logik)|
+|`contextra-rank`|0|K|nein|1.709|1.750|Autarke Rangfusion (RRF), Normalisierung, Explain-Funktionen|
+|`contextra-adapt`|0|K|nein|1.200|1.300|Adaptive Algorithmen, Drift-Watcher und Bandits|
+|`contextra-store`|1|K|nein|13.066|13.400|Autarker LSM-Tree-Storage, WAL, Block-Cache; implementiert `Purger` und `LayerScanner`|
+|`contextra-vector`|1|K|nein|6.701|6.800|Autarker HNSW-Vektorindex, SQ8, ACL-Filter; implementiert `Purger` und `LayerScanner`|
+|`contextra-text`|1|K|nein|2.329|2.400|Autarker BM25/BM25F-Index mit Block-Max-WAND; implementiert `Purger` und `LayerScanner`|
+|`contextra-graph`|1|K|nein|4.500|4.800|Autarker CSR-Graph für Wissensnetze und Relationen; implementiert `Purger`|
+|`contextra-checkpoint`|1|K|nein|1.630|1.700|Autarke Point-in-Time-Snapshots und Backup-Export|
+|`contextra-kvcache`|1|K|nein|1.800|2.000|Verschlüsselter KV-Cache für Sprachmodell-Zustände|
+|`contextra-erasure`|3|K|nein|7.307|7.500|**Modularer Löschkern:** Kapselt Multi-Layer-Löschung, Saga, Vault, GateLog, Restore-Guard, DSGVO- und Deletion-Reporting|
+|`contextra-engine`|3|K|nein|8.500|9.000|Generischer Orchestrator über `Backends`-Trait; bindet Indizes über Ports ein|
+|`contextra-db`|3|K|nein|585|600|Referenz-Komposition für Single-Node-Betrieb über Ports|
+|`contextra-mcp`|4|K|nein|3.314|3.400|MCP-Server (stdio, JSON-RPC 2.0); Werkzeuge für Retrieval und optionale Erasure-Anbindung|
+|`contextra`|4|K|nein|729|800|Schlanke High-Level-Fassade und Composition Root für Gesamtlösungen|
 
 **Rechnung Ist:** 2.611 + 1.526 + 428 + 1.113 + 190 + 1.585 + 2.992 + 6.701 + 2.329 + 1.709 + 13.066 + 1.630 + 10.114 + 585 + 3.314 + 729 = **50.622**. Die Reserve von 1.378 bis 52.000 ist eine Annahme für Saga, Scanner und Restore-Guard. `checkpoint` (1.630) ist Kern, weil Restore Gelöschtes zurückbringen kann (E18).
 
@@ -871,818 +898,101 @@ Retention-Reaper/`MemoryType`-Ort (§11.6), BM25-Morphologie für deutsche Kompo
 
 ---
 
-## 12. Kryptografie, Löschung, Löschbericht, Audit (`contextra-crypto` und Schicht-Crates) `[K]`
+## 12. Modularer Löschkern (`contextra-erasure`) & Bereinigungs-Ports
 
-### 12.1 Rechtlicher und fachlicher Rahmen (keine Rechtsberatung)
+> **Architektur-Entscheidung (Baukastensystem):** Die Löschung über mehrere Ebenen mit kryptografischem Nachweis, Deletion Sagas, FileVault, GateLog, DSGVO-Regelwerken (Art. 17 etc.) und Audit-Chains ist **vollständig in den eigenständigen Baustein `contextra-erasure` modularisiert**.
+>
+> Der Speicherkern (`contextra-store`, `contextra-vector`, `contextra-text`, `contextra-crypto`) ist von dieser Logik befreit. Kern-Datenhalter implementieren lediglich minimale, generische Bereinigungs- und Scan-Ports (`Purger`, `LayerScanner`) aus `contextra-ports`.
 
-> **Rechtshinweis.** Technische Spezifikation, keine Rechtsberatung. **Software kann eine Rechtswirkung weder herbeiführen noch garantieren.** Sie kann den technischen Zustand herstellen, den die vertretenen Rechtsauffassungen verlangen, diesen Zustand messen und belegen und ehrlich benennen, was sie nicht erreicht. Die rechtliche Bewertung trägt der Verantwortliche. Punkte „P-xx“ (§25.1) sind vor jeder Außenkommunikation fachanwaltlich zu prüfen. Das Ziel „rechtlich nicht anfechtbar“ wird deshalb **technisch** als „unter jeder plausiblen Auffassung bedient, gemessen, mit benannten Annahmen“ operationalisiert (§12.1.3).
+### 12.1 Entkopplungsmodell der Löschkette
 
-**Belegstärke:** **[R]** verbindliches Recht · **[B]** Behördenauslegung (EDPB, DSK, Landesbehörden, Standard-Datenschutzmodell, nicht bindend) · **[P]** Fachliteratur/Praxis/Norm · **✔** an der Primärquelle geprüft · **◐** nur Sekundärquelle · **○** allgemeiner Kenntnisstand · **⚠** umstritten/offen.
-
-#### 12.1.1 Grundsatz
-
-1. Art. 17 DSGVO verpflichtet zur Löschung **ohne unangemessene Verzögerung** (unverzüglich), auch ohne Antrag, definiert „Löschen“ aber nicht und schreibt keine Methode vor [R]. Löschen ist selbst Verarbeitung (Art. 5, 32). Das Standard-Datenschutzmodell (Baustein 60) versteht Löschen als **Unkenntlichmachen**: Der angeordnete Informationsverlust muss tatsächlich wirken [B ✔]. Technische Unmöglichkeit rechtfertigt keinen Verstoß (EDPB 02/2025 v2.0, Rn. 50) [B ✔].
-2. Die Aufsichten fordern **Wirksamkeit und Nachweisbarkeit** (EDPB 02/2025 Rn. 63; CEF-Bericht 2025: Löschung verifizieren und nachweisen können) [B ✔]. Art. 5 Abs. 2, 24, 32 verlangen Rechenschaft [R].
-3. Es ist **keine höchstrichterliche Entscheidung bekannt**, die Schlüsselvernichtung als Löschung anerkennt (P-01, P-02).
-4. **Konstruktionsgrundsatz Verteidigung in der Tiefe.** Contextra stellt für jede erreichbare Datenschicht den Zustand her, den die **strengste** Auffassung verlangt (physische Bereinigung, Ebene A und Hygiene). Für nicht erreichbare Reste (Flash, Backups) kommt ein **zweiter, unabhängiger Mechanismus** hinzu (Schlüsselvernichtung mit Epoch Seal und Backup-Trennung, Ebene B). Jede Aussage im Bericht nennt ihre Voraussetzungen und Grenzen.
-5. **Beide Mechanismen sind notwendig, keiner genügt allein.** Ohne Ebene A bleiben Klartext und invertierbare Suchstrukturen (Vektoren, Ghost Vectors). Ohne Ebene B bleiben Flash-Reste und Kopien lesbar, weil Überschreiben auf SSD nicht zuverlässig wirkt (Wear-Leveling). Ohne die Backup-Spur wären Backups eine ungelöschte Kopie.
-
-#### 12.1.2 Quellenlage
-
-Die Spalte „Prüfung 2.3“ trennt, was bei der Quellenprüfung vor 2.3 geprüft wurde, von dem, was bei der Erstellung dieser Fassung am 26.10.2026 **zusätzlich** gegengeprüft wurde. Eine Quelle mit ◐ oder ○ DARF NICHT in Außentexte übernommen werden, bevor der Volltext geprüft ist (P-14).
-
-|Quelle|Aussage (paraphrasiert)|Status|Prüfung vor 2.3|Prüfung 2.3|
-|---|---|---|---|---|
-|EDPB Guidelines 02/2025 Blockchain, v2.0 final (07.07.2026)|Rn. 51: Nach Schlüsselvernichtung sind verschlüsselte Daten unverständlich, solange der Algorithmus nicht gebrochen ist, die Entschlüsselung nicht fortschreitet und der Schlüssel nicht kompromittiert war; verschlüsselte Daten bleiben personenbezogen. Rn. 52: Hash mit Salt oder Schlüssel bleibt personenbezogen, nach Löschung des Schlüssels nicht mehr verknüpfbar, wenn dieser nicht kompromittiert war. Rn. 103–104: „effektive Anonymisierung“ durch Löschung der Off-chain-Daten. Rn. 85, 96, Empf. 13: Notfallplan für Algorithmenwechsel, periodische Neubewertung.|final; Analogie (Blockchain), keine unmittelbare Aussage zu RAG|✔|nicht erneut geöffnet|
-|EDPB Guidelines 02/2026 Anonymisierung, Entwurf v1.0 (07.07.2026), Konsultation bis 30.10.2026|Kriterien No Record Isolation, No Linkage, No Inference; kontextueller Ansatz; Verschlüsselung ist reversibel und kein Ersatz für Anonymisierung; Anonymisierung ist selbst Verarbeitung.|Entwurf|◐|offen (P-14)|
-|EDPB Guidelines 01/2025 Pseudonymisierung|keine Endfassung gefunden|Entwurf|◐|offen|
-|EDPB CEF 2025 Recht auf Löschung|764 Verantwortliche, 32 Aufsichten, 9 Formalverfahren, sieben wiederkehrende Probleme (u. a. Backups, Anonymisierung). Issue 6: Löschung in Backups nicht immer ratsam, dann aber Verfahren, um Löschungen nachzuverfolgen und auf wiederhergestellten Systemen umzusetzen. Best Practice: Daten durch Zufallszeichen ersetzen. Empfehlung: anerkannte Standards befolgen, Löschung verifizieren und demonstrieren. Issue 7: einfache Pseudonymisierung oder Maskierung genügt nicht. Issue 4: Einschränkung nach Art. 18, wenn die Entscheidung aussteht.|Bericht|✔|**bestätigt**: angenommen 10.02.2026, veröffentlicht 18.02.2026 (Pressemitteilung und Berichts-PDF auf edpb.europa.eu gefunden)|
-|NIST SP 800-88 Rev. 2 (26.09.2025), FAQ vom 16.07.2026|Cryptographic Erase (CE) nur bei: kein früherer Klartext, ausreichende Schlüssellänge und Entropie, Zeroization **aller** Zielschlüssel (DEK, Wrapping, Master); Backup- und Escrow-Kopien brauchen eigene Regeln; Teil-CE nur bei absoluter Sicherheit; Verification und Validation getrennt; Zertifikat mit Methode, Technik, Validierungsentscheidung, Concurrence. Rev. 1 ist zurückgezogen; technikspezifische Verfahren verweist Rev. 2 an IEEE 2883.|Norm/FAQ|✔ (FAQ), ◐ (Norm)|**bestätigt**: Veröffentlichung 26.09.2025, Rev. 1 zurückgezogen, CE-Vorbedingung „Verschlüsselung seit Bereitstellung aktiv, kein Klartext je geschrieben“ (Sekundärquellen); Volltext der Norm nicht geöffnet|
-|ISO/IEC 27040:2024|alle Kopien der Zielschlüssel sind zu bereinigen, sonst gilt es nicht als CE|Norm|◐|offen|
-|IEEE 2883:2022|technikspezifische Sanitisierungsverfahren je Medium|Norm|○|nur als Verweis von NIST Rev. 2 bestätigt|
-|BayLfD 30. TB (2020) Nr. 12.5|Zeitversetzte Backup-Löschung zulässig bei technischer Unmöglichkeit, begründeter Löschfrequenz, Zugriff nur über Restore, Nachlöschung bei jedem Restore, Dokumentation|Aufsichtsauffassung|◐|in 2.4 am Primärtext nicht wiederholt geprüft (P-14); trägt keine konkrete Frist|
-|SDM Baustein 60 V1.0a|Löschen als Unkenntlichmachen|Aufsichtsauffassung|✔ (Auszug)|–|
-|EuGH C-413/23 P (EDPS/SRB), 04.09.2025|Relativer Personenbezug; für den Verantwortlichen bleiben pseudonyme Daten personenbezogen, für Empfänger ohne Mittel kann dies anders sein|Urteil|◐|offen|
-|AG Lörrach, 03.03.2025, 3 C 1099/24|Kein Anspruch der betroffenen Person auf Löschnachweis ohne Streitfall|Instanzgericht|◐|offen|
-|OLG Dresden, 15.10.2024, 4 U 940/24|Verantwortlicher muss vom Auftragsverarbeiter aussagekräftige Löschbestätigung einholen|Berufungsgericht|◐|offen|
-|OLG Dresden, 03.02.2026, 4 U 292/25|Anonymisierung als „Minus“ zur Löschung auf Verlangen|Berufungsgericht|◐ nur Sekundärquelle|offen|
-|DSB Österreich, Bescheid 05.12.2018|Unkenntlichmachung zulässig, völlige Irreversibilität nicht nötig|Behörde|◐|offen|
-|eIDAS Art. 41, 42|Vermutung für Datum und Datenintegrität bei qualifiziertem Zeitstempel; § 371a ZPO betrifft qualifizierte Signaturen, nicht Zeitstempel unmittelbar|Recht|◐|offen|
-|Ghost Vectors, arXiv 2606.18497|Soft-gelöschte HNSW-Vektoren bleiben rekonstruierbar; Ghost-Knoten verändern Treffermengen und erzeugen Timing-Kanal|Preprint|✔|–|
-
-#### 12.1.2a Quellenbereinigung und Begründungsbasis (2.4)
-
-Mehrere in der Fachdiskussion kursierende Aussagen sind falsch zugeordnet oder nicht belegt. Das Design stützt sich **nicht** auf sie. Die Tabelle nennt je Aussage die Wertung und die Folge für das Design.
-
-|Aussage|Wertung|Folge im Design|
-|---|---|---|
-|„OLG Dresden 4 U 1278/21 erkennt Anonymisierung als ‚Minus zur Löschung‘ an und stützt Crypto-Shredding“|**Falsch zugeordnet.** Die Entscheidung (14.12.2021) betrifft eine Inkasso-Streitigkeit mit namensgleicher Person und das Zusammenwirken von Aufbewahrungspflichten und Löschanspruch (Prüfung je Datum). Die „Minus“-Formel stammt aus OLG Dresden 4 U 292/25 (03.02.2026, Instanzgericht, ◐) und nennt Schlüsselvernichtung nicht.|Contextra stützt keine Außenaussage auf Anonymisierungsurteile; Löschung wird gemessen (Ebene A) und zusätzlich kryptografisch abgesichert (Ebene B), nicht rechtlich umgedeutet (§12.1.1 Punkt 4).|
-|„Gerichte oder Aufsichten haben Crypto-Shredding als Löschung anerkannt“|**Nicht belegt.** Keine Entscheidung und keine Behördenaussage dazu gefunden; die einzige EDPB-Aussage (02/2025 Rn. 51, Blockchain) ist an Bedingungen geknüpft und eine Analogie.|Klassen mit benannten Annahmen (§12.5); „kryptografisch gelöscht“ nie ohne Custody und Annahmen (§12.11).|
-|„BSI TR-02102 und ISO/IEC 27040 empfehlen oder akzeptieren kryptografisches Löschen“|**Nicht belegt.** TR-02102 regelt Algorithmen und Schlüssellängen, nicht Löschen; die Akzeptanz durch ISO/IEC 27040 ist nicht am Normtext geprüft.|TR-02102 nur für die Algorithmenwahl (§12.2.1); als Löschbeleg dienen Messung und NIST-Bedingungen (LA-3, LA-15).|
-|„Aufsichten in Bayern, Baden-Württemberg und Berlin akzeptieren Backup-Rotation von 30, 60 oder 90 Tagen“|**Keine Primärquelle.** Belegt ist nur: Backups müssen nicht sofort überall verändert werden, nach einer Rücksicherung ist unmittelbar erneut zu löschen und der Vorgang zu überwachen (SDM Baustein 60, M60.S10, M60.P08; CEF 2025 Issue 6).|`key_backup_max_age` und `erased_set_retention` sind **eigene Setzungen** des Produkts, keine behördliche Vorgabe (§12.17, P-06). Die Wirkung hängt nicht an einer behördlichen Frist, sondern am Ablauf des Schlüssel-Backups.|
-|„§ 35 BDSG analog rechtfertigt Nicht-Löschen in Backups und Vektorindizes“|**Trägt nicht.** § 35 Abs. 1 BDSG gilt nur bei nicht automatisierter Verarbeitung und nicht bei unrechtmäßiger Verarbeitung; Zweifel an der Unionsrechtskonformität.|Kein Ausnahmepfad „unverhältnismäßiger Aufwand“ im Design; granulare Löschbarkeit ist Konstruktionsziel (§12.2.5).|
-|„EDPB 28/2024 stellt fest, dass Embeddings personenbezogen sind“|**Zu weit.** Die Stellungnahme prüft die Anonymität trainierter **KI-Modelle**, nicht eines Vektorindex. Die DSK-Orientierungshilfe RAG (10/2025) behandelt die Vektordatenbank als Verarbeitungsgegenstand mit Rechtsgrundlage, ohne Invertierbarkeitsprüfung; die Hamburger Gegenposition betrifft Tokens und Embeddings **im** Modell. Inversionsangriffe auf Text-Embeddings sind technisch belegt (Fachliteratur, ○).|Embeddings gelten **vorsorglich als personenbezogen** (P-05, LA-2); Schichten `VectorIndex` und `CachesAndVault` sind Pflicht (§12.4).|
-|„Die DSK-Orientierungshilfe RAG nennt Crypto-Shredding“|**Falsch.** Sie hält Vektoreinträge für adressierbar und löschbar, erwähnt Crypto-Shredding nicht und nennt Betroffenenrechte im Sprachmodell „weitgehend ungelöst“.|Löschung im Modell und beim Modellanbieter ist Nicht-Gegenstand (§12.20, `ModelParameters`).|
-|„AI Act Art. 12 verlangt die Protokollierung aller Ein- und Ausgaben“|**Überzeichnet.** Nur Hochrisiko-Systeme; verlangt Ereignisprotokolle; Art. 26 Abs. 6 stellt die Aufbewahrung unter den Vorbehalt des Unionsrechts, insbesondere des Datenschutzrechts. Hochrisiko-Fristen laut Digital Omnibus auf 02.12.2027 verschoben (◐, Amtsblatt prüfen).|Logs, Audit und Sidecars enthalten nur Referenz-Hashes und Zähler (INV-LOG-1, §12.10); kein Konflikt mit der Löschung.|
-|„Buchungsbelege 10 Jahre, § 203 StGB als Aufbewahrungsnorm“|**Veraltet bzw. falsch.** Buchungsbelege 8 Jahre seit 01.01.2025 (§ 147 Abs. 3 AO, § 257 Abs. 4 HGB; Banken, Versicherungen weiter 10 Jahre); Bücher, Abschlüsse 10 Jahre; Handels- und Geschäftsbriefe 6 Jahre; Patientenakte 10 Jahre nach Behandlungsabschluss (§ 630f Abs. 3 BGB); § 203 StGB ist Schweigepflicht.|`Restricted` je Datum, Archiv getrennt vom Retrieval-Index (§12.8.6, P-09, P-22).|
-|„Der Löschnachweis darf nicht aufbewahrt werden“ / „Nachweis ist nie geschuldet“|**Differenziert.** AG Lörrach (3 C 1099/24, erstinstanzlich, ◐): kein Anspruch der betroffenen Person auf individuellen Nachweis ohne Streitfall; OLG Dresden 4 U 940/24 (◐): der Verantwortliche muss sich die Löschung vom Auftragsverarbeiter nachweisen lassen; EDPB CEF 2025: Löschung verifizieren und nachweisen können.|Bericht datensparsam (Referenz-Hash statt ID, §12.10), Bescheinigung ohne Identifikatoren (§12.7.8).|
-
-**Tragende Begründungen des Designs** (Quelle in Klammern):
-
-1. *Löschen = Unkenntlichmachen, Kopien eingeschlossen* (SDM Baustein 60: vollzogen erst, wenn keine Kopie oder Replikation beim Verantwortlichen oder Auftragsverarbeiter besteht; Wipe unter Beachtung von Wear-Leveling) ⇒ zehn Schichten, Oberflächen-Inventar, Hygiene.
-2. *Technische Unmöglichkeit entschuldigt nicht* (EDPB 02/2025 Rn. 50) ⇒ Löschbarkeit ist Architekturvorgabe (DocDek je Einheit), kein Betreiberproblem.
-3. *Nachweisbarkeit schuldet der Verantwortliche* (Art. 5 Abs. 2, 24, 32 DSGVO; EuGH C-340/21; EDPB CEF 2025) ⇒ Bericht aus Messung, Verification und Validation getrennt (§12.7.7).
-4. *Kryptografisches Löschen nur mit Zeroization aller Zielschlüssel und ohne früheren Klartext* (NIST SP 800-88 Rev. 2) ⇒ Nadelscan über alle Dateien, Epoch Seal, Heap-Canary, Härtung (§12.18).
-5. *Restrisiko Algorithmus, Obsoleszenz, Quantencomputer, periodische Neubewertung, Notfallplan* (EDPB 02/2025 Rn. 85, 96) ⇒ Krypto-Agilität, `doctor crypto-drill` (§12.2.9).
-6. *Hash mit Schlüssel bleibt personenbezogen, bis der Schlüssel vernichtet ist* (EDPB 02/2025 Rn. 52) ⇒ Referenzschlüssel mit Ablauf (§12.10).
-7. *Relativer Personenbezug* (EuGH C-582/14, C-413/23 P) ⇒ Perspektivenmatrix (§12.1.4): das Urteil „unkenntlich“ gilt je Stelle und wird je Stelle ausgewiesen.
-
-#### 12.1.3 Rechtsstabilitätsmatrix
-
-Contextra MUSS gleichzeitig unter allen plausiblen Auffassungen bestehen. Die Matrix ordnet jedem Maßstab den erfüllenden technischen Zustand zu (Klassen: §12.5).
-
-|Auffassung|Maßstab|Erfüllender Zustand|Rest|
-|---|---|---|---|
-|T1 Strenge Vernichtung|alle Kopien im Einflussbereich physisch entfernt (SDM, EDPB Rn. 50, 63)|Klasse **M**: P plus Hygiene (physische Kompaktion, WAL-Scrub, Checkpoint-Rewrite, Index-Neuaufbau)|Flash-Reste, externe Backups (ausgewiesen)|
-|T2 Unkenntlichmachung|niemand ist mit vertretbarem Aufwand zur Identifizierung in der Lage (SDM, DSB, OLG Dresden 4 U 292/25, Entwurf 02/2026)|Klasse **C** plus Restmetadaten-Selbsttest (§12.7.6) plus Perspektivenmatrix|Aufwandsbewertung ist Rechtsfrage (P-01, P-02)|
-|T3 Cryptographic Erase|NIST-Bedingungen, ISO/IEC 27040 (EDPB Rn. 51 analog)|C2/C3 mit CE-Traceability; C1 mit Annahme A-FLASH|Hardware-Restrisiko bei K1|
-|T4 Einschränkung/Aufbewahrung|Art. 18, Art. 17 Abs. 3 (CEF Issue 4)|Klasse **L**, `Restricted`, Legal Hold|Dauer ist Rechtsfrage (O-12)|
-|T5 Backups|Löschungen nachverfolgen und beim Restore umsetzen (CEF Issue 6, BayLfD 12.5)|Zwei-Spuren-Backup, Restore-Guard, `ErasedSetMirror` (§12.17)|Externe Backups, die Contextra nicht sieht|
-
-#### 12.1.4 Perspektivenmatrix
-
-Der Entwurf 02/2026 prüft Anonymität aus Sicht jeder Stelle mit realistischem Zugang. Der Bericht trägt deshalb ein Urteil **je Perspektive**, erzeugt aus den gemessenen Werten (nie statisch).
-
-|Perspektive|Zugang|nach L|nach P|nach C|
-|---|---|---|---|---|
-|Q1 Leser (MCP-Client, API, `as_of`, Export)|Lesepfade|gesperrt|gesperrt|gesperrt|
-|Q2 Betreiber mit Prozess- und Dateizugriff **und** Passphrase|Engine, Dateien, Keystore|Klartext nur über gesperrte Lesepfade|keine Klartextstruktur mit Scope-Inhalt|persistente Kopien unter vernichtetem DocDek nicht lesbar|
-|Q3 Dateiangreifer ohne Passphrase|Datenverzeichnis|verschlüsselt|verschlüsselt|verschlüsselt|
-|Q4 Medienangreifer mit Flash-Resten, ohne Passphrase|Chip-off, Controller-Reste|verschlüsselt|verschlüsselt|verschlüsselt|
-|Q5 Medienangreifer mit Flash-Resten **und** Passphrase|wie Q4 plus Schlüssel|lesbar|lesbar (Chiffrat)|**C1: möglich** (A-FLASH). **C2/C3: nicht möglich**|
-|Q6 Besitzer eines Daten-Backups ohne Schlüssel-Backup|Backup-Dateien|verschlüsselt|verschlüsselt|nicht lesbar|
-|Q7 Besitzer eines Schlüssel-Backups älter als die Löschung|Schlüssel-Backup|lesbar bis Fensterende|lesbar bis Fensterende|unlesbar nach `key_backup_max_age`; Restore-Guard greift beim Einspielen|
-|Q8 Empfänger/Dritte (Exporte, LLM-Anbieter, Auftragsverarbeiter)|außerhalb von Contextra|nicht erfasst|nicht erfasst|nicht erfasst (§12.20, `RecipientLedger` §12.19)|
-
-#### 12.1.5 Technische Anforderungen aus dem Rahmen
-
-(Die Kennungen heißen in 2.3 `LA-n`, um die Kollision mit den Architekturregeln A1–A10 (§3.3) zu beseitigen; Fassung 2.2.1 führte beide als „A1…“.)
-
-|ID|Anforderung|Rechtslage|Umsetzung|
-|---|---|---|---|
-|LA-1|Nach der Löschung keine Person identifizierbar, Informationsgehalt nicht mit vertretbarem Aufwand reproduzierbar; auch Kopien beim Verantwortlichen erfasst.|[B ✔]|§12.4, §12.5, §12.7, §12.16|
-|LA-2|Alle Repräsentationen im Wirkungsbereich: Quelle, Chunk, Vektor, Volltextindex, Graph, Cache, Log, interne Checkpoints, Schlüsselmaterial.|[P]; Embeddings ⚠|§12.4 (zehn Schichten)|
-|LA-3|Alle Kopien der Zielschlüssel sind erfasst (Wrap-Blobs, Epochen, Schlüssel-Backups).|[P ◐] NIST, ISO 27040|§12.2.4 (Epoch Seal), §12.17 (Spur K), Nadelscan §12.7.3|
-|LA-4|Löschgranularität ohne Kollateralverlust.|[B ✔]|DocDek je Betroffenen-Einheit (§12.2.5, §12.15)|
-|LA-5|Verbleibende Metadaten (Längen, Header, IDs, Zeitstempel) identifizieren nicht wieder; Pseudonyme laufen ab.|[P]; Entwurf 02/2026|Padmé, verschlüsselte Header (§12.2.6), §12.7.6, §12.10|
-|LA-6|Löschung ist verifizierbar und nachweisbar; Verification und Validation getrennt.|[R/B ✔]|§12.7|
-|LA-7|Bericht ist datensparsam.|⚠ umstritten|§12.10, §12.7.8|
-|LA-8|Nach Rücksicherung unmittelbar erneut löschen; Überwachung; Rücksicherung nur innerhalb des Horizonts.|[B ✔]|§12.9, §12.17|
-|LA-9|Aufbewahrungspflichten: Einschränkung statt Löschung.|[R] + ⚠|`Restricted` (§12.8.6)|
-|LA-10|Krypto-Agilität: Austauschplan, periodische Neubewertung.|[B ✔ Analogie]|§12.2.9, REQ-DEL-028|
-|LA-11|Unverzüglich; Monatsfrist; Alarm- und Eskalationsschwellen.|[R ○]|§12.8, §12.19, §15.5|
-|LA-12|Ehrliche Produktaussagen; keine Rechtsbehauptung.|⚠|§2.6, §12.11|
-|LA-13|Löschkonzept dokumentierbar (Löschinventar, Vorlage `doctor export-concept`).|[B ✔]|§12.14|
-|LA-14|Empfänger werden informiert; Auftragsverarbeiter-Löschung nachweisbar.|[R ○/◐]|`RecipientLedger` (§12.19), Bescheinigung (§12.7.8)|
-|LA-15|Prozessspeicher, Dumps, Swap sind adressiert; NIST-Vorbedingung „kein früherer Klartext auf dem Medium“.|[P ◐]|§12.18|
-|LA-16|Wirkung ist unter Fehlern und Abbrüchen garantiert (Crash, ENOSPC, `fsync`-Fehler, Restore).|[B] (Rechenschaft)|§12.8.4, §7.10, §12.12|
-
-**Pflichten des Betreibers (nicht ersetzbar durch Software).** `doctor export-concept` erzeugt eine **nicht rechtsverbindliche** Vorlage: Verzeichnis der Löschschichten und Löschfristen je Collection; Backup-Richtlinie (Daten-Backup, Schlüssel-Backup, `key_backup_max_age`, Ablageorte, `ErasedSetMirror`-Ziel); Textbaustein für Verzeichnis der Verarbeitungstätigkeiten und Auftragsverarbeitung (Löschbestätigung, OLG Dresden 4 U 940/24); Ablauf bei Restore. Ob und an wen Bescheinigungen ausgeliefert werden, entscheidet der Verantwortliche.
-
-### 12.2 Primitive, Schlüsselhierarchie, Verwahrung
-
-#### 12.2.1 Primitive
-
-**AES-256-GCM-SIV** (nonce-misuse-resistant AEAD), **Argon2id** (Passphrase-KDF, INV-KDF-1), **HKDF** (nur aus hochentropischem Material, nie aus Passphrasen), **HMAC-SHA256** (WAL-/Sidecar-Ketten, Referenz-Hashes), **Ed25519** (Berichtssignatur), **SHA-256/BLAKE3** (Hash). Zufall für Schlüssel, Nonces, Salts stammt aus dem System-RNG (P28-Ausnahme). Geheimnisse sind `zeroize`-geschützt (`Zeroizing<[u8; 32]>`, kein `Clone` ohne Zeroisierung, konstantzeitiger Vergleich). Kryptografische Primitive werden nie selbst gebaut. Schlüsselmaterial erscheint nie in `Debug`, Logs oder Fehlertexten.
-
-#### 12.2.2 Hierarchie
+Das Gesamtsystem trennt die Verantwortung strikt nach dem Baukastenprinzip:
 
 ```
-Wurzel (Custody-Slot K1 | K2 | K3)                    EffaceableKeySlot (§12.2.3)
- └─ KEK[coll, epoche]       je Collection und Epoche, gewrappt unter der Wurzel
-     ├─ ShardKek[shard, gen]  je KeyTable-Shard (§12.2.4), gewrappt unter KEK
-     │    └─ DocDek[einheit]  je Betroffenen-Einheit, gewrappt unter ShardKek
-     ├─ ArtKey[artefakt]    je Index-Artefakt (Text-Segment, Graph-Snapshot), gewrappt unter KEK
-     └─ K_ref[tenant, ref_epoche]   Referenzschlüssel (§12.10), zufällig, gewrappt unter KEK
-K_eng                       Struktur und Integrität (keine Nutzdaten), HKDF aus der Wurzel
-K_sc/*                      Zweckschlüssel der Sidecar-Ketten (HMAC), HKDF aus K_eng
++-----------------------------------------------------------------------------------+
+|               contextra-erasure (Modularer Löschkern / Baustein)                  |
+|  - Deletion Saga Machine (Requested -> Gated -> Destroyed -> Purged -> Completed) |
+|  - FileVault (16 Shards, Scope-/Epochen-Schlüsselverwahrung, Shredding)            |
+|  - ReadGate & GateLog (RCU-Intervalle, ErasedSet-Lesesperre)                      |
+|  - RestoreGuard (Prüfung gegen illegitime Wiederherstellung aus Alt-Backups)      |
+|  - Messung & Witness-Aggregation (Positive Canary Controls, Rohscans)             |
+|  - DeletionReport (Ed25519-signiertes Nachweisdokument, DSGVO-Audit-Export)       |
++-----------------------------------------------------------------------------------+
+                                   │ (nutzt neutrale Ports)
+                                   ▼
++-----------------------------------------------------------------------------------+
+|                    contextra-ports (Vertragsschicht)                              |
+|           trait Purger          │          trait LayerScanner                     |
++---------------------------------+-------------------------------------------------+
+          ▲                                               ▲
+          │ (implementieren)                              │ (implementieren)
++---------┴----------------+  +---------------------------┴----+  +-----------------+
+|     contextra-store      |  |        contextra-vector        |  |  contextra-text |
+|  (LSM, WAL, Block-Cache) |  |   (HNSW, Vektor-Primitive)    |  |  (BM25, Tokens) |
++--------------------------+  +--------------------------------+  +-----------------+
 ```
 
-Jeder Schlüssel hat genau einen Zweck und ein Label im Zweckregister (INV-KEYPURPOSE-1, §12.3). **Die Sidecar-Ketten und `K_eng` überleben jede Löschung von Nutzdaten und enthalten keine Nutzinhalte** (INV-LOG-1). Das ist Voraussetzung dafür, dass Berichte und Ketten nach der Löschung prüfbar bleiben.
+### 12.2 Neutrale Bereinigungs-Ports (`contextra-ports`)
 
-#### 12.2.3 Custody-Stufen und Port `EffaceableKeySlot`
-
-|Stufe|Wurzel|Klasse|Status in v1.0|
-|---|---|---|---|
-|K0|keine Verschlüsselung (nur Entwicklung, `doctor` rot)|nur L, P|ausgeliefert|
-|K1|Argon2id aus Passphrase (m ≥ 64 MiB, t ≥ 3, ≥ 250 ms), Software-Keystore|C1|ausgeliefert|
-|K2|Siegelschlüssel in manipulationsresistentem, nicht exportierbarem Modul (z. B. TPM-2.0-Objekt, HSM); Eignung je Plattform ist Spike S-K2|C2|**Port vorgesehen**, nicht ausgeliefert bis Konformitätssuite besteht|
-|K3|externer KMS/HSM mit Zeitfenster-Löschung und Vernichtungsattest|C3|wie K2|
-
-Bis zur bestandenen Konformitätssuite liefern K2 und K3 `CapabilityUnsupported`, **nie** einen Stub, der Erfolg meldet (REQ-DEL-027). Hardware-Effaceable-Konzepte (z. B. Apple Effaceable Storage) sind Schnell-Löschen eines Volumenschlüssels und kein Mechanismus für beliebige Einzelschlüssel; eine Plattform gilt nur als K2, wenn die Suite nachweist, dass Schlüsselmaterial nach Vernichtung nicht aus Resten rekonstruierbar ist. Damit ist E27 (K2/K3 gestrichen) **teilweise zurückgenommen** (E44, §20).
+Datenhaltende Bausteine wissen weder, welcher juristische Anlass für eine Bereinigung vorliegt, noch kennen sie Deletion-Reports oder Sagas. Sie implementieren lediglich mechanische Ports:
 
 ```rust
-pub trait EffaceableKeySlot: Send + Sync {
-    fn custody(&self) -> Custody;                         // K1 | K2 | K3 (K0 hat keinen Slot)
-    fn wrap(&self, material: &Zeroizing<[u8; 32]>, ad: &[u8]) -> Result<WrappedBlob, KeyError>;
-    fn unwrap(&self, blob: &WrappedBlob, ad: &[u8]) -> Result<Zeroizing<[u8; 32]>, KeyError>;
-    fn rotate(&self) -> Result<SlotGeneration, KeyError>; // neue Wurzel-Generation; die alte bleibt bis destroy
-    fn destroy(&self, generation: SlotGeneration) -> Result<DestroyAttestation, KeyError>;
+/// Abstrakter Bezeichner für den zu bereinigenden Bereich.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum KeyScope {
+    Tenant(TenantId),
+    Collection { tenant: TenantId, collection: CollectionId },
+    Document { tenant: TenantId, collection: CollectionId, doc_id: DocId },
+}
+
+/// Port für datenhaltende Module zur physischen Bereinigung.
+pub trait Purger: Send + Sync + 'static {
+    fn purge_scope(&self, scope: &KeyScope) -> Result<PurgeOutcome, PurgeError>;
+}
+
+/// Port zur messtechnischen Überprüfung verbliebener Restdaten.
+pub trait LayerScanner: Send + Sync + 'static {
+    fn scan_for_residual(&self, scope: &KeyScope) -> Result<ScanOutcome, ScanError>;
 }
 ```
 
-`DestroyAttestation` enthält Custody, Verfahren (Zeroization), Zeitpunkt (aus `Clock`) und einen Beleg der Implementierung. **Nur K1 liefert einen lokalen Beleg ohne Dritt-Attest** (Selbstauskunft, kein Beweis der Abwesenheit auf dem Medium). `KmsProvider` bleibt der Port für Erzeugen und Ableiten; er hat keinen Default und keinen Fallback (REQ-PORT-2).
-
-#### 12.2.4 KEK-Epochen und Epoch Seal
-
-**Problem.** Wird nur der DocDek vernichtet, liegt sein gewrappter Blob als Rest auf dem Flash. Wer KEK und Passphrase besitzt, kann ihn entschlüsseln. NIST Rev. 2 zählt Wrapping-Schlüssel zu den CE-Zielschlüsseln, ISO/IEC 27040 verlangt die Bereinigung aller Schlüsselkopien.
-
-**Epoch Seal.**
-
-1. erzeugt `KEK[coll, e+1]`, gewrappt unter der Wurzel;
-2. erzeugt für jeden **geänderten Shard** (Shard mit Vernichtung seit dem letzten Seal) eine neue `ShardKek`-Generation, wrappt dessen lebende DocDeks neu und vernichtet die alte Generation; wrappt außerdem **alle** ShardKeks, ArtKeys und `K_ref` unter `KEK[e+1]` neu (Re-Wrap, kein Datenrewrite);
-3. schreibt die KeyTable atomar neu (REQ-FMT-5);
-4. vernichtet `KEK[e]` und dessen Wrap-Kopie nach dem Vernichtungsprotokoll (§12.2.7);
-5. bei K1 mit `rotate_passphrase_on_seal`: wechselt die Passphrase, sodass die alte Wurzel nicht mehr ableitbar ist, **wenn die alte Passphrase unbekannt ist**;
-6. bei K2/K3: ruft `rotate()` und anschließend `destroy()` am Slot.
-
-Nach dem Seal sind Flash-Reste gewrappter DocDeks früherer Epochen nur mit `KEK[e]` entschlüsselbar, und `KEK[e]` existiert nur noch als Rest unter der Wurzel. Bei K2 und K3 endet die Kette im Modul. Bei K1 endet sie in der Passphrase. Ein Seal **ohne** Passphrasenwechsel erhöht bei K1 den Schutz gegen einen Angreifer mit Flash-Resten **und** Passphrase nicht: Reste des alten KDF-Headers (Salt) und der alten Wurzel-Wraps bleiben mit derselben Passphrase wieder ableitbar. Der Bericht weist deshalb `flash_hardening ∈ {None, PassphraseRotated, ModuleBound, ProviderAttested}` aus (INV-SEAL-HARDENING-1): K1 ohne Wechsel ⇒ `None`, die Klasse C1 stützt sich dann allein auf **A-FLASH** (§12.5.2); K1 mit Wechsel ⇒ `PassphraseRotated`, wirksam gegen Angreifer, die nur die alte Passphrase kennen. Der Passphrasenwechsel ist ein vom Betreiber ausgelöster Vorgang (`seal-now --rotate-passphrase`), nie automatisch. Der Seal bleibt auch ohne Wechsel nötig, weil er die Schlüsselkette bereinigt (Nadelscan, Klasse C1 nach Siegel 3) und Voraussetzung von K2/K3 ist. Der einzige Weg, A-FLASH auf Laptops und Servern zu ersetzen, ist K2 (nicht exportierbares Modul); K2 ist deshalb der priorisierte Ausbau (Spike S-K2).
-
-**KeyTable-Shards (2.4).** Die KeyTable ist in `n_shards` Shards (Startwert 256, nach `hash(unit_ref)`) geteilt; jeder Shard hat eine eigene `ShardKek`-Generation. Begründung: Der gewrappte Blob eines vernichteten DocDek liegt nur in den Dateigenerationen **seines** Shards. Es genügt, diesen Shard unter einer neuen `ShardKek` neu zu schreiben, die alte zu vernichten und die Kette darüber (`KEK` ⇒ ShardKeks) auf `KEK[e+1]` umzustellen. Die Kosten sinken von O(alle Schlüssel) auf O(Schlüssel der geänderten Shards + `n_shards`), und ein Seal kann binnen Minuten statt Tagen laufen. Die Wirkung ist unverändert: Reste im Flash enden bei `KEK[e]`, das nur noch als Rest unter der Wurzel existiert.
-
-**Auslöser.** Zeitgesteuert (`kek_epoch_len`, Startwert 30 Tage), auf Anforderung (`seal-now`) und automatisch nach einer Löschung: Löschungen innerhalb von `seal_coalesce_window` (Startwert 15 min) teilen sich einen Seal; spätestens `seal_after_deletion_max` (Startwert 24 h; Profil `Maximum` 1 h; **in `EnterpriseRegulated` Pflichtwert ≤ 24 h**, H-07) nach der Löschung muss der Seal laufen. Der kürzere Standard folgt aus den Shard-Kosten (siehe unten): Ein Fenster von sieben Tagen verlängerte die Zeit, in der Flash-Reste des DocDek-Wraps unter `KEK[e]` stehen, ohne Kostenvorteil.
-
-**Klassenwirkung (INV-EPOCH-SEAL-1).** C1 bis C3 gelten erst nach dem ersten Seal, der die Löschung umfasst. Zwischen Vernichtung und Seal weist der Bericht die Klasse `C*` (vorläufig) mit `residuals: [R-KEKEPOCH until]` aus.
-
-**Crash-Sicherheit.** Der Seal ist ein eigener durabler Ablauf mit Journal. Ein Absturz mitten im Re-Wrap hinterlässt `KEK[e]` und `KEK[e+1]` nebeneinander und wird beim Start (B7) fortgesetzt. Der Seal ist idempotent.
-
-**Kosten.** Re-Wrap ist O(Schlüssel der geänderten Shards + `n_shards`), nicht O(Datenmenge) und nicht O(alle Schlüssel). Die Messung gehört in `benchmarks/budgets.toml` (O-24, O-40).
-
-#### 12.2.5 DocDek-Regeln
-
-1. Jede Betroffenen-Einheit (§12.15) erhält **genau einen** DocDek, erzeugt bei `remember`.
-2. Jeder Record in WAL, SSTable und Blob-Segment wird mit dem DocDek **seiner Einheit** verschlüsselt. Ein Block mit Records mehrerer Einheiten enthält mehrere Records unter verschiedenen Schlüsseln; die Blockverschlüsselung unter `K_eng` bleibt als äußere Schicht. **Die Vernichtung eines DocDek macht deshalb keinen anderen Record unlesbar** (kein Kollateralverlust, LA-4).
-3. Vektor-Payload (fp32 und SQ8) im persistenten Snapshot liegt je Slot unter dem DocDek.
-4. Der gewrappte DocDek liegt in der **KeyTable** (Ersetzen-Semantik), nicht in einem Append-Log. Das `KeyRegistry`-Sidecar führt nur Ereignisse ohne Schlüsselmaterial und ohne Wrap-Blob (REQ-DEL-N5).
-5. Der Key-Lock der Einheit wird über die **gesamte** Saga gehalten; ein konkurrierendes `remember` auf die Einheit wird abgewiesen (REQ-DEL-012).
-6. **Entschlüsselte Schlüssel im Speicher** liegen ausschließlich in einem registrierten `KeyCache`, der bei Vernichtung **vor** dem Schreiben der neuen KeyTable invalidiert und zeroized wird (H-04). Kein Modul hält eine Kopie außerhalb des `KeyCache`.
-7. Bestand ohne DocDek (Altformat, Scope-DEK) gilt als `LegacyUnkeyed`: höchstens Klasse P, bis `contextra migrate --rekey-units` die Records je Einheit neu verschlüsselt hat (H-12, REQ-DEL-N37). `doctor` weist den Anteil aus.
-
-#### 12.2.6 Record-Format und Restmetadaten
-
-- AEAD: AES-256-GCM-SIV, Nonce 96 Bit zufällig, Tag 128 Bit; AD = `scope_id ‖ doc_key_id ‖ record_version`.
-- **Padding:** Klartextlänge nach dem Padmé-Schema aufgefüllt (Leckage O(log log M), Overhead höchstens 12 %); Mindestlänge `min_record_bytes` (Startwert 256).
-- **Header:** `doc_key_id` und Sequenzbezug stehen **innerhalb** des unter `K_eng` verschlüsselten Blockbereichs, nicht im Klartext des Records (REQ-DEL-N15).
-- **Wrap der Schlüssel:** AEAD-Wrap (AES-256-GCM-SIV), zufällige 96-Bit-Nonce, AD = `key_id ‖ kek_epoch`. Die Nonce dient als **Fahndungsnadel** (§12.7.3). AES-KWP (SP 800-38F) ist per ADR wählbar, hat keine Nonce und braucht ein anderes Suchmuster.
-
-#### 12.2.7 Vernichtungsprotokoll (Destroy-Protokoll, H-03)
-
-Die Schlüsselvernichtung ist ein durabler, idempotenter Ablauf mit festen Schritten. Jeder Schritt wird **vor** der Ausführung im `ErasureJournal` vermerkt (Sidecar vor Wirkung, §7.9 Regel 3).
-
-|Schritt|Aktion|Durabilität / Ausfallverhalten|
-|---|---|---|
-|D1|Journal-Intent `destroy{key_ref, wrap_nonce_digest}`; Pre-Destruction-Inventar der Chiffratblöcke je `key_id` liegt vor (§12.7.3)|`fsync`; ohne Inventar kein D2|
-|D2|Key-Lock halten; `KeyCache`-Eintrag invalidieren und zeroizen|im RAM; danach ist kein Lesen mit diesem Schlüssel mehr möglich|
-|D3|Neue KeyTable-Generation **ohne** den Eintrag schreiben: temporäre Datei, `fsync`, `rename`, `fsync` des Verzeichnisses (REQ-FMT-5)|Ausfall hier: Schlüssel lebt, Einheit bleibt `Frozen`, Retry beim Start (kein „vernichtet“-Bericht)|
-|D4|Alte KeyTable-Generation und alle Temp-/`.bak`-Kopien entfernen (`durable_remove`), Verzeichnis-`fsync`|Reste der alten Datei auf dem Medium sind Gegenstand des Epoch Seal (§12.2.4)|
-|D5|`RevocationLog`-Eintrag `key_destroyed{key_ref_hash}`; `KeyRegistry`-Ereignis `destroyed`|`fsync`|
-|D6|Journal-Done; Nadelscan (§12.7.3)|Bericht erst nach D6|
-
-**Regeln.** (1) Ein Schlüssel gilt erst nach **D3** als vernichtet; der Bericht trägt `key_destroyed` erst nach D6. (2) Recovery wiederholt D2 bis D6 idempotent. (3) Die frühere Formulierung „Eintrag mit Nullen überschreiben, fsync, Eintrag entfernen“ ist **kein** Wirkmechanismus auf SSD und Copy-on-Write-Dateisystemen und wird nur als zusätzliche Hygiene beibehalten; die Wirkung trägt der Epoch Seal. (4) Bei `ENOSPC` nutzt D3 die Notreserve (§7.10); bei `fsync`-Fehler an der KeyTable gilt §7.10 (`Poisoned`, Sperr-only). (5) Nach D3 ist ein Wiederauftauchen des Schlüssels ausgeschlossen, weil ihn nur die KeyTable und Schlüssel-Backups der Spur K halten (§12.17); der Restore-Guard vernichtet ihn dort erneut.
-
-#### 12.2.8 Index-Artefakte (ArtKey)
-
-Postings und Graph enthalten viele Dokumente und können nicht unter einem DocDek liegen.
-
-|Artefakt|Schlüssel|Bereinigung|
-|---|---|---|
-|Vektor-Payload im Snapshot|DocDek|Vernichtung des DocDek|
-|Graph-Snapshot (Topologie, Slot-Nummern)|ArtKey der Snapshot-Generation|Neuaufbau, danach Vernichtung des ArtKey (§12.16)|
-|Text-Segment (Postings, Termwörterbuch, Längen)|ArtKey je Segment|Segment neu schreiben mit neuem ArtKey; alte Segmentdatei entfernen; alten ArtKey bei einer Löschung nach Siegel 2 vernichten (Schritt 5), bei einem Merge ohne Löschbezug sofort|
-
-INV-ARTKEY-1: Jedes Index-Artefakt hat genau einen ArtKey; der alte wird bei Merge sofort, bei Löschung nach Siegel 2 vernichtet (REQ-DEL-N16). **Begründung:** Würde der alte ArtKey schon in Schritt 3 vernichtet, wären Pre-Destruction-Inventar und Messung der entschlüsselten Sicht (Schritt 4) für diese Artefakte unmöglich, und INV-DEL-ORDER-1 wäre unterlaufen. Die alte Segmentdatei ist ab Schritt 3 entfernt; bis Schritt 5 existiert nur noch ihr Flash-Rest, der unter dem (noch lebenden, nicht mehr referenzierten) ArtKey steht.
-
-#### 12.2.9 KeyTable, KeyRegistry, Krypto-Agilität, Keystore
-
-- **KeyTable** (Magic `MFKT`, §7.2) ist ein eigener Speicherbereich mit Ersetzen-Semantik; in 2.4 in `n_shards` Dateien (Shards) geteilt (§12.2.4). Nach jeder Vernichtung und jedem Seal wird die Segmentdatei ohne vernichtete Einträge neu geschrieben (REQ-DEL-N4). Atomares Ersetzen nach REQ-FMT-5, auch für den Keystore.
-- **`KeyRegistry`** (`MFKR`) führt Ereignisse (`created`, `destroyed`, `sealed`) mit Referenz-Hash, ohne Schlüsselmaterial und ohne Wrap-Blob; append-only, HMAC-verkettet, über `DurableLog` mit `fsync` je Eintrag. Ein gelöschtes Log samt Marker bei vorhandenen Daten gilt als Manipulation (fail-closed).
-- **Krypto-Agilität (REQ-DEL-028, P-13).** Jedes persistierte kryptografische Objekt trägt Algorithmus- und Formatkennung. Ein Wechsel von AEAD, KDF, Hash oder Signatur ist ohne Datenverlust möglich (Re-Wrap bzw. Neuverschlüsselung per Kompaktion). Das Notfallverfahren bei Algorithmenversagen (EDPB Rn. 85, 96, Empf. 13) ist dokumentiert und wird halbjährlich per `doctor crypto-drill` geübt; die Eignung der Primitive wird periodisch neu bewertet.
-- `mlock` über `sys`; scheitert die Sperrung, meldet `mem_lock` dies wahrheitsgemäß, und `doctor` weist es aus (§12.18).
-
-### 12.3 Zweckregister und Domänentrennung (INV-KEYPURPOSE-1)
-
-Jeder Schlüssel dient genau einem Zweck; HKDF-Label `contextra/v1/<zweck>`. Das Register `governance/key_purposes.toml` ist die einzige Quelle; das Gate vergleicht es mit dem Code (REQ-KEY-011). Die Datei **fehlt im Repo** (U-29, O-28) und ist Voraussetzung von WP L-2.
-
-|Zweck|Label bzw. Herkunft|Ableitung|Wirkung der Vernichtung|
-|---|---|---|---|
-|Struktur-Schlüssel `K_eng`|`contextra/v1/eng`|HKDF aus der Wurzel|keine Nutzdaten; nie für Nutzdaten|
-|WAL-Integrität|`contextra/v1/wal`|HKDF aus `K_eng`|keine|
-|Sidecar-Ketten|`contextra/v1/sc/keyreg`, `…/revoke`, `…/audit`, `…/journal`, `…/erased`|HKDF aus `K_eng`|keine; Ketten sind keine Datenschlüssel|
-|Keystore-Integritätswurzel|`contextra/v1/keystore-root`|bei K0 im Klartext, sonst gewrappt|keine|
-|`KEK[coll, epoche]`|zufällig, 256 Bit, gewrappt|Wurzel (`EffaceableKeySlot`)|Epoch Seal; bei Collection-Löschung alle `KEK[coll,*]`|
-|`DocDek[einheit]`|zufällig, 256 Bit, gewrappt|`KEK`|**Löschmaßnahme Ebene B** der Einheit|
-|`ArtKey[artefakt]`|zufällig, 256 Bit, gewrappt|`KEK`|Löschmaßnahme für Index-Artefakte|
-|`K_ref[tenant, ref_epoche]`|zufällig, 256 Bit, gewrappt; **bewusst nicht per HKDF ableitbar** (sonst nicht vernichtbar)|`KEK`|Pseudonym-Ablauf (§12.10)|
-|Berichtssignatur|Signierschlüssel des `KeyManager`|`KmsProvider`|keine; Berichte bleiben prüfbar (INV-PROOF-KEY-1)|
-|Surrogat-Vault `[R]`|`contextra/v1/vault`|HKDF aus `K_eng`|Löschschicht `CachesAndVault`|
-
-Regeln: (1) Labels sind paarweise verschieden; Wiederverwendung eines Schlüssels für zwei Zwecke ist unzulässig. (2) Ein Label ohne Registereintrag ist Gate-Fehler. (3) Die Zwecke `DocDek`, `ArtKey`, `KEK-Epoche` und `K_ref` (statt `K_commit`) ersetzen die Streichung aus E27. (4) **Der Berichtssignaturschlüssel wird nie durch einen Seal oder eine Löschung vernichtet**; ein Wechsel erzeugt eine neue `signer_key_id`, die alte bleibt als Verifikationsschlüssel im `RevocationLog` nachvollziehbar (H-16).
-
-### 12.4 Die zehn Löschschichten (`DeletionLayer`)
-
-Der Typ `DeletionLayer` hat in 2.3 **zehn** Varianten (2.2.1: acht). Jede Schicht gehört einer Ebene an (**A** Klartext-Strukturen, die für die Suche Klartext brauchen und physisch bereinigt werden; **B** persistente Reste, die unter einem Schlüssel stehen) und hat **genau einen** Besitzer-Crate, der Scanner **und** Purger stellt (Kantenregel 5, §4.4).
-
-|Schicht|Typname|Ebene|Besitzer (Scanner / Purger)|Maßnahme|Messung|Besonderheit|
-|---|---|---|---|---|---|---|
-|S1 Primärdaten (LSM, WAL)|`Lsm`|A (Memtable), B|`store` (`LsmScanner`)|Records unter DocDek; Memtable zeroizen; Hygiene: `compact_range(scope)`, WAL-Scrub (Segmente ohne Scope neu schreiben, alte entfernen, Verzeichnis-`fsync`)|Klartext, Chiffrat, Nadel|Memtable-Beleg erst nach `force_flush`; Tombstone-GC nur bei Vollkompaktion (§7.4)|
-|S1b Blob-Segmente|`BlobSegments`|B|`store` (`LsmScanner`)|Records unter DocDek; Hygiene: Segment-Rewrite|wie `Lsm`|**neu in 2.3**; früher unter `Lsm` versteckt, daher Lücke im Oberflächen-Inventar|
-|S2 Vektorindex|`VectorIndex`|A, B|`vector` (`VectorScanner`)|Arena-Slots (fp32, SQ8) nullen; Snapshot-Payload unter DocDek; Graph unter ArtKey, Neuaufbau (§12.16)|Slots mit Payload ≠ 0, Snapshot-Datei|kein Rewiring (VETO-F02); Slot-Nummern bis zum Neuaufbau nicht wiederverwendet (INV-HNSW-SLOT-1)|
-|S3 Textindex|`TextIndex`|A, B|`text` (`TextScanner`)|Segmente neu schreiben (neuer ArtKey, alter ArtKey nach Siegel 2 vernichtet, §12.8.2 Schritt 5); Terme nur gelöschter Dokumente aus dem Wörterbuch; Statistik (IDF, Längen, Zähler) neu berechnen|Postings, Wörterbuch, Positionen|Terme müssen verschwinden, sonst Inhaltsrest|
-|S4 Caches und Vault|`CachesAndVault`|A|`store`, `engine`, `privacy`|Block-, Embedding-, RRF-, Antwort-Cache und Surrogat-Vault invalidieren und zeroizen|`CacheScanner` (Enumeration nach Scope)|Antwort-Caches sind Pflicht (REQ-DEL-N7)|
-|S5 Audit, Lineage, Sidecars|`AuditLineage`|–|`engine`, `crypto` (`SidecarScanner`, `LineageScanner`)|Ableitungen kaskadieren (INV-DERIVED-1); Sidecars enthalten nur Referenz-Hashes, keine Nutzinhalte, keine Schlüssel|Referenzen ohne Klartext|Ableitungen mit weiteren Quellen neu ableiten oder `stale`|
-|S6 Interne Checkpoints|`Checkpoints`|B|`checkpoint` (`CheckpointScanner`)|Policy `Rewrite` (Standard), `ExpireNow`, `ExpireAfterHold` nur unter Hold (§12.5.4)|Rohsicht und entschlüsselte Sicht|Hardlink-Klone derselben SSTables liegen im Datenverzeichnis, also in der Kontrolle von Contextra|
-|S7 Schlüsselmaterial|`KeyMaterial`|B|`crypto`, `store` (`KeyScanner`)|KeyTable, Keystore, Wrap-Blobs, Temp-/`.bak`-Kopien|Nadelscan (§12.7.3)|**neu in 2.3**; ohne diese Schicht fehlt der CE-Beleg (LA-3)|
-|– Graph|`Graph`|–|– (`graph` `[A]`)|–|Start (B3) belegt „keine Daten dieses Typs“ ⇒ `FeatureDisabled`|sonst `NotMeasured(NoPhysicalScanner)`|
-|– KV-Cache|`KvCache`|–|– (`kvcache` `[A]`)|–|wie `Graph`|wie `Graph`|
-|S8 Externe Sicherungen|– (Ausschluss)|–|–|ausweisen (`ExternalBackups`); Daten-Backups der Spur D sind keine externen Backups, sofern Contextra sie erzeugt (§12.17)|keine|§12.20|
-
-**Regeln.**
-
-1. Jede Schicht stellt genau einen Witness-Typ aus. `FeatureDisabled` ist nur zulässig, wenn der Rand-Feature-Schalter aus ist **und** der Start den fehlenden Datenbestand belegt; sonst `NotMeasured(NoPhysicalScanner)`.
-2. Eine Schicht, in der Daten liegen können und für die kein Scanner existiert, ist `NotMeasured`; der Bericht ist dann höchstens `Partial` (REQ-DEL-010, -020).
-3. **Ableitungen (INV-DERIVED-1)**: `forget` kaskadiert über die Lineage; der Bericht führt sie als eigene Einträge.
-4. **Embeddings und Vektorbytes sind personenbezogen** (vorsorglich, P-05): „Text gelöscht, Vektor im Index“ ist keine Löschung.
-5. CDC-Ereignisse sind inhaltsfrei (§7.3).
-6. Contextra führt keine eigenen Prompt- oder Gesprächshistorien außerhalb der Primärdaten und der AuditChain; Verläufe des Hosts stehen als `HostHistories` in `excluded` (A-HOSTHIST).
-7. **Oberflächen-Inventar (INV-SURFACE-1, Gate `surface-coverage`).** Jede persistente Datei- und Strukturklasse des Format-Registers (§7.11) steht in genau einer Zeile dieser Tabelle oder in §12.20. Ein neues Format ohne Schichtzuordnung bricht den Build.
-8. **Migration der Typen.** Der Code kennt sieben abweichende Varianten (`LsmMemtable`, `SsTableAllLevels`, `HnswIndex`, `WalAllSegments`, `CsrGraph`, `KvCacheSegments`, `EmbeddingCache`; U-41). Die Abbildung auf die zehn Schichten steht in §21 (U-41) und ist Teil von WP L-1; Berichte V1 bis V3 bleiben lesbar und tragen `coverage_known = false`.
-
-### 12.5 Löschwirkungsklassen, Annahmen, Checkpoint-Policy, aktive Snapshots
-
-#### 12.5.1 Klassen
-
-Die Klassen bauen aufeinander auf. **Ein Bericht darf nur die höchste Klasse ausweisen, deren Voraussetzungen gemessen sind** (INV-CLASS-MEASURED-1). Die Stufen S0 bis S3 und SK der Fassung 2.2.1 gehen in den Klassen und der Saga (§12.8) auf.
-
-|Klasse|Name|Aussage|Voraussetzungen (gemessen)|
-|---|---|---|---|
-|**L**|Gesperrt|Scope für alle Lesepfade gesperrt; rechtlich einer Einschränkung nach Art. 18 entsprechend|`ErasedSet`-Eintrag durabel (`fsync`), Lesepfade geprüft (inkl. `as_of`, Export, Checkpoint-Erzeugung)|
-|**P**|Klartext bereinigt|In keiner Klartextstruktur, die Contextra beschreibt, ist ein Inhalt des Scopes auffindbar|Alle Ebene-A-Schichten gemessen, Positivkontrolle bestanden|
-|**C***|Vorläufig kryptografisch|Schlüssel vernichtet (D3 vollzogen), Epoch Seal steht aus|Nadelscan, Inventar, Kanarien-Probe bestanden; `residuals: [R-KEKEPOCH until]`|
-|**C1**|Reste unlesbar, Software-Schlüssel|Alle persistenten Kopien liegen nur als Chiffrat unter vernichteten Schlüsseln; **Annahme A-FLASH**|wie C*, plus Epoch Seal vollzogen, Custody K1|
-|**C2**|wie C1, Wurzel im Modul|A-FLASH entfällt für die Schlüsselwurzel|wie C1, Custody K2 mit bestandener Konformitätssuite|
-|**C3**|wie C1, externer KMS|A-FLASH ersetzt durch Anbieterattest (Prüfpflicht des Verantwortlichen, P-18)|wie C1, Custody K3|
-|**M**|Messvollständig|P und C erreicht; alle Hygienemaßnahmen vollzogen (physische Kompaktion, Checkpoint-Policy, Graph-Neuaufbau); offen bleiben nur die Pflicht-Ausschlüsse|P, C1/C2/C3, Hygiene gemessen|
-
-**Orthogonale Angaben im Bericht (immer vorhanden):** `legal_state ∈ {Eingeschränkt, TechnischGelöscht, BeschränktAufbewahrt}`; `backup_window ∈ {Closed, OpenUntil(date), ExternalUnmanaged}`; `assumptions[]`; `residuals[]` (zeitlich begrenzte Reste mit Frist, z. B. `R-GRAPH until`, `R-KEKEPOCH until`); `platform_guarantee`.
-
-#### 12.5.2 Annahmecodes
-
-|Code|Annahme|
-|---|---|
-|A-FLASH|Flash-Reste gewrappter Schlüssel und die Passphrase kommen nicht zusammen in die Hand derselben Stelle (nur bei K1)|
-|A-ALGO|Der Algorithmus (AES-256-GCM-SIV, Argon2id, HKDF) ist nicht gebrochen (EDPB Rn. 51)|
-|A-KEYLEAK|Der Schlüssel war vor der Vernichtung nicht kompromittiert (EDPB Rn. 51)|
-|A-RAM|Kein Klartext oder Schlüssel liegt in Swap, Dumps, Hibernation (P-03; §12.18)|
-|A-EXTBACKUP|Backups außerhalb von Contextra sind nicht erfasst|
-|A-HOSTHIST|Verläufe des Host-Systems (Prompt-Historien) sind nicht erfasst|
-|A-CLOCK|Die Systemuhr ist nicht manipuliert (Horizont- und Fristentscheidungen, H-09)|
-
-#### 12.5.3 Wirkung je Plattform und Medium
-
-Contextra behauptet **keine** Löschwirkung auf Medienebene. Auf SSD, Copy-on-Write-Dateisystemen (btrfs, zfs, APFS) und Journalen wirkt Überschreiben nicht zuverlässig; deshalb trägt auf Medienebene die Schlüsselvernichtung (Ebene B) und nicht das Überschreiben. Dateisystem-Snapshots, Time Machine und Journale gelten als externe Kopien und stehen im Bericht (§12.20).
-
-#### 12.5.4 Checkpoint-Policy
-
-`checkpoint_policy` je Collection: `Rewrite` (**Standard**, ohne den Datensatz neu schreiben, Manifest und Prüfsumme neu ausstellen), `ExpireNow` (betroffene Checkpoints sofort verwerfen), `ExpireAfterHold` (nur unter `Restricted`/Legal Hold, höchstens `checkpoint_hold`, danach verwerfen). Der Standard wechselt gegenüber 2.2.1 von `ExpireAfterHold` auf `Rewrite` (O-15), weil Records nach der Vernichtung des DocDek in jedem Checkpoint unlesbar sind und ein Rewrite die Hygiene vollendet, ohne Wiederherstellungspunkte zu verlieren, die andere Einheiten betreffen. Bis zum Rewrite lautet das Ergebnis `Partial{outstanding: Checkpoints}` bzw. Klasse C ohne M, mit Anzahl, ältestem Alter und Ablaufdatum (`RetainedUnderRestoreGuard`). Ein gepinnter Checkpoint (`pin_checkpoint`) zählt zur Schicht `Checkpoints`. Interne Checkpoints sind **Spur D** (§12.17): Sie enthalten keine KeyTable.
-
-#### 12.5.5 Aktive Snapshots
-
-`forget` ermittelt den ältesten aktiven Snapshot, der den Scope sieht, wartet bis `deadline` auf dessen Ende (Obergrenze `snapshot_max_age`) oder schließt mit `excluded = ActiveSnapshot{ids}` ab; der Bericht trägt dann einen eingeschränkten Geltungsbereich (`proof_scope`). Offene Snapshots verzögern die physische Hygiene (Status `Pending`), **nicht** die Schlüsselvernichtung: Ein offener Snapshot liest über den `KeyCache`, der bei D2 invalidiert wird; er erhält danach `SnapshotExpired` und liest den Scope nicht mehr (INV-ASOF-ERASE-1).
-
-### 12.6 AuditChain und RevocationLog
-
-**AuditChain:** append-only, hash-verkettet, signierte Checkpoints, tenant-getrennt; enthält Zugriffe, Löschungen, Berichte (alle vier Siegel), Freigaben, Validierungsentscheidungen, `Unfreeze`. **RevocationLog:** widerrufene Schlüssel/Module/Berechtigungen, `key_destroyed`-Einträge, Haltezustände (Legal Hold); wird bei **jeder** Autorisierung konsultiert (fail-closed). Beide sind durabel (Flush vor Wirksamkeit, Persistenz über `DurableLog`) und crash-sicher; Tail-Truncation ist über einen signierten Kettenkopf erkennbar. Beide Dekoder sind Fuzz-Ziele. Audit-Inhalte enthalten nur Referenz-Hashes (INV-LOG-1). Schreiben DARF den bestehenden Log nie zerstören (REQ-DEL-022). Löschereignisse stehen mit `subject_ref_hash`, nie mit einer ID. Ein externer Zeitanker ist optional (§12.7.9).
-
-### 12.7 Messprinzip, Witness und Löschbericht
-
-#### 12.7.1 Messprinzip
-
-1. **Messen vor Behaupten.** Ein Beleg entsteht nur aus einem Scanner der besitzenden Schicht (INV-WITNESS-MINT-1) und aus einer Messung am **Speicher**, nicht am Lesepfad: Sichtbarkeit (`scan_prefix`, Suche) belegt keine physische Abwesenheit.
-2. Ein Messwert MUSS vom Scanner der Schicht erzeugt werden und trägt Methode, `units_scanned`, `residual_units`, einen Digest über Scan-Parameter und Dateiliste (kein Klartext) und einen Zeitstempel aus dem `Clock`-Port. `units_scanned = 0` ist nicht konstruierbar (Ausnahme: Schlüsselabwesenheit, §12.7.3).
-3. Eine **Konstante oder ein vom Aufrufer gelieferter Zählerwert** DARF NIE als Messung dienen (REQ-DEL-008). **Es gibt keinen Fallback-, Standard- oder Testschlüssel für Berichte** (REQ-DEL-009).
-4. Fehlt einer Schicht die Fähigkeit zu messen, ist sie `NotMeasured`; fehlende Fähigkeit ist `CapabilityUnsupported`, nie ein Erfolgsstub (REQ-DEL-010).
-5. **Zwei unabhängige Messungen** je Pflichtschicht: Scanner der Schicht **und** Black-Box-Probe durch den Orchestrator über einen internen Prüfzugang.
-6. **Positivkontrolle.** Jeder Scan-Lauf weist an einem absichtlich nicht gelöschten Kontroll-Datensatz nach, dass er anschlägt (AC-1); ein Lauf ohne bestandene Kontrolle ist **ungültig**.
-7. **Verification und Validation sind getrennte Zustände** (NIST Rev. 2, §12.7.7).
-
-#### 12.7.2 Ebene A: Klartext-Scanner
-
-1. Rohbyte-Scan **aller** Dateien des Datenverzeichnisses (WAL, SSTables, Blob-Segmente, Index-Artefakte, Checkpoints, Temp, `.bak`, Keystore, KeyTable, Journal, Sidecars) nach kanonischen Termen, Roh-IDs, Embedding-Bytes und Chunk-Prüfsummen des Scopes.
-2. Dekodierte Sicht über die normalen Lesepfade mit **allen aktiven Schlüsseln**.
-3. Positivkontrolle (AC-1) in beiden Sichten.
-
-Der produktive Scanner arbeitet **strukturell und per Rohbyte-Suche über bekannte Muster**; der Canary-Byte-Scan (Spike S-E1: 2.000 → 0 Treffer) ist zusätzlich Test-Werkzeug (§17.9).
-
-#### 12.7.3 Ebene B: drei Nachweise (Schlüsselabwesenheit)
-
-1. **Pre-Destruction-Inventar.** Vor der Vernichtung wird je `key_id` die Liste aller Chiffratblöcke (Datei, Offset, Länge) als Digest und Zähler festgehalten. Danach gilt: Jeder Block ist einem vernichteten oder lebenden Schlüssel zugeordnet; **Blöcke ohne Zuordnung sind ein Fehler (fail-closed)**. Das Inventar ist nur vor der Vernichtung möglich (deshalb D1).
-2. **Nadelscan.** Gesucht wird die **Wrap-Nonce** (96 Bit, zufällig) des vernichteten Schlüssels, die vor der Vernichtung im Journal liegt, in allen Dateien: KeyTable, Keystore, Sidecars, Checkpoints, Temp, `.bak`. Ergebnis: **null Treffer**. Ein Hash des Blobs eignet sich nicht, weil die Rohbyte-Suche alle Offsets hashen müsste. Die Nadel wird nach Abschluss aus dem Journal gelöscht und nur als Digest geführt.
-3. **Kanarien-Probe.** Ein Kanarien-Datensatz mit eigenem DocDek wird verschlüsselt und vom Scanner entschlüsselt, dann **über denselben Vernichtungspfad** (D1 bis D6) vernichtet; die Entschlüsselung muss scheitern. Die Probe belegt Scanner und Vernichtungsweg. Sie belegt **nicht** die Vernichtung des konkreten DocDek; dafür stehen Nadelscan und Inventar.
-
-**Grenzen (stehen immer im Bericht):** Der Scanner sieht keine Flash-Remanenz unterhalb des Dateisystems, keinen Schlüssel in RAM, Swap, Dumps (A-RAM) und keine externen Backups.
-
-#### 12.7.4 Typen
-
-```rust
-/// Nur über `ResidualReport::from_scan` konstruierbar. Kein `Default`, kein `From<usize>`.
-pub struct ResidualReport {
-    layer: DeletionLayer,
-    plane: Plane,                 // A | B
-    method: ScanMethod,           // RawFileScan | DecryptedViewScan | IndexIntrospection | BlackBoxProbe | NeedleScan | InventoryDiff
-    units_scanned: u64,           // > 0, außer NeedleScan (Nadelabwesenheit zählt gescannte Dateien)
-    residual_units: u64,
-    control_matches: u64,         // positive Kontrolle (AC-1); > 0
-    evidence_digest: [u8; 32],    // Scan-Parameter, Dateiliste, Prüfsummen; kein Klartext
-    measured_at: UnixNanos,       // aus `Clock`, nicht vom Aufrufer
-}
-
-/// Konstruktion nur im sealed `ScanSession`-Pfad (siehe unten). Kein Default, kein Deserialize.
-pub struct LayerWitness { /* Felder privat */ }
-impl LayerWitness {
-    pub fn layer(&self) -> DeletionLayer;     // Enum, kein String (U-41)
-    pub fn scanned(&self) -> u64;
-    pub fn remaining(&self) -> u64;
-    pub fn kind(&self) -> WitnessKind;        // Structural | NotMeasured(NotMeasuredReason) | FeatureDisabled
-    pub fn digest(&self) -> [u8; 32];
-}
-```
-
-**Mint-Härtung (H-02, INV-WITNESS-MINT-1).** Der Zustand im Code ist, dass `LayerWitness::issue_from_scanner` `pub` ist und nur über `#[doc(hidden)]` „geschützt“ wird (U-40); jeder Crate kann damit einen Witness mit `remaining = 0` erzeugen. 2.3 verlangt: (a) Konstruktoren sind `pub(crate)`; (b) ein Witness entsteht ausschließlich in `ScanSession::finish(self, clock) -> LayerWitness`, und `ScanSession` ist nur über `LayerScanner::begin_scan` erhältlich, das eine bestandene Positivkontrolle (`ControlToken`) verlangt; (c) die Trait-Methode `LayerScanner::scan` hat eine **Default-Implementierung**, die `begin_scan`, `scan_units`, `finish` in dieser Reihenfolge ruft; Scanner-Crates implementieren nur `scan_units`; (d) das Gate `witness-mint` lehnt jede Konstruktion außerhalb von `ScanSession` ab, auch in Tests des Produktionscodes (Ausnahme: `testkit`).
-
-#### 12.7.5 Bericht `DeletionProof` V5
-
-**Format.** V5 ersetzt den in 2.2.1 eingefrorenen V4 (E26, ersetzt durch E46). **Der Repo-Stand kennt höchstens `SignatureVersion::V3`** (U-39); V4 existiert im Code nicht. 2.3 überspringt V4 nicht: V1 bis V3 bleiben lesbar (`coverage_known = false`), V5 ist das einzige schreibbare Format; die Nummer V4 bleibt unvergeben. Magic `MFDR` (§7.2), Golden-File, Migrationspfad, Fuzz-Ziel (REQ-FMT-1 bis -3). Serialisierung explizit spezifiziert (Feldreihenfolge, Endianness, Längen), nicht aus `serde`-Derives; `bincode` wird nicht für V5 verwendet (U-10 entfällt für V5).
-
-**Pflichtfelder.** `class` (L, P, C*, C1, C2, C3, M), `seal_no` (1 bis 4), `legal_state`, `backup_window`, `assumptions[]`, `residuals[]`, je Schicht (`layer`, `plane`, `method`, `units_scanned`, `residual_units`, `control_matches`, `evidence_digest`, Ergebnis), `custody` und `DestroyAttestation`, Epoch-Seal-Referenz, `subject_ref_hash` (und `unit_ref_hash[]`), `scope`, `uncovered_layers[]` (`UncoveredLayer{layer, reason}`), `excluded[]` (**Pflicht, nie leer**), `perspectives[]` (je Q1 bis Q8 ein erzeugtes Urteil, §12.1.4), `verification`, `validation` (§12.7.7), `requested_at`/`completed_at` (aus `Clock`), `clock_source`, `platform_guarantee`, Verweis auf die AuditChain-Position, `signer_key_id`, Ed25519-Signatur (Schlüssel aus dem `KmsProvider`, INV-PROOF-KEY-1), Prüfsumme über alle Felder.
-
-**NIST-Zertifikatsfelder.** Produkt und Version; Medium (Dateisystemtyp, Laufwerksklasse falls bekannt); Methode (Purge); Technik (Cryptographic Erase, Blockrewrite); Validierungsentscheidung; Concurrence; **CE-Traceability** (Algorithmen, Schlüsselstärken, Schlüsseltypen, Escrow-/Backup-Historie aus Spur K).
-
-```rust
-impl DeletionProof {
-    /// Nur `ErasureOrchestrator` ruft `issue`; Aufrufer außerhalb von `engine` können keinen Bericht bilden.
-    pub fn issue(ctx: &RequestContext, saga: &SagaRecord, witnesses: &[LayerWitness],
-                 class: ReachedClass, assumptions: &[Assumption], residuals: &[Residual],
-                 excluded: &[ExcludedScope], custody: &DestroyAttestation,
-                 key: &SigningKeyHandle, clock: &dyn Clock) -> Result<DeletionProof, ProofError>;
-    pub fn verify(&self, vk: &VerifyingKey) -> Result<VerifiedProof, ProofError>;
-}
-```
-
-**Ist-Stand.** `DeletionProof::issue` ignoriert den Parameter `_custody` (U-42), kennt keine Klasse, keine Annahmen und keine Siegel. Das ist mit V5 zu beheben (WP L-9).
-
-|ID|Regel|
-|---|---|
-|REQ-PRF-1|Der Stub `no_crypto_stubs` (`engine/src/lib.rs:17`) und die leeren Mandanten-Hooks werden **gelöscht**; `crypto` ist nicht-optionale Abhängigkeit der Engine. Der Stub akzeptiert heute **jede** Restzahl (`new_after_verified_empty` liefert immer `Ok`), das ist ein Verstoß gegen A1 (U-21).|
-|REQ-PRF-2|`issue` liefert `Err`, wenn eine Pflichtschicht `remaining > 0` hat oder weder `Structural` noch `FeatureDisabled` ist, wenn die Klasse höher ist als die Messung trägt, wenn `excluded` leer ist oder wenn Annahmen fehlen, die die Klasse erfordert. `verify` mit falschem Schlüssel liefert `Err`.|
-|REQ-PRF-3|Der Bericht nennt je Schicht Methode, Zahlen, Digest sowie `excluded`; die Außenformulierung wird aus dem Bericht erzeugt (INV-CLAIMS-1). Die `custody` wird für die Klasse **genutzt** (C1 bis C3).|
-|REQ-PRF-4|`rg "default_test_deletion_proof_key"` im Produktionscode ergibt **0 Treffer** (heute `contextra-mcp/src/tools_crud.rs:206`, U-22). Der Schlüssel kommt aus dem `KmsProvider`. `contextra_delete` und `contextra_drop_collection` erzeugen keinen Bericht außerhalb der Saga (INV-NO-DUMMY-PROOF-1).|
-|REQ-PRF-5|V5 mit Golden-File, Migrationspfad und Fuzz-Ziel (ersetzt „entfällt, E26“).|
-|REQ-PRF-6|`doctor verify-report` prüft offline Signatur, Prüfsumme, Klasse, Siegelkette und Zeitanker (ersetzt „entfällt, E26“; REQ-DEL-N9). Ein unabhängiger Referenz-Prüfer in anderer Sprache dient **nur als Testorakel** (INV-ORACLE-1) und gehört nicht zum Produkt.|
-|REQ-PRF-7|Jeder Bericht (alle vier Siegel) wird als Eintrag in die AuditChain geschrieben (Magic, Version, Prüfsumme, `fsync`) und ist für den Betreiber lesbar (`report(id)`).|
-
-**Regression.** `review_stub_proof` bleibt dauerhaft im Repo: Bericht mit Restbestand → `Err`; falscher Schlüssel → `Err`; Bericht ohne Scanner-Witness → nicht kompilierbar.
-
-#### 12.7.6 Restmetadaten-Selbsttest
-
-Nach der Vernichtung prüft `doctor` stichprobenartig, ob verbleibende Chiffrat-Records einer gelöschten Einheit (a) sich über Klartext-Header zuordnen lassen (**No Linkage**), (b) eine einzigartige Länge haben (**No Record Isolation**, Verteilung nach Padding), (c) aus Zählern, Statistik oder Zeitstempeln Inhalte ableiten lassen (**No Inference**). Zusätzlich laufen Entropietests auf Restdaten, die Chiffrat sein müssen; ein unerwartet niedriger Wert zeigt einen Chiffrierfehler an. Der Test liefert eine **Warnung, kein Rechtsurteil**.
-
-#### 12.7.7 Verification und Validation
-
-|Zustand|Bedeutung|
-|---|---|
-|`Verified`|Alle Schichten gemessen, Positivkontrollen bestanden|
-|`Validated`|Eine zuständige Person nimmt das Ergebnis ab (Validierungsentscheidung). **Im Regulated-Tier Pflicht, mit zweiter Signatur (Concurrence) einer anderen Person**|
-
-Die Klasse im Bericht gilt für beide Zustände; `Validated` ist ein zusätzliches Feld. Ein Bericht ohne `Validated` im Regulated-Tier trägt den Vermerk `ValidationPending` und gilt nicht als Abschluss (REQ-DEL-N20).
-
-#### 12.7.8 Löschbescheinigung (abstrakt, datensparsam)
-
-Aus dem Bericht wird eine einseitige Bescheinigung erzeugt (OLG Dresden 4 U 940/24, AG Lörrach 3 C 1099/24). Sie **enthält**: Datum, Art des Scopes (z. B. „Akte“), erreichte Klasse je Schichtgruppe, Annahmen, Ausschlüsse (zusammengefasst, nie gekürzt weitergegeben), Bericht-Digest, Signatur, Zeitanker-Status. Sie **enthält nicht**: IDs, Dateinamen, Inhalte, Embedding-Daten. Sie dient der Beantwortung betroffener Personen, der Auftragsverarbeitung und Aufsichtsanfragen; ob und an wen sie auszuliefern ist, entscheidet der Verantwortliche. Ein Anspruch der betroffenen Person auf diesen Nachweis ist nicht gesichert (AG Lörrach).
-
-#### 12.7.9 Zeitanker
-
-Der Digest des Berichts wird optional über einen qualifizierten Zeitstempel (RFC 3161, eIDAS Art. 41, 42) verankert. Der Zeitstempel belegt, dass der Bericht zu diesem Zeitpunkt existierte (Datum und Datenintegrität), **nicht**, dass die Löschung stattgefunden hat. Offline-Betrieb: Anforderung, sobald eine Verbindung besteht (`anchor: pending`); Verifikation offline möglich, wenn Zertifikatskette und Vertrauensliste als Schnappschuss im Bericht liegen. Ein ausgestelltes Token ist nicht widerrufbar; der Zeitstempel überträgt nur den Digest. Anbieterwahl offen (O-34). Der Zeitanker ist ein Port `[R]` (`TimestampAuthority`), nicht Kern.
-
-#### 12.7.10 Aufbewahrung des Berichts
-
-Der Bericht enthält nur Referenz-Hashes und gilt selbst als personenbezogen (EDPB Rn. 52). Aufbewahrung nach `report_retention` (Rechtsfrage P-07), danach pseudonym-ablaufend (§12.10). **Beweiskraft:** Der Bericht ist eine signierte Behauptung des löschenden Systems; die Signatur belegt nicht, dass Bytes fehlen. Unabhängige Aussagekraft entsteht aus gemessener Bereinigung, Nadelscan, Inventar und reproduzierbaren Canary-Läufen (§17.9).
-
-#### 12.7.11 Heap-Canary und Sensitive-Arenen (INV-HEAP-ZERO-1, 2.4)
-
-**Problem.** Ebene A verspricht, dass Klartext-Strukturen bereinigt sind. Das Rohdatei-Scanning sieht nur Dateien, nicht den Prozessspeicher; `zeroize` auf einzelnen Typen belegt nicht, dass Kopien in Allokator-Resten, Puffern oder Caches verschwunden sind. Ohne Messung bliebe die wichtigste Klartextquelle (RAM) ein Behauptungsfeld.
-
-**Regeln.**
-1. Klartext von Nutzdaten (entschlüsselte Blöcke im Block-Cache, Query- und Antwortpuffer, Memtable-Werte, Arena-Slots, Embedding-Caches) liegt ausschließlich in `Sensitive`-Arenen der Insel `sys` (eigene `mmap`-Regionen, `MADV_DONTDUMP`, `mlock` soweit möglich, Zeroisierung bei Freigabe und bei Invalidierung). Ein Typ `Sensitive<T>` ist die einzige Hülle für solche Werte; Gate `plaintext-types` lehnt Klartextpuffer außerhalb der Hülle ab (Schnittstellen bleiben sicher, `unsafe` nur in `sys`, P2).
-2. Der **Heap-Canary-Test** (Feature `test-hooks`, nie im Release) legt Canary-Daten an (≥ 32 Zufallsbyte, Embedding-Bytes, seltene Terme), führt Klasse P herbei und durchsucht den **Prozessspeicher** (Linux: `/proc/self/mem` mit `/proc/self/maps`; macOS: `vm_read`) nach den Needles. Erwartung: 0 Treffer außerhalb einer begründeten Allowlist (Testharness-eigene Kopien). Positivkontrolle: vor der Löschung muss der Scan die Needles finden.
-3. Der Test läuft in jedem CI-Lauf (Tier 1 und 2) und im Profil `Maximum` als `doctor`-Selbstprobe.
-4. **Grenze:** Der Test ist ein Regressionsdetektor für Contextras eigene Puffer, kein Beweis gegen Swap, Hibernation, Kernel- oder CPU-Caches und Fremdprozesse; diese bleiben A-RAM (§12.18, §12.20).
-
-### 12.8 Löschsaga
-
-#### 12.8.1 Zustände
-
-```
-Requested → Authorized → Frozen → LogicallyDeleted → PlaintextPurged → PlaintextMeasured
-          → KeyDestroyed → CryptoMeasured → (Sealed) → Hygiene → HygieneMeasured → Reported → Completed
-              │             └─(Aufbewahrungspflicht/Legal Hold, ab Frozen)→ Restricted{basis, until}
-              └→ Rejected                                   (jeder Zustand) → Partial{outstanding, reason} → Retry/Escalate
-```
-
-Weitere Zustände: `ReviewRequired` (Mixed-Segmente, §12.15), `Unfrozen` (Rücknahme vor `KeyDestroyed`, §12.8.3).
-
-#### 12.8.2 Reihenfolge (Fast-Path vor Hygiene, E42)
-
-**Fast-Path** (Ziel: Minuten bis Stunden):
-
-|Schritt|Zustand / Aktion|Durabilität|Klasse danach|
-|---|---|---|---|
-|1|`Frozen`: `ErasedSet`-Eintrag (mit `subject_ref_hash` und `unit_ref_hash[]`), Lesesperre, `legal_state = Eingeschränkt`; Spiegelung an den `ErasedSetMirror` (§12.17.3)|`fsync` **vor** jeder Änderung|**L** (Siegel 1)|
-|2|`LogicallyDeleted`: Tombstone im WAL-Batch, Lineage-Kaskade|WAL-Commit|L|
-|3|`PlaintextPurged`: Ebene A bereinigen (Arena-Slots nullen, Caches zeroizen, Postings im Speicher, Antwort-Cache); Text-Segmente neu schreiben (neuer ArtKey; alte Segmentdatei entfernt; alter ArtKey bleibt bis Schritt 5)|Journal-Eintrag vor jedem Schritt|–|
-|4|`PlaintextMeasured`: Scanner Ebene A; **Pre-Destruction-Inventar** je `key_id`|Bericht mit Positivkontrolle|**P** (Siegel 2)|
-|5|`KeyDestroyed`: DocDek **und alte ArtKeys** der Einheit vernichten nach Destroy-Protokoll D1 bis D5 (§12.2.7), nach optionaler `erasure_grace`|Journal-Intent vor Vernichtung|–|
-|6|`CryptoMeasured`: Nadelscan, Kanarien-Probe, Chiffrat-Identität (D6)|Bericht|**C***|
-|7|Epoch Seal (§12.2.4), koalesziert (`seal_coalesce_window`), spätestens nach `seal_after_deletion_max`, oder `seal-now`|Journal|**C1/C2/C3** (Siegel 3)|
-
-**Hygiene** (terminiert, ≤ `purge_rebuild_max_days`, Startwert 14 Tage):
-
-|Schritt|Aktion|Begründung|
-|---|---|---|
-|8|Physische Kompaktion der betroffenen SSTables (`compact_range(scope)`), WAL-Scrub, Blob-Rewrite, Checkpoint-Policy|T1; Platz|
-|9|Graph-Neuaufbau (Generationswechsel), danach ArtKey der alten Generation vernichten (§12.16)|schließt `R-GRAPH`|
-|10|`HygieneMeasured`, `Reported`, Siegel 4|**M**|
-
-**Begründung der Reihenfolge.** Records sind je Einheit verschlüsselt (§12.2.5); eine gemeinsame Blockstruktur macht die Vernichtung deshalb nicht kollateral. Die Fassung v3.0 (Bereinigung vor Vernichtung) verzögerte die wirksamste Maßnahme um bis zu 30 Tage. Ein Messargument für „Bereinigung zuerst“ bleibt (Inventar und entschlüsselte Sicht sind nur vorher möglich); es ist in Schritt 4 abgedeckt. **Verworfen: „Key-first“** (Vernichtung unmittelbar nach `Frozen`): sie verhindert die Messung der entschlüsselten Sicht und schließt die Rücknahme bei Irrtum aus; die Karenz (§12.8.3) ersetzt sie.
-
-**Ordnungsinvariante (INV-DEL-ORDER-1, H-05).** Schritt 5 DARF NICHT beginnen, bevor Siegel 2 (Klasse P) für **jede Ebene-A-Schicht** der Einheit ausgestellt und das Pre-Destruction-Inventar durabel ist. Ausnahme: Notpfad (§7.10), in dem nur L erreichbar ist.
-
-#### 12.8.3 Karenz und Rücknahme
-
-Bis Schritt 5 ist die Löschung rücknehmbar (`Unfreeze`, Kategorie `Admin`, Begründung im Audit; **im Regulated-Tier zwei Personen**, H-10). `erasure_grace` (Startwert 0, Obergrenze 72 h, im Regulated-Tier Pflichtwert ohne Standard, REQ-DEL-N26) legt fest, wie lange nach Schritt 4 gewartet wird; währenddessen gilt `legal_state = Eingeschränkt`. Der Retention-Reaper (§11.6) nutzt die Karenz von 7 Tagen im Zustand `PendingDeletion`. Nach D3 gibt es **keine Rücknahme** (kein `Unfreeze`, nur Neuanlage aus Quellmaterial des Betreibers). Das Modell folgt dem Wartefenster üblicher KMS-Dienste (AWS 7 bis 30 Tage), ist aber auf Stunden verkürzt, um die Pflicht zur unverzüglichen Löschung nicht zu verzögern.
-
-#### 12.8.4 Crash-Verhalten
-
-- Absturz vor Schritt 5: Recovery setzt bei `PlaintextPurged` fort; der Scope bleibt gesperrt.
-- Absturz nach D3: Die Vernichtung ist vollzogen; Recovery wiederholt D4 bis D6 und misst nur noch. **Ein Bericht trägt nie Klasse C vor abgeschlossener Messung.**
-- Intent ohne Ausführungsnachweis wird beim Start wiederholt; Vernichtung ist idempotent.
-- Der Epoch Seal ist ein eigener durabler Ablauf (§12.2.4).
-- **Keine Wiederauferstehung (INV-NO-RESURRECTION-1, H-06).** Beim Start (B6/B7) und nach jedem Restore prüft die Engine für **jeden** `ErasedSet`-Eintrag im Zustand ≥ `Frozen`, dass kein lebender DocDek und kein lebender ArtKey der betroffenen Einheiten in der KeyTable steht; Abweichung ⇒ Einheit bleibt gesperrt, Vernichtung wird wiederholt (`resurrection_repaired` im Journal), Alarm.
-- **Uhr (H-09, A-CLOCK).** Entscheidungen, die von Zeit abhängen (Horizont, Fristen, Karenz, `valid_until`), schlagen fail-closed fehl, wenn die Uhr hinter den zuletzt in AuditChain oder Journal geschriebenen Zeitpunkt zurückspringt; `doctor` weist `ClockRegression` aus. Nur die Verkürzung einer Frist (strengere Wirkung) darf bei unsicherer Uhr weiterlaufen.
-
-#### 12.8.5 Siegel (gestufte Teilberichte)
-
-|Siegel|Zeitpunkt|Inhalt|
-|---|---|---|
-|1|nach Schritt 1|Klasse L, `legal_state`|
-|2|nach Schritt 4|Klasse P|
-|3|nach Schritt 7|Klasse C1/C2/C3 mit Annahmen (bzw. C* mit `R-KEKEPOCH until`)|
-|4|nach Schritt 10|Klasse M|
-
-Jedes Siegel ist ein signierter Bericht, in die AuditChain eingetragen und mit dem vorherigen verkettet (REQ-DEL-N27). Der Betreiber kann damit nachweisen, **wann welcher Zustand erreicht war**.
-
-#### 12.8.6 `Restricted` und Legal Hold
-
-Bei Aufbewahrungspflicht (Art. 17 Abs. 3) oder Legal Hold geht die Saga nach Schritt 1 in `Restricted{basis, until}`: **keine Löschoperation, keine Schlüsselvernichtung**, Lesesperre bleibt (AC-11). Nach Ablauf setzt die Saga bei Schritt 2 fort. `ExpireAfterHold` gilt nur für Checkpoints. Ob und wie lange: Rechtsfrage (O-12). Das Archiv ist vom aktiven Retrieval-Index zu trennen (P-09). Ein Hold wird im `RevocationLog` und Audit geführt und betrifft die Saga, nicht die Lesesperre.
-
-#### 12.8.7 Zustandsmodell: Regeln
-
-|ID|Regel|
-|---|---|
-|REQ-FGT-1|Jeder Übergang wird **vor** der Ausführung ins durable Journal geschrieben (`fsync` mit Fehlerpropagation); jeder Schritt ist idempotent.|
-|REQ-FGT-2|Beim Start (B7) setzt die Engine jede Saga ohne `Completed` fort oder meldet `Partial{outstanding}`.|
-|REQ-FGT-3|`Frozen` schreibt den `ErasedSet`-Eintrag durabel **vor** der ersten Löschoperation; ab dann gilt die Lesesperre.|
-|REQ-FGT-4|Fehler von `fsync`, `rename`, `write` in Purgern führen zu `Partial`, nie zu stillem Weiterlaufen.|
-|REQ-FGT-5|Ein Scanner-Ergebnis mit `remaining > 0` hält die Saga in `PlaintextMeasured`/`HygieneMeasured` mit `ResidueRemaining{layer, count}`; es entsteht ein Bericht, kein höherer Klassenanspruch.|
-|REQ-FGT-6|Die Saga ist abbrechbar nur **zwischen** Schritten; Abbruch hinterlässt `Partial`.|
-|REQ-FGT-7|Der `RequestContext` (Mandant, Prinzipal) kommt vom Aufrufer; kein Fallback auf `TenantId::SYSTEM` und kein `unwrap_or(TxId::new(1))` (heute `tools_crud.rs:127,193`, `server_tools.rs:449`, U-23).|
-|REQ-DEL-036|**Fristverfolgung:** Die Saga trägt `requested_at` und Schwellen (§12.19.1); jeder `Partial`-Zustand erzeugt je Schwelle genau einen Alarm, eine Eskalation bzw. eine Meldung (ohne Nutzinhalte). Kein `Partial` ohne ausstehende Schicht, Grund und Ablaufdatum. Contextra sendet nichts nach außen.|
-
-#### 12.8.8 `forget` aus Aufrufersicht
-
-Autorisierung (Kategorie `Destructive`) und Forget-Guard (§13.3) → Schritt 1 (`Frozen`, durabel) → **sofortige Rückgabe** eines `DeletionReceipt` mit ehrlichem Teilbericht (Siegel 1, Klasse L) und `PendingDeletion`-Handle → Schritte 2 bis 7 (Minuten bis Stunden) → Hygiene → Bericht M. `report(id)` liefert den jeweils höchsten Stand. Idempotent und wiederaufnehmbar nach Absturz.
-
-#### 12.8.9 Planung, Effizienz und Profile (2.4)
-
-Die Sicherheitsinvarianten sind unabhängig von Effizienz und Profil; Planung ändert nur **Zeitpunkt, Bündelung und Messtiefe**, nie die Reihenfolge nach INV-DEL-ORDER-1 und nie die Klassenvoraussetzungen (INV-CLASS-MEASURED-1).
-
-**a) Planer.** Ein deterministischer Planer (Earliest-Deadline-First über die Fristen aus §12.19.1, Zeit aus `Clock`) ordnet die Schritte aller offenen Sagas. Schritte 1 und 2 (Sperre, Tombstone) und Messung Ebene A haben absoluten Vorrang vor Hygiene; Hygiene ist durch `SystemPressureMonitor` drosselbar, steigt aber mit näherndem `purge_rebuild_max_days` in der Priorität (kein Verhungern). Ein `dry_run` liefert Kostenvorschau (betroffene Dateien, Bytes, geschätzte Dauer) ohne Wirkung.
-
-**b) UnitDirectory (INV-UNITDIR-1).** Jede persistente Datei (SSTable, Blob-Segment, WAL-Segment, Text-Segment, Index-Snapshot) trägt einen unter `K_eng` verschlüsselten Metadatenblock mit den `doc_key_id` und Blockbereichen der enthaltenen Einheiten. Begründung: Die Blöcke sind per DocDek verschlüsselt und deshalb ohne Schlüssel nicht zuordenbar; ohne Verzeichnis müsste jede Löschung alle Dateien entschlüsseln oder blind scannen. Mit Verzeichnis ist (1) das Pre-Destruction-Inventar O(Dateien + Blöcke der Einheit), (2) die Purge-Kompaktion `compact_range` auf die tatsächlich betroffenen Dateien begrenzt, (3) die Vollständigkeitsprüfung („jeder Block einem lebenden oder vernichteten Schlüssel zugeordnet“) maschinell möglich. Einträge vernichteter Einheiten verschwinden beim Hygiene-Rewrite (Schritt 8); bis dahin sind sie Zufalls-IDs ohne Personenbezug (§12.7.6).
-
-**c) Zweistufige Messung (INV-UNITDIR-1, AC-35).** Der Rohbyte-Vollscan aller Dateien je Löschung wäre O(Datenmenge) und verhinderte häufige Löschungen. Er ist auch nicht nötig, weil ein Klartext-Needle in **verschlüsselten** Dateien nur bei einem Verschlüsselungsfehler trifft. Die Messung teilt sich deshalb:
-
-|Stufe|Gegenstand|Tiefe je Löschung|
-|---|---|---|
-|M1 Inventar|alle Dateien: Zuordnung jedes Blocks zu einem Schlüssel über das UnitDirectory; unzugeordnete Blöcke ⇒ Fehler|vollständig (Metadaten)|
-|M2 Klartext-fähige Bereiche|Memtable, Arenen, Caches, Temp, `.bak`, Journal, Sidecars, Logs, KeyTable-Dateien, Checkpoints im Rohzustand|vollständig, Multi-Needle (alle ausstehenden Needles einer Koaleszenz in einem Durchlauf)|
-|M3 Verschlüsselte Dateien|Nadelscan der Wrap-Nonces, Entropiestichprobe, Stichprobe von Blöcken auf Klartext-Needle|Stichprobe; volle Tiefe alle `full_scan_interval` (Startwert 7 Tage) sowie in jedem CI- und Canary-Lauf|
-
-Differenzbedingung: Der zweistufige Befund und der volle Rohscan liefern auf denselben Daten dasselbe Urteil; eine Abweichung ist ein Defekt des Scanners (AC-35). Klasse P stützt sich auf M1 und M2, Klasse C auf M1 bis M3.
-
-**d) Koaleszenz.** Löschungen innerhalb von `measure_coalesce_window` (Startwert 60 s) teilen sich einen Messlauf; innerhalb von `seal_coalesce_window` einen Seal; mehrere Löschungen derselben Collection einen Graph-Neuaufbau (§12.16). Jede Löschung erhält trotzdem einen eigenen, signierten Bericht mit ihren eigenen Witnesses; Siegel 1 (Klasse L) wird **nie** verzögert (AC-37).
-
-**e) Profile.** Das Profil `ErasureProfile` ändert nur Zeitfenster und Messtiefe:
-
-|Parameter|`Standard` (Default)|`Maximum`|
-|---|---|---|
-|`erasure_grace`|0|0|
-|`seal_after_deletion_max`|24 h|1 h|
-|Passphrasenwechsel beim Seal (K1)|auf Anforderung|bei jedem Seal Pflichtvorgang, sonst `flash_hardening = None`|
-|M3-Tiefe je Löschung|Stichprobe|vollständig|
-|`ErasedSetMirror`|empfohlen|Pflicht|
-|`checkpoint_policy`|`Rewrite`|`Rewrite`|
-|Heap-Canary im Betrieb (`doctor`-Selbstprobe)|aus|bei jeder Löschung|
-
-`EnterpriseRegulated` setzt mindestens `Maximum` für `erasure_grace`-Pflichtwert, Seal und Mirror (§14.2). Beide Profile erfüllen alle Invarianten; `Maximum` erkauft kürzere Restfenster mit höherer Last.
-
-### 12.9 Lesesperre, Key-Lock und Restore-Guard
-
-- **Lesesperre.** Mit `Frozen` trägt der persistente `ErasedSet` nur Referenz-Hashes. `get`, `search`, `hydrate`, `export` und Checkpoint-Erzeugung prüfen ihn **vor** Rückgabe (REQ-DEL-011); sie gilt auch für `as_of` (INV-ASOF-ERASE-1). Die Prüfung verwendet beide Hashes (`subject_ref_hash`, `unit_ref_hash`).
-- **Key-Lock.** Das Löschen hält den Key-Lock der Einheit über die **gesamte** Saga (REQ-DEL-012); konkurrierendes Schreiben darf nichts wieder auftauchen lassen (loom).
-- **`ErasedSet`-Eintrag (H-08).** `{entry_seq, scope_ref, subject_ref_hash?, unit_ref_hash[], ref_epoch, requested_at, state ∈ {Frozen, Restricted, KeyDestroyed, Hygiene, Done}, prev_mac}`. `unit_ref_hash = HMAC(K_ref, doc_key_id)` trägt Löschungen **ohne** Betroffenenbezug (einzelnes Dokument, Collection). Ohne `unit_ref_hash` könnte der Restore-Guard Einheiten ohne `subject_ref` nicht wiederfinden.
-- **Restore-Guard.** Vor dem ersten Lesezugriff nach einem Restore: (1) `ErasedSet` des **Zielsystems** lesen (nicht aus dem Backup); (2) für jeden Eintrag Schritt 3 ff. erneut anwenden, wiederhergestellte DocDeks vernichten (Destroy-Protokoll); (3) Messung wie §12.7; (4) Journal-Ereignis `restore_reapplied`; (5) Dokumentation (Grund, Zeitpunkt) im Audit (BayLfD 12.5). Der Restore-Guard greift **vor** B9 (`INV-BOOT-1`).
-- **Restore-Horizont (INV-RESTORE-HORIZON-1, neu gefasst).** Der Horizont gilt für **Schlüssel-Backups** (Spur K): Ein Schlüssel-Backup mit `valid_until` in der Vergangenheit oder unbestimmbarem Alter wird verweigert (`RestoreBeyondHorizon`, final). Daten-Backups (Spur D) unterliegen keinem Horizont, weil sie ohne Schlüssel inert sind. Die Konfiguration erzwingt `key_backup_max_age ≤ erased_set_retention` (Startfehler in B0). Ein `ErasedSet`-Eintrag bleibt mindestens `erased_set_retention` nach der Löschung zuordenbar (§12.10).
-- **Unbekanntes Alter.** Ist das Erzeugungsdatum eines Schlüssel-Backups nicht aus dem signierten Manifest bestimmbar oder greift `ClockRegression`, wird verweigert.
-
-|ID|Regel|
-|---|---|
-|REQ-RST-1|`ErasedSet` ist durabel, enthält nur Referenz-Hashes (keine Klartext-IDs) und wird in B6 vor Verkehr geladen (INV-BOOT-1).|
-|REQ-RST-2|`restore_checkpoint` sperrt vor dem ersten Lesezugriff, wendet jeden Eintrag erneut an und schreibt `restore_reapplied` ins Journal (REQ-DEL-013).|
-|REQ-RST-3|Schlüssel-Backups, deren signiertes `valid_until` überschritten oder deren Alter nicht bestimmbar ist, werden fail-closed verweigert; Start prüft `key_backup_max_age ≤ erased_set_retention`.|
-|REQ-RST-4|Checkpoint-Erzeugung und Export prüfen den `ErasedSet` vor dem Schreiben.|
-|REQ-RST-5|Backups außerhalb von Contextra stehen als `ExternalBackups`/`ExternalUnmanaged` im Bericht; die Rücksicherungsregel trägt der Verantwortliche.|
-
-### 12.10 Referenzschlüssel, Datensparsamer Bericht, Pseudonym-Ablauf
-
-**Zweck.** Berichte, `ErasedSet`, `KeyRegistry` und Journal müssen auf Betroffene verweisen, ohne sie zu identifizieren. **Terminologie (H-13).** Der Begriff „Commitment“ der Fassung 2.2.1 entfällt: `HMAC-SHA256` ist ein **Hash mit Schlüssel** im Sinne EDPB Rn. 52 und kein kryptografisches Commitment. Er heißt **Referenz-Hash**; der Schlüssel **Referenzschlüssel** `K_ref`. Ein echtes Commitment-Schema ist optional (O-36).
-
-**Regeln.**
-
-1. `subject_ref_hash = HMAC-SHA256(K_ref[tenant, ref_epoche], kanonische Betroffenen-Referenz)`. Der Hash bleibt **personenbezogen** (Rn. 52), solange `K_ref` existiert.
-2. Die kanonische Referenz hat **Mindestentropie** (zufällige Betroffenen-ID, nicht Name oder E-Mail) und steht nur im Dokumentdatensatz. `unit_ref_hash` bildet über die zufällige 128-Bit-`doc_key_id`.
-3. `K_ref` ist zufällig, nicht per HKDF ableitbar, unter `KEK` gewrappt, je (Tenant, Epoche); es wird vom Epoch Seal mitgenommen.
-4. Nach `ref_epoch_len` (90 Tage) **plus** `erased_set_retention` wird `K_ref[tenant, epoche]` vernichtet (Destroy-Protokoll) und im `RevocationLog` eingetragen. Danach sind die Hashes dieser Epoche keiner Person mehr zuordenbar, soweit `K_ref` nicht in Schlüssel-Backups steht (Spur K ist befristet: `key_backup_max_age ≤ erased_set_retention`, daher unkritisch). Der Ablauf entfernt keine Kettenglieder, sondern die Zuordenbarkeit; die Ketten bleiben über ihre Köpfe prüfbar.
-5. Sidecars enthalten keine Nutzinhalte und keine Schlüssel.
-6. `erased_set_retention ≥ key_backup_max_age + Sicherheitszuschlag` (Startwert insgesamt 90 Tage; Obergrenze nach Rechtsprüfung P-06, P-07, P-16; die 365 Tage der Fassung 2.2.1 sind nicht mehr nötig, weil nur Schlüssel-Backups eine Rücksicherung gelöschter Inhalte ermöglichen). In `EnterpriseRegulated` Pflichtwert ohne Standard; nie unbegrenzt.
-
-Kipptest: Will der Eigentümer auch die Referenz-Epochen streichen, werden `ErasedSet`-Einträge nach `erased_set_retention` per atomarem Rewrite entfernt (O-17); der Restore-Guard verliert dann die Wiedererkennung und `restore_unguarded` wird ausgewiesen.
-
-### 12.11 Claim-Taxonomie und Außenformulierung
-
-|Claim|Voraussetzung (gemessen)|
-|---|---|
-|`LogicalSuppression`|Klasse L: Lesesperre aktiv, Black-Box-Probe findet nichts|
-|`PhysicalPurge{layer}`|Klasse P bzw. Hygiene: Segment neu geschrieben, Altdatei entfernt, Rohdateiscan ohne Canary, `units_scanned > 0`|
-|`KeyDestroyed{custody}`|D1 bis D6 vollzogen, Nadelscan 0, Inventar vollständig|
-|`CryptoErasure{C1\|C2\|C3}`|wie `KeyDestroyed`, Epoch Seal vollzogen, Annahmen benannt|
-|`Restricted`|Aufbewahrungspflicht/Legal Hold; Lesesperre aktiv; keine Löschoperation|
-
-**Verboten** (Gate `deletion-honesty`): „100 % gelöscht“, „unwiederbringlich“, „DSGVO-konform“, „Art.-17-konform“, „rechtskonform gelöscht“, „garantiert gelöscht“, „kryptografisch gelöscht“ ohne Custody und Annahmen, „Löschzertifikat“ ohne Scope und Klasse, „Löschung nach Art. 17“, jede Rechtsbehauptung.
-
-**Satzbibliothek (INV-CLAIM-BIND-1).** Außentexte entstehen **nur** aus einer festen Satzbibliothek; es gibt keinen Freitext. Jeder Satz ist an eine gemessene Tatsache gebunden; ein Satz ohne gemessene Tatsache ist ein **Build-Fehler** (Gate `claim-generator`). Beispiele:
-
-- **Klasse C1:** „Der Scope ist gesperrt. Klartextstrukturen sind bereinigt. Persistente Kopien sind nur als Chiffrat vorhanden. Die zugehörigen Schlüssel sind vernichtet. Dies gilt unter den Annahmen A-FLASH, A-ALGO, A-KEYLEAK, A-RAM. Folgende Ausschlüsse bestehen: …“
-- **Klasse M:** wie C, ergänzt um die vollzogene physische Bereinigung und die Liste der Pflicht-Ausschlüsse.
-- **Klasse L:** „Der Scope ist für alle Lesezugriffe gesperrt. Eine Bereinigung der Daten ist **noch nicht** gemessen.“
-
-Das Gate `deletion-honesty` vergleicht jeden **statischen** Außentext (README, MCP-Werkzeugbeschreibungen, `doctor`-Texte) mit den Claims, die der Bericht der Standardkonfiguration (K1: höchstens C1) ausstellt; ein Text, der mehr behauptet, ist Gate-Fehler (REQ-DEL-035, AC-19, AC-24). Die Bezeichnung „Außenformulierung der Fassung 2.2.1“ („Der lokale Schlüssel wurde nicht als Löschmaßnahme vernichtet“) entfällt, weil sie der Wirklichkeit in 2.3 widerspricht.
-
-### 12.12 Abnahmekriterien Löschung
-
-Eine Löschung gilt erst als bewiesen, wenn alle gültigen Kriterien grün sind. AC-7, AC-12, AC-14, AC-15 bleiben **unbelegt** (Inhalt der Fassung 1.3 nicht rekonstruierbar, §25.3); die Nummern werden nicht neu vergeben. Die Epochen-Anforderung deckt AC-21 ab.
-
-|ID|Kriterium|Methode|
-|---|---|---|
-|AC-1|Nach Löschung und Bericht enthält **keine** Datei des Datenverzeichnisses (WAL, SSTables, Blob-Segmente, Index-Artefakte, Checkpoints, Temp, `.bak`, Keystore, KeyTable, Journal) den Canary (≥ 32 Zufallsbyte als Text), dessen Embedding-Bytes, eindeutige Terms oder die Roh-ID. Geprüft in **zwei Sichten**: Rohbytes und entschlüsselte Sicht mit allen überlebenden Schlüsseln. **Positive Kontrolle** in beiden Sichten; sonst ist der Lauf ungültig.|Scanner im Test + unabhängiger `grep -r` + Positivkontrolle|
-|AC-2|Wird eine Messung durch eine Konstante ersetzt, schlägt mindestens ein Test fehl.|Mutation|
-|AC-3|Absturz an jedem Journalzustand und an jedem Schritt D1 bis D6: danach `Completed` mit vollständigen Messungen oder `Partial`, nie `Completed` ohne Messung.|Crash-Matrix (`FaultVfs`)|
-|AC-4|Restore eines Checkpoints vor der Löschung: Betroffener gesperrt, danach erneut gelöscht, `restore_reapplied` im Journal.|Integration|
-|AC-5|Zwischen `Frozen` und `Completed` liefert kein Lesepfad Daten des Betroffenen, auch parallel.|loom/Property|
-|AC-6|Berichts-Negativsuite: Bit-Flip je Feld, Feldvertauschung, Versions-Downgrade, anderer Mandant, falscher Schlüssel, fehlendes `excluded`, Klasse ohne Annahmen, gefälschtes Siegel ⇒ Fehler mit benanntem Grund.|Unit + Fuzz|
-|AC-8|Neustart nach Löschung: gesperrt/gelöscht, Journal konsistent.|Integration|
-|AC-9|Mit `ManualClock` und festen Eingaben ist der Bericht bytegleich reproduzierbar.|Golden-Test|
-|AC-10|Das Gate `deletion-honesty` erkennt konstante Messwerte, verworfene Prüfergebnisse, unbedingte `Ok(true)`-Verifikation und öffentliche Konstruktoren mit Zählerwerten in einem absichtlich fehlerhaften Beispiel.|Gate-Selbsttest|
-|AC-11|Legal Hold ⇒ `Restricted`, keine Löschoperation, **keine Schlüsselvernichtung**, Lesesperre aktiv, `basis` und `until` im Bericht.|Integration|
-|AC-13|Gleichzeitiges `put`/`delete` derselben ID ergibt nach Abschluss nie einen sichtbaren Zustand.|loom|
-|AC-16|Checkpoint vor der Löschung: Bericht höchstens Klasse C ohne M mit `RetainedUnderRestoreGuard{count, oldest_age, expires_at}`, solange der Checkpoint die Einheit enthält; nach `Rewrite`/`ExpireNow`/Ablauf Klasse M.|Integration + Canary-Scan|
-|AC-17|`restore_checkpoint` weist ein Schlüssel-Backup, das `valid_until` überschritten hat oder dessen Alter unbestimmbar ist, mit `RestoreBeyondHorizon` ab; eine Konfiguration mit `key_backup_max_age > erased_set_retention` startet nicht.|Integration + Chaos|
-|AC-18|Nach Vernichtung von `K_ref[tenant, epoche]` ist kein Eintrag dieser Epoche in `ErasedSet`, `AuditChain` und Journal mehr einem Subjekt zuordenbar; die Ketten bleiben prüfbar.|Property|
-|AC-19|Kein statischer Außentext enthält einen Claim, den der Bericht der Standardkonfiguration (K1) nicht ausstellt.|Gate-Selbsttest|
-|AC-20|Mit `ManualClock`: ein `Partial`-Zustand erzeugt nach den drei Schwellen je genau einen Alarm, eine Eskalation bzw. eine Meldung, reproduzierbar, auch nach Absturz.|Integration + Chaos|
-|AC-21|**Epoch Seal.** Nach dem Seal: Re-Wrap aller lebenden Schlüssel, `KEK[e]` vernichtet, keine Datei des Datenverzeichnisses enthält Wrap-Nonce oder Wrap-Blob eines vernichteten Schlüssels; Abbruch an jedem Teilschritt endet in Fortsetzung, idempotent.|Crash-Matrix + Property|
-|AC-22|**Backup-Trennung.** Kein Daten-Backup enthält Schlüsselmaterial (Format- und Literalscan). Backup vor Löschung, Löschung, Restore mit altem und mit frischem Schlüssel-Backup: Scope bleibt gesperrt, kein lesbarer Rest; abgelaufenes Schlüssel-Backup wird verweigert.|Backup-/Restore-Test|
-|AC-23|**Mixed-Segmente.** `BlockAll`, `RedactAndRekey`, `DeleteAll` verhalten sich nach §12.15; kein Segment wird automatisch freigegeben oder gelöscht.|Integration|
-|AC-24|**Claim-Generator.** Jeder Satz der Satzbibliothek ist an einen Messwert gebunden; ein absichtlich überzogener Text lässt das Gate fehlschlagen; die Perspektivenurteile folgen den Messwerten.|Gate-Selbsttest|
-|AC-25|**Nadelscan.** Eine absichtlich zurückgelassene Wrap-Nonce (Test-Mutation) wird gefunden; ohne Nonce 0 Treffer.|Mutation + Property|
-|AC-26|**Kein Dummy-Bericht.** Kein Codepfad erzeugt einen `DeletionProof` ohne Scanner-Witness; `rg` nach `default_test_deletion_proof_key` und `new_after_verified_empty(…, 0)` im Produktionscode ergibt 0 Treffer; Mutation (Witness-Konstante) lässt Tests scheitern.|Gate + Mutation|
-|AC-27|**Keine Wiederauferstehung.** Nach jedem Crash und jedem Restore steht kein lebender Schlüssel einer `ErasedSet`-Einheit in der KeyTable.|Crash-Matrix + Property|
-|AC-28|**Destroy-Durabilität.** Stromausfall an jedem Punkt von D1 bis D6 (`FaultVfs`): Schlüssel lebt und Einheit bleibt `Frozen`, oder Schlüssel ist vernichtet; nie „vernichtet“ gemeldet bei vorhandenem Schlüssel.|Chaos|
-|AC-29|**Mirror.** Restore nach Totalverlust: mit aktuellem `ErasedSetMirror` bleibt der Scope gesperrt; ohne aktuellen Mirror nur mit `--accept-unguarded`, `restore_unguarded` im Bericht.|Integration|
-|AC-30|**Padding und Header.** Kein Record trägt `doc_key_id` im Klartext; die Längenverteilung bleibt nach Padmé unter dem Overhead von 12 %; der Restmetadaten-Selbsttest (§12.7.6) schlägt an einem absichtlich unpaddeten Beispiel an.|Format-Test + Property|
-|AC-31|**Rücknahme.** `Unfreeze` nach D3 wird abgewiesen; im Regulated-Tier braucht `Unfreeze` zwei Personen.|Integration|
-|AC-32|**Uhr.** Bei Uhrrücksprung verweigern Horizont-, Karenz- und `valid_until`-Entscheidungen fail-closed (`ClockRegression`).|Chaos (Uhrsprung)|
-|AC-33|**Verification/Validation.** Im Regulated-Tier ist ein Bericht ohne Concurrence-Signatur `ValidationPending` und gilt nicht als Abschluss.|Typestate + Integration|
-|AC-34|**Heap-Canary.** Nach Klasse P findet der Prozessspeicher-Scan keinen Canary, kein Embedding-Byte-Muster und keinen seltenen Term des Scopes; die Positivkontrolle vor der Löschung findet sie; eine absichtlich nicht zeroisierte Kopie (Test-Mutation) wird gefunden.|Heap-Scan + Mutation|
-|AC-35|**Zweistufige Messung.** Auf 1.000 seed-reproduzierbaren Szenarien (mit Fehlerinjektion) liefern M1 bis M3 und der volle Rohscan dasselbe Urteil; ein Block ohne UnitDirectory-Zuordnung bricht die Messung (fail-closed).|Differentialtest + Property|
-|AC-36|**Shard-Seal.** Nach dem Seal enthält keine Datei Wrap-Nonce oder -Blob eines vernichteten Schlüssels; nur geänderte Shards wurden neu geschrieben (Zähler); der Aufwand wächst mit der Zahl geänderter Shards, nicht mit der Gesamtzahl der Schlüssel; Abbruch an jedem Teilschritt endet in Fortsetzung.|Crash-Matrix + Benchmark|
-|AC-37|**Koaleszenz.** n Löschungen in einem Fenster erzeugen n gültige Berichte mit einem Messlauf; keine Einheit erhält eine höhere Klasse, als ihre eigene Messung trägt; Siegel 1 erscheint unabhängig vom Fenster sofort.|Integration + `ManualClock`|
-|AC-38|**Flash-Härtung.** `flash_hardening` im Bericht folgt dem tatsächlichen Ablauf: K1-Seal ohne Passphrasenwechsel ⇒ `None`; mit Wechsel ⇒ `PassphraseRotated`; ein konfigurierter, nicht ausgeführter Wechsel ändert nichts.|Typestate + Integration|
-
-### 12.13 Löschpfad: Komponenten und Platzierung
-
-**Entwurfsprinzipien:** (1) Messen vor Behaupten: Ein Claim existiert nur, wenn ein Typ, der nur aus einer Messung konstruierbar ist, ihn trägt. (2) Fail-Closed: keine Bescheinigung bei Teilausfall, keine Fallbacks. (3) Verteidigung in der Tiefe: Sperre → logische Löschung → Klartextbereinigung → Schlüsselvernichtung → Seal → Hygiene → Messung → Bericht. (4) Ehrliche Grenzen (§2.6, §12.20). (5) Kein Architekturverstoß: Ports in `ports`, reine Logik in `crypto`, Persistenz in `store`, Orchestrierung in `engine`, Handler dünn. (6) Datensparsame Evidenz. (7) Determinismus: Zeit nur über `Clock`, IDs aus Zählern und Hashes, Schlüsselmaterial nur aus dem System-RNG.
-
-|Komponente|Crate|Ring|Inhalt|
-|---|---|---|---|
-|IDs, Fehler, Grundtypen: `ErasureId`, `SubjectRefHash`, `UnitRefHash`, `ErasureError`, `DeletionLayer` (zehn Varianten), `LayerWitness`-Grundtypen, `ReachedClass`, `Assumption`|`types`|0|reine Datentypen|
-|Ports: `LayerScanner`, `Purger`, `ErasureJournal`, `Vfs`, `DurableLog`, `KmsProvider`, `EffaceableKeySlot`, `ErasedSet`-Zugriff, `ErasedSetMirror`, `RecipientLedger`, `TimestampAuthority` `[R]`|`ports`|0|nur Traits|
-|Reine Krypto- und Kodierungslogik: Bericht V5 (Signatur, Verifikation, Satzbibliothek), `ResidualReport`, KeyTable- und Wrap-Logik, Padmé, Kettenlogik|`crypto`|0|synchron, I/O-frei, lock-frei|
-|Persistenz: atomare Dateien, KeyTable-Datei, `DurableLog`-Impl, Journal-Dateien, Rohdatei-Scanner|`store`|1|`fsync`, Temp-Datei und Rename, Verzeichnis-`fsync`|
-|Scanner/Purger je Schicht: LSM/WAL/Blob/KeyMaterial (`store`), HNSW (`vector`), Volltext (`text`), Checkpoint (`checkpoint`), Caches/Audit/Lineage (`store`/`engine`)|je Crate|0/1/3|implementieren `LayerScanner`/`Purger` (Default-`scan` über `ScanSession`)|
-|Orchestrator: Saga, Lesesperre, Key-Lock, Epoch Seal, Restore-Guard, Legal-Hold-Gate, Fristen|`engine`|3|verdrahtet Scanner/Purger über Ports; `crypto` ist nicht optional|
-|Werkzeug `memory_forget`, CLI (`doctor`, `confirm`, `verify-report`, `seal-now`)|`mcp` über `contextra`|4|nur Aufruf und JSON-Abbildung; **keine Berichtskonstruktion**|
-|Test-Doubles (Fake-Uhr, Fehlerinjektion, Fake-Verwahrer)|`testkit`|–|nur dort|
-
-Löschtypen existieren genau einmal (Kantenregel 5, Gate `deletion-types-once`). Ohne Löschpfad-Orchestrator liefert dessen Konstruktor `Err(CapabilityUnsupported)`, nie einen Stub, der Erfolg meldet (REQ-DEL-027). Die MCP-Antwort enthält `class`, `claims`, `excluded` und den Bericht (oder `null` bei `Partial`/`Restricted`), nie einen Nachweis ohne Messung.
-
-### 12.14 Konformität, Risiken, Löschinventar
-
-`crypto` und `engine` bleiben `#![forbid(unsafe_code)]`; Zeit über `Clock`; Schlüsselmaterial ausschließlich über den System-RNG; Produktionscode ohne `unwrap`/`expect`/`panic!`; Verschlüsselungstypen existieren unabhängig von Features (A1).
-
-|Risiko|Gegenmaßnahme|
-|---|---|
-|Strukturelle Messung übersieht Reste|Nadelscan, Inventar, Canary-Byte-Scan, `excluded` im Bericht; Fachprüfung vor jeder Vermarktung|
-|Flash-Reste gewrappter Schlüssel (K1)|Epoch Seal, Passphrasen-Rotation, Annahme A-FLASH ausgewiesen, K2/K3 per Port|
-|Schlüssel-Backup enthält vernichteten Schlüssel|befristet (`key_backup_max_age`), Restore-Guard vernichtet beim Einspielen|
-|Abbruch während Vernichtung|Destroy-Protokoll D1 bis D6, idempotent, Crash-Matrix|
-|Wiederauferstehung durch Restore oder Fehler|INV-NO-RESURRECTION-1, Prüfung in B6/B7|
-|Purge-Kompaktion/Segment-Rewrite kostet Latenz und Write-Amplification|Segmentgrößen begrenzen; Messung mit der Write-Amplification-Suite (§16)|
-|Padding und Re-Wrap kosten Platz und Zeit|Padmé ≤ 12 %, Re-Wrap O(Schlüssel); Budgets in `budgets.toml` (O-24, O-40)|
-|Ablauf der Referenzschlüssel schwächt den Restore-Guard|Horizont bezieht sich nur auf Schlüssel-Backups (§12.9)|
-|Fehlbedienung (irrtümliche Löschung)|Karenz `erasure_grace`, Forget-Guard (§13.3), `Unfreeze` bis D3|
-|Rechtswertung offen|kein Produkttext ohne fachkundige Freigabe (§25.1)|
-
-**Löschinventar (`doctor`, REQ-DEL-037).** Die Software erzwingt keine Löschfristen, macht ihr Fehlen aber sichtbar. `doctor` weist je Collection ohne Nutzinhalte aus: (1) ob eine Löschfrist/`RetentionPolicy` gesetzt ist (nein = Warnung); (2) Verwahrungsstufe K0/K1/K2/K3; (3) Anteil `LegacyUnkeyed`; (4) interne Checkpoints (Anzahl, ältester, Policy); (5) `erased_set_retention`, `key_backup_max_age`, `kek_epoch_len`, Alter des letzten Seal, Alter der ältesten Schlüssel-Backups, Konsistenz; (6) offene `Partial`-Sagas mit Alter und ausstehender Schicht; (7) `ErasedSetMirror`-Zustand; (8) Härtungslücken (§12.18); (9) offene Residuale (`R-GRAPH`, `R-KEKEPOCH`) mit Frist. Das Inventar ist Beobachtung, keine Rechtsaussage.
-
-### 12.15 Betroffenen-Einheiten, Mehrfachbezug, Mixed-Policy
-
-**Einheit.** Eine Betroffenen-Einheit ist die kleinste Menge von Records, die ohne Kollateralverlust für einen Betroffenen gelöscht werden kann. Standard: ein Dokument mit genau einem Betroffenen.
-
-**Referenzen.** Jedes Dokument trägt `subjects: [subject_ref]`; `subject_ref` ist eine zufällige ID mit Mindestentropie (§12.10), vergeben vom Aufrufer (oder durch eine optionale Erkennung `[R]`). Ohne Angabe gilt das Dokument als Einheit des Aufrufers.
-
-**Mehrfachbezug.** Ein Dokument mit mehreren Betroffenen wird in Segmente zerlegt; jedes Segment erhält die Menge seiner Betroffenen; Segmente mit gleicher Menge teilen einen DocDek. Bei Löschung für Betroffenen A:
-
-|Segmentart|Behandlung|
-|---|---|
-|Menge = {A}|DocDek vernichten|
-|Menge enthält A und andere (Mixed)|Standard `BlockAll`: Segment bleibt gesperrt, `Partial{ReviewRequired}` mit Frist; der Betreiber entscheidet|
-|Menge enthält A nicht|unberührt|
-
-**Mixed-Policy** (je Collection): `BlockAll` (fail-closed, **Standard**), `RedactAndRekey` (Betreiber liefert redigierten Text; neuer DocDek, Re-Embedding, alter DocDek vernichtet), `DeleteAll` (Segment vollständig löschen; Betreiber trägt die Verantwortung für den Kollateralverlust). **Contextra entscheidet nie selbst**, ob ein Mixed-Segment nach Entfernung von A noch personenbezogen ist (Art. 17 Abs. 3, Rechtsfrage). `BlockAll` ist rechtlich eine Einschränkung (Klasse L für das Segment) und läuft in die Fristenverfolgung (§12.19).
-
-**Ableitungen** (Zusammenfassungen, Chunk-Präfixe, Embedding-Caches) kaskadieren über die Lineage (INV-DERIVED-1); Ableitungen mit weiteren Quellen werden neu abgeleitet oder als `stale` markiert.
-
-**Collection- und Tenant-Löschung (Akte).** Alle DocDeks, ArtKeys und `KEK[coll,*]` werden in einer Saga vernichtet; die Index-Dateien der Collection entfallen; bei Tenant-Löschung zusätzlich `K_ref` des Tenants nach Retention. Die Fassung 2.2.1 behandelte dies als „Hygiene ohne Claim“; in 2.3 ist es eine **Löschmaßnahme mit Bericht** (E27 ersetzt).
-
-### 12.16 Index-Generationen und Restinformation
-
-**`R-GRAPH`.** Im HNSW-Graph bleiben nach der Löschung Routing-Knoten ohne Nutzdaten (VETO-F02 verbietet Rewiring). Die Kanten enthalten nur interne Slot-Nummern; die Topologie verrät Nachbarschaftsbeziehungen zu gelöschten Vektoren (No Inference). Sie bleibt als `R-GRAPH` mit Frist im Bericht, bis der Neuaufbau erfolgt ist.
-
-**Neuaufbau.** (1) Hintergrund-Neuaufbau erzeugt Generation g+1 ohne gelöschte Dokumente (deterministisch, INV-INDEX-APPLY-1); (2) atomarer Umschalt-Commit auf g+1; (3) Vernichtung des ArtKey der Generation g. Mehrere Löschungen teilen sich einen Neuaufbau. Auslöser: Tombstone-Anteil ≥ `tombstone_rebuild_ratio` (0,2), Fristablauf (`purge_rebuild_max_days`, Startwert 14), `seal-now`. **VETO-F02 bleibt unberührt:** Der Neuaufbau ist ein vollständiger Generationswechsel, kein partielles Rewiring.
-
-**Restkanäle.** Treffermengen: Ghost-Knoten verändern in der Studie 95 % der Top-K-Mengen und erzeugen einen Timing-Unterschied von rund 4 %; der Neuaufbau beseitigt sie. Statistik (IDF, Dokumentlängen, Zähler) liegt im Text-Segment und wird mit der Segment-Neuschreibung neu berechnet.
-
-**Einordnung.** Qdrant, Milvus, Weaviate und Chroma/FAISS behandeln Löschung als Wartung ohne Frist und ohne Nachweis (Sekundärquellen). Contextra erzwingt die Frist und misst.
-
-### 12.17 Backup und Restore (Zwei-Spuren-Backup)
-
-#### 12.17.1 Spuren
-
-|Spur|Inhalt|Lebensdauer|Schutz|
-|---|---|---|---|
-|**D** (Daten)|SSTables, WAL, Blob-Segmente, Index-Artefakte (Chiffrat), **ohne** KeyTable, **ohne** Keystore, ohne `ErasedSet`|beliebig (Betreiberentscheid)|ohne Schlüssel nicht lesbar|
-|**K** (Schlüssel)|KeyTable-Snapshot (gewrappte DocDeks, ArtKeys, KEK-Epochen, `K_ref`)|**befristet** auf `key_backup_max_age` (Startwert 30 Tage), signiertes `valid_until`|verschlüsselt unter der Wurzel|
-
-**Wirkung.** Nach Löschung und Ablauf aller Schlüssel-Backups, die den DocDek enthalten, existiert der Schlüssel nirgends mehr; Daten-Backups sind für diese Einheit unlesbar. Die Löschung wirkt in Backups spätestens nach `key_backup_max_age`, **ohne Eingriff in das Backup**. Bericht: `backup_window = OpenUntil(deletion_at + key_backup_max_age)` für von Contextra verwaltete Backups, `ExternalUnmanaged` für alles andere.
-
-**Regeln.** INV-BACKUP-SPLIT-1: Kein Daten-Backup enthält Schlüsselmaterial; jedes Schlüssel-Backup trägt ein Ablaufdatum und wird danach verweigert. Der interne `checkpoint` ist Spur D (§12.5.4); `export` schreibt Spur D und optional Spur K nur über einen eigenen, protokollierten Befehl (`export-keys`), der `valid_until` setzt.
-
-#### 12.17.2 Restore-Guard und Horizont
-
-Siehe §12.9. Zusätzlich: Ein Restore **ohne** Schlüssel-Backup lässt Daten inert (Q6). Ein Restore mit Schlüssel-Backup innerhalb `valid_until` stellt Schlüssel zurück, die der Guard für jede `ErasedSet`-Einheit sofort wieder vernichtet, **bevor** B9 Verkehr zulässt.
-
-#### 12.17.3 `ErasedSetMirror`
-
-Nach Totalverlust fehlt der `ErasedSet` des Zielsystems. Der `ErasedSetMirror` (Port, Magic der Einträge `MFEM`) schreibt jeden `ErasedSet`-Eintrag (Referenz-Hashes, Zeitpunkt, Epoche) zusätzlich an ein vom Betreiber bestimmtes Ziel **außerhalb** des Datenverzeichnisses (zweiter Datenträger, WORM, Fremdsystem). Im Regulated-Tier ist er **Pflicht**. Ohne Mirror oder bei einem Mirror, der älter ist als das Schlüssel-Backup, ist ein Restore nur mit `--accept-unguarded` möglich; Bericht und `doctor` weisen `restore_unguarded` aus. **Schreibreihenfolge (H-11):** Ist der Mirror beim Einfrieren nicht erreichbar, blockiert das `Frozen` **nicht** (Löschen darf nicht an Fremdsystemen scheitern); der Eintrag wird `MirrorPending`, `doctor` alarmiert nach 24 h, und der Bericht trägt `residuals: [R-MIRROR until]`. Ein zentrales Löschregister (O-35) ist ein zulässiges Mirror-Ziel.
-
-#### 12.17.4 Verhältnis zu Aufsichtsauffassungen
-
-CEF Issue 6 und BayLfD 12.5 verlangen Nachverfolgung und Nachlöschung beim Restore sowie Begründung, wenn Backups nicht sofort bereinigt werden; der Zwei-Spuren-Ansatz erfüllt dies mit einem festen, dokumentierten Zeitfenster. Ob ein Chiffrat ohne Schlüssel für den Besitzer des Daten-Backups keine personenbezogene Information mehr ist, bleibt P-02.
-
-### 12.18 Härtung (Prozessspeicher, Dumps, Swap)
-
-NIST verlangt für CE, dass vor der Verschlüsselung kein Klartext auf das Medium gelangt ist (LA-15). Contextra setzt:
-
-1. **Core-Dumps aus:** `RLIMIT_CORE = 0`, Prozessattribut gegen Dumps; Schlüssel- und Klartext-Arenen sind von Dumps ausgenommen (`MADV_DONTDUMP` bzw. Plattformäquivalent).
-2. **Schlüsselspeicher gesperrt:** `mlock` für Schlüsselpuffer; meldet die Sperrung Fehler, weist `doctor` dies aus.
-3. **Swap:** `doctor` prüft, ob Swap aktiv und verschlüsselt ist; große Arenen lassen sich nicht sperren, daher Warnung bei unverschlüsseltem Swap.
-4. **Temp-Dateien:** keine Klartext-Zwischenspeicher; Zwischenergebnisse liegen im Speicher oder verschlüsselt unter ArtKey/`K_eng`.
-5. **Dateisystem:** unterstützte lokale Typen (INV-PLATFORM-1); Journal, Snapshots (APFS, btrfs, zfs) und Time Machine gelten als externe Kopien und stehen im Bericht.
-6. **Logs:** nur IDs und Zähler (INV-LOG-1).
-7. **Hibernation:** `doctor` weist auf aktive Hibernation hin (A-RAM).
-
-Die plattformspezifischen Aufrufe sind in Spike S-HRD zu verifizieren (O-38). Bis dahin gilt: Fehlt ein Mittel, meldet `doctor` die Lücke, und A-RAM bleibt im Bericht. Im Regulated-Tier ist eine bekannte Härtungslücke eine **Startwarnung mit Bestätigungspflicht**, kein stiller Betrieb.
-
-### 12.19 Fristen, Empfänger, Legal Hold
-
-#### 12.19.1 Fristen
-
-|Frist|Quelle|Wert|
-|---|---|---|
-|Beantwortung|Art. 12 Abs. 3|ein Monat; Verlängerung um zwei Monate mit Mitteilung binnen eines Monats|
-|`Frozen` (Klasse L)|intern|sofort nach Autorisierung|
-|Klasse P|intern, Zielgröße|≤ 1 Stunde|
-|Klasse C*|intern|unmittelbar nach P (zuzüglich `erasure_grace`)|
-|Epoch Seal|intern|≤ `seal_after_deletion_max` (24 h; Profil `Maximum` 1 h; Regulated ≤ 24 h)|
-|Hygiene (Klasse M)|intern, P-11|≤ `purge_rebuild_max_days` (14 Tage)|
-|Alarm bei `Partial`|intern|24 h|
-|Eskalation bei `Partial`|intern|14 Tage|
-|Meldung Fristgefährdung|intern|25 Tage|
-
-Die Werte sind Zielgrößen. **Contextra sendet nichts nach außen**; Alarme erscheinen in `doctor`, Metrik, CLI, MCP-Antwort und AuditChain. Ob eine Verzögerung zulässig ist, entscheidet die Technik nicht (P-11, P-19).
-
-#### 12.19.2 `RecipientLedger` (Art. 17 Abs. 2, Art. 19, P-12)
-
-Je Dokument führt Contextra ein Register der Ausleitungen (Export, Egress-Kanal `[R]`, Checkpoint-Export) **ohne Inhalte**: Empfängerkennung, Zeitpunkt, Datenklasse. Bei einer Löschung liefert `doctor` die Empfängerliste. Die Mitteilung an Empfänger erfolgt durch den Verantwortlichen. Ausleitungen außerhalb von Contextra sind Ausschluss (§12.20).
-
-### 12.20 Ausschlüsse (verpflichtend im Bericht) und Nicht-Gegenstand
-
-**Ausschlüsse** (`excluded`, nie leer; der Text darf bei Weitergabe nicht gekürzt werden):
-
-- `ExternalBackups`: Sicherungen außerhalb der Spur D/K (A-EXTBACKUP);
-- `ProcessMemoryResidue`: Prozessspeicher, Swap, Dumps, Hibernation vor der Vernichtung (A-RAM);
-- `HistoricalMediaStates`: hardwareinterne Reste (Wear-Leveling, Controller-Cache); Gegenmaßnahme Verschlüsselung plus Epoch Seal, Restannahme A-FLASH bei K1;
-- `ModelParameters`, `ExfiltratedData`: Trainings- und Fine-Tuning-Daten externer Modelle, Kopien beim Auftragsverarbeiter, Modellanbieter-Logs, Prompt-Caches;
-- `HostHistories`: Host-Verläufe (A-HOSTHIST);
-- `DerivedOutsideLineage`: Ableitungen außerhalb der Lineage (vom Betreiber angelegte Exporte);
-- `FilesystemSnapshots`: Dateisystem-Snapshots und Journale;
-- `ActiveSnapshot{ids}` (§12.5.5).
-
-(Der Ausschluss `KeyMaterialBackups` der Fassung 2.2.1 entfällt: Schlüssel-Backups sind Spur K und erfasst; Schlüsselkopien **außerhalb** von Spur K stehen unter `ExternalBackups`.)
-
-**Nicht Gegenstand:** maschinelles Verlernen in Modellgewichten; Löschung beim LLM-Anbieter; Löschung in Backup-Medien außerhalb der Spuren D/K; rechtliche Wertung der Löschwirkung.
-
----
+### 12.3 Architektur des `contextra-erasure`-Bausteins
+
+`contextra-erasure` ist als autarker Baustein konzipiert, der auch in externen Speicherarchitekturen zur Durchsetzung von Lösch- und Nachweispflichten eingesetzt werden kann:
+
+1. **`FileVault` (Schlüsselverwahrung & Shredding):**
+   - 16 physische Shards mit 64-Byte-Slots zur Verwaltung von Dokumenten- und Epochenschlüsseln.
+   - Atomare Schlüsselvernichtung (Crypto-Shredding) durch Überschreiben mit kryptografischem Rauschen und fsync.
+   - Rehash bei Lastfaktor λ > 0.60.
+
+2. **`ReadGate` & `GateLog` (Sofortige Zugriffssperre):**
+   - Sobald eine Löschung initiiert wird, sperrt das `ReadGate` den Scope über atomare RCU-Intervalle (`ErasedSet`).
+   - Append-only `GateLog` garantiert, dass Lesesperren auch nach einem Systemneustart unmittelbar aktiv sind.
+
+3. **`ErasureJournal` & `DeletionSaga`:**
+   - Robuste Zustandssaga mit Crash-Konsistenz:
+     `Requested → Gated → KeyDestroyed → Purging → Measured → Completed` (oder `Restricted` bei Legal Hold).
+   - Idempotenter Wiederanlauf nach Abstürzen ohne Zirkelbezüge.
+
+4. **`Scanner` & `Witness` (Messung vor Behauptung):**
+   - Jede Erfolgsmeldung setzt eine verifizierte Positivkontrolle (Canary) und Messung durch die `LayerScanner`-Implementierungen voraus.
+   - `LayerWitness` liefert den fälschungssicheren messtechnischen Nachweis über bereinigte Schichten.
+
+5. **`RestoreGuard` (Time-Travel- & Backup-Schutz):**
+   - Erkennt das Einspielen veralteter Backups anhand von Epochen- und Sequenz-Diskrepanzen.
+   - Verhindert das unbemerkte Wiederauftauchen gelöschter Datenbestände.
+
+6. **`DeletionReport` (Kryptografisch signierter Nachweis):**
+   - Generierung kanonischer, Ed25519-signierter Löschberichte im JSON-Format.
+   - Weist erreichte Klassen, getroffene technische Maßnahmen und explizite Systemgrenzen (Wear-Leveling, RAM-Flüchtigkeit) transparent aus.
+
+### 12.4 Entlastung der Kernkomponenten
+
+- **`contextra-crypto`:** Enthält keine Deletion-Proof-Payloads oder Revocation-Logs mehr. Ist ein schlanker, hochperformanter Krypto-Primitive-Provider (ChaCha20-Poly1305, AES-256-GCM-SIV, Argon2id, BLAKE3).
+- **`contextra-store`:** Konzentriert sich auf LSM-Merge, WAL-Durability und Block-Caching. Purge-Kompaktion wird rein über den `Purger`-Port getriggert.
+- **`contextra-vector`:** Enthält keinen DSGVO-spezifischen Code mehr. Tombstones dienen ausschließlich internen HNSW-Index-Reorganisationen.
+- **`contextra-text`:** BM25-Indexierung ohne Kenntnis von Deletion-Sagas; Index-Purging als isolierte Operation.
+- **`contextra-engine`:** Verwendet das `Backends`-Trait-Bündel; keine monolithische Einbettung von Löschpfaden.
 
 ## 13. Schnittstellen, Laufzeit und Plattform
 
@@ -1896,7 +1206,7 @@ Werte mit **„fest“** sind unveränderlich. Werte mit **„Startwert“** sin
 | `checkpoint_hold` | 25 Tage | nur für `ExpireAfterHold` unter `Restricted`; interne Zielgröße unter der Monatsfrist (P-11, P-15) |
 | `partial_alarm_after` | 24 Stunden | Interne Zielgröße (P-11, P-19) |
 | `partial_escalate_after` | 14 Tage | dito |
-| `partial_deadline_report` | 25 Tage | dito; Monatsfrist Art. 12 Abs. 3 DSGVO bleibt die Obergrenze |
+| `partial_deadline_report` | 25 Tage | dito; maximale Frist fuer offene Erasure-Sagas |
 | Retry-Backoff der Saga | exponentiell, Start 1 s, Deckel 5 min, Zeit über `Clock` | deterministisch testbar mit `ManualClock` |
 | Canary | mindestens 32 Zufallsbyte als Text | Eindeutigkeit gegen Zufallstreffer (AC-1) |
 | `K_ref`-Lebensdauer | Epochenende + `erased_set_retention` | §12.10 |
