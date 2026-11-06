@@ -181,9 +181,12 @@ fn parse_ppt_atom(header: RecordHeader, payload: &[u8], state: &mut PptState, ir
             }
         }
         REC_TYPE_TEXT_HEADER_ATOM => {
-            if let (Some(&b0), Some(&b1), Some(&b2), Some(&b3)) =
-                (payload.first(), payload.get(1), payload.get(2), payload.get(3))
-            {
+            if let (Some(&b0), Some(&b1), Some(&b2), Some(&b3)) = (
+                payload.first(),
+                payload.get(1),
+                payload.get(2),
+                payload.get(3),
+            ) {
                 let text_type = u32::from_le_bytes([b0, b1, b2, b3]);
                 state.pending_text_type = Some(text_type);
             }
