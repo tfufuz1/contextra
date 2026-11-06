@@ -9,7 +9,7 @@ use contextra_types::{EntityId, Result};
 use std::collections::HashMap;
 
 impl CsrGraph {
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-COMMUNITIES-001]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-COMMUNITIES-001]
     pub fn set_communities_batch(&self, assignments: &[crate::CommunityAssignment]) {
         let mut inner = self.inner_write();
         for a in assignments {

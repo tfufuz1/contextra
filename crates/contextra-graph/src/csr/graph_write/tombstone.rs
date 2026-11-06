@@ -68,7 +68,7 @@ impl CsrGraph {
         Ok((newly_tombstoned.len(), newly_tombstoned, affected_node_ids))
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-TOMBSTONE-001]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-TOMBSTONE-001]
     pub fn tombstone_hyperedge(&self, id: crate::hyperedge::HyperEdgeId, wal_tx: TxId) -> bool {
         let mut inner = self.inner_write();
         let inner_ptr = &mut *inner;

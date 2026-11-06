@@ -167,7 +167,7 @@ impl CsrGraph {
     }
 
     #[allow(clippy::too_many_arguments)]
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-EDGE-MUTATION-001]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-EDGE-MUTATION-001]
     pub fn load_edge_direct(
         &self,
         from: EntityId,

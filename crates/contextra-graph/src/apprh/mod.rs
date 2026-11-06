@@ -78,7 +78,7 @@ impl CsrGraph {
     ///
     /// # Invariants
     /// Runs exclusively in shadow mode unless feature-flag activated. Bit-identical determinism.
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-003]
+    // ANCHOR[contextra-graph:SRC-APPRH-MOD-003]
     pub fn apprh_diffusion(
         &self,
         seeds: &[EntityId],
@@ -88,7 +88,7 @@ impl CsrGraph {
     }
 
     /// Computes shadow comparison between Forward-Push PPR and APPRH on CsrGraph.
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-004]
+    // ANCHOR[contextra-graph:SRC-APPRH-MOD-004]
     pub fn apprh_shadow_compare(
         &self,
         seeds: &[EntityId],
@@ -106,7 +106,7 @@ mod tests {
     use crate::csr::CsrGraph;
     use contextra_types::Entity;
 
-// ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
+    // ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
     #[tokio::test]
     async fn test_apprh_diffusion_and_shadow_compare_diagnostic_paths() {
         let graph = std::sync::Arc::new(CsrGraph::new());
