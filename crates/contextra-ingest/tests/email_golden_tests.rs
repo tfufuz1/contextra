@@ -427,7 +427,9 @@ fn test_email_nesting_depth_bomb() {
     let budget = contextra_ingest::extractor::ResourceBudget::new(limits.clone());
     let ctx = make_ctx(&limits, &policy, &budget, &reg);
 
-    let err = reg.extract(FormatId::Eml, bomb.as_bytes(), &ctx).unwrap_err();
+    let err = reg
+        .extract(FormatId::Eml, bomb.as_bytes(), &ctx)
+        .unwrap_err();
 
     assert!(matches!(
         err,
@@ -461,9 +463,7 @@ fn test_email_mbox_max_archive_entries_limit() {
     let budget = contextra_ingest::extractor::ResourceBudget::new(limits.clone());
     let ctx = make_ctx(&limits, &policy, &budget, &reg);
 
-    let err = reg
-        .extract(FormatId::Mbox, &mbox_data, &ctx)
-        .unwrap_err();
+    let err = reg.extract(FormatId::Mbox, &mbox_data, &ctx).unwrap_err();
 
     assert!(matches!(
         err,

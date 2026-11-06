@@ -290,7 +290,7 @@ impl ContextraBuilder {
     /// Setzt ein vordefiniertes Performance-Profil ([`PerformanceProfile`]).
     ///
     /// Profile (wie `Compliance`, `Balanced`, `BareMetal`) steuern standardisierte
-    /// Kombinationen aus Durability (WAL-fsync), Vektor-Löschmodi und Lizenzringen.
+    /// Kombinationen aus Durability (WAL-fsync), Vektor-Bereinigung und Lizenzringen.
     pub fn with_performance_profile(
         mut self,
         profile: crate::performance_profile::PerformanceProfile,
@@ -324,7 +324,7 @@ impl ContextraBuilder {
     /// # Ablauf von `build`:
     /// 1. **Vorabprüfung**: Prüfe, ob frühere Fehler (z. B. leere Passphrase oder ungültige Signatur) vorliegen.
     /// 2. **Verschlüsselung konfigurieren**: Passphrase aus dem `EncryptionMode` in die Laufzeitkonfiguration übertragen.
-    /// 3. **Performance-Profil auflösen**: Falls ein Profil gesetzt ist, Durability- und Löschmodi übernehmen
+    /// 3. **Performance-Profil auflösen**: Falls ein Profil gesetzt ist, Durability- und Bereinigungsmodi übernehmen
     ///    oder bei Konflikten mit expliziten Parametern abbrechen.
     /// 4. **Lizenz-Autorisierung**: Den angeforderten Ring (z. B. `Fast` oder `Sovereign`) über `license_gate.authorize` abfragen.
     /// 5. **Instanziierung**: Aufruf von `Contextra::open_authorized` mit Pfad, Konfiguration und Token.
@@ -369,7 +369,7 @@ impl ContextraBuilder {
             let resolved = profile.resolve();
             if self.explicit_user_config {
                 if config_for_open.durability_mode != resolved.durability_mode
-                    || config_for_open.deletion_proof_active != resolved.deletion_proof_active
+                    || config_for_open.deletion_proof_active != resolved.integrity_proof_active
                     || config_for_open.vector_delete_mode != resolved.vector_delete_mode
                 {
                     return Err(ContextraError::PolicyViolation(
@@ -379,7 +379,7 @@ impl ContextraBuilder {
                 }
             } else {
                 config_for_open.durability_mode = resolved.durability_mode;
-                config_for_open.deletion_proof_active = resolved.deletion_proof_active;
+                config_for_open.deletion_proof_active = resolved.integrity_proof_active;
                 config_for_open.vector_delete_mode = resolved.vector_delete_mode;
             }
             resolved.feature_ring
@@ -391,6 +391,16 @@ impl ContextraBuilder {
             .license_gate
             .authorize(requested_ring)
             .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+
+        // ── Startsequenz B0–B9 (INV-BOOT-1, INV-WIRING-2, REQ-FAC-005) ─────────────
+        crate::boot::execute_boot_sequence(
+            &self.storage_path,
+            config_for_open.dimension,
+            self.encryption_mode.is_some(),
+            self.encryption_error.is_some(),
+            requested_ring,
+            &self.license_gate,
+        )?;
 
         let instance = Contextra::open_authorized(
             &self.storage_path,
@@ -406,6 +416,7 @@ impl ContextraBuilder {
             Ok(instance)
         }
     }
+
 }
 
 impl Default for ContextraBuilder {

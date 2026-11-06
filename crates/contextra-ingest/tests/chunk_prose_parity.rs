@@ -9,7 +9,12 @@
 // INVARIANTEN: Dieselbe Wortfolge (split_whitespace), passende Breadcrumbs/Heading-Levels.
 // STAND: TS:2026-10-31T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 
 #[path = "fixtures/chunk_prose/mod.rs"]
 mod fixtures;
@@ -26,7 +31,11 @@ use contextra_types::DocId;
 #[test]
 fn test_prose_chunker_engine_parity_fixtures() {
     let fixtures = fixtures::get_prose_fixtures();
-    assert_eq!(fixtures.len(), 10, "Es müssen exakt 10 Fixtures getestet werden");
+    assert_eq!(
+        fixtures.len(),
+        10,
+        "Es müssen exakt 10 Fixtures getestet werden"
+    );
 
     for fix in fixtures {
         // Engine-Chunker Ergebnis
@@ -89,13 +98,16 @@ fn test_prose_chunker_engine_parity_fixtures() {
         let engine_breadcrumbs: Vec<Option<String>> = engine_chunks
             .iter()
             .map(|c| {
-                c.metadata
-                    .as_ref()
-                    .and_then(|m| m.get("breadcrumb").and_then(|v| v.as_str()).map(String::from))
+                c.metadata.as_ref().and_then(|m| {
+                    m.get("breadcrumb")
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                })
             })
             .collect();
 
-        let prose_breadcrumbs: Vec<Option<String>> = drafts.iter().map(|d| d.breadcrumb.clone()).collect();
+        let prose_breadcrumbs: Vec<Option<String>> =
+            drafts.iter().map(|d| d.breadcrumb.clone()).collect();
 
         if !engine_breadcrumbs.is_empty() && !prose_breadcrumbs.is_empty() {
             let e_first = engine_breadcrumbs.first().cloned().flatten();

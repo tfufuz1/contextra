@@ -77,7 +77,8 @@ pub fn parse_presentation(
                         notes_text.clear();
                     }
                     b"frame" => {
-                        current_frame_class = get_attr_value(&reader, &e, b"class").unwrap_or_default();
+                        current_frame_class =
+                            get_attr_value(&reader, &e, b"class").unwrap_or_default();
                     }
                     b"p" | b"h" => {
                         current_text.clear();

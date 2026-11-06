@@ -15,10 +15,9 @@ use unicode_segmentation::UnicodeSegmentation;
 
 /// Bekannte deutsche und englische Abkürzungen (in Kleinbuchstaben).
 const ABBREVIATIONS: &[&str] = &[
-    "z. b.", "z.b.", "dr.", "bzw.", "e. g.", "e.g.", "i. e.", "i.e.",
-    "vs.", "mr.", "mrs.", "ms.", "prof.", "str.", "etc.", "ca.", "vgl.",
-    "st.", "s.", "u. a.", "u.a.", "d. h.", "d.h.", "incl.", "excl.",
-    "min.", "max.", "approx.", "nr.", "no.", "art.", "abs.", "sog.",
+    "z. b.", "z.b.", "dr.", "bzw.", "e. g.", "e.g.", "i. e.", "i.e.", "vs.", "mr.", "mrs.", "ms.",
+    "prof.", "str.", "etc.", "ca.", "vgl.", "st.", "s.", "u. a.", "u.a.", "d. h.", "d.h.", "incl.",
+    "excl.", "min.", "max.", "approx.", "nr.", "no.", "art.", "abs.", "sog.",
 ];
 
 /// Repräsentiert einen Satz innerhalb eines Textes mit dessen Byte-Span.
