@@ -57,7 +57,7 @@ fn rrf_known_values() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn rrf_with_disjoint_lists() {
     let list_a = vec![DocId::from(10), DocId::from(20)];
@@ -82,7 +82,7 @@ fn rrf_with_disjoint_lists() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn rrf_with_three_lists() {
     let list_a = vec![DocId::from(100), DocId::from(200), DocId::from(300)];
