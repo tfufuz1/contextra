@@ -17,7 +17,7 @@
 // HOTSPOTS: [1-40]
 
 #![forbid(unsafe_code)]
-//! Residual measurement and context types (§4.2, §20.5).
+//!   Residual measurement and context types (§4.2, §20.5).
 //!
 //! # Architektur-Rolle
 //! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
