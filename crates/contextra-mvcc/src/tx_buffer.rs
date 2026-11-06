@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TX-BUFFER-ROOT]
 //! # Transaktions-Puffer (`TxBuffer`) für das Staging von Index-Operationen
 //!
 //! Der `TxBuffer` puffert Einfüge- und Löschoperationen aktiver Transaktionen vorübergehend
@@ -27,7 +26,6 @@
 //! - Globales Byte-Budget über alle Transaktionen hinweg (`max_total_staged_bytes`).
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z (SESSION: e459bd5f)
 // ZWECK: Shard-basierter Transaktionsbuffer für das Staging von 2-Phase-Commit Index-Operationen, ReadSet-Limits & Watermark-Tracking.
 // INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention); Bounded ReadSet via try_register_read.
 // HOTSPOTS: 110-380
@@ -47,7 +45,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-// ANCHOR[contextra-mvcc:TX-BUFFER-CONST]
 /// Fester Speicher-Overhead pro gepufferter Operation (32 Bytes).
 pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 
@@ -67,7 +64,6 @@ pub const DEFAULT_MAX_TX_STAGED_BYTES: usize = 16 * 1024 * 1024;
 /// Standard-Maximalgröße für den globalen Puffer über alle Transaktionen hinweg (256 MiB).
 pub const DEFAULT_MAX_TOTAL_STAGED_BYTES: usize = 256 * 1024 * 1024;
 
-// ANCHOR[contextra-mvcc:TX-BUFFER-CONFIG]
 /// Konfigurationsoptionen für den [`TxBuffer`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxBufferConfig {
@@ -99,7 +95,6 @@ impl Default for TxBufferConfig {
     }
 }
 
-// ANCHOR[contextra-mvcc:TX-INDEX-OP]
 /// Eine im Puffer vorgemerkte Operation auf einem Index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -111,11 +106,11 @@ pub enum IndexOp<T: Clone> {
         /// Assoziierte Nutzdaten.
         data: T,
     },
-    /// Löschen eines Dokuments aus dem Index.
+    /// Entfernen eines Dokuments aus dem Index.
     Delete {
         /// Kennung des Dokuments.
         doc_id: DocId,
-        /// Optionale Zusatzdaten zur Löschung.
+        /// Optionale Zusatzdaten zur Entfernung.
         data: Option<T>,
     },
 }
@@ -130,7 +125,6 @@ impl<T: Clone> IndexOp<T> {
     }
 }
 
-// ANCHOR[contextra-mvcc:TX-STAGED-OP-SIZE]
 /// Trait zur Schätzung des Speicherverbrauchs in Bytes für gepufferte Nutzdaten.
 ///
 /// Ermöglicht genaue Buchführung des verbrauchten Hauptspeichers pro Transaktion und global.
@@ -217,7 +211,6 @@ impl KeyShard {
     }
 }
 
-// ANCHOR[contextra-mvcc:TX-BUFFER-STRUCT]
 /// Verwaltet gepufferte Transaktionen, deren Staging-Operationen und ReadSets.
 ///
 /// ### Synchronisations- und Sperrstrategie:
@@ -245,7 +238,6 @@ impl<T: Clone> std::fmt::Debug for TxBuffer<T> {
 }
 
 impl<T: Clone> TxBuffer<T> {
-    // ANCHOR[contextra-mvcc:TX-BUFFER-NEW]
     /// Erstellt einen neuen Puffer mit 64 Shards, 30 Sekunden Timeout und [`SystemClock`].
     pub fn new() -> Self {
         Self::new_with_config(DEFAULT_SHARD_COUNT, Duration::from_secs(30))
@@ -269,7 +261,6 @@ impl<T: Clone> TxBuffer<T> {
         Self::new_with_clock_and_config(Arc::new(SystemClock::new()), shard_count, config)
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-WITH-CLOCK]
     /// Erstellt einen Puffer mit benutzerdefinierter [`Clock`], Shard-Anzahl und Konfiguration.
     pub fn new_with_clock_and_config(
         clock: Arc<dyn Clock>,
@@ -332,7 +323,6 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-HAS-TX]
     /// Prüft, ob die gegebene Transaktion im Puffer registriert ist.
     pub fn has_tx(&self, tx: TxId) -> bool {
         let idx = self.shard_idx(tx);
@@ -343,7 +333,6 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-BEGIN]
     /// Registriert eine neue Transaktion im Puffer zu einem bestimmten Nanosekunden-Zeitstempel.
     ///
     /// ### Ablauf:
@@ -369,7 +358,6 @@ impl<T: Clone> TxBuffer<T> {
         self.begin_at(tx, now_nanos);
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-REGISTER-READ]
     /// Registriert einen Lesezugriff im ReadSet der Transaktion `tx`.
     pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let shard_idx = self.shard_idx(tx);
@@ -383,7 +371,6 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-TRY-REGISTER-READ]
     /// Registriert einen gelesenen Schlüssel für Transaktion `tx` mit Obergrenzen-Prüfung (`max_keys`).
     ///
     /// Verhindert unbegrenztes Speicherwachstum bei massiven Lese-Scans.
@@ -423,7 +410,6 @@ impl<T: Clone> TxBuffer<T> {
         self.register_read(tx, key, snapshot_seq);
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-MIN-READ-SNAPSHOT]
     /// Findet die kleinste Snapshot-Sequenznummer über alle aktiven ReadSets aller Shards hinweg.
     ///
     /// Dient der Bestimmung des globalen GC-Schwellenwerts (Tombstone-Compaction-Floor).
@@ -454,7 +440,6 @@ impl<T: Clone> TxBuffer<T> {
         self.get_read_set(tx)
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-STAGE]
     /// Puffert eine Indexoperation für die Transaktion `tx` unter Prüfung aller Speichergrenzen.
     pub fn stage(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
     where
@@ -463,7 +448,6 @@ impl<T: Clone> TxBuffer<T> {
         self.stage_bounded(tx, op)
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-STAGE-BOUNDED]
     /// Puffert eine Operation und erzwingt Obergrenzen für Operationsanzahl und Byte-Budgets.
     ///
     /// ### Ablauf:
@@ -522,7 +506,6 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-STAGE-MANY]
     /// Puffert mehrere Operationen stapelweise mit einer einzigen Sperrung des Shards.
     pub fn stage_many(&self, tx: TxId, ops: impl IntoIterator<Item = IndexOp<T>>) -> Result<()>
     where
@@ -578,7 +561,6 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-VALIDATE-PENDING]
     /// Prüft, ob für eine registrierte Transaktion tatsächlich anhängige Operationen existieren.
     pub fn validate_pending_ops(&self, tx: TxId) -> Result<()> {
         let shard_idx = self.shard_idx(tx);
@@ -596,7 +578,6 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-DRAIN]
     /// Entnimmt alle gepufferten Operationen der Transaktion `tx` für den anschließenden Commit
     /// und gibt den reservierten Speicherplatz frei.
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
@@ -619,7 +600,6 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-DISCARD]
     /// Verwirft alle gepufferten Operationen und das ReadSet einer Transaktion (Rollback).
     pub fn discard(&self, tx: TxId) {
         let shard_idx = self.shard_idx(tx);
@@ -645,7 +625,6 @@ impl<T: Clone> TxBuffer<T> {
         self.shards.iter().all(|s| s.read().ops.is_empty())
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-REAP-ORPHANS]
     /// Räumt abgelaufene (verwaiste) Transaktionen bezüglich `now_nanos` über alle Shards ab.
     pub fn reap_orphans_at(&self, now_nanos: u64) -> Vec<TxId> {
         self.reap_orphans_bounded_at(usize::MAX, now_nanos)
@@ -657,7 +636,6 @@ impl<T: Clone> TxBuffer<T> {
         self.reap_orphans_at(now_nanos)
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-REAP-BOUNDED]
     /// Räumt maximal `max` verwaiste Transaktionen ab, um Latenzspitzen zu vermeiden.
     ///
     /// ### Ablauf:
@@ -756,7 +734,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         }
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-STAGE-KV]
     /// Puffert eine Schlüssel-Wert-Operation und aktualisiert die Key-Staging-Map.
     ///
     /// Bei Fehlschlag von `stage()` (z. B. Budget-Überlauf) wird das Key-Tracking atomar zurückgerollt.
@@ -789,7 +766,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         Ok(())
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-DRAIN-KV]
     /// Entnimmt alle gepufferten KV-Operationen einer Transaktion und bereinigt das Key-Staging.
     pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {
         let ops = self.drain(tx);
@@ -799,7 +775,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         ops
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-DISCARD-KV]
     /// Verwirft alle KV-Operationen einer Transaktion und bereinigt das Key-Staging.
     pub fn discard_kv(&self, tx: TxId) {
         if let Some(ops) = self.get_ops(tx) {
@@ -808,7 +783,6 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         self.discard(tx);
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-IS-KEY-STAGED]
     /// Prüft, ob ein Schlüssel `key` innerhalb der Transaktion `tx_id` als Einfügung vorgemerkt ist.
     pub fn is_key_staged_for_tx(&self, tx_id: TxId, key: &[u8]) -> bool {
         let shard_idx = self.shard_idx(tx_id);
@@ -827,10 +801,9 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         false
     }
 
-    // ANCHOR[contextra-mvcc:TX-BUFFER-STAGED-STATUS]
     /// Ermittelt atomar den Staging-Status eines Schlüssels über alle uncommitted Transaktionen.
     ///
-    /// Liefert `Some(true)` bei Einfügung, `Some(false)` bei Löschung oder `None`, falls der Schlüssel nicht gepuffert ist.
+    /// Liefert `Some(true)` bei Einfügung, `Some(false)` bei Entfernung oder `None`, falls der Schlüssel nicht gepuffert ist.
     pub fn staged_status(&self, key: &[u8]) -> Option<bool> {
         let idx = self.key_shard_idx(key);
         if let Some(shard_lock) = self.key_shards.get(idx) {
@@ -1185,7 +1158,7 @@ mod tests {
         assert!(buffer.validate_pending_ops(tx).is_ok());
     }
 
-    // Prüft die Semantik von is_key_staged_for_tx für Einfügungen und Löschungen.
+    // Prüft die Semantik von is_key_staged_for_tx für Einfügungen und Entfernungen.
     #[test]
     fn test_is_key_staged_for_tx_semantics() {
         let buffer = TxBuffer::<(Vec<u8>, Vec<u8>)>::new();
@@ -1262,7 +1235,7 @@ mod tests {
     proptest::proptest! {
         // Eigenschaftstest: Verifiziert die strikte Isolation gepufferter Transaktionen über Shards hinweg.
         #[test]
-        fn prop_tx_buffer_isolation(
+        fn test_prop_tx_buffer_isolation(
             tx_ids in proptest::collection::vec(0..u64::MAX, 1..50),
             shard_count in 1..256usize
         ) {
@@ -1296,7 +1269,7 @@ mod tests {
 
         // Eigenschaftstest: Prüft, dass der Orphan-Reaper alle überalterten Transaktionen vollständig abräumt.
         #[test]
-        fn prop_tx_buffer_reap_is_complete(
+        fn test_prop_tx_buffer_reap_is_complete(
             tx_count in 1..100usize,
             timeout_ms in 1..100u64
         ) {
@@ -1320,7 +1293,7 @@ mod tests {
 
         // Eigenschaftstest: Prüft den Lebenszyklus von Stage, Drain und erneutem Stage für dieselbe Transaktion.
         #[test]
-        fn prop_tx_buffer_stage_drain_stage_lifecycle(
+        fn test_prop_tx_buffer_stage_drain_stage_lifecycle(
             tx_id_raw in 0..u64::MAX,
             first_ops in proptest::collection::vec(0..100u64, 1..20),
             second_ops in proptest::collection::vec(0..100u64, 1..20)
@@ -1369,7 +1342,7 @@ mod tests {
 
         // Eigenschaftstest: Prüft, dass das Verwerfen einzelner Transaktionen andere aktive Transaktionen unberührt lässt.
         #[test]
-        fn prop_tx_buffer_partial_discard_isolation(
+        fn test_prop_tx_buffer_partial_discard_isolation(
             tx_ids in proptest::collection::vec(0..u64::MAX, 2..40),
             discard_indices in proptest::collection::vec(0..100usize, 1..20)
         ) {

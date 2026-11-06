@@ -1,5 +1,4 @@
 #![deny(dead_code)]
-// ANCHOR[contextra-mvcc:LIB-ROOT]
 //! # `Contextra` MVCC — Multi-Version Concurrency Control, Sequence Log, Transaction Staging und SSI-Validierung.
 //!
 //! Multi-Version Concurrency Control (MVCC, Mehrversions-Nebenläufigkeitssteuerung) ermöglicht es
@@ -35,7 +34,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub use contextra_types::*;
+pub use contextra_types::{
+    error::{self, ContextraError, Result},
+    tombstone::{SeqBitTombstone, TombstoneSemanticsCheck},
+    types::{self, DocId, TenantId, TxId, TOMBSTONE_BIT},
+};
 
 pub mod seq_log;
 pub mod snapshot;
