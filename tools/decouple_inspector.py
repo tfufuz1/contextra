@@ -4,13 +4,16 @@ decouple_inspector.py — Präzisions-Diagnosewerkzeug für Coding-Agenten & Arc
 
 Zweck:
 Untersucht Rust-Crates auf dem Weg zu einem rein modularen Baukastensystem.
-Zeigt direkte Verdrahtungen, interne/externe Schnittstellen, ungenutzten Code,
+Zeigt direkte Verdrahtungen, interne/externe Schnittstellen, ungenutzten Code (Dead-Code-Kandidaten),
 verstreute Löschketten-/DSGVO-Relikte außerhalb von `contextra-erasure`
 sowie fehlende Port-/Trait-Abstraktionen auf.
 
 Verwendung:
     python3 tools/decouple_inspector.py --help
     python3 tools/decouple_inspector.py --crate contextra-store
+    python3 tools/decouple_inspector.py --crate contextra-store --dead-code
+    python3 tools/decouple_inspector.py --crate contextra-store --functions
+    python3 tools/decouple_inspector.py --crate contextra-store --interfaces
     python3 tools/decouple_inspector.py --all --json
     python3 tools/decouple_inspector.py --erasure-leak-check
 """
@@ -22,8 +25,8 @@ import json
 import os
 import re
 import sys
-from collections import defaultdict
-from dataclasses import dataclass, field
+from collections import Counter, defaultdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -33,8 +36,24 @@ RE_PUB_ITEM = re.compile(
     r'^\s*pub(?:\([^)]+\))?\s+(trait|struct|enum|fn|type|const|static)\s+([A-Za-z0-9_]+)',
     re.MULTILINE,
 )
+RE_PRIV_ITEM = re.compile(
+    r'^\s*(?:async\s+)?(?:unsafe\s+)?(trait|struct|enum|fn|type|const|static)\s+([A-Za-z0-9_]+)',
+    re.MULTILINE,
+)
 RE_FN_DEF = re.compile(
-    r'^\s*(?:pub(?:\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z0-9_]+)',
+    r'^\s*(pub(?:\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z0-9_]+)\s*(?:<[^>]+>)?\s*\(([^)]*)\)(?:\s*->\s*([^{;]+))?',
+    re.MULTILINE,
+)
+RE_TRAIT_DEF = re.compile(
+    r'^\s*(pub(?:\([^)]+\))?\s+)?trait\s+([A-Za-z0-9_]+)',
+    re.MULTILINE,
+)
+RE_STRUCT_DEF = re.compile(
+    r'^\s*(pub(?:\([^)]+\))?\s+)?struct\s+([A-Za-z0-9_]+)',
+    re.MULTILINE,
+)
+RE_ENUM_DEF = re.compile(
+    r'^\s*(pub(?:\([^)]+\))?\s+)?enum\s+([A-Za-z0-9_]+)',
     re.MULTILINE,
 )
 RE_IDENT = re.compile(r'\b[A-Za-z_][A-Za-z0-9_]*\b')
@@ -63,6 +82,25 @@ ERASURE_EXEMPT_CRATES = {
     "contextra-erasure",
 }
 
+# Standard-Keywords/Traits, die nicht als tote Symbole gewertet werden
+IGNORED_DEAD_CODE_NAMES = {
+    "new", "default", "drop", "clone", "fmt", "eq", "hash", "run", "init",
+    "from", "into", "try_from", "as_ref", "as_mut", "deref", "deref_mut",
+    "main", "build", "call", "handle", "execute", "start", "stop", "close",
+    "poll", "send", "recv", "read", "write", "flush", "sync", "reset", "clear",
+    "len", "is_empty", "get", "set", "insert", "remove", "contains",
+}
+
+
+@dataclass
+class FunctionItem:
+    name: str
+    file: str
+    line: int
+    is_pub: bool
+    params: str
+    return_type: str
+
 
 @dataclass
 class CrateInventory:
@@ -74,10 +112,16 @@ class CrateInventory:
     dependencies_dev: Set[str] = field(default_factory=set)
     pub_items: Dict[str, List[str]] = field(default_factory=lambda: defaultdict(list))
     all_fn_defs: Set[str] = field(default_factory=set)
+    fn_catalog: List[FunctionItem] = field(default_factory=list)
+    traits: List[Dict[str, Any]] = field(default_factory=list)
+    structs: List[Dict[str, Any]] = field(default_factory=list)
+    enums: List[Dict[str, Any]] = field(default_factory=list)
     imported_symbols: Dict[str, Set[str]] = field(default_factory=lambda: defaultdict(set))
-    used_identifiers: Set[str] = field(default_factory=set)
+    used_identifiers: Counter[str] = field(default_factory=Counter)
     erasure_leaks: List[Dict[str, Any]] = field(default_factory=list)
     direct_coupling_points: List[Dict[str, Any]] = field(default_factory=list)
+    dead_code_candidates: List[Dict[str, Any]] = field(default_factory=list)
+    missing_port_abstractions: List[Dict[str, Any]] = field(default_factory=list)
     loc: int = 0
     file_count: int = 0
 
@@ -186,6 +230,10 @@ def parse_cargo_toml(cargo_path: Path) -> Tuple[Set[str], Set[str]]:
     return prod_deps, dev_deps
 
 
+def find_line_number(text: str, pos: int) -> int:
+    return text[:pos].count('\n') + 1
+
+
 def inspect_crate(crate_dir: Path, workspace_root: Path) -> CrateInventory:
     """Führt eine Tiefeninspektion eines einzelnen Crates durch."""
     crate_name = crate_dir.name
@@ -203,6 +251,9 @@ def inspect_crate(crate_dir: Path, workspace_root: Path) -> CrateInventory:
     src_dir = crate_dir / "src"
     if not src_dir.exists():
         return inv
+
+    file_tokens: Dict[str, Set[str]] = {}
+    declared_items: List[Dict[str, Any]] = []
 
     for root, dirs, files in os.walk(src_dir):
         for f in files:
@@ -239,18 +290,57 @@ def inspect_crate(crate_dir: Path, workspace_root: Path) -> CrateInventory:
             for kind, item_name in RE_PUB_ITEM.findall(clean_code):
                 inv.pub_items[kind].append(f"{rel_file}::{item_name}")
 
-            # 3. Alle Funktionsdefinitionen sammeln
-            for fn_name in RE_FN_DEF.findall(clean_code):
-                inv.all_fn_defs.add(fn_name)
+            # 3. Traits, Structs, Enums erfassen
+            for match in RE_TRAIT_DEF.finditer(clean_code):
+                is_pub = bool(match.group(1))
+                t_name = match.group(2)
+                line_no = find_line_number(clean_code, match.start())
+                inv.traits.append({"name": t_name, "file": rel_file, "line": line_no, "is_pub": is_pub})
+                declared_items.append({"name": t_name, "kind": "trait", "file": rel_file, "line": line_no, "is_pub": is_pub})
 
-            # 4. Importierte Symbole und direkte Kopplungen erkennen
+            for match in RE_STRUCT_DEF.finditer(clean_code):
+                is_pub = bool(match.group(1))
+                s_name = match.group(2)
+                line_no = find_line_number(clean_code, match.start())
+                inv.structs.append({"name": s_name, "file": rel_file, "line": line_no, "is_pub": is_pub})
+                declared_items.append({"name": s_name, "kind": "struct", "file": rel_file, "line": line_no, "is_pub": is_pub})
+
+            for match in RE_ENUM_DEF.finditer(clean_code):
+                is_pub = bool(match.group(1))
+                e_name = match.group(2)
+                line_no = find_line_number(clean_code, match.start())
+                inv.enums.append({"name": e_name, "file": rel_file, "line": line_no, "is_pub": is_pub})
+                declared_items.append({"name": e_name, "kind": "enum", "file": rel_file, "line": line_no, "is_pub": is_pub})
+
+            # 4. Funktionsdefinitionen sammeln (feingranulares Inventar)
+            for match in RE_FN_DEF.finditer(clean_code):
+                is_pub = bool(match.group(1))
+                fn_name = match.group(2)
+                params = (match.group(3) or "").strip().replace("\n", " ")
+                ret_type = (match.group(4) or "").strip()
+                line_no = find_line_number(clean_code, match.start())
+
+                inv.all_fn_defs.add(fn_name)
+                inv.fn_catalog.append(FunctionItem(
+                    name=fn_name,
+                    file=rel_file,
+                    line=line_no,
+                    is_pub=is_pub,
+                    params=params[:60] + ("..." if len(params) > 60 else ""),
+                    return_type=ret_type[:40] + ("..." if len(ret_type) > 40 else ""),
+                ))
+                declared_items.append({"name": fn_name, "kind": "fn", "file": rel_file, "line": line_no, "is_pub": is_pub})
+
+            # 5. Importierte Symbole und direkte Kopplungen erkennen
             for match in RE_USE.finditer(clean_code):
                 use_stmt = match.group(1).strip()
+                line_no = find_line_number(clean_code, match.start())
                 for dep in prod_deps:
                     crate_ident = dep.replace("-", "_")
                     if crate_ident in use_stmt or dep in use_stmt:
                         inv.direct_coupling_points.append({
                             "file": rel_file,
+                            "line": line_no,
                             "target_crate": dep,
                             "statement": use_stmt,
                         })
@@ -258,9 +348,38 @@ def inspect_crate(crate_dir: Path, workspace_root: Path) -> CrateInventory:
                             if token != crate_ident and token not in ("pub", "use", "self", "crate", "super"):
                                 inv.imported_symbols[dep].add(token)
 
-            # 5. Genutzte Identifikatoren sammeln
-            tokens = set(RE_IDENT.findall(clean_code))
+                                # Prüfung: Wird ein konkreter Speicher-/Kryptotyp importiert, der ein Port sein sollte?
+                                if dep in ("contextra-store", "contextra-vector", "contextra-text", "contextra-crypto", "contextra-mvcc"):
+                                    inv.missing_port_abstractions.append({
+                                        "file": rel_file,
+                                        "line": line_no,
+                                        "crate": dep,
+                                        "symbol": token,
+                                        "statement": use_stmt,
+                                    })
+
+            # 6. Genutzte Identifikatoren sammeln
+            tokens = RE_IDENT.findall(clean_code)
+            file_tokens[rel_file] = set(tokens)
             inv.used_identifiers.update(tokens)
+
+    # 7. Dead-Code Heuristik (Ungenutzte interne/private Definitionen)
+    for item in declared_items:
+        name = item["name"]
+        if name in IGNORED_DEAD_CODE_NAMES:
+            continue
+        if name.startswith("_") or name.startswith("test_") or name.startswith("bench_"):
+            continue
+        # Wenn privat und nur genau 1 Mal im gesamten Crate vorkommt (nämlich bei der Definition selbst)
+        occurrences = inv.used_identifiers.get(name, 0)
+        if not item["is_pub"] and occurrences <= 1:
+            inv.dead_code_candidates.append({
+                "name": name,
+                "kind": item["kind"],
+                "file": item["file"],
+                "line": item["line"],
+                "occurrences": occurrences,
+            })
 
     return inv
 
@@ -280,6 +399,15 @@ def evaluate_crate_decoupling(inv: CrateInventory) -> Dict[str, Any]:
                 f"oder als generische Typ-Parameter injizieren."
             )
 
+    if inv.missing_port_abstractions:
+        findings.append(
+            f"{len(inv.missing_port_abstractions)} Stellen mit direkten Importen aus konkreten Speicherkernen "
+            f"(fehlende Port-/Trait-Abstraktion)."
+        )
+        recommendations.append(
+            f"Direkte Importe aus konkreten Speicher-Crates durch Ports in 'contextra-ports' ersetzen."
+        )
+
     if inv.erasure_leaks:
         findings.append(
             f"{len(inv.erasure_leaks)} Referenzen auf DSGVO/Löschkette/Nachweise gefunden. "
@@ -289,10 +417,15 @@ def evaluate_crate_decoupling(inv: CrateInventory) -> Dict[str, Any]:
             f"DSGVO-/Löschlogik aus {inv.name} extrahieren und in 'contextra-erasure' modularisieren."
         )
 
+    if inv.dead_code_candidates:
+        findings.append(f"{len(inv.dead_code_candidates)} ungenutzte private Symbole/Dead-Code-Kandidaten identifiziert.")
+        recommendations.append("Dead Code bereinigen oder Funktionen sauber verdrahten/exportieren.")
+
     score = 100
     score -= min(40, len(inv.dependencies_prod) * 6)
     score -= min(30, len(inv.erasure_leaks) * 5)
     score -= min(20, len(high_coupling_deps) * 5)
+    score -= min(10, min(10, len(inv.dead_code_candidates) // 2))
     score = max(0, score)
 
     status = "Exzellent (Baustein)" if score >= 80 else ("Akzeptabel" if score >= 60 else "Stark verdrahtet (Refactoring nötig)")
@@ -309,8 +442,17 @@ def evaluate_crate_decoupling(inv: CrateInventory) -> Dict[str, Any]:
         "recommendations": recommendations,
         "erasure_leaks_count": len(inv.erasure_leaks),
         "erasure_leaks": inv.erasure_leaks[:15],
+        "dead_code_count": len(inv.dead_code_candidates),
+        "dead_code_candidates": inv.dead_code_candidates[:20],
+        "missing_ports_count": len(inv.missing_port_abstractions),
+        "missing_port_abstractions": inv.missing_port_abstractions[:15],
         "direct_coupling_points_count": len(inv.direct_coupling_points),
         "coupling_summary": {dep: len(syms) for dep, syms in inv.imported_symbols.items()},
+        "traits_count": len(inv.traits),
+        "structs_count": len(inv.structs),
+        "enums_count": len(inv.enums),
+        "functions_count": len(inv.fn_catalog),
+        "pub_functions_count": sum(1 for f in inv.fn_catalog if f.is_pub),
     }
 
 
@@ -323,6 +465,9 @@ def main() -> int:
     parser.add_argument("--all", action="store_true", help="Alle Crates im Workspace analysieren")
     parser.add_argument("--json", action="store_true", help="Ausgabe als JSON für Agenten-Pipelines")
     parser.add_argument("--erasure-leak-check", action="store_true", help="Nur nach verstreuten Löschketten-/DSGVO-Relikten suchen")
+    parser.add_argument("--dead-code", action="store_true", help="Dead-Code-Kandidaten detailliert auflisten")
+    parser.add_argument("--functions", action="store_true", help="Funktionsinventar detailliert auflisten")
+    parser.add_argument("--interfaces", action="store_true", help="Schnittstelleninventar (Traits, Structs, Enums) detailliert auflisten")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -351,7 +496,20 @@ def main() -> int:
         evaluations.append(evaluate_crate_decoupling(inv))
 
     if args.json:
-        print(json.dumps(evaluations, indent=2, ensure_ascii=False))
+        # Falls spezifische Listen gewünscht sind, reichern wir das JSON an
+        out_data = []
+        for inv, ev in zip(inspections, evaluations):
+            item = dict(ev)
+            if args.functions:
+                item["functions"] = [asdict(f) for f in inv.fn_catalog]
+            if args.interfaces:
+                item["traits"] = inv.traits
+                item["structs"] = inv.structs
+                item["enums"] = inv.enums
+            if args.dead_code:
+                item["all_dead_code_candidates"] = inv.dead_code_candidates
+            out_data.append(item)
+        print(json.dumps(out_data, indent=2, ensure_ascii=False))
         return 0
 
     if args.erasure_leak_check:
@@ -374,16 +532,24 @@ def main() -> int:
     print("CONTEXTRA MODULARITÄTS- & ENTKOPPLUNGS-INSPEKTOR")
     print("=" * 80)
 
-    for ev in evaluations:
+    for inv, ev in zip(inspections, evaluations):
         print(f"\n📦 Crate: {ev['crate']}")
         print(f"   Status: {ev['status']} (Modularitäts-Score: {ev['score']}/100)")
         print(f"   Umfang: {ev['loc']} LOC in {ev['files']} Dateien")
+        print(f"   Schnittstellen: {ev['traits_count']} Traits, {ev['structs_count']} Structs, {ev['enums_count']} Enums")
+        print(f"   Funktionen: {ev['pub_functions_count']} pub / {ev['functions_count']} gesamt")
         print(f"   Interne Abhängigkeiten ({ev['dependencies_count']}): {', '.join(ev['dependencies']) or 'keine (völlig autark)'}")
 
         if ev["coupling_summary"]:
             print("   Schnittstellen-Kopplung (importierte Symbole):")
             for dep, count in ev["coupling_summary"].items():
                 print(f"     -> {dep:25}: {count} Symbole")
+
+        if ev["missing_ports_count"] > 0:
+            print(f"   ⚠️  Fehlende Port-Abstraktion: {ev['missing_ports_count']} direkte Kernel-Importe!")
+
+        if ev["dead_code_count"] > 0:
+            print(f"   ⚠️  Dead-Code-Kandidaten: {ev['dead_code_count']} ungenutzte interne Definitionen!")
 
         if ev["erasure_leaks_count"] > 0:
             print(f"   ⚠️  DSGVO-/Löschketten-Relikte: {ev['erasure_leaks_count']} Stellen identifiziert!")
@@ -397,6 +563,27 @@ def main() -> int:
             print("   Entkopplungs-Handlungsempfehlungen für Agenten:")
             for r in ev["recommendations"]:
                 print(f"     ✓ {r}")
+
+        if args.dead_code and inv.dead_code_candidates:
+            print("   --- Ungenutzte Symbole (Dead Code Kandidaten) ---")
+            for dc in inv.dead_code_candidates[:30]:
+                print(f"     [{dc['kind']}] {dc['name']} ({dc['file']}:{dc['line']})")
+
+        if args.interfaces:
+            print("   --- Schnittstellen-Inventar (Traits & Types) ---")
+            for t in inv.traits:
+                pub_marker = "pub " if t["is_pub"] else ""
+                print(f"     {pub_marker}trait {t['name']} ({t['file']}:{t['line']})")
+            for s in inv.structs[:20]:
+                pub_marker = "pub " if s["is_pub"] else ""
+                print(f"     {pub_marker}struct {s['name']} ({s['file']}:{s['line']})")
+
+        if args.functions:
+            print("   --- Funktions-Inventar (Auszug) ---")
+            for fn in inv.fn_catalog[:25]:
+                pub_marker = "pub " if fn.is_pub else ""
+                ret = f" -> {fn.return_type}" if fn.return_type else ""
+                print(f"     {pub_marker}fn {fn.name}({fn.params}){ret} ({fn.file}:{fn.line})")
 
     print("\n" + "=" * 80)
     print("ZUSAMMENFASSUNG:")
