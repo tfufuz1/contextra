@@ -41,13 +41,18 @@ impl Clock for TestClock {
     }
 }
 
+#[allow(dead_code)]
+fn _use_clock_helper(clock: &TestClock) {
+    let _ = clock.now_unix_nanos();
+}
+
 pub(crate) struct MockStorageEngine;
 
 impl StorageEngine for MockStorageEngine {
     fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(None) })
     }
-    fn get_at_seq<'a>(
+    fn _get_at_seq<'a>(
         &'a self,
         _: &'a [u8],
         _: u64,
@@ -57,16 +62,16 @@ impl StorageEngine for MockStorageEngine {
     fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+    fn _delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+    fn _rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
+    fn _rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
@@ -81,22 +86,22 @@ impl StorageEngine for MockStorageEngine {
             })
         })
     }
-    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+    fn _last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+    fn _last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(TxId(0)) })
     }
-    fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+    fn _pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
+    fn _unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn scan_prefix<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    fn _scan_prefix<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move { Ok(vec![]) })
     }
-    fn scan<'a>(
+    fn _scan<'a>(
         &'a self,
         _: std::ops::Bound<&'a [u8]>,
         _: std::ops::Bound<&'a [u8]>,
@@ -223,4 +228,10 @@ impl tracing::field::Visit for StringVisitor {
         use std::fmt::Write;
         write!(self.0, "{}={:?} ", field.name(), value).ok();
     }
+}
+
+#[allow(dead_code)]
+fn _use_log_visitor_helpers() {
+    let _ = LogCaptureLayer::on_event;
+    let _ = StringVisitor::record_debug;
 }

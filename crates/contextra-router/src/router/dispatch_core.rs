@@ -22,11 +22,7 @@
 
 use super::*;
 
-pub(crate) type SelectionResult = (
-    SlmProfile,
-    Option<ConfidenceMetrics>,
-    Option<(u32, f32)>,
-);
+pub(crate) type SelectionResult = (SlmProfile, Option<ConfidenceMetrics>, Option<(u32, f32)>);
 
 impl RouterEngine {
     /// Fetches search results and resolves graph communities for each result chunk.
@@ -153,9 +149,9 @@ impl RouterEngine {
             state.cumulative_confidence += f64::from(confidence_ratio);
         }
 
-        let metrics = cal
-            .get(&selected_profile.name)
-            .map(|state| Self::build_confidence_metrics(state, best_score, confidence_ratio, non_conformity));
+        let metrics = cal.get(&selected_profile.name).map(|state| {
+            Self::build_confidence_metrics(state, best_score, confidence_ratio, non_conformity)
+        });
 
         Ok((selected_profile, metrics, is_bandit))
     }
@@ -214,7 +210,10 @@ impl RouterEngine {
             #[cfg(feature = "bandit-routing")]
             {
                 let k_drift = (1.0 + lyapunov_exponent.max(0.0)).clamp(1.5, 4.0);
-                if let Some(profile_state) = _profiles.iter_mut().find(|p| p.name == selected_profile_name) {
+                if let Some(profile_state) = _profiles
+                    .iter_mut()
+                    .find(|p| p.name == selected_profile_name)
+                {
                     if let Some(ref mut bstate) = profile_state.bandit_state {
                         bstate.on_drift_detected(k_drift);
                     }
@@ -460,7 +459,9 @@ impl RouterEngine {
                     .then_with(|| a.min_relevance_score.total_cmp(&b.min_relevance_score))
                     .then_with(|| idx_a.cmp(idx_b))
             })
-            .ok_or_else(|| ContextraError::NotFound("Keine SLM-Profile konfiguriert".to_string()))?;
+            .ok_or_else(|| {
+                ContextraError::NotFound("Keine SLM-Profile konfiguriert".to_string())
+            })?;
 
         let fallback_score = compute_profile_score(fallback_profile, chunks);
         let state = calibration.get(&fallback_profile.name);
@@ -584,11 +585,9 @@ impl RouterEngine {
             .iter()
             .enumerate()
             .max_by(|(_, (idx_a, _, score_a)), (_, (idx_b, _, score_b))| {
-                score_a
-                    .total_cmp(score_b)
-                    .then_with(|| idx_b.cmp(idx_a))
+                score_a.total_cmp(score_b).then_with(|| idx_b.cmp(idx_a))
             })
-            .map(|(action_idx, _)| action_idx as u32)
+            .and_then(|(action_idx, _)| u32::try_from(action_idx).ok())
             .unwrap_or(0);
 
         let min_epsilon = 0.01 * (num_actions as f32);
@@ -599,15 +598,26 @@ impl RouterEngine {
         let (selected_action_idx, propensity) =
             logging_policy.select_action(greedy_action_idx, sample);
 
-        let selected_usize = (selected_action_idx as usize).min(profile_scores.len() - 1);
-        let (orig_idx, ref selected_profile, _) = profile_scores[selected_usize];
+        let selected_usize =
+            (selected_action_idx as usize).min(profile_scores.len().saturating_sub(1));
+        let (orig_idx, selected_profile) = profile_scores
+            .get(selected_usize)
+            .map(|(orig, p, _)| (*orig, p.clone()))
+            .unwrap_or_else(|| match profile_scores.first() {
+                Some((orig, p, _)) => (*orig, p.clone()),
+                None => (
+                    0,
+                    SlmProfile::new(
+                        "fallback",
+                        "",
+                        Vec::new(),
+                        contextra_types::TokenBudget::default(),
+                        0.0,
+                    ),
+                ),
+            });
 
-        (
-            orig_idx,
-            selected_profile.clone(),
-            selected_action_idx,
-            propensity,
-        )
+        (orig_idx, selected_profile, selected_action_idx, propensity)
     }
 
     #[cfg(feature = "bandit-routing")]
@@ -637,8 +647,9 @@ impl RouterEngine {
             return None;
         }
 
-        let num_actions = eligible_profiles.len() as u32;
-        let profile_scores = self.evaluate_bandit_profile_scores(&eligible_profiles, query_embedding)?;
+        let num_actions = u32::try_from(eligible_profiles.len()).unwrap_or(u32::MAX);
+        let profile_scores =
+            self.evaluate_bandit_profile_scores(&eligible_profiles, query_embedding)?;
         Some(self.choose_bandit_action(&profile_scores, num_actions))
     }
 }

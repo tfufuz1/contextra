@@ -23,7 +23,6 @@ contextra-types = { workspace = true }
 contextra-wire = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-adapt = { workspace = true }
-contextra-privacy = { workspace = true }
 arc-swap = "1"
 parking_lot = { workspace = true }
 tokio = { workspace = true }
