@@ -23,7 +23,7 @@
 //!   fehlende Capabilities oder Kapazitätsgrenzen), bleibt der Vault nutzbar, aber ohne physische
 //!   RAM-Fixierung. Eine Warnung wird via `tracing::warn!` ausgegeben.
 
-use contextra_sys::LockedRegions;
+include!("vault_sys.inc");
 use contextra_types::{DocId, TenantId, TxId};
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -119,7 +119,7 @@ impl Default for VaultConfig {
 }
 
 // ANCHOR[contextra-db:VAULT-007]
-/// Quittung nach erfolgreichem [`VolatileContextVault::purge()`].
+/// Quittung nach erfolgreicher flüchtiger Speicherbereinigung via [`VolatileContextVault::purge_memory()`].
 #[derive(Debug)]
 pub struct PurgeReceipt {
     /// Anzahl überschriebener und verworfener Chunks.
@@ -129,6 +129,8 @@ pub struct PurgeReceipt {
     /// Zeitstempel, an dem die Bereinigung vollzogen wurde.
     pub purged_at: Instant,
 }
+
+include!("vault_compat.inc");
 
 // ANCHOR[contextra-db:VAULT-008]
 /// Quittung nach Übergabe der Chunks an die persistente Datenbank via [`VolatileContextVault::commit()`].
@@ -260,8 +262,8 @@ impl VolatileContextVault {
     /// # Ablauf von `purge`:
     /// 1. Alle Chunk-Inhalte im Heap explizit via [`Zeroize::zeroize()`] mit Nullen überschreiben.
     /// 2. Erst nach dem Nullsetzen: Betriebssystem-Locks via `unlock_all()` freigeben (`munlock`).
-    /// 3. Chunk-Liste leeren, Vault als konsumiert markieren und [`PurgeReceipt`] ausstellen.
-    pub fn purge(mut self) -> PurgeReceipt {
+    /// 3. Chunk-Liste leeren, Vault als konsumiert markieren und [`VolatileDrainReceipt`] ausstellen.
+    pub fn purge_memory(mut self) -> VolatileDrainReceipt {
         let chunks_purged = self.chunks.len();
         let bytes_zeroed = self.current_bytes;
 
@@ -281,11 +283,17 @@ impl VolatileContextVault {
         self.chunks.clear();
         self.consumed = true;
 
-        PurgeReceipt {
+        VolatileDrainReceipt {
             chunks_purged,
             bytes_zeroed,
             purged_at: Instant::now(),
         }
+    }
+
+    /// Neutralisierte Speicherleeren-Methode (Alias für [`Self::purge_memory`]).
+    #[inline]
+    pub fn purge(self) -> VolatileDrainReceipt {
+        self.purge_memory()
     }
 
     // ANCHOR[contextra-db:VAULT-014]

@@ -32,14 +32,14 @@ mod tests {
     use super::*;
     use contextra_types::EntityId;
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-002]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-002]
     #[test]
     fn test_compute_edge_weight_formula() {
         let score = compute_edge_weight(0.3, 0.7, 0.5);
         assert!((score - 0.5).abs() < f32::EPSILON);
     }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-003]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-003]
     #[test]
     fn test_cooccurrence_reinforcement_decay() {
         let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
@@ -53,7 +53,7 @@ mod tests {
         assert!(edge.cooccurrence_weight >= 0.0);
     }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-004]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-004]
     #[test]
     fn test_weight_normalization_caps_w_max() {
         let mut edges = vec![
@@ -72,7 +72,7 @@ mod tests {
         assert_eq!(edges[1].cooccurrence_weight, 5.0);
     }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-005]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-005]
     #[test]
     fn test_traversal_reinforcement_evaporation() {
         let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
@@ -86,14 +86,14 @@ mod tests {
         assert!(edge.traversal_weight >= 0.0);
     }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-006]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-006]
     #[test]
     fn test_compute_edge_weight_extreme_alpha() {
         assert_eq!(compute_edge_weight(0.8, 0.2, 1.0), 0.8);
         assert_eq!(compute_edge_weight(0.8, 0.2, 0.0), 0.2);
     }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-007]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-007]
     #[test]
     fn test_apply_weight_normalization_zero_and_below_max() {
         let mut edges = vec![
@@ -111,7 +111,7 @@ mod tests {
         apply_weight_normalization(&mut empty_edges, 10.0);
     }
 
-// ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-008]
+    // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-008]
     #[test]
     fn test_cooccurrence_reinforcement_triggers_normalization() {
         let mut edge = CsrEdge::new(EntityId::new(1), 1.0);

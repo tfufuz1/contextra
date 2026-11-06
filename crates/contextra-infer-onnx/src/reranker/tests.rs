@@ -516,7 +516,7 @@ fn test_ece_reduction_after_platt_calibration() {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
     #[test]
-    fn prop_platt_calibration_reduces_ece(
+    fn test_prop_platt_calibration_reduces_ece(
         scale in 1.5f32..5.0f32,
         shift in -2.0f32..2.0f32,
     ) {

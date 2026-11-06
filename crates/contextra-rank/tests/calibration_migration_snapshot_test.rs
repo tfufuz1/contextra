@@ -49,7 +49,7 @@ fn test_isotonic_migration_snapshot() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_migration_snapshot() {
     let obs = vec![

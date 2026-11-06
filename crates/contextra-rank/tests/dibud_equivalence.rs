@@ -172,7 +172,7 @@ fn test_dibud_unlimited_budget_equivalence_200_fixtures() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_dibud_limited_budget_prefix_property() {
     let mut lcg = SimpleLcg::new(0xCAFE_BABE_9876_5432);

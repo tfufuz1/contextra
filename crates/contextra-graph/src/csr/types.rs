@@ -34,7 +34,7 @@ pub struct CsrEdge {
 }
 
 impl CsrEdge {
-// ANCHOR[contextra-graph:SRC-CSR-TYPES-003]
+    // ANCHOR[contextra-graph:SRC-CSR-TYPES-003]
     pub fn new(target: EntityId, weight: f32) -> Self {
         Self {
             target,

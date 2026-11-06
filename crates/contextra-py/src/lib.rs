@@ -11,7 +11,7 @@
 //!
 //! Dieses Crate stellt die offizielle Python-Brücke (FFI = Foreign Function Interface)
 //! für die eingebettete 4-Signal Hybrid-Search Vektordatenbank **Contextra** bereit.
-//! Es verbindet das Python-Ökosystem via PyO3 mit dem Rust-Kern (`contextra-db`, `contextra-store`).
+//! Es verbindet das Python-Ökosystem via PyO3 mit dem Rust-Kern (`contextra-db`).
 //!
 //! ## Ring-Zugehörigkeit & Architektur
 //!
@@ -20,8 +20,8 @@
 //!   weiterhin als vollwertiges Workspace-Mitglied geführt.
 //! - **Abhängigkeiten (eingehend):** Keine Workspace-Crates hängen von `contextra-py` ab.
 //!   Die Nutzung erfolgt ausschließlich durch Python-Clients / User-Space.
-//! - **Abhängigkeiten (ausgehend):** `contextra-types`, `contextra-store`, `contextra-db`,
-//!   `contextra-rank`, `contextra-adapt`, `contextra-wire` sowie Third-Party Crates wie
+//! - **Abhängigkeiten (ausgehend):** `contextra-types`, `contextra-db`,
+//!   `contextra-wire` sowie Third-Party Crates wie
 //!   `pyo3`, `numpy`, `tokio`, `parking_lot`, `flatbuffers`, `serde_json`, `pythonize`.
 //!
 //! ## Wichtige Invarianten für Entwickler

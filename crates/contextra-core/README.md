@@ -1,28 +1,17 @@
 # contextra-core
 
-Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer.
+Historische Übergangs-Fassade (Strangler-Muster).
 
 Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
 
+## Rolle & Zweck
+`contextra-core` ist eine reine Übergangs- und Strangler-Fassade. Im Zuge der Zerlegung des historischen Monolithen wurden alle Kern-Typen und Port-Schnittstellen nach [`contextra-types`](../contextra-types/), [`contextra-ports`](../contextra-ports/) und [`contextra-mvcc`](../contextra-mvcc/) ausgelagert.
 
-`contextra-core` ist eine Strangler-Fassade für historische Core-Typen und Traits (Ring 0 / Legacy).
-
-## Zweck
-
-Dient während der Migration als Re-Export-Schicht für Typen und Traits, die schrittweise nach `contextra-types`, `contextra-ports` und `contextra-mvcc` ausgelagert wurden.
-
-## Ring-Zugehörigkeit & Status
-
+## Baukasten-Einordnung & Status
 - **Ring:** Ring 0 (Legacy Facade)
-- **Status:** 🟡 In Migration / Strangler
+- **Status:** 🟡 Deprecated Debt / Strangler-Fassade
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-## Öffentliche API-Übersicht
-
-Re-exportiert grundlegende Submodule und Typen aus Ring-0-Crates:
-- Re-exports von `contextra_types::*`
-- Re-exports von `contextra_ports::*`
-
-## Architektur & Verweise
-
-Details zum Strangler-Muster und der Zerlegung von `contextra-core` finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §20 (Phase 1b).
+## Deprecated Debt & Migration
+- **Veralteter Baustein:** Dieser Crate ist als *Deprecated Debt* (siehe [`DEPRECATED_DEBT.md`](../../DEPRECATED_DEBT.md)) deklariert.
+- **Handlungsempfehlung:** Neue Komponenten dürfen nicht von `contextra-core` abhängen, sondern müssen direkt `contextra-types` oder `contextra-ports` einbinden. `contextra-core` wird nach vollständiger Portierung aller Downstream-Abhängigkeiten archiviert.

@@ -19,6 +19,7 @@
 //! - `hwm_lock`: Schützt das Nachführen des High-Water-Marks für transaktionale Zähler.
 
 use crate::guard::{CheckpointGuard, PinGuard};
+use crate::hardlink_cloner::SnapshotPinner;
 use crate::hardlink_cloner::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult,
 };
@@ -27,7 +28,6 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
-use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
@@ -897,11 +897,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         seq_no: u64,
         source_dir: &Path,
         target_dir: &Path,
-        snapshot_registry: &Arc<SnapshotRegistry>,
+        snapshot_pinner: &(dyn SnapshotPinner + '_),
     ) -> Result<HardlinkCloneResult> {
         let cloner = DefaultHardlinkCloner::new();
         cloner
-            .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_registry)
+            .clone_sstable_hardlinks(seq_no, source_dir, target_dir, snapshot_pinner)
             .await
     }
 }

@@ -1,12 +1,12 @@
 //! # Modul: erasure.rs
 //!
-//! **Zweck:** Fail-Closed ErasureOrchestrator für gemessene Löschungen (DeletionProof-Saga).
+//! **Zweck:** Fail-Closed ErasureOrchestrator für gemessene Bereinigungen (DEBT-01).
 //!
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
 
 // FILE-CONTEXT
-// ZWECK: Orchestrierung der fail-closed Datenlöschung (ErasureOrchestrator, SPEC §12.7.4).
+// ZWECK: Orchestrierung der fail-closed Datenbereinigung (ErasureOrchestrator, SPEC §12.7.4, DEBT-01).
 // INVARIANTEN: DeletionProof entsteht ausschließlich nach unabhängiger LayerWitness-Messung aller Schichten. Fehler nach erster Mutation ergeben Ok(ErasureReport { verified: false, proof: None, ... }).
 // NICHT-OFFENSICHTLICH: Physische Purger laufen in fixer Reihenfolge (Text -> Vector -> LSM). Scans laufen unabhängig und vertrauen Purgern nicht.
 
@@ -14,7 +14,9 @@
 
 use crate::*;
 use contextra_crypto::deletion_proof::LayerWitnessExt;
-use contextra_ports::scanner::{LayerScanner, LayerWitness, ScanTarget, ScanTechnique, WitnessLayer};
+use contextra_ports::scanner::{
+    LayerScanner, LayerWitness, ScanTarget, ScanTechnique, WitnessLayer,
+};
 use contextra_ports::SystemClock;
 use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};
 use serde::{Deserialize, Serialize};
@@ -26,7 +28,7 @@ pub enum CollectionStatus {
     /// Normal aktiv.
     #[default]
     Active,
-    /// Zur Löschung Vormerkung/Fehlgeschlagen.
+    /// Zur physischen Bereinigung vorgemerkt/Fehlgeschlagen.
     PendingPurge,
 }
 

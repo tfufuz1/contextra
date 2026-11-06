@@ -12,10 +12,10 @@
 //! | `contextra_explain` | `DatabaseRead` | Provenance breakdown & retrieval explanation |
 //! | `contextra_insert` | `DatabaseWrite` | Store a document with auto-chunking & auto-embedding |
 //! | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-//! | `contextra_delete` | `DatabaseWrite` | Delete single document without measured deletion proof |
+//! | `contextra_delete` | `DatabaseWrite` | Delete single document without measured receipt |
 //! | `contextra_forget` | `DatabaseWrite` | Delete document (unverified) or drop collection (with verified proof) |
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
-//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue a verified DeletionProof |
+//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue verified drop receipt |
 
 pub mod bulk_exfiltration_detector;
 pub mod config;
@@ -49,7 +49,7 @@ pub use egress_gateway::{
 };
 
 pub use explain::{ExplainRequest, ExplainResponse};
-pub use proof_key::deletion_proof_key_from_env;
+pub use proof_key::proof_key_from_env;
 
 pub use io::{read_line_bounded, MAX_RPC_BYTES, MAX_SEARCH_QUERY_BYTES};
 

@@ -833,7 +833,7 @@ mod tests {
     proptest! {
         // Eigenschaftstest: Beliebige Byte-Vektoren bleiben nach Kompression und Dekompression unverändert.
         #[test]
-        fn prop_compression_roundtrip(vec in proptest::collection::vec(0u8..255u8, 0..100)) {
+        fn test_prop_compression_roundtrip(vec in proptest::collection::vec(0u8..255u8, 0..100)) {
             let compressed = compress_bytes(&vec);
             let decompressed = decompress_bytes(&compressed).unwrap();
             prop_assert_eq!(vec, decompressed);

@@ -6,7 +6,11 @@ use super::{ProcessExitError, ERRNO_ACCES, ERRNO_INVAL, ERRNO_NOSYS, ERRNO_NOTSU
 use crate::executor::SandboxState;
 use wasmtime::{Caller, Linker};
 
-#[allow(clippy::disallowed_methods, clippy::cast_sign_loss, clippy::indexing_slicing)]
+#[allow(
+    clippy::disallowed_methods,
+    clippy::cast_sign_loss,
+    clippy::indexing_slicing
+)]
 pub(crate) fn register_sys(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::Error> {
     // proc_exit
     linker.func_wrap(

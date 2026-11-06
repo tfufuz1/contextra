@@ -228,8 +228,8 @@ async fn test_crud_drop_collection_preflight_and_tenant_origin() {
         .unwrap()
         .contains("confirm parameter must be explicitly set to true"));
 
-    // 2. Preflight key check: fails when CONTEXTRA_DELETION_PROOF_KEY is unset
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    // 2. Preflight key check: fails when CONTEXTRA_PROOF_KEY is unset
+    std::env::remove_var("CONTEXTRA_PROOF_KEY");
     let req_no_key = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(json!(31)),
@@ -251,10 +251,7 @@ async fn test_crud_drop_collection_preflight_and_tenant_origin() {
         .contains("deletion proof key not configured"));
 
     // 3. Setting proof key
-    std::env::set_var(
-        "CONTEXTRA_DELETION_PROOF_KEY",
-        "test_key_32_bytes_long_exact!!",
-    );
+    std::env::set_var("CONTEXTRA_PROOF_KEY", "test_key_32_bytes_long_exact!!");
 
     // 4. Tenant origin check: User passing tenant_id parameter must not override server tenant_id
     // If server has tenant_id = None, it must reject with "tenant_id not configured on server"
@@ -321,7 +318,7 @@ async fn test_crud_drop_collection_preflight_and_tenant_origin() {
     assert!(text.contains("\"ok\":true"));
     assert!(text.contains("\"verified\":true"));
 
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    std::env::remove_var("CONTEXTRA_PROOF_KEY");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -385,7 +382,7 @@ async fn test_crud_handle_delete_boundaries_and_semantics() {
         .contains("id length exceeds limit"));
 
     // 4. Key preflight check: fails when proof key is missing
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    std::env::remove_var("CONTEXTRA_PROOF_KEY");
     let req_no_key = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(json!(43)),
@@ -404,10 +401,7 @@ async fn test_crud_handle_delete_boundaries_and_semantics() {
         .contains("deletion proof key not configured"));
 
     // 5. Successful single delete with key set
-    std::env::set_var(
-        "CONTEXTRA_DELETION_PROOF_KEY",
-        "test_key_32_bytes_long_exact!!",
-    );
+    std::env::set_var("CONTEXTRA_PROOF_KEY", "test_key_32_bytes_long_exact!!");
     let req_ok = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(json!(44)),
@@ -426,7 +420,7 @@ async fn test_crud_handle_delete_boundaries_and_semantics() {
     assert!(text.contains("\"verified\":false"));
     assert!(text.contains("\"claim\":\"LogicalDeletionOnly\""));
 
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    std::env::remove_var("CONTEXTRA_PROOF_KEY");
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -22,11 +22,12 @@ use contextra_types::{DocId, Result};
 
 /// Calculates effective candidate count limit based on query overfetch preferences and reranker settings.
 pub(super) fn calc_hybrid_candidate_k(query: &contextra_types::HybridQuery, k: usize) -> usize {
-    let overfetch = k.saturating_mul(Collection::<crate::LsmStorage, crate::HnswIndex>::OVERFETCH_FACTOR);
+    let overfetch =
+        k.saturating_mul(Collection::<crate::LsmStorage, crate::HnswIndex>::OVERFETCH_FACTOR);
     if query.has_reranker {
-        let pool_max = query
-            .rerank_pool_max
-            .unwrap_or(Collection::<crate::LsmStorage, crate::HnswIndex>::DEFAULT_MIN_RERANK_CANDIDATES);
+        let pool_max = query.rerank_pool_max.unwrap_or(
+            Collection::<crate::LsmStorage, crate::HnswIndex>::DEFAULT_MIN_RERANK_CANDIDATES,
+        );
         overfetch.max(pool_max)
     } else {
         overfetch
@@ -219,9 +220,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     let max_cap = total_docs.min(MAX_OVERFETCH_SCAN).max(candidate_k);
                     let mut final_filtered = Vec::new();
 
-                    for (stage_idx, &stage_mult) in
-                        OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate()
-                    {
+                    for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
                         report.overfetch_stages =
                             report.overfetch_stages.max((stage_idx + 1) as u8);
                         let oversample = (candidate_k * stage_mult).min(max_cap);
@@ -251,8 +250,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 let mut final_filtered = Vec::new();
 
                 for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
-                    report.overfetch_stages =
-                        report.overfetch_stages.max((stage_idx + 1) as u8);
+                    report.overfetch_stages = report.overfetch_stages.max((stage_idx + 1) as u8);
                     let oversample = (candidate_k * stage_mult).min(max_cap);
                     let raw_vec_results = self
                         .search_filtered_at(vector, oversample, None, seq)
@@ -281,7 +279,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 .await
         };
 
-        let elapsed_vec = (self.clock().monotonic_nanos().saturating_sub(vec_start_nanos)) as f64 / 1_000_000_000.0;
+        let elapsed_vec = (self
+            .clock()
+            .monotonic_nanos()
+            .saturating_sub(vec_start_nanos)) as f64
+            / 1_000_000_000.0;
         record_histogram_safe(active_sink, SEARCH_LATENCY_VECTOR, elapsed_vec, &[]);
 
         match vector_res {
@@ -331,8 +333,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
                 report.overfetch_stages = report.overfetch_stages.max((stage_idx + 1) as u8);
-                let oversample =
-                    (calculated_initial * stage_mult / 3).clamp(candidate_k, max_cap);
+                let oversample = (calculated_initial * stage_mult / 3).clamp(candidate_k, max_cap);
                 let bm25_results = self.text_index.search_at(text, oversample, seq).await?;
                 let bm25_len = bm25_results.len();
                 let hydrated = self
@@ -373,7 +374,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .await
         };
 
-        let elapsed_text = (self.clock().monotonic_nanos().saturating_sub(text_start_nanos)) as f64 / 1_000_000_000.0;
+        let elapsed_text = (self
+            .clock()
+            .monotonic_nanos()
+            .saturating_sub(text_start_nanos)) as f64
+            / 1_000_000_000.0;
         record_histogram_safe(active_sink, SEARCH_LATENCY_TEXT, elapsed_text, &[]);
 
         match text_res {
@@ -470,7 +475,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Ok(Vec::new())
         };
 
-        let elapsed_graph = (self.clock().monotonic_nanos().saturating_sub(graph_start_nanos)) as f64 / 1_000_000_000.0;
+        let elapsed_graph = (self
+            .clock()
+            .monotonic_nanos()
+            .saturating_sub(graph_start_nanos)) as f64
+            / 1_000_000_000.0;
         record_histogram_safe(active_sink, SEARCH_LATENCY_GRAPH, elapsed_graph, &[]);
 
         let graph_results = match graph_res {
@@ -485,9 +494,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         };
 
-        if !text_results.is_empty()
-            && graph_results.is_empty()
-            && query.graph_start_node.is_none()
+        if !text_results.is_empty() && graph_results.is_empty() && query.graph_start_node.is_none()
         {
             let msg =
                 "Implicit graph anchors derived from text results produced empty graph signal";
@@ -512,8 +519,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text_results: Vec<crate::SearchResult>,
         graph_results: Vec<crate::SearchResult>,
     ) -> Result<Vec<crate::SearchResult>> {
-        let (vw, tw, gw) =
-            crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
+        let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
 
         let target_community_id: Option<u64> =
             if let Some(same_comm_entity) = query.same_community_as {

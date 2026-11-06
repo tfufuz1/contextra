@@ -21,7 +21,7 @@
 //! # Funktionsweise
 //! Verwaltet Dokumente, Posting-Listen, Vorwärtsindex und BM25-Statistiken über dem
 //! [`contextra_ports::StorageEngine`]-Port. Unterstützt Transaktionen (Staging, Commit, Rollback),
-//! physische Löschung (Purge) und Scans für Verifiable Deletion.
+//! physische Bereinigung (Purge) und Verifikations-Scans.
 
 mod index_struct;
 mod morph_index;

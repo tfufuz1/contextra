@@ -20,7 +20,7 @@ pub struct MemoryEstimate {
 
 impl MemoryEstimate {
     #[inline]
-// ANCHOR[contextra-graph:SRC-CSR-INNER-ESTIMATE-002]
+    // ANCHOR[contextra-graph:SRC-CSR-INNER-ESTIMATE-002]
     pub fn total_bytes(&self) -> usize {
         self.shared_payload_bytes + self.private_bytes
     }

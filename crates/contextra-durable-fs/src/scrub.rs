@@ -1,7 +1,7 @@
 //! # Sicheres Überschreiben und Entfernen von Dateien (Scrubbing)
 //!
 //! Zweck: Implementierung von Schutzmechanismen und Überschreibverfahren (Scrubbing) vor dem
-//! physischen Löschen von Dateien von Speichermedien.
+//! physischen Entfernen von Dateien von Speichermedien.
 //!
 //! Ring-Zugehörigkeit: Ring 0 (Dauerhafte Dateisystem-Hilfsmittel).
 //! Wird genutzt von: Bereinigungsroutinen und Storage-Wartungspfaden.
@@ -180,7 +180,10 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
             injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
+            let slice = zeros
+                .get(..chunk_size)
+                .ok_or_else(|| std::io::Error::other("chunk_size out of bounds"))?;
+            file.write_all(slice)?;
             remaining -= chunk_size as u64;
         }
 
@@ -219,10 +222,12 @@ fn verify_zero_readback(
         let chunk_size = usize::try_from(remaining)
             .unwrap_or(buf.len())
             .min(buf.len());
-        file.read_exact(&mut buf[..chunk_size])?;
-        if buf[..chunk_size].iter().any(|&b| b != 0) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+        let slice = buf
+            .get_mut(..chunk_size)
+            .ok_or_else(|| std::io::Error::other("chunk_size out of bounds"))?;
+        file.read_exact(slice)?;
+        if slice.iter().any(|&b| b != 0) {
+            return Err(std::io::Error::other(
                 format!(
                     "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
                     path
@@ -271,7 +276,9 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
                 continue;
             }
 
-            let mount_point = parts[4];
+            let Some(&mount_point) = parts.get(4) else {
+                continue;
+            };
             let mount_path = Path::new(mount_point);
 
             if canonical_path.starts_with(mount_path) {
@@ -279,8 +286,8 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
                 if mlen >= best_match_len {
                     best_match_len = mlen;
                     if let Some(dash_pos) = parts.iter().position(|&p| p == "-") {
-                        if dash_pos + 1 < parts.len() {
-                            best_match_fstype = parts[dash_pos + 1].to_lowercase();
+                        if let Some(&fstype_part) = parts.get(dash_pos + 1) {
+                            best_match_fstype = fstype_part.to_lowercase();
                         }
                     }
                 }

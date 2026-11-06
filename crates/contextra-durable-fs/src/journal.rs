@@ -146,7 +146,9 @@ impl PendingDeleteJournal {
                 }
                 Err(err) => {
                     // NOTE: Fehlgeschlagenen Eintrag und alle nachfolgenden unberührten Einträge im Journal behalten.
-                    remaining.extend(self.entries[idx..].iter().cloned());
+                    if let Some(sub) = self.entries.get(idx..) {
+                        remaining.extend(sub.iter().cloned());
+                    }
                     self.entries = remaining;
                     if let Err(flush_err) = self.flush() {
                         self.health.record_event(HealthEvent::FsyncFailure);

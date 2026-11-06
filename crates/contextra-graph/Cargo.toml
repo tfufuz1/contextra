@@ -28,7 +28,6 @@ physio-percolation = ["graph-connectivity-health"]
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-adapt = { workspace = true }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
 ahash = { workspace = true }

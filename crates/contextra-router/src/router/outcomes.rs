@@ -106,8 +106,6 @@ impl RouterEngine {
         let ttl_nanos = PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000);
         let mut map = self.pending_decisions.write();
         if map.len() >= MAX_PENDING_DECISIONS {
-            let sample_ts = map.values().next().map(|(_, ts)| *ts).unwrap_or(0);
-            eprintln!("EVICTING: len={}, now={}, sample_ts={}, diff={}, ttl={}", map.len(), now_nanos, sample_ts, now_nanos.saturating_sub(sample_ts), ttl_nanos);
             map.retain(|_, (_, ts)| now_nanos.saturating_sub(*ts) <= ttl_nanos);
         }
 

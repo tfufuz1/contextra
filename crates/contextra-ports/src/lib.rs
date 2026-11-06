@@ -150,3 +150,24 @@ mod dyn_safety {
         _assert_dyn_vfs(None);
     }
 }
+
+pub mod barrier;
+pub mod erasure;
+pub mod gate;
+pub mod keys;
+pub mod ledger;
+pub mod observer;
+pub mod report_signer;
+
+pub use barrier::{
+    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
+};
+pub use erasure::{
+    EraseTarget as PortEraseTarget, ErasureLayer, ErasureTarget, LayerScope, PurgeCx, PurgeOutcome,
+    StorageBackend,
+};
+pub use gate::{GateDecision, KeyBound, KeyRange, RangeGate, ReadGate};
+pub use keys::{Envelope, FileKey, FileKeyring, FileKind, RecordSealer, SealCtx};
+pub use ledger::{LedgerEntry, LedgerSink, RangeSet};
+pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
+pub use report_signer::ReportSigner;

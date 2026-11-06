@@ -8,7 +8,8 @@
 // contextra-mcp/src/sandbox.rs
 // MCP Tool Isolation Layer (Contextra Volatile-Output Isolation)
 
-use contextra_types::{ContextraError, Result};
+use contextra_types::ContextraError;
+type Result<T> = std::result::Result<T, ContextraError>;
 use parking_lot::Mutex;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -42,9 +43,9 @@ pub struct ToolDefinition {
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
 /// | `contextra_delete` | `DatabaseWrite` | Delete document without measured proof |
-/// | `contextra_forget` | `DatabaseWrite` | Delete document or drop collection with verified DeletionProof |
+/// | `contextra_forget` | `DatabaseWrite` | Delete document or drop collection with verified drop receipt |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
-/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue a verified DeletionProof |
+/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue verified drop receipt |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -91,7 +92,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_forget",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a document (unverified) or drop an entire collection (with verified DeletionProof export).",
+        description: "Delete a document (unverified) or drop an entire collection (with verified drop receipt export).",
         input_schema: || json!({
             "type": "object",
             "properties": {
@@ -169,7 +170,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_drop_collection",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete an entire collection and issue a verified collection-wide cryptographic DeletionProof.",
+        description: "Delete an entire collection and issue a verified collection-wide cryptographic drop receipt.",
         input_schema: || json!({
             "type": "object",
             "properties": {
@@ -539,7 +540,7 @@ mod tests {
     }
 
     #[test]
-    fn volatile_tool_result_roundtrip() {
+    fn test_volatile_tool_result_roundtrip() {
         let key =
             contextra_crypto::CryptoKey::try_new("0123456789abcdef0123456789abcdef", b"salt1234")
                 .unwrap(); // unwrap

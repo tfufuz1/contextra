@@ -25,7 +25,7 @@ Dieser Plan legt Reihenfolge, Arbeitspakete, Gates und Risiken zur Transformatio
 | 6 | Produktschnitte, Baustein-Export & isolierte Beispiele | M | G6 |
 | 7 | Dokumentation, Governance-Bereinigung und CI-Absicherung | S | G7 |
 
-Phase 3 und 4 vollziehen die zentrale Modularisierung: Sie befreien den Speicherkern von der monolithischen Löschkette und kapseln die DSGVO-/Proof-Verantwortung autark in `contextra-erasure`.
+Phase 3 und 4 vollziehen die zentrale Modularisierung: Sie befreien den Speicherkern von der monolithischen Löschkette und kapseln die DSGVO-/Proof-Verantwortung autark in `contextra-erasure`. Alle bestehenden Altlasten und Querabhängigkeiten werden im zentralen Schuldenregister [`DEPRECATED_DEBT.md`](DEPRECATED_DEBT.md) verbindlich dokumentiert.
 
 ## 3. Phase 0 – Baseline
 

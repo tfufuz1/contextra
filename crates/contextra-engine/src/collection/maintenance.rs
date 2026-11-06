@@ -14,7 +14,7 @@
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{
-    record_counter_safe, record_histogram_safe, REBUILD_DURATION, REAPER_DOCS_REAPED,
+    record_counter_safe, record_histogram_safe, REAPER_DOCS_REAPED, REBUILD_DURATION,
 };
 use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
@@ -142,7 +142,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         Ok(count)
     }
-
 
     /// Repairs the index by re-syncing with the storage.
     ///
@@ -529,7 +528,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         if count > 0 {
-            record_counter_safe(self.metrics_sink().as_ref(), REAPER_DOCS_REAPED, count as u64, &[]);
+            record_counter_safe(
+                self.metrics_sink().as_ref(),
+                REAPER_DOCS_REAPED,
+                count as u64,
+                &[],
+            );
         }
 
         if count > 0 && self.index.is_rebuild_required() {
@@ -663,12 +667,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         if count > 0 {
-            record_counter_safe(self.metrics_sink().as_ref(), REAPER_DOCS_REAPED, count as u64, &[]);
+            record_counter_safe(
+                self.metrics_sink().as_ref(),
+                REAPER_DOCS_REAPED,
+                count as u64,
+                &[],
+            );
         }
 
         Ok(count)
     }
-
 
     /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
     ///

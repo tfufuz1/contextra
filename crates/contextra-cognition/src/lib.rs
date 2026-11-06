@@ -40,6 +40,8 @@
 // ANCHOR[contextra-cognition:ROOT-001]
 /// Modul für Aggregationsphase (LeanRAG Stage 3).
 pub mod aggregation_phase;
+/// Modul für entkoppelte Eingabe- und Ausgabe-Channels (Baukasten-Integration).
+pub mod channel;
 /// Modul für die Ausführung der Konsolidierung.
 pub mod consolidation_executor;
 /// Modul für Konsolidierungs-Locks und Kaskaden-Invalidierung.
@@ -69,6 +71,10 @@ pub use aggregation_phase::{
     check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
     AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
     ConsolidationPipelineResult, SuperEdgeDraft, SuperEdgeSink,
+};
+pub use channel::{
+    CognitiveInputChannel, CognitiveOutputSink, DirectCognitiveChannel, InMemoryCognitiveChannel,
+    InMemoryOutputSink,
 };
 #[allow(deprecated)]
 pub use consolidation_executor::{

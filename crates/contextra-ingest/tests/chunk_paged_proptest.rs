@@ -6,7 +6,13 @@
 //!
 // FILE-CONTEXT
 // ZWECK: Property-basierte Tests für PagedChunker (WP-ING-14).
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
 // INVARIANTEN: Zero-Panic, Abdeckung aller Seiten, page <= page_end, monotone Spans, Determinismus.
 // STAND: TS:2026-10-31T00:00:00Z
 

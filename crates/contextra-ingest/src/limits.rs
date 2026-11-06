@@ -70,7 +70,7 @@ pub struct ExtractPolicy {
     pub include_hidden: bool,
     /// Kommentare im Dokument extrahieren? (Standard: true)
     pub include_comments: bool,
-    /// Nachverfolgte Löschungen (Tracked Deletions) einbeziehen? (Standard: false)
+    /// Nachverfolgte Streichungen (Tracked Deletions) einbeziehen? (Standard: false)
     pub include_tracked_deletions: bool,
     /// Kopf- und Fußzeilen extrahieren? (Standard: false)
     pub include_headers_footers: bool,

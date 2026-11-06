@@ -112,6 +112,95 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Spezifikation des Flush-Umfangs für geöffnete Dateihandles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlushKind {
+    /// Flusht nur die Dateinutzdaten auf stabile Speichermedien (`fdatasync`).
+    DataOnly,
+    /// Flusht Dateinutzdaten und Metadaten auf stabile Speichermedien (`fsync`).
+    DataAndMetadata,
+}
+
+/// Dateisystemklassifikation für Persistenz- und Locking-Garantien (§23.4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FsClass {
+    /// Lokales Dateisystem mit unterstützten POSIX/Win32-Durability-Garantien (ext4, xfs, btrfs, zfs, APFS, NTFS).
+    LocalSupported,
+    /// Netzlaufwerk (NFS, SMB, CIFS).
+    Network,
+    /// Benutzerdefiniertes Dateisystem im Userspace (FUSE).
+    Fuse,
+    /// Cloud-synchronisierter Ordner (OneDrive, Dropbox, iCloud Drive, etc.).
+    CloudSync,
+    /// Unbekanntes oder nicht klassifizierbares Dateisystem.
+    Unknown,
+}
+
+impl FsClass {
+    /// Liefert `true`, wenn das Dateisystem vollständige lokale Persistenz und Locking unterstützt.
+    #[must_use]
+    pub const fn is_supported_local(&self) -> bool {
+        matches!(self, Self::LocalSupported)
+    }
+}
+
+/// Flusht eine geöffnete Datei auf die Festplatte mittels Ring-0-Plattform-Primitiven.
+pub fn flush_file(file: &File, kind: FlushKind) -> std::io::Result<()> {
+    let metadata_changed = match kind {
+        FlushKind::DataOnly => false,
+        FlushKind::DataAndMetadata => true,
+    };
+    contextra_sys::durable_flush_file(file, metadata_changed)
+}
+
+/// Flusht Verzeichniseinträge auf stabile Speichermedien.
+pub fn flush_dir(dir: &Path) -> std::io::Result<()> {
+    contextra_sys::durable_flush_dir(dir)
+}
+
+fn is_cloud_sync_path(path: &Path) -> bool {
+    let path_str = path.to_string_lossy().to_lowercase();
+    path_str.contains("onedrive")
+        || path_str.contains("dropbox")
+        || path_str.contains("icloud")
+        || path_str.contains("mobile documents")
+        || path_str.contains("google drive")
+        || path_str.contains("googledrive")
+        || path_str.contains("box sync")
+        || path_str.contains("owncloud")
+        || path_str.contains("nextcloud")
+}
+
+/// Ermittelt die Dateisystemklasse für den angegebenen Pfad (§23.4).
+pub fn fs_class(path: &Path) -> std::io::Result<FsClass> {
+    if is_cloud_sync_path(path) {
+        return Ok(FsClass::CloudSync);
+    }
+
+    if !path.exists() && path.parent().is_none_or(|p| !p.exists()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "path does not exist",
+        ));
+    }
+
+    Ok(FsClass::LocalSupported)
+}
+
+/// Benennt eine Datei atomar um und flusht das übergeordnete Verzeichnis.
+pub fn rename_durable(from: &Path, to: &Path) -> std::io::Result<()> {
+    let parent = to.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "target path has no parent directory",
+        )
+    })?;
+
+    std::fs::rename(from, to)?;
+    flush_dir(parent)?;
+    Ok(())
+}
+
 /// Atomarer Zähler zur Generierung eindeutiger temporärer Dateinamen für [`atomic_replace`].
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -546,7 +635,10 @@ pub fn scrub_and_remove_with_injector<F: FaultInjector>(
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
             injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
+            let slice = zeros
+                .get(..chunk_size)
+                .ok_or_else(|| std::io::Error::other("chunk_size out of bounds"))?;
+            file.write_all(slice)?;
             remaining -= chunk_size as u64;
         }
 

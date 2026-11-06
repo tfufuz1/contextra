@@ -144,10 +144,22 @@ async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn
         }
         router.state.store(Arc::new(new_state));
     }
-    assert_eq!(router.calibration_stats().get("p1").map(|s| s.times_selected), Some(5));
+    assert_eq!(
+        router
+            .calibration_stats()
+            .get("p1")
+            .map(|s| s.times_selected),
+        Some(5)
+    );
 
     router.reset_calibration("p1");
-    assert_eq!(router.calibration_stats().get("p1").map(|s| s.times_selected), Some(0));
+    assert_eq!(
+        router
+            .calibration_stats()
+            .get("p1")
+            .map(|s| s.times_selected),
+        Some(0)
+    );
     Ok(())
 }
 

@@ -19,7 +19,7 @@
 //! - Keine Abhängigkeiten zu anderen Contextra-Crates.
 //!
 //! **Wird eingebunden von (eingehend, 30 Crates):**
-//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-avv-generator`,
+//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-agreement-generator`,
 //!   `contextra-checkpoint`, `contextra-cognition`, `contextra-core`, `contextra-crypto`, `contextra-db`,
 //!   `contextra-engine`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`,
 //!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`,
@@ -57,7 +57,14 @@ pub mod tombstone;
 pub mod types;
 // ANCHOR[contextra-types:MOD-WIT]
 /// Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen.
+pub mod erasure;
+pub mod ids;
+pub mod refs;
 pub mod witness;
+
+pub use erasure::*;
+pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
+pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};
 
 pub use error::{ContextraError, HnswDeletionError, Result};
 pub use error_dto::ContextraErrorDto;

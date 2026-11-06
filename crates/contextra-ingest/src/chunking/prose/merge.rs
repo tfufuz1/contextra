@@ -18,7 +18,11 @@ use serde_json::{json, Value};
 /// Wendet Zusammenführungsregeln (Heading-Attachment und min_tokens-Merge) auf Drafts an.
 // ANCHOR[contextra-ingest:CHK-0225]
 // fn `merge_small_chunks` fuer Zusammenfuehrung von Teilbloecken unter Einhaltung des Token-Budgets.
-pub fn merge_small_chunks(drafts: Vec<ChunkDraft>, hard_limit: usize, cfg: &ChunkingConfig) -> Vec<ChunkDraft> {
+pub fn merge_small_chunks(
+    drafts: Vec<ChunkDraft>,
+    hard_limit: usize,
+    cfg: &ChunkingConfig,
+) -> Vec<ChunkDraft> {
     if drafts.is_empty() {
         return Vec::new();
     }
@@ -37,7 +41,8 @@ pub fn merge_small_chunks(drafts: Vec<ChunkDraft>, hard_limit: usize, cfg: &Chun
         if let Some(last) = merged.last_mut() {
             let last_tokens = token_count(&last.text);
 
-            let same_section = is_same_main_section(last.breadcrumb.as_deref(), draft.breadcrumb.as_deref());
+            let same_section =
+                is_same_main_section(last.breadcrumb.as_deref(), draft.breadcrumb.as_deref());
 
             if same_section
                 && (last_tokens < cfg.min_tokens || draft_tokens < cfg.min_tokens)
@@ -64,7 +69,8 @@ pub fn merge_small_chunks(drafts: Vec<ChunkDraft>, hard_limit: usize, cfg: &Chun
                 }
 
                 if !merged_bc_list.is_empty() {
-                    last.extra.insert("merged_breadcrumbs".into(), Value::Array(merged_bc_list));
+                    last.extra
+                        .insert("merged_breadcrumbs".into(), Value::Array(merged_bc_list));
                 }
 
                 continue;
@@ -100,7 +106,10 @@ fn attach_headings(drafts: Vec<ChunkDraft>, hard_limit: usize) -> Vec<ChunkDraft
             let combined_text = format!("{}\n\n{}", heading_text, draft.text);
             let combined_tokens = token_count(&combined_text);
 
-            let first_h_span_start = pending_headings.first().map(|h| h.span.start).unwrap_or(draft.span.start);
+            let first_h_span_start = pending_headings
+                .first()
+                .map(|h| h.span.start)
+                .unwrap_or(draft.span.start);
             let first_bc = pending_headings.first().and_then(|h| h.breadcrumb.clone());
             let first_hl = pending_headings.first().and_then(|h| h.heading_level);
 

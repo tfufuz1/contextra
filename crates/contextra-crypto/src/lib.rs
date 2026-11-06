@@ -28,8 +28,8 @@
 //!    Argon2id für sichere Passphrasen-Verarbeitung.
 //! 3. **WAL-Integrität:** Kryptographische Integritätsketten mittels HMAC-SHA256 für
 //!    das Write-Ahead-Log (WAL).
-//! 4. **DSGVO-Löschbeweise:** Erstellung und Verifikation kryptographisch signierter
-//!    Löschzertifikate (Ed25519, BLAKE3) nach Art. 17 DSGVO.
+//! 4. **Kryptographische Attestationsbeweise:** Erstellung und Verifikation signierter
+//!    Attestationszertifikate (Ed25519, BLAKE3).
 //! 5. **KV-Segment-Verschlüsselung & Shredding:** Feingranulare Mandanten- und Segment-
 //!    Isolierung mit kryptographischem Shredding (Crypto-Erase).
 //!
@@ -41,9 +41,11 @@
 //!   Dateisystem- oder Netzwerk-I/O durch.
 
 
+pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
 pub mod crypto;
+pub mod dek;
 pub mod deletion_proof;
 pub mod ed25519_proof;
 pub mod error;
@@ -52,8 +54,14 @@ pub mod kv_cipher;
 pub mod kv_segment;
 pub mod kv_shredding;
 pub mod revocation_log;
+pub mod secret;
 pub mod wal_completeness;
 pub mod wal_crypto;
+
+pub use aead::*;
+pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};
+pub use kdf::hkdf_expand;
+pub use secret::SecretKey;
 
 pub use audit_chain::{
     compute_record_commitment, AuditChain, AuditChainEntry, AuditChainHeadSignature, DataClass,

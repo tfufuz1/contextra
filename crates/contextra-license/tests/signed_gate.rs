@@ -197,3 +197,13 @@ fn test_inv_license_2_fast_ring_always_allowed() {
     // Fast ring MUST pass unconditionally under INV-LICENSE-2 despite expiration & missing allowed_rings
     assert_eq!(gate.check_ring(FeatureRing::Fast), Ok(()));
 }
+
+#[test]
+fn test_verify_ring_inherent_method() {
+    let gate = SignedLicenseGate::no_activation();
+    assert_eq!(gate.verify_ring(FeatureRing::Fast), Ok(()));
+    assert_eq!(
+        gate.verify_ring(FeatureRing::Sovereign),
+        Err(LicenseError::NotActivated(FeatureRing::Sovereign))
+    );
+}

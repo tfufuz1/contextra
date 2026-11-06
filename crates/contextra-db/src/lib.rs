@@ -52,10 +52,7 @@ pub mod prelude {
     pub use crate::multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
 
     #[cfg(feature = "volatile-vault")]
-    pub use crate::volatile_vault::{
-        CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-        VaultError, VolatileContextVault,
-    };
+    pub use crate::volatile_vault::*;
 }
 
 // ANCHOR[contextra-db:FACADE-002]
@@ -90,7 +87,7 @@ pub use prelude::*;
 // ANCHOR[contextra-db:FACADE-012]
 /// Adaptiver Decay-Controller für zeitliche Relevanz-Abwertung.
 pub mod decay_controller {
-    pub use contextra_adapt::decay_controller::*;
+    pub use contextra_engine::decay_controller::*;
 }
 pub use contextra_engine::fusion;
 // ANCHOR[contextra-db:FACADE-013]
@@ -101,17 +98,12 @@ pub mod homeostat;
 pub mod multistep;
 // ANCHOR[contextra-db:FACADE-015]
 /// PID-Regler zur Einhaltung von Latenzbudgets.
-pub mod pid_latency_controller {
-    pub use contextra_adapt::pid_latency_controller::*;
-}
+pub mod pid_latency_controller;
 
 #[cfg(feature = "volatile-vault")]
 pub mod volatile_vault;
 #[cfg(feature = "volatile-vault")]
-pub use volatile_vault::{
-    CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-    VaultError, VolatileContextVault,
-};
+pub use volatile_vault::*;
 
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
 pub use homeostat::RerankDeadline;
@@ -381,6 +373,8 @@ mod tests {
                 "stabil".to_string()
             }
         }
+        let dummy = DummyRouter;
+        assert_eq!(dummy.overall_drift_status(), "stabil");
 
         let router_arc: Arc<dyn DriftStatusProvider> = Arc::new(DummyRouter);
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
@@ -506,21 +500,6 @@ mod tests {
                 "collection(\"c\") must return the exact same Arc instance"
             );
         }
-    }
-
-    // Prüft, dass Kollektionen vollständig voneinander isoliert sind.
-    #[tokio::test]
-    async fn collections_are_isolated() {
-        let (db, _tmp) = test_db(4).await;
-        let vec = vec![1.0, 0.0, 0.0, 0.0];
-        let col_a = db.collection("alpha").await.unwrap(); // unwrap
-        let col_b = db.collection("beta").await.unwrap(); // unwrap
-        col_a.insert("doc1", &vec, None).await.unwrap(); // unwrap
-        let results = col_b.search(&vec, 10).await.unwrap(); // unwrap
-        assert!(
-            results.is_empty(),
-            "Collection B must not see Collection A's data"
-        );
     }
 
     // Prüft Daten- und Schlüsselraum-Isolation über separate Kollektionen hinweg.

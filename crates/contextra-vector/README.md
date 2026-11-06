@@ -1,16 +1,20 @@
 # contextra-vector
 
-Vektorsuche und Indexierung (HNSW, DiskANN, SQ8 Quantisierung).
+Vektorsuche und Indexierung (HNSW, SQ8 Quantisierung).
 
 Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §9.2, §9.3, `capabilities.toml`).
 
-## Rolle in einem Satz
-`contextra-vector` implementiert speichereffiziente Vektorindexierung und Ähnlichkeitssuche (HNSW, SQ8, ACL-Bitset) mit Mandantenisolation und Tombstone-Pruning.
+## Rolle & Zweck
+`contextra-vector` ist der autarke Vektorindex-Baustein des Contextra-Ökosystems. Er bietet speichereffiziente Vektorsuche und Indexierung (Hierarchical Navigable Small World, HNSW) mit skalarer Quantisierung (SQ8) und Cosine-/Dot-Produkt-Distanzen.
 
-## Ring, Klasse & Reifegrad
+Der Baustein kann isoliert in beliebigen Rust-Systemen als eigenständige Vektor-Engine betrieben werden.
+
+## Baukasten-Einordnung & Status
 - **Ring:** Ring 0 (Vektorindexierung)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-simd` (Spec §6.9, `capabilities.toml`)
+- **Status:** 🟡 In Migration (Bereinigung von Löschketten-Relikten gemäß `PLAN.md` Phase 4)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+- **Erlaubte Abhängigkeiten:** `contextra-types`, `contextra-ports`, `contextra-simd`.
 
-*Sicherheits & Lösch-Invarianten:* VETO-F02 (Tombstone-Pruning ohne kryptographische Löschbeweise), INV-TENANT-IDX-1 (mandantenisolierte Vektorräume).
+## Deprecated Debt & Entkopplung
+- **Löschketten-Verdrahtung:** Historische Nachweis- und Deletion-Proof-Logiken sind als *Deprecated Debt* (siehe [`DEPRECATED_DEBT.md`](../../DEPRECATED_DEBT.md)) deklariert.
+- **Zielarchitektur:** `contextra-vector` beschränkt sich auf Mandantenisolation und Tombstone-Pruning via `LayerScanner`/`Purger`-Ports. Sämtliche Nachweis- und Signaturaufgaben liegen in [`contextra-erasure`](../contextra-erasure/).

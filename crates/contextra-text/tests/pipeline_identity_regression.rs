@@ -215,7 +215,7 @@ async fn test_pipeline_identity_point_search_recall() -> Result<()> {
     index.insert(tx, doc_id, sample_text).await?;
     index.commit(tx).await?;
 
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
     let tokens = tokenizer.tokenize(sample_text);
 
     assert!(!tokens.is_empty(), "Tokenization must yield tokens");
