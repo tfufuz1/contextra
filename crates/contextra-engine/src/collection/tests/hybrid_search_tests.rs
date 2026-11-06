@@ -8,7 +8,7 @@
 use super::fixtures::*;
 
 #[tokio::test]
-async fn hybrid_search_caps_k_at_max_search_k() {
+async fn test_hybrid_search_caps_k_at_max_search_k() {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

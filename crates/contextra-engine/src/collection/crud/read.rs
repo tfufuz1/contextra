@@ -253,10 +253,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         &self,
         start: std::ops::Bound<&[u8]>,
         end: std::ops::Bound<&[u8]>,
-    ) -> (
-        std::ops::Bound<Vec<u8>>,
-        std::ops::Bound<Vec<u8>>,
-    ) {
+    ) -> (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>) {
         use std::ops::Bound;
 
         let start_ns = match start {

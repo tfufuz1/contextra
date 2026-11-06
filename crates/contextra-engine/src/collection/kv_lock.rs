@@ -127,7 +127,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn prop_sorted_unique_shards_properties(
+        fn test_prop_sorted_unique_shards_properties(
             keys in prop::collection::vec(".*", 0..100),
             shard_count in 1..64usize,
         ) {

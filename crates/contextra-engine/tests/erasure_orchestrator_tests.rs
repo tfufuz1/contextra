@@ -125,7 +125,10 @@ async fn test_sabotage_purger_leaves_residual_fails_verification() -> Result<()>
     // Simulate open snapshot blocking preflight purge (fail-closed verification)
     let snap = db.inner_storage().snapshot_registry.register_at(1, 1);
     let report_res = db.erase_document(tenant_id, "testcol", "doc1").await;
-    assert!(report_res.is_err(), "Open snapshot must block erasure preflight");
+    assert!(
+        report_res.is_err(),
+        "Open snapshot must block erasure preflight"
+    );
     drop(snap);
 
     Ok(())
