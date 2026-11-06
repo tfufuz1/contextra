@@ -417,14 +417,19 @@ impl BanditProfileState {
         for i in 0..d {
             inv_a[i * d + i] = 1.0;
         }
+        let effective_alpha_base = if alpha_base == 0.0 {
+            default_alpha_base()
+        } else {
+            alpha_base
+        };
         Self {
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
             inv_a: AlignedF32Vec::new(inv_a),
             updates_since_reset: 0,
             work_buf: AlignedF32Vec::zeros(d),
-            alpha: alpha_base,
-            alpha_base,
+            alpha: effective_alpha_base,
+            alpha_base: effective_alpha_base,
             alpha_max_multiplier: default_alpha_max_multiplier(),
             lambda: 0.1,
             mu: 0.2,
@@ -519,7 +524,7 @@ impl BanditProfileState {
     /// # Ablauf
     /// 1. Dimension des Kontext-Vektors `x` gegen `expected_dim()` validieren.
     /// 2. Bei `SketchedProjection`: Vektor via Rademacher-Matrix `Rx` in den $k$-dimensionalen Raum projizieren.
-    /// 3. Erwartungswert-Term berechnen: Skalarprodukt $	heta^T x$ (bzw. $	heta_{\text{sketch}}^T (Rx)$).
+    /// 3. Erwartungswert-Term berechnen: Skalarprodukt $\theta^T x$ (bzw. $\theta_{\text{sketch}}^T (Rx)$).
     /// 4. Unsicherheits-/Varianz-Term $\sqrt{\Sigma(x)}$ ermitteln:
     ///    - Sherman-Morrison / Sketched: Quadratische Form $\sqrt{x^T A^{-1} x}$.
     ///    - Diagonal-Approximation: $\sqrt{\sum x_i^2 / \sigma_i^2}$.
