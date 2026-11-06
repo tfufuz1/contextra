@@ -4,12 +4,12 @@
 //! physischen Löschen von Dateien von Speichermedien.
 //!
 //! Ring-Zugehörigkeit: Ring 0 (Dauerhafte Dateisystem-Hilfsmittel).
-//! Wird genutzt von: Bereinigungsroutinen, Lösch-Orchestrierern und DSGVO-Löschpfaden.
+//! Wird genutzt von: Bereinigungsroutinen und Storage-Wartungspfaden.
 //! Wichtigste Typen:
 //! - [`ScrubPolicy`]: Konfiguriert, ob Nullen-Überschreiben aktiv ist ([`ScrubPolicy::OverwriteZeros`]) oder nicht ([`ScrubPolicy::Disabled`]).
 //! - [`ScrubRefusal`]: Gründe für eine Verweigerung des Überschreibens (z. B. Copy-on-Write-Dateisysteme, Hardlinks, aktive Leser).
 //! - [`ScrubOutcome`]: Ergebnis des Bereinigungsversuchs ([`ScrubOutcome::Scrubbed`], [`ScrubOutcome::RemovedUnscrubbed`], [`ScrubOutcome::Refused`]).
-//! - [`scrub_if_safe`]: Hauptfunktion zur sicheren Löschung mit vorgeschalteter Risikoanalyse.
+//! - [`scrub_if_safe`]: Hauptfunktion zur sicheren Datei-Entfernung mit vorgeschalteter Risikoanalyse.
 //!
 //! Invarianten:
 //! - `INV-CLAIMS-1`: Überschreiben garantiert auf modernen Flash-/SSD-Medien keine Zerstörung auf Zellebene (Wear-Leveling).
@@ -22,21 +22,18 @@
 // ZWECK: Sicheres Entfernen von Dateien (Scrubbing) mit Sicherheitsprüfungen (CoW, Hardlinks, ReaderAlive).
 // INVARIANTEN: Zero-Panic, pure safe Rust, I/O-Fehler werden als std::io::Result propagiert.
 
-//! # Flash-/SSD-Remanenz und physische Vernichtungsgrenzen
+//! # Flash-/SSD-Remanenz und physische Grenzen beim Überschreiben
 //!
 //! **WICHTIGER HINWEIS (Wei et al., FAST 2011):**
 //! Das Überschreiben von Dateiinhalten mit Nullen auf Flash-basierten Speichermedien (SSDs, NVMe, eMMC)
-//! garantiert **keine physische Vernichtung** der Datenblöcke auf Zellebene. Durch Flash Translation Layers (FTL),
+//! garantiert keine physische Vernichtung der Datenblöcke auf Zellebene. Durch Flash Translation Layers (FTL),
 //! Wear Leveling, Over-Provisioning und Out-of-Place-Writes verbleiben alte Datenblöcke in physischen Flash-Zellen.
-//!
-//! Belastbare und zuverlässige Datenlöschung auf Flash-Medien ist **ausschließlich via Crypto-Erase (S4)**
-//! (Vernichtung des Verschlüsselungsschlüssels) möglich.
 //!
 //! Der Rückgabetyp ([`ScrubOutcome::Scrubbed`]) und die Quittung ([`ScrubReceipt`]) bieten daher explizit
 //! **keine physische Garantie** (`physical_guarantee: None`).
 
 use crate::{durable_remove_with_injector, FaultInjector, NoFault, ScrubReceipt};
-use contextra_sys::{flush_file, FlushKind};
+use contextra_sys::durable_flush_file;
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -188,7 +185,7 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
         }
 
         injector.on_fsync(Some(path))?;
-        flush_file(&file, FlushKind::DataAndMetadata)?;
+        durable_flush_file(&file, true)?;
 
         // NOTE: Readback-Zero-Verifikation: Stellt sicher, dass das Betriebssystem die Nullen tatsächlich übernommen hat.
         verify_zero_readback(&mut file, path, len)?;

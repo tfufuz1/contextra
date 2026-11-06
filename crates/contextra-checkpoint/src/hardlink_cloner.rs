@@ -159,7 +159,7 @@ impl DefaultHardlinkCloner {
 impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     // ANCHOR[contextra-checkpoint:CLONE-004]
     // Ablauf von `clone_sstable_hardlinks`:
-    // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Löschung).
+    // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Bereinigung).
     // 2. Zielverzeichnis anlegen falls noch nicht vorhanden.
     // 3. Quellverzeichnis nach `.sst`-Dateien durchsuchen.
     // 4. Für jede Datei bestehende Zieldatei entfernen und Hardlink setzen.

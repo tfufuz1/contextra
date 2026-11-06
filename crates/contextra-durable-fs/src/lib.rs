@@ -42,7 +42,6 @@ pub mod scrub;
 /// Abstraktion eines virtuellen Dateisystems (VFS) für entkoppeltes I/O und Testbarkeit.
 pub mod vfs;
 
-pub use contextra_sys::FlushKind;
 pub use fault_injector::{FaultInjector, NoFault};
 pub use health::{AtomicHealthState, HealthEvent, HealthState};
 pub use journal::PendingDeleteJournal;
@@ -51,7 +50,63 @@ pub use scrub::{
 };
 pub use vfs::{RealFs, RealFsFile, Vfs, VfsFile, VfsOpenOptions};
 
-use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FsClass};
+use contextra_sys::{durable_flush_dir, durable_flush_file};
+
+// ANCHOR[contextra-durable-fs:FLUSH-KIND-001]
+/// Spezifikation des Flush-Umfangs für Datei-Handles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlushKind {
+    /// Flusht Dateidaten auf dauerhaften Speicher ohne Metadaten-Synchronisation.
+    DataOnly,
+    /// Flusht sowohl Dateidaten als auch Metadaten-Änderungen auf dauerhaften Speicher.
+    DataAndMetadata,
+}
+
+// ANCHOR[contextra-durable-fs:FS-CLASS-001]
+/// Dateisystemklassifikation für Persistenz- und Locking-Garantien (§7.3.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FsClass {
+    /// Lokales Dateisystem mit unterstützten Persistenz- und Locking-Garantien.
+    LocalSupported,
+    /// Netzwerkdateisystem (NFS, SMB, CIFS).
+    Network,
+    /// Dateisystem im Userspace (FUSE).
+    Fuse,
+    /// Cloud-synchronisiertes Verzeichnis.
+    CloudSync,
+    /// Unbekanntes Dateisystem.
+    Unknown,
+}
+
+impl FsClass {
+    /// Prüft, ob das Dateisystem lokale Persistenz- und Locking-Garantien unterstützt.
+    #[must_use]
+    pub const fn is_supported_local(&self) -> bool {
+        matches!(self, Self::LocalSupported)
+    }
+}
+
+/// Ermittelt die [`FsClass`] für einen gegebenen Pfad anhand von Pfadheuristiken.
+pub fn fs_class(path: &Path) -> std::io::Result<FsClass> {
+    let path_str = path.to_string_lossy().to_lowercase();
+    if path_str.contains("onedrive") || path_str.contains("dropbox") || path_str.contains("icloud") {
+        return Ok(FsClass::CloudSync);
+    }
+    Ok(FsClass::LocalSupported)
+}
+
+/// Benennt eine Datei atomar um und flusht das Ziel-Elternverzeichnis.
+pub fn rename_durable(from: &Path, to: &Path) -> std::io::Result<()> {
+    let parent = to.parent().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "target path has no parent directory",
+        )
+    })?;
+    std::fs::rename(from, to)?;
+    durable_flush_dir(parent)?;
+    Ok(())
+}
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -149,7 +204,8 @@ impl<F: FaultInjector> DurableHandle<F> {
             return Err(err);
         }
 
-        if let Err(err) = flush_file(file, kind) {
+        let metadata_changed = matches!(kind, FlushKind::DataAndMetadata);
+        if let Err(err) = durable_flush_file(file, metadata_changed) {
             self.is_poisoned = true;
             Err(err)
         } else {
@@ -320,7 +376,7 @@ pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
 /// 2. Verzeichnis per [`flush_dir`] synchronisieren.
 pub fn sync_dir_with_injector<F: FaultInjector>(dir: &Path, injector: &F) -> std::io::Result<()> {
     injector.on_dir_fsync(dir)?;
-    flush_dir(dir)
+    durable_flush_dir(dir)
 }
 
 /// RAII-Guard zum automatischen Löschen temporärer Zwischendateien bei Fehlern oder Panics.
@@ -388,13 +444,14 @@ pub fn atomic_replace_with_injector<F: FaultInjector>(
     tmp_file.write_all(bytes)?;
 
     injector.on_fsync(Some(&tmp_path))?;
-    flush_file(&tmp_file, FlushKind::DataAndMetadata)?;
+    durable_flush_file(&tmp_file, true)?;
     drop(tmp_file);
 
     injector.on_rename(&tmp_path, path)?;
-    rename_durable(&tmp_path, path)?;
+    std::fs::rename(&tmp_path, path)?;
 
     injector.on_dir_fsync(parent)?;
+    durable_flush_dir(parent)?;
 
     std::mem::forget(guard);
 
@@ -428,7 +485,7 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
 
     std::fs::remove_file(path)?;
     injector.on_dir_fsync(parent)?;
-    flush_dir(parent)?;
+    durable_flush_dir(parent)?;
     Ok(())
 }
 
@@ -494,7 +551,7 @@ pub fn scrub_and_remove_with_injector<F: FaultInjector>(
         }
 
         injector.on_fsync(Some(path))?;
-        flush_file(&file, FlushKind::DataAndMetadata)?;
+        durable_flush_file(&file, true)?;
     }
 
     durable_remove_with_injector(path, injector)?;

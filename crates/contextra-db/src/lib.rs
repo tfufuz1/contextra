@@ -18,23 +18,22 @@
 //!   Zero-Copy-IPC sowie direkte I/O- und Durabilitätssicherungen (fsync/fdatasync).
 //! - **Ring 1 — Fachspezifische Indizes (`contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-crypto`)**:
 //!   Implementiert Vektorsuche (HNSW / Hierarchical Navigable Small World), BM25-Textsuche,
-//!   Graph-CSR-Strukturen (Compressed Sparse Row) und kryptographische DSGVO-Art.-17-Löschbeweise.
-//! - **Ring 2 — Adaption & Kognitive Orchestrierung (`contextra-engine`, `contextra-adapt`, `contextra-cognition`)**:
-//!   Kombiniert Multi-Signal-Fusion (RRF / Reciprocal Rank Fusion), dynamische Schwellenwert-Anpassung,
-//!   Memory Consolidation (Speicher-Konsolidierung), Turn-Segmentierung und Schlafzyklen-Synthese.
+//!   Graph-CSR-Strukturen (Compressed Sparse Row) und kryptographische Authentifizierung.
+//! - **Ring 2 — Adaption & Aggregation (`contextra-engine`, `contextra-adapt`)**:
+//!   Kombiniert Multi-Signal-Fusion (RRF / Reciprocal Rank Fusion) und dynamische Schwellenwert-Anpassung.
 //! - **Ring 3 — Fassade & Haupt-API (`contextra-db`)**:
-//!   Bündelt alle Subsysteme in eine konsistente, typ- und mandanten-sichere API ([`Contextra`], [`Collection`]).
+//!   Bündelt alle Subsysteme in eine konsistente, typ- und mandanten-sichere Storage-API ([`Contextra`], [`Collection`]).
 //!
 //! ## Einbindung und Abhängigkeiten
 //! - **Eingehende Einbindungen**: `contextra` (Top-Level Facade), `contextra-agent`, `contextra-py` (Python-Bindings), `contextra-bench`.
 //! - **Ausgehende Abhängigkeiten**: `contextra-engine`, `contextra-types`, `contextra-ports`, `contextra-store`,
-//!   `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-rank`,
+//!   `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-adapt`, `contextra-rank`,
 //!   `contextra-checkpoint`, `contextra-crypto`, `contextra-sys`.
 //!
 //! ## API-Strukturierung: `prelude` vs. `advanced`
 //!
 //! - **[`prelude`]**: Die empfohlene, stabile Kern-API für reguläre Datenbankoperationen (Einfügen, Suchen, Löschen, Multi-Step).
-//! - **[`advanced`]**: Erweiterte Steuerungselemente und fortgeschrittene Subsystem-Schnittstellen aus `adapt`, `cognition` und `graph`.
+//! - **[`advanced`]**: Erweiterte Steuerungselemente und fortgeschrittene Subsystem-Schnittstellen aus `adapt` und `engine`.
 
 // ANCHOR[contextra-db:FACADE-001]
 /// Stabile Kern-API für den alltäglichen Einsatz.
@@ -60,10 +59,7 @@ pub mod prelude {
 }
 
 // ANCHOR[contextra-db:FACADE-002]
-/// Erweiterte Experten-Schnittstellen aus Adaption, Kognition und Graph-Maintenance.
-///
-/// Bietet tiefere Eingriffsmöglichkeiten für Hintergrundwartung, Latenzkontrolle (PID),
-/// Decay-Steuerung und Schlafzyklen-Konsolidierung.
+/// Erweiterte Experten-Schnittstellen aus Adaption und Engine.
 pub mod advanced {
     pub use crate::decay_controller::{
         AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs,
@@ -76,17 +72,6 @@ pub mod advanced {
         MIN_SCALING_FACTOR,
     };
 
-    pub use contextra_cognition as cognition;
-    pub use contextra_cognition::{
-        cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
-        compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-        execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
-        run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
-        ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard,
-        ConsolidationPhaseResult, ConsolidationSession, ContextCompactor, ContextManager,
-        MaintenanceConfig, MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken,
-        SynthesisConfig, SynthesisPhaseResult, TurnSegment,
-    };
     pub use contextra_engine as engine;
     pub use contextra_engine::{
         background_workers, chunker, export, filter, import, temporal_filter, transaction,
@@ -94,8 +79,6 @@ pub mod advanced {
         ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
     };
 
-    #[cfg(feature = "graph-connectivity-health")]
-    pub use contextra_engine::collection::maintenance::PercolationResult;
     #[cfg(feature = "sandbox")]
     pub use contextra_engine::SandboxBridge;
 }
@@ -104,65 +87,6 @@ pub mod advanced {
 pub use advanced::*;
 pub use prelude::*;
 
-// ANCHOR[contextra-db:FACADE-003]
-/// Kontext-Verwaltung und Konversationshistorie.
-pub mod context {
-    pub use contextra_cognition::context::*;
-}
-
-// ANCHOR[contextra-db:FACADE-004]
-/// Kontext-Kompaktierung und Chunk-Zusammenfassung.
-pub mod context_compaction {
-    pub use contextra_cognition::context_compaction::*;
-}
-
-// ANCHOR[contextra-db:FACADE-005]
-/// Speicher-Konsolidierung und Wissens-Synthese.
-pub mod memory_consolidation {
-    pub use contextra_cognition::memory_consolidation::*;
-}
-
-// ANCHOR[contextra-db:FACADE-006]
-/// Synthese-Phase für konsolidierte Wissenssegmente.
-pub mod synthesis_phase {
-    pub use contextra_cognition::synthesis_phase::*;
-}
-
-// ANCHOR[contextra-db:FACADE-007]
-/// Ausführung von Konsolidierungs-Passes.
-pub mod consolidation_executor {
-    pub use contextra_cognition::consolidation_executor::*;
-}
-
-// ANCHOR[contextra-db:FACADE-008]
-/// Locks und Synchronisation für Konsolidierung.
-pub mod consolidation_locks {
-    pub use contextra_cognition::consolidation_locks::*;
-}
-
-// ANCHOR[contextra-db:FACADE-009]
-/// Scheduler für periodische Hintergrundwartung.
-pub mod maintenance_scheduler {
-    pub use contextra_cognition::maintenance_scheduler::*;
-}
-
-// ANCHOR[contextra-db:FACADE-010]
-/// Konfiguration für Wartungszyklen.
-pub mod maintenance_config {
-    pub use contextra_cognition::maintenance_config::*;
-}
-
-// ANCHOR[contextra-db:FACADE-011]
-/// Veraltetes Reaper-Modul (bitte stattdessen `background_workers` verwenden).
-#[deprecated(note = "use background_workers instead")]
-pub mod reaper {
-    pub use contextra_engine::background_workers::*;
-}
-#[deprecated(note = "use start_consolidation_worker instead")]
-#[allow(deprecated)]
-pub use contextra_cognition::start_consolidation_reaper;
-
-// mod Collection is used via pub mod collection
 // ANCHOR[contextra-db:FACADE-012]
 /// Adaptiver Decay-Controller für zeitliche Relevanz-Abwertung.
 pub mod decay_controller {
@@ -201,8 +125,6 @@ pub use pid_latency_controller::{
 
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
 
 pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;
