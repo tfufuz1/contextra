@@ -13,7 +13,7 @@
 
 use contextra::performance_profile::PerformanceProfile;
 use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
-use contextra_store::lsm::DurabilityMode;
+use contextra::performance_profile::DurabilityMode;
 use tempfile::TempDir;
 
 // ANCHOR[contextra:TEST-WIR-001]

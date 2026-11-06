@@ -14,7 +14,7 @@ use contextra::collection_profile::{
     AutoExtractionMode, CollectionProfile, CollectionProfileError, LsmTuning,
 };
 use contextra::performance_profile::PerformanceProfile;
-use contextra_store::kv::delete_mode::KvDeleteMode;
+use contextra::collection_profile::KvDeleteMode;
 
 // ANCHOR[contextra:TEST-CPM-001]
 // Prüft alle Permutationen von PerformanceProfile (Compliance, Balanced, BareMetal) und KvDeleteMode (TombstoneOnly, CryptoShred) auf korrekte Validierung bzw. Ablehnung bei Inkompatibilität.

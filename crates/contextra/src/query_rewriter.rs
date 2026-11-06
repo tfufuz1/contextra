@@ -79,6 +79,15 @@ impl LlmQueryRewriter {
         self.max_snippet_chars = n;
         self
     }
+
+    /// Öffentlicher Einstiegspunkt zur asynchronen Umformulierung einer Suchanfrage.
+    pub async fn rewrite_query(
+        &self,
+        original_query: &str,
+        current_results: &[ScoredEntry],
+    ) -> Result<Vec<String>> {
+        self.rewrite(original_query, current_results).await
+    }
 }
 
 impl QueryRewriter for LlmQueryRewriter {
