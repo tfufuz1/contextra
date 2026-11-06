@@ -896,7 +896,12 @@ async fn test_abuse_filesystem_trailing_slash_symlink_escape_blocked() -> TestRe
 
     let trailing_slash_path = b"../../etc/passwd/";
     let res_slash = executor
-        .execute(&wasm_bytes, trailing_slash_path, &caps, Duration::from_secs(1))
+        .execute(
+            &wasm_bytes,
+            trailing_slash_path,
+            &caps,
+            Duration::from_secs(1),
+        )
         .await;
     assert!(
         res_slash.is_ok(),
