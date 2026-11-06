@@ -2,8 +2,9 @@
 //!
 //! Zweck: Durability-Tests für Handle-Poisoning (`INV-FSYNC-1`), `DirLock`-Dateisystemprüfungen und `atomic_replace`.
 
-use contextra_durable_fs::{atomic_replace, DirLock, DurableHandle, LockMode};
-use contextra_sys::{FlushKind, FsClass};
+use contextra_durable_fs::{
+    atomic_replace, fs_class, DirLock, DurableHandle, FlushKind, FsClass, LockMode,
+};
 use std::fs::File;
 
 // ANCHOR[contextra-durable-fs:TEST-DUR-HANDLE-POISON]
@@ -69,7 +70,7 @@ fn test_dirlock_cloud_sync_rejection_and_memory_only_override() -> std::io::Resu
 
     std::fs::create_dir_all(&cloud_dir)?;
 
-    let class = contextra_sys::fs_class(&cloud_dir)?;
+    let class = fs_class(&cloud_dir)?;
     assert_eq!(class, FsClass::CloudSync);
 
     let lock_res = DirLock::acquire(&cloud_dir, LockMode::Normal);
