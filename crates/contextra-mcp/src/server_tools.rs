@@ -2,7 +2,8 @@ use crate::io::MAX_SEARCH_QUERY_BYTES;
 use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
-use contextra::chunker::{ChunkerConfig, MarkdownChunker};
+// Chunker types
+use contextra::chunker;
 use contextra_types::{DocId, MAX_SEARCH_K};
 use serde_json::{json, Value};
 
@@ -236,7 +237,9 @@ impl McpServer {
                         ));
                     }
                 };
-                let chunker = MarkdownChunker::new(ChunkerConfig::default());
+                let chunker = contextra::chunker::MarkdownChunker::new(
+                    contextra::chunker::ChunkerConfig::default(),
+                );
                 let doc_id = DocId::from_key(id).map_err(|e| {
                     McpError::invalid_params(format!("Invalid document ID '{}': {}", id, e))
                 })?;
@@ -425,7 +428,7 @@ impl McpServer {
                         "collection": col_name,
                         "id": id,
                         "proof": null,
-                        "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden",
+                        "reason": "Schichteigene Messung für Einzel-Dokument-Entfernung nicht angebunden",
                         "claim": "LogicalDeletionOnly",
                         "erasure_measured": false
                     }))

@@ -2,7 +2,7 @@
 // via Contextra::open() with OpenFastGate license enforcement. Without a valid signed
 // license gate (SignedLicenseGate in contextra-license), no configuration or environment
 // variable (CONTEXTRA_*) can activate a higher feature ring (Sovereign or Compliance).
-// Furthermore, DeletionProof active mode is strictly disabled in Fast-Ring.
+// Furthermore, Proof active mode is strictly disabled in Fast-Ring.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -114,7 +114,7 @@ async fn test_mcp_entrypoint_env_vars_cannot_bypass_license_gate() {
 }
 
 #[tokio::test]
-async fn test_mcp_entrypoint_ring_is_fast_and_no_deletion_proof_active() {
+async fn test_mcp_entrypoint_ring_is_fast_and_no_proof_active() {
     // Verify that default plugin registry feature ring is Fast
     let (server, _tmp) = setup_server().await;
 
