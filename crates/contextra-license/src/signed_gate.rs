@@ -702,6 +702,12 @@ impl SignedLicenseGate {
         verify_step_7_success()
     }
 
+    // ANCHOR[contextra-license:GATE-VERIFY-RING]
+    /// Überprüft die Berechtigung für einen Feature-Ring über die [`LicenseGate`]-Schnittstelle.
+    pub fn verify_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
+        self.check_ring(ring)
+    }
+
     // ANCHOR[contextra-license:GATE-CREATE-TEST-PAYLOAD]
     /// Erzeugt Testdaten (Payload-Bytes, Signatur und Verifying-Key-Bytes) für Unit- und Integrationstests.
     pub fn create_test_signed_payload(
