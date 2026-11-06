@@ -4,13 +4,13 @@
 // NICHT-OFFENSICHTLICH: Document purge purges postings, dl, fw, tbs, empties plb keys and updates atomic stats.
 // HOTSPOTS: purge_document_internal, purge_collection_internal
 
-//! Physische Löschung (Purge) für Dokumente und Kollektionen im Textindex.
+//! Physische Bereinigung (Purge) für Dokumente und Kollektionen im Textindex.
 //!
 //! # Ring-Zuordnung
 //! Ring 0 (Kern).
 //!
-//! # Zweck & DSGVO-Konformität
-//! Stellt sicher, dass bei Verifiable Deletion (DSGVO Art. 17) sämtliche Spuren
+//! # Zweck
+//! Stellt sicher, dass bei physischer Bereinigung sämtliche Spuren
 //! eines Dokuments (Postings, Vorwärtsindex, Dokumentlänge, Tombstones) unwiderruflich
 //! aus dem persistenten Storage entfernt und die BM25-Statistiken atomar korrigiert werden.
 
@@ -60,7 +60,7 @@ impl PurgeReport {
     }
 
     // ANCHOR[contextra-text:PURGE-003]
-    /// Liefert `true`, wenn die Löschung fehlerfrei und vollständig war.
+    /// Liefert `true`, wenn die Bereinigung fehlerfrei und vollständig war.
     pub fn is_success(&self) -> bool {
         self.units_failed == 0 && self.errors.is_empty()
     }
@@ -366,7 +366,9 @@ impl<S: StorageEngine + 'static> TextPurger<S> {
             let new_docs = current_docs.saturating_sub(1);
             let new_tokens = current_tokens.saturating_sub(doc_len as u64);
             let new_avg_len = if new_docs > 0 {
-                (new_tokens as f64 / new_docs as f64 * 1000.0) as u64
+                ((new_tokens as f64 / new_docs as f64) * 1000.0)
+                    .round()
+                    .clamp(0.0, u64::MAX as f64) as u64
             } else {
                 0
             };

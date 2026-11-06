@@ -13,7 +13,7 @@ use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 #[test]
 fn inspect_20_compounds() {
     let splitter = GermanCompoundSplitter::new();
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
 
     let words = vec![
         "Datenschutzgrundverordnung",
@@ -53,7 +53,7 @@ fn inspect_20_compounds() {
 // Testfall `inspect_umlaut_bimap`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_umlaut_bimap() {
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().expect("try_new succeeds");
 
     let pairs = vec![
         ("Bär", "Baer"),
