@@ -1,8 +1,8 @@
 //! Graph ports and collection mutation trait definitions (Anhang B §B.5.1.3).
 
 pub use crate::graph_index::{GraphIndex, GraphIndexStats};
-use contextra_types::types::domain::{DocId, EntityId};
-use contextra_types::ContextraError;
+use crate::types::domain::{DocId, EntityId};
+use crate::ContextraError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

@@ -1,7 +1,7 @@
 //! QueryRewriter port trait for Multi-Step Retrieval query expansion.
 
 use crate::BoxFuture;
-use contextra_types::{QueryRewriteOutput, Result, ScoredEntry};
+use crate::{QueryRewriteOutput, Result, ScoredEntry};
 
 /// Trait for query rewriting in multi-step iterative retrieval (LLM-agnostic).
 pub trait QueryRewriter: Send + Sync {

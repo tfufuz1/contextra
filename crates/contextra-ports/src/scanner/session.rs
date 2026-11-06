@@ -8,7 +8,7 @@
 use super::layer::{ScanTarget, ScanTechnique, WitnessLayer};
 use super::witness::LayerWitness;
 use crate::clock::Clock;
-use contextra_types::{ContextraError, Result};
+use crate::{ContextraError, Result};
 
 /// Laufende Scan-Session zur kontrollierten Erzeugung eines `LayerWitness`.
 #[derive(Debug)]
