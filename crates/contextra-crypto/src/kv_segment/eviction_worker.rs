@@ -16,10 +16,10 @@
 //!
 //! 1. **`EvictionWorker`**: Für den regelmäßigen Hot-Path (z.B. VRAM > 80%-Trigger).
 //!    Arbeitet auf einem **dedizierten OS-Thread** via `std::sync::mpsc`. Reicht
-//!    Löschbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
+//!    Bereinigungsbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
 //!    den Tokio-Async-Executor blockieren.
 //!
-//! 2. **`emergency_wipe()`**: Für seltene Notfall-Löschungen (z.B. Prozess-Shutdown,
+//! 2. **`emergency_wipe()`**: Für seltene Notfall-Bereinigungen (z.B. Prozess-Shutdown,
 //!    Sicherheits-Alarm). Synchron, blockierend, vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
@@ -97,7 +97,7 @@ impl Drop for EvictionWorker {
     }
 }
 
-/// SEPARATER Pfad für Notfall-Löschung (z.B. Prozess-Shutdown, expliziter
+/// SEPARATER Pfad für Notfall-Bereinigung (z.B. Prozess-Shutdown, expliziter
 /// Sicherheits-Trigger). Synchron, blockierend, vor Rückkehr abgeschlossen --
 /// bewusst ANDERS als der reguläre Worker-Pfad.
 pub fn emergency_wipe(store: &TenantIsolatedKvStore) {

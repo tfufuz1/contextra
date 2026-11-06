@@ -1,7 +1,7 @@
-//! # DSGVO-Löschbeweis-Subsystem (`deletion_proof/`)
+//! # Kryptographisches Attestations- und Nachweis-Subsystem (`deletion_proof/`)
 //!
-//! Dieses Modul implementiert kryptographische Löschzertifikate (Deletion Proofs)
-//! zum rechtssicheren Nachweis der physischen und kryptographischen Löschung nach Art. 17 DSGVO.
+//! Dieses Modul implementiert kryptographische Attestationszertifikate (Deletion Proofs)
+//! zum Nachweis der physischen und kryptographischen Bereinigung.
 //!
 //! ## Submodule
 //! - `types.rs`: Datenstrukturen und Enums (DeletionProof, DeletionLayer, etc.).
@@ -11,7 +11,7 @@
 //! - `chain.rs`: Verkettung aufeinanderfolgender Beweise.
 //! - `key_derivation.rs`: Schlüsselableitung für Signatur und Prüfsummen.
 // FILE-CONTEXT
-// ZWECK: Directory module declaration and re-exports for cryptographic deletion proofs (GDPR Art. 17).
+// ZWECK: Directory module declaration and re-exports for cryptographic deletion proofs and attestations.
 // INVARIANTEN: All public interfaces from legacy deletion_proof.rs re-exported without breaking changes.
 
 #![forbid(unsafe_code)]
