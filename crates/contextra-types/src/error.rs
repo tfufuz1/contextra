@@ -330,7 +330,7 @@ pub enum ContextraError {
         tx_id: u64,
     },
 
-    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit `deletion_proof_active`.
+    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit aktiven Invarianten.
     #[error("KV delete mode configuration error: {0}")]
     KvDeleteModeConfig(&'static str),
 
