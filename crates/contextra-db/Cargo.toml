@@ -14,20 +14,10 @@ ring = "3"
 
 [dependencies]
 contextra-engine = { workspace = true }
-contextra-cognition = { workspace = true }
-contextra-sys = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 bytes = { workspace = true }
-contextra-crypto = { workspace = true }
-contextra-store = { workspace = true }
 blake3 = { workspace = true }
-contextra-vector = { workspace = true }
-contextra-text = { workspace = true }
-contextra-checkpoint = { workspace = true }
-contextra-graph = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-adapt = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -38,7 +28,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
@@ -46,6 +35,14 @@ criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 contextra-testkit = { workspace = true }
+contextra-store = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-text = { workspace = true }
+contextra-adapt = { workspace = true }
+contextra-rank = { workspace = true }
+contextra-checkpoint = { workspace = true }
+contextra-cognition = { workspace = true }
+contextra-sys = { workspace = true }
 ed25519-dalek = "2"
 
 [features]
@@ -56,13 +53,11 @@ reranking = []
 onnx = ["contextra-engine/onnx"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = ["contextra-engine/background-maintenance"]
-graph-connectivity-health = ["contextra-engine/graph-connectivity-health", "contextra-graph/physio-percolation"]
+graph-connectivity-health = ["contextra-engine/graph-connectivity-health"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = ["contextra-engine/adaptive-candidate-pool-sizing"]
 volatile-vault = []
-# RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to contextra-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
-edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
-
+edge-reinforcement-learning = []
 
 [[example]]
 name = "quickstart"
@@ -76,6 +71,3 @@ required-features = ["experimental-diskann"]
 
 [[example]]
 name = "collections"
-
-[[example]]
-name = "verify_deletion_proof_external"
