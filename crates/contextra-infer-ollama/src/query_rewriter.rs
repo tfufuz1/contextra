@@ -57,6 +57,15 @@ impl OllamaQueryRewriter {
     pub fn config(&self) -> &OllamaQueryRewriterConfig {
         &self.config
     }
+
+    /// Rewrites a query structured according to contextra-ports QueryRewriter contract.
+    pub fn rewrite_structured<'a>(
+        &'a self,
+        original_query: &'a str,
+        current_results: &'a [ScoredEntry],
+    ) -> BoxFuture<'a, Result<Vec<QueryRewriteOutput>>> {
+        QueryRewriter::rewrite_structured(self, original_query, current_results)
+    }
 }
 
 impl QueryRewriter for OllamaQueryRewriter {
