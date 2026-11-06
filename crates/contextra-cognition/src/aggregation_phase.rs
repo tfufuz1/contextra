@@ -879,3 +879,29 @@ fn run_deterministic_diagonal_gmm(
 
     assign_clusters_from_gmm(nodes, k, dim, &pi, &mu, &sigma_sq)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_splitmix64_determinism() {
+        let mut rng1 = SplitMix64::new(42);
+        let mut rng2 = SplitMix64::new(42);
+
+        for _ in 0..100 {
+            assert_eq!(rng1.next_u64(), rng2.next_u64());
+            assert_eq!(rng1.next_f64(), rng2.next_f64());
+        }
+    }
+
+    #[test]
+    fn test_compute_entity_community_hash_permutation_invariant() {
+        let list1 = vec![EntityId::new(10), EntityId::new(2), EntityId::new(50)];
+        let list2 = vec![EntityId::new(50), EntityId::new(10), EntityId::new(2)];
+        assert_eq!(
+            compute_entity_community_hash(&list1),
+            compute_entity_community_hash(&list2)
+        );
+    }
+}

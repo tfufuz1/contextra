@@ -29,7 +29,7 @@ use super::types::CompactionStrategy;
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
 // ANCHOR[contextra-cognition:SESS-001]
 /// Transaktionale OCC-Konsolidierungssitzung.
-pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex>
+pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex>
 {
     /// Reference to the active collection.
     pub collection: &'a Collection<S, V>,
