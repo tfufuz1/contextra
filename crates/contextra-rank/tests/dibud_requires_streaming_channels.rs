@@ -86,7 +86,7 @@ fn test_dibud_lazy_streaming_infinite_iterators_ak17() {
     );
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_dibud_std_async_driver_minimal_executor() {
     let vec_docs = [make_doc_id(101), make_doc_id(102)];
@@ -141,7 +141,7 @@ fn test_dibud_std_async_driver_minimal_executor() {
     assert!(!outcome.ranked.is_empty());
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_dibud_channel_exhaustion_all_certified() {
     let mut v = vec![make_doc_id(1), make_doc_id(2)].into_iter();
@@ -164,7 +164,7 @@ fn test_dibud_channel_exhaustion_all_certified() {
     assert_eq!(outcome.certified_len, outcome.ranked.len());
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_dibud_budget_one_no_panic() {
     let mut v = vec![make_doc_id(1), make_doc_id(2)].into_iter();
@@ -188,7 +188,7 @@ fn test_dibud_budget_one_no_panic() {
     assert!(outcome.certified_len <= 1);
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_dibud_provenance_recording() {
     let doc1 = make_doc_id(1);
