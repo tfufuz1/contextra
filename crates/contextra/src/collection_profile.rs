@@ -10,27 +10,42 @@
 //! ## Ring-Zugehörigkeit & Zweck
 //! - **Ring 4 (Fassade)**: Bietet übergeordnete Konfigurationsbündel für typische
 //!   Betriebsumgebungen an, von ressourcenbeschränkten Edge-Geräten bis zu hochgradig
-//!   regulierten Unternehmensumgebungen (DSGVO, Compliance).
+//!   abgesicherten Unternehmensumgebungen (Compliance, Governance).
 //!
 //! ## Wichtigste Typen & Konstanten
 //! - [`DEFAULT_AUTO_EXTRACTION_MODE`]: Standardmodus für automatische Entitäten-Extraktion via LLM.
 //! - [`ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT`]: Abweichender Default für regulierte Umgebungen.
 //! - [`LsmTuning`]: Feineinstellung für LSM-Speicherstrukturen (Memtable, RAM, Group-Commit).
-//! - [`CollectionProfile`]: Kombiniert Performance, KV-Löschmodus, LSM-Tuning und Extraktionsmodus.
+//! - [`KvDeleteMode`]: Bestimmt das KV-Bereinigungsverfahren (TombstoneOnly oder CryptoShred).
+//! - [`CollectionProfile`]: Kombiniert Performance, KV-Bereinigungsmodus, LSM-Tuning und Extraktionsmodus.
 //! - [`DeploymentTier`]: Enumeration vordefinierter Betriebsstufen (`EdgeMinimal`, `PowerUserLocal`,
 //!   `EnterpriseShared`, `EnterpriseRegulated`).
 //!
 //! ## Invarianten
-//! - **INV-COLLECTION-PROFILE-1**: Wenn kryptografische Löschnachweise (DeletionProof) aktiv sind,
+//! - **INV-COLLECTION-PROFILE-1**: Wenn kryptografische Integritätsnachweise aktiv sind,
 //!   darf `kv_delete_mode` nicht auf `TombstoneOnly` stehen, da reine Tombstones keinen kryptografischen
-//!   Löschbeweis (Crypto-Shredding) erbringen können.
+//!   Bereinigungsnachweis (Crypto-Shredding) erbringen können.
 //! - **INV-COLLECTION-PROFILE-2**: Alle Voreinstellungen in `DeploymentTier` müssen bei Aufruf von `resolve()`
 //!   stets valide sein (`validate().is_ok()`).
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
 use contextra_ports::license::LicenseGate;
-use contextra_store::kv::delete_mode::KvDeleteMode;
 pub use contextra_types::types::domain::AutoExtractionMode;
+use serde::{Deserialize, Serialize};
+
+/// Mode specifying KV segment deletion behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum KvDeleteMode {
+    TombstoneOnly,
+    CryptoShred,
+}
+
+impl Default for KvDeleteMode {
+    fn default() -> Self {
+        Self::CryptoShred
+    }
+}
 
 // ANCHOR[contextra:PRF-001]
 /// Standardmodus für die automatische LLM-gestützte Metadaten-/Entitäten-Extraktion bei Standard-Tiers.
@@ -42,7 +57,7 @@ pub const DEFAULT_AUTO_EXTRACTION_MODE: AutoExtractionMode = AutoExtractionMode:
 /// Standardmodus für `EnterpriseRegulated`.
 ///
 /// In EnterpriseRegulated wird kein Dokumenttext automatisch an ein Extraktions-LLM
-/// gegeben, solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung gemäß Art. 5 DSGVO);
+/// gegeben, solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung);
 /// explizite Aktivierung pro Collection bleibt möglich.
 pub const ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT: AutoExtractionMode =
     AutoExtractionMode::Disabled;
@@ -77,7 +92,7 @@ pub struct CollectionProfile {
 pub enum CollectionProfileError {
     #[error("performance profile invalid: {0}")]
     Performance(#[from] PerformanceProfileError),
-    #[error("deletion-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side DeletionProof")]
+    #[error("integrity-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side IntegrityProof")]
     KvDeleteMismatch,
 }
 
@@ -87,14 +102,14 @@ impl CollectionProfile {
     ///
     /// # Ablauf von `validate`:
     /// 1. Performance-Profil auflösen und dessen Konfiguration prüfen (`resolved.validate()`).
-    /// 2. Prüfen, ob `deletion_proof_active` mit `KvDeleteMode::TombstoneOnly` kombiniert wurde (Invariante INV-COLLECTION-PROFILE-1).
+    /// 2. Prüfen, ob `integrity_proof_active` mit `KvDeleteMode::TombstoneOnly` kombiniert wurde (Invariante INV-COLLECTION-PROFILE-1).
     ///
     /// # Fehler
-    /// Gibt [`CollectionProfileError::KvDeleteMismatch`] zurück, falls Löschnachweise aktiv sind, aber nur Tombstones konfiguriert wurden.
+    /// Gibt [`CollectionProfileError::KvDeleteMismatch`] zurück, falls Integritätsnachweise aktiv sind, aber nur Tombstones konfiguriert wurden.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
-        if resolved.deletion_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
+        if resolved.integrity_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
             return Err(CollectionProfileError::KvDeleteMismatch);
         }
         Ok(())
