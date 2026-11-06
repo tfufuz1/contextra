@@ -36,6 +36,7 @@ members = [
     "crates/contextra-audit-export",
     "crates/contextra-avv-generator",
     "crates/contextra-license",
+    "crates/contextra-erasure",
     "crates/contextra-ingest",
 ]
 # Restored archived crates to default-members:
@@ -152,6 +153,7 @@ contextra-rank = { path = "crates/contextra-rank" }
 contextra-audit-export = { path = "crates/contextra-audit-export" }
 contextra-avv-generator = { path = "crates/contextra-avv-generator" }
 contextra-license = { path = "crates/contextra-license" }
+contextra-erasure = { path = "crates/contextra-erasure" }
 contextra-ingest = { path = "crates/contextra-ingest" }
 
 # Ingestion dependencies
