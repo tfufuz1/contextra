@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn model_info_deserializes_correctly() {
+    fn test_model_info_deserializes_correctly() {
         let json = r#"{"modelfile":"FROM nomic-embed-text","parameter_size":"137M","quantization_level":"Q4_0"}"#;
         let info: ModelInfo = serde_json::from_str(json).unwrap(); // unwrap
         assert_eq!(info.modelfile.as_deref(), Some("FROM nomic-embed-text"));

@@ -1055,7 +1055,6 @@ name = "contextra-infer-ollama"
 version = "0.1.0"
 dependencies = [
  "contextra-ports",
- "contextra-rank",
  "contextra-types",
  "futures",
  "futures-util",
