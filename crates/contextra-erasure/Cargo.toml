@@ -1,0 +1,45 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-erasure"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht."
+
+[package.metadata.contextra]
+ring = "3"
+
+[dependencies]
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-crypto = { workspace = true }
+
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+blake3 = { workspace = true }
+sha2 = "0.10"
+hmac = "0.12"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+futures-util = "0.3"
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+loom = "0.7"
+tokio = { workspace = true, features = ["test-util"] }
+
+[[test]]
+name = "t_observer"
+
+[[bench]]
+name = "bm_erase"
+harness = false
