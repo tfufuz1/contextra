@@ -11,7 +11,7 @@
 //!
 //! ## Zweck
 //! Dieses Modul stellt Typen und Parser für das JSON-RPC-2.0-Drahtprotokoll bereit. Es wird für
-//! IPC-Nachrichten (z. B. zwischen CLI/MCP/Router und Engine) eingesetzt.
+//! IPC-Nachrichten (z. B. zwischen Kommunikationsendpunkten und Diensten) eingesetzt.
 //!
 //! ## Sicherheitsinvariante & Zero-Panic-Garantie
 //! Die Verarbeitung erfolgt strikt defensiv (Fail-Closed) und ohne `unsafe`-Code:
