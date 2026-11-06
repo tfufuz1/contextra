@@ -10,7 +10,6 @@
 //!
 //! Misst Durchsatz und Latenz von Checkpoint-Erstellung, Laden, Guard-Rollback und nebenläufiger Erzeugung.
 
-
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{Result, TxId};
