@@ -513,7 +513,7 @@ pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + '
 /// Tokio-Background-Task Engine für periodische Speicher-Konsolidierung und Wissenssynthese.
 // ANCHOR[contextra-cognition:EXEC-010]
 /// Engine für periodische Hintergrund-Konsolidierung und Wissenssynthese.
-pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
+pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex> {
     collection: Arc<Collection<S, V>>,
     llm: Option<Arc<dyn LlmTextGenerator>>,
     validator: Option<Arc<dyn ResponseGroundingValidator>>,
@@ -830,13 +830,11 @@ mod tests {
     use super::*;
     use contextra_graph::CsrGraph;
     use contextra_ports::{BoxFuture, LlmTextGenerator};
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
+    use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
-    use tempfile::tempdir;
 
     struct TestMockLlm {
         should_fail: AtomicBool,
@@ -870,28 +868,13 @@ mod tests {
         }
     }
 
-    async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)
-    {
-        let dir = tempdir().expect("tempdir");
-        let storage = Arc::new(
-            LsmStorage::new(contextra_store::LsmConfig {
-                path: dir.path().to_path_buf(),
-                ..Default::default()
-            })
-            .await
-            .expect("LsmStorage"),
-        );
-        let index = Arc::new(
-            HnswIndex::try_new(contextra_vector::HnswConfig {
-                dimension: 4,
-                ..Default::default()
-            })
-            .expect("HnswIndex"),
-        );
+    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let index = Arc::new(InMemoryVectorIndex::new(4));
         let graph = Arc::new(CsrGraph::new());
         let next_tx = Arc::new(AtomicU64::new(1));
 
-        let col = Arc::new(Collection::new(
+        Arc::new(Collection::new(
             "default".to_string(),
             storage,
             index,
@@ -899,15 +882,14 @@ mod tests {
             next_tx,
             4,
             contextra_engine::Language::English,
-        ));
-        (col, dir)
+        ))
     }
 
 // ANCHOR[contextra-cognition:TEST-CONSOLID-040]
 // Prüft Testfall `test_consolidation_engine_concurrency_no_deadlock`.
     #[tokio::test]
     async fn test_consolidation_engine_concurrency_no_deadlock() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
         let cancel_token = tokio_util::sync::CancellationToken::new();
 
         let engine = Arc::new(ConsolidationEngine::new(
@@ -960,7 +942,7 @@ mod tests {
 // Prüft Testfall `test_consolidation_engine_fault_injection_resume`.
     #[tokio::test]
     async fn test_consolidation_engine_fault_injection_resume() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
         let cancel_token = tokio_util::sync::CancellationToken::new();
 
         let llm = Arc::new(TestMockLlm::new());
@@ -1044,7 +1026,7 @@ mod tests {
 // Prüft Testfall `test_execute_consolidation_pass_skips_when_guard_locked`.
     #[tokio::test]
     async fn test_execute_consolidation_pass_skips_when_guard_locked() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
 
         let turn1 = (DocId::new(1), vec![1.0, 0.0, 0.0, 0.0]);
         let turn2 = (DocId::new(2), vec![1.0, 0.0, 0.0, 0.0]);
@@ -1069,7 +1051,7 @@ mod tests {
 // Prüft Testfall `test_consolidation_nodes_guard_deadlock_regression`.
     #[tokio::test]
     async fn test_consolidation_nodes_guard_deadlock_regression() {
-        let (col, _dir) = create_test_collection().await;
+        let col = create_test_collection().await;
 
         for i in 1..=5 {
             let id = format!("doc_{}", i);
