@@ -38,7 +38,7 @@ pub fn bsi_mapping_table() -> Vec<BsiMappingEntry> {
     vec![
         BsiMappingEntry {
             primitive_name: "Ed25519".to_string(),
-            code_location: "crates/contextra-crypto/src/deletion_proof.rs".to_string(),
+            code_location: "crates/contextra-crypto/src/deletion_proof/mod.rs".to_string(),
             bsi_reference: "BSI TR-02102-1 / BSI IT-Grundschutz CON.6 (Löschen und Vernichten)".to_string(),
             note: "Digitale Signatur für Löschnachweise (DeletionProof v4). BSI TR-02102-1 §1.5/§3.2 bewertet Ed25519 (Curve25519) als empfohlenes Asymmetrisches Signaturverfahren mit 128-Bit Sicherheit; unterstützt BSI IT-Grundschutz CON.6 Löschen und Vernichten. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
         },
