@@ -1,7 +1,7 @@
 //! Reranker port trait for cross-encoder post-retrieval ranking.
 
 use super::BoxFuture;
-use contextra_types::{RerankResult, Result};
+use crate::{RerankResult, Result};
 
 /// Trait for post-retrieval cross-encoder reranking models.
 pub trait Reranker: Send + Sync {

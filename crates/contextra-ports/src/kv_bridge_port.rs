@@ -6,8 +6,8 @@
 //! Key-Value Bridge Storage port trait for Tier 2 persistence decoupling.
 
 use crate::BoxFuture;
+use crate::{Result, TxId};
 use bytes::Bytes;
-use contextra_types::{Result, TxId};
 
 /// Abstrahiertes Persistence-Interface für KV-Bridge Tier-2 Spill-over operations.
 ///

@@ -5,7 +5,7 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_types::Result;
+use crate::Result;
 use serde::Serialize;
 
 /// Identifikator für die physische Storage-Schicht.
@@ -105,7 +105,7 @@ impl ScanTarget {
 /// Statistiken über bereinigte Einheiten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 pub struct PurgeStats {
-    /// Anzahl physisch gelöschter Einheiten.
+    /// Anzahl physisch bereinigter Einheiten.
     pub purged_units: u64,
     /// Anzahl freigegebener Bytes.
     pub bytes_freed: u64,
@@ -113,10 +113,6 @@ pub struct PurgeStats {
 
 /// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
 pub trait Purger: Send + Sync {
-    /// Führt die physische Löschung für das gegebene Ziel aus.
-    fn purge(
-        &self,
-        ctx: &contextra_types::RequestContext,
-        target: &ScanTarget,
-    ) -> Result<PurgeStats>;
+    /// Führt die physische Bereinigung für das gegebene Ziel aus.
+    fn purge(&self, ctx: &crate::RequestContext, target: &ScanTarget) -> Result<PurgeStats>;
 }
