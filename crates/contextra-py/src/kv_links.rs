@@ -264,46 +264,26 @@ mod tests {
 
     // Prüft, dass alle gültigen Relationsbezeichnungen unabhängig von Groß-/Kleinschreibung korrekt geparst werden.
     #[test]
-    fn test_parse_link_relation_valid_cases() {
-        assert_eq!(
-            parse_link_relation("elaborates").expect("should parse"),
-            LinkRelation::Elaborates
-        );
-        assert_eq!(
-            parse_link_relation("Elaborates").expect("should parse"),
-            LinkRelation::Elaborates
-        );
-        assert_eq!(
-            parse_link_relation("ELABORATES").expect("should parse"),
-            LinkRelation::Elaborates
-        );
+    fn test_parse_link_relation_valid_cases() -> Result<(), crate::bindings::PyContextraError> {
+        assert_eq!(parse_link_relation("elaborates")?, LinkRelation::Elaborates);
+        assert_eq!(parse_link_relation("Elaborates")?, LinkRelation::Elaborates);
+        assert_eq!(parse_link_relation("ELABORATES")?, LinkRelation::Elaborates);
 
         assert_eq!(
-            parse_link_relation("contradicts").expect("should parse"),
+            parse_link_relation("contradicts")?,
             LinkRelation::Contradicts
         );
         assert_eq!(
-            parse_link_relation("Contradicts").expect("should parse"),
+            parse_link_relation("Contradicts")?,
             LinkRelation::Contradicts
         );
 
-        assert_eq!(
-            parse_link_relation("supersedes").expect("should parse"),
-            LinkRelation::Supersedes
-        );
-        assert_eq!(
-            parse_link_relation("SuperSedes").expect("should parse"),
-            LinkRelation::Supersedes
-        );
+        assert_eq!(parse_link_relation("supersedes")?, LinkRelation::Supersedes);
+        assert_eq!(parse_link_relation("SuperSedes")?, LinkRelation::Supersedes);
 
-        assert_eq!(
-            parse_link_relation("references").expect("should parse"),
-            LinkRelation::References
-        );
-        assert_eq!(
-            parse_link_relation("REFERENCES").expect("should parse"),
-            LinkRelation::References
-        );
+        assert_eq!(parse_link_relation("references")?, LinkRelation::References);
+        assert_eq!(parse_link_relation("REFERENCES")?, LinkRelation::References);
+        Ok(())
     }
 
     // Prüft, dass ungültige oder leere Relationsbezeichnungen mit einem Fehler abgewiesen werden.

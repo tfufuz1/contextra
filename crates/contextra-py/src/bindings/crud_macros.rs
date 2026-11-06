@@ -232,7 +232,7 @@ macro_rules! contextra_crud_methods {
                 }
                 let weights = match (vector_weight, text_weight, graph_weight) {
                     (Some(v), Some(t), Some(g)) => {
-                        Some(contextra_rank::FusionWeights::new(v, t, g)
+                        Some(contextra_types::FusionWeights::new(v, t, g)
                             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?)
                     }
                     (None, None, None) => None,
@@ -278,7 +278,7 @@ macro_rules! contextra_crud_methods {
                 }
                 let weights = match (vector_weight, text_weight, graph_weight) {
                     (Some(v), Some(t), Some(g)) => {
-                        Some(contextra_rank::FusionWeights::new(v, t, g)
+                        Some(contextra_types::FusionWeights::new(v, t, g)
                             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?)
                     }
                     (None, None, None) => None,
