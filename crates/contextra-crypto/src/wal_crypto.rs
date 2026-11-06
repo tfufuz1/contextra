@@ -6,7 +6,7 @@
 //! - **Längenpräfixe (V3):** Zur Vermeidung von Partitionskollisionen werden Schlüssel- und
 //!   Wertlängen strikt als 4-Byte Little-Endian kodiert.
 //! - **HMAC-Kette:** Jeder WAL-Eintrag verkettet den Hash des vorherigen Eintrags,
-//!   sodass Löschungen oder Vertauschungen sofort erkannt werden.
+//!   sodass Entfernungen oder Vertauschungen sofort erkannt werden.
 //! - **KMS-Wrapping:** Dateischlüssel werden per Key Management Service (KMS) geschützt gewrappt.
 
 // FILE-CONTEXT
@@ -728,7 +728,7 @@ mod tests {
     }
 
     #[test]
-    fn hmac_chain_detects_tampered_entry() {
+    fn test_hmac_chain_detects_tampered_entry() {
         let key = b"integrity-key-32-bytes-long-----";
         let e1 = create_entry(key, [0u8; 32], 1, 0, b"key1", b"val1");
         let e2 = create_entry(key, e1.checksum, 2, 0, b"key2", b"val2");
@@ -750,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn hmac_chain_detects_deleted_entry() {
+    fn test_hmac_chain_detects_deleted_entry() {
         let key = b"integrity-key-32-bytes-long-----";
         let e1 = create_entry(key, [0u8; 32], 1, 0, b"key1", b"val1");
         let e2 = create_entry(key, e1.checksum, 2, 0, b"key2", b"val2");

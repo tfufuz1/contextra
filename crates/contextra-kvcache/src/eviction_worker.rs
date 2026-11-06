@@ -9,7 +9,7 @@
 //!    Löschbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
 //!    den Tokio-Async-Executor blockieren.
 //!
-//! 2. **[`emergency_wipe()`]**: Für seltene Notfall-Löschungen (z. B. Prozess-Shutdown,
+//! 2. **[`emergency_wipe()`]**: Für seltene Notfall-Bereinigungen (z. B. Prozess-Shutdown,
 //!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
@@ -209,7 +209,7 @@ impl Drop for EvictionWorker {
 }
 
 // ANCHOR[contextra-kvcache:EVICT-003]
-/// Synchroner Notfall-Wipe für sofortige Speicherlöschung.
+/// Synchroner Notfall-Wipe für sofortige Speicherbereinigung.
 ///
 /// Löscht blockierend alle Segmente im Store synchron aus dem RAM und stellt
 /// sicher, dass alle vertraulichen Tensordaten mittels Zeroize überschrieben sind,

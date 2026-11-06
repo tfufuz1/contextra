@@ -14,7 +14,6 @@
 //!
 //! Verifiziert die strikte Trennung von Checkpoints über verschiedene Mandanten-Namespaces hinweg.
 
-
 use contextra_checkpoint::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
     StateCheckpoint,

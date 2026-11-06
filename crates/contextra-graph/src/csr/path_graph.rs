@@ -10,6 +10,43 @@ use contextra_types::EntityId;
 
 use super::graph_write::CsrGraph;
 
+impl crate::provider::GraphProvider for CsrGraph {
+    fn node_ids(&self) -> Vec<EntityId> {
+        let inner = self.inner_read();
+        let mut ids = Vec::new();
+        for (idx, &eid) in inner.reverse_map.iter().enumerate() {
+            if inner.entity_at(idx).is_some() {
+                ids.push(eid);
+            }
+        }
+        ids
+    }
+
+    fn contains_node(&self, node: EntityId) -> bool {
+        let inner = self.inner_read();
+        inner.id_map.get(&node).and_then(|&idx| inner.entity_at(idx)).is_some()
+    }
+
+    fn outgoing_edges(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        <Self as crate::path_rag::PathGraph>::neighbors_with_weights(self, node)
+    }
+
+    fn incoming_edges(&self, node: EntityId) -> Vec<(EntityId, f32)> {
+        <Self as crate::path_rag::PathGraph>::predecessors_with_weights(self, node)
+    }
+
+    fn hyperedges_for_entity(&self, node: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
+        self.hyperedges_for_entity(node)
+    }
+
+    fn get_hyperedge(
+        &self,
+        id: crate::hyperedge::HyperEdgeId,
+    ) -> Option<Arc<crate::hyperedge::HyperEdge>> {
+        self.get_hyperedge(id)
+    }
+}
+
 impl crate::path_rag::PathGraph for CsrGraph {
     fn neighbors_with_weights(&self, node: EntityId) -> Vec<(EntityId, f32)> {
         let inner = self.inner_read();

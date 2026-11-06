@@ -41,7 +41,8 @@ fn create_test_zip_package(
         zip.start_file("mimetype", stored_options).unwrap();
         zip.write_all(mimetype.as_bytes()).unwrap();
 
-        let deflate_options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+        let deflate_options =
+            FileOptions::default().compression_method(CompressionMethod::Deflated);
 
         if let Some(meta) = meta_xml {
             zip.start_file("meta.xml", deflate_options).unwrap();
@@ -52,7 +53,8 @@ fn create_test_zip_package(
         zip.write_all(content_xml.as_bytes()).unwrap();
 
         if let Some(manifest) = manifest_xml {
-            zip.start_file("META-INF/manifest.xml", deflate_options).unwrap();
+            zip.start_file("META-INF/manifest.xml", deflate_options)
+                .unwrap();
             zip.write_all(manifest.as_bytes()).unwrap();
         }
 
@@ -101,7 +103,12 @@ fn test_odf_heading_hierarchy_and_nested_list() {
   </office:body>
 </office:document-content>"#;
 
-    let zip_bytes = create_test_zip_package("application/vnd.oasis.opendocument.text", None, content_xml, None);
+    let zip_bytes = create_test_zip_package(
+        "application/vnd.oasis.opendocument.text",
+        None,
+        content_xml,
+        None,
+    );
 
     let extractor = OdfExtractor::new();
     let reg = ExtractorRegistry::new_empty();
@@ -179,7 +186,12 @@ fn test_odf_table_column_span_and_repeated_empty_protection() {
   </office:body>
 </office:document-content>"#;
 
-    let zip_bytes = create_test_zip_package("application/vnd.oasis.opendocument.text", None, content_xml, None);
+    let zip_bytes = create_test_zip_package(
+        "application/vnd.oasis.opendocument.text",
+        None,
+        content_xml,
+        None,
+    );
 
     let extractor = OdfExtractor::new();
     let reg = ExtractorRegistry::new_empty();
@@ -221,7 +233,12 @@ fn test_odf_non_empty_table_cell_repeated_exceeds_budget() {
   </office:body>
 </office:document-content>"#;
 
-    let zip_bytes = create_test_zip_package("application/vnd.oasis.opendocument.text", None, content_xml, None);
+    let zip_bytes = create_test_zip_package(
+        "application/vnd.oasis.opendocument.text",
+        None,
+        content_xml,
+        None,
+    );
 
     let extractor = OdfExtractor::new();
     let reg = ExtractorRegistry::new_empty();
@@ -231,7 +248,9 @@ fn test_odf_non_empty_table_cell_repeated_exceeds_budget() {
     let budget = ResourceBudget::new(limits.clone());
     let ctx = create_context(&limits, &policy, &budget, &reg);
 
-    let err = extractor.extract(FormatId::Odt, &zip_bytes, &ctx).unwrap_err();
+    let err = extractor
+        .extract(FormatId::Odt, &zip_bytes, &ctx)
+        .unwrap_err();
     assert!(matches!(
         err,
         IngestError::LimitExceeded {
@@ -256,7 +275,12 @@ fn test_odf_footnotes_comments_and_tracked_deletions_policy() {
   </office:body>
 </office:document-content>"#;
 
-    let zip_bytes = create_test_zip_package("application/vnd.oasis.opendocument.text", None, content_xml, None);
+    let zip_bytes = create_test_zip_package(
+        "application/vnd.oasis.opendocument.text",
+        None,
+        content_xml,
+        None,
+    );
 
     let extractor = OdfExtractor::new();
     let reg = ExtractorRegistry::new_empty();
@@ -278,8 +302,12 @@ fn test_odf_footnotes_comments_and_tracked_deletions_policy() {
         })
         .collect();
 
-    assert!(note_blocks.iter().any(|(k, t)| *k == NoteKind::Footnote && t == "Wichtige Fußnote"));
-    assert!(note_blocks.iter().any(|(k, t)| *k == NoteKind::Comment && t == "Prüfkommentar"));
+    assert!(note_blocks
+        .iter()
+        .any(|(k, t)| *k == NoteKind::Footnote && t == "Wichtige Fußnote"));
+    assert!(note_blocks
+        .iter()
+        .any(|(k, t)| *k == NoteKind::Comment && t == "Prüfkommentar"));
 
     let text_content: String = ir
         .blocks
@@ -328,7 +356,12 @@ fn test_odf_hidden_paragraph_prompt_injection_policy() {
   </office:body>
 </office:document-content>"#;
 
-    let zip_bytes = create_test_zip_package("application/vnd.oasis.opendocument.text", None, content_xml, None);
+    let zip_bytes = create_test_zip_package(
+        "application/vnd.oasis.opendocument.text",
+        None,
+        content_xml,
+        None,
+    );
 
     let extractor = OdfExtractor::new();
     let reg = ExtractorRegistry::new_empty();
@@ -344,7 +377,10 @@ fn test_odf_hidden_paragraph_prompt_injection_policy() {
 
     for block in &ir1.blocks {
         if let BlockKind::Paragraph { ref text } = block.kind {
-            assert!(!text.contains("PROMPT INJECTION"), "Versteckter Text darf nicht extrahiert werden!");
+            assert!(
+                !text.contains("PROMPT INJECTION"),
+                "Versteckter Text darf nicht extrahiert werden!"
+            );
             assert!(!text.contains("SECRET_KEY"));
         }
     }
@@ -403,7 +439,12 @@ fn test_odp_presentation_title_notes_and_hidden_slide() {
   </office:body>
 </office:document-content>"#;
 
-    let zip_bytes = create_test_zip_package("application/vnd.oasis.opendocument.presentation", None, content_xml, None);
+    let zip_bytes = create_test_zip_package(
+        "application/vnd.oasis.opendocument.presentation",
+        None,
+        content_xml,
+        None,
+    );
 
     let extractor = OdfExtractor::new();
     let reg = ExtractorRegistry::new_empty();
@@ -419,7 +460,9 @@ fn test_odp_presentation_title_notes_and_hidden_slide() {
         .blocks
         .iter()
         .filter_map(|b| match &b.kind {
-            BlockKind::Boundary(Boundary::Slide { number, title }) => Some((*number, title.clone())),
+            BlockKind::Boundary(Boundary::Slide { number, title }) => {
+                Some((*number, title.clone()))
+            }
             _ => None,
         })
         .collect();
@@ -466,7 +509,9 @@ fn test_flat_odf_extraction() {
     let budget = ResourceBudget::new(limits.clone());
     let ctx = create_context(&limits, &policy, &budget, &reg);
 
-    let ir = extractor.extract(FormatId::Odt, flat_fodt.as_bytes(), &ctx).unwrap();
+    let ir = extractor
+        .extract(FormatId::Odt, flat_fodt.as_bytes(), &ctx)
+        .unwrap();
 
     assert_eq!(ir.meta.title.as_deref(), Some("Flat ODF Dokument"));
     assert_eq!(ir.meta.language.as_deref(), Some("de-DE"));
@@ -501,8 +546,15 @@ fn test_encrypted_odf_returns_encrypted_error() {
     let budget = ResourceBudget::new(limits.clone());
     let ctx = create_context(&limits, &policy, &budget, &reg);
 
-    let err = extractor.extract(FormatId::Odt, &zip_bytes, &ctx).unwrap_err();
-    assert_eq!(err, IngestError::Encrypted { format: Some(FormatId::Odt) });
+    let err = extractor
+        .extract(FormatId::Odt, &zip_bytes, &ctx)
+        .unwrap_err();
+    assert_eq!(
+        err,
+        IngestError::Encrypted {
+            format: Some(FormatId::Odt)
+        }
+    );
 }
 
 // ANCHOR[contextra-ingest:TST-0389]
@@ -523,6 +575,8 @@ fn test_corrupt_xml_returns_corrupt_error() {
     let budget = ResourceBudget::new(limits.clone());
     let ctx = create_context(&limits, &policy, &budget, &reg);
 
-    let err = extractor.extract(FormatId::Odt, &zip_bytes, &ctx).unwrap_err();
+    let err = extractor
+        .extract(FormatId::Odt, &zip_bytes, &ctx)
+        .unwrap_err();
     assert!(matches!(err, IngestError::Corrupt { .. }));
 }

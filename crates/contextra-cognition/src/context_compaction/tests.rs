@@ -18,9 +18,8 @@ use contextra_engine::ProvenanceRecord;
 use contextra_graph::CsrGraph;
 use contextra_ports::SeededRng;
 use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
-use contextra_store::{LsmConfig, LsmStorage};
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
-use contextra_vector::{HnswConfig, HnswIndex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -305,7 +304,7 @@ fn test_compact_empty_chunks_returns_empty_compacted_context() {
 
 #[derive(Clone)]
 struct FaultyDeleteStorage {
-    inner: Arc<LsmStorage>,
+    inner: Arc<InMemoryStorageEngine>,
     fail_delete: Arc<AtomicBool>,
 }
 
@@ -412,31 +411,22 @@ impl StorageEngine for FaultyDeleteStorage {
 #[tokio::test]
 async fn test_consolidation_aborts_on_delete_failure(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let tmp = tempfile::tempdir()?;
-    let lsm_config = LsmConfig {
-        path: tmp.path().to_path_buf(),
-        ..Default::default()
-    };
-    let lsm = Arc::new(LsmStorage::new(lsm_config).await?);
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let fail_delete = Arc::new(AtomicBool::new(false));
     let faulty_storage = FaultyDeleteStorage {
-        inner: lsm,
+        inner: storage,
         fail_delete: fail_delete.clone(),
     };
 
     let dim = 4;
-    let hnsw_config = HnswConfig {
-        dimension: dim,
-        ..Default::default()
-    };
-    let hnsw = Arc::new(HnswIndex::try_new(hnsw_config)?);
+    let index = Arc::new(InMemoryVectorIndex::new(dim));
     let graph = Arc::new(CsrGraph::with_storage(Arc::new(faulty_storage.clone())));
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "test_col".to_string(),
         Arc::new(faulty_storage),
-        hnsw,
+        index,
         graph,
         next_tx,
         dim,
@@ -540,12 +530,7 @@ fn test_compactor_with_rng_builder() {
 #[tokio::test]
 async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_monotonically(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let tmp = tempfile::tempdir()?;
-    let lsm_config = LsmConfig {
-        path: tmp.path().to_path_buf(),
-        ..Default::default()
-    };
-    let lsm = Arc::new(LsmStorage::new(lsm_config).await?);
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let next_tx = Arc::new(AtomicU64::new(10));
 
     let target_doc_id = DocId::new(42);
@@ -557,15 +542,15 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
     let intent_bytes = serde_json::to_vec(&intent)?;
 
     let setup_tx = TxId::new(1);
-    lsm.put(setup_tx, b"consolidation_intent:1", &intent_bytes)
+    storage.put(setup_tx, b"consolidation_intent:1", &intent_bytes)
         .await?;
-    lsm.commit(setup_tx).await?;
-    lsm.put(setup_tx, b"consolidation_intent:2", &intent_bytes)
+    storage.commit(setup_tx).await?;
+    storage.put(setup_tx, b"consolidation_intent:2", &intent_bytes)
         .await?;
-    lsm.commit(setup_tx).await?;
+    storage.commit(setup_tx).await?;
 
     let prev_counter = next_tx.load(Ordering::SeqCst);
-    let cleaned = cleanup_orphaned_consolidation_intents(lsm.as_ref(), &next_tx).await?;
+    let cleaned = cleanup_orphaned_consolidation_intents(storage.as_ref(), &next_tx).await?;
     assert_eq!(cleaned, 2, "Should clean up exactly 2 orphaned intents");
 
     let post_counter = next_tx.load(Ordering::SeqCst);
@@ -587,19 +572,8 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
 // Prüft Testfall `test_concurrent_mutation_aborts_consolidation`.
 #[tokio::test]
 async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
-    let tmp = tempfile::tempdir().unwrap();
-    let lsm_config = LsmConfig {
-        path: tmp.path().to_path_buf(),
-        ..Default::default()
-    };
-    let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
-    let index = Arc::new(
-        HnswIndex::try_new(HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let col = Collection::new(
         "default".to_string(),
         storage,

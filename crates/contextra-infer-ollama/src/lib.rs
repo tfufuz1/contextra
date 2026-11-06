@@ -22,7 +22,7 @@ pub use context_prefixer::{ContextPrefixConfig, ContextPrefixEngine, ContextPref
 pub use embedding::OllamaEmbedder;
 pub use importance::{
     parse_importance_score_response, score_importance, score_importance_batch,
-    score_importance_with_calibrator, Confidence, ImportanceAssessment,
+    score_importance_with_calibrator, Confidence, ImportanceAssessment, ImportanceCalibrator,
 };
 pub use model_info::ModelInfo;
 pub use query_rewriter::{OllamaQueryRewriter, OllamaQueryRewriterConfig};

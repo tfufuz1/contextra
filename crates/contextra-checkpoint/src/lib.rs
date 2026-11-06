@@ -53,7 +53,9 @@ mod store;
 
 // Öffentliche Re-Exports für bequemen Zugriff von außen ohne tiefe Pfade
 pub use guard::{CheckpointGuard, PinGuard};
-pub use hardlink_cloner::{CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult};
+pub use hardlink_cloner::{
+    CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult, SnapshotPinner,
+};
 pub use manifest::CheckpointManifest;
 pub use meta::{CheckpointMeta, StateCheckpoint};
 #[allow(deprecated)]

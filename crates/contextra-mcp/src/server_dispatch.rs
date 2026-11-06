@@ -168,7 +168,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_forget",
-                            "description": "Delete a document (unverified) or drop an entire collection (with verified DeletionProof export).",
+                            "description": "Delete a document (unverified) or drop an entire collection (with verified drop receipt export).",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -241,7 +241,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_drop_collection",
-                            "description": "Delete an entire collection and issue a verified collection-wide cryptographic DeletionProof.",
+                            "description": "Delete an entire collection and issue a verified collection-wide cryptographic drop receipt.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {

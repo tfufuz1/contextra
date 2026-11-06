@@ -1143,7 +1143,7 @@ pub(crate) fn parse_prompt_template(
     let mut depth = 0;
     let mut child_tags = Vec::new();
     let mut current_tag = String::new();
-    let mut tag_contents = std::collections::HashMap::new();
+    let mut tag_contents = std::collections::BTreeMap::new();
     let mut text_buf = String::new();
     let mut top_level_tag = String::new();
 

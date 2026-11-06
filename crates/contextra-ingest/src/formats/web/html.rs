@@ -17,15 +17,13 @@
 use crate::error::{IngestError, LimitKind};
 use crate::extractor::ExtractContext;
 use crate::format::FormatId;
-use crate::ir::{
-    BlockKind, DocMeta, DocumentIr, ExtractWarning, Locator, Table, WarningCode,
-};
+use crate::ir::{BlockKind, DocMeta, DocumentIr, ExtractWarning, Locator, Table, WarningCode};
 use html5ever::driver::ParseOpts;
 use html5ever::tendril::{StrTendril, TendrilSink};
 use html5ever::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
 use html5ever::{
-    local_name, namespace_url, ns, parse_document, Attribute, ExpandedName, LocalName,
-    Namespace, QualName,
+    local_name, namespace_url, ns, parse_document, Attribute, ExpandedName, LocalName, Namespace,
+    QualName,
 };
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -179,11 +177,7 @@ impl TreeSink for DomArena {
         }
     }
 
-    fn append_before_sibling(
-        &self,
-        sibling: &Self::Handle,
-        child: NodeOrText<Self::Handle>,
-    ) {
+    fn append_before_sibling(&self, sibling: &Self::Handle, child: NodeOrText<Self::Handle>) {
         let parent = sibling.parent.borrow().as_ref().and_then(|w| w.upgrade());
         if let Some(p) = parent {
             self.append(&p, child);
@@ -346,7 +340,11 @@ fn scan_arena_structure(
     let mut has_main = false;
 
     while let Some(node) = stack.pop() {
-        if let NodeKind::Element { ref name, ref attrs } = node.kind {
+        if let NodeKind::Element {
+            ref name,
+            ref attrs,
+        } = node.kind
+        {
             let tag_name = name.local.as_ref().to_ascii_lowercase();
 
             if tag_name == "main" || tag_name == "article" {
@@ -491,94 +489,96 @@ impl<'a, 'b> HtmlBlockBuilder<'a, 'b> {
 
         while let Some(op) = stack.pop() {
             match op {
-                TraversalOp::Enter(node) => {
-                    match node.kind {
-                        NodeKind::Document => {
-                            let children = node.children.borrow();
-                            for child in children.iter().rev() {
-                                stack.push(TraversalOp::Enter(child.clone()));
-                            }
+                TraversalOp::Enter(node) => match node.kind {
+                    NodeKind::Document => {
+                        let children = node.children.borrow();
+                        for child in children.iter().rev() {
+                            stack.push(TraversalOp::Enter(child.clone()));
                         }
-                        NodeKind::Element { ref name, ref attrs } => {
-                            let tag = name.local.as_ref().to_ascii_lowercase();
+                    }
+                    NodeKind::Element {
+                        ref name,
+                        ref attrs,
+                    } => {
+                        let tag = name.local.as_ref().to_ascii_lowercase();
 
-                            if matches!(
-                                tag.as_str(),
-                                "script"
-                                    | "style"
-                                    | "noscript"
-                                    | "template"
-                                    | "iframe"
-                                    | "svg"
-                                    | "head"
-                            ) {
-                                continue;
+                        if matches!(
+                            tag.as_str(),
+                            "script"
+                                | "style"
+                                | "noscript"
+                                | "template"
+                                | "iframe"
+                                | "svg"
+                                | "head"
+                        ) {
+                            continue;
+                        }
+
+                        let attrs_borrow = attrs.borrow();
+
+                        if is_hidden_element(&tag, &attrs_borrow) && !self.ctx.policy.include_hidden
+                        {
+                            if !self.hidden_warning_added {
+                                self.ir.warnings.push(ExtractWarning {
+                                    code: WarningCode::HiddenContentSkipped,
+                                    detail: "Versteckte HTML-Inhalte übersprungen".into(),
+                                });
+                                self.hidden_warning_added = true;
                             }
+                            continue;
+                        }
 
-                            let attrs_borrow = attrs.borrow();
+                        if self.has_main_or_article
+                            && matches!(tag.as_str(), "nav" | "aside" | "header" | "footer")
+                        {
+                            continue;
+                        }
 
-                            if is_hidden_element(&tag, &attrs_borrow) && !self.ctx.policy.include_hidden {
-                                if !self.hidden_warning_added {
-                                    self.ir.warnings.push(ExtractWarning {
-                                        code: WarningCode::HiddenContentSkipped,
-                                        detail: "Versteckte HTML-Inhalte übersprungen".into(),
-                                    });
-                                    self.hidden_warning_added = true;
-                                }
-                                continue;
-                            }
+                        if tag == "table" {
+                            self.flush_text_block()?;
+                            self.process_table(&node)?;
+                            continue;
+                        }
 
-                            if self.has_main_or_article
-                                && matches!(tag.as_str(), "nav" | "aside" | "header" | "footer")
-                            {
-                                continue;
-                            }
-
-                            if tag == "table" {
-                                self.flush_text_block()?;
-                                self.process_table(&node)?;
-                                continue;
-                            }
-
-                            if tag == "img" {
-                                for attr in attrs_borrow.iter() {
-                                    if attr.name.local.as_ref().eq_ignore_ascii_case("alt") {
-                                        let alt_text = attr.value.as_ref().trim();
-                                        if !alt_text.is_empty() {
-                                            self.flush_text_block()?;
-                                            self.ctx.budget.charge_text(alt_text.len() as u64)?;
-                                            self.ir.push(
-                                                BlockKind::Caption {
-                                                    text: alt_text.to_string(),
-                                                },
-                                                Locator::default(),
-                                            );
-                                        }
+                        if tag == "img" {
+                            for attr in attrs_borrow.iter() {
+                                if attr.name.local.as_ref().eq_ignore_ascii_case("alt") {
+                                    let alt_text = attr.value.as_ref().trim();
+                                    if !alt_text.is_empty() {
+                                        self.flush_text_block()?;
+                                        self.ctx.budget.charge_text(alt_text.len() as u64)?;
+                                        self.ir.push(
+                                            BlockKind::Caption {
+                                                text: alt_text.to_string(),
+                                            },
+                                            Locator::default(),
+                                        );
                                     }
                                 }
-                                continue;
                             }
-
-                            if tag == "br" {
-                                self.text_buffer.push('\n');
-                                continue;
-                            }
-
-                            self.handle_element_enter(&tag, &attrs_borrow)?;
-
-                            stack.push(TraversalOp::Exit(node.clone()));
-
-                            let children = node.children.borrow();
-                            for child in children.iter().rev() {
-                                stack.push(TraversalOp::Enter(child.clone()));
-                            }
+                            continue;
                         }
-                        NodeKind::Text(ref text) => {
-                            self.text_buffer.push_str(&text.borrow());
+
+                        if tag == "br" {
+                            self.text_buffer.push('\n');
+                            continue;
                         }
-                        _ => {}
+
+                        self.handle_element_enter(&tag, &attrs_borrow)?;
+
+                        stack.push(TraversalOp::Exit(node.clone()));
+
+                        let children = node.children.borrow();
+                        for child in children.iter().rev() {
+                            stack.push(TraversalOp::Enter(child.clone()));
+                        }
                     }
-                }
+                    NodeKind::Text(ref text) => {
+                        self.text_buffer.push_str(&text.borrow());
+                    }
+                    _ => {}
+                },
                 TraversalOp::Exit(node) => {
                     if let NodeKind::Element { ref name, .. } = node.kind {
                         let tag = name.local.as_ref().to_ascii_lowercase();
@@ -901,10 +901,11 @@ fn flatten_table_grid(rows: &[Vec<CellData>]) -> Result<Vec<Vec<String>>, Ingest
 
                 for dc in 0..span_cols {
                     let target_c = c_idx.saturating_add(dc);
-                    let target_row = grid.get_mut(target_r).ok_or_else(|| IngestError::Corrupt {
-                        format: Some(FormatId::Html),
-                        detail: "Ungültige Tabellenstruktur".into(),
-                    })?;
+                    let target_row =
+                        grid.get_mut(target_r).ok_or_else(|| IngestError::Corrupt {
+                            format: Some(FormatId::Html),
+                            detail: "Ungültige Tabellenstruktur".into(),
+                        })?;
 
                     while target_row.len() <= target_c {
                         target_row.push(String::new());

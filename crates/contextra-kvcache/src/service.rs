@@ -6,7 +6,7 @@
 //! - Speicherbudgetierung & Eviction-Policy ([`KvReusePolicy`])
 //! - Verschlüsselten Tier-2-Spill ([`KvBridgeStorage`])
 //! - KIVI 2-Bit Quantisierung
-//! - Scratchpad-Invalidierung & Mandantenlöschung ([`TenantId`])
+//! - Scratchpad-Invalidierung & Mandanten-Bereinigung ([`TenantId`])
 //!
 //! # Beispiel
 //! ```rust
@@ -469,7 +469,7 @@ impl KvCacheService {
         Ok(invalidated)
     }
 
-    /// Entfernt alle RAM-Segmente und Radix-Knoten für einen Mandanten (DSGVO Art. 17 Mandantenlöschung).
+    /// Entfernt alle RAM-Segmente und Radix-Knoten für einen Mandanten (Mandanten-Bereinigung).
     ///
     /// # Ablauf
     /// 1. Alle Segment-IDs des Mandanten ermitteln und RAM-Zähler korrigieren.
@@ -541,7 +541,7 @@ impl KvCacheService {
 mod tests {
     use super::*;
 
-    // Prüft Erstellung über KvCacheServiceBuilder und Durchsetzung der Mandantentrennung bei Lookups und Löschungen.
+    // Prüft Erstellung über KvCacheServiceBuilder und Durchsetzung der Mandantentrennung bei Lookups und Bereinigungen.
     #[test]
     fn test_kv_cache_service_builder_and_isolation() {
         let service = KvCacheServiceBuilder::new()
