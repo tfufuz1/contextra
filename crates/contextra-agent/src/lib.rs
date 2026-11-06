@@ -98,4 +98,4 @@ pub use event_source::{BackgroundEvent, EventSource, PollingDocumentEventSource,
 pub use goal_condition::{parse_legacy_condition_string, GoalCondition};
 pub use graph::{AgentNode, NodeType, StateGraph, WorkflowEdge};
 pub use step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
-pub use tools::{RetrieveTool, ToolManifest, ToolRegistry};
+pub use tools::{ContextRetriever, RetrieveTool, ToolManifest, ToolRegistry};
