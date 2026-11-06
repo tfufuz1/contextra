@@ -48,7 +48,7 @@ pub(super) struct OnnxReranker {
     config: RerankConfig,
     tokenizer: std::sync::Arc<Tokenizer>,
     // parking_lot::Mutex ist panic-safe (kein PoisonError), da es keinen
-    // Poison-Mechanismus hat. Kein .unwrap()/.map_err() nötig. // unwrap
+    // Poison-Mechanismus hat. Kein unwrap/map_err nötig.
     session: std::sync::Arc<parking_lot::Mutex<ort::session::Session>>,
 }
 
@@ -237,14 +237,21 @@ impl OnnxReranker {
         let mut type_ids_flat = vec![0i64; b_size * max_seq_len];
 
         for (i, (ids, mask, tids)) in encodings.iter().enumerate() {
+            let row_offset = i.saturating_mul(max_seq_len);
             for (j, &id) in ids.iter().enumerate() {
-                input_ids_flat[i * max_seq_len + j] = id as i64;
+                if let Some(target) = input_ids_flat.get_mut(row_offset.saturating_add(j)) {
+                    *target = id as i64;
+                }
             }
             for (j, &m) in mask.iter().enumerate() {
-                attention_mask_flat[i * max_seq_len + j] = m as i64;
+                if let Some(target) = attention_mask_flat.get_mut(row_offset.saturating_add(j)) {
+                    *target = m as i64;
+                }
             }
             for (j, &t) in tids.iter().enumerate() {
-                type_ids_flat[i * max_seq_len + j] = t as i64;
+                if let Some(target) = type_ids_flat.get_mut(row_offset.saturating_add(j)) {
+                    *target = t as i64;
+                }
             }
         }
 
@@ -338,7 +345,13 @@ impl OnnxReranker {
         b_size: usize,
         calibration: &PlattScaledSigmoid,
     ) -> Result<Vec<f32>, String> {
-        if shape.is_empty() || shape[0] as usize != b_size {
+        let first_dim = shape
+            .first()
+            .copied()
+            .ok_or_else(|| "Empty shape".to_string())?;
+        let batch_dim = usize::try_from(first_dim)
+            .map_err(|_| format!("Invalid batch dimension in shape: {first_dim}"))?;
+        if batch_dim != b_size {
             return Err(format!(
                 "Output tensor batch size mismatch: expected {b_size}, shape {:?}",
                 shape
@@ -363,12 +376,17 @@ impl OnnxReranker {
                 }
             }
             2 => {
-                let cols = shape[1] as usize;
-                if data.len() != b_size * cols {
+                let second_dim = *shape
+                    .get(1)
+                    .ok_or_else(|| "Missing second dimension".to_string())?;
+                let cols = usize::try_from(second_dim)
+                    .map_err(|_| format!("Invalid cols dimension: {second_dim}"))?;
+                let expected_len = b_size.saturating_mul(cols);
+                if data.len() != expected_len {
                     return Err(format!(
                         "Output tensor len {} != expected {}",
                         data.len(),
-                        b_size * cols
+                        expected_len
                     ));
                 }
                 if cols == 1 {
@@ -377,13 +395,20 @@ impl OnnxReranker {
                     }
                 } else if cols == 2 {
                     for i in 0..b_size {
-                        let l0 = data[i * 2];
-                        let l1 = data[i * 2 + 1];
+                        let l0 = *data
+                            .get(i.saturating_mul(2))
+                            .ok_or_else(|| format!("Missing logit 0 for item {i}"))?;
+                        let l1 = *data
+                            .get(i.saturating_mul(2).saturating_add(1))
+                            .ok_or_else(|| format!("Missing logit 1 for item {i}"))?;
                         scores.push(transform(l1 - l0));
                     }
                 } else {
                     for i in 0..b_size {
-                        scores.push(transform(data[i * cols]));
+                        let val = *data
+                            .get(i.saturating_mul(cols))
+                            .ok_or_else(|| format!("Missing logit for item {i}"))?;
+                        scores.push(transform(val));
                     }
                 }
             }

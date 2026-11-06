@@ -24,8 +24,8 @@
 //!   Konsumenten auf die spezialisierten Crates entfernt werden (SPEC §5.2 / WP 2.8).
 //!
 //! ## Konsumenten (Wer nutzt diese Crate?)
-//! - [`contextra`]: Haupt-Fassadencrate.
-//! - [`contextra-engine`]: Core-Engine zur Ausführung von Speicher-, Such- und Löschoperationen.
+//! - `contextra`: Haupt-Fassadencrate.
+//! - `contextra-engine`: Core-Engine zur Ausführung von Speicher-, Such- und Löschoperationen.
 //!
 //! ## Nebenläufigkeits- und Sperrkonzept
 //! In `contextra-core` selbst existieren keine internen Mutexe oder Sperren (`#![forbid(unsafe_code)]`).
