@@ -8,7 +8,7 @@ use ahash::AHashMap;
 use contextra_types::{EntityId, Result, TxId};
 
 impl CsrGraph {
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PATH-RAG-001]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PATH-RAG-001]
     pub fn path_rag_at<'a>(
         &'a self,
         start_nodes: &'a [EntityId],

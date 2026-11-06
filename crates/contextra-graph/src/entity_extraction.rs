@@ -37,7 +37,7 @@ pub struct ExtractedRelation {
 
 impl ExtractedRelation {
     /// Erstellt eine neue `ExtractedRelation`.
-// ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-002]
+    // ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-002]
     pub fn new(
         source: impl Into<String>,
         target: impl Into<String>,
@@ -92,7 +92,7 @@ pub struct RuleBasedEntityExtractor {
 
 impl RuleBasedEntityExtractor {
     /// Erstellt einen neuen `RuleBasedEntityExtractor` mit der angegebenen Mindest-Konfidenz-Schwelle.
-// ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-005]
+    // ANCHOR[contextra-graph:SRC-ENTITY-EXTRACTION-005]
     pub fn new(min_confidence: f32) -> Self {
         let patterns = vec![
             RelationPattern {

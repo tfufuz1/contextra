@@ -36,7 +36,7 @@ impl ApprhParams {
     ///
     /// # Complexity
     /// Time complexity $O(1)$.
-// ANCHOR[contextra-graph:SRC-APPRH-PARAMS-002]
+    // ANCHOR[contextra-graph:SRC-APPRH-PARAMS-002]
     pub fn validate(&self) -> Result<(), ApprhError> {
         if !self.ppr.alpha.is_finite() || self.ppr.alpha <= 0.0 || self.ppr.alpha >= 1.0 {
             return Err(ApprhError::InvalidParameter(format!(
@@ -73,14 +73,14 @@ impl ApprhParams {
 mod tests {
     use super::*;
 
-// ANCHOR[contextra-graph:SRC-APPRH-PARAMS-003]
+    // ANCHOR[contextra-graph:SRC-APPRH-PARAMS-003]
     #[test]
     fn test_default_params_valid() {
         let params = ApprhParams::default();
         assert!(params.validate().is_ok());
     }
 
-// ANCHOR[contextra-graph:SRC-APPRH-PARAMS-004]
+    // ANCHOR[contextra-graph:SRC-APPRH-PARAMS-004]
     #[test]
     fn test_invalid_params() {
         let p = ApprhParams {

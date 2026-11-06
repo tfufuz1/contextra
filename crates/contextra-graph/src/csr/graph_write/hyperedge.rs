@@ -38,7 +38,7 @@ fn dfs_upward_cascade(
 }
 
 impl CsrGraph {
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-001]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-001]
     pub fn enqueue_cascade_deferred(
         &self,
         doc_id: DocId,
@@ -50,7 +50,7 @@ impl CsrGraph {
         }
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-002]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-002]
     pub fn pending_cascade_queue_len(&self) -> usize {
         self.cascade_queue.lock().len()
     }
@@ -102,7 +102,7 @@ impl CsrGraph {
         Ok(tombstoned_count)
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-003]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-003]
     pub fn relate_n_ary(
         &self,
         id: crate::hyperedge::HyperEdgeId,
@@ -152,7 +152,7 @@ impl CsrGraph {
         Ok(())
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-004]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-004]
     pub fn insert_hyperedge_direct(&self, hyperedge: crate::hyperedge::HyperEdge) {
         let hyperedge_arc = Arc::new(hyperedge);
         let mut inner = self.inner_write();
@@ -181,7 +181,7 @@ impl CsrGraph {
         inner.hyperedges.insert(hyperedge_id, hyperedge_arc);
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-005]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-005]
     pub fn parent_hyperedges_of(
         &self,
         child: crate::hyperedge::HyperEdgeId,
@@ -206,7 +206,7 @@ impl CsrGraph {
         parents
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-006]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-006]
     pub fn hyperedges_for_doc(&self, doc_id: DocId) -> Vec<crate::hyperedge::HyperEdgeId> {
         let inner = self.inner_read();
         inner
@@ -226,7 +226,7 @@ impl CsrGraph {
             .unwrap_or_default()
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-007]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-007]
     pub fn max_hyperedge_id(&self) -> u64 {
         let inner = self.inner_read();
         inner
@@ -237,7 +237,7 @@ impl CsrGraph {
             .unwrap_or(0)
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-008]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-008]
     pub fn get_hyperedge(
         &self,
         id: crate::hyperedge::HyperEdgeId,
@@ -250,7 +250,7 @@ impl CsrGraph {
             .cloned()
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-009]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-009]
     pub fn hyperedges_for_entity(&self, entity_id: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
         let inner = self.inner_read();
         inner
@@ -353,7 +353,7 @@ impl CsrGraph {
         }
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-010]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-010]
     pub fn commit_super_edge_batch(
         &self,
         tombstone_ids: &[crate::hyperedge::HyperEdgeId],
@@ -380,7 +380,7 @@ impl CsrGraph {
         Ok(())
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-011]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-HYPEREDGE-011]
     pub fn insert_hyperedge(&self, edge: crate::hyperedge::HyperEdge) {
         self.insert_hyperedge_direct(edge);
     }

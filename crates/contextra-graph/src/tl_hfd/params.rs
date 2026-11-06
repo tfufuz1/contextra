@@ -44,7 +44,7 @@ impl TlHfdParams {
     ///
     /// # Complexity
     /// Time complexity $O(1)$.
-// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-002]
+    // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-002]
     pub fn validate(&self) -> Result<(), TlHfdError> {
         if !self.sigma.is_finite() || self.sigma <= 0.0 {
             return Err(TlHfdError::InvalidParameter(format!(
@@ -90,14 +90,14 @@ impl TlHfdParams {
 mod tests {
     use super::*;
 
-// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-003]
+    // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-003]
     #[test]
     fn test_default_params_valid() {
         let params = TlHfdParams::default();
         assert!(params.validate().is_ok());
     }
 
-// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-004]
+    // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-004]
     #[test]
     fn test_invalid_params() {
         let p = TlHfdParams {

@@ -47,7 +47,7 @@ pub struct VirtualHyperedgeNode {
 
 impl VirtualHyperedgeNode {
     /// Creates a new `VirtualHyperedgeNode`.
-// ANCHOR[contextra-graph:SRC-COMMUNITY-003]
+    // ANCHOR[contextra-graph:SRC-COMMUNITY-003]
     pub fn new(hyperedge_id: u64) -> Self {
         Self {
             hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
@@ -72,7 +72,7 @@ pub struct StarExpansionIterator {
 
 impl StarExpansionIterator {
     /// Erstellt einen neuen `StarExpansionIterator` für den gegebenen CsrGraph.
-// ANCHOR[contextra-graph:SRC-COMMUNITY-005]
+    // ANCHOR[contextra-graph:SRC-COMMUNITY-005]
     pub fn new(graph: &CsrGraph) -> Self {
         let inner = graph.inner_read();
         let mut hyperedge_keys: Vec<crate::hyperedge::HyperEdgeId> = inner
@@ -92,7 +92,7 @@ impl StarExpansionIterator {
     }
 
     /// Liest das nächste Element inkl. Kantengewicht (Konvention K: `2w/(|e|-1)`).
-// ANCHOR[contextra-graph:SRC-COMMUNITY-006]
+    // ANCHOR[contextra-graph:SRC-COMMUNITY-006]
     pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
         while self.current_hyperedge_idx < self.hyperedge_keys.len() {
             let key = self.hyperedge_keys[self.current_hyperedge_idx];

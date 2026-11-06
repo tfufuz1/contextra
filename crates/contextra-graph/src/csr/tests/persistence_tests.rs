@@ -125,7 +125,7 @@ async fn test_pagerank_linear_chain() {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-004]
 #[tokio::test]
-async fn traverse_handles_cycles_without_infinite_loop() {
+async fn test_traverse_handles_cycles_without_infinite_loop() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
     let id_a = EntityId::from_key("node_a").expect("test: non-empty key must succeed"); // expect
@@ -168,7 +168,7 @@ async fn traverse_handles_cycles_without_infinite_loop() {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-005]
 #[tokio::test]
-async fn multi_traverse_keeps_highest_score_per_entity() {
+async fn test_multi_traverse_keeps_highest_score_per_entity() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
     let id_a = EntityId::from_key("node_a").expect("test: non-empty key must succeed"); // expect
@@ -304,7 +304,7 @@ async fn test_staged_edges_invisible_to_concurrent_readers() {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-008]
 #[tokio::test]
-async fn graph_edges_survive_storage_roundtrip() {
+async fn test_graph_edges_survive_storage_roundtrip() {
     use contextra_store::{LsmConfig, LsmStorage};
 
     let dir = tempfile::tempdir().unwrap(); // unwrap allowed
@@ -543,7 +543,7 @@ async fn test_traverse_at_time_unbounded_validity() {
 proptest::proptest! {
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-013]
     #[test]
-    fn prop_add_edge_rollback_no_index_growth(
+    fn test_prop_add_edge_rollback_no_index_growth(
         edge_specs in proptest::collection::vec((1u64..1000, 1001u64..2000), 10..100)
     ) {
         let rt = tokio::runtime::Builder::new_current_thread().build().unwrap(); // unwrap
@@ -569,7 +569,7 @@ proptest::proptest! {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-014]
     #[test]
-    fn prop_edge_visible_monotone(
+    fn test_prop_edge_visible_monotone(
         vf in 0u64..100,
         vt in 100u64..200,
         as_of in 0u64..200,
@@ -583,7 +583,7 @@ proptest::proptest! {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-015]
     #[test]
-    fn prop_traverse_at_time_never_panics(
+    fn test_prop_traverse_at_time_never_panics(
         node_count in 1..=15usize,
         edge_specs in proptest::collection::vec((0..15usize, 0..15usize, 0u64..50u64, 50u64..100u64), 0..30),
         start_idx in 0..15usize,
@@ -620,7 +620,7 @@ proptest::proptest! {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-016]
 #[test]
-fn prop_csr_graph_traverse_at_consistency() {
+fn test_prop_csr_graph_traverse_at_consistency() {
     use proptest::prelude::*;
 
     #[derive(Debug, Clone)]
@@ -742,7 +742,7 @@ fn prop_csr_graph_traverse_at_consistency() {
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-017]
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn compact_async_CASE_dirty_and_clean_states() {
+async fn test_compact_async_CASE_dirty_and_clean_states() {
     let graph = Arc::new(CsrGraph::new());
     let tx = TxId::new(1);
 
