@@ -342,8 +342,9 @@ async fn test_pending_decisions_evicted_after_ttl() -> Result<(), Box<dyn std::e
     let router = create_test_router(collection, vec![profile], None);
 
     // Fill pending_decisions with MAX_PENDING_DECISIONS stale entries older than TTL (300s)
-    let stale_timestamp =
-        router.clock.monotonic_nanos().saturating_sub(PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000) + 10_000_000_000);
+    let stale_timestamp = router.clock.monotonic_nanos().saturating_sub(
+        PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000) + 10_000_000_000,
+    );
     {
         let mut map = router.pending_decisions.write();
         for _ in 0..MAX_PENDING_DECISIONS {
@@ -400,8 +401,9 @@ async fn test_pending_decisions_max_capacity_enforced() -> Result<(), Box<dyn st
     let router = create_test_router(collection, vec![profile], None);
 
     // Fill pending_decisions with MAX_PENDING_DECISIONS + 1 stale entries without record_outcome
-    let stale_timestamp =
-        router.clock.monotonic_nanos().saturating_sub(PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000) + 10_000_000_000);
+    let stale_timestamp = router.clock.monotonic_nanos().saturating_sub(
+        PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000) + 10_000_000_000,
+    );
     {
         let mut map = router.pending_decisions.write();
         for _ in 0..=(MAX_PENDING_DECISIONS) {

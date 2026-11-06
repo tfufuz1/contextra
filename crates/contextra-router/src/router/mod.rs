@@ -83,7 +83,9 @@ impl BanditExploration {
         z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
         z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
         let u = z ^ (z >> 31);
-        ((u >> 11) as f64 / ((1u64 << 53) as f64)) as f32
+        #[allow(clippy::cast_possible_truncation)]
+        let sample = ((u >> 11) as f64 / ((1u64 << 53) as f64)) as f32;
+        sample
     }
 }
 
