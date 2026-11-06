@@ -973,6 +973,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-erasure"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "bytes",
+ "contextra-crypto",
+ "contextra-ports",
+ "contextra-types",
+ "ed25519-dalek",
+ "futures-util",
+ "hmac",
+ "loom",
+ "parking_lot 0.12.5",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "contextra-graph"
 version = "0.1.0"
 dependencies = [
