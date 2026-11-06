@@ -1,23 +1,23 @@
 //! # Crash-sicheres Pending-Delete-Journal
 //!
-//! Zweck: Dauerhafte Protokollierung und Nachverfolgung von Dateien, die zur physischen Löschung
+//! Zweck: Dauerhafte Protokollierung und Nachverfolgung von Dateien, die zur physischen Bereinigung
 //! vorgemerkt sind, über Prozessabstürze und Systemneustarts hinweg (Crash-Resumption).
 //!
 //! Ring-Zugehörigkeit: Ring 0 (Dauerhafte Dateisystem-Hilfsmittel).
-//! Wird genutzt von: Bereinigungs- und Shredding-Routinen (z. B. WAL- und SSTable-Löschungen).
+//! Wird genutzt von: Bereinigungs- und Shredding-Routinen (z. B. WAL- und SSTable-Bereinigung).
 //! Wichtigste Typen:
-//! - [`PendingDeleteJournal`]: Das Journal-Objekt zur Registrierung und schrittweisen Abarbeitung ausstehender Löschpfade.
+//! - [`PendingDeleteJournal`]: Das Journal-Objekt zur Registrierung und schrittweisen Abarbeitung ausstehender Bereinigungspfade.
 //!
 //! Invarianten:
 //! - Atomare Persistenz: Änderungen am Journal werden stets über [`crate::atomic_replace`] geschrieben,
 //!   sodass niemals halb geschriebene Journal-Zustände auf der Festplatte verbleiben.
 //! - Fail-Closed: Schlägt das Schreiben des Journals oder ein Löschversuch fehl, wird das Ereignis
 //!   an den verknüpften [`crate::AtomicHealthState`] gemeldet (`FsyncFailure` oder `Enospc`).
-//! - Crash-Sicherheit: Nicht gelöschte Dateien verbleiben im Journal und werden beim nächsten Start erneut abgearbeitet.
+//! - Crash-Sicherheit: Nicht bereinigte Dateien verbleiben im Journal und werden beim nächsten Start erneut abgearbeitet.
 
 // FILE-CONTEXT
 // STAND: 2026-10-13
-// ZWECK: Durable Pending-Delete Journal zur Aufzeichnung und Nachverfolgung ausstehender Löschungen.
+// ZWECK: Durable Pending-Delete Journal zur Aufzeichnung und Nachverfolgung ausstehender Bereinigungen.
 // INVARIANTEN: Atomare Persistenz via atomic_replace, Fehler werden propagiert, HealthState Tracking.
 
 use crate::{atomic_replace, durable_remove, AtomicHealthState, HealthEvent, HealthState};
@@ -25,12 +25,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 // ANCHOR[contextra-durable-fs:JOURNAL-STRUCT-001]
-/// Journal zur dauerhaften Aufzeichnung von Löschaufträgen über Prozessabstürze hinweg.
+/// Journal zur dauerhaften Aufzeichnung von Bereinigungsaufträgen über Prozessabstürze hinweg.
 ///
 /// Funktionsweise:
-/// Bevor eine Datei physisch gelöscht wird, wird ihr Pfad im Journal vermerkt und synchronisiert.
-/// Sollte das System während des Löschvorgangs abstürzen, kann ein neu gestarteter Prozess
-/// das Journal öffnen und alle noch anhängigen Löschungen zuverlässig nachholen (Idempotenz).
+/// Bevor eine Datei physisch bereinigt wird, wird ihr Pfad im Journal vermerkt und synchronisiert.
+/// Sollte das System während des Bereinigungsvorgangs abstürzen, kann ein neu gestarteter Prozess
+/// das Journal öffnen und alle noch anhängigen Entfernungen zuverlässig nachholen (Idempotenz).
 #[derive(Debug)]
 pub struct PendingDeleteJournal {
     journal_path: PathBuf,
@@ -146,7 +146,9 @@ impl PendingDeleteJournal {
                 }
                 Err(err) => {
                     // NOTE: Fehlgeschlagenen Eintrag und alle nachfolgenden unberührten Einträge im Journal behalten.
-                    remaining.extend(self.entries[idx..].iter().cloned());
+                    if let Some(sub) = self.entries.get(idx..) {
+                        remaining.extend(sub.iter().cloned());
+                    }
                     self.entries = remaining;
                     if let Err(flush_err) = self.flush() {
                         self.health.record_event(HealthEvent::FsyncFailure);
@@ -180,8 +182,7 @@ impl PendingDeleteJournal {
         let mut buffer = String::new();
         for path in &self.entries {
             buffer.push_str(&path.to_string_lossy());
-            buffer.push('
-');
+            buffer.push('\n');
         }
         match atomic_replace(&self.journal_path, buffer.as_bytes()) {
             Ok(()) => Ok(()),

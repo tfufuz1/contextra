@@ -6,7 +6,6 @@ use contextra_durable_fs::{scrub_and_remove, ScrubReceipt};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::SystemTime;
 
 static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -18,12 +17,7 @@ impl TestDir {
     fn new() -> std::io::Result<Self> {
         let count = TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let pid = std::process::id();
-        let nanos = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-
-        let dir_name = format!("contextra_scrub_test_{}_{}_{}", pid, nanos, count);
+        let dir_name = format!("contextra_scrub_test_{}_{}", pid, count);
         let path = std::env::temp_dir().join(dir_name);
         fs::create_dir_all(&path)?;
 
