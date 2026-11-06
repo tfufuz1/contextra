@@ -13,20 +13,7 @@ import sys
 import os
 import json
 
-CORE_CRATES = [
-    "contextra-types",
-    "contextra-ports",
-    "contextra-mvcc",
-    "contextra-crypto",
-    "contextra-vector",
-    "contextra-text",
-    "contextra-store",
-    "contextra-checkpoint",
-    "contextra-engine",
-    "contextra-db",
-    "contextra",
-    "contextra-mcp",
-]
+CORE_CRATES = ['contextra-types', 'contextra-ports', 'contextra-mvcc', 'contextra-crypto', 'contextra-vector', 'contextra-text', 'contextra-store', 'contextra-durable-fs', 'contextra-simd', 'contextra-sys', 'contextra-rank', 'contextra-erasure', 'contextra-engine', 'contextra']
 
 def count_loc(filepath):
     try:
