@@ -12,6 +12,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod orchestration;
+
 pub use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
 };
