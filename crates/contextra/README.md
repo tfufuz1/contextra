@@ -1,37 +1,23 @@
 # contextra
 
-Haupt-Library Facade für Endanwender.
+High-Level Fassade und Composition Root des Baukastensystems.
 
 Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; §6.0, `capabilities.toml`).
 
+## Rolle & Zweck
+`contextra` ist die übergeordnete Endanwender-Bibliothek und zentrale Composition Root (Ring 4). Sie bindet die einzelnen Lego-Bausteine des Ökosystems über das Builder-Muster (`ContextraBuilder`) zu einer gebrauchsfertigen Gesamtlösung zusammen.
 
-`contextra` ist die primäre Fassade und Composition Root des Contextra Cognitive OS (Ring 4).
-
-## Zweck
-
-Stellt den zentralen Einstiegspunkt und Builder-Muster (`ContextraBuilder`) für Rust-Anwendungen bereit. Dient als einzige Composition Root des Systems, um Backends, Memory Engines, Privatsphäre-Filter und Inferenz-Anbindungen sauber zu verbinden.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 4 (Ränder / Composition Root)
-- **Status:** 🟡 In Migration / Shell (Fassade)
+## Baukasten-Einordnung & Status
+- **Ring:** Ring 4 (Endanwender-Fassade)
+- **Status:** 🟡 In Migration (Fassade wird an die neuen modularen Bausteine angebunden)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 
-## Öffentliche API-Übersicht
+## Baukasten-Nutzung
+```rust
+use contextra::ContextraBuilder;
 
-In Phase 1b des Migrationsplans wird die Fassade kontinuierlich erweitert. Momentan stellt `contextra` grundlegende Module und Builder-Typen bereit:
-
-- **Composition Root / Builder:** `ContextraBuilder`
-- **Konfiguration:** `ContextraConfig`
-
-## Architektur & Verweise
-
-Für Details zur Zielarchitektur, Ring-Struktur und den einzelnen Migrationsphasen siehe [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §A2 / §4.2 im Repository-Root.
-
-## Feature-Ringe (Ring-Split)
-
-| Feature-Name | Enthaltene Features / Abhängigkeiten | Zielgruppe | Lizenzmodell |
-| --- | --- | --- | --- |
-| `embedded` | Default (embedded local search) | OSS-Adoption | Open Source (MIT/Apache-2.0) |
-| `candle` | `contextra-infer-candle` | Local Candle Inference | Open Source (MIT/Apache-2.0) |
-| `compliance` | `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |
+let client = ContextraBuilder::new()
+    .with_data_dir("./contextra_data")
+    .build()
+    .await?;
+```
