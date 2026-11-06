@@ -40,21 +40,21 @@ pub enum EraseTarget {
     },
 }
 
-/// Zeitliches Verhalten der Löschung (SPEC 7.3).
+/// Zeitliches Verhalten des Vorgangs (SPEC 7.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum Timing {
-    /// Sofortige Löschung im Vordergrund.
+    /// Sofortige Ausführung im Vordergrund.
     Now,
-    /// Gebündelte Löschung im Batch-Fenster.
+    /// Gebündelte Ausführung im Batch-Fenster.
     Batched,
 }
 
 /// Löschmodus (SPEC 7.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum EraseMode {
-    /// Vollständige physische Löschung und Schlüsselvernichtung.
+    /// Vollständige physische Bereinigung und Schlüsselvernichtung.
     Erase,
-    /// Einschränkung der Verarbeitung (Art. 18 DSGVO).
+    /// Einschränkung der Verarbeitung.
     Restrict,
 }
 
@@ -104,7 +104,7 @@ pub struct EraseRequest {
 pub struct EraseReceipt {
     /// Eindeutige Kennung des Löschvorgangs.
     pub id: ErasureId,
-    /// Status der Löschung.
+    /// Status des Vorgangs.
     pub status: ErasureStatus,
     /// Zeitstempel der Sperrung im Gate.
     pub gated_at: Timestamp,
@@ -154,7 +154,7 @@ pub enum PendingReason {
 /// Begründung für die Ablehnung eines Löschauftrags (SPEC 7.3, 7.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum RefusalReason {
-    /// Gesetzliche Aufbewahrungspflicht steht der Löschung entgegen.
+    /// Gesetzliche Aufbewahrungspflicht steht der Bereinigung entgegen.
     RetentionObligation,
     /// Unzulässige Parameterkombination.
     InvalidParameters,
@@ -177,7 +177,7 @@ pub enum Phase {
     Replace,
     /// Version-Supersede (D-117).
     Supersede,
-    /// Zugriffseinschränkung (Art. 18 DSGVO, D-116).
+    /// Zugriffseinschränkung (D-116).
     Restrict,
 }
 
@@ -194,7 +194,7 @@ pub enum ErasureStatus {
     Purging,
     /// Unabhängige Messung läuft.
     Verifying,
-    /// Löschung vollständig nachgewiesen und abgeschlossen.
+    /// Bereinigung vollständig nachgewiesen und abgeschlossen.
     Completed,
     /// Einschränkung der Verarbeitung aktiv (D-116, D-124).
     Restricted,

@@ -19,7 +19,7 @@
 //! - Keine Abhängigkeiten zu anderen Contextra-Crates.
 //!
 //! **Wird eingebunden von (eingehend, 30 Crates):**
-//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-avv-generator`,
+//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-agreement-generator`,
 //!   `contextra-checkpoint`, `contextra-cognition`, `contextra-core`, `contextra-crypto`, `contextra-db`,
 //!   `contextra-engine`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`,
 //!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`,
