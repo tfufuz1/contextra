@@ -894,7 +894,7 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-cognition",
+ "contextra-crypto",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",

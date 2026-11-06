@@ -1,13 +1,13 @@
 #![forbid(unsafe_code)]
-//! Ephemerer RAM-Puffer für sensitive Kontexte (Safe-Modus).
+//! Ephemerer RAM-Puffer für volatile, sensitive Byte-Daten.
 //!
 //! # Architektur & Ring-Zugehörigkeit
-//! `VolatileContextVault` gehört zu `contextra-db` (Ring 3, Fassade) und implementiert
-//! einen flüchtigen Zwischenspeicher für hochgradig sensitive Kontextdaten (Zero-Retention/Privacy).
+//! `VolatileContextVault` gehört zu `contextra-db` (Ring 3) und implementiert
+//! einen flüchtigen Zwischenspeicher für sensible flüchtige In-Memory-Daten.
 //!
 //! # Funktionsweise & Garantien
-//! Der Vault speichert Chunks ausschließlich im Arbeitsspeicher (Heap), niemals auf
-//! SSD/Festplatte oder in persistenten WAL-Dateien (Write-Ahead-Log).
+//! Der Vault speichert Chunks ausschließlich im Arbeitsspeicher (Heap), niemals
+//! auf SSD/Festplatte oder in persistenten WAL-Dateien (Write-Ahead-Log).
 //! Beim Drop (oder explizitem Aufruf von [`VolatileContextVault::purge()`]) werden sämtliche Inhalte via
 //! [`zeroize::Zeroize`] mit Nullen überschrieben.
 //!
@@ -121,12 +121,12 @@ impl Default for VaultConfig {
 // ANCHOR[contextra-db:VAULT-007]
 /// Quittung nach erfolgreicher flüchtiger Speicherbereinigung via [`VolatileContextVault::purge_memory()`].
 #[derive(Debug)]
-pub struct VolatileDrainReceipt {
-    /// Anzahl physisch entfernter und überschriebener Chunks.
+pub struct PurgeReceipt {
+    /// Anzahl überschriebener und verworfener Chunks.
     pub chunks_purged: usize,
     /// Exakte Anzahl an Bytes, die im RAM mit Nullen überschrieben wurden.
     pub bytes_zeroed: usize,
-    /// Zeitstempel, an dem die Speicherbereinigung vollzogen wurde.
+    /// Zeitstempel, an dem die Bereinigung vollzogen wurde.
     pub purged_at: Instant,
 }
 
@@ -144,16 +144,8 @@ pub struct CommitReceipt {
     pub tenant_id: TenantId,
     /// Zugewiesene Transaktions- und Sequenznummer ([`TxId`]).
     pub tx_id: TxId,
-    /// Optionaler Verweis auf ein zugehöriges Audit- oder Nachweis-Token.
-    pub audit_token_reference: Option<String>,
-}
-
-impl CommitReceipt {
-    /// Rückwärtskompatibler Zugriff auf die Nachweisreferenz.
-    #[inline]
-    pub fn audit_reference(&self) -> Option<&str> {
-        self.audit_token_reference.as_deref()
-    }
+    /// Optionale generische Metadaten-Referenz.
+    pub metadata_reference: Option<String>,
 }
 
 // ANCHOR[contextra-db:VAULT-009]
@@ -343,7 +335,7 @@ impl VolatileContextVault {
         mut self,
         tenant_id: TenantId,
         tx_id: TxId,
-        evidence_reference: Option<impl Into<String>>,
+        metadata_reference: Option<impl Into<String>>,
     ) -> Result<(Vec<VaultChunk>, CommitReceipt), VaultError> {
         if self.consumed {
             return Err(VaultError::AlreadyConsumed);
@@ -361,7 +353,7 @@ impl VolatileContextVault {
             bytes_committed,
             tenant_id,
             tx_id,
-            audit_token_reference: evidence_reference.map(|r| r.into()),
+            metadata_reference: metadata_reference.map(|r| r.into()),
         };
 
         Ok((chunks, receipt))
@@ -567,7 +559,7 @@ mod tests {
         assert!(vault.is_memory_locked());
     }
 
-    /// Commit erzeugt CommitReceipt mit Mandant, Sequenznummer und Löschbeweis-Referenz.
+    /// Commit erzeugt CommitReceipt mit Mandant, Sequenznummer und Metadaten-Referenz.
     #[test]
     fn test_commit_generates_receipt_with_metadata() {
         let mut vault = VolatileContextVault::open(VaultConfig {
@@ -583,9 +575,9 @@ mod tests {
 
         let tenant_id = TenantId::try_new(42).unwrap();
         let tx_id = TxId::new(1001);
-        let proof_ref = "urn:contextra:proof:v5:tenant:42:tx:1001";
+        let meta_ref = "meta:reference:payload:1001";
 
-        let (chunks, receipt) = vault.commit(tenant_id, tx_id, Some(proof_ref)).unwrap();
+        let (chunks, receipt) = vault.commit(tenant_id, tx_id, Some(meta_ref)).unwrap();
 
         assert_eq!(chunks.len(), 2);
         assert_eq!(receipt.chunks_committed, 2);
@@ -595,6 +587,6 @@ mod tests {
         );
         assert_eq!(receipt.tenant_id, tenant_id);
         assert_eq!(receipt.tx_id, tx_id);
-        assert_eq!(receipt.audit_token_reference.as_deref(), Some(proof_ref));
+        assert_eq!(receipt.metadata_reference.as_deref(), Some(meta_ref));
     }
 }

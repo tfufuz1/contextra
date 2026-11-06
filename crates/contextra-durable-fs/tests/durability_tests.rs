@@ -2,9 +2,7 @@
 //!
 //! Zweck: Durability-Tests für Handle-Poisoning (`INV-FSYNC-1`), `DirLock`-Dateisystemprüfungen und `atomic_replace`.
 
-use contextra_durable_fs::{
-    atomic_replace, fs_class, DirLock, DurableHandle, FlushKind, FsClass, LockMode,
-};
+use contextra_durable_fs::{atomic_replace, fs_class, DirLock, DurableHandle, FlushKind, FsClass, LockMode};
 use std::fs::File;
 
 // ANCHOR[contextra-durable-fs:TEST-DUR-HANDLE-POISON]

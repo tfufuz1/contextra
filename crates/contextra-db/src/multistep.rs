@@ -1,24 +1,22 @@
 // FILE-CONTEXT
-// ZWECK: Multi-Step Iterative Retrieval Engine für komplexe Agenten-Abfragen (o-series Pattern).
+// ZWECK: Multi-Step Iterative Retrieval Engine für iterative Abfragen.
 // INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PID-reguliert in [50, 200].
 // STAND: TS:2026-09-12T00:00:00Z
 
-//! Multi-Step Iterative Retrieval Engine für komplexe Abfragen in KI-Agenten.
+//! Multi-Step Iterative Retrieval Engine für iterative Suchanfragen.
 //!
 //! # Architektur & Ring-Zugehörigkeit
-//! Dieses Modul gehört zu `contextra-db` (Ring 3, Fassade) und implementiert ein
-//! iteratives Abfragemuster (Retrieval-Augmented Generation / Agentic Search).
+//! Dieses Modul gehört zu `contextra-db` (Ring 3) und implementiert ein
+//! iteratives, mehrstufiges Abfragemuster für hybride Speicherabfragen.
 //!
 //! # Funktionsweise für Entwickler
-//! Komplexe Fragen können oft nicht in einem einzigen Suchdurchgang beantwortet werden.
-//! Die Multi-Step-Engine arbeitet wie folgt:
 //! 1. **Runde 1**: Standard-Hybrid-Suche (Vektor + BM25-Volltext) mit der Originalanfrage.
 //! 2. **Qualitätsprüfung**: Es wird geprüft, ob genügend Treffer den Schwellenwert
 //!    [`MultiStepConfig::quality_threshold`] überschreiten.
 //! 3. **Runde 2..N**: Falls die Qualität unzureichend ist, generiert ein [`QueryRewriter`]
 //!    automatisierte Teilfragen (Sub-Queries).
-//! 4. **Multi-Signal-Abfragen**: Für Sub-Queries können neue Textanfragen, Vektoreinbettungen
-//!    (via [`TextEmbeddingEngine`]) oder Wissensgraph-Knoten ([`EntityId`]) abgefragt werden.
+//! 4. **Multi-Signal-Abfragen**: Für Sub-Queries können neue Textanfragen oder Vektoreinbettungen
+//!    (via [`TextEmbeddingEngine`]) abgefragt werden.
 //! 5. **RRF-Fusion**: Alle Zwischenergebnisse werden mittels RRF (Reciprocal Rank Fusion)
 //!    zu einer finalen Rangliste kombiniert.
 //! 6. **PID-Latenzschutz**: Ein PID-Regler steuert die Kandidatenpoolgröße und bricht
@@ -29,7 +27,7 @@ use crate::{Collection, SearchResult};
 include!("multistep_pid.inc");
 pub use contextra_ports::QueryRewriter;
 use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, TextEmbeddingEngine};
-use contextra_types::{EntityId, Result, ScoredEntry};
+use contextra_types::{Result, ScoredEntry};
 use std::sync::Arc;
 
 // ANCHOR[contextra-db:MULTISTEP-001]
@@ -361,12 +359,12 @@ impl<S: StorageEngine> MultiStepEngine<S> {
                     builder = builder.vector(vector);
                 }
 
-                // Graph modality (Anchors)
+                // Optional graph anchors (if present in rewrite output)
                 if !output.anchor_entities.is_empty() {
-                    let anchor_ids: Vec<EntityId> = output
+                    let anchor_ids: Vec<contextra_types::EntityId> = output
                         .anchor_entities
                         .iter()
-                        .filter_map(|e| EntityId::from_key(e).ok())
+                        .filter_map(|e| contextra_types::EntityId::from_key(e).ok())
                         .collect();
                     if !anchor_ids.is_empty() {
                         builder = builder.anchor_entities(anchor_ids);
