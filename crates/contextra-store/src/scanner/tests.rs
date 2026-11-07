@@ -3,7 +3,7 @@
 //! Validiert Scan-Semantiken und Fehlerbehandlung.
 
 // FILE-CONTEXT
-// ZWECK: Tests für LSM Scanner & Purger (Vertrag V1, LÖSCHKETTE W1-P01).
+// ZWECK: Tests für LSM Scanner & Purger (Vertrag V1, PURGE-PIPELINE W1-P01).
 // INVARIANTEN: Negativtests zuerst; Sabotage und Restdaten werden zuverlässig erkannt.
 // HOTSPOTS: [1-180]
 

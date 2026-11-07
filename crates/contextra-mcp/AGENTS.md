@@ -1,107 +1,37 @@
-# AGENTS.md — contextra-mcp
-> Layer 4 | Model Context Protocol (MCP) Server, Sandbox, Security | ~1600 LOC
+# AGENTS.md — `contextra-mcp`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-mcp` implementiert den Model Context Protocol (MCP) Server für Contextra (Ring 4).
+Er stellt standardisierte JSON-RPC 2.0 Schnittstellen (ausschließlich über `stdio`, HTTP-Schicht entfernt gem. ADR-010) bereit, über die externe Coding-Agenten und LLMs die Contextra-Bausteine sicher steuern können.
+Als Gateway-Baustein kapselt er Zugriffsberechtigungen (`McpSandbox`), Prompt-Injection-Schutz und flüchtige Ergebnisablage, ohne interne Domänenlogik zu duplizieren.
 
-Implementiert den Model Context Protocol (MCP) Server für Contextra, wodurch externe Agenten
-(wie Claude oder Jules) die Codebasis über standardisierte JSON-RPC 2.0 Schnittstellen
-steuern können. Enthält eine harte Security-Sandbox (`McpSandbox`), Prompt-Injection-Guards
-und Volatile-Result-Speicherung.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 4 (Model Context Protocol Gateway & Server)
+- **Klasse:** Erweiterung `[E]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-wire`, `contextra-rank`, `contextra-crypto`, `contextra-privacy`, `contextra-router` (Spec §6.9, `capabilities.toml`).
 
-## 2. Modul-Karte
+## 3. Garantien & Architektur-Invarianten
+- **Sandbox-Zwang (ADR-044):** Sämtliche Tool-Ausführungen laufen ausnahmslos über `McpSandbox` mit strikten Timeouts und Rechteprüfungen.
+- **Single-Lock Disziplin:** `McpSandbox` schützt Ergebnisse über ein einziges, ungeschachteltes `parking_lot::Mutex`; geschachtelte Locks sind verboten.
+- **UTF-8 sichere Token-Kappung:** `RecallTruncator` schneidet Text exakt an UTF-8 Zeichengrenzen (`is_char_boundary`), um Slicing-Panics bei Umlauten oder Emojis zu verhindern.
+- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; JSON-RPC Fehlercodes (-32700 bis -32603) für alle Fehlerzustände.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]`, `McpServer`, Stdio-Event-Loop (`contextra_consolidate`, `contextra_cloud_query`, `uvx`-Distribution) |
-| `config.rs` | CLI- und Server-Konfiguration (`McpConfig`) |
-| `protocol.rs` | `McpError`, JSON-RPC 2.0 Message-Parser und Typen |
-| `sandbox.rs` | `McpSandbox`, `SandboxPolicy`, `VolatileToolResult` (verschlüsselter RAM) |
-| `egress_gateway.rs` | Egress Shield Gateway für Cloud Queries (`CloudQueryRequest`, `DefaultEgressClassifier`) |
-| `egress_guard.rs` | Schutz und Validierung ausgehender Anfragen gegen Exfiltration |
-| `prompt_injection.rs` | `PromptInjectionGuard`, `SecurityAuditLogger`, Pattern-Matching |
+## 4. Verbotene Muster
+- Direkte HTTP-, WebSocket- oder Netzwerklayer im MCP-Crate (ausschließlich `run_stdio`).
+- Ungeprüfte Schreibzugriffe ohne explizite Write-Authorization.
+- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+- Geschachtelte Locks über Modulgrenzen hinweg (`detect_nested_locks.yml`).
 
-## 3. Kritische Invarianten
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Implementiert:** MCP JSON-RPC Server über Stdio.
+- **Konsumiert:** `contextra-wire`, `contextra-ports`, `contextra-types`.
+- **Angebundene Inferenz-Provider:** Candle, Ollama und ONNX als optionale Feature-Gates.
 
-### Nur Stdio-Transport (ADR-010)
-Der MCP-Server kommuniziert **ausschließlich** über Stdio (Standard I/O) mittels JSON-RPC 2.0.
-Die HTTP-Schnittstelle wurde laut ADR-010 aus Sicherheitsgründen restlos entfernt.
-Ein Einbau von `axum` oder `hyper` ist ein Security-Blocker!
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Prompt Injection & Escaping Tests:** Verifikation der Sandbox gegen manipulative Tool-Argumente.
+- **UTF-8 Slicing Fuzzing:** Fuzzing des Token-Truncators mit Multibyte-Sequenzen, CJK und Emojis.
+- **JSON-RPC Conformance:** Sabotagetests mit fehlerhaften RPC-Nachrichten zur Prüfung der Spezifikationskonformität.
 
-### Sandbox-Defaults
-Die `SandboxPolicy` definiert harte Grenzen:
-- `allow_db_reads`: true
-- `allow_db_writes`: false (muss explizit opt-in via Env-Var `CONTEXTRA_MCP_WRITE_ALLOW`)
-- `allow_code_execution`: false (strikt verboten by default)
-- `allow_cloud_egress`: false (Cloud-Egress strikt verboten by default; erfordert explizites Opt-in)
-Schreibende Operationen (Write-Authorization, ADR-044) sowie Cloud-Egress-Aufrufe werden vor Ausführung blockiert, wenn deaktiviert.
-
-### Prompt-Injection Guard (Quarantäne)
-Eingehende Texte (für Embeddings/Graph) passieren den `PromptInjectionGuard`.
-Treffer auf Patterns (wie `ignore all previous instructions`) lösen sofortige Quarantäne aus.
-Diese Events werden im `SecurityAuditLogger` unwiderruflich erfasst.
-
-### Volatile Results (Anthropic Containment)
-Sehr große Tool-Ergebnisse (MAX_VOLATILE_OUTPUT_BYTES = 16 MB) oder sensitive Daten 
-werden nicht als JSON im Klartext zurückgeschickt, sondern im `VolatileToolResult` 
-RAM-verschlüsselt (via `contextra-crypto::VolatileEncryptionKey`, Cargo-Package-Name: `contextra-privacy`). Der Agent erhält
-nur einen Reference-Key, den andere Tools einlösen können.
-Die Anzahl ist begrenzt (`MAX_VOLATILE_RESULTS` = 1000).
-
-## 4. Public API Quick-Reference
-
-```rust
-// === McpServer (lib.rs) ===
-pub struct McpServer { ... }
-impl McpServer {
-    pub fn new(collection: Arc<Collection<LsmStorage>>) -> Self;
-    pub fn with_sandbox(self, sandbox: Arc<McpSandbox>) -> Self;
-    pub fn with_injection_guard(self, guard: Arc<PromptInjectionGuard>) -> Self;
-    pub async fn run_stdio(self: Arc<Self>) -> Result<(), Box<dyn Error>>;
-}
-
-// === Sandbox & Security (sandbox.rs, prompt_injection.rs) ===
-pub struct SandboxPolicy {
-    pub allow_db_reads: bool,
-    pub allow_db_writes: bool,
-    pub allow_code_execution: bool,
-    pub allow_cloud_egress: bool,
-    pub max_execution_ms: u64,
-}
-pub struct McpSandbox { ... }
-impl McpSandbox {
-    pub async fn execute_with_timeout<F, T, E>(&self, category: ToolCategory, future: F) -> Result<T, McpError>;
-}
-pub struct PromptInjectionGuard { ... }
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — Timeout im Tool ignorieren:
-let result = tool_call().await;
-// ✅ KORREKT — Alle Tool-Ausführungen MÜSSEN durch die Sandbox:
-let result = sandbox.execute_with_timeout(ToolCategory::DatabaseRead, tool_call()).await?;
-
-// ❌ FALSCH — HTTP Server hinzufügen:
-// ✅ KORREKT — MCP läuft exklusiv über `run_stdio`.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`McpSandbox` verwaltet die `VolatileToolResult` in einer `HashMap`, die durch 
-ein **einziges**, nicht geschachteltes `parking_lot::Mutex` geschützt ist.
-Regel `detect_nested_locks.yml` verbietet geschachtelte Locks innerhalb von Layer 4 strikt.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: Alle L0-L3 Crates (`contextra-core`, `contextra-db`, `contextra-agent`, `contextra-crypto` / `contextra-privacy`)
-- **Verbotene Imports**: Keine (Layer 4 Top Crate)
-- **Genutzt von**: CLI (`contextra`) und externen MCP-Clients (Cursor, Jules, Claude)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-010 | Entfernung der HTTP-Schicht (Nur Stdio) |
-| ADR-044 | MCP Write-Authorization (Opt-In Security) |
-| `rules/detect_nested_locks.yml` | Verbietet Deadlock-anfällige Lock-Schachtelungen |
+## 7. Offene Punkte & Technische Schulden
+- DEBT-01: Vollständige Entkopplung der MCP-Erasure-Tools via `contextra-erasure`.
