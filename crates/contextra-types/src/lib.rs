@@ -62,16 +62,56 @@ pub mod ids;
 pub mod refs;
 pub mod witness;
 
-pub use erasure::*;
-pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
+// Explizite Re-Exporte für IDs und Referenzen
+#[allow(deprecated)]
+pub use ids::{ErasureId, GateId};
+pub use ids::{FileId, Seq, StoreId, Timestamp};
 pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};
 
-pub use error::{ContextraError, HnswDeletionError, Result};
+// Explizite Re-Exporte für Fehler und DTO
+#[allow(deprecated)]
+pub use error::HnswDeletionError;
+pub use error::{ContextraError, Result};
 pub use error_dto::ContextraErrorDto;
+
+// Explizite Re-Exporte für Modell-Fingerprint, Retrieval-Strategie, Schema, TenantScope und Tombstones
 pub use model_fingerprint::ModelFingerprint;
 pub use retrieval_strategy::RetrievalStrategy;
 pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
-pub use types::*;
-pub use witness::{RequestContext, SagaRecord, ScanMethod};
+
+// Explizite Re-Exporte für RequestContext und Lösch-Saga
+pub use witness::RequestContext;
+#[allow(deprecated)]
+pub use witness::{SagaRecord, ScanMethod};
+
+// Explizite Re-Exporte für Löschtypen (deprecated per D-E1)
+#[allow(deprecated)]
+pub use erasure::{
+    Armed, ControlEvidence, EraseMode, EraseReceipt, EraseRequest, EraseTarget, ErasureStatus,
+    GateVariant, KeyCoverage, LayerId, LayerWitness, MeasureClass, PendingReason, Phase,
+    RefusalReason, ResidualRisk, Residue, RetentionAttestation, RetentionCode, RiskCondition,
+    Scanner, Timing, Unarmed,
+};
+
+// Direkte Re-Exporte der Modulpfade für Abwärtskompatibilität
+pub use types::{budget, domain, filter, importance, saos};
+
+// Explizite Re-Exporte für Domänentypen (M3, M11 ohne Glob)
+pub use types::{
+    budget::{BudgetStrategy, Reservation, ResourceBudget, ResourceTracker, TokenBudget},
+    domain::{
+        AutoExtractionMode, CollectionId, ConfigFingerprint, DistanceMetric, DocId, Edge,
+        Embedding, Entity, EntityId, LinkRelation, MemoryLink, MemoryType, PprAlgorithm, PprConfig,
+        RerankResult, ScoredDocument, TenantId, TlHfdParams, TxId, WorkflowState,
+        EXPIRY_METADATA_KEY, MAX_SEARCH_K, TOMBSTONE_BIT,
+    },
+    filter::FilterExpr,
+    importance::{DecayFunction, ImportanceScore, MemoryImportance},
+    saos::{
+        ContextChunk, ContextWindow, FusionStrategy, FusionWeights, GraphTraversalStrategy,
+        HybridQuery, HybridQueryBuilder, OnSignalFailure, QueryOptions, QueryOptionsBuilder,
+        QueryRewriteOutput, ScoredEntry, Signal, SignalFusionStrategies,
+    },
+};
