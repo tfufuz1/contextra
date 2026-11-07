@@ -1,0 +1,3345 @@
+[
+  {
+    "crate": "contextra",
+    "total_declarations": 63,
+    "dead_code_candidates_count": 10,
+    "candidates": [
+      {
+        "name": "with_max_subqueries",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/query_rewriter.rs",
+        "line": 64,
+        "decl": "pub fn with_max_subqueries(mut self, n: usize) -> Self {"
+      },
+      {
+        "name": "with_max_context_results",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/query_rewriter.rs",
+        "line": 71,
+        "decl": "pub fn with_max_context_results(mut self, n: usize) -> Self {"
+      },
+      {
+        "name": "with_max_snippet_chars",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/query_rewriter.rs",
+        "line": 78,
+        "decl": "pub fn with_max_snippet_chars(mut self, n: usize) -> Self {"
+      },
+      {
+        "name": "validate_with_license",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/collection_profile.rs",
+        "line": 123,
+        "decl": "pub fn validate_with_license("
+      },
+      {
+        "name": "BootPhase",
+        "kind": "enum",
+        "file": "/app/crates/contextra/src/boot.rs",
+        "line": 17,
+        "decl": "pub enum BootPhase {"
+      },
+      {
+        "name": "with_embedding_backend",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/builder.rs",
+        "line": 227,
+        "decl": "pub fn with_embedding_backend(mut self, backend: EmbeddingBackend) -> Self {"
+      },
+      {
+        "name": "with_license_gate",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/builder.rs",
+        "line": 253,
+        "decl": "pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {"
+      },
+      {
+        "name": "with_signed_license",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/builder.rs",
+        "line": 264,
+        "decl": "pub fn with_signed_license("
+      },
+      {
+        "name": "with_performance_profile",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/builder.rs",
+        "line": 294,
+        "decl": "pub fn with_performance_profile("
+      },
+      {
+        "name": "new_arc",
+        "kind": "fn",
+        "file": "/app/crates/contextra/src/agent_memory.rs",
+        "line": 175,
+        "decl": "pub fn new_arc(engine: Arc<Contextra>) -> Self {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-adapt",
+    "total_declarations": 165,
+    "dead_code_candidates_count": 8,
+    "candidates": [
+      {
+        "name": "ring3_background_task_token",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/flow_thompson.rs",
+        "line": 198,
+        "decl": "pub fn ring3_background_task_token() -> Ring3Token {"
+      },
+      {
+        "name": "update_with_flow",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/flow_thompson.rs",
+        "line": 335,
+        "decl": "pub fn update_with_flow("
+      },
+      {
+        "name": "with_params",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/pid_latency_controller.rs",
+        "line": 79,
+        "decl": "pub fn with_params(kp: f64, ki: f64, kd: f64, target_latency_ms: f64) -> Self {"
+      },
+      {
+        "name": "derive_seed",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/bandit.rs",
+        "line": 166,
+        "decl": "pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {"
+      },
+      {
+        "name": "bench_sherman_morrison_p95_latency",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/bandit.rs",
+        "line": 936,
+        "decl": "fn bench_sherman_morrison_p95_latency() {"
+      },
+      {
+        "name": "predict",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/rie_greedy.rs",
+        "line": 114,
+        "decl": "pub fn predict(&self, context: &[f32]) -> Result<f32, RieGreedyError> {"
+      },
+      {
+        "name": "analyze",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/lyapunov.rs",
+        "line": 139,
+        "decl": "pub fn analyze(&self) -> LyapunovResult {"
+      },
+      {
+        "name": "status_str",
+        "kind": "fn",
+        "file": "/app/crates/contextra-adapt/src/lyapunov.rs",
+        "line": 151,
+        "decl": "pub fn status_str(&self) -> &'static str {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-agent",
+    "total_declarations": 175,
+    "dead_code_candidates_count": 8,
+    "candidates": [
+      {
+        "name": "try_register_tool_with_manifest",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/engine.rs",
+        "line": 108,
+        "decl": "pub fn try_register_tool_with_manifest("
+      },
+      {
+        "name": "with_last_seen_seq",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/event_source.rs",
+        "line": 149,
+        "decl": "pub fn with_last_seen_seq(mut self, last_seen_seq: u64) -> Self {"
+      },
+      {
+        "name": "set_cache_directive",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/context.rs",
+        "line": 167,
+        "decl": "pub fn set_cache_directive(&mut self, directive: CacheDirective) {"
+      },
+      {
+        "name": "get_cache_directive",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/context.rs",
+        "line": 172,
+        "decl": "pub fn get_cache_directive(&self) -> &CacheDirective {"
+      },
+      {
+        "name": "directive_for_node",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/context.rs",
+        "line": 183,
+        "decl": "pub fn directive_for_node(&self, node_id: &str, step_id: StepId) -> CacheDirective {"
+      },
+      {
+        "name": "try_add_edge_with_goal",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/graph.rs",
+        "line": 241,
+        "decl": "pub fn try_add_edge_with_goal("
+      },
+      {
+        "name": "with_name",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/tools/retrieve.rs",
+        "line": 59,
+        "decl": "pub fn with_name(name: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "get_manifest",
+        "kind": "fn",
+        "file": "/app/crates/contextra-agent/src/tools/registry.rs",
+        "line": 55,
+        "decl": "pub fn get_manifest(&self, name: &str) -> Option<&ToolManifest> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-audit-export",
+    "total_declarations": 25,
+    "dead_code_candidates_count": 3,
+    "candidates": [
+      {
+        "name": "with_sample_data_for",
+        "kind": "fn",
+        "file": "/app/crates/contextra-audit-export/src/testkit.rs",
+        "line": 34,
+        "decl": "pub fn with_sample_data_for(tenant_id: TenantId) -> Self {"
+      },
+      {
+        "name": "add_entry",
+        "kind": "fn",
+        "file": "/app/crates/contextra-audit-export/src/testkit.rs",
+        "line": 108,
+        "decl": "pub fn add_entry(&mut self, entry: ProcessingRegisterEntry) {"
+      },
+      {
+        "name": "render_register_json",
+        "kind": "fn",
+        "file": "/app/crates/contextra-audit-export/src/lib.rs",
+        "line": 257,
+        "decl": "pub fn render_register_json("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-avv-generator",
+    "total_declarations": 24,
+    "dead_code_candidates_count": 3,
+    "candidates": [
+      {
+        "name": "with_contract_date",
+        "kind": "fn",
+        "file": "/app/crates/contextra-avv-generator/src/lib.rs",
+        "line": 147,
+        "decl": "pub fn with_contract_date(mut self, contract_date: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "with_subprocessors_allowed",
+        "kind": "fn",
+        "file": "/app/crates/contextra-avv-generator/src/lib.rs",
+        "line": 154,
+        "decl": "pub fn with_subprocessors_allowed(mut self, allowed: bool) -> Self {"
+      },
+      {
+        "name": "render_avv_markdown_with_date",
+        "kind": "fn",
+        "file": "/app/crates/contextra-avv-generator/src/lib.rs",
+        "line": 267,
+        "decl": "pub fn render_avv_markdown_with_date(ctx: &AvvContext, date: &str) -> Result<String, AvvError> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-checkpoint",
+    "total_declarations": 185,
+    "dead_code_candidates_count": 4,
+    "candidates": [
+      {
+        "name": "set_metrics_sink",
+        "kind": "fn",
+        "file": "/app/crates/contextra-checkpoint/src/store.rs",
+        "line": 466,
+        "decl": "pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {"
+      },
+      {
+        "name": "total_recovered",
+        "kind": "fn",
+        "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
+        "line": 51,
+        "decl": "pub fn total_recovered(&self) -> usize {"
+      },
+      {
+        "name": "register_orphan",
+        "kind": "fn",
+        "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
+        "line": 149,
+        "decl": "pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {"
+      },
+      {
+        "name": "with_vfs",
+        "kind": "fn",
+        "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
+        "line": 351,
+        "decl": "pub fn with_vfs(mut self, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-cognition",
+    "total_declarations": 158,
+    "dead_code_candidates_count": 6,
+    "candidates": [
+      {
+        "name": "with_edge_reinforcement_buffer",
+        "kind": "fn",
+        "file": "/app/crates/contextra-cognition/src/maintenance_scheduler.rs",
+        "line": 87,
+        "decl": "pub fn with_edge_reinforcement_buffer("
+      },
+      {
+        "name": "with_leanrag",
+        "kind": "fn",
+        "file": "/app/crates/contextra-cognition/src/consolidation_executor.rs",
+        "line": 559,
+        "decl": "pub fn with_leanrag(mut self, cfg: AggregationConfig) -> Self {"
+      },
+      {
+        "name": "with_validator",
+        "kind": "fn",
+        "file": "/app/crates/contextra-cognition/src/consolidation_executor.rs",
+        "line": 565,
+        "decl": "pub fn with_validator(mut self, validator: Arc<dyn ResponseGroundingValidator>) -> Self {"
+      },
+      {
+        "name": "with_rich_validator",
+        "kind": "fn",
+        "file": "/app/crates/contextra-cognition/src/consolidation_executor.rs",
+        "line": 571,
+        "decl": "pub fn with_rich_validator(mut self, validator: Arc<dyn GroundingValidator>) -> Self {"
+      },
+      {
+        "name": "start_worker",
+        "kind": "fn",
+        "file": "/app/crates/contextra-cognition/src/consolidation_executor.rs",
+        "line": 584,
+        "decl": "pub fn start_worker("
+      },
+      {
+        "name": "with_rng",
+        "kind": "fn",
+        "file": "/app/crates/contextra-cognition/src/context_compaction/compactor.rs",
+        "line": 133,
+        "decl": "pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-core",
+    "total_declarations": 0,
+    "dead_code_candidates_count": 0,
+    "candidates": []
+  },
+  {
+    "crate": "contextra-crypto",
+    "total_declarations": 292,
+    "dead_code_candidates_count": 24,
+    "candidates": [
+      {
+        "name": "cipher_for_scoped",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/crypto.rs",
+        "line": 316,
+        "decl": "pub fn cipher_for_scoped<T>("
+      },
+      {
+        "name": "from_signing_key",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/ed25519_proof.rs",
+        "line": 75,
+        "decl": "pub fn from_signing_key(signing_key: ed25519_dalek::SigningKey) -> Self {"
+      },
+      {
+        "name": "with_signature",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/audit_chain.rs",
+        "line": 149,
+        "decl": "pub fn with_signature("
+      },
+      {
+        "name": "sign_head",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/audit_chain.rs",
+        "line": 288,
+        "decl": "pub fn sign_head("
+      },
+      {
+        "name": "get_wrapped_kek",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_shredding.rs",
+        "line": 162,
+        "decl": "pub fn get_wrapped_kek(&self, group_id: u64) -> Option<(Vec<u8>, [u8; 12])> {"
+      },
+      {
+        "name": "get_wrapped_dek",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_shredding.rs",
+        "line": 172,
+        "decl": "pub fn get_wrapped_dek(&self, group_id: u64, record_id: u64) -> Option<(Vec<u8>, [u8; 12])> {"
+      },
+      {
+        "name": "is_key_active",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_shredding.rs",
+        "line": 336,
+        "decl": "pub fn is_key_active(&self, group_id: u64) -> bool {"
+      },
+      {
+        "name": "is_record_active",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_shredding.rs",
+        "line": 341,
+        "decl": "pub fn is_record_active(&self, group_id: u64, record_id: u64) -> bool {"
+      },
+      {
+        "name": "set_last_seq_no",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/wal_crypto.rs",
+        "line": 392,
+        "decl": "pub fn set_last_seq_no(&mut self, seq_no: Option<u64>) {"
+      },
+      {
+        "name": "last_seq_no_snapshot",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/wal_crypto.rs",
+        "line": 397,
+        "decl": "pub fn last_seq_no_snapshot(&self) -> Option<u64> {"
+      },
+      {
+        "name": "new_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kdf.rs",
+        "line": 94,
+        "decl": "pub fn new_for_test(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Self {"
+      },
+      {
+        "name": "generate_default",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kdf.rs",
+        "line": 132,
+        "decl": "pub fn generate_default() -> Result<Self> {"
+      },
+      {
+        "name": "set_spill_handler",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_segment/store.rs",
+        "line": 172,
+        "decl": "pub fn set_spill_handler(&self, handler: SpillHandler) {"
+      },
+      {
+        "name": "remove_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_segment/store.rs",
+        "line": 243,
+        "decl": "pub fn remove_segment(&self, tenant: TenantId, segment_id: u64) {"
+      },
+      {
+        "name": "insert_encrypted_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/kv_segment/store.rs",
+        "line": 259,
+        "decl": "pub fn insert_encrypted_segment("
+      },
+      {
+        "name": "issue",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/creation.rs",
+        "line": 18,
+        "decl": "pub fn issue<'a>("
+      },
+      {
+        "name": "create",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/creation.rs",
+        "line": 213,
+        "decl": "pub fn create("
+      },
+      {
+        "name": "create_v3_with_audit_position",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/creation.rs",
+        "line": 323,
+        "decl": "pub fn create_v3_with_audit_position("
+      },
+      {
+        "name": "derive_deletion_proof_key_for_tenant",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/key_derivation.rs",
+        "line": 14,
+        "decl": "pub fn derive_deletion_proof_key_for_tenant("
+      },
+      {
+        "name": "verify_standalone_for_tenant",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/verifier.rs",
+        "line": 144,
+        "decl": "pub fn verify_standalone_for_tenant("
+      },
+      {
+        "name": "verify_audit_chain_and_head",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/verifier.rs",
+        "line": 159,
+        "decl": "pub fn verify_audit_chain_and_head("
+      },
+      {
+        "name": "export_for_audit",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/verification.rs",
+        "line": 136,
+        "decl": "pub fn export_for_audit(&self) -> Result<String> {"
+      },
+      {
+        "name": "verify_wal_delete_receipt",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/verification.rs",
+        "line": 164,
+        "decl": "pub fn verify_wal_delete_receipt("
+      },
+      {
+        "name": "verify_proof_sequence",
+        "kind": "fn",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/chain.rs",
+        "line": 12,
+        "decl": "pub fn verify_proof_sequence(proofs: &[DeletionProof]) -> Result<bool> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-db",
+    "total_declarations": 51,
+    "dead_code_candidates_count": 4,
+    "candidates": [
+      {
+        "name": "is_expired",
+        "kind": "fn",
+        "file": "/app/crates/contextra-db/src/homeostat.rs",
+        "line": 21,
+        "decl": "pub fn is_expired(&self) -> bool {"
+      },
+      {
+        "name": "remaining",
+        "kind": "fn",
+        "file": "/app/crates/contextra-db/src/homeostat.rs",
+        "line": 25,
+        "decl": "pub fn remaining(&self) -> Duration {"
+      },
+      {
+        "name": "current_scaling_factor",
+        "kind": "fn",
+        "file": "/app/crates/contextra-db/src/pid_latency_controller.rs",
+        "line": 47,
+        "decl": "pub fn current_scaling_factor(&self) -> f64 {"
+      },
+      {
+        "name": "reset",
+        "kind": "fn",
+        "file": "/app/crates/contextra-db/src/pid_latency_controller.rs",
+        "line": 80,
+        "decl": "pub fn reset(&mut self) {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-durable-fs",
+    "total_declarations": 90,
+    "dead_code_candidates_count": 12,
+    "candidates": [
+      {
+        "name": "allows_writes",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/health.rs",
+        "line": 109,
+        "decl": "pub fn allows_writes(self) -> bool {"
+      },
+      {
+        "name": "write_atomic",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/vfs.rs",
+        "line": 64,
+        "decl": "fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {"
+      },
+      {
+        "name": "list_dir",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/vfs.rs",
+        "line": 111,
+        "decl": "fn list_dir(&self, path: &Path) -> Result<Vec<String>> {"
+      },
+      {
+        "name": "read_verified",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/vfs.rs",
+        "line": 176,
+        "decl": "fn read_verified(&self, offset: u64, len: usize) -> std::io::Result<(Vec<u8>, VerifiedVia)> {"
+      },
+      {
+        "name": "health_state",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/journal.rs",
+        "line": 91,
+        "decl": "pub fn health_state(&self) -> HealthState {"
+      },
+      {
+        "name": "record",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/journal.rs",
+        "line": 104,
+        "decl": "pub fn record(&mut self, path: &Path) -> std::io::Result<()> {"
+      },
+      {
+        "name": "pending",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/journal.rs",
+        "line": 111,
+        "decl": "pub fn pending(&self) -> &[PathBuf] {"
+      },
+      {
+        "name": "PoisonedHandle",
+        "kind": "struct",
+        "file": "/app/crates/contextra-durable-fs/src/lib.rs",
+        "line": 158,
+        "decl": "pub struct PoisonedHandle;"
+      },
+      {
+        "name": "new_with_path_and_injector",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/lib.rs",
+        "line": 201,
+        "decl": "pub fn new_with_path_and_injector(file: File, path: PathBuf, injector: F) -> Self {"
+      },
+      {
+        "name": "get_ref",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/lib.rs",
+        "line": 256,
+        "decl": "pub fn get_ref(&self) -> Option<&File> {"
+      },
+      {
+        "name": "poison",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/lib.rs",
+        "line": 276,
+        "decl": "pub fn poison(&mut self) {"
+      },
+      {
+        "name": "acquire",
+        "kind": "fn",
+        "file": "/app/crates/contextra-durable-fs/src/lib.rs",
+        "line": 342,
+        "decl": "pub fn acquire(dir: &Path, mode: LockMode) -> std::io::Result<Self> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-engine",
+    "total_declarations": 436,
+    "dead_code_candidates_count": 22,
+    "candidates": [
+      {
+        "name": "CHECKPOINT_DURATION",
+        "kind": "const",
+        "file": "/app/crates/contextra-engine/src/metrics_names.rs",
+        "line": 15,
+        "decl": "pub const CHECKPOINT_DURATION: &str = \"checkpoint.duration\";"
+      },
+      {
+        "name": "with_tenant_policy",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/lib.rs",
+        "line": 281,
+        "decl": "pub fn with_tenant_policy(mut self, policy: TenantPolicy) -> Self {"
+      },
+      {
+        "name": "inner_storage",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/lib.rs",
+        "line": 412,
+        "decl": "pub fn inner_storage(&self) -> Arc<LsmStorage> {"
+      },
+      {
+        "name": "with_hnsw",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 333,
+        "decl": "pub fn with_hnsw("
+      },
+      {
+        "name": "with_clock",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 424,
+        "decl": "pub fn with_clock(self, clock: Arc<dyn Clock>) -> Self {"
+      },
+      {
+        "name": "set_clock",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 430,
+        "decl": "pub fn set_clock(&self, clock: Arc<dyn Clock>) {"
+      },
+      {
+        "name": "with_config",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 440,
+        "decl": "pub fn with_config(self, config: CollectionConfig) -> Self {"
+      },
+      {
+        "name": "set_config",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 446,
+        "decl": "pub fn set_config(&self, config: CollectionConfig) {"
+      },
+      {
+        "name": "with_pressure_receiver",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 456,
+        "decl": "pub fn with_pressure_receiver("
+      },
+      {
+        "name": "set_pressure_receiver",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 465,
+        "decl": "pub fn set_pressure_receiver("
+      },
+      {
+        "name": "user_key_prefix",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 545,
+        "decl": "pub fn user_key_prefix(&self) -> Vec<u8> {"
+      },
+      {
+        "name": "with_community_detection_trigger_threshold",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/mod.rs",
+        "line": 657,
+        "decl": "pub fn with_community_detection_trigger_threshold(self, threshold: u64) -> Self {"
+      },
+      {
+        "name": "set_router",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/contextra_impl/wiring.rs",
+        "line": 24,
+        "decl": "pub fn set_router(&self, router: std::sync::Weak<dyn DriftStatusProvider>) {"
+      },
+      {
+        "name": "set_calibrator",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/contextra_impl/wiring.rs",
+        "line": 30,
+        "decl": "pub fn set_calibrator("
+      },
+      {
+        "name": "with_proof_key_provider",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/contextra_impl/erasure.rs",
+        "line": 119,
+        "decl": "pub fn with_proof_key_provider(self, provider: Arc<dyn ProofKeyProvider>) -> Self {"
+      },
+      {
+        "name": "from_allowed_ids",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/query_builder/scope.rs",
+        "line": 38,
+        "decl": "pub fn from_allowed_ids(allowed_doc_ids: BTreeSet<DocId>) -> Self {"
+      },
+      {
+        "name": "METRIC_SEARCH_LATENCY_VECTOR",
+        "kind": "const",
+        "file": "/app/crates/contextra-engine/src/collection/query_builder/mod.rs",
+        "line": 24,
+        "decl": "pub const METRIC_SEARCH_LATENCY_VECTOR: &str = \"search.latency.vector\";"
+      },
+      {
+        "name": "METRIC_SEARCH_LATENCY_TEXT",
+        "kind": "const",
+        "file": "/app/crates/contextra-engine/src/collection/query_builder/mod.rs",
+        "line": 27,
+        "decl": "pub const METRIC_SEARCH_LATENCY_TEXT: &str = \"search.latency.text\";"
+      },
+      {
+        "name": "METRIC_SEARCH_LATENCY_GRAPH",
+        "kind": "const",
+        "file": "/app/crates/contextra-engine/src/collection/query_builder/mod.rs",
+        "line": 30,
+        "decl": "pub const METRIC_SEARCH_LATENCY_GRAPH: &str = \"search.latency.graph\";"
+      },
+      {
+        "name": "recommended_mode_for_regulated",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs",
+        "line": 86,
+        "decl": "pub fn recommended_mode_for_regulated(is_regulated: bool) -> AutoExtractionMode {"
+      },
+      {
+        "name": "with_auto_extraction",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs",
+        "line": 170,
+        "decl": "pub fn with_auto_extraction("
+      },
+      {
+        "name": "set_auto_extraction_config",
+        "kind": "fn",
+        "file": "/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs",
+        "line": 202,
+        "decl": "pub fn set_auto_extraction_config(&self, config: AutoExtractionConfig) {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-erasure",
+    "total_declarations": 653,
+    "dead_code_candidates_count": 66,
+    "candidates": [
+      {
+        "name": "finalize_erasure",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/ledger.rs",
+        "line": 67,
+        "decl": "pub fn finalize_erasure("
+      },
+      {
+        "name": "is_replay",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restore.rs",
+        "line": 26,
+        "decl": "pub fn is_replay(&self, seq: Seq) -> bool {"
+      },
+      {
+        "name": "open_durable",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/journal.rs",
+        "line": 37,
+        "decl": "pub fn open_durable("
+      },
+      {
+        "name": "new_in_memory_with_key",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/vault.rs",
+        "line": 68,
+        "decl": "pub fn new_in_memory_with_key(total_capacity: usize, mac_key: [u8; 32]) -> Self {"
+      },
+      {
+        "name": "create_dir",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/vault.rs",
+        "line": 114,
+        "decl": "pub fn create_dir("
+      },
+      {
+        "name": "open_dir",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/vault.rs",
+        "line": 162,
+        "decl": "pub fn open_dir("
+      },
+      {
+        "name": "replace_durable_shard",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/vault.rs",
+        "line": 352,
+        "decl": "pub fn replace_durable_shard(&mut self, index: usize, shard: DurableVaultShard) {"
+      },
+      {
+        "name": "read_exact_at",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/io.rs",
+        "line": 29,
+        "decl": "pub fn read_exact_at(f: &dyn VfsFile, buf: &mut [u8], offset: u64) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "zero_at",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/io.rs",
+        "line": 54,
+        "decl": "pub fn zero_at(f: &dyn VfsFile, offset: u64, len: usize) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "verify_updated_seq",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/supersede.rs",
+        "line": 142,
+        "decl": "pub fn verify_updated_seq(&self, latest_committed_seq: u64) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "compute_chained",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/types_local.rs",
+        "line": 598,
+        "decl": "pub fn compute_chained("
+      },
+      {
+        "name": "verify_chain_hash",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/types_local.rs",
+        "line": 628,
+        "decl": "pub fn verify_chain_hash(&self, prev_hash: &[u8; 32]) -> bool {"
+      },
+      {
+        "name": "read_only",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/types_local.rs",
+        "line": 1360,
+        "decl": "pub fn read_only() -> Self {"
+      },
+      {
+        "name": "write_create",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/types_local.rs",
+        "line": 1367,
+        "decl": "pub fn write_create() -> Self {"
+      },
+      {
+        "name": "allows_access_to_restricted",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restricted.rs",
+        "line": 102,
+        "decl": "pub fn allows_access_to_restricted(&self, is_target_restricted: bool) -> bool {"
+      },
+      {
+        "name": "create_entry",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restricted.rs",
+        "line": 143,
+        "decl": "pub fn create_entry("
+      },
+      {
+        "name": "is_lifted",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restricted.rs",
+        "line": 175,
+        "decl": "pub fn is_lifted(&self) -> bool {"
+      },
+      {
+        "name": "lift",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restricted.rs",
+        "line": 185,
+        "decl": "pub fn lift(&mut self, _reason: &str) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "supersede_by_erasure",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restricted.rs",
+        "line": 199,
+        "decl": "pub fn supersede_by_erasure(&mut self) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "advance_to_r2_intent",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/replace.rs",
+        "line": 88,
+        "decl": "pub fn advance_to_r2_intent(&mut self) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "verify_replacement_present",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/replace.rs",
+        "line": 104,
+        "decl": "pub fn verify_replacement_present(&self, is_present: bool) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "advance_to_r3_gate_old",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/replace.rs",
+        "line": 112,
+        "decl": "pub fn advance_to_r3_gate_old(&mut self) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "advance_to_r4_key_destroyed",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/replace.rs",
+        "line": 126,
+        "decl": "pub fn advance_to_r4_key_destroyed(&mut self) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "verify_chain",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/ledger/sink.rs",
+        "line": 56,
+        "decl": "pub fn verify_chain(&self) -> bool {"
+      },
+      {
+        "name": "SNAPSHOT_REVOKE",
+        "kind": "const",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 18,
+        "decl": "pub const SNAPSHOT_REVOKE: Self = Self(0);"
+      },
+      {
+        "name": "TEXT_REWRITE",
+        "kind": "const",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 20,
+        "decl": "pub const TEXT_REWRITE: Self = Self(1);"
+      },
+      {
+        "name": "WAL_FLUSH",
+        "kind": "const",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 22,
+        "decl": "pub const WAL_FLUSH: Self = Self(2);"
+      },
+      {
+        "name": "SSTABLE_REWRITE",
+        "kind": "const",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 24,
+        "decl": "pub const SSTABLE_REWRITE: Self = Self(3);"
+      },
+      {
+        "name": "VECTOR_REPAIR",
+        "kind": "const",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 26,
+        "decl": "pub const VECTOR_REPAIR: Self = Self(4);"
+      },
+      {
+        "name": "CACHE_EVICT",
+        "kind": "const",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 30,
+        "decl": "pub const CACHE_EVICT: Self = Self(6);"
+      },
+      {
+        "name": "sort_by_priority",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/purge/order.rs",
+        "line": 50,
+        "decl": "pub fn sort_by_priority(mut layers: Vec<LayerPurgeOrder>) -> Vec<LayerPurgeOrder> {"
+      },
+      {
+        "name": "merge",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/purge/window.rs",
+        "line": 39,
+        "decl": "pub fn merge(&mut self, other: &WindowOutcome) {"
+      },
+      {
+        "name": "with_deadline_nanos",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/purge/cx.rs",
+        "line": 30,
+        "decl": "pub fn with_deadline_nanos(mut self, deadline_nanos: u64) -> Self {"
+      },
+      {
+        "name": "is_expired",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/purge/cx.rs",
+        "line": 43,
+        "decl": "pub fn is_expired(&self) -> bool {"
+      },
+      {
+        "name": "lift_restriction",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/erased_set.rs",
+        "line": 194,
+        "decl": "pub fn lift_restriction(&mut self, lo: &KeyBuf, hi: &KeyBuf) {"
+      },
+      {
+        "name": "remove_erased",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/erased_set.rs",
+        "line": 200,
+        "decl": "pub fn remove_erased(&mut self, lo: &KeyBuf, hi: &KeyBuf) {"
+      },
+      {
+        "name": "with_bounds_65",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/batch.rs",
+        "line": 60,
+        "decl": "pub fn with_bounds_65("
+      },
+      {
+        "name": "bind_global_erased_set",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/batch.rs",
+        "line": 201,
+        "decl": "pub fn bind_global_erased_set(set: Arc<RwLock<ErasedSet>>) {"
+      },
+      {
+        "name": "evaluate_restricted_access",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/batch.rs",
+        "line": 242,
+        "decl": "pub fn evaluate_restricted_access("
+      },
+      {
+        "name": "linearized_read",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/read_gate.rs",
+        "line": 28,
+        "decl": "pub fn linearized_read<T, F>(&self, k: &KeyBuf, mut f: F) -> Result<T, GateDecision>"
+      },
+      {
+        "name": "linearized_read_raw",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/read_gate.rs",
+        "line": 57,
+        "decl": "pub fn linearized_read_raw<T, F>(&self, raw: &[u8; 78], mut f: F) -> Result<T, GateDecision>"
+      },
+      {
+        "name": "from_entries",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/log.rs",
+        "line": 70,
+        "decl": "pub fn from_entries(entries: Vec<GateLogEntry>) -> Self {"
+      },
+      {
+        "name": "compact",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/log.rs",
+        "line": 102,
+        "decl": "pub fn compact(&self) -> Self {"
+      },
+      {
+        "name": "replay_into",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/gate/log.rs",
+        "line": 127,
+        "decl": "pub fn replay_into(&self, set: &mut crate::gate::erased_set::ErasedSet) {"
+      },
+      {
+        "name": "with_units",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/scope/set.rs",
+        "line": 33,
+        "decl": "pub fn with_units(layer_id: ScopeLayerId, units: Vec<u64>) -> Self {"
+      },
+      {
+        "name": "total_units",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/scope/set.rs",
+        "line": 69,
+        "decl": "pub fn total_units(&self) -> u64 {"
+      },
+      {
+        "name": "verify_with_key",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/report/signing.rs",
+        "line": 44,
+        "decl": "pub fn verify_with_key(&self, verifying_key: &VerifyingKey) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "with_signer_id",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/report/signing.rs",
+        "line": 190,
+        "decl": "pub fn with_signer_id(key: SigningKey, signer_id: SignerId) -> Self {"
+      },
+      {
+        "name": "sign_bytes",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/report/signing.rs",
+        "line": 236,
+        "decl": "pub fn sign_bytes("
+      },
+      {
+        "name": "set_field",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/report/build.rs",
+        "line": 247,
+        "decl": "pub fn set_field(&mut self, key: &str, val: &str) {"
+      },
+      {
+        "name": "from_risk",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/report/risk.rs",
+        "line": 338,
+        "decl": "pub fn from_risk(risk: &ResidualRiskId) -> Self {"
+      },
+      {
+        "name": "append_record",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/journal/appendlog.rs",
+        "line": 181,
+        "decl": "pub fn append_record(&mut self, rec: &JournalRecord) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "reduce_completed",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/journal/appendlog.rs",
+        "line": 229,
+        "decl": "pub fn reduce_completed(&mut self) -> Result<(), ErasureError> {"
+      },
+      {
+        "name": "from_record",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/journal/record.rs",
+        "line": 358,
+        "decl": "pub fn from_record(rec: &JournalRecord) -> Self {"
+      },
+      {
+        "name": "to_record",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/journal/record.rs",
+        "line": 372,
+        "decl": "pub fn to_record(&self) -> JournalRecord {"
+      },
+      {
+        "name": "next_safe_seq",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/restore/guard.rs",
+        "line": 62,
+        "decl": "pub fn next_safe_seq(&self, store_current_seq: u64) -> u64 {"
+      },
+      {
+        "name": "with_control_file",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/field.rs",
+        "line": 113,
+        "decl": "pub fn with_control_file(mut self, path: impl Into<PathBuf>) -> Self {"
+      },
+      {
+        "name": "with_target_pattern",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/field.rs",
+        "line": 119,
+        "decl": "pub fn with_target_pattern(mut self, pattern: impl Into<Vec<u8>>) -> Self {"
+      },
+      {
+        "name": "with_target_patterns",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/field.rs",
+        "line": 125,
+        "decl": "pub fn with_target_patterns(mut self, patterns: impl IntoIterator<Item = Vec<u8>>) -> Self {"
+      },
+      {
+        "name": "with_mk3_status",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/field.rs",
+        "line": 131,
+        "decl": "pub fn with_mk3_status(mut self, status: Mk3StatusInput) -> Self {"
+      },
+      {
+        "name": "with_decoder",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/field.rs",
+        "line": 137,
+        "decl": "pub fn with_decoder(mut self, decoder: std::sync::Arc<dyn StructureDecoder>) -> Self {"
+      },
+      {
+        "name": "is_clean",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/field.rs",
+        "line": 182,
+        "decl": "pub fn is_clean(&self) -> bool {"
+      },
+      {
+        "name": "verify_scanner_integrity",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/measure/positive_control.rs",
+        "line": 148,
+        "decl": "pub fn verify_scanner_integrity(pattern: &[u8], mutator: impl Fn(&[u8]) -> Vec<u8>) -> bool {"
+      },
+      {
+        "name": "with_core",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/saga/driver.rs",
+        "line": 47,
+        "decl": "pub fn with_core(core: Arc<super::core::ErasureCore>) -> Self {"
+      },
+      {
+        "name": "process_event",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/saga/driver.rs",
+        "line": 105,
+        "decl": "pub fn process_event("
+      },
+      {
+        "name": "config",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/saga/core.rs",
+        "line": 188,
+        "decl": "pub fn config(&self) -> &ErasureConfig {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-graph",
+    "total_declarations": 510,
+    "dead_code_candidates_count": 11,
+    "candidates": [
+      {
+        "name": "as_arc",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/arc_slice.rs",
+        "line": 81,
+        "decl": "pub fn as_arc(&self) -> &Arc<[T]> {"
+      },
+      {
+        "name": "with_batch_size",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/ppr_stream.rs",
+        "line": 50,
+        "decl": "pub fn with_batch_size(mut self, n: usize) -> Self {"
+      },
+      {
+        "name": "with_exclude_seeds",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/ppr_stream.rs",
+        "line": 57,
+        "decl": "pub fn with_exclude_seeds(mut self, exclude: bool) -> Self {"
+      },
+      {
+        "name": "is_exhausted",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/ppr_stream.rs",
+        "line": 120,
+        "decl": "pub fn is_exhausted(&self) -> bool {"
+      },
+      {
+        "name": "add_hyperedge",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/provider.rs",
+        "line": 68,
+        "decl": "pub fn add_hyperedge(&mut self, hyperedge: HyperEdge) {"
+      },
+      {
+        "name": "DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT",
+        "kind": "const",
+        "file": "/app/crates/contextra-graph/src/cascade.rs",
+        "line": 22,
+        "decl": "pub const DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT: usize = MAX_HYPEREDGE_CASCADE_FANOUT;"
+      },
+      {
+        "name": "slice_participants",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/hyperedge.rs",
+        "line": 248,
+        "decl": "pub fn slice_participants("
+      },
+      {
+        "name": "with_default_monitor",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/apprh/selector.rs",
+        "line": 92,
+        "decl": "pub fn with_default_monitor(config: ApprhSelectorConfig) -> Result<Self, ApprhError> {"
+      },
+      {
+        "name": "get_source_doc_id",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/csr/graph_write/mod.rs",
+        "line": 160,
+        "decl": "pub fn get_source_doc_id(&self, index: usize) -> Option<DocId> {"
+      },
+      {
+        "name": "pending_cascade_queue_len",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/csr/graph_write/hyperedge.rs",
+        "line": 54,
+        "decl": "pub fn pending_cascade_queue_len(&self) -> usize {"
+      },
+      {
+        "name": "commit_super_edge_batch",
+        "kind": "fn",
+        "file": "/app/crates/contextra-graph/src/csr/graph_write/hyperedge.rs",
+        "line": 357,
+        "decl": "pub fn commit_super_edge_batch("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-infer-candle",
+    "total_declarations": 170,
+    "dead_code_candidates_count": 8,
+    "candidates": [
+      {
+        "name": "tracked_request_count",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/attention_exporter.rs",
+        "line": 88,
+        "decl": "pub fn tracked_request_count(&self) -> usize {"
+      },
+      {
+        "name": "layer_count",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/kv_state.rs",
+        "line": 163,
+        "decl": "pub fn layer_count(&self) -> usize {"
+      },
+      {
+        "name": "import_block_at",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/kv_state.rs",
+        "line": 305,
+        "decl": "pub fn import_block_at(&mut self, block: &KvBlock, at: usize) -> Result<(), ContextraError> {"
+      },
+      {
+        "name": "with_prefix_store",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/inference/core.rs",
+        "line": 172,
+        "decl": "pub fn with_prefix_store(mut self, store: Arc<dyn contextra_ports::kv::KvPrefixStore>) -> Self {"
+      },
+      {
+        "name": "with_generation_config",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/inference/quantized_llama.rs",
+        "line": 62,
+        "decl": "pub fn with_generation_config(mut self, config: GenerationConfig) -> Self {"
+      },
+      {
+        "name": "with_max_context_length",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/inference/config.rs",
+        "line": 47,
+        "decl": "pub fn with_max_context_length(mut self, limit: usize) -> Self {"
+      },
+      {
+        "name": "with_max_token_budget",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/inference/config.rs",
+        "line": 53,
+        "decl": "pub fn with_max_token_budget(mut self, budget: usize) -> Self {"
+      },
+      {
+        "name": "validate_token_budget",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-candle/src/inference/config.rs",
+        "line": 73,
+        "decl": "pub fn validate_token_budget(&self, requested_tokens: usize) -> Result<(), ContextraError> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-infer-ollama",
+    "total_declarations": 110,
+    "dead_code_candidates_count": 3,
+    "candidates": [
+      {
+        "name": "with_provenance",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-ollama/src/importance.rs",
+        "line": 129,
+        "decl": "pub fn with_provenance("
+      },
+      {
+        "name": "with_clock",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-ollama/src/client/core.rs",
+        "line": 197,
+        "decl": "pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {"
+      },
+      {
+        "name": "loopback_only",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-ollama/src/client/policy.rs",
+        "line": 44,
+        "decl": "pub fn loopback_only() -> Self {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-infer-onnx",
+    "total_declarations": 72,
+    "dead_code_candidates_count": 1,
+    "candidates": [
+      {
+        "name": "with_expected_dimension",
+        "kind": "fn",
+        "file": "/app/crates/contextra-infer-onnx/src/lib.rs",
+        "line": 738,
+        "decl": "pub fn with_expected_dimension(mut self, dim: usize) -> Self {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-ingest",
+    "total_declarations": 598,
+    "dead_code_candidates_count": 33,
+    "candidates": [
+      {
+        "name": "extensions",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/format.rs",
+        "line": 104,
+        "decl": "pub fn extensions(self) -> &'static [&'static str] {"
+      },
+      {
+        "name": "file_names",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/safe/archive.rs",
+        "line": 93,
+        "decl": "pub fn file_names(&mut self) -> Vec<String> {"
+      },
+      {
+        "name": "list_children",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/ole/cfb_reader.rs",
+        "line": 105,
+        "decl": "pub fn list_children(&self, storage_path: &str) -> Result<Vec<Entry>, IngestError> {"
+      },
+      {
+        "name": "finish",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 107,
+        "decl": "fn finish(self) -> Self::Output {"
+      },
+      {
+        "name": "parse_error",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 111,
+        "decl": "fn parse_error(&self, _msg: Cow<'static, str>) {}"
+      },
+      {
+        "name": "get_document",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 113,
+        "decl": "fn get_document(&self) -> Self::Handle {"
+      },
+      {
+        "name": "set_quirks_mode",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 117,
+        "decl": "fn set_quirks_mode(&self, mode: QuirksMode) {"
+      },
+      {
+        "name": "same_node",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 121,
+        "decl": "fn same_node(&self, x: &Self::Handle, y: &Self::Handle) -> bool {"
+      },
+      {
+        "name": "elem_name",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 125,
+        "decl": "fn elem_name<'a>(&'a self, target: &'a Self::Handle) -> Self::ElemName<'a> {"
+      },
+      {
+        "name": "get_template_contents",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 135,
+        "decl": "fn get_template_contents(&self, target: &Self::Handle) -> Self::Handle {"
+      },
+      {
+        "name": "append_based_on_parent_node",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 166,
+        "decl": "fn append_based_on_parent_node("
+      },
+      {
+        "name": "append_before_sibling",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 180,
+        "decl": "fn append_before_sibling(&self, sibling: &Self::Handle, child: NodeOrText<Self::Handle>) {"
+      },
+      {
+        "name": "append_doctype_to_document",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 187,
+        "decl": "fn append_doctype_to_document("
+      },
+      {
+        "name": "add_attrs_if_missing",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 201,
+        "decl": "fn add_attrs_if_missing(&self, target: &Self::Handle, attrs: Vec<Attribute>) {"
+      },
+      {
+        "name": "remove_from_parent",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 216,
+        "decl": "fn remove_from_parent(&self, target: &Self::Handle) {"
+      },
+      {
+        "name": "reparent_children",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 224,
+        "decl": "fn reparent_children(&self, from: &Self::Handle, to: &Self::Handle) {"
+      },
+      {
+        "name": "is_mathml_annotation_xml_integration_point",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 232,
+        "decl": "fn is_mathml_annotation_xml_integration_point(&self, _handle: &Self::Handle) -> bool {"
+      },
+      {
+        "name": "create_element",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 236,
+        "decl": "fn create_element("
+      },
+      {
+        "name": "create_comment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 252,
+        "decl": "fn create_comment(&self, text: StrTendril) -> Self::Handle {"
+      },
+      {
+        "name": "create_pi",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/web/html.rs",
+        "line": 260,
+        "decl": "fn create_pi(&self, _target: StrTendril, _data: StrTendril) -> Self::Handle {"
+      },
+      {
+        "name": "deserialize",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 46,
+        "decl": "fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>"
+      },
+      {
+        "name": "expecting",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 57,
+        "decl": "fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {"
+      },
+      {
+        "name": "visit_bool",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 61,
+        "decl": "fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_i64",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 65,
+        "decl": "fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_u64",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 69,
+        "decl": "fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_f64",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 73,
+        "decl": "fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_str",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 81,
+        "decl": "fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>"
+      },
+      {
+        "name": "visit_string",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 88,
+        "decl": "fn visit_string<E>(self, v: String) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_none",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 92,
+        "decl": "fn visit_none<E>(self) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_some",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 96,
+        "decl": "fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>"
+      },
+      {
+        "name": "visit_unit",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 103,
+        "decl": "fn visit_unit<E>(self) -> Result<Self::Value, E> {"
+      },
+      {
+        "name": "visit_seq",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 107,
+        "decl": "fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>"
+      },
+      {
+        "name": "visit_map",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ingest/src/formats/structured/json.rs",
+        "line": 128,
+        "decl": "fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-kvcache",
+    "total_declarations": 216,
+    "dead_code_candidates_count": 10,
+    "candidates": [
+      {
+        "name": "remove_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/store.rs",
+        "line": 543,
+        "decl": "pub fn remove_segment(&self, tenant: TenantId, segment_id: u64) {"
+      },
+      {
+        "name": "insert_encrypted_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/store.rs",
+        "line": 559,
+        "decl": "pub fn insert_encrypted_segment("
+      },
+      {
+        "name": "get_decrypted_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/store.rs",
+        "line": 593,
+        "decl": "pub fn get_decrypted_segment("
+      },
+      {
+        "name": "scan_units",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/store.rs",
+        "line": 858,
+        "decl": "fn scan_units("
+      },
+      {
+        "name": "write_quantized",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/segment.rs",
+        "line": 324,
+        "decl": "pub fn write_quantized("
+      },
+      {
+        "name": "read_dequantized",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/segment.rs",
+        "line": 354,
+        "decl": "pub fn read_dequantized("
+      },
+      {
+        "name": "register_segment_request",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/eviction_worker.rs",
+        "line": 155,
+        "decl": "pub fn register_segment_request("
+      },
+      {
+        "name": "unregister_segment_request",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/eviction_worker.rs",
+        "line": 167,
+        "decl": "pub fn unregister_segment_request(&self, tenant_id: TenantId, segment_id: u64) {"
+      },
+      {
+        "name": "enable_kivi_quantization",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/service.rs",
+        "line": 151,
+        "decl": "pub fn enable_kivi_quantization(mut self, config: Option<KiviQuantizeConfig>) -> Self {"
+      },
+      {
+        "name": "invalidate_scratchpad",
+        "kind": "fn",
+        "file": "/app/crates/contextra-kvcache/src/service.rs",
+        "line": 457,
+        "decl": "pub fn invalidate_scratchpad("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-license",
+    "total_declarations": 43,
+    "dead_code_candidates_count": 15,
+    "candidates": [
+      {
+        "name": "create_signed",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 191,
+        "decl": "pub fn create_signed("
+      },
+      {
+        "name": "no_activation",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 496,
+        "decl": "pub fn no_activation() -> Self {"
+      },
+      {
+        "name": "from_activation",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 509,
+        "decl": "pub fn from_activation(activation: SignedActivation, verifying_key: VerifyingKey) -> Self {"
+      },
+      {
+        "name": "from_signed_payload",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 534,
+        "decl": "pub fn from_signed_payload("
+      },
+      {
+        "name": "from_signed_payload_with_clock",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 550,
+        "decl": "pub fn from_signed_payload_with_clock("
+      },
+      {
+        "name": "with_local_installation_id",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 621,
+        "decl": "pub fn with_local_installation_id(mut self, id_hash: [u8; 32]) -> Self {"
+      },
+      {
+        "name": "check_step_1_fast_ring",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 644,
+        "decl": "pub fn check_step_1_fast_ring(&self, ring: FeatureRing) -> bool {"
+      },
+      {
+        "name": "check_step_2_presence",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 649,
+        "decl": "pub fn check_step_2_presence(&self, ring: FeatureRing) -> Result<(), StepVerificationError> {"
+      },
+      {
+        "name": "check_step_3_installation",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 658,
+        "decl": "pub fn check_step_3_installation("
+      },
+      {
+        "name": "check_step_4_signature",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 671,
+        "decl": "pub fn check_step_4_signature(&self) -> Result<(), StepVerificationError> {"
+      },
+      {
+        "name": "check_step_5_expiration",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 680,
+        "decl": "pub fn check_step_5_expiration(&self) -> Result<(), StepVerificationError> {"
+      },
+      {
+        "name": "check_step_6_ring_permission",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 689,
+        "decl": "pub fn check_step_6_ring_permission("
+      },
+      {
+        "name": "check_step_7_success",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 701,
+        "decl": "pub fn check_step_7_success(&self) -> Result<(), StepVerificationError> {"
+      },
+      {
+        "name": "verify_ring",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 707,
+        "decl": "pub fn verify_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {"
+      },
+      {
+        "name": "create_test_signed_payload",
+        "kind": "fn",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 713,
+        "decl": "pub fn create_test_signed_payload("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-mcp",
+    "total_declarations": 137,
+    "dead_code_candidates_count": 11,
+    "candidates": [
+      {
+        "name": "parse_error",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/protocol.rs",
+        "line": 29,
+        "decl": "pub fn parse_error(msg: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "invalid_request",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/protocol.rs",
+        "line": 33,
+        "decl": "pub fn invalid_request(msg: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "method_not_found",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/protocol.rs",
+        "line": 37,
+        "decl": "pub fn method_not_found(msg: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "search_text",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/egress_guard.rs",
+        "line": 14,
+        "decl": "fn search_text<'a>("
+      },
+      {
+        "name": "search_hybrid",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/routing.rs",
+        "line": 9,
+        "decl": "fn search_hybrid<'a>("
+      },
+      {
+        "name": "get_community",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/routing.rs",
+        "line": 39,
+        "decl": "fn get_community<'a>("
+      },
+      {
+        "name": "prepare_context",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/routing.rs",
+        "line": 50,
+        "decl": "fn prepare_context("
+      },
+      {
+        "name": "with_tenant_id",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/server.rs",
+        "line": 69,
+        "decl": "pub fn with_tenant_id(mut self, tenant_id: Option<TenantId>) -> Self {"
+      },
+      {
+        "name": "with_injection_guard",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/server.rs",
+        "line": 74,
+        "decl": "pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {"
+      },
+      {
+        "name": "with_egress_classifier",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/server.rs",
+        "line": 79,
+        "decl": "pub fn with_egress_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {"
+      },
+      {
+        "name": "with_plugin_registry",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mcp/src/server.rs",
+        "line": 89,
+        "decl": "pub fn with_plugin_registry("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-mvcc",
+    "total_declarations": 174,
+    "dead_code_candidates_count": 15,
+    "candidates": [
+      {
+        "name": "DEFAULT_MAX_READ_SET_KEYS",
+        "kind": "const",
+        "file": "/app/crates/contextra-mvcc/src/tx_buffer.rs",
+        "line": 59,
+        "decl": "pub const DEFAULT_MAX_READ_SET_KEYS: usize = 100_000;"
+      },
+      {
+        "name": "drain_kv",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/tx_buffer.rs",
+        "line": 770,
+        "decl": "pub fn drain_kv(&self, tx: TxId) -> Vec<IndexOp<(Vec<u8>, Vec<u8>)>> {"
+      },
+      {
+        "name": "discard_kv",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/tx_buffer.rs",
+        "line": 779,
+        "decl": "pub fn discard_kv(&self, tx: TxId) {"
+      },
+      {
+        "name": "staged_status",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/tx_buffer.rs",
+        "line": 807,
+        "decl": "pub fn staged_status(&self, key: &[u8]) -> Option<bool> {"
+      },
+      {
+        "name": "pin_for_tenant",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/snapshot.rs",
+        "line": 219,
+        "decl": "pub fn pin_for_tenant(&self, tenant: TenantId, seq_no: u64) {"
+      },
+      {
+        "name": "longest_active_pin",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/snapshot.rs",
+        "line": 327,
+        "decl": "pub fn longest_active_pin(&self) -> Option<(u64, Duration)> {"
+      },
+      {
+        "name": "keys_map",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 166,
+        "decl": "pub fn keys_map(&self) -> &AHashMap<Vec<u8>, u64> {"
+      },
+      {
+        "name": "prefixes_map",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 171,
+        "decl": "pub fn prefixes_map(&self) -> &AHashMap<Vec<u8>, u64> {"
+      },
+      {
+        "name": "with_snapshot_registry",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 593,
+        "decl": "pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {"
+      },
+      {
+        "name": "set_snapshot_registry",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 599,
+        "decl": "pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>) {"
+      },
+      {
+        "name": "with_metrics_sink",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 604,
+        "decl": "pub fn with_metrics_sink("
+      },
+      {
+        "name": "set_metrics_sink",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 613,
+        "decl": "pub fn set_metrics_sink("
+      },
+      {
+        "name": "forget_from",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 651,
+        "decl": "pub fn forget_from(&self, first_seq: u64) -> usize {"
+      },
+      {
+        "name": "diagnose_pruning_blocker",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 733,
+        "decl": "pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {"
+      },
+      {
+        "name": "validate_and_record",
+        "kind": "fn",
+        "file": "/app/crates/contextra-mvcc/src/ssi.rs",
+        "line": 993,
+        "decl": "pub fn validate_and_record<'a>("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-ports",
+    "total_declarations": 447,
+    "dead_code_candidates_count": 33,
+    "candidates": [
+      {
+        "name": "compute_chained",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/ledger.rs",
+        "line": 95,
+        "decl": "pub fn compute_chained("
+      },
+      {
+        "name": "verify_chain_hash",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/ledger.rs",
+        "line": 125,
+        "decl": "pub fn verify_chain_hash(&self, prev_hash: &[u8; 32]) -> bool {"
+      },
+      {
+        "name": "read_all",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/ledger.rs",
+        "line": 169,
+        "decl": "fn read_all(&self) -> Result<Vec<LedgerEntry>, String>;"
+      },
+      {
+        "name": "prune",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/ledger.rs",
+        "line": 178,
+        "decl": "fn prune(&self, older_than: Timestamp) -> Result<usize, String>;"
+      },
+      {
+        "name": "seal",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/keys.rs",
+        "line": 136,
+        "decl": "fn seal<'a>("
+      },
+      {
+        "name": "make_slots_durable",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/keys.rs",
+        "line": 169,
+        "decl": "fn make_slots_durable(&self) -> BoxFuture<'_, Result<(), String>>;"
+      },
+      {
+        "name": "resolve",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/erasure.rs",
+        "line": 253,
+        "decl": "fn resolve(&self, t: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, String>>;"
+      },
+      {
+        "name": "on_gate",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/erasure.rs",
+        "line": 262,
+        "decl": "fn on_gate(&self, s: &LayerScope) -> BoxFuture<'_, Result<(), String>>;"
+      },
+      {
+        "name": "key_coverage",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/erasure.rs",
+        "line": 295,
+        "decl": "fn key_coverage(&self) -> KeyCoverage;"
+      },
+      {
+        "name": "write_create",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/vfs.rs",
+        "line": 66,
+        "decl": "pub fn write_create() -> Self {"
+      },
+      {
+        "name": "write_at",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/vfs.rs",
+        "line": 111,
+        "decl": "fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;"
+      },
+      {
+        "name": "set_len",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/vfs.rs",
+        "line": 120,
+        "decl": "fn set_len(&self, len: u64) -> std::io::Result<()>;"
+      },
+      {
+        "name": "check_bound",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/gate.rs",
+        "line": 145,
+        "decl": "fn check_bound(&self, b: &KeyBound) -> GateDecision;"
+      },
+      {
+        "name": "variant_for_range",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/gate.rs",
+        "line": 154,
+        "decl": "fn variant_for_range(&self, r: &KeyRange) -> RangeGate;"
+      },
+      {
+        "name": "gate_epoch",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/gate.rs",
+        "line": 168,
+        "decl": "fn gate_epoch(&self) -> u64 {"
+      },
+      {
+        "name": "covers",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/gate.rs",
+        "line": 175,
+        "decl": "fn covers(&self, k: &KeyBuf) -> bool {"
+      },
+      {
+        "name": "covers_raw",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/gate.rs",
+        "line": 188,
+        "decl": "fn covers_raw(&self, raw: &[u8; 78]) -> bool {"
+      },
+      {
+        "name": "gated_seq_raw",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/gate.rs",
+        "line": 196,
+        "decl": "fn gated_seq_raw(&self, _raw: &[u8; 78]) -> Option<Seq> {"
+      },
+      {
+        "name": "assert_checkpoint_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 38,
+        "decl": "pub fn assert_checkpoint_contract<T: Checkpoint>(t: &T, tx: TxId, state: &WorkflowState) {"
+      },
+      {
+        "name": "assert_attention_exporter_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 72,
+        "decl": "pub fn assert_attention_exporter_contract<T: AttentionExporter>(t: &T, req: RequestId) {"
+      },
+      {
+        "name": "assert_graph_index_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 77,
+        "decl": "pub fn assert_graph_index_contract<T: GraphIndex + CommunityResolver>("
+      },
+      {
+        "name": "assert_lifecycle_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 91,
+        "decl": "pub fn assert_lifecycle_contract<"
+      },
+      {
+        "name": "assert_embedding_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 107,
+        "decl": "pub fn assert_embedding_contract<"
+      },
+      {
+        "name": "assert_observability_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 129,
+        "decl": "pub fn assert_observability_contract<T: DriftStatusProvider>(t: &T) {"
+      },
+      {
+        "name": "assert_license_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 134,
+        "decl": "pub fn assert_license_contract<T: LicenseGate>(t: &T, ring: FeatureRing) {"
+      },
+      {
+        "name": "assert_reranker_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 140,
+        "decl": "pub fn assert_reranker_contract<T: Reranker>(t: &T, results: &[RerankResult]) {"
+      },
+      {
+        "name": "assert_text_index_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 147,
+        "decl": "pub fn assert_text_index_contract<T: TextIndex + SegmentSynthesizer>(t: &T) {"
+      },
+      {
+        "name": "assert_storage_engine_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 153,
+        "decl": "pub fn assert_storage_engine_contract<T: StorageEngine>("
+      },
+      {
+        "name": "assert_purger_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 175,
+        "decl": "pub fn assert_purger_contract<T: Purger>(t: &T, ctx: &RequestContext, target: &ScanTarget) {"
+      },
+      {
+        "name": "assert_egress_policy_contract",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/conformance.rs",
+        "line": 180,
+        "decl": "pub fn assert_egress_policy_contract<T: crate::policy::EgressPolicy>("
+      },
+      {
+        "name": "current_feature_ring",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/plugin.rs",
+        "line": 116,
+        "decl": "pub fn current_feature_ring(&self) -> FeatureRing {"
+      },
+      {
+        "name": "MAX_SCAN_MERGE_ACCUMULATOR",
+        "kind": "const",
+        "file": "/app/crates/contextra-ports/src/storage.rs",
+        "line": 29,
+        "decl": "pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;"
+      },
+      {
+        "name": "mint_witness_for_testkit",
+        "kind": "fn",
+        "file": "/app/crates/contextra-ports/src/scanner/witness.rs",
+        "line": 99,
+        "decl": "pub fn mint_witness_for_testkit("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-privacy",
+    "total_declarations": 167,
+    "dead_code_candidates_count": 10,
+    "candidates": [
+      {
+        "name": "with_gazetteer",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/entity_recognizer.rs",
+        "line": 92,
+        "decl": "pub fn with_gazetteer(gazetteer: Gazetteer) -> Self {"
+      },
+      {
+        "name": "with_max_input_length",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/entity_recognizer.rs",
+        "line": 101,
+        "decl": "pub fn with_max_input_length(mut self, limit: usize) -> Self {"
+      },
+      {
+        "name": "add_gazetteer_term",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/entity_recognizer.rs",
+        "line": 114,
+        "decl": "pub fn add_gazetteer_term(mut self, term: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "recognize_bounded",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/entity_recognizer.rs",
+        "line": 127,
+        "decl": "pub fn recognize_bounded("
+      },
+      {
+        "name": "internal_error",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/error.rs",
+        "line": 94,
+        "decl": "pub fn internal_error(msg: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "append_record",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/processing_registry.rs",
+        "line": 109,
+        "decl": "pub fn append_record("
+      },
+      {
+        "name": "with_classifier",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/egress_gateway.rs",
+        "line": 109,
+        "decl": "pub fn with_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {"
+      },
+      {
+        "name": "with_egress_vault",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/egress_gateway.rs",
+        "line": 124,
+        "decl": "pub fn with_egress_vault(mut self, vault: Arc<EgressVault>) -> Self {"
+      },
+      {
+        "name": "with_bulk_detector",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/egress_gateway.rs",
+        "line": 134,
+        "decl": "pub fn with_bulk_detector("
+      },
+      {
+        "name": "resolve_effective_kv_delete_mode",
+        "kind": "fn",
+        "file": "/app/crates/contextra-privacy/src/egress_gateway.rs",
+        "line": 389,
+        "decl": "pub fn resolve_effective_kv_delete_mode<D, K>("
+      }
+    ]
+  },
+  {
+    "crate": "contextra-py",
+    "total_declarations": 72,
+    "dead_code_candidates_count": 1,
+    "candidates": [
+      {
+        "name": "VERSION",
+        "kind": "const",
+        "file": "/app/crates/contextra-py/src/lib.rs",
+        "line": 141,
+        "decl": "pub const VERSION: &str = \"0.1.0\";"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-rank",
+    "total_declarations": 173,
+    "dead_code_candidates_count": 13,
+    "candidates": [
+      {
+        "name": "set_baseline",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/drift.rs",
+        "line": 90,
+        "decl": "pub fn set_baseline(&mut self, baseline: f32) {"
+      },
+      {
+        "name": "observe",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/drift.rs",
+        "line": 97,
+        "decl": "pub fn observe(&mut self, score: f32) -> DriftStatus {"
+      },
+      {
+        "name": "overall_drift_status",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/drift.rs",
+        "line": 136,
+        "decl": "pub fn overall_drift_status(&self) -> &'static str {"
+      },
+      {
+        "name": "synthesized_from",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/fusion/types.rs",
+        "line": 110,
+        "decl": "pub fn synthesized_from(source_doc_ids: &[contextra_types::DocId]) -> Self {"
+      },
+      {
+        "name": "is_fitted",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/platt.rs",
+        "line": 54,
+        "decl": "pub fn is_fitted(&self) -> bool {"
+      },
+      {
+        "name": "params",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/platt.rs",
+        "line": 59,
+        "decl": "pub fn params(&self) -> (f32, f32) {"
+      },
+      {
+        "name": "predict",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/platt.rs",
+        "line": 64,
+        "decl": "pub fn predict(&self, raw_score: f32) -> f32 {"
+      },
+      {
+        "name": "apply",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/platt.rs",
+        "line": 69,
+        "decl": "pub fn apply(&self, logit: f32) -> f32 {"
+      },
+      {
+        "name": "fit",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/platt.rs",
+        "line": 105,
+        "decl": "pub fn fit(observations: &[(f32, bool)]) -> Self {"
+      },
+      {
+        "name": "with_bounds",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/conformal.rs",
+        "line": 140,
+        "decl": "pub fn with_bounds("
+      },
+      {
+        "name": "calibrated_probability",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/isotonic.rs",
+        "line": 136,
+        "decl": "pub fn calibrated_probability(&mut self, raw_score: f32) -> Option<f32> {"
+      },
+      {
+        "name": "expected_calibration_error",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/calibration/isotonic.rs",
+        "line": 274,
+        "decl": "pub fn expected_calibration_error(&mut self) -> Option<f32> {"
+      },
+      {
+        "name": "provenance_of",
+        "kind": "fn",
+        "file": "/app/crates/contextra-rank/src/dibud/state.rs",
+        "line": 83,
+        "decl": "pub fn provenance_of(&self, doc_id: &DocId) -> Option<&ProvenanceRecord> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-router",
+    "total_declarations": 121,
+    "dead_code_candidates_count": 6,
+    "candidates": [
+      {
+        "name": "bandit_decision_propensity",
+        "kind": "fn",
+        "file": "/app/crates/contextra-router/src/router/outcomes.rs",
+        "line": 24,
+        "decl": "pub fn bandit_decision_propensity(&self, id: DecisionId) -> Option<f32> {"
+      },
+      {
+        "name": "with_vfs",
+        "kind": "fn",
+        "file": "/app/crates/contextra-router/src/router/lifecycle.rs",
+        "line": 107,
+        "decl": "pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {"
+      },
+      {
+        "name": "with_initial_decision_id",
+        "kind": "fn",
+        "file": "/app/crates/contextra-router/src/router/lifecycle.rs",
+        "line": 123,
+        "decl": "pub fn with_initial_decision_id(mut self, start: u64) -> Self {"
+      },
+      {
+        "name": "with_routing_strategy",
+        "kind": "fn",
+        "file": "/app/crates/contextra-router/src/router/lifecycle.rs",
+        "line": 132,
+        "decl": "pub fn with_routing_strategy("
+      },
+      {
+        "name": "advance",
+        "kind": "fn",
+        "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
+        "line": 29,
+        "decl": "pub fn advance(&self, duration: std::time::Duration) {"
+      },
+      {
+        "name": "set_community",
+        "kind": "fn",
+        "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
+        "line": 94,
+        "decl": "pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-sandbox",
+    "total_declarations": 44,
+    "dead_code_candidates_count": 2,
+    "candidates": [
+      {
+        "name": "pure_merge_operator",
+        "kind": "fn",
+        "file": "/app/crates/contextra-sandbox/src/capabilities.rs",
+        "line": 68,
+        "decl": "pub fn pure_merge_operator() -> Self {"
+      },
+      {
+        "name": "new_pure",
+        "kind": "fn",
+        "file": "/app/crates/contextra-sandbox/src/merge.rs",
+        "line": 43,
+        "decl": "pub fn new_pure(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self, SandboxError> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-simd",
+    "total_declarations": 42,
+    "dead_code_candidates_count": 0,
+    "candidates": []
+  },
+  {
+    "crate": "contextra-store",
+    "total_declarations": 531,
+    "dead_code_candidates_count": 32,
+    "candidates": [
+      {
+        "name": "shard_entry_counts",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/memtable.rs",
+        "line": 598,
+        "decl": "pub fn shard_entry_counts(&self) -> [usize; SHARD_COUNT] {"
+      },
+      {
+        "name": "encode_graph_key",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/tenant_codec.rs",
+        "line": 60,
+        "decl": "pub fn encode_graph_key(&self, collection: &CollectionId, entity_id: u64) -> Vec<u8> {"
+      },
+      {
+        "name": "collection_prefix",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/tenant_codec.rs",
+        "line": 78,
+        "decl": "pub fn collection_prefix(&self, collection: &CollectionId) -> Vec<u8> {"
+      },
+      {
+        "name": "spawn_tracked",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 121,
+        "decl": "pub fn spawn_tracked<F>(&self, future: F)"
+      },
+      {
+        "name": "ROLLBACK_INLINE_THRESHOLD_ENTRIES",
+        "kind": "const",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 158,
+        "decl": "pub const ROLLBACK_INLINE_THRESHOLD_ENTRIES: usize = 1;"
+      },
+      {
+        "name": "set_metrics_sink",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 186,
+        "decl": "pub fn set_metrics_sink(&self, sink: Arc<dyn contextra_ports::MetricsSink>) {"
+      },
+      {
+        "name": "with_ssi_validator",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 223,
+        "decl": "pub fn with_ssi_validator("
+      },
+      {
+        "name": "next_seq_no_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 299,
+        "decl": "pub fn next_seq_no_for_test(&self) -> u64 {"
+      },
+      {
+        "name": "sstables_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 313,
+        "decl": "pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {"
+      },
+      {
+        "name": "block_cache_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 319,
+        "decl": "pub fn block_cache_for_test(&self) -> Arc<BlockCache> {"
+      },
+      {
+        "name": "budget_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 325,
+        "decl": "pub fn budget_for_test(&self) -> Arc<ResourceTracker> {"
+      },
+      {
+        "name": "manifest_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 331,
+        "decl": "pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {"
+      },
+      {
+        "name": "validate_against_features",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/config.rs",
+        "line": 41,
+        "decl": "pub fn validate_against_features("
+      },
+      {
+        "name": "MAX_INTERNAL_MERGE_ENTRIES_FACTOR",
+        "kind": "const",
+        "file": "/app/crates/contextra-store/src/lsm/mod.rs",
+        "line": 113,
+        "decl": "pub const MAX_INTERNAL_MERGE_ENTRIES_FACTOR: usize = 8;"
+      },
+      {
+        "name": "dropped_count_for",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/observer.rs",
+        "line": 299,
+        "decl": "pub fn dropped_count_for(&self, observer: &Arc<dyn WalObserver>) -> u64 {"
+      },
+      {
+        "name": "is_any_circuit_breaker_open",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/observer.rs",
+        "line": 321,
+        "decl": "pub fn is_any_circuit_breaker_open(&self) -> bool {"
+      },
+      {
+        "name": "clear_circuit_breaker",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/lsm/observer.rs",
+        "line": 329,
+        "decl": "pub fn clear_circuit_breaker(&self, observer: &Arc<dyn WalObserver>) {"
+      },
+      {
+        "name": "with_adaptive_planner",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/compaction/engine.rs",
+        "line": 97,
+        "decl": "pub fn with_adaptive_planner(mut self, planner: Arc<dyn AdaptiveCompactionPlanner>) -> Self {"
+      },
+      {
+        "name": "write_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/kv/segment.rs",
+        "line": 72,
+        "decl": "pub fn write_segment("
+      },
+      {
+        "name": "read_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/kv/segment.rs",
+        "line": 113,
+        "decl": "pub fn read_segment(&self, segment: &KvSegmentPayload) -> Result<Vec<u8>, ContextraError> {"
+      },
+      {
+        "name": "delete_segment",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/kv/segment.rs",
+        "line": 152,
+        "decl": "pub fn delete_segment(&self, group_id: u64) -> bool {"
+      },
+      {
+        "name": "generate_deletion_proof",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/kv/segment.rs",
+        "line": 164,
+        "decl": "pub fn generate_deletion_proof(&self, group_id: u64) -> Result<bool, ContextraError> {"
+      },
+      {
+        "name": "compute_checksum_v2",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/encode.rs",
+        "line": 179,
+        "decl": "pub fn compute_checksum_v2("
+      },
+      {
+        "name": "compute_checksum",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/encode.rs",
+        "line": 207,
+        "decl": "pub fn compute_checksum("
+      },
+      {
+        "name": "integrity_key_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/hmac.rs",
+        "line": 209,
+        "decl": "pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {"
+      },
+      {
+        "name": "arm_truncate_failure_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/io.rs",
+        "line": 946,
+        "decl": "pub fn arm_truncate_failure_for_test(&self) {"
+      },
+      {
+        "name": "MAX_WAL_SIZE",
+        "kind": "const",
+        "file": "/app/crates/contextra-store/src/wal/mod.rs",
+        "line": 310,
+        "decl": "pub const MAX_WAL_SIZE: u64 = 128 * 1024 * 1024;"
+      },
+      {
+        "name": "with_legacy_fallback",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/mod.rs",
+        "line": 359,
+        "decl": "pub fn with_legacy_fallback(mut self, allow: bool) -> Self {"
+      },
+      {
+        "name": "allow_legacy_fallback_for_test",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/mod.rs",
+        "line": 805,
+        "decl": "pub fn allow_legacy_fallback_for_test(&self) -> bool {"
+      },
+      {
+        "name": "open_loom",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/wal/mod.rs",
+        "line": 911,
+        "decl": "pub fn open_loom() -> Self {"
+      },
+      {
+        "name": "block_binary_search",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/sstable/block_search.rs",
+        "line": 190,
+        "decl": "pub fn block_binary_search("
+      },
+      {
+        "name": "set_format_version",
+        "kind": "fn",
+        "file": "/app/crates/contextra-store/src/sstable/builder.rs",
+        "line": 271,
+        "decl": "pub fn set_format_version(&mut self, version: u16) {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-sys",
+    "total_declarations": 44,
+    "dead_code_candidates_count": 0,
+    "candidates": []
+  },
+  {
+    "crate": "contextra-testkit",
+    "total_declarations": 98,
+    "dead_code_candidates_count": 9,
+    "candidates": [
+      {
+        "name": "trigger_crash",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/fault_vfs.rs",
+        "line": 97,
+        "decl": "pub fn trigger_crash(&self) {"
+      },
+      {
+        "name": "now_secs_f64",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/manual_clock.rs",
+        "line": 101,
+        "decl": "pub fn now_secs_f64(&self) -> f64 {"
+      },
+      {
+        "name": "commit_batch",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/reference_model.rs",
+        "line": 133,
+        "decl": "pub fn commit_batch(&mut self, ops: Vec<RefOp>) -> u64 {"
+      },
+      {
+        "name": "snapshot_seq",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/reference_model.rs",
+        "line": 140,
+        "decl": "pub fn snapshot_seq(&self) -> u64 {"
+      },
+      {
+        "name": "scan_range_at",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/reference_model.rs",
+        "line": 189,
+        "decl": "pub fn scan_range_at("
+      },
+      {
+        "name": "get_latest",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/reference_model.rs",
+        "line": 216,
+        "decl": "pub fn get_latest(&self, key: &[u8]) -> Option<Vec<u8>> {"
+      },
+      {
+        "name": "scan_prefix_latest",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/reference_model.rs",
+        "line": 222,
+        "decl": "pub fn scan_prefix_latest(&self, prefix: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {"
+      },
+      {
+        "name": "snapshot_map_at",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/reference_model.rs",
+        "line": 228,
+        "decl": "pub fn snapshot_map_at(&self, seq: u64) -> BTreeMap<Vec<u8>, Vec<u8>> {"
+      },
+      {
+        "name": "flush",
+        "kind": "fn",
+        "file": "/app/crates/contextra-testkit/src/in_memory_store.rs",
+        "line": 223,
+        "decl": "fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-text",
+    "total_declarations": 233,
+    "dead_code_candidates_count": 7,
+    "candidates": [
+      {
+        "name": "with_batch_size",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/stream.rs",
+        "line": 82,
+        "decl": "pub fn with_batch_size(mut self, n: usize) -> Self {"
+      },
+      {
+        "name": "is_exhausted",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/stream.rs",
+        "line": 135,
+        "decl": "pub fn is_exhausted(&self) -> bool {"
+      },
+      {
+        "name": "new_with_target",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/inverted/scanner.rs",
+        "line": 111,
+        "decl": "pub fn new_with_target(index: Arc<InvertedIndex<S>>, target: ScanTarget) -> Self {"
+      },
+      {
+        "name": "with_target",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/inverted/scanner.rs",
+        "line": 120,
+        "decl": "pub fn with_target(self, target: ScanTarget) -> Self {"
+      },
+      {
+        "name": "set_target",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/inverted/scanner.rs",
+        "line": 127,
+        "decl": "pub fn set_target(&self, target: ScanTarget) {"
+      },
+      {
+        "name": "new_with_all_domains",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/morphology/compound_splitter.rs",
+        "line": 115,
+        "decl": "pub fn new_with_all_domains() -> Self {"
+      },
+      {
+        "name": "extend_vocabulary",
+        "kind": "fn",
+        "file": "/app/crates/contextra-text/src/morphology/compound_splitter.rs",
+        "line": 123,
+        "decl": "pub fn extend_vocabulary(&mut self, words: impl IntoIterator<Item = impl AsRef<str>>) {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-types",
+    "total_declarations": 260,
+    "dead_code_candidates_count": 43,
+    "candidates": [
+      {
+        "name": "into_inner_checked",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/tenant_scope.rs",
+        "line": 51,
+        "decl": "pub fn into_inner_checked(self, expected: &TenantId) -> Result<T, TenantScopeViolation> {"
+      },
+      {
+        "name": "EraseRequest",
+        "kind": "struct",
+        "file": "/app/crates/contextra-types/src/erasure.rs",
+        "line": 116,
+        "decl": "pub struct EraseRequest {"
+      },
+      {
+        "name": "EraseReceipt",
+        "kind": "struct",
+        "file": "/app/crates/contextra-types/src/erasure.rs",
+        "line": 133,
+        "decl": "pub struct EraseReceipt {"
+      },
+      {
+        "name": "KeyCoverage",
+        "kind": "enum",
+        "file": "/app/crates/contextra-types/src/erasure.rs",
+        "line": 269,
+        "decl": "pub enum KeyCoverage {"
+      },
+      {
+        "name": "GateVariant",
+        "kind": "enum",
+        "file": "/app/crates/contextra-types/src/erasure.rs",
+        "line": 284,
+        "decl": "pub enum GateVariant {"
+      },
+      {
+        "name": "condition",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/erasure.rs",
+        "line": 409,
+        "decl": "pub fn condition(&self) -> RiskCondition {"
+      },
+      {
+        "name": "limit_exceeded",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 384,
+        "decl": "pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "snapshot_unsupported_for_signal",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 402,
+        "decl": "pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "kv_quantization",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 455,
+        "decl": "pub fn kv_quantization(msg: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "durability_config",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 461,
+        "decl": "pub fn durability_config(msg: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "wal_truncation_detected",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 485,
+        "decl": "pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {"
+      },
+      {
+        "name": "contextra_error_display_no_panic",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 511,
+        "decl": "fn contextra_error_display_no_panic() {"
+      },
+      {
+        "name": "into_inner",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/ids.rs",
+        "line": 38,
+        "decl": "pub fn into_inner(self) -> Vec<u8> {"
+      },
+      {
+        "name": "as_u8",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/schema.rs",
+        "line": 78,
+        "decl": "pub fn as_u8(self) -> u8 {"
+      },
+      {
+        "name": "is_compatible_with_current_build",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/schema.rs",
+        "line": 99,
+        "decl": "pub fn is_compatible_with_current_build(self) -> bool {"
+      },
+      {
+        "name": "try_reserve",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/budget.rs",
+        "line": 262,
+        "decl": "pub fn try_reserve(&self, tokens: usize) -> Result<()> {"
+      },
+      {
+        "name": "strategy_for_signal",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 79,
+        "decl": "pub fn strategy_for_signal(&self, signal_name: &str) -> FusionStrategy {"
+      },
+      {
+        "name": "text_only",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 388,
+        "decl": "pub fn text_only(text: impl Into<String>) -> Self {"
+      },
+      {
+        "name": "ScoredEntry",
+        "kind": "struct",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 410,
+        "decl": "pub struct ScoredEntry {"
+      },
+      {
+        "name": "with_fusion_strategy",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 549,
+        "decl": "pub fn with_fusion_strategy(mut self, strategy: impl Into<SignalFusionStrategies>) -> Self {"
+      },
+      {
+        "name": "with_include_provenance",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 579,
+        "decl": "pub fn with_include_provenance(mut self, include: bool) -> Self {"
+      },
+      {
+        "name": "with_rerank_pool_multiplier",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 585,
+        "decl": "pub fn with_rerank_pool_multiplier(mut self, multiplier: usize) -> Self {"
+      },
+      {
+        "name": "with_rerank_pool_max",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 591,
+        "decl": "pub fn with_rerank_pool_max(mut self, max: usize) -> Self {"
+      },
+      {
+        "name": "with_on_signal_failure",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 597,
+        "decl": "pub fn with_on_signal_failure(mut self, policy: OnSignalFailure) -> Self {"
+      },
+      {
+        "name": "prop_fusion_weights_never_panics",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 772,
+        "decl": "fn prop_fusion_weights_never_panics("
+      },
+      {
+        "name": "MAX_SEARCH_K",
+        "kind": "const",
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 90,
+        "decl": "pub const MAX_SEARCH_K: usize = 1_000;"
+      },
+      {
+        "name": "with_source_doc_id",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 227,
+        "decl": "pub fn with_source_doc_id(mut self, doc_id: DocId) -> Self {"
+      },
+      {
+        "name": "with_validity",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 287,
+        "decl": "pub fn with_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self {"
+      },
+      {
+        "name": "default_decay",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 336,
+        "decl": "pub fn default_decay(&self) -> crate::types::importance::DecayFunction {"
+      },
+      {
+        "name": "with_threshold",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 548,
+        "decl": "pub fn with_threshold(mut self, threshold: f32) -> Self {"
+      },
+      {
+        "name": "is_enabled",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 586,
+        "decl": "pub fn is_enabled(self) -> bool {"
+      },
+      {
+        "name": "DEFAULT",
+        "kind": "const",
+        "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
+        "line": 39,
+        "decl": "pub const DEFAULT: Self = Self(0);"
+      },
+      {
+        "name": "prop_docid_serialization",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+        "line": 177,
+        "decl": "fn prop_docid_serialization(id in proptest::num::u64::ANY) {"
+      },
+      {
+        "name": "doc_id_from_key_deterministic",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+        "line": 185,
+        "decl": "fn doc_id_from_key_deterministic(s in \"[a-zA-Z0-9_\\\\-]{1,256}\") {"
+      },
+      {
+        "name": "doc_id_from_key_never_panics",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+        "line": 192,
+        "decl": "fn doc_id_from_key_never_panics(s in \".*\") {"
+      },
+      {
+        "name": "doc_id_empty_key_is_err",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+        "line": 197,
+        "decl": "fn doc_id_empty_key_is_err(_ in \"\") {"
+      },
+      {
+        "name": "prop_txid_serialization",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+        "line": 202,
+        "decl": "fn prop_txid_serialization(id in proptest::num::u64::ANY) {"
+      },
+      {
+        "name": "prop_entityid_serialization",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+        "line": 210,
+        "decl": "fn prop_entityid_serialization(id in proptest::num::u64::ANY) {"
+      },
+      {
+        "name": "doc_id_valid_key_is_ok",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+        "line": 142,
+        "decl": "fn doc_id_valid_key_is_ok() {"
+      },
+      {
+        "name": "doc_id_from_empty_returns_err",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+        "line": 149,
+        "decl": "fn doc_id_from_empty_returns_err() {"
+      },
+      {
+        "name": "tx_id_ordering_is_consistent",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+        "line": 162,
+        "decl": "fn tx_id_ordering_is_consistent() {"
+      },
+      {
+        "name": "prop_tx_id_range_isolation",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+        "line": 418,
+        "decl": "fn prop_tx_id_range_isolation(offset in 0u64..=1_000_000u64) {"
+      },
+      {
+        "name": "prop_tx_id_overflow_isolation",
+        "kind": "fn",
+        "file": "/app/crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+        "line": 427,
+        "decl": "fn prop_tx_id_overflow_isolation(offset in 1_000_001u64..=u64::MAX) {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-vector",
+    "total_declarations": 326,
+    "dead_code_candidates_count": 8,
+    "candidates": [
+      {
+        "name": "with_batch_size",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/candidate_stream.rs",
+        "line": 69,
+        "decl": "pub fn with_batch_size(mut self, n: usize) -> Self {"
+      },
+      {
+        "name": "fetched_depth",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/candidate_stream.rs",
+        "line": 113,
+        "decl": "pub fn fetched_depth(&self) -> usize {"
+      },
+      {
+        "name": "is_exhausted",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/candidate_stream.rs",
+        "line": 118,
+        "decl": "pub fn is_exhausted(&self) -> bool {"
+      },
+      {
+        "name": "q_range",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/persistence/header.rs",
+        "line": 227,
+        "decl": "pub fn q_range(&self) -> (f32, f32) {"
+      },
+      {
+        "name": "check_drift",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/quantize/mod.rs",
+        "line": 257,
+        "decl": "pub fn check_drift(&self, vector: &[f32]) -> f32 {"
+      },
+      {
+        "name": "from_vectors",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/acorn/naive_reference.rs",
+        "line": 35,
+        "decl": "pub fn from_vectors(vectors: Vec<(DocId, Vec<f32>)>) -> Self {"
+      },
+      {
+        "name": "set_fault_injection_insert_target",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/hnsw/types.rs",
+        "line": 355,
+        "decl": "pub fn set_fault_injection_insert_target(&self, target: u64) {"
+      },
+      {
+        "name": "all_doc_ids_from_map",
+        "kind": "fn",
+        "file": "/app/crates/contextra-vector/src/hnsw/types.rs",
+        "line": 478,
+        "decl": "pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-wire",
+    "total_declarations": 168,
+    "dead_code_candidates_count": 1,
+    "candidates": [
+      {
+        "name": "into_inner",
+        "kind": "fn",
+        "file": "/app/crates/contextra-wire/src/adapter.rs",
+        "line": 71,
+        "decl": "pub fn into_inner(self) -> Bytes {"
+      }
+    ]
+  }
+]

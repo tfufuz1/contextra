@@ -1,0 +1,3298 @@
+# Async Boundary & Concurrency Scanner (M8 / INV-LOCK-ORDER-1)
+
+> Generiert durch `tools/async_boundary_scanner.py`.
+> Regel M8: Ring 0 und Speicherkerne halten ihre Logik synchron. Async nur an der Port-Grenze.
+
+## Crate Übersicht (Produktivpfade)
+
+| Crate | Sync Mandat (M8) | async fn | .await | tokio:: | block_on | Lock across Await |
+|---|---|---|---|---|---|---|
+| `contextra` | Nein | 13 | 24 | 4 | 0 | 0 |
+| `contextra-adapt` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-agent` | Nein | 37 | 127 | 21 | 0 | 0 |
+| `contextra-audit-export` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-avv-generator` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-checkpoint` | Nein | 50 | 97 | 25 | 5 | 23 |
+| `contextra-cognition` | Nein | 59 | 131 | 51 | 2 | 3 |
+| `contextra-core` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-crypto` | **MANDAT** | 3 | 3 | 8 | 2 | 1 |
+| `contextra-db` | Nein | 30 | 153 | 32 | 0 | 3 |
+| `contextra-durable-fs` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-engine` | Nein | 186 | 558 | 72 | 2 | 40 |
+| `contextra-erasure` | Nein | 13 | 63 | 2 | 0 | 20 |
+| `contextra-graph` | Nein | 58 | 137 | 30 | 1 | 0 |
+| `contextra-infer-candle` | Nein | 24 | 42 | 48 | 3 | 0 |
+| `contextra-infer-ollama` | Nein | 44 | 152 | 76 | 0 | 0 |
+| `contextra-infer-onnx` | Nein | 17 | 30 | 17 | 0 | 2 |
+| `contextra-ingest` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-kvcache` | Nein | 2 | 12 | 4 | 2 | 2 |
+| `contextra-license` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-mcp` | Nein | 18 | 58 | 18 | 3 | 0 |
+| `contextra-mvcc` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-ports` | **MANDAT** | 50 | 49 | 10 | 0 | 0 |
+| `contextra-privacy` | Nein | 42 | 51 | 33 | 0 | 0 |
+| `contextra-py` | Nein | 0 | 0 | 5 | 33 | 0 |
+| `contextra-rank` | **MANDAT** | 1 | 1 | 0 | 0 | 0 |
+| `contextra-router` | Nein | 5 | 10 | 5 | 0 | 0 |
+| `contextra-sandbox` | Nein | 5 | 9 | 9 | 0 | 0 |
+| `contextra-simd` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-store` | Nein | 165 | 595 | 212 | 9 | 94 |
+| `contextra-sys` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-testkit` | Nein | 29 | 153 | 6 | 0 | 0 |
+| `contextra-text` | Nein | 47 | 120 | 2 | 2 | 2 |
+| `contextra-types` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-vector` | Nein | 57 | 60 | 7 | 2 | 14 |
+| `contextra-wire` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+
+## Auffälligkeiten & M8-Abweichungen
+
+### `contextra-checkpoint`
+
+- `/app/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:11` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:12` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:14` [await_expr]: `let store = PersistentCheckpointStore::open(storage, "demo_namespace").await?;`
+- `/app/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:26` [await_expr]: `.await?;`
+- `/app/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:30` [await_expr]: `let listed = store.list_checkpoints().await?;`
+- `/app/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:34` [await_expr]: `if let Some(cp) = store.get_checkpoint("demo_cp").await? {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:62` [tokio_import]: `use tokio::fs;`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:68` [async_fn]: `pub async fn create_dir_all<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:72` [async_fn]: `pub async fn read_dir<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomReadDir> {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:76` [async_fn]: `pub async fn metadata<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomMetadata> {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:83` [async_fn]: `pub async fn remove_file<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:87` [async_fn]: `pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:94` [async_fn]: `pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(_from: P, _to: Q) -> std::io::Result<u64> {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:100` [async_fn]: `pub async fn next_entry(&mut self) -> std::io::Result<Option<LoomDirEntry>> {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:210` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:214` [await_expr]: `let mut read_dir = fs::read_dir(source_dir).await.map_err(ContextraError::Io)?;`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:218` [await_expr]: `while let Some(entry) = read_dir.next_entry().await.map_err(ContextraError::Io)? {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:235` [await_expr]: `if fs::metadata(&target_path).await.is_ok() {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:236` [await_expr]: `let _ = fs::remove_file(&target_path).await;`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:240` [await_expr]: `if let Err(io_err) = fs::hard_link(&path, &target_path).await {`
+- `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:247` [await_expr]: `if let Err(copy_err) = fs::copy(&path, &target_path).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:143` [async_fn]: `async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(`
+- `/app/crates/contextra-checkpoint/src/store.rs:148` [await_expr]: `let entries = storage.scan_prefix(prefix.as_bytes()).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:169` [await_expr]: `if let Ok(last_tx) = storage.last_tx_id().await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:177` [await_expr]: `let persisted_val: Option<u64> = match storage.get(counter_key.as_bytes()).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:203` [async_fn]: `async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(`
+- `/app/crates/contextra-checkpoint/src/store.rs:215` [await_expr]: `storage.put(tx, key.as_bytes(), &bytes).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:216` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:217` [await_expr]: `storage.flush().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:239` [tokio_import]: `write_lock: tokio::sync::Mutex<()>,`
+- `/app/crates/contextra-checkpoint/src/store.rs:245` [tokio_import]: `hwm_lock: tokio::sync::Mutex<()>,`
+- `/app/crates/contextra-checkpoint/src/store.rs:268` [async_fn]: `pub async fn open_and_recover(`
+- `/app/crates/contextra-checkpoint/src/store.rs:275` [await_expr]: `Self::open_and_recover_with_orphan_registry(storage, ns, orphan_registry).await`
+- `/app/crates/contextra-checkpoint/src/store.rs:279` [async_fn]: `pub async fn open_and_recover_with_orphan_registry(`
+- `/app/crates/contextra-checkpoint/src/store.rs:284` [await_expr]: `let store = Self::open_with_orphan_registry(storage, namespace, orphan_registry).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:285` [await_expr]: `let recovered_pins = store.recover_orphaned_pins().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:286` [await_expr]: `let recovered_checkpoints = store.recover_orphaned_checkpoints().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:295` [async_fn]: `pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:299` [await_expr]: `Self::open_with_orphan_registry(storage, ns, orphan_registry).await`
+- `/app/crates/contextra-checkpoint/src/store.rs:303` [async_fn]: `pub async fn open_with_orphan_registry(`
+- `/app/crates/contextra-checkpoint/src/store.rs:309` [await_expr]: `let (start_raw, initial_hwm) = determine_tx_counter_bounds(&storage, &namespace).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:319` [tokio_import]: `write_lock: tokio::sync::Mutex::new(()),`
+- `/app/crates/contextra-checkpoint/src/store.rs:322` [tokio_import]: `hwm_lock: tokio::sync::Mutex::new(()),`
+- `/app/crates/contextra-checkpoint/src/store.rs:350` [tokio_import]: `let res = if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/app/crates/contextra-checkpoint/src/store.rs:351` [tokio_import]: `if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {`
+- `/app/crates/contextra-checkpoint/src/store.rs:352` [tokio_import]: `tokio::task::block_in_place(|| {`
+- `/app/crates/contextra-checkpoint/src/store.rs:353` [block_on]: `handle.block_on(Self::open_with_orphan_registry(`
+- `/app/crates/contextra-checkpoint/src/store.rs:361` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-checkpoint/src/store.rs:365` [block_on]: `rt.block_on(Self::open_with_orphan_registry(`
+- `/app/crates/contextra-checkpoint/src/store.rs:380` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-checkpoint/src/store.rs:386` [block_on]: `rt.block_on(Self::open_with_orphan_registry(`
+- `/app/crates/contextra-checkpoint/src/store.rs:411` [async_fn]: `pub async fn allocate_tx(&self) -> Result<TxId> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:421` [await_expr]: `let _guard = self.hwm_lock.lock().await;`
+- `/app/crates/contextra-checkpoint/src/store.rs:421` [lock_held_across_await_warning]: `Lock acquired at line 421 near await at line 421`
+- `/app/crates/contextra-checkpoint/src/store.rs:425` [await_expr]: `persist_hwm_internal(&self.storage, &self.namespace, new_hwm).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:425` [lock_held_across_await_warning]: `Lock acquired at line 421 near await at line 425`
+- `/app/crates/contextra-checkpoint/src/store.rs:515` [async_fn]: `pub async fn create_checkpoint(`
+- `/app/crates/contextra-checkpoint/src/store.rs:536` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/app/crates/contextra-checkpoint/src/store.rs:536` [lock_held_across_await_warning]: `Lock acquired at line 536 near await at line 536`
+- `/app/crates/contextra-checkpoint/src/store.rs:538` [await_expr]: `let old_checkpoint = self.get_checkpoint_internal(name).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:538` [lock_held_across_await_warning]: `Lock acquired at line 536 near await at line 538`
+- `/app/crates/contextra-checkpoint/src/store.rs:541` [await_expr]: `.await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:541` [lock_held_across_await_warning]: `Lock acquired at line 536 near await at line 541`
+- `/app/crates/contextra-checkpoint/src/store.rs:545` [await_expr]: `if let Err(e) = self.storage.unpin_checkpoint(old.seq_no).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:545` [lock_held_across_await_warning]: `Lock acquired at line 536 near await at line 545`
+- `/app/crates/contextra-checkpoint/src/store.rs:573` [async_fn]: `async fn save_checkpoint_with_pin_guard(`
+- `/app/crates/contextra-checkpoint/src/store.rs:584` [await_expr]: `.await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:586` [await_expr]: `if let Err(e) = self.save_checkpoint_internal(meta.clone()).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:587` [await_expr]: `if let Err(unpin_err) = pin_guard.unpin().await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:611` [async_fn]: `pub async fn drop_checkpoint(&self, name: &str) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:613` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/app/crates/contextra-checkpoint/src/store.rs:613` [lock_held_across_await_warning]: `Lock acquired at line 613 near await at line 613`
+- `/app/crates/contextra-checkpoint/src/store.rs:615` [await_expr]: `if let Some(checkpoint) = self.get_checkpoint_internal(name).await? {`
+- `/app/crates/contextra-checkpoint/src/store.rs:615` [lock_held_across_await_warning]: `Lock acquired at line 613 near await at line 615`
+- `/app/crates/contextra-checkpoint/src/store.rs:620` [await_expr]: `let unique_tx = self.allocate_tx().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:620` [lock_held_across_await_warning]: `Lock acquired at line 613 near await at line 620`
+- `/app/crates/contextra-checkpoint/src/store.rs:622` [await_expr]: `if let Err(e) = self.storage.delete(unique_tx, key.as_bytes()).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:622` [lock_held_across_await_warning]: `Lock acquired at line 613 near await at line 622`
+- `/app/crates/contextra-checkpoint/src/store.rs:623` [await_expr]: `if let Err(rb_err) = self.storage.rollback(unique_tx).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:623` [lock_held_across_await_warning]: `Lock acquired at line 613 near await at line 623`
+- `/app/crates/contextra-checkpoint/src/store.rs:628` [await_expr]: `if let Err(e) = self.storage.commit(unique_tx).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:629` [await_expr]: `if let Err(rb_err) = self.storage.rollback(unique_tx).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:636` [await_expr]: `if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:650` [async_fn]: `async fn save_checkpoint_internal(&self, meta: CheckpointMeta) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:656` [await_expr]: `let tx = self.allocate_tx().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:657` [await_expr]: `if let Err(e) = self.storage.put(tx, key.as_bytes(), &value).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:658` [await_expr]: `if let Err(rb_err) = self.storage.rollback(tx).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:663` [await_expr]: `if let Err(e) = self.storage.commit(tx).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:664` [await_expr]: `if let Err(rb_err) = self.storage.rollback(tx).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:676` [async_fn]: `async fn get_checkpoint_internal(&self, name: &str) -> Result<Option<CheckpointMeta>> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:684` [await_expr]: `match self.storage.get(key.as_bytes()).await? {`
+- `/app/crates/contextra-checkpoint/src/store.rs:684` [lock_held_across_await_warning]: `Lock acquired at line 678 near await at line 684`
+- `/app/crates/contextra-checkpoint/src/store.rs:710` [async_fn]: `pub async fn list_checkpoints(&self) -> Result<Vec<CheckpointMeta>> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:712` [await_expr]: `let entries: Vec<(Vec<u8>, Vec<u8>)> = self.storage.scan_prefix(prefix.as_bytes()).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:744` [async_fn]: `pub async fn get_checkpoint(&self, name: &str) -> Result<Option<CheckpointMeta>> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:746` [await_expr]: `self.get_checkpoint_internal(name).await`
+- `/app/crates/contextra-checkpoint/src/store.rs:746` [lock_held_across_await_warning]: `Lock acquired at line 732 near await at line 746`
+- `/app/crates/contextra-checkpoint/src/store.rs:756` [async_fn]: `pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:758` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/app/crates/contextra-checkpoint/src/store.rs:758` [lock_held_across_await_warning]: `Lock acquired at line 758 near await at line 758`
+- `/app/crates/contextra-checkpoint/src/store.rs:762` [await_expr]: `.await?`
+- `/app/crates/contextra-checkpoint/src/store.rs:762` [lock_held_across_await_warning]: `Lock acquired at line 758 near await at line 762`
+- `/app/crates/contextra-checkpoint/src/store.rs:765` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:765` [lock_held_across_await_warning]: `Lock acquired at line 758 near await at line 765`
+- `/app/crates/contextra-checkpoint/src/store.rs:776` [await_expr]: `self.storage.rollback_to_tx(meta.tx_id).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:779` [await_expr]: `self.list_checkpoints().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:790` [async_fn]: `pub async fn flush_orphan_registry(&self) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:793` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/store.rs:798` [async_fn]: `pub async fn shutdown(&self) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:799` [await_expr]: `self.flush_orphan_registry().await`
+- `/app/crates/contextra-checkpoint/src/store.rs:803` [async_fn]: `pub async fn close(&self) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:804` [await_expr]: `self.shutdown().await`
+- `/app/crates/contextra-checkpoint/src/store.rs:840` [async_fn]: `pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:844` [await_expr]: `if let Err(e) = self.storage.unpin_checkpoint(orphan.seq_no).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:864` [async_fn]: `pub async fn recover_orphaned_checkpoints(&self) -> Result<Vec<TxId>> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:865` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/app/crates/contextra-checkpoint/src/store.rs:865` [lock_held_across_await_warning]: `Lock acquired at line 865 near await at line 865`
+- `/app/crates/contextra-checkpoint/src/store.rs:869` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:869` [lock_held_across_await_warning]: `Lock acquired at line 865 near await at line 869`
+- `/app/crates/contextra-checkpoint/src/store.rs:873` [await_expr]: `if let Err(e) = self.storage.rollback_to_tx(cp.tx_id).await {`
+- `/app/crates/contextra-checkpoint/src/store.rs:873` [lock_held_across_await_warning]: `Lock acquired at line 865 near await at line 873`
+- `/app/crates/contextra-checkpoint/src/store.rs:895` [async_fn]: `pub async fn create_hardlink_clone(`
+- `/app/crates/contextra-checkpoint/src/store.rs:905` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/store.rs:912` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/app/crates/contextra-checkpoint/src/store.rs:912` [lock_held_across_await_warning]: `Lock acquired at line 912 near await at line 912`
+- `/app/crates/contextra-checkpoint/src/store.rs:913` [await_expr]: `self.save_checkpoint_internal(meta).await`
+- `/app/crates/contextra-checkpoint/src/store.rs:913` [lock_held_across_await_warning]: `Lock acquired at line 912 near await at line 913`
+- `/app/crates/contextra-checkpoint/src/store.rs:923` [await_expr]: `let all = self.list_checkpoints().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:923` [lock_held_across_await_warning]: `Lock acquired at line 919 near await at line 923`
+- `/app/crates/contextra-checkpoint/src/store.rs:929` [await_expr]: `Box::pin(async move { self.list_checkpoints().await })`
+- `/app/crates/contextra-checkpoint/src/store.rs:929` [lock_held_across_await_warning]: `Lock acquired at line 919 near await at line 929`
+- `/app/crates/contextra-checkpoint/src/store.rs:937` [await_expr]: `Box::pin(async move { self.recover_orphaned_pins().await })`
+- `/app/crates/contextra-checkpoint/src/store.rs:941` [await_expr]: `Box::pin(async move { self.recover_orphaned_checkpoints().await })`
+- `/app/crates/contextra-checkpoint/src/store.rs:945` [await_expr]: `Box::pin(async move { self.flush_orphan_registry().await })`
+- `/app/crates/contextra-checkpoint/src/store.rs:954` [async_fn]: `async fn create_named_checkpoint(`
+- `/app/crates/contextra-checkpoint/src/store.rs:963` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/store.rs:966` [async_fn]: `async fn restore_named_checkpoint(&self, name: &str) -> Result<Self::Meta> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:967` [await_expr]: `self.restore_checkpoint(name).await`
+- `/app/crates/contextra-checkpoint/src/store.rs:970` [async_fn]: `async fn drop_named_checkpoint(&self, name: &str) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:971` [await_expr]: `self.drop_checkpoint(name).await`
+- `/app/crates/contextra-checkpoint/src/store.rs:974` [async_fn]: `async fn list_named_checkpoints(&self) -> Result<Vec<Self::Meta>> {`
+- `/app/crates/contextra-checkpoint/src/store.rs:975` [await_expr]: `self.list_checkpoints().await`
+- `/app/crates/contextra-checkpoint/src/store.rs:984` [await_expr]: `let seq_no = self.storage.last_seq_no().await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:994` [await_expr]: `self.storage.rollback_to_tx(state.tx).await?;`
+- `/app/crates/contextra-checkpoint/src/store.rs:995` [await_expr]: `self.list_checkpoints().await?;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:56` [async_fn]: `pub async fn pin(`
+- `/app/crates/contextra-checkpoint/src/guard.rs:62` [await_expr]: `Self::pin_with_clock(storage, seq_no, orphan_registry, clock).await`
+- `/app/crates/contextra-checkpoint/src/guard.rs:74` [async_fn]: `pub async fn pin_with_clock(`
+- `/app/crates/contextra-checkpoint/src/guard.rs:81` [await_expr]: `storage.pin_checkpoint(seq_no).await?;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:108` [async_fn]: `pub async fn unpin(mut self) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:110` [await_expr]: `self.storage.unpin_checkpoint(seq_no).await?;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:112` [await_expr]: `if let Err(err) = self.orphan_registry.flush_orphan_registry().await {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:151` [await_expr]: `#[must_use = "CheckpointGuard must be explicitly finalized via .commit() or .rollback().await"]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:273` [async_fn]: `pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:275` [await_expr]: `Self::for_agent_step_with_clock(storage, tx, clock).await`
+- `/app/crates/contextra-checkpoint/src/guard.rs:279` [async_fn]: `pub async fn for_agent_step_with_registry(`
+- `/app/crates/contextra-checkpoint/src/guard.rs:299` [async_fn]: `pub async fn for_agent_step_with_clock(`
+- `/app/crates/contextra-checkpoint/src/guard.rs:350` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:352` [await_expr]: `if let Err(err) = reg.flush_orphan_registry().await {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:374` [async_fn]: `pub async fn rollback(mut self) -> Result<()> {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:388` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:397` [await_expr]: `let res = self.storage.rollback_to_tx(cp.tx_id).await;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:398` [await_expr]: `if let Err(err) = self.orphan_registry.flush_orphan_registry().await {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:419` [tokio_import]: `if tokio::runtime::Handle::try_current().is_ok() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:421` [await_expr]: `"Cannot call rollback_blocking from within an active async Tokio runtime context; use rollback().await instead"`
+- `/app/crates/contextra-checkpoint/src/guard.rs:444` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-checkpoint/src/guard.rs:453` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:454` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:462` [await_expr]: `self.storage.rollback_to_tx(cp.tx_id).await`
+- `/app/crates/contextra-checkpoint/src/guard.rs:543` [await_expr]: `Box::pin(async move { self.get(key).await })`
+- `/app/crates/contextra-checkpoint/src/guard.rs:634` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-checkpoint/src/guard.rs:639` [block_on]: `let guard = rt.block_on(async {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:641` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/guard.rs:679` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:680` [async_fn]: `async fn test_rollback_blocking_in_async_context_returns_error() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:690` [tokio_import]: `let res = tokio::time::timeout(std::time::Duration::from_secs(2), async move {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:693` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/guard.rs:702` [await_expr]: `assert!(msg.contains("rollback().await"));`
+- `/app/crates/contextra-checkpoint/src/guard.rs:705` [await_expr]: `"Expected ContextraError::Internal error message instructing to use rollback().await"`
+- `/app/crates/contextra-checkpoint/src/guard.rs:711` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:712` [async_fn]: `async fn test_checkpoint_guard_for_agent_step() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:715` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/guard.rs:728` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:729` [async_fn]: `async fn checkpoint_guard_CASE_uncommitted_guard_holds_state() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:747` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:748` [async_fn]: `async fn checkpoint_guard_CASE_commit_moves_ownership() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:769` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:770` [async_fn]: `async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:813` [await_expr]: `let res = consumed_guard3.rollback().await;`
+- `/app/crates/contextra-checkpoint/src/guard.rs:818` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:819` [async_fn]: `async fn test_checkpoint_metrics_commit_duration() {`
+- `/app/crates/contextra-checkpoint/src/guard.rs:853` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-checkpoint/src/guard.rs:854` [async_fn]: `async fn test_checkpoint_metrics_drop_rollback_duration() {`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:179` [async_fn]: `pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:188` [await_expr]: `if let Err(e) = storage.unpin_checkpoint(pin_id).await {`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:479` [async_fn]: `pub async fn flush_orphan_registry(&self) -> std::io::Result<()> {`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:492` [tokio_import]: `let res = if tokio::runtime::Handle::try_current().is_ok() {`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:493` [tokio_import]: `tokio::task::spawn_blocking(move || state.persist_sync())`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:494` [await_expr]: `.await`
+- `/app/crates/contextra-checkpoint/src/orphan.rs:642` [async_fn]: `pub async fn await_pending_rollbacks() {}`
+### `contextra-cognition`
+
+- `/app/crates/contextra-cognition/examples/standalone_consolidation.rs:12` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-cognition/examples/standalone_consolidation.rs:13` [async_fn]: `async fn main() -> Result<()> {`
+- `/app/crates/contextra-cognition/examples/standalone_consolidation.rs:44` [await_expr]: `let segments = channel.send_pre_condensed(&tenant_id, &[input]).await?;`
+- `/app/crates/contextra-cognition/examples/standalone_consolidation.rs:47` [await_expr]: `if let Some((tenant, inputs)) = rx.recv().await {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:124` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:125` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:127` [tokio_import]: `let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:128` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:137` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:139` [await_expr]: `self.run_tick().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:153` [async_fn]: `async fn tick_decay_eviction(&self) {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:159` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:192` [async_fn]: `async fn tick_percolation_check(&self) {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:199` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:222` [async_fn]: `async fn tick_background_consolidation(&self) {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:242` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:263` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:299` [async_fn]: `pub async fn run_tick(&self) {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:302` [await_expr]: `if let Err(err) = write_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:311` [await_expr]: `self.tick_decay_eviction().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:313` [await_expr]: `self.tick_percolation_check().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:314` [await_expr]: `self.tick_background_consolidation().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:317` [await_expr]: `complete_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:330` [async_fn]: `async fn write_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:342` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:343` [await_expr]: `collection.storage().commit(tx).await?;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:347` [async_fn]: `async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:359` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:360` [await_expr]: `collection.storage().commit(tx).await?;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:376` [tokio_import]: `use tokio::time::sleep;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:378` [async_fn]: `async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:395` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:396` [async_fn]: `async fn test_maintenance_scheduler_tick_writes_wal_intent() {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:397` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:414` [await_expr]: `scheduler.run_tick().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:418` [await_expr]: `let entries = col.storage().scan_prefix(&prefix).await.unwrap();`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:430` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:431` [async_fn]: `async fn test_maintenance_scheduler_step_isolation_on_error() {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:432` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:449` [await_expr]: `scheduler.run_tick().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:453` [await_expr]: `let entries = col.storage().scan_prefix(&prefix).await.unwrap();`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:460` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:461` [async_fn]: `async fn test_maintenance_scheduler_background_task_and_cancellation() {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:462` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:481` [await_expr]: `sleep(Duration::from_millis(50)).await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:484` [await_expr]: `let res = handle.await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:493` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:494` [async_fn]: `async fn test_active_sessions_tracking() {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:495` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:527` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:528` [async_fn]: `async fn test_maintenance_scheduler_with_custom_clock() {`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:529` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:548` [await_expr]: `scheduler.run_tick().await;`
+- `/app/crates/contextra-cognition/src/maintenance_scheduler.rs:551` [await_expr]: `let entries = col.storage().scan_prefix(&prefix).await.unwrap();`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:61` [async_fn]: `pub async fn run_synthesis_pass(`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:91` [await_expr]: `match synthesizer.synthesize_segment(&text_refs).await {`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:166` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:167` [async_fn]: `async fn test_synthesis_pass_empty_segments_returns_empty() {`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:169` [await_expr]: `let res = run_synthesis_pass(&[], &[], &synthesizer, 3).await;`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:177` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:178` [async_fn]: `async fn test_synthesis_pass_too_short_segments_skipped() {`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:186` [await_expr]: `let res = run_synthesis_pass(&[segment], &texts, &synthesizer, 3).await;`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:194` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:195` [async_fn]: `async fn test_synthesis_pass_llm_error_increments_skipped_not_err() {`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:207` [await_expr]: `let res = run_synthesis_pass(&[segment], &texts, &synthesizer, 3).await;`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:215` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:216` [async_fn]: `async fn test_synthesis_pass_synthesized_chunk_has_correct_source_ids() {`
+- `/app/crates/contextra-cognition/src/synthesis_phase.rs:224` [await_expr]: `let res = run_synthesis_pass(&[segment], &texts, &synthesizer, 3).await;`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:535` [async_fn]: `async fn synthesize_single_community(`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:549` [await_expr]: `match llm.generate(&prompt_builder).await {`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:591` [async_fn]: `pub async fn run_structural_synthesis_pass(`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:627` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1077` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1078` [async_fn]: `async fn test_run_synthesis_pass_community_under_min_size_ignored() {`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1097` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1131` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1132` [async_fn]: `async fn test_run_synthesis_pass_max_llm_calls_per_cycle_limits_and_defers() {`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1155` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1172` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1173` [async_fn]: `async fn test_run_synthesis_pass_meta_chunk_has_required_prefix_and_abstracts_from() {`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1195` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1211` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1212` [async_fn]: `async fn test_run_synthesis_pass_error_on_one_community_continues_others() {`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1237` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1261` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1262` [async_fn]: `async fn test_run_synthesis_pass_ungrounded_response_discarded() {`
+- `/app/crates/contextra-cognition/src/memory_consolidation.rs:1289` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_locks.rs:35` [tokio_import]: `use tokio::sync::MutexGuard;`
+- `/app/crates/contextra-cognition/src/consolidation_locks.rs:80` [async_fn]: `pub async fn cascade_invalidate_edges_ordered(`
+- `/app/crates/contextra-cognition/src/consolidation_locks.rs:103` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/semantic_aggregation_facade.rs:58` [async_fn]: `pub async fn consolidate_semantic_hyperedges<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/semantic_aggregation_facade.rs:74` [await_expr]: `let entries = collection.storage().scan_prefix(&user_key_prefix).await?;`
+- `/app/crates/contextra-cognition/src/semantic_aggregation_facade.rs:91` [await_expr]: `match embedder.embed(text).await {`
+- `/app/crates/contextra-cognition/src/semantic_aggregation_facade.rs:123` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/aggregation_phase.rs:407` [async_fn]: `async fn synthesize_alpha_nodes(`
+- `/app/crates/contextra-cognition/src/aggregation_phase.rs:428` [await_expr]: `match llm.generate(&prompt).await {`
+- `/app/crates/contextra-cognition/src/aggregation_phase.rs:561` [async_fn]: `pub async fn run_aggregation_pass(`
+- `/app/crates/contextra-cognition/src/aggregation_phase.rs:603` [await_expr]: `let alpha_nodes = synthesize_alpha_nodes(&final_clusters, cfg, llm, tracker).await;`
+- `/app/crates/contextra-cognition/src/channel.rs:11` [tokio_import]: `use tokio::sync::mpsc;`
+- `/app/crates/contextra-cognition/src/channel.rs:59` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:85` [async_fn]: `async fn apply_duplicate_supersessions<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:91` [await_expr]: `let user_id = match collection.storage().get(&doc_key).await {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:109` [await_expr]: `match collection.delete(&user_id).await {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:125` [async_fn]: `pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:159` [tokio_import]: `tokio::task::spawn_blocking(move || run_consolidation_pass(&turns_owned, &config_owned))`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:160` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:168` [await_expr]: `apply_duplicate_supersessions(collection, &result.duplicates_superseded).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:174` [await_expr]: `.await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:215` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:216` [tokio_import]: `tokio::task::block_in_place(move || handle.block_on(future))`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:216` [block_on]: `tokio::task::block_in_place(move || handle.block_on(future))`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:245` [async_fn]: `pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:264` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:267` [async_fn]: `async fn build_stable_community_list<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:276` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:303` [async_fn]: `async fn fetch_community_source_texts<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:314` [await_expr]: `if let Ok(Some(val)) = collection.storage().get(&doc_key).await {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:316` [await_expr]: `if let Ok(Some(doc)) = collection.get(&meta.id).await {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:334` [async_fn]: `async fn persist_synthesized_meta_chunks<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:355` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:358` [await_expr]: `let _ = collection.put_kv(&chunk_id, &metadata).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:372` [async_fn]: `pub async fn execute_background_consolidation_with_rich_validator<`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:386` [await_expr]: `execute_consolidation_pass(collection, turns, consolidation_config).await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:399` [await_expr]: `build_stable_community_list(collection, synth_cfg, tracker).await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:400` [await_expr]: `let source_texts = fetch_community_source_texts(collection, &stable_communities).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:418` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:420` [await_expr]: `persist_synthesized_meta_chunks(collection, &synth_res).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:434` [async_fn]: `pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:445` [await_expr]: `run_aggregation_pass(nodes, edges, cfg, llm, tracker, &mut sink).await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:452` [async_fn]: `pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:469` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:481` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:503` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:526` [tokio_import]: `stability_tracker: Arc<tokio::sync::Mutex<CommunityStabilityTracker>>,`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:548` [tokio_import]: `stability_tracker: Arc::new(tokio::sync::Mutex::new(CommunityStabilityTracker::new())),`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:577` [tokio_import]: `pub fn start(self: Arc<Self>) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:578` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:579` [await_expr]: `self.run().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:590` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:602` [async_fn]: `pub async fn run(&self) {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:603` [tokio_import]: `let mut ticker = tokio::time::interval(self.interval);`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:604` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:613` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:615` [await_expr]: `if let Err(err) = self.run_cycle().await {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:634` [async_fn]: `async fn scan_collection_turns(&self) -> Result<Vec<(DocId, Vec<f32>)>> {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:640` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:670` [tokio_import]: `tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:671` [tokio_import]: `let handle = tokio::runtime::Handle::current();`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:673` [block_on]: `handle.block_on(async {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:683` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:695` [async_fn]: `async fn execute_leanrag_stage_if_configured(&self, turns: &[(DocId, Vec<f32>)]) {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:740` [async_fn]: `pub async fn run_cycle(`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:764` [await_expr]: `let turns = self.scan_collection_turns().await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:778` [await_expr]: `let mut tracker_guard = self.stability_tracker.lock().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:778` [lock_held_across_await_warning]: `Lock acquired at line 778 near await at line 778`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:803` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:812` [await_expr]: `.await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:815` [await_expr]: `self.execute_leanrag_stage_if_configured(&turns).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:871` [async_fn]: `async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:891` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:892` [async_fn]: `async fn test_consolidation_engine_concurrency_no_deadlock() {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:893` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:911` [tokio_import]: `insert_handles.push(tokio::spawn(async move {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:920` [await_expr]: `let _ = col_clone.insert(&id, &vec, Some(json!({"fg": true}))).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:921` [await_expr]: `let _ = col_clone.query().embedding(&vec).k(5).execute().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:926` [await_expr]: `h.await.expect("join handle");`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:932` [await_expr]: `let res = engine.run_cycle().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:936` [await_expr]: `let _ = engine_handle.await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:939` [await_expr]: `assert_eq!(col.len().await, 20);`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:944` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:945` [async_fn]: `async fn test_consolidation_engine_fault_injection_resume() {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:946` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:958` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:967` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:971` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:992` [await_expr]: `let cycle1 = engine.run_cycle().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1008` [await_expr]: `let cycle2 = engine.run_cycle().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1020` [await_expr]: `let cycle3 = engine.run_cycle().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1028` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1029` [async_fn]: `async fn test_execute_consolidation_pass_skips_when_guard_locked() {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1030` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1044` [await_expr]: `let res = execute_consolidation_pass(col.as_ref(), &turns, &config).await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1053` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1054` [async_fn]: `async fn test_consolidation_nodes_guard_deadlock_regression() {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1055` [await_expr]: `let col = create_test_collection().await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1060` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1063` [await_expr]: `col.relate("doc_1", "doc_2", "link").await.expect("relate");`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1064` [await_expr]: `col.relate("doc_2", "doc_3", "link").await.expect("relate");`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1065` [await_expr]: `col.relate("doc_3", "doc_4", "link").await.expect("relate");`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1074` [tokio_import]: `let task1 = tokio::spawn(async move {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1081` [await_expr]: `.await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1085` [tokio_import]: `let task2 = tokio::spawn(async move {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1092` [await_expr]: `.await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1096` [tokio_import]: `let result = tokio::time::timeout(Duration::from_secs(5), async {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1097` [tokio_import]: `let _ = tokio::join!(task1, task2);`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1099` [await_expr]: `.await;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1113` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1114` [async_fn]: `async fn test_spawn_blocking_consolidation_does_not_block_runtime() {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1115` [tokio_import]: `use tokio::time::timeout;`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1129` [tokio_import]: `tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-cognition/src/consolidation_executor.rs:1133` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:52` [async_fn]: `pub async fn start(`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:60` [await_expr]: `let tx = collection.get_doc_tx(doc_id).await?.unwrap_or(base_tx);`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:74` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:75` [await_expr]: `collection.storage().commit(base_tx).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:90` [async_fn]: `pub async fn validate_occ(&self) -> Result<()> {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:92` [await_expr]: `match self.collection.get_doc_tx(doc_id).await? {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:118` [async_fn]: `pub async fn refresh(&mut self) -> Result<Vec<DocId>> {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:125` [await_expr]: `match self.collection.get_doc_tx(doc_id).await? {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:152` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:153` [await_expr]: `self.collection.storage().commit(new_base_tx).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:162` [async_fn]: `pub async fn abort(self) -> Result<()> {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:167` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:168` [await_expr]: `self.collection.storage().commit(abort_tx).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:176` [async_fn]: `pub async fn execute<G>(&self, generator: &G) -> Result<()>`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:181` [await_expr]: `self.validate_occ().await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:189` [await_expr]: `if let Some(val) = self.collection.storage().get(&doc_key).await? {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:191` [await_expr]: `if let Some(doc) = self.collection.get(&meta.id).await? {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:229` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:244` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:250` [async_fn]: `pub async fn commit(`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:258` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:264` [async_fn]: `pub async fn commit_ref(`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:271` [await_expr]: `let _guard = self.collection.consolidation_guard.lock().await;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:271` [lock_held_across_await_warning]: `Lock acquired at line 271 near await at line 271`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:274` [await_expr]: `self.validate_occ().await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:274` [lock_held_across_await_warning]: `Lock acquired at line 271 near await at line 274`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:296` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:303` [await_expr]: `match self.collection.storage().get(&doc_key).await? {`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:308` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:334` [await_expr]: `.await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/session.rs:337` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/cleanup.rs:23` [async_fn]: `pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(`
+- `/app/crates/contextra-cognition/src/context_compaction/cleanup.rs:31` [await_expr]: `let orphaned_keys = storage.scan_prefix(prefix).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/cleanup.rs:41` [await_expr]: `storage.delete(tx, &key).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/cleanup.rs:42` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:214` [async_fn]: `pub async fn consolidate_via_llm(`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:242` [await_expr]: `let summary_text = generator.generate_with_context(tenant, &segments).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:289` [async_fn]: `pub async fn consolidate_with_retry<S, V, G>(`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:310` [await_expr]: `.await`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:320` [async_fn]: `pub async fn consolidate_with_retry_with_rng<S, V, G>(`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:337` [await_expr]: `ConsolidationSession::start(collection, &current_sources, target_doc_id).await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:339` [await_expr]: `let result = session.execute(generator).await;`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:345` [await_expr]: `let changed = session.refresh().await?;`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:354` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(base_ms + jitter_ms)).await;`
+- `/app/crates/contextra-cognition/src/context_compaction/compactor.rs:354` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(base_ms + jitter_ms)).await;`
+### `contextra-crypto`
+
+- `/app/crates/contextra-crypto/src/crypto.rs:882` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-crypto/src/crypto.rs:883` [async_fn]: `async fn test_parallel_nonce_uniqueness() {`
+- `/app/crates/contextra-crypto/src/crypto.rs:896` [tokio_import]: `handles.push(tokio::spawn(async move {`
+- `/app/crates/contextra-crypto/src/crypto.rs:910` [await_expr]: `handle.await.expect("task handle joined"); // expect`
+- `/app/crates/contextra-crypto/src/crypto.rs:910` [lock_held_across_await_warning]: `Lock acquired at line 900 near await at line 910`
+- `/app/crates/contextra-crypto/src/wal_crypto.rs:621` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-crypto/src/wal_crypto.rs:622` [async_fn]: `async fn test_encrypted_wal_roundtrip() -> Result<()> {`
+- `/app/crates/contextra-crypto/src/wal_crypto.rs:635` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-crypto/src/wal_crypto.rs:636` [async_fn]: `async fn test_encrypted_wal_1mb_roundtrip() -> Result<()> {`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:649` [tokio_import]: `let notify_batch_released = Arc::new(tokio::sync::Notify::new());`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:650` [tokio_import]: `let notify_read_complete = Arc::new(tokio::sync::Notify::new());`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:658` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:663` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:665` [await_expr]: `notify_batch_released_clone.notified().await;`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:683` [tokio_import]: `tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:686` [block_on]: `.block_on(async {`
+- `/app/crates/contextra-crypto/src/kv_segment/store.rs:687` [await_expr]: `notify_read_complete_evict.notified().await;`
+### `contextra-db`
+
+- `/app/crates/contextra-db/examples/hybrid_search.rs:22` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:23` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:28` [await_expr]: `let db = Contextra::open_with_config("./hybrid_data", config).await?;`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:68` [await_expr]: `db.insert_many(&docs).await?;`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:78` [await_expr]: `let results = db.hybrid_search(text_query, &vector_query, 3, None).await?;`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:96` [await_expr]: `let vector_only = db.search(&vector_query, 3).await?;`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:103` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:104` [await_expr]: `let _ = tokio::fs::remove_dir_all("./hybrid_data").await;`
+- `/app/crates/contextra-db/examples/hybrid_search.rs:104` [tokio_import]: `let _ = tokio::fs::remove_dir_all("./hybrid_data").await;`
+- `/app/crates/contextra-db/examples/quickstart.rs:19` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-db/examples/quickstart.rs:20` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/app/crates/contextra-db/examples/quickstart.rs:26` [await_expr]: `let db = Contextra::open_with_config("./example_data", config).await?;`
+- `/app/crates/contextra-db/examples/quickstart.rs:34` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/quickstart.rs:41` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/quickstart.rs:48` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/quickstart.rs:52` [await_expr]: `let results = db.search(&query, 2).await?;`
+- `/app/crates/contextra-db/examples/quickstart.rs:63` [await_expr]: `if let Some(doc) = db.get("rust-lang").await? {`
+- `/app/crates/contextra-db/examples/quickstart.rs:69` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-db/examples/quickstart.rs:72` [await_expr]: `let _ = tokio::fs::remove_dir_all("./example_data").await;`
+- `/app/crates/contextra-db/examples/quickstart.rs:72` [tokio_import]: `let _ = tokio::fs::remove_dir_all("./example_data").await;`
+- `/app/crates/contextra-db/examples/collections.rs:20` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-db/examples/collections.rs:21` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/app/crates/contextra-db/examples/collections.rs:26` [await_expr]: `let db = Contextra::open_with_config("./collections_data", config).await?;`
+- `/app/crates/contextra-db/examples/collections.rs:29` [await_expr]: `let agents = db.collection("agents").await?;`
+- `/app/crates/contextra-db/examples/collections.rs:30` [await_expr]: `let tools = db.collection("tools").await?;`
+- `/app/crates/contextra-db/examples/collections.rs:39` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/collections.rs:47` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/collections.rs:56` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/collections.rs:64` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/collections.rs:69` [await_expr]: `let agent_results = agents.query().embedding(query).k(2).execute().await?;`
+- `/app/crates/contextra-db/examples/collections.rs:75` [await_expr]: `let tool_results = tools.query().embedding(query).k(2).execute().await?;`
+- `/app/crates/contextra-db/examples/collections.rs:82` [await_expr]: `let all = db.list_collections().await?;`
+- `/app/crates/contextra-db/examples/collections.rs:89` [await_expr]: `let snapshot = db.create_snapshot().await?;`
+- `/app/crates/contextra-db/examples/collections.rs:99` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/collections.rs:102` [await_expr]: `let at_snapshot = agents.get_at_snapshot("reviewer", snapshot).await?;`
+- `/app/crates/contextra-db/examples/collections.rs:113` [await_expr]: `let current = agents.get("reviewer").await?;`
+- `/app/crates/contextra-db/examples/collections.rs:121` [await_expr]: `db.drop_collection("tools", tenant_id, &[0u8; 32]).await?;`
+- `/app/crates/contextra-db/examples/collections.rs:122` [await_expr]: `let remaining = db.list_collections().await?;`
+- `/app/crates/contextra-db/examples/collections.rs:128` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-db/examples/collections.rs:129` [await_expr]: `let _ = tokio::fs::remove_dir_all("./collections_data").await;`
+- `/app/crates/contextra-db/examples/collections.rs:129` [tokio_import]: `let _ = tokio::fs::remove_dir_all("./collections_data").await;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:10` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-db/examples/db_standalone.rs:11` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/app/crates/contextra-db/examples/db_standalone.rs:20` [await_expr]: `let db = Contextra::open_with_config(tmp_dir.path(), config).await?;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:28` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:30` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await?;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:36` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-db/src/multistep.rs:143` [async_fn]: `pub async fn search(`
+- `/app/crates/contextra-db/src/multistep.rs:151` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/multistep.rs:174` [async_fn]: `pub async fn search_with_embedder(`
+- `/app/crates/contextra-db/src/multistep.rs:210` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/src/multistep.rs:282` [tokio_import]: `let rewrite_outputs_res = tokio::time::timeout(`
+- `/app/crates/contextra-db/src/multistep.rs:286` [await_expr]: `.await;`
+- `/app/crates/contextra-db/src/multistep.rs:332` [await_expr]: `match emb.embed(sem_q).await {`
+- `/app/crates/contextra-db/src/multistep.rs:374` [await_expr]: `match builder.execute().await {`
+- `/app/crates/contextra-db/src/lib.rs:135` [async_fn]: `async fn test_db(dim: usize) -> (Contextra, TempDir) {`
+- `/app/crates/contextra-db/src/lib.rs:144` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:150` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:151` [async_fn]: `async fn test_insert_search_roundtrip() {`
+- `/app/crates/contextra-db/src/lib.rs:152` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:159` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:167` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:171` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:174` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 2).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:181` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:182` [async_fn]: `async fn test_insert_search_returns_metadata() {`
+- `/app/crates/contextra-db/src/lib.rs:183` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:190` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:193` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:202` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:203` [async_fn]: `async fn test_get_by_key() {`
+- `/app/crates/contextra-db/src/lib.rs:204` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:211` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:214` [await_expr]: `let doc = db.get("doc-1").await.expect("get").expect("should exist"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:218` [await_expr]: `let none = db.get("nonexistent").await.expect("get"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:223` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:224` [async_fn]: `async fn test_update() {`
+- `/app/crates/contextra-db/src/lib.rs:225` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:228` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:232` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:236` [await_expr]: `let doc = db.get("doc-1").await.expect("get").expect("exists"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:240` [await_expr]: `let results = db.search(&[0.0, 1.0, 0.0, 0.0], 1).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:246` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:247` [async_fn]: `async fn test_delete() {`
+- `/app/crates/contextra-db/src/lib.rs:248` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:251` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:253` [await_expr]: `assert_eq!(db.len().await.expect("len"), 1); // expect`
+- `/app/crates/contextra-db/src/lib.rs:255` [await_expr]: `db.delete("doc-1").await.expect("delete"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:256` [await_expr]: `assert_eq!(db.len().await.expect("len"), 0); // expect`
+- `/app/crates/contextra-db/src/lib.rs:259` [await_expr]: `let doc = db.get("doc-1").await.expect("get"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:264` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:265` [async_fn]: `async fn test_relate() {`
+- `/app/crates/contextra-db/src/lib.rs:266` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:269` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:272` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:277` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:282` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:283` [async_fn]: `async fn test_dimension_mismatch() {`
+- `/app/crates/contextra-db/src/lib.rs:284` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:285` [await_expr]: `let result = db.insert("doc-1", &[1.0, 0.0], None).await;`
+- `/app/crates/contextra-db/src/lib.rs:290` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:291` [async_fn]: `async fn test_empty_search() {`
+- `/app/crates/contextra-db/src/lib.rs:292` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:293` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:298` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:299` [async_fn]: `async fn test_relate_and_scan_prefix() {`
+- `/app/crates/contextra-db/src/lib.rs:300` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:303` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:306` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:309` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:313` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:316` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:322` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:336` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:343` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:344` [async_fn]: `async fn test_stats_aggregation() {`
+- `/app/crates/contextra-db/src/lib.rs:345` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:348` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:351` [await_expr]: `let stats = db.stats().await.expect("stats"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:359` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:360` [async_fn]: `async fn test_stats_live_data_and_weak_reference_lifecycle() {`
+- `/app/crates/contextra-db/src/lib.rs:361` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:364` [await_expr]: `let stats_unattached = db.stats().await.expect("stats");`
+- `/app/crates/contextra-db/src/lib.rs:396` [await_expr]: `let stats_attached = db.stats().await.expect("stats");`
+- `/app/crates/contextra-db/src/lib.rs:396` [lock_held_across_await_warning]: `Lock acquired at line 386 near await at line 396`
+- `/app/crates/contextra-db/src/lib.rs:405` [await_expr]: `let stats_dropped = db.stats().await.expect("stats after drop");`
+- `/app/crates/contextra-db/src/lib.rs:413` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:414` [async_fn]: `async fn test_integration_end_to_end() {`
+- `/app/crates/contextra-db/src/lib.rs:415` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:423` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:430` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:437` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:442` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:445` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:449` [await_expr]: `let results = db.search(&[1.0, 0.5, 0.0, 0.0], 2).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:459` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:465` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:470` [await_expr]: `db.delete("agent-1").await.expect("delete"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:473` [await_expr]: `let get_agent = db.get("agent-1").await.expect("get"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:475` [await_expr]: `assert_eq!(db.len().await.expect("len"), 2); // 3 inserted, 1 deleted // expect`
+- `/app/crates/contextra-db/src/lib.rs:479` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:480` [async_fn]: `async fn test_concurrent_collection_idempotency() {`
+- `/app/crates/contextra-db/src/lib.rs:481` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:487` [tokio_import]: `handles.push(tokio::spawn(async move {`
+- `/app/crates/contextra-db/src/lib.rs:488` [await_expr]: `db_clone.collection("c").await.expect("collection c") // expect`
+- `/app/crates/contextra-db/src/lib.rs:494` [await_expr]: `cols.push(handle.await.expect("join handle")); // expect`
+- `/app/crates/contextra-db/src/lib.rs:507` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:508` [async_fn]: `async fn test_collections_are_isolated() {`
+- `/app/crates/contextra-db/src/lib.rs:509` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:510` [await_expr]: `let col_a = db.collection("a").await.expect("col a"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:511` [await_expr]: `let col_b = db.collection("b").await.expect("col b"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:515` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:519` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:522` [await_expr]: `let res_a = col_a.get("k1").await.expect("get a").expect("exists"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:523` [await_expr]: `let res_b = col_b.get("k1").await.expect("get b").expect("exists"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:530` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:538` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:539` [async_fn]: `async fn test_close_and_reopen_100_docs() {`
+- `/app/crates/contextra-db/src/lib.rs:549` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:555` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:558` [await_expr]: `db.close().await.expect("close"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:563` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:565` [await_expr]: `assert_eq!(db.len().await.expect("len"), 100); // expect`
+- `/app/crates/contextra-db/src/lib.rs:568` [await_expr]: `let doc = db.get(&id).await.expect("get").expect("exists"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:572` [await_expr]: `let results = db.search(&[0.5, 0.5, 0.0, 0.0], 10).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:578` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:579` [async_fn]: `async fn test_close_and_reopen() {`
+- `/app/crates/contextra-db/src/lib.rs:589` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:592` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:594` [await_expr]: `db.close().await.expect("close"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:599` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:601` [await_expr]: `let doc = db.get("doc-1").await.expect("get").expect("exists"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:608` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:609` [async_fn]: `async fn test_drop_removes_all_data() {`
+- `/app/crates/contextra-db/src/lib.rs:610` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:614` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:617` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:621` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:626` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:628` [await_expr]: `assert_eq!(col2.len().await, 0);`
+- `/app/crates/contextra-db/src/lib.rs:629` [await_expr]: `assert!(col2.get("k1").await.expect("get").is_none()); // expect`
+- `/app/crates/contextra-db/src/lib.rs:633` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:634` [async_fn]: `async fn test_default_collection_compat() {`
+- `/app/crates/contextra-db/src/lib.rs:635` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:637` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:640` [await_expr]: `let doc = db.get("k").await.expect("get").expect("exists"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:643` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:648` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:649` [async_fn]: `async fn test_list_collections() {`
+- `/app/crates/contextra-db/src/lib.rs:650` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:651` [await_expr]: `db.collection("c1").await.expect("c1"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:652` [await_expr]: `db.collection("c2").await.expect("c2"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:653` [await_expr]: `db.collection("c3").await.expect("c3"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:655` [await_expr]: `let list = db.list_collections().await.expect("list"); // expect`
+- `/app/crates/contextra-db/src/lib.rs:685` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:687` [async_fn]: `async fn test_onnx_default_backend_e2e_with_fixture() {`
+- `/app/crates/contextra-db/src/lib.rs:718` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:723` [await_expr]: `let vec = embedder.embed("test document").await.expect("embed test");`
+- `/app/crates/contextra-db/src/lib.rs:723` [lock_held_across_await_warning]: `Lock acquired at line 722 near await at line 723`
+- `/app/crates/contextra-db/src/lib.rs:728` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:729` [async_fn]: `async fn test_open_dimension_mismatch_fails() -> contextra_types::Result<()> {`
+- `/app/crates/contextra-db/src/lib.rs:736` [await_expr]: `let db = Contextra::open_with_config(dir.path(), config_768).await?;`
+- `/app/crates/contextra-db/src/lib.rs:736` [lock_held_across_await_warning]: `Lock acquired at line 722 near await at line 736`
+- `/app/crates/contextra-db/src/lib.rs:737` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-db/src/lib.rs:744` [await_expr]: `let result = Contextra::open_with_config(dir.path(), config_1536).await;`
+- `/app/crates/contextra-db/src/lib.rs:818` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:819` [async_fn]: `async fn test_provenance_rrf_sum_invariant() {`
+- `/app/crates/contextra-db/src/lib.rs:820` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:821` [await_expr]: `let col = db.collection("prov_test").await.expect("collection");`
+- `/app/crates/contextra-db/src/lib.rs:831` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:842` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:867` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-db/src/lib.rs:868` [async_fn]: `async fn test_search_results_have_provenance_is_some() {`
+- `/app/crates/contextra-db/src/lib.rs:869` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-db/src/lib.rs:870` [await_expr]: `let col = db.collection("search_prov_test").await.expect("collection");`
+- `/app/crates/contextra-db/src/lib.rs:877` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:882` [await_expr]: `.await`
+- `/app/crates/contextra-db/src/lib.rs:900` [await_expr]: `.await`
+### `contextra-engine`
+
+- `/app/crates/contextra-engine/src/import.rs:35` [async_fn]: `pub async fn import_memories(&self, col_export: ExportCollectionV1) -> Result<ImportSummary> {`
+- `/app/crates/contextra-engine/src/import.rs:70` [await_expr]: `self.upsert(&mem.id, emb, Some(meta)).await`
+- `/app/crates/contextra-engine/src/import.rs:72` [await_expr]: `self.upsert_text_only(&mem.id, text, Some(meta)).await`
+- `/app/crates/contextra-engine/src/import.rs:82` [await_expr]: `self.upsert_text_only(&mem.id, text, Some(meta)).await`
+- `/app/crates/contextra-engine/src/import.rs:84` [await_expr]: `self.put_kv(&mem.id, &meta).await`
+- `/app/crates/contextra-engine/src/import.rs:97` [await_expr]: `match self.relate(&rel.from, &rel.to, &rel.label).await {`
+- `/app/crates/contextra-engine/src/import.rs:112` [async_fn]: `pub async fn import_memories(&self, doc: ExportDocumentV1) -> Result<ImportSummary> {`
+- `/app/crates/contextra-engine/src/import.rs:123` [await_expr]: `let col = self.collection(&col_export.name).await?;`
+- `/app/crates/contextra-engine/src/import.rs:124` [await_expr]: `let col_summary = col.import_memories(col_export).await?;`
+- `/app/crates/contextra-engine/src/merge_operator_adapter.rs:101` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-engine/src/merge_operator_adapter.rs:114` [block_on]: `rt.block_on(async move {`
+- `/app/crates/contextra-engine/src/merge_operator_adapter.rs:116` [await_expr]: `let res = merge_fn_clone.merge(&job.existing, &job.new).await;`
+- `/app/crates/contextra-engine/src/lib.rs:117` [tokio_import]: `) -> tokio::task::JoinHandle<()>`
+- `/app/crates/contextra-engine/src/lib.rs:135` [tokio_import]: `) -> tokio::task::JoinHandle<()>`
+- `/app/crates/contextra-engine/src/lib.rs:381` [tokio_import]: `collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,`
+- `/app/crates/contextra-engine/src/lib.rs:382` [tokio_import]: `tenant_collections: tokio::sync::RwLock<TenantCollectionMap>,`
+- `/app/crates/contextra-engine/src/lib.rs:473` [await_expr]: `let results: Vec<SearchResult> = self.search(&vector, k).await?;`
+- `/app/crates/contextra-engine/src/lib.rs:489` [await_expr]: `self.insert(&id, &[], Some(val_json)).await`
+- `/app/crates/contextra-engine/src/lib.rs:499` [await_expr]: `let doc = self.get(&id).await?;`
+- `/app/crates/contextra-engine/src/export.rs:89` [async_fn]: `pub async fn export_memories(&self) -> Result<ExportCollectionV1> {`
+- `/app/crates/contextra-engine/src/export.rs:108` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/export.rs:197` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/export.rs:232` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/export.rs:233` [async_fn]: `async fn test_export_import_roundtrip() {`
+- `/app/crates/contextra-engine/src/export.rs:241` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:244` [await_expr]: `let col_default = db1.collection("default").await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:255` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:267` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:276` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:279` [await_expr]: `db1.relate("mem-1", "mem-2", "related_to").await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:281` [await_expr]: `let custom_col = db1.collection("work").await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:291` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:295` [await_expr]: `let export_doc = db1.export_memories().await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:302` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:305` [await_expr]: `let summary = db2.import_memories(export_doc.clone()).await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:311` [await_expr]: `let col2_default = db2.collection("default").await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:312` [await_expr]: `assert_eq!(col2_default.len().await, 2);`
+- `/app/crates/contextra-engine/src/export.rs:314` [await_expr]: `let doc1 = col2_default.get("mem-1").await.unwrap().unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:319` [await_expr]: `let doc2 = col2_default.get("mem-2").await.unwrap().unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:325` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:334` [await_expr]: `let col2_work = db2.collection("work").await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:335` [await_expr]: `assert_eq!(col2_work.len().await, 1);`
+- `/app/crates/contextra-engine/src/export.rs:336` [await_expr]: `let work_doc = col2_work.get("work-1").await.unwrap().unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:340` [await_expr]: `let export_doc2 = db2.export_memories().await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:344` [await_expr]: `let summary_reimport = db2.import_memories(export_doc.clone()).await.unwrap();`
+- `/app/crates/contextra-engine/src/export.rs:346` [await_expr]: `assert_eq!(col2_default.len().await, 2);`
+- `/app/crates/contextra-engine/src/export.rs:349` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/export.rs:350` [async_fn]: `async fn test_import_schema_version_mismatch_fails() {`
+- `/app/crates/contextra-engine/src/export.rs:359` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/export.rs:368` [await_expr]: `let err = db.import_memories(invalid_doc).await;`
+- `/app/crates/contextra-engine/src/export.rs:379` [async_fn]: `pub async fn export_memories(&self) -> Result<ExportDocumentV1> {`
+- `/app/crates/contextra-engine/src/export.rs:380` [await_expr]: `let collection_names = self.list_collections().await?;`
+- `/app/crates/contextra-engine/src/export.rs:384` [await_expr]: `let col = self.collection(&name).await?;`
+- `/app/crates/contextra-engine/src/export.rs:385` [await_expr]: `let export_col = col.export_memories().await?;`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:8` [tokio_import]: `use tokio::sync::{Mutex, MutexGuard};`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:50` [async_fn]: `pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:51` [await_expr]: `let guard = self.shards[idx].lock().await;`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:51` [lock_held_across_await_warning]: `Lock acquired at line 51 near await at line 51`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:57` [async_fn]: `pub async fn lock_for<'a>(&'a self, key: &str) -> KeyGuard<'a> {`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:59` [await_expr]: `self.lock_shard(idx).await`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:59` [lock_held_across_await_warning]: `Lock acquired at line 51 near await at line 59`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:82` [async_fn]: `pub async fn lock_many_sorted<'a>(`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:90` [await_expr]: `guards.push(self.lock_shard(idx).await);`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:254` [tokio_import]: `let rt = tokio::runtime::Builder::new_multi_thread()`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:260` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:264` [tokio_import]: `let t1 = tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:265` [await_expr]: `let _guards = locks_t1.lock_many_sorted(["key_alpha", "key_beta"]).await;`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:269` [tokio_import]: `let t2 = tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:270` [await_expr]: `let _guards = locks_t2.lock_many_sorted(["key_beta", "key_alpha"]).await;`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:273` [await_expr]: `t1.await.unwrap();`
+- `/app/crates/contextra-engine/src/collection/kv_lock.rs:274` [await_expr]: `t2.await.unwrap();`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:30` [async_fn]: `pub async fn evict_decayed_chunks(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:38` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:57` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:120` [await_expr]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:120` [tokio_import]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:133` [await_expr]: `if let Err(e) = self.delete(id).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:151` [async_fn]: `pub async fn repair(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:153` [await_expr]: `let res = self.repair_internal().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:169` [async_fn]: `async fn repair_internal(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:170` [await_expr]: `let _guard = self.consolidation_guard.lock().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:170` [lock_held_across_await_warning]: `Lock acquired at line 170 near await at line 170`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:171` [await_expr]: `let docs = self.storage.scan_prefix(&self.prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:171` [lock_held_across_await_warning]: `Lock acquired at line 170 near await at line 171`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:173` [await_expr]: `self.index.all_doc_ids().await?.into_iter().collect();`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:173` [lock_held_across_await_warning]: `Lock acquired at line 170 near await at line 173`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:180` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:180` [lock_held_across_await_warning]: `Lock acquired at line 170 near await at line 180`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:183` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:183` [lock_held_across_await_warning]: `Lock acquired at line 170 near await at line 183`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:207` [async_fn]: `async fn recover_pending_transaction_intents(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:212` [await_expr]: `let intents = self.storage.scan_prefix(&intent_prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:236` [await_expr]: `if self.storage.get(&target_doc_key).await?.is_some() {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:239` [await_expr]: `if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:258` [await_expr]: `if self.storage.get(&doc_key).await?.is_some() {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:267` [await_expr]: `if let Some(val) = self.storage.get(&doc_key).await? {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:275` [await_expr]: `if let Some(user_val) = self.storage.get(&user_key).await? {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:294` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:304` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:312` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:324` [await_expr]: `self.graph_index.add_entity(recovery_tx, entity).await`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:341` [await_expr]: `if let Err(e) = self.index.delete(recovery_tx, doc_id).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:349` [await_expr]: `self.text_index.delete_document(recovery_tx, doc_id).await`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:359` [await_expr]: `if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:368` [await_expr]: `if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:374` [await_expr]: `self.index.commit(recovery_tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:377` [await_expr]: `self.text_index.commit(recovery_tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:380` [await_expr]: `self.graph_index.commit(recovery_tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:383` [await_expr]: `self.storage.commit(recovery_tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:390` [async_fn]: `async fn fallback_scan_missing_text_index_documents(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:422` [await_expr]: `if let Ok(bm25_res) = self.text_index.search_bm25(&text, 1, None).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:426` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:434` [await_expr]: `self.index.commit(fallback_tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:437` [await_expr]: `self.text_index.commit(fallback_tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:445` [async_fn]: `pub async fn stats(&self) -> Result<contextra_ports::VectorIndexStats> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:446` [await_expr]: `self.index.stats().await`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:452` [async_fn]: `pub async fn reap_expired_documents(&self, max_expired: usize) -> Result<usize> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:453` [await_expr]: `let current_seq = self.snapshot_seq().await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:464` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:511` [await_expr]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:511` [tokio_import]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:520` [await_expr]: `if let Err(e) = self.delete(id).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:555` [async_fn]: `pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:568` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:568` [lock_held_across_await_warning]: `Lock acquired at line 556 near await at line 568`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:642` [await_expr]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:642` [tokio_import]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:650` [await_expr]: `match self.delete(&id).await {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:685` [async_fn]: `pub async fn update_document_importance(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:693` [await_expr]: `let Some(data) = self.storage.get_tracked(tx, &user_key).await? else {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:748` [await_expr]: `let _guard = self.kv_locks.lock_for(doc_id).await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:750` [await_expr]: `self.storage.put(tx, &user_key, &user_bytes).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:751` [await_expr]: `self.storage.put(tx, &doc_key, &doc_bytes).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:752` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:760` [async_fn]: `pub async fn run_community_detection(&self) -> Result<Vec<CommunityAssignment>> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:762` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:768` [async_fn]: `pub async fn run_community_detection_with_config(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:772` [await_expr]: `let assignments = detect_communities(&self.graph_index, config).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:785` [await_expr]: `self.storage.put(tx, &key, &val).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:788` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:795` [async_fn]: `pub async fn get_community(&self, entity_id: EntityId) -> Result<Option<u64>> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:801` [await_expr]: `if let Some(bytes) = self.storage.get(&key).await? {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:813` [async_fn]: `pub async fn get_communities_batch(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:822` [await_expr]: `let graph_map = self.graph_index.get_communities_batch(entity_ids).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:829` [await_expr]: `let entries = self.storage.scan_prefix(&prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:852` [async_fn]: `pub async fn drop_collection(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:853` [await_expr]: `let _guard = self.consolidation_guard.lock().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:853` [lock_held_across_await_warning]: `Lock acquired at line 853 near await at line 853`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:865` [await_expr]: `self.storage.delete_prefix(tx, &prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:865` [lock_held_across_await_warning]: `Lock acquired at line 853 near await at line 865`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:869` [await_expr]: `self.storage.delete_prefix(tx, &txt_prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:871` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:894` [async_fn]: `pub async fn run_percolation_check(`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:898` [await_expr]: `let stats = self.graph_index.stats().await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:923` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:940` [await_expr]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:940` [tokio_import]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:951` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/collection/maintenance.rs:957` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/mod.rs:283` [tokio_import]: `pub consolidation_guard: Arc<tokio::sync::Mutex<()>>,`
+- `/app/crates/contextra-engine/src/collection/mod.rs:295` [tokio_import]: `parking_lot::RwLock<Option<tokio::sync::watch::Receiver<contextra_store::SystemPressure>>>,`
+- `/app/crates/contextra-engine/src/collection/mod.rs:395` [tokio_import]: `consolidation_guard: Arc::new(tokio::sync::Mutex::new(())),`
+- `/app/crates/contextra-engine/src/collection/mod.rs:458` [tokio_import]: `pressure_rx: tokio::sync::watch::Receiver<contextra_store::SystemPressure>,`
+- `/app/crates/contextra-engine/src/collection/mod.rs:467` [tokio_import]: `pressure_rx: tokio::sync::watch::Receiver<contextra_store::SystemPressure>,`
+- `/app/crates/contextra-engine/src/collection/mod.rs:494` [async_fn]: `pub async fn set_embedder(&self, embedder: Arc<dyn TextEmbeddingEngine>) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:557` [async_fn]: `pub async fn len(&self) -> usize {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:558` [await_expr]: `self.index.len().await`
+- `/app/crates/contextra-engine/src/collection/mod.rs:569` [async_fn]: `pub async fn is_empty(&self) -> bool {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:570` [await_expr]: `self.index.is_empty().await`
+- `/app/crates/contextra-engine/src/collection/mod.rs:575` [async_fn]: `pub async fn load_index(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:586` [await_expr]: `let entries = self.storage.scan_prefix(&scan_prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/mod.rs:598` [await_expr]: `if let Err(e) = self.index.insert(tx, doc_id, &stored.embedding).await {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:602` [await_expr]: `self.index.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/mod.rs:609` [async_fn]: `pub async fn migrate_doc_keys_v1(&self) -> Result<u64> {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:618` [await_expr]: `let entries = self.storage.scan_prefix(&prefix).await?;`
+- `/app/crates/contextra-engine/src/collection/mod.rs:627` [await_expr]: `self.storage.put(tx, &k, &meta_data).await?;`
+- `/app/crates/contextra-engine/src/collection/mod.rs:634` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/mod.rs:646` [async_fn]: `pub async fn load_text_stats(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:647` [await_expr]: `self.text_index.load_stats().await`
+- `/app/crates/contextra-engine/src/collection/mod.rs:691` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/collection/mod.rs:692` [await_expr]: `match collection_clone.run_community_detection().await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:16` [async_fn]: `pub async fn relate_with_provenance(`
+- `/app/crates/contextra-engine/src/collection/relate.rs:28` [await_expr]: `let _guards = self.lock_keys_sorted([from, to]).await;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:39` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:49` [await_expr]: `if let Err(e) = self.storage.put(db_tx.tx_id, &key, &bytes).await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:51` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:76` [await_expr]: `match db_tx.commit().await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:87` [async_fn]: `pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:88` [await_expr]: `self.relate_with_provenance(from, to, label, None).await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:93` [async_fn]: `pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:94` [await_expr]: `self.relate(from, to, label).await?;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:95` [await_expr]: `self.relate(to, from, label).await?;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:107` [async_fn]: `pub async fn relate_n_ary(`
+- `/app/crates/contextra-engine/src/collection/relate.rs:144` [await_expr]: `let _guards = self.lock_keys_sorted(lock_keys).await;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:182` [await_expr]: `if let Err(e) = self.storage.put(db_tx.tx_id, &key, &bytes).await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:184` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:201` [await_expr]: `match db_tx.commit().await {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:215` [async_fn]: `async fn test_db(dim: usize) -> (crate::Contextra, TempDir) {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:224` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:229` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/collection/relate.rs:230` [async_fn]: `async fn test_relate_n_ary_basic() {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:231` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:232` [await_expr]: `let col = db.collection("default").await.expect("collection");`
+- `/app/crates/contextra-engine/src/collection/relate.rs:235` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:238` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:241` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:252` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:271` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/collection/relate.rs:272` [async_fn]: `async fn test_relate_n_ary_insufficient_participants() {`
+- `/app/crates/contextra-engine/src/collection/relate.rs:273` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/app/crates/contextra-engine/src/collection/relate.rs:274` [await_expr]: `let col = db.collection("default").await.expect("collection");`
+- `/app/crates/contextra-engine/src/collection/relate.rs:277` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/relate.rs:281` [await_expr]: `let res = col.relate_n_ary("solo", &single_participant, None).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction.rs:168` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction.rs:170` [await_expr]: `if let Err(e) = collection.graph_index.rollback(tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction.rs:176` [await_expr]: `if let Err(e) = collection.text_index.rollback(tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction.rs:182` [await_expr]: `if let Err(e) = collection.index.rollback(tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction.rs:188` [await_expr]: `if let Err(e) = collection.storage.rollback(tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:42` [async_fn]: `pub async fn execute_rollback(&mut self) {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:44` [await_expr]: `if let Err(e) = action.execute().await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:104` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:106` [await_expr]: `None => self.collection.storage.delete(rollback_tx, f_key).await,`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:126` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:128` [await_expr]: `None => self.collection.storage.delete(rollback_tx, r_key).await,`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:150` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:156` [await_expr]: `if let Err(e) = self.collection.storage.commit(rollback_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:172` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:172` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:228` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:230` [await_expr]: `if let Err(e) = self.collection.graph_index.commit(comp_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:278` [await_expr]: `if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:287` [await_expr]: `if let Err(e) = self.collection.index.commit(comp_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:351` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:360` [await_expr]: `if let Err(e) = self.collection.text_index.commit(comp_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:387` [await_expr]: `if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:390` [await_expr]: `if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:393` [await_expr]: `if let Err(e) = self.collection.index.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/compensating_actions.rs:396` [await_expr]: `if let Err(e) = self.collection.storage.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:14` [async_fn]: `pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:22` [await_expr]: `let orphaned_keys = storage.scan_prefix(prefix).await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:32` [await_expr]: `storage.delete(tx, &key).await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:33` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:52` [async_fn]: `pub async fn recover_pending_intents<S: StorageEngine>(`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:56` [await_expr]: `let mut intent_entries = storage.scan_prefix(b"__tx_intent:").await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:58` [await_expr]: `if let Ok(col_entries) = storage.scan_prefix(col_idx_prefix).await {`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:64` [await_expr]: `if let Ok(ns_entries) = storage.scan_prefix(&ns_prefix).await {`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:100` [await_expr]: `if storage.get(&doc_key).await?.is_some() {`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:110` [await_expr]: `storage.put(tx, &intent_key, &committed_bytes).await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:111` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:115` [await_expr]: `storage.put(tx, &intent_key, &aborted_bytes).await?;`
+- `/app/crates/contextra-engine/src/transaction/cleanup.rs:116` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:23` [async_fn]: `pub(super) async fn commit_text_staged(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:43` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:43` [lock_held_across_await_warning]: `Lock acquired at line 32 near await at line 43`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:50` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:58` [async_fn]: `pub(super) async fn commit_graph_staged(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:78` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:78` [lock_held_across_await_warning]: `Lock acquired at line 67 near await at line 78`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:82` [await_expr]: `GraphIndex::add_edge(&*self.collection.graph_index, self.tx_id, edge).await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:109` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:109` [lock_held_across_await_warning]: `Lock acquired at line 98 near await at line 109`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:124` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:124` [lock_held_across_await_warning]: `Lock acquired at line 113 near await at line 124`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:131` [async_fn]: `pub async fn commit(self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:133` [await_expr]: `let res = self.commit_internal().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:149` [async_fn]: `async fn commit_internal(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:244` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:246` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:253` [await_expr]: `if let Err(e) = self.collection.storage.commit(intent_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:254` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:262` [await_expr]: `if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:263` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:295` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:297` [await_expr]: `let _ = self.collection.storage.commit(stage1_tx).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:302` [await_expr]: `if let Err(e) = self.commit_text_staged().await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:303` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:307` [await_expr]: `if let Err(e) = self.commit_graph_staged().await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:308` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:312` [await_expr]: `if let Err(index_err) = self.collection.index.commit(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:313` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:326` [await_expr]: `if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:327` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:338` [await_expr]: `if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:339` [await_expr]: `ledger.execute_rollback().await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:371` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:373` [await_expr]: `if let Ok(()) = self.collection.storage.commit(cleanup_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:379` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(50 * attempt as u64)).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_commit.rs:379` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(50 * attempt as u64)).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:18` [async_fn]: `pub(super) async fn compensate_hnsw(&self, doc_ids: &[DocId]) {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:25` [await_expr]: `if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:33` [await_expr]: `if let Err(e) = self.collection.index.commit(comp_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:40` [async_fn]: `pub(super) async fn compensate_text(&self, doc_ids: &[DocId]) {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:51` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:60` [await_expr]: `if let Err(e) = self.collection.text_index.commit(comp_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:67` [async_fn]: `pub(super) async fn compensate_lsm(&self, intent_key: &[u8], doc_ids: &[DocId]) {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:103` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:105` [await_expr]: `None => self.collection.storage.delete(rollback_tx, f_key).await,`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:125` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:127` [await_expr]: `None => self.collection.storage.delete(rollback_tx, r_key).await,`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:143` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:149` [await_expr]: `if let Err(e) = self.collection.storage.commit(rollback_tx).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:165` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:165` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:183` [async_fn]: `pub(super) async fn rollback_internal(&self) {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:184` [await_expr]: `if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:187` [await_expr]: `if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:190` [await_expr]: `if let Err(e) = self.collection.index.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:193` [await_expr]: `if let Err(e) = self.collection.storage.rollback(self.tx_id).await {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:199` [async_fn]: `pub async fn rollback(self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:202` [await_expr]: `let graph_res = self.collection.graph_index.rollback(self.tx_id).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:203` [await_expr]: `let text_res = self.collection.text_index.rollback(self.tx_id).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:204` [await_expr]: `let index_res = self.collection.index.rollback(self.tx_id).await;`
+- `/app/crates/contextra-engine/src/transaction/db_transaction_rollback.rs:205` [await_expr]: `let storage_res = self.collection.storage.rollback(self.tx_id).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:16` [async_fn]: `pub async fn stats(&self) -> Result<ContextraStats> {`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:17` [await_expr]: `let default_col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:18` [await_expr]: `let active_memory_count = default_col.len().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:19` [await_expr]: `let index_stats = default_col.stats().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:20` [await_expr]: `let storage_stats = self.storage.stats().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:57` [async_fn]: `pub async fn flush(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/diagnostics.rs:58` [await_expr]: `self.storage.flush().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:136` [async_fn]: `pub async fn erase_document(`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:162` [await_expr]: `let col = self.collection_for_tenant(collection, tenant_id).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:174` [await_expr]: `if let Err(e) = col.delete(id).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:193` [tokio_import]: `let (purgers_ok, purge_err) = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:222` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:243` [tokio_import]: `let scan_result = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:300` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:344` [async_fn]: `pub async fn erase_collection(&self, tenant_id: TenantId, name: &str) -> Result<ErasureReport> {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:370` [await_expr]: `let col = self.collection_for_tenant(name, tenant_id).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:392` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:406` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:418` [await_expr]: `let _ = tenant_storage.delete(tx_id, &col_idx_key).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:419` [await_expr]: `if let Err(e) = tenant_storage.commit(tx_id).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:438` [tokio_import]: `let (purgers_ok, purge_err) = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:467` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:477` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:478` [await_expr]: `let _ = tenant_storage.commit(tx_id).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:495` [tokio_import]: `let scan_result = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:552` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:562` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:563` [await_expr]: `let _ = tenant_storage.commit(tx_id).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:590` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:591` [await_expr]: `let _ = tenant_storage.commit(tx_id).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:606` [await_expr]: `self.collections.write().await.remove(name);`
+- `/app/crates/contextra-engine/src/contextra_impl/erasure.rs:609` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:17` [async_fn]: `pub(crate) async fn default_col(&self) -> Result<Arc<Collection<LsmStorage>>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:18` [await_expr]: `self.collection("default").await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:24` [async_fn]: `pub async fn put_kv(&self, id: &str, value: &Value) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:25` [await_expr]: `self.default_col().await?.put_kv(id, value).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:31` [async_fn]: `pub async fn get_kv(&self, id: &str) -> Result<Option<Value>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:32` [await_expr]: `self.default_col().await?.get_kv(id).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:38` [async_fn]: `pub async fn insert(&self, id: &str, embedding: &[f32], metadata: Option<Value>) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:40` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:42` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:48` [async_fn]: `pub async fn insert_typed(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:57` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:59` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:65` [async_fn]: `pub async fn upsert(&self, id: &str, embedding: &[f32], metadata: Option<Value>) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:67` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:69` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:75` [async_fn]: `pub async fn insert_many(&self, docs: &[(String, Vec<f32>, Option<Value>)]) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:76` [await_expr]: `self.default_col().await?.insert_many(docs).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:82` [async_fn]: `pub async fn upsert_many(&self, docs: &[(String, Vec<f32>, Option<Value>)]) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:83` [await_expr]: `self.default_col().await?.upsert_many(docs).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:89` [async_fn]: `pub async fn get(&self, id: &str) -> Result<Option<Document>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:90` [await_expr]: `self.default_col().await?.get(id).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:96` [async_fn]: `pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<Document>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:97` [await_expr]: `self.default_col().await?.get_at_snapshot(id, seq_no).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:103` [async_fn]: `pub async fn last_committed_seq(&self) -> Result<u64> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:104` [await_expr]: `self.storage.last_seq_no().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:110` [async_fn]: `pub async fn create_snapshot(&self) -> Result<u64> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:111` [await_expr]: `self.storage.last_seq_no().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:117` [async_fn]: `pub async fn update(&self, id: &str, embedding: &[f32], metadata: Option<Value>) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:119` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:121` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:128` [async_fn]: `pub async fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:130` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:135` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:146` [async_fn]: `pub async fn search_with_filter(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:152` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:157` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:164` [async_fn]: `pub async fn search_with_filter_expr(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:170` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:175` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:181` [async_fn]: `pub async fn insert_text_only(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:188` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:190` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:196` [async_fn]: `pub async fn upsert_text_only(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:203` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:205` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:212` [async_fn]: `pub async fn search_text(&self, text: &str, k: usize) -> Result<Vec<SearchResult>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:214` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:219` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:226` [async_fn]: `pub async fn search_filtered(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:234` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:236` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:243` [async_fn]: `pub async fn hybrid_search(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:250` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:255` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:262` [async_fn]: `pub async fn hybrid_search_reranked(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:270` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:278` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:285` [async_fn]: `pub async fn hybrid_search_with_weights(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:293` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:301` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:308` [async_fn]: `pub async fn hybrid_search_with_strategy(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:317` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:328` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:335` [async_fn]: `pub async fn hybrid_search_with_query(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:340` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:344` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:349` [async_fn]: `pub async fn delete(&self, id: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:350` [await_expr]: `self.default_col().await?.delete(id).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:356` [async_fn]: `pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:357` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:358` [await_expr]: `col.relate(from, to, label).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:364` [async_fn]: `pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:365` [await_expr]: `let col = self.default_col().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:366` [await_expr]: `col.relate_bidirectional(from, to, label).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:372` [async_fn]: `pub async fn scan_prefix(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:377` [await_expr]: `self.default_col().await?.scan_prefix(prefix, limit).await`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:383` [async_fn]: `pub async fn len(&self) -> Result<usize> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:384` [await_expr]: `Ok(self.default_col().await?.len().await)`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:390` [async_fn]: `pub async fn is_empty(&self) -> Result<bool> {`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:391` [await_expr]: `Ok(self.default_col().await?.is_empty().await)`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:397` [async_fn]: `pub async fn scan(`
+- `/app/crates/contextra-engine/src/contextra_impl/crud.rs:403` [await_expr]: `self.default_col().await?.scan(start, end, limit).await`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:19` [async_fn]: `pub async fn open(path: impl AsRef<Path>) -> Result<Self> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:28` [await_expr]: `Self::open_authorized(path, config, &token, fast_gate).await`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:34` [async_fn]: `pub async fn open_with_config(`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:43` [await_expr]: `Self::open_authorized(path, config, &token, fast_gate).await`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:49` [async_fn]: `pub async fn open_authorized(`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:80` [await_expr]: `let storage = Arc::new(LsmStorage::new(lsm_config).await?);`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:86` [await_expr]: `let last_tx = storage.last_tx_id().await?.inner();`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:91` [await_expr]: `if let Some(stored_dim_bytes) = storage.get(dim_key).await? {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:108` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:109` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:136` [tokio_import]: `collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:137` [tokio_import]: `tenant_collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:148` [await_expr]: `db.initialize_collections().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:152` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:156` [await_expr]: `transaction::recover_pending_intents(db.storage.as_ref(), &db.next_tx).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:159` [await_expr]: `db.repair_on_open().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:161` [await_expr]: `db.init_embedding_backend(&config.embedding_backend).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:164` [await_expr]: `let default_col = db.collection("default").await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:175` [await_expr]: `if let Err(e) = handle.await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:186` [async_fn]: `async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:198` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:201` [await_expr]: `self.set_embedder(embedder_arc).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:218` [async_fn]: `async fn initialize_collections(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:224` [await_expr]: `let entries = self.storage.scan_prefix(col_idx_prefix).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:228` [await_expr]: `let _ = self.collection(&name).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:237` [async_fn]: `pub async fn repair_on_open(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:239` [await_expr]: `match tokio::time::timeout(timeout_duration, self.repair_on_open_internal()).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:239` [tokio_import]: `match tokio::time::timeout(timeout_duration, self.repair_on_open_internal()).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:250` [async_fn]: `async fn repair_on_open_internal(&self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:269` [await_expr]: `let pending_intents = self.scan_pending_intents().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:287` [await_expr]: `let value_opt = self.storage.get(&intent_key).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:301` [await_expr]: `let col = match self.collection(&col_name).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:313` [await_expr]: `let _ = self.storage.put(tx, &intent_key, &failed_bytes).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:314` [await_expr]: `let _ = self.storage.commit(tx).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:321` [await_expr]: `if let Err(e) = col.repair().await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:334` [await_expr]: `let _ = self.storage.put(tx, &intent_key, &failed_bytes).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:335` [await_expr]: `let _ = self.storage.commit(tx).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:354` [await_expr]: `if col.storage.get(&doc_key).await.unwrap_or(None).is_some() {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:373` [await_expr]: `if let Err(e) = self.storage.put(tx, &intent_key, &final_bytes).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:378` [await_expr]: `} else if let Err(e) = self.storage.commit(tx).await {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:410` [async_fn]: `async fn scan_pending_intents(&self) -> Result<Vec<Vec<u8>>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:431` [await_expr]: `let entries = self.storage.scan_prefix(default_prefix).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:437` [await_expr]: `let col_entries = self.storage.scan_prefix(col_idx_prefix).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:444` [await_expr]: `let ns_entries = self.storage.scan_prefix(&ns_prefix).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:463` [async_fn]: `pub async fn wait_shutdown(&self) {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:466` [await_expr]: `self.task_tracker.wait().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:467` [await_expr]: `self.collections.write().await.clear();`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:468` [await_expr]: `self.tenant_collections.write().await.clear();`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:482` [async_fn]: `pub async fn close(self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:483` [await_expr]: `self.wait_shutdown().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:484` [await_expr]: `self.flush().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:485` [await_expr]: `self.storage.close().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:492` [async_fn]: `pub async fn with_embedder(self, embedder: Arc<dyn TextEmbeddingEngine>) -> Self {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:497` [await_expr]: `let cols = self.collections.read().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:497` [lock_held_across_await_warning]: `Lock acquired at line 497 near await at line 497`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:509` [async_fn]: `pub async fn set_embedder(&self, embedder: Arc<dyn TextEmbeddingEngine>) -> Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:514` [await_expr]: `let collections_read = self.collections.read().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:514` [lock_held_across_await_warning]: `Lock acquired at line 514 near await at line 514`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:530` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:531` [async_fn]: `async fn test_instance_bound_consolidation_launchers_isolation() -> contextra_types::Result<()>`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:543` [tokio_import]: `tokio::spawn(async {})`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:550` [tokio_import]: `tokio::spawn(async {})`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:556` [await_expr]: `let db1 = Contextra::open_with_config(dir1.path(), config1).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:557` [await_expr]: `let db2 = Contextra::open_with_config(dir2.path(), config2).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:562` [await_expr]: `db1.close().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:563` [await_expr]: `db2.close().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:568` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:569` [async_fn]: `async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()>`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:574` [await_expr]: `let db = Contextra::open_with_config(dir.path(), config).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:575` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:580` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:581` [async_fn]: `async fn test_custom_lsm_configuration_passthrough() -> contextra_types::Result<()> {`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:591` [await_expr]: `let db = Contextra::open_with_config(dir.path(), config).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/lifecycle.rs:592` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:18` [async_fn]: `pub async fn collection_for_tenant(`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:25` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:31` [async_fn]: `pub async fn collection_with_language_and_tenant(`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:54` [await_expr]: `let read_guard = self.tenant_collections.read().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:54` [lock_held_across_await_warning]: `Lock acquired at line 54 near await at line 54`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:72` [await_expr]: `contextra_graph::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:95` [await_expr]: `tenant_storage.put(tx, &col_idx_key, b"{}").await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:95` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 95`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:96` [await_expr]: `tenant_storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:96` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 96`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:99` [await_expr]: `col.load_index().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:99` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 99`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:100` [await_expr]: `col.load_text_stats().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:100` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 100`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:101` [await_expr]: `col.migrate_doc_keys_v1().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:101` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 101`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:105` [await_expr]: `let mut write_guard = self.tenant_collections.write().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:105` [lock_held_across_await_warning]: `Lock acquired at line 105 near await at line 105`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:117` [await_expr]: `if let Err(e) = worker_handle.await {`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:117` [lock_held_across_await_warning]: `Lock acquired at line 105 near await at line 117`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:130` [async_fn]: `pub async fn collection(&self, name: &str) -> Result<Arc<Collection<LsmStorage>>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:131` [await_expr]: `self.collection_with_language(name, Language::English).await`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:140` [async_fn]: `pub async fn collection_with_language(`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:165` [await_expr]: `let read_guard = self.collections.read().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:165` [lock_held_across_await_warning]: `Lock acquired at line 165 near await at line 165`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:171` [await_expr]: `let mut write_guard = self.collections.write().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:171` [lock_held_across_await_warning]: `Lock acquired at line 171 near await at line 171`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:182` [await_expr]: `let mut graph = contextra_graph::CsrGraph::load_from_storage(self.storage.as_ref()).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:182` [lock_held_across_await_warning]: `Lock acquired at line 171 near await at line 182`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:205` [await_expr]: `self.storage.put(tx, &col_idx_key, b"{}").await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:205` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 205`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:206` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:206` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 206`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:209` [await_expr]: `col.load_index().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:209` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 209`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:210` [await_expr]: `col.load_text_stats().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:210` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 210`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:211` [await_expr]: `col.migrate_doc_keys_v1().await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:211` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 211`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:222` [await_expr]: `if let Err(e) = worker_handle.await {`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:245` [async_fn]: `pub async fn list_collections(&self) -> Result<Vec<String>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:247` [await_expr]: `let entries = self.storage.scan_prefix(col_idx_prefix).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:259` [await_expr]: `let guard = self.collections.read().await;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:259` [lock_held_across_await_warning]: `Lock acquired at line 259 near await at line 259`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:272` [async_fn]: `pub async fn list_collections_for_tenant(&self, tenant_id: TenantId) -> Result<Vec<String>> {`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:278` [await_expr]: `let entries = tenant_storage.scan_prefix(col_idx_prefix).await?;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:298` [async_fn]: `pub async fn drop_collection(`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:317` [await_expr]: `let report = self.erase_collection(tenant_id, name).await;`
+- `/app/crates/contextra-engine/src/contextra_impl/collections.rs:317` [lock_held_across_await_warning]: `Lock acquired at line 312 near await at line 317`
+- `/app/crates/contextra-engine/src/extraction/mod.rs:58` [await_expr]: `open_ie::extract_triples(text, gen, config).await`
+- `/app/crates/contextra-engine/src/extraction/mod.rs:83` [async_fn]: `pub async fn extract_triples_for_mode(`
+- `/app/crates/contextra-engine/src/extraction/mod.rs:90` [await_expr]: `extractor.extract_triples(text, generator, config).await`
+- `/app/crates/contextra-engine/src/extraction/mod.rs:94` [async_fn]: `pub async fn extract_triples_for_config(`
+- `/app/crates/contextra-engine/src/extraction/mod.rs:99` [await_expr]: `extract_triples_for_mode(ExtractorMode::OpenIe, text, generator, config).await`
+- `/app/crates/contextra-engine/src/extraction/open_ie.rs:80` [async_fn]: `pub async fn extract_triples(`
+- `/app/crates/contextra-engine/src/extraction/open_ie.rs:112` [await_expr]: `let response = generator.generate(&prompt).await?;`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:33` [tokio_import]: `) -> (tokio::task::JoinHandle<()>, Arc<AtomicU32>) {`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:37` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:38` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:39` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:51` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:54` [tokio_import]: `let expired = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:57` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:102` [tokio_import]: `let rebuild_res = tokio::time::timeout(`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:106` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:168` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/orphan_workers.rs:186` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:29` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:30` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:31` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:32` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:33` [await_expr]: `ticker.tick().await;`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:41` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:43` [await_expr]: `match collection.reap_expired_documents(MAX_EXPIRED_PER_TICK).await {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:79` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:91` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:93` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:94` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:95` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:97` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:99` [await_expr]: `match collection.evict_decayed_chunks(&decay_controller, 100).await {`
+- `/app/crates/contextra-engine/src/background_workers/expiry_workers.rs:119` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/config.rs:68` [await_expr]: `Box::pin(async move { self.rebuild().await })`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:18` [tokio_import]: `use tokio::sync::Mutex;`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:39` [async_fn]: `pub async fn enqueue(&self, ids: impl IntoIterator<Item = HyperEdgeId>) {`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:40` [await_expr]: `let mut guard = self.inner.lock().await;`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:40` [lock_held_across_await_warning]: `Lock acquired at line 40 near await at line 40`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:45` [async_fn]: `pub async fn drain_up_to(&self, max: usize) -> Vec<HyperEdgeId> {`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:46` [await_expr]: `let mut guard = self.inner.lock().await;`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:46` [lock_held_across_await_warning]: `Lock acquired at line 46 near await at line 46`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:58` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:59` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:60` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:61` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:70` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-engine/src/background_workers/hyperedge_worker.rs:72` [await_expr]: `let batch = queue.drain_up_to(MAX_DEFERRED_HYPEREDGES_PER_TICK).await;`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:163` [async_fn]: `pub async fn execute_all(`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:167` [await_expr]: `if let Err(e) = step.run(&mut self.context).await {`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:266` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:267` [async_fn]: `async fn test_typestate_workflow_success() {`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:286` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:295` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:296` [async_fn]: `async fn test_typestate_workflow_failure() {`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:305` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:314` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/orchestration/mod.rs:315` [async_fn]: `async fn test_engine_service_container_wiring() {`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:30` [async_fn]: `pub async fn new(storage: &'a S, seq: u64) -> Result<Self> {`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:31` [await_expr]: `storage.pin_checkpoint(seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:41` [async_fn]: `pub async fn new_at_latest(storage: &'a S) -> Result<(Self, u64)> {`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:42` [await_expr]: `let seq = storage.last_seq_no().await?;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:43` [await_expr]: `storage.pin_checkpoint(seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:55` [async_fn]: `pub async fn release(mut self) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:57` [await_expr]: `self.storage.unpin_checkpoint(self.seq).await`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:76` [async_fn]: `pub async fn with_pinned_checkpoint<S, F, Fut, T>(storage: &S, seq: u64, f: F) -> Result<T>`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:82` [await_expr]: `let pin_guard = CheckpointPinGuard::new(storage, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:83` [await_expr]: `let result = f().await;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:84` [await_expr]: `if let Err(e) = pin_guard.release().await {`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:94` [async_fn]: `pub async fn with_pinned_checkpoint_at_latest<S, F, Fut, T>(storage: &S, f: F) -> Result<T>`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:100` [await_expr]: `let (pin_guard, seq) = CheckpointPinGuard::new_at_latest(storage).await?;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:101` [await_expr]: `let result = f(seq).await;`
+- `/app/crates/contextra-engine/src/collection/search/checkpoint.rs:102` [await_expr]: `if let Err(e) = pin_guard.release().await {`
+- `/app/crates/contextra-engine/src/collection/search/hydrate.rs:18` [async_fn]: `pub(super) async fn hydrate_from_scored_at(`
+- `/app/crates/contextra-engine/src/collection/search/hydrate.rs:32` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {`
+- `/app/crates/contextra-engine/src/collection/search/hydrate.rs:67` [async_fn]: `pub(super) async fn hydrate_from_tuples_at(`
+- `/app/crates/contextra-engine/src/collection/search/hydrate.rs:81` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:23` [async_fn]: `pub async fn search(`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:34` [await_expr]: `self.search_with_filter_expr(query_embedding, k, None).await`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:41` [async_fn]: `pub async fn search_with_filter(`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:51` [await_expr]: `self.search_with_filter_expr(query, k, expr).await`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:58` [async_fn]: `pub async fn search_with_filter_expr(`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:83` [await_expr]: `None => return self.search_filtered_at(query, k, None, seq).await,`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:86` [await_expr]: `let matched_ids = self.get_matching_doc_ids_at(&filter, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:95` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:97` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:104` [async_fn]: `pub async fn search_text(`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:122` [await_expr]: `embedder.embed(query_text).await?`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:122` [lock_held_across_await_warning]: `Lock acquired at line 112 near await at line 122`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:124` [await_expr]: `self.search(&embedding, k).await`
+- `/app/crates/contextra-engine/src/collection/search/basic.rs:124` [lock_held_across_await_warning]: `Lock acquired at line 112 near await at line 124`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:27` [async_fn]: `pub(super) async fn estimate_filter_selectivity(`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:37` [await_expr]: `let matched = self.get_matching_doc_ids_at(filter, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:50` [await_expr]: `let entries = self.storage.scan_prefix_at(&prefix, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:87` [async_fn]: `pub(super) async fn get_matching_doc_ids_at(`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:100` [await_expr]: `let entries = self.storage.scan_prefix_at(&prefix, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:123` [async_fn]: `pub(super) async fn get_matching_doc_ids_for_query_at(`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:140` [await_expr]: `let entries = self.storage.scan_prefix_at(&prefix, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:181` [async_fn]: `pub async fn search_filtered(`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:191` [await_expr]: `self.search_filtered_at(query, k, filter, seq).await`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:193` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:198` [async_fn]: `pub async fn search_filtered_at(`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:221` [await_expr]: `let scored_docs = self.index.search_filtered(query, fetch_k, filter).await?;`
+- `/app/crates/contextra-engine/src/collection/search/filtered.rs:224` [await_expr]: `let (results, skipped) = self.hydrate_from_scored_at(scored_docs, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:17` [async_fn]: `pub async fn execute(self) -> Result<Vec<crate::SearchResult>> {`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:19` [await_expr]: `let (results, report) = self.execute_with_report().await?;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:39` [async_fn]: `pub async fn execute_with_report(`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:52` [await_expr]: `self.collection.snapshot_seq().await?`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:71` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:76` [await_expr]: `let reranked = self.apply_reranker_stage(reranker, results, k).await?;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:192` [async_fn]: `async fn apply_reranker_stage(`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:241` [await_expr]: `tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:241` [tokio_import]: `tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:336` [async_fn]: `pub async fn execute_with_scope(self) -> Result<Vec<crate::SearchResult>> {`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:367` [await_expr]: `self.collection.snapshot_seq().await?`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:372` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:376` [await_expr]: `return self.apply_reranker_stage(reranker, results, k).await;`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:385` [async_fn]: `async fn hydrate_acorn_search_results(`
+- `/app/crates/contextra-engine/src/collection/query_builder/builder_exec.rs:399` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:16` [async_fn]: `pub async fn put_kv(&self, id: &str, value: &serde_json::Value) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:18` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:23` [await_expr]: `self.storage.put(tx, &user_key, &data).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:24` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:31` [async_fn]: `pub async fn put_kv_if_absent(&self, id: &str, value: &serde_json::Value) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:33` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:38` [await_expr]: `let written = self.storage.put_if_absent(tx, &user_key, &data).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:40` [await_expr]: `if let Err(rollback_err) = self.storage.rollback(tx).await {`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:53` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:59` [async_fn]: `pub async fn get_kv(&self, id: &str) -> Result<Option<serde_json::Value>> {`
+- `/app/crates/contextra-engine/src/collection/crud/kv.rs:63` [await_expr]: `if let Some(data) = self.storage.get(&key).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:20` [async_fn]: `pub async fn insert_text_only(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:38` [await_expr]: `embedder.embed(text).await?`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:38` [lock_held_across_await_warning]: `Lock acquired at line 28 near await at line 38`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:51` [await_expr]: `let res = self.insert(id, &embedding, metadata).await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:56` [await_expr]: `auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:68` [async_fn]: `pub async fn upsert_text_only(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:86` [await_expr]: `embedder.embed(text).await?`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:86` [lock_held_across_await_warning]: `Lock acquired at line 76 near await at line 86`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:99` [await_expr]: `let res = self.upsert(id, &embedding, metadata).await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:104` [await_expr]: `auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:116` [async_fn]: `pub async fn insert_with_ttl(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:130` [await_expr]: `let current_seq = self.snapshot_seq().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:143` [await_expr]: `self.insert(id, embedding, Some(meta)).await`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:147` [async_fn]: `pub async fn insert_typed(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:179` [await_expr]: `self.insert(id, embedding, Some(meta)).await`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:184` [async_fn]: `pub async fn insert(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:197` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:198` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:199` [await_expr]: `self.insert_inner_unlocked(id, embedding, metadata).await`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:203` [async_fn]: `pub(crate) async fn insert_inner_unlocked(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:231` [await_expr]: `match self.insert_op(&db_tx, id, embedding, metadata).await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:233` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:254` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:263` [async_fn]: `pub(crate) async fn check_doc_id_collision(&self, doc_id: DocId, id: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:266` [await_expr]: `if let Some(val) = self.storage.get(&doc_key).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:288` [async_fn]: `pub(crate) async fn check_doc_id_collision_tracked(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:295` [await_expr]: `if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:317` [async_fn]: `pub async fn insert_op(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:329` [await_expr]: `self.check_doc_id_collision_tracked(tx, doc_id, id).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:351` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:355` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:358` [await_expr]: `self.storage.put(tx, &user_key, &data).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:361` [await_expr]: `let written = self.storage.put_if_absent(tx, &doc_key, &meta_data).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:363` [await_expr]: `self.check_doc_id_collision(doc_id, id).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:368` [await_expr]: `self.index.insert(tx, doc_id, embedding).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:384` [async_fn]: `pub async fn insert_many(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:410` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:413` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:418` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:431` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:442` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:444` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:453` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:460` [async_fn]: `pub async fn upsert(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:484` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:485` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:487` [await_expr]: `let result = self.update_op(&db_tx, id, embedding, metadata).await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:491` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:496` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:506` [async_fn]: `pub async fn upsert_many(`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:532` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:535` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:539` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:552` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:562` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:564` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/insert.rs:573` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:18` [async_fn]: `pub async fn update(`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:32` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:35` [await_expr]: `match self.update_op(&db_tx, id, embedding, metadata).await {`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:37` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:43` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:54` [async_fn]: `pub async fn update_op(`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:66` [await_expr]: `self.check_doc_id_collision_tracked(tx, doc_id, id).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:74` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:78` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:100` [await_expr]: `self.storage.put(tx, &user_key, &data).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:101` [await_expr]: `self.storage.put(tx, &doc_key, &meta_data).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:119` [await_expr]: `if let Err(e) = self.index.delete(tx, doc_id).await {`
+- `/app/crates/contextra-engine/src/collection/crud/update.rs:126` [await_expr]: `self.index.insert(tx, doc_id, embedding).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:15` [async_fn]: `pub async fn delete(&self, id: &str) -> Result<()> {`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:16` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:19` [await_expr]: `match self.delete_op(&mut db_tx, id).await {`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:21` [await_expr]: `db_tx.commit().await?;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:27` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:38` [async_fn]: `pub async fn delete_op(`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:53` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:57` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:65` [await_expr]: `self.storage.delete(tx, &user_key).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:66` [await_expr]: `self.storage.delete(tx, &doc_key).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/delete.rs:70` [await_expr]: `self.index.delete(tx, doc_id).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:15` [async_fn]: `pub async fn link_memories(`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:31` [await_expr]: `.await;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:33` [await_expr]: `self.check_link_cycle(from, to, relation).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:41` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:45` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:53` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:82` [await_expr]: `self.storage.put(tx, &user_key, &new_user_bytes).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:95` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:98` [await_expr]: `self.storage.commit(tx).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:106` [async_fn]: `async fn check_link_cycle(`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:130` [await_expr]: `let links = self.get_links(curr).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:141` [async_fn]: `async fn update_metadata_links(`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:177` [await_expr]: `self.storage.put(tx, doc_key, &updated_bytes).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:206` [await_expr]: `self.storage.put(tx, doc_key, &updated_bytes).await?;`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:216` [async_fn]: `pub async fn get_links(`
+- `/app/crates/contextra-engine/src/collection/crud/links.rs:222` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/internal.rs:56` [async_fn]: `pub(crate) async fn apply_insert_backpressure(&self) {`
+- `/app/crates/contextra-engine/src/collection/crud/internal.rs:79` [await_expr]: `tokio::time::sleep(backpressure_delay).await;`
+- `/app/crates/contextra-engine/src/collection/crud/internal.rs:79` [tokio_import]: `tokio::time::sleep(backpressure_delay).await;`
+- `/app/crates/contextra-engine/src/collection/crud/internal.rs:89` [async_fn]: `pub(crate) async fn lock_keys_sorted<'a>(`
+- `/app/crates/contextra-engine/src/collection/crud/internal.rs:93` [await_expr]: `self.kv_locks.lock_many_sorted(keys).await`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:30` [async_fn]: `pub async fn snapshot_seq(&self) -> Result<u64> {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:31` [await_expr]: `self.storage.last_seq_no().await`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:36` [async_fn]: `pub async fn get(&self, id: &str) -> Result<Option<crate::Document>> {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:37` [await_expr]: `self.get_at_snapshot(id, u64::MAX).await`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:42` [async_fn]: `pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:45` [await_expr]: `if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:62` [async_fn]: `pub async fn get_doc_tx(&self, doc_id: DocId) -> Result<Option<TxId>> {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:64` [await_expr]: `if let Some(bytes) = self.storage.get(&doc_key).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:88` [async_fn]: `pub async fn scan_prefix(`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:120` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:174` [async_fn]: `pub async fn scan(`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:211` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:291` [async_fn]: `pub async fn get_tracked(&self, tx: TxId, id: &str) -> Result<Option<StoredDocument>> {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:293` [await_expr]: `if let Some(bytes) = self.storage.get_tracked(tx, &key).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:302` [async_fn]: `pub async fn get_at_seq_tracked(`
+- `/app/crates/contextra-engine/src/collection/crud/read.rs:309` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq_tracked(tx, &key, max_seq).await? {`
+- `/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs:240` [async_fn]: `pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(`
+- `/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs:264` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs:289` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs:321` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs:322` [async_fn]: `async fn test_noop_llm_generator_behavior_defined_skip() {`
+- `/app/crates/contextra-engine/src/collection/crud/auto_extraction.rs:326` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:45` [async_fn]: `pub async fn hybrid_search_with_query(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:52` [await_expr]: `self.hybrid_search_with_query_at(query, seq).await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:54` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:59` [async_fn]: `pub async fn hybrid_search_with_query_at(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:66` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:72` [async_fn]: `pub async fn hybrid_search_with_query_and_report_at(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:103` [await_expr]: `let total_docs = self.len().await;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:143` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:158` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:171` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:186` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:190` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:195` [async_fn]: `async fn evaluate_vector_signal_for_query(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:213` [await_expr]: `let matched_ids_opt = self.get_matching_doc_ids_for_query_at(query, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:229` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:257` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:279` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:305` [async_fn]: `async fn evaluate_text_signal_for_query(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:324` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:337` [await_expr]: `let bm25_results = self.text_index.search_at(text, oversample, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:347` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:366` [await_expr]: `let bm25_results = self.text_index.search_at(text, candidate_k, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:374` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:400` [async_fn]: `async fn evaluate_graph_signal_for_query(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:449` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:454` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:457` [await_expr]: `self.graph_index.path_rag_at(anchors, max_hops, seq).await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:469` [await_expr]: `let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:513` [async_fn]: `async fn fuse_and_filter_superseded_results(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:526` [await_expr]: `self.get_community(same_comm_entity).await?`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:562` [await_expr]: `let links = self.get_links(doc_id).await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/query.rs:588` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:23` [async_fn]: `pub async fn hybrid_search(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:31` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:45` [async_fn]: `pub async fn hybrid_search_reranked(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:60` [await_expr]: `builder.execute().await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:68` [async_fn]: `pub async fn hybrid_search_with_weights(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:86` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:94` [async_fn]: `pub async fn hybrid_search_with_strategy(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:136` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:146` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:154` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:180` [await_expr]: `.await?`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:199` [await_expr]: `self.get_community(same_comm_entity).await?`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:233` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:236` [await_expr]: `.await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:240` [async_fn]: `async fn evaluate_graph_signal_tuples_at(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:252` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:261` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:270` [await_expr]: `.await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:280` [await_expr]: `self.hydrate_from_tuples_at(doc_tuples, seq).await`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:294` [async_fn]: `pub(super) async fn apply_community_boost_post_fusion(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:320` [await_expr]: `let community_map = self.get_communities_batch(&candidate_eids).await?;`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:346` [async_fn]: `pub async fn traverse_links(`
+- `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:363` [await_expr]: `let links = self.get_links(current_id).await?;`
+### `contextra-erasure`
+
+- `/app/crates/contextra-erasure/src/purge/window.rs:64` [async_fn]: `pub async fn run_core_window(core: &ErasureCore) -> Result<WindowOutcome, ErasureError> {`
+- `/app/crates/contextra-erasure/src/purge/window.rs:65` [await_expr]: `core.run_purge_window().await`
+- `/app/crates/contextra-erasure/src/gate/batch.rs:123` [async_fn]: `pub async fn execute_batch(`
+- `/app/crates/contextra-erasure/src/gate/batch.rs:137` [await_expr]: `let _exclusive_permit = self.barrier.exclusive().await;`
+- `/app/crates/contextra-erasure/src/scope/file.rs:30` [async_fn]: `pub async fn store_scope_file(`
+- `/app/crates/contextra-erasure/src/scope/file.rs:42` [await_expr]: `.await`
+- `/app/crates/contextra-erasure/src/scope/file.rs:112` [async_fn]: `pub async fn load_scope_file(`
+- `/app/crates/contextra-erasure/src/scope/file.rs:139` [await_expr]: `.await`
+- `/app/crates/contextra-erasure/src/saga/driver.rs:90` [async_fn]: `pub async fn step_async(&self, saga: &mut EraseSaga) -> Result<StepOutcome, ErasureError> {`
+- `/app/crates/contextra-erasure/src/saga/driver.rs:93` [await_expr]: `if let Ok(st) = core.status(id).await {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:44` [tokio_import]: `use tokio::sync::{oneshot, RwLock};`
+- `/app/crates/contextra-erasure/src/saga/core.rs:199` [async_fn]: `async fn notify_observer(`
+- `/app/crates/contextra-erasure/src/saga/core.rs:217` [await_expr]: `let res = obs.on_erased(event).await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:258` [async_fn]: `pub async fn erase(&self, req: EraseExecutionRequest) -> Result<EraseReceipt, ErasureError> {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:268` [await_expr]: `let keys = self.open_keys.read().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:268` [lock_held_across_await_warning]: `Lock acquired at line 268 near await at line 268`
+- `/app/crates/contextra-erasure/src/saga/core.rs:270` [await_expr]: `let map = self.active_sagas.read().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:270` [lock_held_across_await_warning]: `Lock acquired at line 270 near await at line 270`
+- `/app/crates/contextra-erasure/src/saga/core.rs:309` [tokio_import]: `tokio::spawn(async move {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:311` [await_expr]: `Self::execute_erase_flow(req, deps, cfg, active_sagas, open_keys, open_key).await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:317` [await_expr]: `match rx.await {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:326` [async_fn]: `async fn execute_erase_flow(`
+- `/app/crates/contextra-erasure/src/saga/core.rs:342` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:342` [lock_held_across_await_warning]: `Lock acquired at line 342 near await at line 342`
+- `/app/crates/contextra-erasure/src/saga/core.rs:365` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:366` [await_expr]: `let gated_seq = deps.gate.add_gate(erasure_id, &req.target).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:369` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:372` [await_expr]: `.await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:375` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:375` [lock_held_across_await_warning]: `Lock acquired at line 375 near await at line 375`
+- `/app/crates/contextra-erasure/src/saga/core.rs:388` [await_expr]: `let mut keys = open_keys.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:388` [lock_held_across_await_warning]: `Lock acquired at line 388 near await at line 388`
+- `/app/crates/contextra-erasure/src/saga/core.rs:407` [await_expr]: `let scope = match layer.resolve(&req.target).await {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:414` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:415` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:415` [lock_held_across_await_warning]: `Lock acquired at line 415 near await at line 415`
+- `/app/crates/contextra-erasure/src/saga/core.rs:441` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:444` [await_expr]: `let _permit = deps.commit_barrier.exclusive().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:445` [await_expr]: `let gated_seq = deps.gate.add_gate(erasure_id, &req.target).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:449` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:455` [await_expr]: `if let Err(_err) = layer.on_gate(scope).await {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:460` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:461` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:461` [lock_held_across_await_warning]: `Lock acquired at line 461 near await at line 461`
+- `/app/crates/contextra-erasure/src/saga/core.rs:485` [await_expr]: `deps.vault.destroy_highest_key(&req.target).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:488` [await_expr]: `let absent = deps.vault.verify_key_absent(&req.target).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:494` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:495` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:495` [lock_held_across_await_warning]: `Lock acquired at line 495 near await at line 495`
+- `/app/crates/contextra-erasure/src/saga/core.rs:520` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:522` [await_expr]: `Self::notify_observer(&deps, erasure_id, &req.target, ObservedPhase::Gated).await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:528` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:528` [lock_held_across_await_warning]: `Lock acquired at line 528 near await at line 528`
+- `/app/crates/contextra-erasure/src/saga/core.rs:541` [await_expr]: `let mut keys = open_keys.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:541` [lock_held_across_await_warning]: `Lock acquired at line 541 near await at line 541`
+- `/app/crates/contextra-erasure/src/saga/core.rs:559` [await_expr]: `.await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:579` [async_fn]: `async fn execute_purge_and_verify(`
+- `/app/crates/contextra-erasure/src/saga/core.rs:592` [await_expr]: `let map = active_sagas.read().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:592` [lock_held_across_await_warning]: `Lock acquired at line 592 near await at line 592`
+- `/app/crates/contextra-erasure/src/saga/core.rs:600` [await_expr]: `let _purge_permit = deps.purge_barrier.purge().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:600` [lock_held_across_await_warning]: `Lock acquired at line 592 near await at line 600`
+- `/app/crates/contextra-erasure/src/saga/core.rs:609` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:610` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:610` [lock_held_across_await_warning]: `Lock acquired at line 610 near await at line 610`
+- `/app/crates/contextra-erasure/src/saga/core.rs:630` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:633` [await_expr]: `deps.snapshots.revoke_covering(target, gated_seq).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:648` [await_expr]: `if let Err(_err) = layer.purge(scope, &purge_cx).await {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:653` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:654` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:654` [lock_held_across_await_warning]: `Lock acquired at line 654 near await at line 654`
+- `/app/crates/contextra-erasure/src/saga/core.rs:677` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:681` [await_expr]: `match deps.measure.witness_layer(layer.id(), target).await {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:688` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:689` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:689` [lock_held_across_await_warning]: `Lock acquired at line 689 near await at line 689`
+- `/app/crates/contextra-erasure/src/saga/core.rs:713` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:719` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:725` [await_expr]: `.await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:728` [await_expr]: `deps.gate.compact_gate(erasure_id).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:731` [await_expr]: `Self::notify_observer(&deps, erasure_id, target, ObservedPhase::Completed).await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:734` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:734` [lock_held_across_await_warning]: `Lock acquired at line 734 near await at line 734`
+- `/app/crates/contextra-erasure/src/saga/core.rs:747` [await_expr]: `let mut keys = open_keys.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:747` [lock_held_across_await_warning]: `Lock acquired at line 747 near await at line 747`
+- `/app/crates/contextra-erasure/src/saga/core.rs:757` [async_fn]: `pub async fn run_purge_window(`
+- `/app/crates/contextra-erasure/src/saga/core.rs:769` [await_expr]: `let map = self.active_sagas.read().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:769` [lock_held_across_await_warning]: `Lock acquired at line 769 near await at line 769`
+- `/app/crates/contextra-erasure/src/saga/core.rs:804` [await_expr]: `.await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:821` [async_fn]: `pub async fn recover_and_resume(&self) -> Result<Vec<ErasureId>, ErasureError> {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:822` [await_expr]: `let open_sagas = self.deps.journal.recover_open_sagas().await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:838` [await_expr]: `self.deps.journal.append_state(id, next_step, None).await?;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:840` [await_expr]: `let mut active = self.active_sagas.write().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:840` [lock_held_across_await_warning]: `Lock acquired at line 840 near await at line 840`
+- `/app/crates/contextra-erasure/src/saga/core.rs:863` [async_fn]: `pub async fn status(&self, id: ErasureId) -> Result<ErasureCoreStatus, ErasureError> {`
+- `/app/crates/contextra-erasure/src/saga/core.rs:864` [await_expr]: `let map = self.active_sagas.read().await;`
+- `/app/crates/contextra-erasure/src/saga/core.rs:864` [lock_held_across_await_warning]: `Lock acquired at line 864 near await at line 864`
+- `/app/crates/contextra-erasure/src/saga/seams.rs:59` [async_fn]: `pub async fn query_target_gate(`
+- `/app/crates/contextra-erasure/src/saga/seams.rs:63` [await_expr]: `gate.decision_for_target(target).await`
+### `contextra-infer-onnx`
+
+- `/app/crates/contextra-infer-onnx/examples/fake_reranker.rs:14` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-infer-onnx/examples/fake_reranker.rs:15` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-infer-onnx/examples/fake_reranker.rs:33` [await_expr]: `let results = reranker.rerank(query, &candidates).await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:124` [async_fn]: `pub async fn ensure_onnx_model_download(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:129` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:144` [async_fn]: `pub async fn ensure_onnx_model_download_with_options(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:157` [await_expr]: `let model_exists = path_exists_async(&model_file).await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:158` [await_expr]: `let tokenizer_exists = path_exists_async(&tokenizer_file).await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:172` [await_expr]: `create_dir_all_async(&target_dir).await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:212` [await_expr]: `.await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:230` [await_expr]: `.await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:239` [async_fn]: `async fn download_onnx_file_secured(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:270` [await_expr]: `let response = client.get(url_str).send().await.map_err(|e| {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:301` [await_expr]: `let bytes = response.bytes().await.map_err(|e| {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:333` [tokio_import]: `tokio::task::spawn_blocking(move || -> Result<()> {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:358` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:365` [async_fn]: `async fn path_exists_async(path: &Path) -> Result<bool> {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:367` [tokio_import]: `tokio::task::spawn_blocking(move || p.exists())`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:368` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:375` [async_fn]: `async fn create_dir_all_async(dir: &Path) -> Result<()> {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:377` [tokio_import]: `tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:385` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:393` [async_fn]: `pub async fn ensure_onnx_model_download(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:510` [tokio_import]: `semaphore: Arc<tokio::sync::Semaphore>,`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:551` [await_expr]: `self.embed_async(text).await.map_err(|e| match e {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:594` [tokio_import]: `handles.push(tokio::spawn(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:595` [await_expr]: `async move { embedder.embed(&text_owned).await },`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:602` [await_expr]: `match handle.await {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:619` [await_expr]: `seq_results.push(self.embed(text).await?);`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:701` [tokio_import]: `semaphore: Arc::new(tokio::sync::Semaphore::new(max_concurrent)),`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:749` [async_fn]: `pub async fn embed_async(&self, text: &str) -> Result<Vec<f32>> {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:757` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:765` [tokio_import]: `let output = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:769` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:769` [lock_held_across_await_warning]: `Lock acquired at line 766 near await at line 769`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1029` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1031` [async_fn]: `async fn test_ensure_onnx_model_download_cached_returns_immediately() {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1040` [await_expr]: `.await`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1045` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1047` [async_fn]: `async fn test_mock_embedding_engine() -> std::result::Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1059` [await_expr]: `let res = engine.embed("contextra").await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1064` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1066` [async_fn]: `async fn test_embed_batch_ordering_and_fallback(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1093` [await_expr]: `let batch_res = engine.embed_batch(&texts).await?;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1112` [await_expr]: `let err_res = failing_engine.embed_batch(&texts).await;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1121` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1123` [async_fn]: `async fn test_embed_batch_oversized_limit(`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1140` [await_expr]: `let res = EmbeddingProvider::embed_batch(&embedder, &large_texts).await;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1151` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1154` [async_fn]: `async fn test_model_download_offline_by_default() {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1159` [await_expr]: `let res = ensure_onnx_model_download("nomic-embed-text", Some(&cache_dir)).await;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1167` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1170` [async_fn]: `async fn test_model_download_options_secured_checks() {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1181` [await_expr]: `.await;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1200` [await_expr]: `.await;`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1208` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1211` [async_fn]: `async fn test_ensure_onnx_model_download_disabled_feature() {`
+- `/app/crates/contextra-infer-onnx/src/lib.rs:1212` [await_expr]: `let res = ensure_onnx_model_download("nomic-embed-text", None).await;`
+- `/app/crates/contextra-infer-onnx/src/reranker/cross_encoder.rs:226` [async_fn]: `pub async fn rerank(`
+- `/app/crates/contextra-infer-onnx/src/reranker/cross_encoder.rs:240` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;`
+- `/app/crates/contextra-infer-onnx/src/reranker/cross_encoder.rs:240` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;`
+- `/app/crates/contextra-infer-onnx/src/reranker/cross_encoder.rs:260` [await_expr]: `onnx.rerank(_query, candidates, &calib).await`
+- `/app/crates/contextra-infer-onnx/src/reranker/cross_encoder.rs:260` [lock_held_across_await_warning]: `Lock acquired at line 259 near await at line 260`
+- `/app/crates/contextra-infer-onnx/src/reranker/onnx.rs:107` [async_fn]: `pub(super) async fn rerank(`
+- `/app/crates/contextra-infer-onnx/src/reranker/onnx.rs:127` [tokio_import]: `let scores = tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-infer-onnx/src/reranker/onnx.rs:137` [await_expr]: `.await`
+### `contextra-kvcache`
+
+- `/app/crates/contextra-kvcache/src/store.rs:1037` [tokio_import]: `let notify_batch_released = Arc::new(tokio::sync::Notify::new());`
+- `/app/crates/contextra-kvcache/src/store.rs:1038` [tokio_import]: `let notify_read_complete = Arc::new(tokio::sync::Notify::new());`
+- `/app/crates/contextra-kvcache/src/store.rs:1046` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-kvcache/src/store.rs:1051` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-kvcache/src/store.rs:1053` [await_expr]: `notify_batch_released_clone.notified().await;`
+- `/app/crates/contextra-kvcache/src/store.rs:1071` [tokio_import]: `tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-kvcache/src/store.rs:1074` [block_on]: `.block_on(async {`
+- `/app/crates/contextra-kvcache/src/store.rs:1075` [await_expr]: `notify_read_complete_evict.notified().await;`
+- `/app/crates/contextra-kvcache/src/adapters.rs:55` [await_expr]: `Box::pin(async move { self.engine.get(key).await })`
+- `/app/crates/contextra-kvcache/src/adapters.rs:65` [await_expr]: `Box::pin(async move { self.engine.put(tx_id, key, value).await })`
+- `/app/crates/contextra-kvcache/src/adapters.rs:70` [await_expr]: `Box::pin(async move { self.engine.commit(tx_id).await })`
+- `/app/crates/contextra-kvcache/src/service.rs:229` [await_expr]: `spill.put(tx_id, key.as_bytes(), &encrypted).await.ok()?;`
+- `/app/crates/contextra-kvcache/src/service.rs:230` [await_expr]: `spill.commit(tx_id).await.ok()?;`
+- `/app/crates/contextra-kvcache/src/service.rs:383` [async_fn]: `pub async fn read_segment(`
+- `/app/crates/contextra-kvcache/src/service.rs:396` [await_expr]: `if let Some(spill_bytes) = spill.get(key.as_bytes()).await? {`
+- `/app/crates/contextra-kvcache/src/service.rs:412` [async_fn]: `pub async fn spill_segment(`
+- `/app/crates/contextra-kvcache/src/service.rs:434` [await_expr]: `spill.put(tx_id, key.as_bytes(), &serialized_data).await?;`
+- `/app/crates/contextra-kvcache/src/service.rs:435` [await_expr]: `spill.commit(tx_id).await?;`
+- `/app/crates/contextra-kvcache/src/service.rs:505` [await_expr]: `spill_storage.put(tx_id, key.as_bytes(), &[]).await.ok()?;`
+- `/app/crates/contextra-kvcache/src/service.rs:505` [lock_held_across_await_warning]: `Lock acquired at line 494 near await at line 505`
+- `/app/crates/contextra-kvcache/src/service.rs:506` [await_expr]: `spill_storage.commit(tx_id).await.ok()`
+- `/app/crates/contextra-kvcache/src/service.rs:506` [lock_held_across_await_warning]: `Lock acquired at line 494 near await at line 506`
+### `contextra-ports`
+
+- `/app/crates/contextra-ports/src/vector_index.rs:59` [await_expr]: `self.insert(tx, *id, embedding).await?;`
+- `/app/crates/contextra-ports/src/vector_index.rs:119` [await_expr]: `self.search(query, k).await`
+- `/app/crates/contextra-ports/src/vector_index.rs:143` [await_expr]: `async { self.len().await == 0 }`
+- `/app/crates/contextra-ports/src/vector_index.rs:188` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/vector_index.rs:189` [async_fn]: `async fn test_hnsw_search_at_capability() {`
+- `/app/crates/contextra-ports/src/vector_index.rs:192` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &[f32]) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:195` [async_fn]: `async fn search(&self, _: &[f32], _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:198` [async_fn]: `async fn search_at(&self, _: &[f32], _: usize, _: u64) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:201` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:204` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:207` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:210` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:213` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:216` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-ports/src/vector_index.rs:219` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:230` [await_expr]: `let res = index.search_at(&[1.0, 0.0], 5, 1).await;`
+- `/app/crates/contextra-ports/src/vector_index.rs:242` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/vector_index.rs:243` [async_fn]: `async fn test_vector_index_defaults() {`
+- `/app/crates/contextra-ports/src/vector_index.rs:246` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &[f32]) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:250` [async_fn]: `async fn search(&self, _: &[f32], _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:253` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:256` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:259` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:262` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:265` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:268` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-ports/src/vector_index.rs:271` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/app/crates/contextra-ports/src/vector_index.rs:283` [await_expr]: `assert!(index.is_empty().await);`
+- `/app/crates/contextra-ports/src/vector_index.rs:289` [await_expr]: `index.insert_batch(TxId(1), &vectors).await.unwrap();`
+- `/app/crates/contextra-ports/src/vector_index.rs:290` [await_expr]: `assert_eq!(index.len().await, 2);`
+- `/app/crates/contextra-ports/src/vector_index.rs:291` [await_expr]: `assert!(!index.is_empty().await);`
+- `/app/crates/contextra-ports/src/vector_index.rs:294` [await_expr]: `let res = index.search_filtered(&[1.0], 1, Some(&|_| true)).await;`
+- `/app/crates/contextra-ports/src/vector_index.rs:303` [await_expr]: `let res2 = index.search_at(&[1.0], 1, 42).await;`
+- `/app/crates/contextra-ports/src/query_rewriter.rs:19` [await_expr]: `.await?;`
+- `/app/crates/contextra-ports/src/query_rewriter.rs:38` [await_expr]: `let queries = self.rewrite(original_query, current_results).await?;`
+- `/app/crates/contextra-ports/src/graph_index.rs:61` [await_expr]: `let results = self.traverse(start_node, 1).await?;`
+- `/app/crates/contextra-ports/src/graph_index.rs:88` [await_expr]: `self.add_edge(tx, Edge::new(from, to, label)).await?;`
+- `/app/crates/contextra-ports/src/graph_index.rs:89` [await_expr]: `self.add_edge(tx, Edge::new(to, from, label)).await?;`
+- `/app/crates/contextra-ports/src/graph_index.rs:104` [await_expr]: `let results = self.traverse(start, max_hops).await?;`
+- `/app/crates/contextra-ports/src/graph_index.rs:129` [await_expr]: `let results = self.traverse_at(start, max_hops, seq_no).await?;`
+- `/app/crates/contextra-ports/src/graph_index.rs:295` [await_expr]: `Box::pin(async move { self.len().await == 0 })`
+- `/app/crates/contextra-ports/src/graph_index.rs:324` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/graph_index.rs:325` [async_fn]: `async fn test_csr_graph_capability() {`
+- `/app/crates/contextra-ports/src/graph_index.rs:392` [await_expr]: `let res_traverse_at = graph.traverse_at(EntityId::new(1), 2, 1).await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:403` [await_expr]: `.await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:414` [await_expr]: `.await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:424` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/graph_index.rs:425` [async_fn]: `async fn test_graph_index_defaults() {`
+- `/app/crates/contextra-ports/src/graph_index.rs:468` [await_expr]: `let res = index.traverse_at(EntityId::new(1), 2, 42).await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:479` [await_expr]: `.await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:489` [await_expr]: `.await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:499` [await_expr]: `.await;`
+- `/app/crates/contextra-ports/src/graph_index.rs:508` [await_expr]: `let res_path_rag_at = index.path_rag_at(&[EntityId::new(1)], 2, 42).await;`
+- `/app/crates/contextra-ports/src/embedding.rs:56` [await_expr]: `results.push(self.embed(text).await?);`
+- `/app/crates/contextra-ports/src/embedding.rs:101` [await_expr]: `results.push(self.embed(text).await?);`
+- `/app/crates/contextra-ports/src/embedding.rs:137` [await_expr]: `self.generate(&concatenated).await`
+- `/app/crates/contextra-ports/src/embedding.rs:157` [await_expr]: `.await`
+- `/app/crates/contextra-ports/src/embedding.rs:168` [await_expr]: `.await`
+- `/app/crates/contextra-ports/src/embedding.rs:177` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/embedding.rs:178` [async_fn]: `async fn test_embedding_error_display() {`
+- `/app/crates/contextra-ports/src/embedding.rs:197` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/embedding.rs:198` [async_fn]: `async fn test_context_segment_and_generate_with_context_default(`
+- `/app/crates/contextra-ports/src/embedding.rs:219` [await_expr]: `let res = llm.generate_with_context(tenant, &[seg1, seg2]).await?;`
+- `/app/crates/contextra-ports/src/embedding.rs:224` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/embedding.rs:225` [async_fn]: `async fn test_generate_with_context_default_matches_concatenation(`
+- `/app/crates/contextra-ports/src/embedding.rs:231` [await_expr]: `let with_ctx = llm.generate_with_context(tenant, &[seg1, seg2]).await?;`
+- `/app/crates/contextra-ports/src/embedding.rs:232` [await_expr]: `let direct = llm.generate("Hello\n\nWorld").await?;`
+- `/app/crates/contextra-ports/src/embedding.rs:237` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/embedding.rs:238` [async_fn]: `async fn test_generate_with_context_empty_segments() -> Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-ports/src/embedding.rs:241` [await_expr]: `let res = llm.generate_with_context(tenant, &[]).await?;`
+- `/app/crates/contextra-ports/src/conformance.rs:46` [async_fn]: `pub async fn assert_checkpoint_coordinator_contract<T: CheckpointCoordinator>(`
+- `/app/crates/contextra-ports/src/conformance.rs:53` [await_expr]: `.await,`
+- `/app/crates/contextra-ports/src/conformance.rs:55` [await_expr]: `drop(t.restore_named_checkpoint("name").await);`
+- `/app/crates/contextra-ports/src/conformance.rs:56` [await_expr]: `drop(t.drop_named_checkpoint("name").await);`
+- `/app/crates/contextra-ports/src/conformance.rs:57` [await_expr]: `drop(t.list_named_checkpoints().await);`
+- `/app/crates/contextra-ports/src/conformance.rs:61` [async_fn]: `pub async fn assert_vector_index_contract<T: VectorIndex + HybridSearchProvider>(`
+- `/app/crates/contextra-ports/src/conformance.rs:67` [await_expr]: `drop(t.search_at(&[0.0; 4], 10, 0).await);`
+- `/app/crates/contextra-ports/src/conformance.rs:68` [await_expr]: `drop(t.insert(TxId(1), doc, &[0.0; 4]).await);`
+- `/app/crates/contextra-ports/src/text_index.rs:93` [await_expr]: `async { self.len().await == 0 }`
+- `/app/crates/contextra-ports/src/text_index.rs:116` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/text_index.rs:117` [async_fn]: `async fn test_text_index_search_at_capability() {`
+- `/app/crates/contextra-ports/src/text_index.rs:120` [async_fn]: `async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-ports/src/text_index.rs:123` [async_fn]: `async fn search_at(&self, _: &str, _: usize, _: u64) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-ports/src/text_index.rs:126` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &str) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:129` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:132` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:135` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:138` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:141` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-ports/src/text_index.rs:144` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-ports/src/text_index.rs:147` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/app/crates/contextra-ports/src/text_index.rs:156` [await_expr]: `let res = text_index.search_at("test", 5, 1).await;`
+- `/app/crates/contextra-ports/src/text_index.rs:166` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-ports/src/text_index.rs:167` [async_fn]: `async fn test_text_index_defaults() {`
+- `/app/crates/contextra-ports/src/text_index.rs:170` [async_fn]: `async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-ports/src/text_index.rs:173` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &str) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:176` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:179` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:182` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:185` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/app/crates/contextra-ports/src/text_index.rs:188` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-ports/src/text_index.rs:191` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-ports/src/text_index.rs:194` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/app/crates/contextra-ports/src/text_index.rs:204` [await_expr]: `let res = index.search_at("query", 10, 42).await;`
+- `/app/crates/contextra-ports/src/storage.rs:117` [await_expr]: `self.put(tx_id, key, value).await?;`
+- `/app/crates/contextra-ports/src/storage.rs:131` [await_expr]: `self.delete(tx_id, &key).await?;`
+- `/app/crates/contextra-ports/src/storage.rs:144` [await_expr]: `.await?`
+- `/app/crates/contextra-ports/src/storage.rs:148` [await_expr]: `self.delete_many(tx_id, matching_keys).await`
+- `/app/crates/contextra-ports/src/storage.rs:195` [await_expr]: `let all = self.scan_prefix(prefix).await?;`
+### `contextra-rank`
+
+- `/app/crates/contextra-rank/src/dibud/driver.rs:51` [async_fn]: `pub async fn fuse_exact_prefix_async<P, Fut>(`
+- `/app/crates/contextra-rank/src/dibud/driver.rs:65` [await_expr]: `let item = poll(ch).await?;`
+### `contextra-store`
+
+- `/app/crates/contextra-store/examples/chaos_writer.rs:15` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-store/examples/chaos_writer.rs:16` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-store/examples/chaos_writer.rs:34` [await_expr]: `let storage = LsmStorage::new(config).await?;`
+- `/app/crates/contextra-store/examples/chaos_writer.rs:54` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/examples/chaos_writer.rs:55` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-store/examples/chaos_writer.rs:63` [await_expr]: `tokio::time::sleep(Duration::from_millis(10)).await;`
+- `/app/crates/contextra-store/examples/chaos_writer.rs:63` [tokio_import]: `tokio::time::sleep(Duration::from_millis(10)).await;`
+- `/app/crates/contextra-store/examples/store_standalone.rs:9` [tokio_import]: `#[tokio::main]`
+- `/app/crates/contextra-store/examples/store_standalone.rs:10` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-store/examples/store_standalone.rs:21` [await_expr]: `let storage = LsmStorage::new(config).await?;`
+- `/app/crates/contextra-store/examples/store_standalone.rs:28` [await_expr]: `storage.put(tx, key, val).await?;`
+- `/app/crates/contextra-store/examples/store_standalone.rs:29` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-store/examples/store_standalone.rs:32` [await_expr]: `let read_val = storage.get(key).await?;`
+- `/app/crates/contextra-store/examples/store_standalone.rs:39` [await_expr]: `storage.close().await?;`
+- `/app/crates/contextra-store/src/system_pressure.rs:60` [tokio_import]: `pressure_tx: tokio::sync::watch::Sender<SystemPressure>,`
+- `/app/crates/contextra-store/src/system_pressure.rs:61` [tokio_import]: `pub pressure_rx: tokio::sync::watch::Receiver<SystemPressure>,`
+- `/app/crates/contextra-store/src/system_pressure.rs:74` [tokio_import]: `let (pressure_tx, pressure_rx) = tokio::sync::watch::channel(default_pressure);`
+- `/app/crates/contextra-store/src/system_pressure.rs:114` [async_fn]: `pub async fn run(`
+- `/app/crates/contextra-store/src/system_pressure.rs:128` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/system_pressure.rs:131` [async_fn]: `pub async fn run_with_metrics_sink(`
+- `/app/crates/contextra-store/src/system_pressure.rs:149` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-store/src/system_pressure.rs:151` [tokio_import]: `_ = tokio::time::sleep(self.sampling_interval) => {`
+- `/app/crates/contextra-store/src/system_pressure.rs:152` [tokio_import]: `let metrics = tokio::runtime::Handle::current().metrics();`
+- `/app/crates/contextra-store/src/system_pressure.rs:164` [tokio_import]: `let blocking_probe = tokio::task::spawn_blocking(|| {`
+- `/app/crates/contextra-store/src/system_pressure.rs:167` [await_expr]: `let blocking_util = match tokio::time::timeout(Duration::from_millis(100), blocking_probe).await {`
+- `/app/crates/contextra-store/src/system_pressure.rs:167` [tokio_import]: `let blocking_util = match tokio::time::timeout(Duration::from_millis(100), blocking_probe).await {`
+- `/app/crates/contextra-store/src/system_pressure.rs:265` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/system_pressure.rs:266` [async_fn]: `async fn test_monitor_run_cancellation() {`
+- `/app/crates/contextra-store/src/system_pressure.rs:271` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/app/crates/contextra-store/src/system_pressure.rs:272` [await_expr]: `monitor.run(cancel_token, || 0, || 10, 10).await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:275` [await_expr]: `tokio::time::sleep(Duration::from_millis(20)).await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:275` [tokio_import]: `tokio::time::sleep(Duration::from_millis(20)).await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:278` [await_expr]: `let res = tokio::time::timeout(Duration::from_secs(1), handle).await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:278` [tokio_import]: `let res = tokio::time::timeout(Duration::from_secs(1), handle).await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:285` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/system_pressure.rs:286` [async_fn]: `async fn test_watch_receiver_updates() {`
+- `/app/crates/contextra-store/src/system_pressure.rs:295` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/app/crates/contextra-store/src/system_pressure.rs:303` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:313` [await_expr]: `rx.changed().await.unwrap();`
+- `/app/crates/contextra-store/src/system_pressure.rs:319` [await_expr]: `let _ = handle.await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:322` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/system_pressure.rs:323` [async_fn]: `async fn test_blocking_pool_load_triggers_pressure() {`
+- `/app/crates/contextra-store/src/system_pressure.rs:329` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/app/crates/contextra-store/src/system_pressure.rs:330` [await_expr]: `monitor.run(cancel_token, || 0, || 10, 10).await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:336` [tokio_import]: `handles.push(tokio::task::spawn_blocking(|| {`
+- `/app/crates/contextra-store/src/system_pressure.rs:345` [await_expr]: `if rx.changed().await.is_ok() {`
+- `/app/crates/contextra-store/src/system_pressure.rs:362` [await_expr]: `let _ = handle.await;`
+- `/app/crates/contextra-store/src/system_pressure.rs:364` [await_expr]: `let _ = h.await;`
+- `/app/crates/contextra-store/src/tenant_codec.rs:558` [await_expr]: `self.inner.get_handle(&physical_key).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:569` [await_expr]: `self.inner.get_at_seq_handle(&physical_key, seq_no).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:580` [await_expr]: `self.inner.get_tracked_handle(tx_id, &physical_key).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:594` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:608` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/tenant_codec.rs:620` [await_expr]: `self.inner.put_handle(tx_id, &physical_key, value).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:634` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:648` [await_expr]: `self.inner.put_batch_handle(tx_id, &physical_entries).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:655` [await_expr]: `self.inner.delete_handle(tx_id, &physical_key).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:662` [await_expr]: `self.inner.delete_many_handle(tx_id, physical_keys).await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:671` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/tenant_codec.rs:717` [await_expr]: `let raw_res = self.inner.scan_prefix_handle(&physical_prefix).await?;`
+- `/app/crates/contextra-store/src/tenant_codec.rs:734` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/tenant_codec.rs:751` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/tenant_codec.rs:788` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/tenant_codec.rs:830` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/fsync.rs:11` [async_fn]: `pub async fn sync_file(path: &Path) -> Result<()> {`
+- `/app/crates/contextra-store/src/fsync.rs:14` [await_expr]: `let file = crate::wal::fs::File::open(path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/fsync.rs:20` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/fsync.rs:43` [async_fn]: `pub async fn sync_parent_dir(path: &Path) -> Result<()> {`
+- `/app/crates/contextra-store/src/fsync.rs:53` [await_expr]: `let dir = crate::wal::fs::File::open(dir_path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/fsync.rs:60` [await_expr]: `dir.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/fsync.rs:80` [async_fn]: `pub async fn fsync_parent_dir(path: &Path) -> Result<()> {`
+- `/app/crates/contextra-store/src/fsync.rs:81` [await_expr]: `sync_parent_dir(path).await`
+- `/app/crates/contextra-store/src/fsync.rs:89` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/fsync.rs:91` [async_fn]: `async fn test_sync_file_and_parent_dir_unix() {`
+- `/app/crates/contextra-store/src/fsync.rs:94` [tokio_import]: `tokio::fs::write(&file_path, b"test payload")`
+- `/app/crates/contextra-store/src/fsync.rs:95` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/fsync.rs:98` [await_expr]: `sync_file(&file_path).await.expect("sync_file failed");`
+- `/app/crates/contextra-store/src/fsync.rs:100` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/fsync.rs:103` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/fsync.rs:107` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/fsync.rs:109` [async_fn]: `async fn test_sync_file_and_parent_dir_windows() {`
+- `/app/crates/contextra-store/src/fsync.rs:111` [await_expr]: `let err = sync_parent_dir(path).await.unwrap_err();`
+- `/app/crates/contextra-store/src/fsync.rs:118` [await_expr]: `let err_file = sync_file(path).await.unwrap_err();`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:25` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:26` [tokio_import]: `if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:27` [tokio_import]: `tokio::task::block_in_place(|| handle.block_on(fut))`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:27` [block_on]: `tokio::task::block_in_place(|| handle.block_on(fut))`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:31` [tokio_import]: `let mut builder = tokio::runtime::Builder::new_current_thread();`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:36` [block_on]: `rt.block_on(fut)`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:43` [tokio_import]: `let mut builder = tokio::runtime::Builder::new_current_thread();`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:48` [block_on]: `rt.block_on(fut)`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:73` [await_expr]: `if let Ok(mut builder) = SstableBuilder::create(&canary_path).await {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:74` [await_expr]: `if builder.add(canary_key, canary_val, 1, 1).await.is_ok() {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:75` [await_expr]: `if builder.finish().await.is_ok() {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:79` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:81` [await_expr]: `if let Ok(entries) = reader.iter().await {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:98` [await_expr]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:98` [tokio_import]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:116` [await_expr]: `let readers = self.storage.sstables_for_scanner().await;`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:131` [await_expr]: `if let Ok(entries) = reader.iter().await {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:151` [await_expr]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:151` [tokio_import]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:152` [await_expr]: `while let Ok(Some(entry)) = dir.next_entry().await {`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:160` [await_expr]: `SstableReader::open_with_key_manager(&path, block_cache, None).await`
+- `/app/crates/contextra-store/src/scanner/sstable.rs:162` [await_expr]: `if let Ok(entries) = orphan_reader.iter().await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:52` [await_expr]: `self.storage.flush().await?;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:55` [await_expr]: `let readers = self.storage.sstables_for_scanner().await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:62` [await_expr]: `let entries = reader.iter().await.unwrap_or_default();`
+- `/app/crates/contextra-store/src/scanner/purge.rs:73` [await_expr]: `if retained.len() == reader.iter().await.unwrap_or_default().len() {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:83` [await_expr]: `if let Ok(mut builder) = SstableBuilder::create(&new_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:85` [await_expr]: `let _ = builder.add(&rk, &rv, rseq, 1).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:87` [await_expr]: `if builder.finish().await.is_ok() {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:93` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/scanner/purge.rs:106` [await_expr]: `let mut sst_guard = sst_arc.write().await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:106` [lock_held_across_await_warning]: `Lock acquired at line 106 near await at line 106`
+- `/app/crates/contextra-store/src/scanner/purge.rs:113` [await_expr]: `for r in &self.storage.sstables_for_scanner().await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:113` [lock_held_across_await_warning]: `Lock acquired at line 106 near await at line 113`
+- `/app/crates/contextra-store/src/scanner/purge.rs:117` [await_expr]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:117` [tokio_import]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:117` [lock_held_across_await_warning]: `Lock acquired at line 106 near await at line 117`
+- `/app/crates/contextra-store/src/scanner/purge.rs:118` [await_expr]: `while let Ok(Some(entry)) = dir.next_entry().await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:118` [lock_held_across_await_warning]: `Lock acquired at line 106 near await at line 118`
+- `/app/crates/contextra-store/src/scanner/purge.rs:129` [await_expr]: `if let Ok(metadata) = tokio::fs::metadata(&old_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:129` [tokio_import]: `if let Ok(metadata) = tokio::fs::metadata(&old_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:132` [await_expr]: `let _ = tokio::fs::write(&old_path, zeros).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:132` [tokio_import]: `let _ = tokio::fs::write(&old_path, zeros).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:133` [await_expr]: `if tokio::fs::remove_file(&old_path).await.is_ok() {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:133` [tokio_import]: `if tokio::fs::remove_file(&old_path).await.is_ok() {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:141` [await_expr]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:141` [tokio_import]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:142` [await_expr]: `while let Ok(Some(entry)) = dir.next_entry().await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:155` [await_expr]: `if let Ok(wal) = Wal::open_read_only(&wal_path, None).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:156` [await_expr]: `if let Ok(entries) = wal.replay().await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:201` [await_expr]: `if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:201` [tokio_import]: `if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:204` [await_expr]: `let _ = tokio::fs::write(&wal_path, zeros).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:204` [tokio_import]: `let _ = tokio::fs::write(&wal_path, zeros).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:205` [await_expr]: `let _ = tokio::fs::remove_file(&wal_path).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:205` [tokio_import]: `let _ = tokio::fs::remove_file(&wal_path).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:212` [await_expr]: `Wal::open_with_config(&tmp_wal_path, WalConfig::default()).await`
+- `/app/crates/contextra-store/src/scanner/purge.rs:215` [await_expr]: `new_wal.prepare_batch(retained_wal).await`
+- `/app/crates/contextra-store/src/scanner/purge.rs:217` [await_expr]: `let _ = new_wal.append_batch(batch).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:220` [await_expr]: `if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:220` [tokio_import]: `if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {`
+- `/app/crates/contextra-store/src/scanner/purge.rs:223` [await_expr]: `let _ = tokio::fs::write(&wal_path, zeros).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:223` [tokio_import]: `let _ = tokio::fs::write(&wal_path, zeros).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:225` [await_expr]: `let _ = tokio::fs::rename(&tmp_wal_path, &wal_path).await;`
+- `/app/crates/contextra-store/src/scanner/purge.rs:225` [tokio_import]: `let _ = tokio::fs::rename(&tmp_wal_path, &wal_path).await;`
+- `/app/crates/contextra-store/src/scanner/memtable.rs:68` [await_expr]: `block_on_future(async { self.storage.memtables_for_scanner().await });`
+- `/app/crates/contextra-store/src/scanner/wal.rs:40` [await_expr]: `if let Ok(wal) = Wal::open_with_config(&canary_path, WalConfig::default()).await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:46` [await_expr]: `if let Ok((batch, _)) = wal.prepare_batch(vec![(op, 1)]).await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:47` [await_expr]: `let _ = wal.append_batch(batch).await;`
+- `/app/crates/contextra-store/src/scanner/wal.rs:50` [await_expr]: `if let Ok(reader_wal) = Wal::open_read_only(&canary_path, None).await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:51` [await_expr]: `if let Ok(entries) = reader_wal.replay().await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:68` [await_expr]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/app/crates/contextra-store/src/scanner/wal.rs:68` [tokio_import]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/app/crates/contextra-store/src/scanner/wal.rs:88` [await_expr]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:88` [tokio_import]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:89` [await_expr]: `while let Ok(Some(entry)) = dir.next_entry().await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:102` [await_expr]: `if let Ok(wal) = Wal::open_read_only(&wal_path, None).await {`
+- `/app/crates/contextra-store/src/scanner/wal.rs:103` [await_expr]: `if let Ok(entries) = wal.replay().await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:21` [tokio_import]: `use tokio::sync::RwLock;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:51` [tokio_import]: `pub(super) flush_notify: Arc<tokio::sync::Notify>,`
+- `/app/crates/contextra-store/src/lsm/engine.rs:54` [tokio_import]: `pub(super) commit_mutex: tokio::sync::Mutex<()>,`
+- `/app/crates/contextra-store/src/lsm/engine.rs:56` [tokio_import]: `pub(super) flush_mutex: tokio::sync::Mutex<()>,`
+- `/app/crates/contextra-store/src/lsm/engine.rs:58` [tokio_import]: `pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,`
+- `/app/crates/contextra-store/src/lsm/engine.rs:64` [tokio_import]: `pub(super) pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,`
+- `/app/crates/contextra-store/src/lsm/engine.rs:66` [tokio_import]: `pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,`
+- `/app/crates/contextra-store/src/lsm/engine.rs:83` [async_fn]: `pub async fn open(config: LsmConfig) -> Result<Self> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:84` [await_expr]: `Self::new_with_merge_operator(config, None).await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:88` [async_fn]: `pub async fn open_with_merge_operator(`
+- `/app/crates/contextra-store/src/lsm/engine.rs:92` [await_expr]: `Self::new_with_merge_operator(config, Some(merge_operator)).await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:98` [tokio_import]: `) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:108` [async_fn]: `pub async fn wait_shutdown(&self) {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:110` [await_expr]: `self.task_tracker.wait().await;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:114` [async_fn]: `pub async fn close(&self) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:115` [await_expr]: `self.wait_shutdown().await;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:116` [await_expr]: `self.flush().await?;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:130` [async_fn]: `pub async fn simulate_wal_append_failure_for_test(&self) {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:137` [async_fn]: `pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:144` [async_fn]: `pub async fn restore_wal_file_handle_for_test(&self) {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:241` [async_fn]: `pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:242` [await_expr]: `read::get_tracked(self, tx_id, key).await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:254` [async_fn]: `pub async fn get_at_seq_tracked(`
+- `/app/crates/contextra-store/src/lsm/engine.rs:260` [await_expr]: `read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:267` [async_fn]: `pub async fn scan_prefix_tracked(`
+- `/app/crates/contextra-store/src/lsm/engine.rs:272` [await_expr]: `read::scan_prefix_tracked(self, tx_id, prefix).await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:337` [async_fn]: `pub async fn maybe_compact_for_test(&self) -> Result<bool> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:340` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:348` [async_fn]: `pub async fn has_pending_legacy_wal_migration_path(path: &std::path::Path) -> Result<bool> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:349` [await_expr]: `let mut entries = match tokio::fs::read_dir(path).await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:349` [tokio_import]: `let mut entries = match tokio::fs::read_dir(path).await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:359` [await_expr]: `while let Some(entry) = entries.next_entry().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:372` [await_expr]: `if !Wal::has_migration_marker(&file_path).await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:381` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:383` [await_expr]: `let _ = test_wal.replay().await?;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:399` [async_fn]: `pub async fn has_pending_legacy_wal_migration(&self) -> Result<bool> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:400` [await_expr]: `Self::has_pending_legacy_wal_migration_path(&self.config.path).await`
+- `/app/crates/contextra-store/src/lsm/engine.rs:410` [async_fn]: `pub async fn migrate_legacy_wal_keys(`
+- `/app/crates/contextra-store/src/lsm/engine.rs:414` [await_expr]: `let mut entries = match tokio::fs::read_dir(&config.path).await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:414` [tokio_import]: `let mut entries = match tokio::fs::read_dir(&config.path).await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:427` [await_expr]: `crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:430` [await_expr]: `let salt = tokio::fs::read(&salt_path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:430` [tokio_import]: `let salt = tokio::fs::read(&salt_path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:446` [await_expr]: `while let Some(entry) = entries.next_entry().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:459` [await_expr]: `if !Wal::has_migration_marker(&file_path).await {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:461` [await_expr]: `Wal::open_for_legacy_migration(&file_path, key_manager.clone()).await?;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:480` [async_fn]: `pub(crate) async fn memtables_for_scanner(`
+- `/app/crates/contextra-store/src/lsm/engine.rs:486` [await_expr]: `let state = self.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/engine.rs:486` [lock_held_across_await_warning]: `Lock acquired at line 486 near await at line 486`
+- `/app/crates/contextra-store/src/lsm/engine.rs:494` [async_fn]: `pub(crate) async fn sstables_for_scanner(&self) -> Vec<Arc<crate::sstable::SstableReader>> {`
+- `/app/crates/contextra-store/src/lsm/engine.rs:495` [await_expr]: `self.sstables.read().await.clone()`
+- `/app/crates/contextra-store/src/lsm/engine.rs:495` [lock_held_across_await_warning]: `Lock acquired at line 486 near await at line 495`
+- `/app/crates/contextra-store/src/lsm/guard.rs:11` [tokio_import]: `pub(super) _lock: &'a tokio::sync::MutexGuard<'a, ()>,`
+- `/app/crates/contextra-store/src/lsm/commit.rs:57` [async_fn]: `pub(super) async fn apply_backpressure(&self) {`
+- `/app/crates/contextra-store/src/lsm/commit.rs:61` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(5)).await;`
+- `/app/crates/contextra-store/src/lsm/commit.rs:61` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(5)).await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:17` [tokio_import]: `use tokio::sync::RwLock;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:38` [async_fn]: `pub(crate) async fn write_salt_atomically(`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:56` [tokio_import]: `match tokio::fs::OpenOptions::new()`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:60` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:83` [await_expr]: `let mut std_file = file.into_std().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:85` [tokio_import]: `tokio::task::spawn_blocking(move || -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:95` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:98` [await_expr]: `tokio::fs::rename(&tmp_path, salt_path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:98` [tokio_import]: `tokio::fs::rename(&tmp_path, salt_path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:102` [await_expr]: `crate::util::fsync_parent_dir(salt_path).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:105` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:108` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&tmp_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:108` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&tmp_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:118` [async_fn]: `pub(super) async fn directory_is_pristine(path: &std::path::Path) -> Result<bool> {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:119` [await_expr]: `let mut entries = tokio::fs::read_dir(path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:119` [tokio_import]: `let mut entries = tokio::fs::read_dir(path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:123` [await_expr]: `while let Some(entry) = entries.next_entry().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:148` [async_fn]: `pub async fn new(config: LsmConfig) -> Result<Self> {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:149` [await_expr]: `Self::new_with_merge_operator(config, None).await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:152` [async_fn]: `pub async fn new_with_merge_operator(`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:163` [tokio_import]: `tokio::fs::create_dir_all(&config.path)`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:164` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:167` [await_expr]: `crate::util::fsync_parent_dir(&config.path).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:172` [await_expr]: `let salt = match tokio::fs::read(&salt_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:172` [tokio_import]: `let salt = match tokio::fs::read(&salt_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:183` [await_expr]: `if !directory_is_pristine(&config.path).await? {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:189` [await_expr]: `write_salt_atomically(&salt_path, &buf).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:205` [tokio_import]: `let mut entries = tokio::fs::read_dir(&config.path)`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:206` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:211` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:250` [await_expr]: `let entries = crate::manifest::Manifest::load(&manifest_path).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:274` [await_expr]: `let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:275` [await_expr]: `let wal_entries = wal.replay().await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:375` [await_expr]: `let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:394` [tokio_import]: `let mut entries = tokio::fs::read_dir(&config.path)`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:395` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:399` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:421` [tokio_import]: `let mut entries = tokio::fs::read_dir(&config.path)`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:422` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:426` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:437` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:437` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:450` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:450` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:475` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:494` [await_expr]: `crate::manifest::Manifest::open_with_dir_lock(&manifest_path, Some(dir_lock)).await?,`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:497` [await_expr]: `let ssts_read = sstables.read().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:497` [lock_held_across_await_warning]: `Lock acquired at line 497 near await at line 497`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:505` [await_expr]: `let initial_wal_hmac = *wal.last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:505` [lock_held_across_await_warning]: `Lock acquired at line 505 near await at line 505`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:509` [await_expr]: `manifest.append_batch(&add_entries).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:509` [lock_held_across_await_warning]: `Lock acquired at line 505 near await at line 509`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:540` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:567` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:571` [tokio_import]: `let flush_notify = Arc::new(tokio::sync::Notify::new());`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:601` [tokio_import]: `commit_mutex: tokio::sync::Mutex::new(()),`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:602` [tokio_import]: `flush_mutex: tokio::sync::Mutex::new(()),`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:603` [tokio_import]: `pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:609` [tokio_import]: `pending_commit_queue: tokio::sync::Mutex::new(None),`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:626` [await_expr]: `storage.flush().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:633` [await_expr]: `let wal = storage.wal.read().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:633` [lock_held_across_await_warning]: `Lock acquired at line 633 near await at line 633`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:638` [await_expr]: `if let Err(e) = tokio::fs::remove_file(old_wal_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:638` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(old_wal_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:638` [lock_held_across_await_warning]: `Lock acquired at line 633 near await at line 638`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:644` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:644` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:644` [lock_held_across_await_warning]: `Lock acquired at line 633 near await at line 644`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:664` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:683` [async_fn]: `pub async fn rollback_to_tx(&self, target_tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:684` [await_expr]: `let _commit_lock = self.commit_mutex.lock().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:684` [lock_held_across_await_warning]: `Lock acquired at line 684 near await at line 684`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:688` [await_expr]: `self.rollback_to_tx_locked(target_tx, &commit_guard).await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:688` [lock_held_across_await_warning]: `Lock acquired at line 684 near await at line 688`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:691` [async_fn]: `pub(super) async fn rollback_to_tx_locked(`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:707` [tokio_import]: `tokio::fs::write(&intent_path, &intent_bytes)`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:708` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:713` [tokio_import]: `tokio::task::spawn_blocking(move || {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:723` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:727` [await_expr]: `let state = self.state.write().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:727` [lock_held_across_await_warning]: `Lock acquired at line 727 near await at line 727`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:728` [await_expr]: `let wal = self.wal.read().await.clone();`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:728` [lock_held_across_await_warning]: `Lock acquired at line 728 near await at line 728`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:730` [await_expr]: `let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:730` [lock_held_across_await_warning]: `Lock acquired at line 728 near await at line 730`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:731` [await_expr]: `wal.truncate(target_offset, target_hmac).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:731` [lock_held_across_await_warning]: `Lock acquired at line 728 near await at line 731`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:750` [await_expr]: `let mut sstables_lock = self.sstables.write().await;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:750` [lock_held_across_await_warning]: `Lock acquired at line 750 near await at line 750`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:769` [await_expr]: `let mut stream = spanning.stream().await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:770` [await_expr]: `while let Some((k, v, seq, tx)) = stream.next_entry().await? {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:789` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:792` [await_expr]: `builder.add(&k, &v, seq, tx).await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:794` [await_expr]: `builder.finish().await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:801` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:808` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:842` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:842` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:856` [await_expr]: `if let Err(e) = self.manifest.append_batch(&manifest_batch).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:860` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&intent_path).await {`
+- `/app/crates/contextra-store/src/lsm/recovery.rs:860` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&intent_path).await {`
+- `/app/crates/contextra-store/src/lsm/flush.rs:9` [async_fn]: `pub async fn force_flush(&self) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/flush.rs:10` [await_expr]: `self.flush().await`
+- `/app/crates/contextra-store/src/lsm/flush.rs:17` [async_fn]: `pub async fn maybe_compact(&self) -> Result<bool> {`
+- `/app/crates/contextra-store/src/lsm/flush.rs:20` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/scan.rs:46` [async_fn]: `pub async fn point_lookup_metrics(&self, key: &[u8]) -> (usize, usize, usize, usize, bool) {`
+- `/app/crates/contextra-store/src/lsm/scan.rs:48` [await_expr]: `let sstables = self.sstables.read().await;`
+- `/app/crates/contextra-store/src/lsm/scan.rs:48` [lock_held_across_await_warning]: `Lock acquired at line 48 near await at line 48`
+- `/app/crates/contextra-store/src/lsm/scan.rs:57` [await_expr]: `let (b_pass, r_pass, blk_read, k_found) = sst.lookup_metrics(key).await;`
+- `/app/crates/contextra-store/src/lsm/scan.rs:57` [lock_held_across_await_warning]: `Lock acquired at line 48 near await at line 57`
+- `/app/crates/contextra-store/src/lsm/scan.rs:84` [async_fn]: `pub(super) async fn collect_visible_entries<F>(`
+- `/app/crates/contextra-store/src/lsm/scan.rs:98` [await_expr]: `let state = self.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/scan.rs:98` [lock_held_across_await_warning]: `Lock acquired at line 98 near await at line 98`
+- `/app/crates/contextra-store/src/lsm/scan.rs:99` [await_expr]: `let sstables = self.sstables.read().await;`
+- `/app/crates/contextra-store/src/lsm/scan.rs:99` [lock_held_across_await_warning]: `Lock acquired at line 99 near await at line 99`
+- `/app/crates/contextra-store/src/lsm/scan.rs:125` [await_expr]: `sst.scan_prefix(prefix).await?`
+- `/app/crates/contextra-store/src/lsm/scan.rs:128` [await_expr]: `sst.scan_range(start.map(|s| s), end.map(|e| e)).await?`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:11` [async_fn]: `pub(super) async fn execute_group_commit_append(`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:15` [tokio_import]: `truncate_guard: tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:21` [await_expr]: `let start_hmac = wal.last_hmac_snapshot().await;`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:24` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:26` [await_expr]: `if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:32` [await_expr]: `match wal.recover_from_poison().await {`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:58` [tokio_import]: `pub(super) sender: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/app/crates/contextra-store/src/lsm/group_commit.rs:78` [tokio_import]: `pub(super) notify_full: Arc<tokio::sync::Notify>,`
+- `/app/crates/contextra-store/src/lsm/observer.rs:202` [tokio_import]: `sender: tokio::sync::mpsc::Sender<(u64, TxId, WriteOrigin)>,`
+- `/app/crates/contextra-store/src/lsm/observer.rs:209` [tokio_import]: `) -> (Self, tokio::task::JoinHandle<()>) {`
+- `/app/crates/contextra-store/src/lsm/observer.rs:210` [tokio_import]: `let (tx, mut rx) = tokio::sync::mpsc::channel::<(u64, TxId, WriteOrigin)>(capacity);`
+- `/app/crates/contextra-store/src/lsm/observer.rs:213` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/app/crates/contextra-store/src/lsm/observer.rs:214` [await_expr]: `while let Some((seq_no, tx_id, origin)) = rx.recv().await {`
+- `/app/crates/contextra-store/src/lsm/observer.rs:451` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/app/crates/contextra-store/src/lsm/observer.rs:452` [tokio_import]: `if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {`
+- `/app/crates/contextra-store/src/lsm/observer.rs:453` [tokio_import]: `tokio::task::block_in_place(run_notify);`
+- `/app/crates/contextra-store/src/compaction/engine.rs:18` [tokio_import]: `use tokio::sync::RwLock;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:31` [tokio_import]: `pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,`
+- `/app/crates/contextra-store/src/compaction/engine.rs:90` [tokio_import]: `rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,`
+- `/app/crates/contextra-store/src/compaction/engine.rs:119` [async_fn]: `pub async fn maybe_compact(`
+- `/app/crates/contextra-store/src/compaction/engine.rs:125` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/compaction/engine.rs:129` [async_fn]: `pub async fn maybe_compact_with_cancel(`
+- `/app/crates/contextra-store/src/compaction/engine.rs:139` [await_expr]: `let ssts = sstables.read().await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:139` [lock_held_across_await_warning]: `Lock acquired at line 139 near await at line 139`
+- `/app/crates/contextra-store/src/compaction/engine.rs:223` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:226` [await_expr]: `crate::util::fsync_parent_dir(&output_path).await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:235` [await_expr]: `.await?,`
+- `/app/crates/contextra-store/src/compaction/engine.rs:240` [await_expr]: `let mut ssts = sstables.write().await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:240` [lock_held_across_await_warning]: `Lock acquired at line 240 near await at line 240`
+- `/app/crates/contextra-store/src/compaction/engine.rs:262` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&output_path).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:262` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&output_path).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:287` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:312` [await_expr]: `if let Err(e) = tokio::fs::remove_file(path).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:312` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(path).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:316` [await_expr]: `if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:316` [tokio_import]: `if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:317` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:317` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:335` [await_expr]: `let ssts = sstables.read().await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:335` [lock_held_across_await_warning]: `Lock acquired at line 335 near await at line 335`
+- `/app/crates/contextra-store/src/compaction/engine.rs:348` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/compaction/engine.rs:348` [lock_held_across_await_warning]: `Lock acquired at line 335 near await at line 348`
+- `/app/crates/contextra-store/src/compaction/engine.rs:396` [async_fn]: `pub async fn merge_sstables(`
+- `/app/crates/contextra-store/src/compaction/engine.rs:410` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/compaction/engine.rs:414` [async_fn]: `pub async fn merge_sstables_with_cancel(`
+- `/app/crates/contextra-store/src/compaction/engine.rs:430` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:433` [await_expr]: `if let Err(e) = tokio::fs::remove_file(output_path).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:433` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(output_path).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:447` [async_fn]: `async fn merge_sstables_inner(`
+- `/app/crates/contextra-store/src/compaction/engine.rs:508` [await_expr]: `streams.push(sst.stream().await?);`
+- `/app/crates/contextra-store/src/compaction/engine.rs:513` [await_expr]: `if let Some((key, value, seq, tx)) = stream.next_entry().await? {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:525` [await_expr]: `SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:552` [await_expr]: `tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:552` [tokio_import]: `tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:585` [await_expr]: `tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:585` [tokio_import]: `tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:588` [await_expr]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:588` [tokio_import]: `tokio::task::yield_now().await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:649` [await_expr]: `streams[popped_next.source_idx].next_entry().await?`
+- `/app/crates/contextra-store/src/compaction/engine.rs:666` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:679` [await_expr]: `tokio::time::sleep(delay).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:679` [tokio_import]: `tokio::time::sleep(delay).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:742` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:757` [await_expr]: `tokio::time::sleep(delay).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:757` [tokio_import]: `tokio::time::sleep(delay).await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:773` [await_expr]: `if let Some((key, value, seq, tx)) = streams[item.source_idx].next_entry().await? {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:783` [await_expr]: `builder.finish().await?;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:800` [async_fn]: `pub async fn run_loop(`
+- `/app/crates/contextra-store/src/compaction/engine.rs:814` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:815` [tokio_import]: `_ = tokio::time::sleep(self.config.check_interval) => {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:816` [await_expr]: `match self.maybe_compact_with_cancel(&sstables, &data_path, Some(&shutdown)).await {`
+- `/app/crates/contextra-store/src/compaction/engine.rs:824` [await_expr]: `let ssts = sstables.read().await;`
+- `/app/crates/contextra-store/src/compaction/engine.rs:824` [lock_held_across_await_warning]: `Lock acquired at line 824 near await at line 824`
+- `/app/crates/contextra-store/src/compaction/engine.rs:837` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/compaction/engine.rs:837` [lock_held_across_await_warning]: `Lock acquired at line 824 near await at line 837`
+- `/app/crates/contextra-store/src/wal/flusher.rs:8` [tokio_import]: `use tokio::io::{AsyncSeekExt, AsyncWriteExt};`
+- `/app/crates/contextra-store/src/wal/flusher.rs:22` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/app/crates/contextra-store/src/wal/flusher.rs:27` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/app/crates/contextra-store/src/wal/flusher.rs:30` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<PathBuf>>,`
+- `/app/crates/contextra-store/src/wal/flusher.rs:35` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/app/crates/contextra-store/src/wal/flusher.rs:39` [tokio_import]: `item_tx: tokio::sync::mpsc::UnboundedSender<(u64, WalEntry, u64)>,`
+- `/app/crates/contextra-store/src/wal/flusher.rs:40` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<WalVersion>>,`
+- `/app/crates/contextra-store/src/wal/flusher.rs:174` [tokio_import]: `let (tx, mut rx) = tokio::sync::mpsc::channel::<WalCommand>(config.queue_capacity);`
+- `/app/crates/contextra-store/src/wal/flusher.rs:186` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:188` [await_expr]: `let mut flusher_last_hmac = *last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:188` [lock_held_across_await_warning]: `Lock acquired at line 188 near await at line 188`
+- `/app/crates/contextra-store/src/wal/flusher.rs:193` [await_expr]: `None => match rx.recv().await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:193` [lock_held_across_await_warning]: `Lock acquired at line 188 near await at line 193`
+- `/app/crates/contextra-store/src/wal/flusher.rs:242` [tokio_import]: `let deadline = tokio::time::Instant::now()`
+- `/app/crates/contextra-store/src/wal/flusher.rs:243` [tokio_import]: `+ tokio::time::Duration::from_micros(config.batch_window_micros);`
+- `/app/crates/contextra-store/src/wal/flusher.rs:245` [await_expr]: `match tokio::time::timeout_at(deadline, rx.recv()).await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:245` [tokio_import]: `match tokio::time::timeout_at(deadline, rx.recv()).await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:298` [await_expr]: `file.write_all(&WAL_V3_HEADER).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:321` [await_expr]: `if let Err(err) = file.write_all(&batch_payload[..cut]).await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:327` [await_expr]: `if let Err(err) = file.flush().await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:343` [await_expr]: `file.write_all(&batch_payload).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:350` [await_expr]: `file.flush().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:360` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:388` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:396` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:417` [await_expr]: `let mut last_hmac_guard = last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:417` [lock_held_across_await_warning]: `Lock acquired at line 417 near await at line 417`
+- `/app/crates/contextra-store/src/wal/flusher.rs:456` [await_expr]: `if let Err(e) = file.set_len(offset).await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:464` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:473` [await_expr]: `if let Err(e) = file.seek(std::io::SeekFrom::Start(offset)).await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:488` [await_expr]: `let mut last_hmac_guard = last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:488` [lock_held_across_await_warning]: `Lock acquired at line 488 near await at line 488`
+- `/app/crates/contextra-store/src/wal/flusher.rs:493` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:493` [lock_held_across_await_warning]: `Lock acquired at line 488 near await at line 493`
+- `/app/crates/contextra-store/src/wal/flusher.rs:516` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:533` [await_expr]: `match crate::wal::fs::try_exists(&candidate_path).await {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:549` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/flusher.rs:559` [await_expr]: `crate::util::fsync_parent_dir(&sealed_path).await?;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:562` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/flusher.rs:572` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/flusher.rs:582` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:627` [await_expr]: `file.seek(std::io::SeekFrom::Start(0)).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:634` [await_expr]: `file.set_len(0).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:642` [await_expr]: `file.write_all(&total_bytes).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:649` [await_expr]: `file.flush().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:672` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/flusher.rs:682` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:694` [await_expr]: `let mut last_hmac_guard = last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:694` [lock_held_across_await_warning]: `Lock acquired at line 694 near await at line 694`
+- `/app/crates/contextra-store/src/wal/flusher.rs:699` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:699` [lock_held_across_await_warning]: `Lock acquired at line 694 near await at line 699`
+- `/app/crates/contextra-store/src/wal/flusher.rs:720` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/flusher.rs:722` [await_expr]: `let _ = file.seek(std::io::SeekFrom::End(0)).await; // INTENTIONAL-DROP`
+- `/app/crates/contextra-store/src/wal/replay.rs:64` [async_fn]: `pub async fn replay(&self) -> Result<Vec<(u64, WalEntry, u64)>> {`
+- `/app/crates/contextra-store/src/wal/replay.rs:65` [await_expr]: `self.replay_with_sink(&NoopReplayProgressSink).await`
+- `/app/crates/contextra-store/src/wal/replay.rs:69` [async_fn]: `pub async fn replay_with_sink<S: ReplayProgressSink>(`
+- `/app/crates/contextra-store/src/wal/replay.rs:73` [await_expr]: `let (entries, _) = self.replay_mmap_with_sink(sink).await?;`
+- `/app/crates/contextra-store/src/wal/replay.rs:78` [async_fn]: `pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {`
+- `/app/crates/contextra-store/src/wal/replay.rs:80` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/replay.rs:88` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/wal/replay.rs:94` [async_fn]: `pub async fn replay_from(&self, since_seq_no: u64) -> Result<Vec<WalEntry>> {`
+- `/app/crates/contextra-store/src/wal/replay.rs:95` [await_expr]: `let all = self.replay().await?;`
+- `/app/crates/contextra-store/src/wal/replay.rs:104` [async_fn]: `pub(crate) async fn replay_with_size_and_version(`
+- `/app/crates/contextra-store/src/wal/replay.rs:108` [await_expr]: `self.replay_mmap_with_size_and_version(file_size).await`
+- `/app/crates/contextra-store/src/wal/replay.rs:112` [async_fn]: `async fn replay_mmap_with_size_and_version(`
+- `/app/crates/contextra-store/src/wal/replay.rs:116` [await_expr]: `match self.replay_mmap().await {`
+- `/app/crates/contextra-store/src/wal/replay.rs:130` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/wal/replay.rs:139` [async_fn]: `pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {`
+- `/app/crates/contextra-store/src/wal/replay.rs:140` [await_expr]: `self.replay_mmap_with_sink(&NoopReplayProgressSink).await`
+- `/app/crates/contextra-store/src/wal/replay.rs:145` [async_fn]: `pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(`
+- `/app/crates/contextra-store/src/wal/replay.rs:199` [async_fn]: `pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>`
+- `/app/crates/contextra-store/src/wal/replay.rs:245` [await_expr]: `self.scan_entries_with_callback(file_size, callback).await`
+- `/app/crates/contextra-store/src/wal/replay.rs:711` [async_fn]: `pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {`
+- `/app/crates/contextra-store/src/wal/replay.rs:714` [await_expr]: `if !crate::wal::fs::try_exists(&bak_path).await.unwrap_or(false) {`
+- `/app/crates/contextra-store/src/wal/replay.rs:718` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/replay.rs:721` [await_expr]: `let bak_len = match crate::wal::fs::metadata(&bak_path).await {`
+- `/app/crates/contextra-store/src/wal/replay.rs:729` [await_expr]: `match crate::wal::fs::rename(&bak_path, wal_path).await {`
+- `/app/crates/contextra-store/src/wal/replay.rs:734` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/replay.rs:738` [await_expr]: `let _ = crate::wal::fs::remove_file(&bak_path).await;`
+- `/app/crates/contextra-store/src/wal/replay.rs:744` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/replay.rs:746` [await_expr]: `f.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:152` [async_fn]: `pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(PreparedBatch, [u8; 32])> {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:153` [await_expr]: `let mut last_hmac = self.last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:153` [lock_held_across_await_warning]: `Lock acquired at line 153 near await at line 153`
+- `/app/crates/contextra-store/src/wal/hmac.rs:178` [async_fn]: `pub async fn rollback_hmac(&self, prev_hmac: [u8; 32]) {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:179` [await_expr]: `let mut last_hmac = self.last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:179` [lock_held_across_await_warning]: `Lock acquired at line 179 near await at line 179`
+- `/app/crates/contextra-store/src/wal/hmac.rs:228` [async_fn]: `pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:241` [async_fn]: `async fn read_key_file(path: &Path) -> Result<[u8; 32]> {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:242` [await_expr]: `let bytes = super::fs::read(path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:262` [await_expr]: `read_key_file(&key_path).await`
+- `/app/crates/contextra-store/src/wal/hmac.rs:265` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:285` [await_expr]: `let file_res = options.open(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:297` [await_expr]: `if let Err(e) = file.write_all(&key).await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:298` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:304` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:305` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:315` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:319` [await_expr]: `let link_res = super::fs::hard_link(&tmp_path, &key_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:320` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:324` [await_expr]: `crate::util::fsync_parent_dir(&key_path).await?;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:327` [await_expr]: `Err(_) => read_key_file(&key_path).await,`
+- `/app/crates/contextra-store/src/wal/hmac.rs:336` [async_fn]: `pub(crate) async fn has_migration_marker(wal_path: &Path) -> bool {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:338` [await_expr]: `super::fs::try_exists(&marker).await.unwrap_or(false)`
+- `/app/crates/contextra-store/src/wal/hmac.rs:362` [async_fn]: `pub(crate) async fn write_migration_marker_atomically(wal_path: &Path) -> Result<()> {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:363` [await_expr]: `let new_key = Self::load_or_create_integrity_key(wal_path).await?;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:364` [await_expr]: `Self::write_migration_marker_with_key_atomically(wal_path, &new_key).await`
+- `/app/crates/contextra-store/src/wal/hmac.rs:367` [async_fn]: `pub(crate) async fn write_migration_marker_with_key_atomically(`
+- `/app/crates/contextra-store/src/wal/hmac.rs:380` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:395` [await_expr]: `let mut file = match options.open(&tmp_path).await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:407` [await_expr]: `if let Err(e) = file.write_all(marker_content.as_bytes()).await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:408` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:415` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:416` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:424` [await_expr]: `if let Err(e) = super::fs::rename(&tmp_path, &marker_path).await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:425` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:434` [await_expr]: `crate::util::fsync_parent_dir(&marker_path).await?;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:438` [async_fn]: `pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:445` [async_fn]: `async fn read_uuid_file(path: &Path) -> Result<[u8; 16]> {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:446` [await_expr]: `let bytes = super::fs::read(path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:461` [await_expr]: `read_uuid_file(&uuid_path).await`
+- `/app/crates/contextra-store/src/wal/hmac.rs:464` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:490` [await_expr]: `let mut file = match options.open(&tmp_path).await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:494` [await_expr]: `return read_uuid_file(&uuid_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:504` [await_expr]: `if let Err(e) = file.write_all(&bytes).await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:505` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:512` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/app/crates/contextra-store/src/wal/hmac.rs:513` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:521` [await_expr]: `let link_res = super::fs::hard_link(&tmp_path, &uuid_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:522` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:526` [await_expr]: `crate::util::fsync_parent_dir(&uuid_path).await?;`
+- `/app/crates/contextra-store/src/wal/hmac.rs:529` [await_expr]: `Err(_) => read_uuid_file(&uuid_path).await,`
+- `/app/crates/contextra-store/src/wal/io.rs:9` [tokio_import]: `use tokio::io::{AsyncReadExt, AsyncSeekExt};`
+- `/app/crates/contextra-store/src/wal/io.rs:21` [async_fn]: `pub(crate) async fn do_scan_entries_with_callback<F>(`
+- `/app/crates/contextra-store/src/wal/io.rs:35` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:38` [tokio_import]: `let mut reader = tokio::io::BufReader::new(file);`
+- `/app/crates/contextra-store/src/wal/io.rs:69` [await_expr]: `if reader.read_exact(&mut header_buf).await.is_ok() {`
+- `/app/crates/contextra-store/src/wal/io.rs:80` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:84` [tokio_import]: `reader = tokio::io::BufReader::new(reader.into_inner());`
+- `/app/crates/contextra-store/src/wal/io.rs:92` [await_expr]: `if let Err(e) = reader.read_exact(&mut len_buf).await {`
+- `/app/crates/contextra-store/src/wal/io.rs:140` [await_expr]: `if let Err(e) = reader.read_exact(&mut entry_data_raw).await {`
+- `/app/crates/contextra-store/src/wal/io.rs:470` [async_fn]: `pub(crate) async fn prepare_append_payload(`
+- `/app/crates/contextra-store/src/wal/io.rs:505` [await_expr]: `tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;`
+- `/app/crates/contextra-store/src/wal/io.rs:505` [tokio_import]: `tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;`
+- `/app/crates/contextra-store/src/wal/io.rs:535` [tokio_import]: `let frames_payload = tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {`
+- `/app/crates/contextra-store/src/wal/io.rs:616` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:634` [async_fn]: `pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {`
+- `/app/crates/contextra-store/src/wal/io.rs:636` [await_expr]: `let truncate_guard = self.truncate_lock.lock().await;`
+- `/app/crates/contextra-store/src/wal/io.rs:636` [lock_held_across_await_warning]: `Lock acquired at line 636 near await at line 636`
+- `/app/crates/contextra-store/src/wal/io.rs:638` [await_expr]: `.await?`
+- `/app/crates/contextra-store/src/wal/io.rs:638` [lock_held_across_await_warning]: `Lock acquired at line 636 near await at line 638`
+- `/app/crates/contextra-store/src/wal/io.rs:641` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:641` [lock_held_across_await_warning]: `Lock acquired at line 636 near await at line 641`
+- `/app/crates/contextra-store/src/wal/io.rs:646` [async_fn]: `pub async fn enqueue_append_batch_locked(`
+- `/app/crates/contextra-store/src/wal/io.rs:649` [tokio_import]: `_guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/wal/io.rs:650` [tokio_import]: `) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {`
+- `/app/crates/contextra-store/src/wal/io.rs:658` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:663` [await_expr]: `let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;`
+- `/app/crates/contextra-store/src/wal/io.rs:673` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:679` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:679` [lock_held_across_await_warning]: `Lock acquired at line 666 near await at line 679`
+- `/app/crates/contextra-store/src/wal/io.rs:685` [async_fn]: `pub async fn append_batch_locked(`
+- `/app/crates/contextra-store/src/wal/io.rs:688` [tokio_import]: `guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/wal/io.rs:690` [await_expr]: `let ack_rx = self.enqueue_append_batch_locked(batch, guard).await?;`
+- `/app/crates/contextra-store/src/wal/io.rs:692` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:699` [async_fn]: `pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {`
+- `/app/crates/contextra-store/src/wal/io.rs:701` [await_expr]: `let truncate_guard = self.truncate_lock.lock().await;`
+- `/app/crates/contextra-store/src/wal/io.rs:701` [lock_held_across_await_warning]: `Lock acquired at line 701 near await at line 701`
+- `/app/crates/contextra-store/src/wal/io.rs:703` [await_expr]: `.await?`
+- `/app/crates/contextra-store/src/wal/io.rs:703` [lock_held_across_await_warning]: `Lock acquired at line 701 near await at line 703`
+- `/app/crates/contextra-store/src/wal/io.rs:706` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:706` [lock_held_across_await_warning]: `Lock acquired at line 701 near await at line 706`
+- `/app/crates/contextra-store/src/wal/io.rs:711` [async_fn]: `pub async fn try_enqueue_append_batch_locked(`
+- `/app/crates/contextra-store/src/wal/io.rs:714` [tokio_import]: `_guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/wal/io.rs:715` [tokio_import]: `) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {`
+- `/app/crates/contextra-store/src/wal/io.rs:723` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:728` [await_expr]: `let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;`
+- `/app/crates/contextra-store/src/wal/io.rs:738` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:745` [tokio_import]: `tokio::sync::mpsc::error::TrySendError::Full(_) => {`
+- `/app/crates/contextra-store/src/wal/io.rs:748` [tokio_import]: `tokio::sync::mpsc::error::TrySendError::Closed(_) => {`
+- `/app/crates/contextra-store/src/wal/io.rs:756` [async_fn]: `pub async fn try_append_batch_locked(`
+- `/app/crates/contextra-store/src/wal/io.rs:759` [tokio_import]: `guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/wal/io.rs:761` [await_expr]: `let ack_rx = self.try_enqueue_append_batch_locked(batch, guard).await?;`
+- `/app/crates/contextra-store/src/wal/io.rs:763` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:772` [async_fn]: `pub async fn scan_entries_with_callback<F>(`
+- `/app/crates/contextra-store/src/wal/io.rs:788` [tokio_import]: `let (item_tx, mut item_rx) = tokio::sync::mpsc::unbounded_channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:789` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:796` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:800` [await_expr]: `while let Some((seq, entry, pos)) = item_rx.recv().await {`
+- `/app/crates/contextra-store/src/wal/io.rs:807` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:814` [async_fn]: `pub(crate) async fn rewrite_as_v3(`
+- `/app/crates/contextra-store/src/wal/io.rs:828` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:834` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:834` [lock_held_across_await_warning]: `Lock acquired at line 821 near await at line 834`
+- `/app/crates/contextra-store/src/wal/io.rs:838` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:844` [async_fn]: `pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()> {`
+- `/app/crates/contextra-store/src/wal/io.rs:845` [await_expr]: `let _truncate_guard = self.truncate_lock.lock().await;`
+- `/app/crates/contextra-store/src/wal/io.rs:845` [lock_held_across_await_warning]: `Lock acquired at line 845 near await at line 845`
+- `/app/crates/contextra-store/src/wal/io.rs:861` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:867` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:867` [lock_held_across_await_warning]: `Lock acquired at line 855 near await at line 867`
+- `/app/crates/contextra-store/src/wal/io.rs:870` [await_expr]: `ack_rx.await.map_err(|_| {`
+- `/app/crates/contextra-store/src/wal/io.rs:877` [async_fn]: `pub async fn rotate_and_seal(&self) -> Result<PathBuf> {`
+- `/app/crates/contextra-store/src/wal/io.rs:891` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/wal/io.rs:893` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:897` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:903` [async_fn]: `pub async fn find_tx_offset(&self, target_tx_id: TxId) -> Result<(u64, [u8; 32])> {`
+- `/app/crates/contextra-store/src/wal/io.rs:905` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:929` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/wal/io.rs:936` [async_fn]: `pub async fn last_hmac_snapshot(&self) -> [u8; 32] {`
+- `/app/crates/contextra-store/src/wal/io.rs:937` [await_expr]: `*self.last_hmac.lock().await`
+- `/app/crates/contextra-store/src/wal/io.rs:961` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/app/crates/contextra-store/src/wal/io.rs:963` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/wal/io.rs:964` [async_fn]: `async fn test_do_scan_entries_with_callback_v3_without_key_manager() {`
+- `/app/crates/contextra-store/src/wal/io.rs:970` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:973` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:975` [await_expr]: `file.flush().await.expect("flush failed");`
+- `/app/crates/contextra-store/src/wal/io.rs:981` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/io.rs:1001` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:22` [tokio_import]: `pub use tokio::fs::*;`
+- `/app/crates/contextra-store/src/wal/mod.rs:31` [async_fn]: `pub async fn read<P: AsRef<Path>>(path: P) -> std::io::Result<Vec<u8>> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:36` [async_fn]: `pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(`
+- `/app/crates/contextra-store/src/wal/mod.rs:42` [async_fn]: `pub async fn remove_file<P: AsRef<Path>>(path: P) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:46` [async_fn]: `pub async fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:50` [async_fn]: `pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> std::io::Result<u64> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:54` [async_fn]: `pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:58` [async_fn]: `pub async fn try_exists<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:63` [async_fn]: `pub async fn set_permissions<P: AsRef<Path>>(`
+- `/app/crates/contextra-store/src/wal/mod.rs:70` [async_fn]: `pub async fn metadata<P: AsRef<Path>>(path: P) -> std::io::Result<LoomMetadata> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:167` [async_fn]: `pub async fn open<P: AsRef<Path>>(&self, _path: P) -> std::io::Result<LoomFile> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:185` [async_fn]: `pub async fn open<P: AsRef<Path>>(_path: P) -> std::io::Result<Self> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:188` [async_fn]: `pub async fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:192` [async_fn]: `pub async fn flush(&self) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:195` [async_fn]: `pub async fn sync_all(&self) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:198` [async_fn]: `pub async fn set_len(&mut self, len: u64) -> std::io::Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:202` [async_fn]: `pub async fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:214` [async_fn]: `pub async fn metadata(&self) -> std::io::Result<LoomMetadata> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:219` [tokio_import]: `impl tokio::io::AsyncRead for LoomFile {`
+- `/app/crates/contextra-store/src/wal/mod.rs:223` [tokio_import]: `buf: &mut tokio::io::ReadBuf<'_>,`
+- `/app/crates/contextra-store/src/wal/mod.rs:236` [tokio_import]: `impl tokio::io::AsyncWrite for LoomFile {`
+- `/app/crates/contextra-store/src/wal/mod.rs:277` [tokio_import]: `impl tokio::io::AsyncSeek for LoomFile {`
+- `/app/crates/contextra-store/src/wal/mod.rs:376` [tokio_import]: `pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,`
+- `/app/crates/contextra-store/src/wal/mod.rs:377` [tokio_import]: `pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,`
+- `/app/crates/contextra-store/src/wal/mod.rs:378` [tokio_import]: `pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,`
+- `/app/crates/contextra-store/src/wal/mod.rs:380` [tokio_import]: `pub truncate_lock: Arc<tokio::sync::Mutex<()>>,`
+- `/app/crates/contextra-store/src/wal/mod.rs:400` [async_fn]: `pub async fn open(path: impl AsRef<Path>) -> Result<Self> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:401` [await_expr]: `Self::open_with_config(path, WalConfig::default()).await`
+- `/app/crates/contextra-store/src/wal/mod.rs:417` [async_fn]: `pub async fn migrate_legacy_wal(`
+- `/app/crates/contextra-store/src/wal/mod.rs:422` [await_expr]: `if Self::has_migration_marker(path_ref).await {`
+- `/app/crates/contextra-store/src/wal/mod.rs:436` [await_expr]: `let wal = Self::open_with_config(path_ref, config).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:437` [await_expr]: `let was_rekeyed = wal.rekey_from_legacy().await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:461` [async_fn]: `pub async fn open_for_legacy_migration(`
+- `/app/crates/contextra-store/src/wal/mod.rs:466` [await_expr]: `if Self::has_migration_marker(path_ref).await {`
+- `/app/crates/contextra-store/src/wal/mod.rs:471` [await_expr]: `return Self::open_with_key_manager(path_ref, key_manager).await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:480` [await_expr]: `let wal = Self::open_with_config(path_ref, config).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:481` [await_expr]: `let was_rekeyed = wal.rekey_from_legacy().await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:489` [async_fn]: `pub(crate) async fn rekey_from_legacy(&self) -> Result<bool> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:490` [await_expr]: `if Self::has_migration_marker(&self.path).await {`
+- `/app/crates/contextra-store/src/wal/mod.rs:502` [await_expr]: `Self::write_migration_marker_atomically(&self.path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:509` [await_expr]: `let entries = self.replay().await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:512` [await_expr]: `let _secure_key = Self::load_or_create_integrity_key(&self.path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:515` [await_expr]: `self.rewrite_as_v3(&entries).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:518` [await_expr]: `Self::write_migration_marker_atomically(&self.path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:536` [async_fn]: `pub async fn open_read_only(`
+- `/app/crates/contextra-store/src/wal/mod.rs:547` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:551` [async_fn]: `pub async fn open_read_only_with_config(`
+- `/app/crates/contextra-store/src/wal/mod.rs:556` [await_expr]: `let has_marker = Self::has_migration_marker(&path).await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:564` [await_expr]: `let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:567` [await_expr]: `let key = Self::load_or_create_integrity_key(&path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:572` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:587` [tokio_import]: `last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),`
+- `/app/crates/contextra-store/src/wal/mod.rs:591` [tokio_import]: `truncate_lock: Arc::new(tokio::sync::Mutex::new(())),`
+- `/app/crates/contextra-store/src/wal/mod.rs:597` [async_fn]: `pub async fn open_with_key_manager(`
+- `/app/crates/contextra-store/src/wal/mod.rs:608` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:612` [async_fn]: `pub async fn open_with_config(path: impl AsRef<Path>, config: WalConfig) -> Result<Self> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:617` [await_expr]: `let _ = recover_from_bak_if_present(&path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:624` [await_expr]: `let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:627` [await_expr]: `let key = Self::load_or_create_integrity_key(&path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:636` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:645` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:659` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/mod.rs:666` [await_expr]: `crate::util::fsync_parent_dir(&path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:671` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:674` [await_expr]: `let has_marker = Self::has_migration_marker(&path).await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:692` [tokio_import]: `last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),`
+- `/app/crates/contextra-store/src/wal/mod.rs:696` [tokio_import]: `truncate_lock: Arc::new(tokio::sync::Mutex::new(())),`
+- `/app/crates/contextra-store/src/wal/mod.rs:704` [await_expr]: `let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:717` [await_expr]: `let copy_res = self::fs::copy(&wal.path, &bak_path).await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:723` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/wal/mod.rs:729` [await_expr]: `bak_file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/mod.rs:734` [await_expr]: `crate::util::fsync_parent_dir(&bak_path).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:736` [await_expr]: `let rewrite_res = wal.rewrite_as_v3(&entries).await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:776` [await_expr]: `wal.truncate(verified_end, last_hmac).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:778` [await_expr]: `let mut guard = wal.last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:778` [lock_held_across_await_warning]: `Lock acquired at line 778 near await at line 778`
+- `/app/crates/contextra-store/src/wal/mod.rs:835` [async_fn]: `pub async fn truncate_uncommitted_tail(&self) -> Result<u64> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:836` [await_expr]: `let entries = self.replay().await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:849` [await_expr]: `self.truncate(last_pos, last_entry.checksum).await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:857` [async_fn]: `pub async fn recover_from_poison(&self) -> Result<()> {`
+- `/app/crates/contextra-store/src/wal/mod.rs:863` [await_expr]: `let entries = self.replay().await?;`
+- `/app/crates/contextra-store/src/wal/mod.rs:865` [await_expr]: `let metadata = self::fs::metadata(&self.path).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/wal/mod.rs:894` [await_expr]: `if let Err(e) = self.truncate(verified_offset, verified_hmac).await {`
+- `/app/crates/contextra-store/src/wal/mod.rs:902` [await_expr]: `let mut hmac_guard = self.last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/wal/mod.rs:902` [lock_held_across_await_warning]: `Lock acquired at line 902 near await at line 902`
+- `/app/crates/contextra-store/src/wal/mod.rs:923` [tokio_import]: `last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),`
+- `/app/crates/contextra-store/src/wal/mod.rs:927` [tokio_import]: `truncate_lock: Arc::new(tokio::sync::Mutex::new(())),`
+- `/app/crates/contextra-store/src/manifest/core.rs:14` [tokio_import]: `use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};`
+- `/app/crates/contextra-store/src/manifest/core.rs:29` [tokio_import]: `pub(super) file: tokio::sync::Mutex<tokio::fs::File>,`
+- `/app/crates/contextra-store/src/manifest/core.rs:43` [async_fn]: `pub async fn open(path: impl AsRef<Path>) -> Result<Self> {`
+- `/app/crates/contextra-store/src/manifest/core.rs:44` [await_expr]: `Self::open_with_dir_lock(path, None).await`
+- `/app/crates/contextra-store/src/manifest/core.rs:48` [async_fn]: `pub(crate) async fn open_with_dir_lock(`
+- `/app/crates/contextra-store/src/manifest/core.rs:53` [tokio_import]: `let (mut file, is_new) = match tokio::fs::OpenOptions::new()`
+- `/app/crates/contextra-store/src/manifest/core.rs:58` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/core.rs:62` [tokio_import]: `let file = tokio::fs::OpenOptions::new()`
+- `/app/crates/contextra-store/src/manifest/core.rs:67` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/core.rs:85` [await_expr]: `file.write_all(&header).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/core.rs:88` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/core.rs:95` [await_expr]: `crate::util::fsync_parent_dir(&path).await?;`
+- `/app/crates/contextra-store/src/manifest/core.rs:100` [tokio_import]: `file: tokio::sync::Mutex::new(file),`
+- `/app/crates/contextra-store/src/manifest/core.rs:106` [async_fn]: `pub async fn append(&self, entry: &ManifestEntry) -> Result<()> {`
+- `/app/crates/contextra-store/src/manifest/core.rs:107` [await_expr]: `self.append_batch(std::slice::from_ref(entry)).await`
+- `/app/crates/contextra-store/src/manifest/core.rs:111` [async_fn]: `pub async fn append_batch(&self, entries: &[ManifestEntry]) -> Result<()> {`
+- `/app/crates/contextra-store/src/manifest/core.rs:120` [await_expr]: `let mut file = self.file.lock().await;`
+- `/app/crates/contextra-store/src/manifest/core.rs:120` [lock_held_across_await_warning]: `Lock acquired at line 120 near await at line 120`
+- `/app/crates/contextra-store/src/manifest/core.rs:121` [await_expr]: `file.write_all(&batch_bytes).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/core.rs:121` [lock_held_across_await_warning]: `Lock acquired at line 120 near await at line 121`
+- `/app/crates/contextra-store/src/manifest/core.rs:128` [await_expr]: `file.flush().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/core.rs:128` [lock_held_across_await_warning]: `Lock acquired at line 120 near await at line 128`
+- `/app/crates/contextra-store/src/manifest/core.rs:135` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/core.rs:151` [async_fn]: `pub async fn load(path: &Path) -> Result<Vec<ManifestEntry>> {`
+- `/app/crates/contextra-store/src/manifest/core.rs:152` [await_expr]: `if !tokio::fs::try_exists(path).await.unwrap_or(false) {`
+- `/app/crates/contextra-store/src/manifest/core.rs:152` [tokio_import]: `if !tokio::fs::try_exists(path).await.unwrap_or(false) {`
+- `/app/crates/contextra-store/src/manifest/core.rs:156` [await_expr]: `let mut file = match tokio::fs::File::open(path).await {`
+- `/app/crates/contextra-store/src/manifest/core.rs:156` [tokio_import]: `let mut file = match tokio::fs::File::open(path).await {`
+- `/app/crates/contextra-store/src/manifest/core.rs:169` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/core.rs:173` [tokio_import]: `let mut reader = tokio::io::BufReader::new(&mut file);`
+- `/app/crates/contextra-store/src/manifest/core.rs:179` [await_expr]: `if reader.read_exact(&mut header).await.is_ok() {`
+- `/app/crates/contextra-store/src/manifest/core.rs:192` [tokio_import]: `.seek(tokio::io::SeekFrom::Start(0))`
+- `/app/crates/contextra-store/src/manifest/core.rs:193` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/core.rs:207` [await_expr]: `match reader.read_exact(&mut len_bytes).await {`
+- `/app/crates/contextra-store/src/manifest/core.rs:237` [await_expr]: `if let Err(e) = reader.read_exact(&mut entry_raw).await {`
+- `/app/crates/contextra-store/src/manifest/core.rs:256` [await_expr]: `if let Err(e) = reader.read_exact(&mut partial_raw).await {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:6` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:28` [async_fn]: `pub async fn rollover(&self, live_entries: &[ManifestEntry]) -> Result<()> {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:29` [await_expr]: `let _ = self.maybe_rollover(live_entries, 0).await?;`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:45` [async_fn]: `pub async fn maybe_rollover(`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:50` [await_expr]: `let mut file = self.file.lock().await;`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:50` [lock_held_across_await_warning]: `Lock acquired at line 50 near await at line 50`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:51` [await_expr]: `let metadata = file.metadata().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:51` [lock_held_across_await_warning]: `Lock acquired at line 50 near await at line 51`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:80` [tokio_import]: `match tokio::fs::OpenOptions::new()`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:84` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:109` [await_expr]: `new_file.write_all(&header).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:118` [await_expr]: `new_file.write_all(&bytes).await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:126` [await_expr]: `new_file.flush().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:132` [await_expr]: `new_file.sync_all().await.map_err(|e| {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:141` [tokio_import]: `tokio::fs::rename(&tmp_path, &self.path)`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:142` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:150` [await_expr]: `crate::util::fsync_parent_dir(&self.path).await?;`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:152` [tokio_import]: `let reopened_file = tokio::fs::OpenOptions::new()`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:157` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:168` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:177` [await_expr]: `if let Err(clean_err) = tokio::fs::remove_file(&tmp_path).await {`
+- `/app/crates/contextra-store/src/manifest/rollover.rs:177` [tokio_import]: `if let Err(clean_err) = tokio::fs::remove_file(&tmp_path).await {`
+- `/app/crates/contextra-store/src/sstable/stream.rs:21` [async_fn]: `pub async fn next(&mut self) -> Result<Option<(Bytes, Bytes, u64, u64)>> {`
+- `/app/crates/contextra-store/src/sstable/stream.rs:40` [await_expr]: `let block_data = self.reader.get_block(offset, next_offset).await?;`
+- `/app/crates/contextra-store/src/sstable/stream.rs:135` [async_fn]: `pub async fn next_entry(&mut self) -> Result<Option<(Bytes, Bytes, u64, u64)>> {`
+- `/app/crates/contextra-store/src/sstable/stream.rs:136` [await_expr]: `self.next().await`
+- `/app/crates/contextra-store/src/sstable/reader_ext.rs:12` [async_fn]: `pub async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes, u64, u64)>> {`
+- `/app/crates/contextra-store/src/sstable/reader_ext.rs:46` [await_expr]: `let block_data = self.get_block(offset, next_offset).await?;`
+- `/app/crates/contextra-store/src/sstable/reader_ext.rs:158` [async_fn]: `pub async fn scan_range(`
+- `/app/crates/contextra-store/src/sstable/reader_ext.rs:185` [await_expr]: `let block_data = self.get_block(offset, next_offset).await?;`
+- `/app/crates/contextra-store/src/sstable/builder.rs:13` [tokio_import]: `use tokio::fs::File;`
+- `/app/crates/contextra-store/src/sstable/builder.rs:14` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/app/crates/contextra-store/src/sstable/builder.rs:228` [async_fn]: `pub async fn create(path: impl AsRef<Path>) -> Result<Self> {`
+- `/app/crates/contextra-store/src/sstable/builder.rs:229` [await_expr]: `Self::create_with_key_manager(path, None).await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:232` [async_fn]: `pub async fn create_with_key_manager(`
+- `/app/crates/contextra-store/src/sstable/builder.rs:247` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:277` [async_fn]: `pub async fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> Result<()> {`
+- `/app/crates/contextra-store/src/sstable/builder.rs:317` [await_expr]: `self.flush_block().await?;`
+- `/app/crates/contextra-store/src/sstable/builder.rs:338` [async_fn]: `async fn flush_block(&mut self) -> Result<()> {`
+- `/app/crates/contextra-store/src/sstable/builder.rs:374` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:386` [async_fn]: `pub async fn finish(mut self) -> Result<SstableMetadata> {`
+- `/app/crates/contextra-store/src/sstable/builder.rs:387` [await_expr]: `self.flush_block().await?;`
+- `/app/crates/contextra-store/src/sstable/builder.rs:412` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:433` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:440` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:444` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:448` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:452` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:456` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:460` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:466` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:471` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:476` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/builder.rs:479` [await_expr]: `crate::util::fsync_parent_dir(&self.path).await?;`
+- `/app/crates/contextra-store/src/sstable/builder.rs:484` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:266` [async_fn]: `pub async fn open(path: impl AsRef<Path>, block_cache: Arc<BlockCache>) -> Result<Self> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:267` [await_expr]: `Self::open_with_key_manager(path, block_cache, None).await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:270` [async_fn]: `pub async fn open_with_key_manager(`
+- `/app/crates/contextra-store/src/sstable/reader.rs:288` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<(std::fs::File, u64)> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:294` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:309` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:315` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:479` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:484` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:539` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:544` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:631` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/sstable/reader.rs:681` [async_fn]: `async fn read_block_at_file(`
+- `/app/crates/contextra-store/src/sstable/reader.rs:699` [tokio_import]: `let data = tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:704` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:744` [async_fn]: `pub(super) async fn get_block(&self, offset: u64, next_offset: u64) -> Result<Bytes> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:756` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/sstable/reader.rs:763` [async_fn]: `pub async fn get_at(`
+- `/app/crates/contextra-store/src/sstable/reader.rs:801` [await_expr]: `let block_data = self.get_block(*offset, next_offset).await?;`
+- `/app/crates/contextra-store/src/sstable/reader.rs:907` [async_fn]: `pub async fn get(&self, key: &[u8]) -> Result<Option<(Bytes, u64, u64)>> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:908` [await_expr]: `self.get_at(key, u64::MAX, u64::MAX).await`
+- `/app/crates/contextra-store/src/sstable/reader.rs:912` [async_fn]: `pub async fn lookup_metrics(&self, key: &[u8]) -> (bool, bool, bool, bool) {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:944` [await_expr]: `let block_data = match self.get_block(offset, next_offset).await {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:972` [async_fn]: `pub async fn stream(self: &Arc<Self>) -> Result<SstableStream> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:984` [async_fn]: `pub async fn iter(&self) -> Result<Vec<(Bytes, Bytes, u64)>> {`
+- `/app/crates/contextra-store/src/sstable/reader.rs:1007` [await_expr]: `let block_data = self.get_block(offset, next_offset).await?;`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:273` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:274` [async_fn]: `async fn test_in_memory_store_put_get_commit_contract() {`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:278` [await_expr]: `assert!(store.get(b"key1").await.unwrap().is_none());`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:280` [await_expr]: `store.put(tx, b"key1", b"value1").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:282` [await_expr]: `assert!(store.get(b"key1").await.unwrap().is_none());`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:284` [await_expr]: `store.commit(tx).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:285` [await_expr]: `let val = store.get(b"key1").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:289` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:290` [async_fn]: `async fn test_in_memory_store_transaction_isolation() {`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:294` [await_expr]: `store.put(tx, b"uncommitted_key", b"val").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:296` [await_expr]: `let res = store.get(b"uncommitted_key").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:300` [await_expr]: `store.rollback(tx).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:301` [await_expr]: `store.commit(tx).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:302` [await_expr]: `let res_after = store.get(b"uncommitted_key").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:306` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:307` [async_fn]: `async fn test_in_memory_store_mvcc_get_at_seq() {`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:312` [await_expr]: `store.put(tx1, b"key_mvcc", b"v1").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:313` [await_expr]: `store.commit(tx1).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:315` [await_expr]: `store.put(tx2, b"key_mvcc", b"v2").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:316` [await_expr]: `store.commit(tx2).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:319` [await_expr]: `let val_at_1 = store.get_at_seq(b"key_mvcc", 1).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:322` [await_expr]: `let val_at_2 = store.get_at_seq(b"key_mvcc", 2).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:326` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:327` [async_fn]: `async fn test_in_memory_store_rollback_to_tx() {`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:332` [await_expr]: `store.put(tx1, b"key_t1", b"v1").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:333` [await_expr]: `store.commit(tx1).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:335` [await_expr]: `store.put(tx2, b"key_t2", b"v2").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:336` [await_expr]: `store.commit(tx2).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:339` [await_expr]: `store.rollback_to_tx(tx1).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:342` [await_expr]: `store.get(b"key_t1").await.unwrap(),`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:345` [await_expr]: `assert!(store.get(b"key_t2").await.unwrap().is_none());`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:348` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:349` [async_fn]: `async fn test_in_memory_store_zero_disk_io() {`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:356` [await_expr]: `store.put(tx, b"key_disk", b"val_disk").await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:357` [await_expr]: `store.commit(tx).await.unwrap();`
+- `/app/crates/contextra-store/src/engine/memory_only.rs:358` [await_expr]: `store.flush().await.unwrap();`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:10` [async_fn]: `pub(super) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:16` [async_fn]: `pub(super) async fn rollback_to_tx(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:17` [await_expr]: `LsmStorage::rollback_to_tx(storage, tx_id).await`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:20` [async_fn]: `pub(super) async fn pin_checkpoint(storage: &LsmStorage, seq_no: u64) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:25` [async_fn]: `pub(super) async fn unpin_checkpoint(storage: &LsmStorage, seq_no: u64) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:30` [async_fn]: `pub(super) async fn stats(storage: &LsmStorage) -> Result<StorageStats> {`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:31` [await_expr]: `let state = storage.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:31` [lock_held_across_await_warning]: `Lock acquired at line 31 near await at line 31`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:32` [await_expr]: `let sstables = storage.sstables.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:32` [lock_held_across_await_warning]: `Lock acquired at line 32 near await at line 32`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:51` [async_fn]: `pub(super) async fn last_seq_no(storage: &LsmStorage) -> Result<u64> {`
+- `/app/crates/contextra-store/src/lsm/ops/maintenance.rs:55` [async_fn]: `pub(super) async fn last_tx_id(storage: &LsmStorage) -> Result<TxId> {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:19` [async_fn]: `pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:20` [await_expr]: `let _flush_lock = storage.flush_mutex.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:20` [lock_held_across_await_warning]: `Lock acquired at line 20 near await at line 20`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:24` [await_expr]: `let state = storage.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:24` [lock_held_across_await_warning]: `Lock acquired at line 24 near await at line 24`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:38` [await_expr]: `let new_wal = Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:38` [lock_held_across_await_warning]: `Lock acquired at line 24 near await at line 38`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:46` [await_expr]: `let _commit_lock = storage.commit_mutex.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:46` [lock_held_across_await_warning]: `Lock acquired at line 46 near await at line 46`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:48` [await_expr]: `let mut state = storage.state.write().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:48` [lock_held_across_await_warning]: `Lock acquired at line 48 near await at line 48`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:62` [await_expr]: `Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:62` [lock_held_across_await_warning]: `Lock acquired at line 48 near await at line 62`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:68` [await_expr]: `let mut wal_guard = storage.wal.write().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:68` [lock_held_across_await_warning]: `Lock acquired at line 68 near await at line 68`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:72` [await_expr]: `let hmac = *old_wal.last_hmac.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:72` [lock_held_across_await_warning]: `Lock acquired at line 72 near await at line 72`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:76` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:76` [lock_held_across_await_warning]: `Lock acquired at line 72 near await at line 76`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:109` [await_expr]: `SstableBuilder::create_with_key_manager(&sst_path, storage.key_manager.clone()).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:115` [await_expr]: `builder.add(&k, &v, seq, tx).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:121` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:129` [await_expr]: `.await`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:134` [await_expr]: `let pending = storage.pending_sealed_wals.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:134` [lock_held_across_await_warning]: `Lock acquired at line 134 near await at line 134`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:151` [await_expr]: `storage.manifest.append_batch(&manifest_entries).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:155` [await_expr]: `let mut state = storage.state.write().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:155` [lock_held_across_await_warning]: `Lock acquired at line 155 near await at line 155`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:156` [await_expr]: `let mut sstables = storage.sstables.write().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:156` [lock_held_across_await_warning]: `Lock acquired at line 156 near await at line 156`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:182` [await_expr]: `let mut pending_guard = storage.pending_sealed_wals.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:182` [lock_held_across_await_warning]: `Lock acquired at line 182 near await at line 182`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:184` [await_expr]: `let wal_read = storage.wal.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:184` [lock_held_across_await_warning]: `Lock acquired at line 184 near await at line 184`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:193` [await_expr]: `trunc_guard_opt = Some(old_wal.truncate_lock.lock().await);`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:193` [lock_held_across_await_warning]: `Lock acquired at line 184 near await at line 193`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:197` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&wal_path).await {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:197` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&wal_path).await {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:197` [lock_held_across_await_warning]: `Lock acquired at line 184 near await at line 197`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:202` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:202` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:215` [await_expr]: `crate::util::fsync_parent_dir(&storage.config.path).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:237` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:241` [await_expr]: `if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {`
+- `/app/crates/contextra-store/src/lsm/ops/compaction.rs:241` [tokio_import]: `if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:20` [async_fn]: `pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:23` [await_expr]: `storage.apply_backpressure().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:41` [async_fn]: `pub(super) async fn put_if_absent(`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:49` [await_expr]: `storage.apply_backpressure().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:80` [await_expr]: `let is_present = match storage.get_at_seq(key, current_max_seq).await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:128` [async_fn]: `pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:130` [await_expr]: `storage.apply_backpressure().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:148` [async_fn]: `pub(super) async fn delete_many(`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:163` [await_expr]: `storage.apply_backpressure().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:189` [async_fn]: `pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:192` [await_expr]: `.await?`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:196` [await_expr]: `storage.delete_many(tx_id, matching_keys).await`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:217` [async_fn]: `pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:220` [await_expr]: `let res = commit_internal(storage, tx_id).await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:236` [async_fn]: `async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:237` [await_expr]: `storage.apply_backpressure().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:253` [await_expr]: `let commit_lock = storage.commit_mutex.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:253` [lock_held_across_await_warning]: `Lock acquired at line 253 near await at line 253`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:277` [await_expr]: `let wal = storage.wal.read().await.clone();`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:277` [lock_held_across_await_warning]: `Lock acquired at line 277 near await at line 277`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:280` [await_expr]: `return single_commit_path(storage, tx_id, wal, wal_ops, mem_updates, first_seq).await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:280` [lock_held_across_await_warning]: `Lock acquired at line 277 near await at line 280`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:283` [await_expr]: `let queue_guard = storage.pending_commit_queue.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:283` [lock_held_across_await_warning]: `Lock acquired at line 283 near await at line 283`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:293` [await_expr]: `follower_commit_path(storage, params, queue_guard, commit_lock).await`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:293` [lock_held_across_await_warning]: `Lock acquired at line 283 near await at line 293`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:295` [await_expr]: `leader_commit_path(storage, wal, params, queue_guard, commit_lock).await`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:295` [lock_held_across_await_warning]: `Lock acquired at line 283 near await at line 295`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:367` [async_fn]: `async fn single_commit_path(`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:375` [await_expr]: `let (wal_entries, prev_hmac) = wal.prepare_batch(wal_ops).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:417` [await_expr]: `let truncate_guard = wal.truncate_lock.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:417` [lock_held_across_await_warning]: `Lock acquired at line 417 near await at line 417`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:419` [await_expr]: `let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:419` [lock_held_across_await_warning]: `Lock acquired at line 417 near await at line 419`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:421` [await_expr]: `if let Err(trunc_err) = wal.truncate(start_offset, prev_hmac).await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:421` [lock_held_across_await_warning]: `Lock acquired at line 417 near await at line 421`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:427` [await_expr]: `match wal.recover_from_poison().await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:427` [lock_held_across_await_warning]: `Lock acquired at line 417 near await at line 427`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:443` [await_expr]: `let _ = wal.rollback_hmac(prev_hmac).await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:464` [await_expr]: `let state = storage.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:464` [lock_held_across_await_warning]: `Lock acquired at line 464 near await at line 464`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:485` [async_fn]: `async fn follower_commit_path(`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:488` [tokio_import]: `mut queue_guard: tokio::sync::MutexGuard<'_, Option<PendingCommitQueue>>,`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:489` [tokio_import]: `commit_lock: tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:502` [tokio_import]: `let (tx, mut rx) = tokio::sync::oneshot::channel();`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:524` [await_expr]: `let res = match tokio::time::timeout(storage.config.tx_timeout, &mut rx).await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:524` [tokio_import]: `let res = match tokio::time::timeout(storage.config.tx_timeout, &mut rx).await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:542` [await_expr]: `let mut queue_guard = storage.pending_commit_queue.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:542` [lock_held_across_await_warning]: `Lock acquired at line 542 near await at line 542`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:564` [await_expr]: `match rx.await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:589` [async_fn]: `async fn leader_commit_path(`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:593` [tokio_import]: `mut queue_guard: tokio::sync::MutexGuard<'_, Option<PendingCommitQueue>>,`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:594` [tokio_import]: `commit_lock: tokio::sync::MutexGuard<'_, ()>,`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:601` [tokio_import]: `let notify_full = Arc::new(tokio::sync::Notify::new());`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:685` [tokio_import]: `tokio::select! {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:686` [tokio_import]: `_ = tokio::time::sleep(Duration::from_micros(storage.config.group_commit_window_micros)) => {},`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:690` [await_expr]: `let commit_lock = storage.commit_mutex.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:690` [lock_held_across_await_warning]: `Lock acquired at line 690 near await at line 690`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:692` [await_expr]: `let mut queue_guard = storage.pending_commit_queue.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:692` [lock_held_across_await_warning]: `Lock acquired at line 692 near await at line 692`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:713` [await_expr]: `let (all_wal_entries, prev_hmac) = match wal.prepare_batch(all_wal_ops).await {`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:734` [await_expr]: `let truncate_guard = wal.truncate_lock.lock().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:734` [lock_held_across_await_warning]: `Lock acquired at line 734 near await at line 734`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:742` [await_expr]: `.await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:742` [lock_held_across_await_warning]: `Lock acquired at line 734 near await at line 742`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:745` [await_expr]: `let _ = wal.rollback_hmac(prev_hmac).await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:745` [lock_held_across_await_warning]: `Lock acquired at line 734 near await at line 745`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:799` [await_expr]: `let state = storage.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/write.rs:799` [lock_held_across_await_warning]: `Lock acquired at line 799 near await at line 799`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:13` [async_fn]: `pub(crate) async fn get_tracked(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:20` [await_expr]: `get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:37` [async_fn]: `pub(crate) async fn get_at_seq_tracked(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:49` [await_expr]: `storage.get_at_seq(key, snapshot_seq).await`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:52` [async_fn]: `pub(crate) async fn scan_prefix_tracked(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:58` [await_expr]: `let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:67` [async_fn]: `pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:70` [await_expr]: `let res = storage.get_at_seq(key, snapshot_seq).await?;`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:80` [async_fn]: `pub(super) async fn get_at_seq(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:90` [await_expr]: `let state = storage.state.read().await;`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:90` [lock_held_across_await_warning]: `Lock acquired at line 90 near await at line 90`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:122` [await_expr]: `let sstables = storage.sstables.read().await.clone();`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:122` [lock_held_across_await_warning]: `Lock acquired at line 122 near await at line 122`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:130` [await_expr]: `if let Some((val, seq, tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:130` [lock_held_across_await_warning]: `Lock acquired at line 122 near await at line 130`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:150` [async_fn]: `pub(super) async fn scan_prefix(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:154` [await_expr]: `storage.scan_prefix_at(prefix, u64::MAX).await`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:157` [async_fn]: `pub(super) async fn scan_prefix_bounded(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:180` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:220` [async_fn]: `pub(super) async fn scan_prefix_at(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:233` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:245` [async_fn]: `pub(super) async fn scan_bounded(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:267` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:302` [async_fn]: `pub(super) async fn scan(`
+- `/app/crates/contextra-store/src/lsm/ops/read.rs:316` [await_expr]: `.await?;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:16` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:23` [await_expr]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:23` [tokio_import]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:33` [await_expr]: `match Wal::open_with_config(&wal_path, config).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:35` [await_expr]: `let _ = wal.replay().await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:16` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:23` [await_expr]: `if tokio::fs::write(&manifest_path, data).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:23` [tokio_import]: `if tokio::fs::write(&manifest_path, data).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:27` [await_expr]: `let _ = Manifest::load(&manifest_path).await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:16` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:23` [await_expr]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:23` [tokio_import]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:33` [await_expr]: `if let Ok(wal) = Wal::open_with_config(&wal_path, config).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:34` [await_expr]: `let _ = wal.replay().await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:35` [tokio_import]: `let file_size = tokio::fs::metadata(&wal_path)`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:36` [await_expr]: `.await`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:39` [await_expr]: `let _ = wal.scan_entries_mmap(file_size, |_, _, _| true).await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:153` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:161` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:181` [await_expr]: `let wal = match Wal::open_with_config(&wal_path, config.clone()).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:201` [await_expr]: `let (batch, _) = match wal.prepare_batch(vec![(op, seq)]).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:206` [await_expr]: `if wal.append_batch(batch).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:213` [await_expr]: `if let Ok(replayed) = wal.replay().await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:235` [await_expr]: `let mut file_bytes = match tokio::fs::read(&wal_path).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:235` [tokio_import]: `let mut file_bytes = match tokio::fs::read(&wal_path).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:277` [await_expr]: `if tokio::fs::write(&wal_path, &file_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:277` [tokio_import]: `if tokio::fs::write(&wal_path, &file_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:282` [await_expr]: `let wal_reopen = match Wal::open_with_config(&wal_path, config).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:288` [await_expr]: `if let Ok(replayed_entries) = wal_reopen.replay().await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:34` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:42` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:54` [await_expr]: `let storage = match LsmStorage::new(config).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:73` [await_expr]: `if storage.put(tx_id, &key, &val).await.is_ok()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:74` [await_expr]: `&& storage.commit(tx_id).await.is_ok()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:84` [await_expr]: `if storage.delete(tx_id, &key).await.is_ok()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:85` [await_expr]: `&& storage.commit(tx_id).await.is_ok()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:91` [await_expr]: `if let Err(_e) = storage.flush().await {}`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:94` [await_expr]: `let _ = storage.maybe_compact().await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:99` [await_expr]: `let actual = storage.get(key).await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:9` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:17` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:32` [await_expr]: `if tokio::fs::write(path.join("MANIFEST"), manifest_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:32` [tokio_import]: `if tokio::fs::write(path.join("MANIFEST"), manifest_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:38` [await_expr]: `if tokio::fs::write(path.join("wal-0.log"), wal_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:38` [tokio_import]: `if tokio::fs::write(path.join("wal-0.log"), wal_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:44` [await_expr]: `if tokio::fs::write(path.join("000001.sst"), sstable_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:44` [tokio_import]: `if tokio::fs::write(path.join("000001.sst"), sstable_bytes).await.is_err() {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:54` [await_expr]: `if let Ok(storage) = LsmStorage::new(config).await {`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:55` [await_expr]: `let _ = storage.get(b"test_key").await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:56` [await_expr]: `let _ = storage.scan_prefix(b"").await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:57` [await_expr]: `let _ = storage.last_seq_no().await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:58` [await_expr]: `let _ = storage.last_tx_id().await;`
+- `/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:59` [await_expr]: `let _ = storage.stats().await;`
+### `contextra-text`
+
+- `/app/crates/contextra-text/src/stream.rs:95` [async_fn]: `pub async fn next_batch(&mut self) -> Result<Vec<(DocId, f32)>> {`
+- `/app/crates/contextra-text/src/stream.rs:97` [await_expr]: `self.refill().await?;`
+- `/app/crates/contextra-text/src/stream.rs:114` [async_fn]: `pub async fn next_doc(&mut self) -> Result<Option<DocId>> {`
+- `/app/crates/contextra-text/src/stream.rs:116` [await_expr]: `self.refill().await?;`
+- `/app/crates/contextra-text/src/stream.rs:151` [async_fn]: `async fn refill(&mut self) -> Result<()> {`
+- `/app/crates/contextra-text/src/stream.rs:164` [await_expr]: `.await?;`
+- `/app/crates/contextra-text/src/wand.rs:262` [async_fn]: `pub async fn block_max_wand_search<S: StorageEngine>(`
+- `/app/crates/contextra-text/src/wand.rs:284` [await_expr]: `storage.last_seq_no().await?`
+- `/app/crates/contextra-text/src/wand.rs:298` [await_expr]: `let active_tbs_entries = storage.scan_prefix_at(&tbs_global_prefix, seq).await?;`
+- `/app/crates/contextra-text/src/wand.rs:330` [await_expr]: `let loaded_list = if let Some(bytes) = storage.get_at_seq(&batch_key, seq).await? {`
+- `/app/crates/contextra-text/src/wand.rs:339` [await_expr]: `let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;`
+- `/app/crates/contextra-text/src/wand.rs:365` [await_expr]: `let doc_len = match storage.get(&dl_key).await? {`
+- `/app/crates/contextra-text/src/wand.rs:528` [await_expr]: `None => match storage.get_at_seq(&dl_key, seq).await? {`
+- `/app/crates/contextra-text/src/wand.rs:564` [await_expr]: `let ex = storage.get_at_seq(&tbs_key, seq).await?.is_some();`
+- `/app/crates/contextra-text/src/wand.rs:576` [await_expr]: `storage.get_at_seq(&key, seq).await?.is_some()`
+- `/app/crates/contextra-text/src/wand.rs:649` [await_expr]: `Box::pin(async move { self.get_at_seq(key, u64::MAX).await })`
+- `/app/crates/contextra-text/src/wand.rs:789` [await_expr]: `Box::pin(async move { self.scan_prefix_at(prefix, u64::MAX).await })`
+- `/app/crates/contextra-text/src/wand.rs:819` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-text/src/wand.rs:820` [async_fn]: `async fn test_block_max_wand_equivalence_and_pruning_performance() -> Result<()> {`
+- `/app/crates/contextra-text/src/wand.rs:835` [await_expr]: `index.upsert_document(tx, doc_id, &text).await?;`
+- `/app/crates/contextra-text/src/wand.rs:837` [await_expr]: `index.commit_stats(tx).await?;`
+- `/app/crates/contextra-text/src/wand.rs:838` [await_expr]: `storage.commit(tx).await?;`
+- `/app/crates/contextra-text/src/wand.rs:842` [await_expr]: `let query_results = index.search_bm25("common rare", k, None).await?;`
+- `/app/crates/contextra-text/src/wand.rs:876` [await_expr]: `.await?;`
+- `/app/crates/contextra-text/src/lib.rs:103` [async_fn]: `async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-text/src/lib.rs:104` [await_expr]: `self.index.search(query, k).await`
+- `/app/crates/contextra-text/src/lib.rs:112` [async_fn]: `async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-text/src/lib.rs:113` [await_expr]: `self.index.search_at(query, k, seq_no).await`
+- `/app/crates/contextra-text/src/lib.rs:122` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {`
+- `/app/crates/contextra-text/src/lib.rs:123` [await_expr]: `self.index.insert(tx, id, text).await`
+- `/app/crates/contextra-text/src/lib.rs:128` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/app/crates/contextra-text/src/lib.rs:129` [await_expr]: `self.index.delete(tx, id).await`
+- `/app/crates/contextra-text/src/lib.rs:134` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/lib.rs:135` [await_expr]: `self.index.commit(tx).await`
+- `/app/crates/contextra-text/src/lib.rs:140` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/lib.rs:141` [await_expr]: `self.index.rollback(tx).await`
+- `/app/crates/contextra-text/src/lib.rs:146` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/lib.rs:147` [await_expr]: `self.index.rollback_to_tx(tx_id).await`
+- `/app/crates/contextra-text/src/lib.rs:152` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-text/src/lib.rs:153` [await_expr]: `self.index.last_tx_id().await`
+- `/app/crates/contextra-text/src/lib.rs:158` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-text/src/lib.rs:159` [await_expr]: `self.index.len().await`
+- `/app/crates/contextra-text/src/lib.rs:164` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/app/crates/contextra-text/src/lib.rs:165` [await_expr]: `self.index.stats().await`
+- `/app/crates/contextra-text/src/lib.rs:241` [await_expr]: `Box::pin(async move { self.get(key).await })`
+- `/app/crates/contextra-text/src/lib.rs:304` [await_expr]: `Box::pin(async move { self.scan_prefix(prefix).await })`
+- `/app/crates/contextra-text/src/lib.rs:310` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-text/src/lib.rs:311` [async_fn]: `async fn test_bm25_scorer_case_full_lifecycle() -> Result<()> {`
+- `/app/crates/contextra-text/src/lib.rs:318` [await_expr]: `scorer.insert(tx, doc_id, "rust text search engine").await?;`
+- `/app/crates/contextra-text/src/lib.rs:319` [await_expr]: `scorer.commit(tx).await?;`
+- `/app/crates/contextra-text/src/lib.rs:321` [await_expr]: `assert_eq!(scorer.len().await, 1);`
+- `/app/crates/contextra-text/src/lib.rs:323` [await_expr]: `let results = scorer.search("rust engine", 10).await?;`
+- `/app/crates/contextra-text/src/lib.rs:327` [await_expr]: `let stats = scorer.stats().await?;`
+- `/app/crates/contextra-text/src/lib.rs:329` [await_expr]: `assert_eq!(scorer.last_tx_id().await?, TxId(1));`
+- `/app/crates/contextra-text/src/lib.rs:331` [await_expr]: `scorer.delete(tx, doc_id).await?;`
+- `/app/crates/contextra-text/src/lib.rs:332` [await_expr]: `scorer.commit(tx).await?;`
+- `/app/crates/contextra-text/src/lib.rs:333` [await_expr]: `assert_eq!(scorer.len().await, 0);`
+- `/app/crates/contextra-text/src/lib.rs:335` [await_expr]: `scorer.rollback(tx).await?;`
+- `/app/crates/contextra-text/src/lib.rs:336` [await_expr]: `scorer.rollback_to_tx(tx).await?;`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:42` [async_fn]: `async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:47` [await_expr]: `self.inner.search(query, k).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:53` [async_fn]: `async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:54` [await_expr]: `self.inner.search_at(query, k, seq_no).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:57` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:58` [await_expr]: `self.inner.insert(tx, id, text).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:61` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:62` [await_expr]: `self.inner.delete(tx, id).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:65` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:66` [await_expr]: `self.inner.commit(tx).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:69` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:70` [await_expr]: `self.inner.rollback(tx).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:73` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:74` [await_expr]: `self.inner.rollback_to_tx(tx_id).await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:77` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:78` [await_expr]: `self.inner.last_tx_id().await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:81` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:82` [await_expr]: `self.inner.len().await`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:85` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/app/crates/contextra-text/src/inverted/morph_index.rs:86` [await_expr]: `self.inner.stats().await`
+- `/app/crates/contextra-text/src/inverted/purge.rs:34` [block_on]: `futures::executor::block_on(f)`
+- `/app/crates/contextra-text/src/inverted/purge.rs:134` [await_expr]: `let dl_bytes_res = block_on_async(async move { storage.get(&dl_key_c).await });`
+- `/app/crates/contextra-text/src/inverted/purge.rs:166` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &dl_key_c).await }) {`
+- `/app/crates/contextra-text/src/inverted/purge.rs:180` [await_expr]: `let fw_bytes_res = block_on_async(async move { storage.get(&fw_key_c).await });`
+- `/app/crates/contextra-text/src/inverted/purge.rs:210` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &fw_key_c).await }) {`
+- `/app/crates/contextra-text/src/inverted/purge.rs:224` [await_expr]: `let raw_prefix_res = block_on_async(async move { storage.scan_prefix(&prefix).await });`
+- `/app/crates/contextra-text/src/inverted/purge.rs:254` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &k_c).await }) {`
+- `/app/crates/contextra-text/src/inverted/purge.rs:269` [await_expr]: `let plb_bytes_res = block_on_async(async move { storage.get(&plb_key_c).await });`
+- `/app/crates/contextra-text/src/inverted/purge.rs:311` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &plb_key_c).await })`
+- `/app/crates/contextra-text/src/inverted/purge.rs:332` [await_expr]: `async move { storage.put(tx, &plb_key_c, &encoded).await },`
+- `/app/crates/contextra-text/src/inverted/purge.rs:359` [await_expr]: `let _ = storage.delete(tx, &pl_doc_key).await;`
+- `/app/crates/contextra-text/src/inverted/purge.rs:360` [await_expr]: `let _ = storage.delete(tx, &tbs_key).await;`
+- `/app/crates/contextra-text/src/inverted/purge.rs:400` [await_expr]: `block_on_async(async move { storage.put(tx, &meta_key, &meta_bytes).await });`
+- `/app/crates/contextra-text/src/inverted/purge.rs:406` [await_expr]: `if let Err(e) = block_on_async(async move { storage.commit(tx).await }) {`
+- `/app/crates/contextra-text/src/inverted/purge.rs:432` [await_expr]: `let raw_entries_res = block_on_async(async move { storage.scan_prefix(&prefix_c).await });`
+- `/app/crates/contextra-text/src/inverted/purge.rs:432` [lock_held_across_await_warning]: `Lock acquired at line 418 near await at line 432`
+- `/app/crates/contextra-text/src/inverted/purge.rs:451` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &k).await }) {`
+- `/app/crates/contextra-text/src/inverted/purge.rs:468` [await_expr]: `if let Err(e) = block_on_async(async move { storage.commit(tx).await }) {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:121` [async_fn]: `pub async fn load_stats(&self) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:123` [await_expr]: `if let Some(bytes) = self.storage.get(&meta_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:181` [async_fn]: `pub(crate) async fn ensure_term_loaded(`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:190` [await_expr]: `if let Some(bytes) = self.storage.get(&plb_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:201` [await_expr]: `let raw_entries = self.storage.scan_prefix(&prefix).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:219` [await_expr]: `let doc_len = match self.storage.get(&dl_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:271` [async_fn]: `pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:293` [await_expr]: `if let Some(bytes) = self.storage.get(&dl_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:302` [await_expr]: `if let Some(fw_bytes) = self.storage.get(&fw_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:308` [await_expr]: `self.storage.put(tx, &tbs_key, &[]).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:317` [await_expr]: `.await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:325` [await_expr]: `self.storage.put(tx, &fw_key, &fw_bytes).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:338` [await_expr]: `self.ensure_term_loaded(term).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:340` [await_expr]: `self.storage.put(tx, &pl_doc_key, &tf.to_le_bytes()).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:347` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:363` [async_fn]: `pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:366` [await_expr]: `self.ensure_term_loaded(term).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:371` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:374` [await_expr]: `self.storage.delete(tx, &plb_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:387` [async_fn]: `pub async fn compact_terms(&self, tx: TxId) -> Result<u64> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:388` [await_expr]: `self.resolve_tombstones(tx).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:391` [async_fn]: `pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:399` [await_expr]: `let tombstones = self.storage.scan_prefix(&tbs_prefix).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:431` [await_expr]: `let is_live = if let Some(fw_bytes) = self.storage.get(&fw_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:446` [await_expr]: `self.ensure_term_loaded(&term).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:448` [await_expr]: `self.storage.delete(tx, &pl_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:455` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:457` [await_expr]: `self.storage.delete(tx, &plb_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:460` [await_expr]: `self.storage.delete(tx, &tbs_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:469` [async_fn]: `pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:474` [await_expr]: `if let Some(bytes) = self.storage.get(&dl_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:486` [await_expr]: `self.storage.delete(tx, &dl_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:489` [await_expr]: `if let Some(fw_bytes) = self.storage.get(&fw_key).await? {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:492` [await_expr]: `self.ensure_term_loaded(term).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:494` [await_expr]: `self.storage.delete(tx, &pl_doc_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:496` [await_expr]: `self.storage.put(tx, &tbs_key, &[]).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:504` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:506` [await_expr]: `self.storage.delete(tx, &plb_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:511` [await_expr]: `self.storage.delete(tx, &fw_key).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:539` [async_fn]: `pub(crate) async fn commit_stats(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:590` [await_expr]: `self.storage.put(tx, &meta_key, &meta_bytes).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:595` [async_fn]: `pub(crate) async fn rollback_stats(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:605` [async_fn]: `pub async fn search_bm25(`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:611` [await_expr]: `self.search_bm25_at(query, k, max_seq).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:617` [async_fn]: `pub async fn search_bm25_at(`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:663` [await_expr]: `.await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:670` [async_fn]: `async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:671` [await_expr]: `let results = self.search_bm25(query, k, None).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:682` [async_fn]: `async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:683` [await_expr]: `let results = self.search_bm25(query, k, Some(seq_no)).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:690` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:691` [await_expr]: `self.upsert_document(tx, id, text).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:694` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:695` [await_expr]: `self.delete_document(tx, id).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:698` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:699` [await_expr]: `self.commit_stats(tx).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:700` [await_expr]: `self.storage.commit(tx).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:703` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:704` [await_expr]: `self.rollback_stats(tx).await?;`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:705` [await_expr]: `self.storage.rollback(tx).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:708` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:709` [await_expr]: `self.storage.rollback_to_tx(tx_id).await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:712` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:713` [await_expr]: `self.storage.last_tx_id().await`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:716` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:720` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/app/crates/contextra-text/src/inverted/index_struct.rs:722` [await_expr]: `let meta = if let Some(bytes) = self.storage.get(&meta_key).await? {`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:85` [block_on]: `futures::executor::block_on(f)`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:144` [await_expr]: `.await?;`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:145` [await_expr]: `scratch_c.commit(tx).await`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:151` [await_expr]: `let raw_entries = block_on_async(async move { storage.scan_prefix(&prefix).await })?;`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:176` [await_expr]: `let _ = scratch_c.storage().delete(tx_del, &k).await;`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:178` [await_expr]: `scratch_c.commit(tx_del).await`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:221` [await_expr]: `let raw_entries = block_on_async(async move { storage.scan_prefix(&index_prefix).await })?;`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:221` [lock_held_across_await_warning]: `Lock acquired at line 210 near await at line 221`
+- `/app/crates/contextra-text/src/inverted/scanner.rs:281` [await_expr]: `block_on_async(async move { storage.scan_prefix(&col_prefix).await })?;`
+### `contextra-vector`
+
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:10` [tokio_import]: `#[tokio::main(flavor = "current_thread")]`
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:11` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:25` [await_expr]: `.await?;`
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:28` [await_expr]: `.await?;`
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:31` [await_expr]: `.await?;`
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:34` [await_expr]: `index.commit(tx).await?;`
+- `/app/crates/contextra-vector/examples/standalone_vector.rs:38` [await_expr]: `let results = index.search(&query, 2).await?;`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:76` [async_fn]: `pub async fn next_batch(&mut self) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:78` [await_expr]: `self.refill().await?;`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:94` [async_fn]: `pub async fn next_doc(&mut self) -> Result<Option<DocId>> {`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:96` [await_expr]: `self.refill().await?;`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:127` [async_fn]: `async fn refill(&mut self) -> Result<()> {`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:138` [await_expr]: `Some(seq) => self.index.search_at(&self.query, target_k, seq).await?,`
+- `/app/crates/contextra-vector/src/candidate_stream.rs:139` [await_expr]: `None => self.index.search(&self.query, target_k).await?,`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:15` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:18` [await_expr]: `return hnsw.insert(tx, id, embedding).await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:18` [lock_held_across_await_warning]: `Lock acquired at line 16 near await at line 18`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:25` [await_expr]: `Self::append_to_pending_wal(&pending_wal, id, embedding).await?;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:25` [lock_held_across_await_warning]: `Lock acquired at line 16 near await at line 25`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:36` [await_expr]: `let n_persisted = self.len().await as u64;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:36` [lock_held_across_await_warning]: `Lock acquired at line 28 near await at line 36`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:49` [async_fn]: `async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:50` [await_expr]: `self.search_internal(query, k).await`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:53` [async_fn]: `async fn search_filtered(`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:59` [await_expr]: `self.search_filtered_internal(query, k, filter).await`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:63` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:66` [await_expr]: `return hnsw.delete(tx, id).await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:66` [lock_held_across_await_warning]: `Lock acquired at line 64 near await at line 66`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:96` [await_expr]: `Self::append_to_tombstone_wal(&tombstone_wal, id).await?;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:101` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:104` [await_expr]: `return hnsw.commit(tx).await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:104` [lock_held_across_await_warning]: `Lock acquired at line 102 near await at line 104`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:109` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:112` [await_expr]: `return hnsw.rollback(tx).await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:112` [lock_held_across_await_warning]: `Lock acquired at line 110 near await at line 112`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:117` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:120` [await_expr]: `return hnsw.rollback_to_tx(tx_id).await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:120` [lock_held_across_await_warning]: `Lock acquired at line 118 near await at line 120`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:126` [async_fn]: `async fn all_doc_ids(&self) -> Result<Vec<DocId>> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:129` [await_expr]: `return hnsw.all_doc_ids().await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:129` [lock_held_across_await_warning]: `Lock acquired at line 127 near await at line 129`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:147` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:151` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:154` [await_expr]: `return hnsw.len().await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:154` [lock_held_across_await_warning]: `Lock acquired at line 152 near await at line 154`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:156` [await_expr]: `self.all_doc_ids().await.map(|ids| ids.len()).unwrap_or(0)`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:156` [lock_held_across_await_warning]: `Lock acquired at line 152 near await at line 156`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:159` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:161` [await_expr]: `let count = self.len().await;`
+- `/app/crates/contextra-vector/src/diskann/vector_index_impl.rs:161` [lock_held_across_await_warning]: `Lock acquired at line 152 near await at line 161`
+- `/app/crates/contextra-vector/src/diskann/persistence.rs:36` [async_fn]: `pub async fn persist_delta(&self) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/persistence.rs:245` [async_fn]: `pub async fn load(&self) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/persistence.rs:639` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-vector/src/diskann/persistence.rs:640` [async_fn]: `async fn test_docid_128_mmap_persistence_roundtrip() -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/persistence.rs:666` [await_expr]: `index.build(&vectors, &ids).await?;`
+- `/app/crates/contextra-vector/src/diskann/persistence.rs:670` [await_expr]: `reloaded.load().await?;`
+- `/app/crates/contextra-vector/src/diskann/filtered.rs:21` [async_fn]: `pub(crate) async fn search_filtered_internal(`
+- `/app/crates/contextra-vector/src/diskann/filtered.rs:35` [await_expr]: `return self.search_internal(query, k).await;`
+- `/app/crates/contextra-vector/src/diskann/filtered.rs:42` [await_expr]: `let raw = self.search_internal(query, fetch_k).await?;`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:25` [async_fn]: `pub async fn search_predicate_augmented(`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:196` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:197` [async_fn]: `async fn test_gamma_zero_regression_reduction() -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:216` [await_expr]: `index.build(&vecs, &ids).await?;`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:221` [await_expr]: `let filtered_res = index.search_filtered(&query, 5, Some(&filter)).await?;`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:224` [await_expr]: `.await?;`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:236` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:237` [async_fn]: `async fn test_low_selectivity_augmented_improves_recall() -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:256` [await_expr]: `index.build(&vecs, &ids).await?;`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:262` [await_expr]: `let filtered_res = index.search_filtered(&query, 5, Some(&filter)).await?;`
+- `/app/crates/contextra-vector/src/diskann/predicate_augmented.rs:265` [await_expr]: `.await?;`
+- `/app/crates/contextra-vector/src/diskann/search.rs:226` [async_fn]: `pub async fn search_internal(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-vector/src/diskann/search.rs:243` [await_expr]: `return hnsw.search(query, k).await;`
+- `/app/crates/contextra-vector/src/diskann/search.rs:243` [lock_held_across_await_warning]: `Lock acquired at line 241 near await at line 243`
+- `/app/crates/contextra-vector/src/diskann/search.rs:256` [await_expr]: `return hnsw.search(query, k).await;`
+- `/app/crates/contextra-vector/src/diskann/search.rs:256` [lock_held_across_await_warning]: `Lock acquired at line 246 near await at line 256`
+- `/app/crates/contextra-vector/src/diskann/search.rs:281` [await_expr]: `hnsw.search(query, k).await`
+- `/app/crates/contextra-vector/src/diskann/build.rs:145` [async_fn]: `pub(crate) async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/build.rs:299` [async_fn]: `pub(crate) async fn append_to_pending_wal(`
+- `/app/crates/contextra-vector/src/diskann/build.rs:714` [async_fn]: `pub async fn build(&self, vectors: &[Vec<f32>], ids: &[DocId]) -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/build.rs:778` [tokio_import]: `#[tokio::test]`
+- `/app/crates/contextra-vector/src/diskann/build.rs:779` [async_fn]: `async fn test_docid_128_wal_roundtrip() -> Result<()> {`
+- `/app/crates/contextra-vector/src/diskann/build.rs:794` [await_expr]: `DiskAnnIndex::append_to_pending_wal(&pending_wal_path, doc1, &embedding1).await?;`
+- `/app/crates/contextra-vector/src/diskann/build.rs:795` [await_expr]: `DiskAnnIndex::append_to_pending_wal(&pending_wal_path, doc2, &embedding2).await?;`
+- `/app/crates/contextra-vector/src/diskann/build.rs:807` [await_expr]: `DiskAnnIndex::append_to_tombstone_wal(&tombstone_wal_path, doc1).await?;`
+- `/app/crates/contextra-vector/src/diskann/build.rs:808` [await_expr]: `DiskAnnIndex::append_to_tombstone_wal(&tombstone_wal_path, doc2).await?;`
+- `/app/crates/contextra-vector/src/persistence/mmap.rs:91` [async_fn]: `pub async fn open_async(path: impl AsRef<std::path::Path> + Send) -> Result<Self> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:13` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:39` [async_fn]: `async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:218` [async_fn]: `async fn search_filtered(`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:224` [await_expr]: `self.search_filtered_internal(query, k, filter, None).await`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:227` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:240` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:369` [async_fn]: `async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:374` [await_expr]: `.await`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:374` [lock_held_across_await_warning]: `Lock acquired at line 371 near await at line 374`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:377` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:388` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:456` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:460` [async_fn]: `async fn all_doc_ids(&self) -> Result<Vec<DocId>> {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:493` [async_fn]: `async fn len(&self) -> usize {`
+- `/app/crates/contextra-vector/src/hnsw/vector_index_impl.rs:518` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:421` [async_fn]: `pub async fn rebuild(&self) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:422` [await_expr]: `self.inner.rebuild().await`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:425` [async_fn]: `pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:426` [await_expr]: `self.inner.rebuild_region(region_node_ids).await`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:517` [async_fn]: `pub async fn wait_for_rebuild(&self) -> bool {`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:518` [await_expr]: `self.inner.wait_for_rebuild().await`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:521` [async_fn]: `pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:522` [await_expr]: `self.inner.wait_for_rebuild_with_timeout(timeout).await`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:525` [async_fn]: `pub async fn load_mmap(&self, path: impl AsRef<std::path::Path> + Send) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:526` [await_expr]: `let mmap_index = crate::persistence::MmapIndex::open_async(path).await?;`
+- `/app/crates/contextra-vector/src/hnsw/types.rs:834` [async_fn]: `pub async fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/core_search.rs:167` [async_fn]: `pub(super) async fn search_filtered_internal(`
+- `/app/crates/contextra-vector/src/hnsw/core_search.rs:429` [async_fn]: `pub async fn search_adaptive(`
+- `/app/crates/contextra-vector/src/hnsw/core_search.rs:435` [await_expr]: `self.search_adaptive_filtered(query, k, policy, None).await`
+- `/app/crates/contextra-vector/src/hnsw/core_search.rs:439` [async_fn]: `pub async fn search_adaptive_filtered(`
+- `/app/crates/contextra-vector/src/hnsw/core_search.rs:448` [await_expr]: `.await?;`
+- `/app/crates/contextra-vector/src/hnsw/core_search.rs:453` [async_fn]: `pub async fn search_adaptive_with_stats(`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:53` [async_fn]: `pub async fn wait_for_rebuild(&self) -> bool {`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:55` [await_expr]: `self.wait_for_rebuild_with_clock(clock).await`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:58` [async_fn]: `pub async fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:60` [await_expr]: `.await`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:63` [async_fn]: `pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:66` [await_expr]: `.await`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:69` [async_fn]: `pub async fn wait_for_rebuild_with_timeout_and_clock(`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:502` [async_fn]: `pub async fn rebuild(&self) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:507` [async_fn]: `pub async fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {`
+- `/app/crates/contextra-vector/src/hnsw/core_rebuild.rs:624` [async_fn]: `pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:37` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:45` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:75` [await_expr]: `.await;`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:78` [await_expr]: `let _ = index.search(&query, k).await;`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:81` [await_expr]: `let _ = index.delete(TxId::new(tx_id), DocId::new(doc_id)).await;`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:22` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:30` [block_on]: `rt.block_on(async {`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:91` [await_expr]: `let _ = index.insert(tx, DocId::new((i + 1) as u64), vec).await;`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:93` [await_expr]: `let _ = index.commit(tx).await;`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:101` [await_expr]: `if index.save(&path).await.is_err() {`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:130` [await_expr]: `if reloaded.load_mmap(&path).await.is_ok() {`
+- `/app/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:132` [await_expr]: `let _ = reloaded.search(&query, 5).await;`

@@ -1,0 +1,2512 @@
+[
+  {
+    "crate": "contextra",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-adapt",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-agent",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-audit-export",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-avv-generator",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-checkpoint",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-cognition",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-core",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-crypto",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-db",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-durable-fs",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-engine",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-erasure",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-graph",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 5,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": [
+      {
+        "file": "/app/crates/contextra-graph/tests/ppr_alloc_test.rs",
+        "items": [
+          {
+            "line": 22,
+            "kind": "unsafe_impl",
+            "code": "unsafe impl GlobalAlloc for CountingAllocator {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 25,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn alloc(&self, layout: Layout) -> *mut u8 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 30,
+            "kind": "unsafe_block",
+            "code": "unsafe { System.alloc(layout) }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 34,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 37,
+            "kind": "unsafe_block",
+            "code": "unsafe { System.dealloc(ptr, layout) }; // SAFETY: Forward ptr and layout to System allocator.",
+            "has_safety_comment": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "crate": "contextra-infer-candle",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-infer-ollama",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-infer-onnx",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-ingest",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-kvcache",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-license",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-mcp",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-mvcc",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-ports",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-privacy",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-py",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-rank",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-router",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-sandbox",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-simd",
+    "is_allowed_island": true,
+    "root_forbid_unsafe": false,
+    "total_unsafe_occurrences": 272,
+    "missing_safety_comments": 18,
+    "files_with_unsafe": [
+      {
+        "file": "/app/crates/contextra-simd/src/dispatch.rs",
+        "items": [
+          {
+            "line": 124,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::cosine_distance_avx2(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 129,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::cosine_distance_avx512(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 134,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { neon::cosine_distance_neon(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 141,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 145,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 153,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { neon::cosine_distance_neon(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 182,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::euclidean_distance_avx2(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 187,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::euclidean_distance_avx512(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 192,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { neon::euclidean_distance_neon(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 199,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 203,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 211,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { neon::euclidean_distance_neon(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 240,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::dot_product_avx2(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 245,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::dot_product_avx512(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 250,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { neon::dot_product_neon(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 257,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::dot_product_avx512(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 261,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::dot_product_avx2(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 269,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { neon::dot_product_neon(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 302,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 307,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 314,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 318,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 351,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 356,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 363,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 369,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 402,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 407,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 414,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 418,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 445,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::dot_product_u8_avx2(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 454,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 464,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 468,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 495,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 502,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 509,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 513,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 544,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 553,
+            "kind": "unsafe_block",
+            "code": "Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) })",
+            "has_safety_comment": true
+          },
+          {
+            "line": 563,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });",
+            "has_safety_comment": true
+          },
+          {
+            "line": 567,
+            "kind": "unsafe_block",
+            "code": "return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-simd/src/kernels/neon.rs",
+        "items": [
+          {
+            "line": 16,
+            "kind": "unsafe_fn",
+            "code": "//! - Alle Kernel sind `unsafe fn`, da der Aufrufer sicherstellen muss, dass die NEON-Erweiterung",
+            "has_safety_comment": false
+          },
+          {
+            "line": 33,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 38,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { vdupq_n_f32(0.0) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 40,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { vdupq_n_f32(0.0) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 42,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { vdupq_n_f32(0.0) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 49,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 52,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { vfmaq_f32(dot_v, va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 54,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { vfmaq_f32(norm_a_v, va, va) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 56,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { vfmaq_f32(norm_b_v, vb, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 62,
+            "kind": "unsafe_block",
+            "code": "let mut dot = unsafe { vaddvq_f32(dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 64,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a = unsafe { vaddvq_f32(norm_a_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 66,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b = unsafe { vaddvq_f32(norm_b_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 70,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 95,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 100,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { vdupq_n_f32(0.0) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 107,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 109,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { vsubq_f32(va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 112,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { vfmaq_f32(sum_v, diff, diff) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 118,
+            "kind": "unsafe_block",
+            "code": "let mut sum = unsafe { vaddvq_f32(sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 122,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 140,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 145,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { vdupq_n_f32(0.0) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 152,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 155,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { vfmaq_f32(dot_v, va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 161,
+            "kind": "unsafe_block",
+            "code": "let mut dot = unsafe { vaddvq_f32(dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 165,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-simd/src/kernels/avx2.rs",
+        "items": [
+          {
+            "line": 17,
+            "kind": "unsafe_fn",
+            "code": "//! Alle Funktionen in diesem Modul sind als `pub(crate) unsafe fn` deklariert und mit",
+            "has_safety_comment": false
+          },
+          {
+            "line": 35,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 40,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 42,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 44,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 51,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 59,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 61,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm256_fmadd_ps(va, va, norm_a_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 63,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm256_fmadd_ps(vb, vb, norm_b_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 69,
+            "kind": "unsafe_block",
+            "code": "let (mut dot, mut norm_a, mut norm_b) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 80,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 105,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 110,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 117,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 124,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { _mm256_sub_ps(va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 127,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm256_fmadd_ps(diff, diff, sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 133,
+            "kind": "unsafe_block",
+            "code": "let mut sum = unsafe { hsum256_ps_avx(sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 137,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 155,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 160,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 167,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 175,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 181,
+            "kind": "unsafe_block",
+            "code": "let mut dot = unsafe { hsum256_ps_avx(dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 185,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 202,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 207,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 209,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 211,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 218,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 226,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 228,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm256_fmadd_ps(va, va, norm_a_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 230,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm256_fmadd_ps(vb, vb, norm_b_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 236,
+            "kind": "unsafe_block",
+            "code": "let (mut dot, mut norm_a, mut norm_b) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 248,
+            "kind": "unsafe_block",
+            "code": "let (x, b_val) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 283,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 288,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 295,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 302,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { _mm256_sub_ps(va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 305,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm256_fmadd_ps(diff, diff, sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 311,
+            "kind": "unsafe_block",
+            "code": "let mut sum = unsafe { hsum256_ps_avx(sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 317,
+            "kind": "unsafe_block",
+            "code": "let (x, b_val) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 345,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 350,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm256_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 357,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 365,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 371,
+            "kind": "unsafe_block",
+            "code": "let mut dot = unsafe { hsum256_ps_avx(dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 377,
+            "kind": "unsafe_block",
+            "code": "let (x, b_val) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 402,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 404,
+            "kind": "unsafe_block",
+            "code": "let vlow = unsafe { _mm256_castps256_ps128(v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 406,
+            "kind": "unsafe_block",
+            "code": "let vhigh = unsafe { _mm256_extractf128_ps(v, 1) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 408,
+            "kind": "unsafe_block",
+            "code": "let v128 = unsafe { _mm_add_ps(vlow, vhigh) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 410,
+            "kind": "unsafe_block",
+            "code": "let v64 = unsafe { _mm_add_ps(v128, _mm_movehl_ps(v128, v128)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 412,
+            "kind": "unsafe_block",
+            "code": "let v32 = unsafe { _mm_add_ss(v64, _mm_shuffle_ps(v64, v64, 0x55)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 414,
+            "kind": "unsafe_block",
+            "code": "unsafe { _mm_cvtss_f32(v32) }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 424,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 429,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 431,
+            "kind": "unsafe_block",
+            "code": "let zero = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 438,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 446,
+            "kind": "unsafe_block",
+            "code": "let va_lo = unsafe { _mm256_unpacklo_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 448,
+            "kind": "unsafe_block",
+            "code": "let vb_lo = unsafe { _mm256_unpacklo_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 450,
+            "kind": "unsafe_block",
+            "code": "let prod_lo = unsafe { _mm256_madd_epi16(va_lo, vb_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 453,
+            "kind": "unsafe_block",
+            "code": "let va_hi = unsafe { _mm256_unpackhi_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 455,
+            "kind": "unsafe_block",
+            "code": "let vb_hi = unsafe { _mm256_unpackhi_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 457,
+            "kind": "unsafe_block",
+            "code": "let prod_hi = unsafe { _mm256_madd_epi16(va_hi, vb_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 460,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm256_add_epi32(sum_v, prod_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 462,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm256_add_epi32(sum_v, prod_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 468,
+            "kind": "unsafe_block",
+            "code": "let mut sum = u32::from_ne_bytes(unsafe { hsum256_epi32_avx2(sum_v) }.to_ne_bytes());",
+            "has_safety_comment": true
+          },
+          {
+            "line": 472,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 487,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 492,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 494,
+            "kind": "unsafe_block",
+            "code": "let zero = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 501,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 509,
+            "kind": "unsafe_block",
+            "code": "let va_lo = unsafe { _mm256_unpacklo_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 511,
+            "kind": "unsafe_block",
+            "code": "let vb_lo = unsafe { _mm256_unpacklo_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 513,
+            "kind": "unsafe_block",
+            "code": "let diff_lo = unsafe { _mm256_sub_epi16(va_lo, vb_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 515,
+            "kind": "unsafe_block",
+            "code": "let prod_lo = unsafe { _mm256_madd_epi16(diff_lo, diff_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 518,
+            "kind": "unsafe_block",
+            "code": "let va_hi = unsafe { _mm256_unpackhi_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 520,
+            "kind": "unsafe_block",
+            "code": "let vb_hi = unsafe { _mm256_unpackhi_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 522,
+            "kind": "unsafe_block",
+            "code": "let diff_hi = unsafe { _mm256_sub_epi16(va_hi, vb_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 524,
+            "kind": "unsafe_block",
+            "code": "let prod_hi = unsafe { _mm256_madd_epi16(diff_hi, diff_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 527,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm256_add_epi32(sum_v, prod_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 529,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm256_add_epi32(sum_v, prod_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 535,
+            "kind": "unsafe_block",
+            "code": "let mut sum = u32::from_ne_bytes(unsafe { hsum256_epi32_avx2(sum_v) }.to_ne_bytes());",
+            "has_safety_comment": true
+          },
+          {
+            "line": 539,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { (*a.get_unchecked(i) as i32) - (*b.get_unchecked(i) as i32) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 555,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(",
+            "has_safety_comment": true
+          },
+          {
+            "line": 563,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 565,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 567,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 569,
+            "kind": "unsafe_block",
+            "code": "let zero = unsafe { _mm256_setzero_si256() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 576,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 584,
+            "kind": "unsafe_block",
+            "code": "let va_lo = unsafe { _mm256_unpacklo_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 586,
+            "kind": "unsafe_block",
+            "code": "let vb_lo = unsafe { _mm256_unpacklo_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 588,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm256_add_epi32(dot_v, _mm256_madd_epi16(va_lo, vb_lo)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 590,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm256_add_epi32(norm_a_v, _mm256_madd_epi16(va_lo, va_lo)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 592,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm256_add_epi32(norm_b_v, _mm256_madd_epi16(vb_lo, vb_lo)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 595,
+            "kind": "unsafe_block",
+            "code": "let va_hi = unsafe { _mm256_unpackhi_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 597,
+            "kind": "unsafe_block",
+            "code": "let vb_hi = unsafe { _mm256_unpackhi_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 599,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm256_add_epi32(dot_v, _mm256_madd_epi16(va_hi, vb_hi)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 601,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm256_add_epi32(norm_a_v, _mm256_madd_epi16(va_hi, va_hi)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 603,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm256_add_epi32(norm_b_v, _mm256_madd_epi16(vb_hi, vb_hi)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 609,
+            "kind": "unsafe_block",
+            "code": "let (mut dot, mut norm_a_sq, mut norm_b_sq) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 619,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 640,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 642,
+            "kind": "unsafe_block",
+            "code": "let vlow = unsafe { _mm256_castsi256_si128(v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 644,
+            "kind": "unsafe_block",
+            "code": "let vhigh = unsafe { _mm256_extracti128_si256(v, 1) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 646,
+            "kind": "unsafe_block",
+            "code": "let v128 = unsafe { _mm_add_epi32(vlow, vhigh) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 648,
+            "kind": "unsafe_block",
+            "code": "let v64 = unsafe { _mm_add_epi32(v128, _mm_srli_si128(v128, 8)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 650,
+            "kind": "unsafe_block",
+            "code": "let v32 = unsafe { _mm_add_epi32(v64, _mm_srli_si128(v64, 4)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 652,
+            "kind": "unsafe_block",
+            "code": "unsafe { _mm_cvtsi128_si32(v32) }",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-simd/src/kernels/avx512.rs",
+        "items": [
+          {
+            "line": 17,
+            "kind": "unsafe_fn",
+            "code": "//! Alle Funktionen in diesem Modul sind als `pub(crate) unsafe fn` deklariert und erfordern",
+            "has_safety_comment": false
+          },
+          {
+            "line": 35,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 40,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 42,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 44,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 51,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 59,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 61,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm512_fmadd_ps(va, va, norm_a_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 63,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm512_fmadd_ps(vb, vb, norm_b_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 69,
+            "kind": "unsafe_block",
+            "code": "let (mut dot, mut norm_a, mut norm_b) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 79,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 104,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 109,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 116,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 123,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { _mm512_sub_ps(va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 126,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm512_fmadd_ps(diff, diff, sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 132,
+            "kind": "unsafe_block",
+            "code": "let mut sum = unsafe { hsum512_ps_avx(sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 136,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 154,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 159,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 166,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 174,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 180,
+            "kind": "unsafe_block",
+            "code": "let mut dot = unsafe { hsum512_ps_avx(dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 184,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 201,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 206,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 208,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 210,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 217,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 225,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 227,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm512_fmadd_ps(va, va, norm_a_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 229,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm512_fmadd_ps(vb, vb, norm_b_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 235,
+            "kind": "unsafe_block",
+            "code": "let (mut dot, mut norm_a, mut norm_b) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 247,
+            "kind": "unsafe_block",
+            "code": "let (x, b_val) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 282,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 287,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 294,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 301,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { _mm512_sub_ps(va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 304,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm512_fmadd_ps(diff, diff, sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 310,
+            "kind": "unsafe_block",
+            "code": "let mut sum = unsafe { hsum512_ps_avx(sum_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 316,
+            "kind": "unsafe_block",
+            "code": "let (x, b_val) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 344,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 349,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm512_setzero_ps() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 356,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 364,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 370,
+            "kind": "unsafe_block",
+            "code": "let mut dot = unsafe { hsum512_ps_avx(dot_v) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 376,
+            "kind": "unsafe_block",
+            "code": "let (x, b_val) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 401,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 403,
+            "kind": "unsafe_block",
+            "code": "let v256 = unsafe { _mm256_add_ps(_mm512_extractf32x8_ps(v, 0), _mm512_extractf32x8_ps(v, 1)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 405,
+            "kind": "unsafe_block",
+            "code": "let vlow = unsafe { _mm256_castps256_ps128(v256) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 407,
+            "kind": "unsafe_block",
+            "code": "let vhigh = unsafe { _mm256_extractf128_ps(v256, 1) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 409,
+            "kind": "unsafe_block",
+            "code": "let v128 = unsafe { _mm_add_ps(vlow, vhigh) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 411,
+            "kind": "unsafe_block",
+            "code": "let v64 = unsafe { _mm_add_ps(v128, _mm_movehl_ps(v128, v128)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 413,
+            "kind": "unsafe_block",
+            "code": "let v32 = unsafe { _mm_add_ss(v64, _mm_shuffle_ps(v64, v64, 0x55)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 415,
+            "kind": "unsafe_block",
+            "code": "unsafe { _mm_cvtss_f32(v32) }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 425,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 430,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm512_setzero_si512() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 437,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 445,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm512_dpbusd_epi32(sum_v, va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 451,
+            "kind": "unsafe_block",
+            "code": "let mut sum = u32::from_ne_bytes(unsafe { hsum512_epi32_avx512(sum_v) }.to_ne_bytes());",
+            "has_safety_comment": true
+          },
+          {
+            "line": 455,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 470,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 475,
+            "kind": "unsafe_block",
+            "code": "let mut sum_v = unsafe { _mm512_setzero_si512() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 477,
+            "kind": "unsafe_block",
+            "code": "let zero = unsafe { _mm512_setzero_si512() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 484,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 492,
+            "kind": "unsafe_block",
+            "code": "let va_lo = unsafe { _mm512_unpacklo_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 494,
+            "kind": "unsafe_block",
+            "code": "let vb_lo = unsafe { _mm512_unpacklo_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 496,
+            "kind": "unsafe_block",
+            "code": "let diff_lo = unsafe { _mm512_sub_epi16(va_lo, vb_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 498,
+            "kind": "unsafe_block",
+            "code": "let prod_lo = unsafe { _mm512_madd_epi16(diff_lo, diff_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 501,
+            "kind": "unsafe_block",
+            "code": "let va_hi = unsafe { _mm512_unpackhi_epi8(va, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 503,
+            "kind": "unsafe_block",
+            "code": "let vb_hi = unsafe { _mm512_unpackhi_epi8(vb, zero) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 505,
+            "kind": "unsafe_block",
+            "code": "let diff_hi = unsafe { _mm512_sub_epi16(va_hi, vb_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 507,
+            "kind": "unsafe_block",
+            "code": "let prod_hi = unsafe { _mm512_madd_epi16(diff_hi, diff_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 510,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm512_add_epi32(sum_v, prod_lo) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 512,
+            "kind": "unsafe_block",
+            "code": "sum_v = unsafe { _mm512_add_epi32(sum_v, prod_hi) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 518,
+            "kind": "unsafe_block",
+            "code": "let mut sum = u32::from_ne_bytes(unsafe { hsum512_epi32_avx512(sum_v) }.to_ne_bytes());",
+            "has_safety_comment": true
+          },
+          {
+            "line": 522,
+            "kind": "unsafe_block",
+            "code": "let diff = unsafe { (*a.get_unchecked(i) as i32) - (*b.get_unchecked(i) as i32) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 538,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(",
+            "has_safety_comment": true
+          },
+          {
+            "line": 546,
+            "kind": "unsafe_block",
+            "code": "let mut dot_v = unsafe { _mm512_setzero_si512() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 548,
+            "kind": "unsafe_block",
+            "code": "let mut norm_a_v = unsafe { _mm512_setzero_si512() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 550,
+            "kind": "unsafe_block",
+            "code": "let mut norm_b_v = unsafe { _mm512_setzero_si512() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 557,
+            "kind": "unsafe_block",
+            "code": "let (va, vb) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 565,
+            "kind": "unsafe_block",
+            "code": "dot_v = unsafe { _mm512_dpbusd_epi32(dot_v, va, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 567,
+            "kind": "unsafe_block",
+            "code": "norm_a_v = unsafe { _mm512_dpbusd_epi32(norm_a_v, va, va) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 569,
+            "kind": "unsafe_block",
+            "code": "norm_b_v = unsafe { _mm512_dpbusd_epi32(norm_b_v, vb, vb) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 575,
+            "kind": "unsafe_block",
+            "code": "let (mut dot, mut norm_a_sq, mut norm_b_sq) = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 585,
+            "kind": "unsafe_block",
+            "code": "let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 606,
+            "kind": "unsafe_fn",
+            "code": "pub(crate) unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 609,
+            "kind": "unsafe_block",
+            "code": "unsafe { _mm256_add_epi32(_mm512_castsi512_si256(v), _mm512_extracti32x8_epi32(v, 1)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 611,
+            "kind": "unsafe_block",
+            "code": "let vlow = unsafe { _mm256_castsi256_si128(v256) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 613,
+            "kind": "unsafe_block",
+            "code": "let vhigh = unsafe { _mm256_extracti128_si256(v256, 1) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 615,
+            "kind": "unsafe_block",
+            "code": "let v128 = unsafe { _mm_add_epi32(vlow, vhigh) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 617,
+            "kind": "unsafe_block",
+            "code": "let v64 = unsafe { _mm_add_epi32(v128, _mm_srli_si128(v128, 8)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 619,
+            "kind": "unsafe_block",
+            "code": "let v32 = unsafe { _mm_add_epi32(v64, _mm_srli_si128(v64, 4)) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 621,
+            "kind": "unsafe_block",
+            "code": "unsafe { _mm_cvtsi128_si32(v32) }",
+            "has_safety_comment": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "crate": "contextra-store",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-sys",
+    "is_allowed_island": true,
+    "root_forbid_unsafe": false,
+    "total_unsafe_occurrences": 21,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": [
+      {
+        "file": "/app/crates/contextra-sys/src/mlock.rs",
+        "items": [
+          {
+            "line": 62,
+            "kind": "unsafe_block",
+            "code": "let ret = unsafe { libc::mlock(ptr as *const libc::c_void, len) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 100,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 121,
+            "kind": "unsafe_block",
+            "code": "let ret = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 158,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-sys/src/posix.rs",
+        "items": [
+          {
+            "line": 49,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 95,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 136,
+            "kind": "unsafe_block",
+            "code": "let res = unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 202,
+            "kind": "unsafe_block",
+            "code": "let mut duped_file = unsafe {",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-sys/src/acl_win32.rs",
+        "items": [
+          {
+            "line": 98,
+            "kind": "unsafe_block",
+            "code": "let proc_uid = unsafe { libc::geteuid() };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 122,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 149,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 211,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 302,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 328,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 347,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-sys/src/mmap.rs",
+        "items": [
+          {
+            "line": 65,
+            "kind": "unsafe_block",
+            "code": "unsafe { memmap2::Mmap::map(file) }",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-sys/src/vault.rs",
+        "items": [
+          {
+            "line": 103,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-sys/src/durability.rs",
+        "items": [
+          {
+            "line": 73,
+            "kind": "unsafe_block",
+            "code": "let res = unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 97,
+            "kind": "unsafe_block",
+            "code": "let res = unsafe { libc::fcntl(fd, libc::F_FULLFSYNC, 0) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 115,
+            "kind": "unsafe_block",
+            "code": "let res = unsafe { libc::fsync(fd) };",
+            "has_safety_comment": true
+          },
+          {
+            "line": 132,
+            "kind": "unsafe_block",
+            "code": "let res = unsafe { windows_sys::Win32::Storage::FileSystem::FlushFileBuffers(handle) };",
+            "has_safety_comment": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "crate": "contextra-testkit",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-text",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 5,
+    "missing_safety_comments": 1,
+    "files_with_unsafe": [
+      {
+        "file": "/app/crates/contextra-text/tests/alloc_profiler.rs",
+        "items": [
+          {
+            "line": 27,
+            "kind": "unsafe_impl",
+            "code": "unsafe impl GlobalAlloc for CountingAllocator {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 31,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn alloc(&self, layout: Layout) -> *mut u8 {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 37,
+            "kind": "unsafe_block",
+            "code": "let ptr = unsafe { System.alloc(layout) }; // SAFETY: Forward layout to System allocator.",
+            "has_safety_comment": true
+          },
+          {
+            "line": 43,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 48,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "crate": "contextra-types",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-vector",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  },
+  {
+    "crate": "contextra-wire",
+    "is_allowed_island": true,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 54,
+    "missing_safety_comments": 9,
+    "files_with_unsafe": [
+      {
+        "file": "/app/crates/contextra-wire/build.rs",
+        "items": [
+          {
+            "line": 59,
+            "kind": "unsafe_block",
+            "code": "/// Kapselt Aufrufe von `self._tab.get` in `unsafe { ... }`, falls sie nicht bereits gewrappt sind.",
+            "has_safety_comment": false
+          },
+          {
+            "line": 67,
+            "kind": "unsafe_block",
+            "code": "/// 3. Voranstellen von `unsafe { ` und Anh\u00e4ngen von ` }`.",
+            "has_safety_comment": false
+          },
+          {
+            "line": 82,
+            "kind": "unsafe_block",
+            "code": "if prefix.trim_end().ends_with(\"unsafe {\") || prefix.contains(\"unsafe\") {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 110,
+            "kind": "unsafe_block",
+            "code": "result.push_str(\"unsafe { \");",
+            "has_safety_comment": false
+          },
+          {
+            "line": 168,
+            "kind": "unsafe_block",
+            "code": "let expected1 = \"    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()\";",
+            "has_safety_comment": false
+          },
+          {
+            "line": 173,
+            "kind": "unsafe_block",
+            "code": "let expected2 = \"    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }\";",
+            "has_safety_comment": false
+          },
+          {
+            "line": 176,
+            "kind": "unsafe_block",
+            "code": "let input3 = \"    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}\";",
+            "has_safety_comment": false
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
+        "items": [
+          {
+            "line": 60,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 82,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 111,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 127,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 143,
+            "kind": "unsafe_block",
+            "code": "unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 265,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 290,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 322,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 335,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 349,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 364,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 503,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 525,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 555,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 569,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 583,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 713,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 735,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 766,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 779,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 794,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 922,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 938,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 961,
+            "kind": "unsafe_block",
+            "code": "unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1044,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1060,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1083,
+            "kind": "unsafe_block",
+            "code": "unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1168,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1187,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1211,
+            "kind": "unsafe_block",
+            "code": "unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1221,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1320,
+            "kind": "unsafe_fn",
+            "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1363,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1399,
+            "kind": "unsafe_block",
+            "code": "unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1409,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1426,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1440,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1454,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1468,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1482,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1496,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1510,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1524,
+            "kind": "unsafe_block",
+            "code": "unsafe {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1791,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {",
+            "has_safety_comment": true
+          },
+          {
+            "line": 1801,
+            "kind": "unsafe_fn",
+            "code": "pub unsafe fn size_prefixed_root_as_search_response_unchecked(",
+            "has_safety_comment": true
+          }
+        ]
+      },
+      {
+        "file": "/app/crates/contextra-wire/tests/schema_drift.rs",
+        "items": [
+          {
+            "line": 191,
+            "kind": "unsafe_block",
+            "code": "if prefix.trim_end().ends_with(\"unsafe {\") || prefix.contains(\"unsafe\") {",
+            "has_safety_comment": false
+          },
+          {
+            "line": 216,
+            "kind": "unsafe_block",
+            "code": "result.push_str(\"unsafe { \");",
+            "has_safety_comment": false
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -241,7 +241,25 @@ cargo bench -p <crate>
 | K9 | **Werkzeug-Crates.** SPEC §4.2 nennt `testkit`, `xtask`, `xtask-heavy`, `bench`. Im Repository existieren `testkit` und `benchmarks/contextra-bench`; `xtask*` fehlen. | `testkit` und `contextra-bench` gelten als Werkzeug und sind nie Abhängigkeit des Kerns. `xtask` siehe §8. |
 | K10 | **`governance/security_ports.toml` zeigt auf nicht existierende Pfade** (`contextra_ports::kms::*`, `::purger::Purger`, `::log::DurableLog`, `::journal::ErasureJournal`, `contextra_store::vfs::StdVfs`). `StorageRead`/`StorageWrite` (verlangt von `.agents/rules/async-io.md`) existieren nicht. | Pfade nie aus diesen Dateien übernehmen; am Code prüfen. Korrektur in WP 2.2/7. |
 
-## 11. Referenzen
+## 11. Diagnose- & Analysewerkzeuge (`tools/`) für Coding-Agenten
+
+Für mikrofeingranulare Codebase-Analysen, Konformitätschecks und Architekturprüfungen stehen folgende Python-Diagnosewerkzeuge bereit. Alle Werkzeuge laufen ohne externe Abhängigkeiten (Standardbibliothek), speichern Berichte nachvollziehbar in `docs/diagnostics/` und unterstützen `--json`, `--crate` und `--workspace`:
+
+| Werkzeug | Primäre Prüfung | Ausgabeberichte |
+|---|---|---|
+| `python3 tools/zero_panic_analyzer.py` | Zero-Panic (P7): Detektiert `unwrap`, `expect`, `panic!`, `todo!`, `assert!` in Prod vs. Test | `ZERO_PANIC_AUDIT.md`, `.json` |
+| `python3 tools/unsafe_boundary_auditor.py` | Unsafe-Inseln (M9): Auditiert `unsafe`, erzwingt `// SAFETY:`-Dokumentation | `UNSAFE_BOUNDARY_AUDIT.md`, `.json` |
+| `python3 tools/determinism_guard.py` | Determinismus (P28): Findet `Instant::now`, `SystemTime::now`, `thread_rng`, ungesicherte `HashMap`/`HashSet` | `DETERMINISM_GUARD_AUDIT.md`, `.json` |
+| `python3 tools/type_registry_sync.py` | Typ-Register (K3/A2): Extrahiert alle Typen und erkennt Namenskollisionen/Shadowing über Crates | `TYPE_REGISTRY_COLLISIONS.md`, `.json` |
+| `python3 tools/async_boundary_scanner.py` | Async-Grenzen (M8 / INV-LOCK-ORDER-1): Findet `async`/`tokio` in Ring 0 und Lock-Guards über `.await` | `ASYNC_BOUNDARY_REPORT.md`, `.json` |
+| `python3 tools/fsync_durability_tracer.py` | Durability (INV-FSYNC-1 / M4): Findet rohes `std::fs`/`tokio::fs` und ignorierte `fsync` (`let _ =`) | `FSYNC_DURABILITY_AUDIT.md`, `.json` |
+| `python3 tools/port_contract_auditor.py` | Verträge & Re-Exporte (M3 / M7): Validiert Port-Traits und unterbindet fremde Re-Exporte | `PORT_CONTRACT_AUDIT.md`, `.json` |
+| `python3 tools/dead_code_pruner.py` | Code-Hygiene: Mikrofeingranulare Erkennung toter/unreferenzierter interner Symbole | `DEAD_CODE_ANALYSIS.md`, `.json` |
+| `python3 tools/error_topology_mapper.py` | Fehler-Topologie (INV-LOG-1 / HR-4): Kartiert Fehlertypen und verhindert Datenleaks in Fehlermeldungen | `ERROR_TOPOLOGY_REPORT.md`, `.json` |
+| `python3 tools/test_matrix_advisor.py` | Test-Pyramide (§8): Prüft Abdeckung (Unit, Proptest, Loom, FaultVfs, Benchmarks) und gibt Ratschläge | `TEST_MATRIX_ADVISOR.md`, `.json` |
+| `python3 tools/orchestrate_diagnostics.py` | Master-Orchestrierung: Führt alle 10 Werkzeuge aus und erzeugt Gesamtreport | `DIAGNOSTIC_SUMMARY.md` |
+
+## 12. Referenzen
 
 | Dokument | Zweck |
 |---|---|

@@ -1,0 +1,533 @@
+[
+  {
+    "crate": "contextra",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-adapt",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-agent",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "StorageEngine"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-audit-export",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-avv-generator",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-checkpoint",
+    "is_data_holder": true,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "StorageEngine"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-cognition",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock",
+      "StorageEngine"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-core",
+    "is_data_holder": false,
+    "m3_leaks_count": 7,
+    "m3_leaks": [
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 135,
+        "reexported_crate": "contextra_mvcc",
+        "code": "pub use contextra_mvcc::seq_log;"
+      },
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 144,
+        "reexported_crate": "contextra_mvcc",
+        "code": "pub use contextra_mvcc::snapshot;"
+      },
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 153,
+        "reexported_crate": "contextra_mvcc",
+        "code": "pub use contextra_mvcc::tx_buffer;"
+      },
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 164,
+        "reexported_crate": "contextra_wire",
+        "code": "pub use contextra_wire::*;"
+      },
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 179,
+        "reexported_crate": "contextra_mvcc",
+        "code": "pub use contextra_mvcc::seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};"
+      },
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 191,
+        "reexported_crate": "contextra_mvcc",
+        "code": "pub use contextra_mvcc::snapshot::{SnapshotGuard, SnapshotRegistry};"
+      },
+      {
+        "file": "/app/crates/contextra-core/src/lib.rs",
+        "line": 202,
+        "reexported_crate": "contextra_mvcc",
+        "code": "pub use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer};"
+      }
+    ],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-crypto",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Vfs"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-db",
+    "is_data_holder": false,
+    "m3_leaks_count": 7,
+    "m3_leaks": [
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 44,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::collection::{self, Collection, CollectionConfig};"
+      },
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 45,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::{"
+      },
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 73,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::DurabilityMode;"
+      },
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 75,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::{"
+      },
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 82,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::SandboxBridge;"
+      },
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 92,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::decay_controller::*;"
+      },
+      {
+        "file": "/app/crates/contextra-db/src/lib.rs",
+        "line": 94,
+        "reexported_crate": "contextra_engine",
+        "code": "pub use contextra_engine::fusion;"
+      }
+    ],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-durable-fs",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Vfs"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-engine",
+    "is_data_holder": false,
+    "m3_leaks_count": 4,
+    "m3_leaks": [
+      {
+        "file": "/app/crates/contextra-engine/src/lib.rs",
+        "line": 20,
+        "reexported_crate": "contextra_crypto",
+        "code": "pub use contextra_crypto::deletion_proof::{"
+      },
+      {
+        "file": "/app/crates/contextra-engine/src/lib.rs",
+        "line": 30,
+        "reexported_crate": "contextra_store",
+        "code": "pub use contextra_store::lsm::DurabilityMode;"
+      },
+      {
+        "file": "/app/crates/contextra-engine/src/lib.rs",
+        "line": 102,
+        "reexported_crate": "contextra_text",
+        "code": "pub use contextra_text::Language;"
+      },
+      {
+        "file": "/app/crates/contextra-engine/src/lib.rs",
+        "line": 396,
+        "reexported_crate": "contextra_impl",
+        "code": "pub use contextra_impl::erasure::{"
+      }
+    ],
+    "implemented_ports": [
+      "StorageEngine",
+      "VectorIndex"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-erasure",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-graph",
+    "is_data_holder": true,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Purger"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-infer-candle",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-infer-ollama",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-infer-onnx",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Vfs"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-ingest",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-kvcache",
+    "is_data_holder": true,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "LayerScanner"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-license",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-mcp",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-mvcc",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-ports",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock",
+      "IdGen",
+      "LayerScanner",
+      "MetricsSink",
+      "Rng",
+      "TextIndex",
+      "VectorIndex",
+      "Vfs"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-privacy",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-py",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-rank",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-router",
+    "is_data_holder": false,
+    "m3_leaks_count": 6,
+    "m3_leaks": [
+      {
+        "file": "/app/crates/contextra-router/src/lib.rs",
+        "line": 35,
+        "reexported_crate": "contextra_adapt",
+        "code": "pub use contextra_adapt::bandit;"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/lib.rs",
+        "line": 40,
+        "reexported_crate": "contextra_adapt",
+        "code": "pub use contextra_adapt::lyapunov;"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/lib.rs",
+        "line": 45,
+        "reexported_crate": "contextra_adapt",
+        "code": "pub use contextra_adapt::offpolicy;"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/lib.rs",
+        "line": 60,
+        "reexported_crate": "contextra_adapt",
+        "code": "pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/lib.rs",
+        "line": 61,
+        "reexported_crate": "contextra_adapt",
+        "code": "pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/lib.rs",
+        "line": 69,
+        "reexported_crate": "contextra_adapt",
+        "code": "pub use contextra_adapt::{BanditImplementation, BanditPolicy, BanditProfileState};"
+      }
+    ],
+    "implemented_ports": [
+      "Clock"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-sandbox",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-simd",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-store",
+    "is_data_holder": true,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "LayerScanner",
+      "Purger",
+      "StorageEngine"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-sys",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-testkit",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock",
+      "MetricsSink",
+      "StorageEngine",
+      "TextIndex",
+      "VectorIndex",
+      "Vfs"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-text",
+    "is_data_holder": true,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "LayerScanner",
+      "Purger",
+      "StorageEngine",
+      "TextIndex"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-types",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-vector",
+    "is_data_holder": true,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [
+      "Clock",
+      "LayerScanner",
+      "MetricsSink",
+      "Purger",
+      "VectorIndex"
+    ],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  },
+  {
+    "crate": "contextra-wire",
+    "is_data_holder": false,
+    "m3_leaks_count": 0,
+    "m3_leaks": [],
+    "implemented_ports": [],
+    "holder_domain_violations_count": 0,
+    "holder_domain_violations": []
+  }
+]

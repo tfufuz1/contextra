@@ -1,0 +1,461 @@
+[
+  {
+    "crate": "contextra",
+    "unit_tests": 65,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-adapt",
+    "unit_tests": 141,
+    "proptests": 1,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-agent",
+    "unit_tests": 121,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-audit-export",
+    "unit_tests": 32,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-avv-generator",
+    "unit_tests": 25,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-checkpoint",
+    "unit_tests": 143,
+    "proptests": 1,
+    "loom_checks": 1,
+    "fault_vfs_tests": 3,
+    "benches": 6,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-cognition",
+    "unit_tests": 110,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-core",
+    "unit_tests": 7,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-crypto",
+    "unit_tests": 321,
+    "proptests": 7,
+    "loom_checks": 17,
+    "fault_vfs_tests": 6,
+    "benches": 10,
+    "has_benches_dir": true,
+    "has_fuzz_dir": true,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-db",
+    "unit_tests": 186,
+    "proptests": 3,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 1,
+    "has_benches_dir": false,
+    "has_fuzz_dir": true,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-durable-fs",
+    "unit_tests": 37,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Kritischer Concurrency-Crate: Loom-Tests erforderlich",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-engine",
+    "unit_tests": 260,
+    "proptests": 3,
+    "loom_checks": 7,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-erasure",
+    "unit_tests": 94,
+    "proptests": 0,
+    "loom_checks": 5,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-graph",
+    "unit_tests": 399,
+    "proptests": 6,
+    "loom_checks": 0,
+    "fault_vfs_tests": 3,
+    "benches": 10,
+    "has_benches_dir": true,
+    "has_fuzz_dir": true,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-infer-candle",
+    "unit_tests": 119,
+    "proptests": 2,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 10,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-infer-ollama",
+    "unit_tests": 117,
+    "proptests": 2,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-infer-onnx",
+    "unit_tests": 41,
+    "proptests": 1,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 5,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-ingest",
+    "unit_tests": 204,
+    "proptests": 9,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": true,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-kvcache",
+    "unit_tests": 101,
+    "proptests": 2,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-license",
+    "unit_tests": 67,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-mcp",
+    "unit_tests": 145,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": true,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-mvcc",
+    "unit_tests": 110,
+    "proptests": 5,
+    "loom_checks": 9,
+    "fault_vfs_tests": 0,
+    "benches": 5,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-ports",
+    "unit_tests": 52,
+    "proptests": 1,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-privacy",
+    "unit_tests": 147,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-py",
+    "unit_tests": 91,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-rank",
+    "unit_tests": 94,
+    "proptests": 6,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-router",
+    "unit_tests": 142,
+    "proptests": 3,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 15,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-sandbox",
+    "unit_tests": 74,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-simd",
+    "unit_tests": 80,
+    "proptests": 1,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 8,
+    "has_benches_dir": true,
+    "has_fuzz_dir": false,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-store",
+    "unit_tests": 567,
+    "proptests": 17,
+    "loom_checks": 23,
+    "fault_vfs_tests": 7,
+    "benches": 31,
+    "has_benches_dir": true,
+    "has_fuzz_dir": true,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-sys",
+    "unit_tests": 31,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-testkit",
+    "unit_tests": 62,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 22,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-text",
+    "unit_tests": 206,
+    "proptests": 5,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 1,
+    "has_benches_dir": false,
+    "has_fuzz_dir": true,
+    "recommendations": []
+  },
+  {
+    "crate": "contextra-types",
+    "unit_tests": 186,
+    "proptests": 6,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": false,
+    "recommendations": [
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-vector",
+    "unit_tests": 264,
+    "proptests": 3,
+    "loom_checks": 4,
+    "fault_vfs_tests": 0,
+    "benches": 45,
+    "has_benches_dir": true,
+    "has_fuzz_dir": true,
+    "recommendations": [
+      "Chaos-Tests mit FaultVfs zur Crash-Validierung anlegen"
+    ]
+  },
+  {
+    "crate": "contextra-wire",
+    "unit_tests": 108,
+    "proptests": 0,
+    "loom_checks": 0,
+    "fault_vfs_tests": 0,
+    "benches": 0,
+    "has_benches_dir": false,
+    "has_fuzz_dir": true,
+    "recommendations": [
+      "Property-Tests mit proptest erg\u00e4nzen",
+      "Criterion-Benchmarks f\u00fcr Hot Paths anlegen"
+    ]
+  }
+]
