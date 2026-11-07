@@ -8,7 +8,7 @@
 //! `check` ist O(log n); kein I/O.
 //! Hält atomare `gate_epoch` für Lese-Linearisierung (D-120, I-21).
 
-use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
+use crate::types_local::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Ein einzelner Gate-Eintrag für 16-Byte oder 65-Byte Bereiche.

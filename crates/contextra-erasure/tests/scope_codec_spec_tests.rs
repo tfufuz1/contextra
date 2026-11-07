@@ -12,7 +12,7 @@
 use contextra_erasure::scope::codec::{decode_scope, encode_scope};
 use contextra_erasure::scope::set::{LayerScopeSet, ResolvedLayerScope};
 use contextra_erasure::scope::{load_scope_file, store_scope_file};
-use contextra_ports::keys::{FileId, FileKey, FileKeyring, FileKind};
+use contextra_erasure::types_local::{FileId, FileKey, FileKeyring, FileKind};
 use contextra_ports::vfs::Vfs;
 use contextra_ports::BoxFuture;
 use parking_lot::RwLock;

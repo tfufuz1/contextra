@@ -17,16 +17,16 @@ use contextra_erasure::saga::machine::{EraseSaga, SagaState};
 use contextra_erasure::saga::seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
-use contextra_ports::barrier::{
+use contextra_erasure::types_local::ErasureId;
+use contextra_erasure::types_local::GateDecision;
+use contextra_erasure::types_local::PendingReason;
+use contextra_erasure::types_local::{
     BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
 };
+use contextra_erasure::types_local::{EraseTarget, LayerId, LayerWitness};
 use contextra_ports::clock::Clock;
-use contextra_ports::erasure::{EraseTarget, LayerId, LayerWitness};
-use contextra_ports::gate::GateDecision;
 use contextra_ports::id_gen::IdGen;
 use contextra_ports::BoxFuture;
-use contextra_types::erasure::PendingReason;
-use contextra_types::ids::ErasureId;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -40,7 +40,7 @@ impl SagaJournal for MatrixJournal {
         &'a self,
         _erasure_id: ErasureId,
         _target: &'a EraseTarget,
-        _attestation: &'a contextra_types::erasure::RetentionAttestation,
+        _attestation: &'a contextra_erasure::types_local::RetentionAttestation,
     ) -> BoxFuture<'a, Result<(), ErasureError>> {
         Box::pin(async move { Ok(()) })
     }
@@ -131,7 +131,7 @@ impl SagaReport for DummyReport {
         &'a self,
         _id: ErasureId,
         _t: &'a EraseTarget,
-        _att: &'a contextra_types::erasure::RetentionAttestation,
+        _att: &'a contextra_erasure::types_local::RetentionAttestation,
         _w: &'a [LayerWitness],
     ) -> BoxFuture<'a, Result<Vec<u8>, ErasureError>> {
         Box::pin(async move { Ok(vec![1, 2, 3]) })

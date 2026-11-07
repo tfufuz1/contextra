@@ -5,14 +5,13 @@
 //!      └──────────┴──────────┴── Pending(reason) (idempotent, wiederholbar)
 //!   Refused  (terminal, vor Gate)
 
-use contextra_ports::erasure::EraseTarget as PortEraseTarget;
-use contextra_types::erasure::PendingReason;
-use contextra_types::ids::ErasureId;
+use crate::types_local::EraseTarget as PortEraseTarget;
+use crate::types_local::ErasureId;
+use crate::types_local::PendingReason;
 use serde::{Deserialize, Serialize};
 
-pub use contextra_types::erasure::{
-    EraseMode as SagaMode, EraseRequest as SagaEraseRequest, EraseTarget as SagaEraseTarget,
-};
+pub use self::EraseRequest as SagaEraseRequest;
+pub use crate::types_local::{EraseMode as SagaMode, EraseTarget as SagaEraseTarget};
 
 /// Anfrage zur Löschung (Kompatibilität mit Ports & Tests).
 #[derive(Debug, Clone, PartialEq, Eq)]

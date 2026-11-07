@@ -96,7 +96,7 @@ mod loom_model {
 mod stress_tests {
     use contextra_erasure::gate::erased_set::ErasedSet;
     use contextra_erasure::gate::read_gate::GateGuard;
-    use contextra_ports::gate::{GateDecision, KeyBuf, ReadGate, Seq};
+    use contextra_erasure::types_local::{GateDecision, KeyBuf, ReadGate, Seq};
     use parking_lot::RwLock;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;

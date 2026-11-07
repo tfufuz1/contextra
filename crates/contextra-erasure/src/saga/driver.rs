@@ -5,8 +5,8 @@
 
 use crate::error::ErasureError;
 use crate::saga::machine::{EraseSaga, SagaState};
-use contextra_types::erasure::PendingReason;
-use contextra_types::ids::ErasureId;
+use crate::types_local::ErasureId;
+use crate::types_local::PendingReason;
 use std::sync::Arc;
 
 /// Ereignis der Treiber-Pipeline (SPEC §11.2).

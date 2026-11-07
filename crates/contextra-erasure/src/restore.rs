@@ -8,7 +8,7 @@ pub mod replay;
 pub use guard::{FileRestoreChecker, GuardOutcome};
 pub use replay::{replay_erasures, ReplayOutcome};
 
-use contextra_ports::gate::Seq;
+use crate::types_local::Seq;
 
 /// Restore-Guard prüft Sequenznummern gegen den Ledger-Floor.
 #[derive(Debug, Clone, Copy)]

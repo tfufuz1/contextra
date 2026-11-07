@@ -4,7 +4,7 @@
 //! Der Bericht enthält einen Vermerk über den Restore-Vorfall.
 
 use crate::error::ErasureError;
-use contextra_types::ids::ErasureId;
+use crate::types_local::ErasureId;
 
 /// Ergebnis eines Replay-Vorgangs.
 #[derive(Debug)]

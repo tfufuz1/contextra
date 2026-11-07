@@ -2,10 +2,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_erasure::types_local::{FileId, FileKeyring, FileKind, RecordSealer, SealCtx};
+use contextra_erasure::types_local::{KeyBuf, KeyRange};
 use contextra_erasure::vault::keyring::InMemoryKeyring;
 use contextra_erasure::vault::sealer::VaultSealer;
-use contextra_ports::gate::{KeyBuf, KeyRange};
-use contextra_ports::keys::{FileId, FileKeyring, FileKind, RecordSealer, SealCtx};
 
 #[tokio::test]
 async fn t_fk_1_keyring_create_open_destroy() {

@@ -18,6 +18,6 @@ pub use seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
 
-pub use contextra_types::erasure::{
+pub use crate::types_local::{
     EraseMode, EraseTarget, PendingReason, RetentionAttestation, RetentionCode, Timing,
 };

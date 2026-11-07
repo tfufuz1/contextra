@@ -22,8 +22,8 @@
 use super::canonical::to_canonical_json;
 use super::risk::{evaluate_residual_risks_with_context, ResidualRiskContext, ResidualRiskEntry};
 use crate::error::ErasureError;
-use contextra_types::erasure::LayerWitness;
-use contextra_types::ids::ErasureId;
+use crate::types_local::ErasureId;
+use crate::types_local::LayerWitness;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -85,9 +85,9 @@ impl LayerWitnessReport {
         };
 
         let class_str = match w.class() {
-            contextra_types::erasure::MeasureClass::Mk1 => "MK1".to_string(),
-            contextra_types::erasure::MeasureClass::Mk2 => "MK2".to_string(),
-            contextra_types::erasure::MeasureClass::Mk3 => "MK3".to_string(),
+            crate::types_local::MeasureClass::Mk1 => "MK1".to_string(),
+            crate::types_local::MeasureClass::Mk2 => "MK2".to_string(),
+            crate::types_local::MeasureClass::Mk3 => "MK3".to_string(),
         };
 
         Self {

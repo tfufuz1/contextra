@@ -17,11 +17,11 @@
     clippy::cast_sign_loss
 )]
 
+use contextra_erasure::types_local::{FileId, FileKeyring, FileKind};
 use contextra_erasure::vault::{
     encode_metablock, open_vault_shard, rehash_shard, FileVault, MetablockParams, SlotType,
     VaultShard, VaultSlotData, VAULT_NUM_SHARDS, VAULT_SLOT_BASE, VAULT_SLOT_SIZE,
 };
-use contextra_ports::keys::{FileId, FileKeyring, FileKind};
 
 /// SPEC: T-VAULT-1
 /// T-ID: T-VAULT-1
@@ -234,7 +234,8 @@ async fn test_t_fk_keyring_lifecycle_and_zeroize() {
 /// Modul für dauerhafte VFS-Tests mit Injektion
 mod durable_tests {
     use super::*;
-    use contextra_ports::vfs::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
+    use contextra_erasure::types_local::{VerifiedVia, VfsFile, VfsOpenOptions};
+    use contextra_ports::vfs::Vfs;
     use contextra_ports::{ContextraError, Result};
     use parking_lot::Mutex;
     use std::collections::HashMap;
@@ -333,31 +334,6 @@ mod durable_tests {
     }
 
     impl Vfs for MockVfs {
-        fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
-            let mut files = self.files.lock();
-            if opts.create_new && files.contains_key(path) {
-                return Err(ContextraError::Io(Error::new(
-                    ErrorKind::AlreadyExists,
-                    "file exists",
-                )));
-            }
-
-            let entry = files
-                .entry(path.to_path_buf())
-                .or_insert_with(|| Arc::new(Mutex::new(Vec::new())));
-
-            if opts.truncate {
-                entry.lock().clear();
-            }
-
-            Ok(Box::new(MockVfsFile {
-                data: Arc::clone(entry),
-                fail_sync: Arc::clone(&self.fail_sync),
-                sync_count: Arc::clone(&self.sync_count),
-                read_count: Arc::clone(&self.read_count),
-            }))
-        }
-
         fn read(&self, path: &Path) -> Result<Vec<u8>> {
             let files = self.files.lock();
             if let Some(data) = files.get(path) {
@@ -368,6 +344,12 @@ mod durable_tests {
         }
 
         fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
+            if self.fail_sync.load(Ordering::Acquire) {
+                return Err(ContextraError::Io(Error::new(
+                    ErrorKind::Other,
+                    "injected sync failure",
+                )));
+            }
             let mut files = self.files.lock();
             files.insert(path.to_path_buf(), Arc::new(Mutex::new(data.to_vec())));
             Ok(())
@@ -399,19 +381,6 @@ mod durable_tests {
             let mut files = self.files.lock();
             files.remove(path);
             Ok(())
-        }
-
-        fn rename(&self, from: &Path, to: &Path) -> Result<()> {
-            let mut files = self.files.lock();
-            if let Some(data) = files.remove(from) {
-                files.insert(to.to_path_buf(), data);
-                Ok(())
-            } else {
-                Err(ContextraError::Io(Error::new(
-                    ErrorKind::NotFound,
-                    "source file not found",
-                )))
-            }
         }
 
         fn sync_dir(&self, _path: &Path) -> Result<()> {

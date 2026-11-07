@@ -14,8 +14,8 @@
 //!   `key_coverage` je Schicht `none` und das Restrisiko `SupersededWithSameKey`.
 
 use crate::error::ErasureError;
-use contextra_types::erasure::KeyCoverage;
-use contextra_types::ids::ErasureId;
+use crate::types_local::ErasureId;
+use crate::types_local::KeyCoverage;
 use serde::{Deserialize, Serialize};
 
 /// Modus der Berichtigung (SPEC D-117).
