@@ -52,7 +52,7 @@ pub mod percolation;
 pub mod ppr;
 pub mod ppr_stream;
 pub mod provenance;
-pub mod purger;
+pub mod provider;
 pub mod session_dag;
 pub mod tl_hfd;
 
@@ -109,7 +109,9 @@ pub use ppr::compute_ppr_with_apprh_selector;
 pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
-pub use purger::{graph_purger, GraphPurger};
+pub use provider::{
+    compute_pagerank, detect_communities_on_provider, GraphProvider, InMemoryGraphProvider,
+};
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
 };

@@ -40,8 +40,6 @@
 //! - **I/O- und Lock-Freiheit in `src/crypto`:** Reine Kryptographie-Routinen führen keine
 //!   Dateisystem- oder Netzwerk-I/O durch.
 
-
-pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
 pub mod crypto;
