@@ -176,6 +176,15 @@ pub mod check {
         drop(t.purge(ctx, target));
     }
 
+    /// Verifies dynamic object-safety and evaluation conformance of [`EgressPolicy`].
+    pub fn assert_egress_policy_contract<T: crate::policy::EgressPolicy>(
+        t: &T,
+        ctx: &RequestContext,
+        payload: &str,
+    ) {
+        drop(t.evaluate(ctx, payload));
+    }
+
     /// Internal visitor conformance verification for KV deserialization.
     pub fn assert_visitor_methods() {
         use serde::de::Visitor;

@@ -298,5 +298,5 @@ pub trait ErasureLayer: Send + Sync {
 /// Generisches Storage-Backend für modulare Datenzugriffe im Löschkern.
 pub trait StorageBackend: Send + Sync + 'static {}
 
-/// Generisches Erasure-Target für Löschungsanweisungen.
+/// Generisches Erasure-Target für Bereinigungsanweisungen.
 pub trait ErasureTarget: Send + Sync + 'static {}

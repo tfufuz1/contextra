@@ -259,6 +259,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 }
 
+/// Prelude for storage engine ports.
+pub mod prelude {
+    pub use super::{StorageEngine, StorageStats};
+    pub use crate::kv::KvPrefixStore;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
