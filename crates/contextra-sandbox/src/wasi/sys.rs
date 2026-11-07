@@ -1,6 +1,4 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: WASI proc_exit, clock_time_get, random_get, args, environ implementations
+//! WASI proc_exit, clock_time_get, random_get, args, environ implementations (§4.18).
 
 use super::{ProcessExitError, ERRNO_ACCES, ERRNO_INVAL, ERRNO_NOSYS, ERRNO_NOTSUP, ERRNO_SUCCESS};
 use crate::executor::SandboxState;
@@ -17,7 +15,10 @@ pub(crate) fn register_sys(linker: &mut Linker<SandboxState>) -> Result<(), anyh
         "wasi_snapshot_preview1",
         "proc_exit",
         |mut caller: Caller<'_, SandboxState>, code: i32| -> Result<(), wasmtime::Error> {
-            let _ = caller.data_mut().check_and_inc_host_call();
+            let state = caller.data_mut();
+            if let Err(e) = state.check_and_inc_host_call() {
+                return Err(wasmtime::Error::from(e));
+            }
             Err(wasmtime::Error::from(ProcessExitError { code }))
         },
     )?;

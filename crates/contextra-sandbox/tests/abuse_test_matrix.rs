@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: Abuse and exploit test matrix for Wasm execution boundary (§4.18)
-// INVARIANTEN: Zero panics, no process termination, timeout < 10s per test, fail-closed security
-
 use contextra_sandbox::{SandboxError, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
 
