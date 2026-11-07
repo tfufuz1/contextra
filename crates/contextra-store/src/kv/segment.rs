@@ -147,7 +147,7 @@ impl KvSegmentManager {
     /// Deletes a KV segment.
     ///
     /// Under `CryptoShred`, revokes (destroys) the subkey for `group_id` in `KeyRegistry` in O(1) time.
-    /// The physical ciphertext remains intact on disk, but becomes information-theoretically unrecoverable.
+    /// The physical ciphertext remains intact on disk, but becomes cryptographically unreadable without the key.
     /// Under `TombstoneOnly`, subkey revocation is a no-op (LSM tombstones are used instead).
     pub fn delete_segment(&self, group_id: u64) -> bool {
         match self.config.delete_mode {
@@ -160,7 +160,7 @@ impl KvSegmentManager {
     ///
     /// INVARIANTE `INV-KV-DELETE-1`: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente
     /// möglich, niemals für `TombstoneOnly`. Falls ein Aufrufer versucht, für ein `TombstoneOnly`-Segment einen
-    /// Löschbeweis auszustellen, schlägt dies mit `ContextraError::KvDeleteModeConfig` fehl.
+    /// Bereinigungsnachweis auszustellen, schlägt dies mit `ContextraError::KvDeleteModeConfig` fehl.
     pub fn generate_deletion_proof(&self, group_id: u64) -> Result<bool, ContextraError> {
         match self.config.delete_mode {
             KvDeleteMode::TombstoneOnly => Err(ContextraError::KvDeleteModeConfig(

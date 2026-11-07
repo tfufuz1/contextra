@@ -17,7 +17,7 @@
 //!
 //! ## Einbindung und Abhängigkeiten
 //! - **Abhängigkeiten (normal):** `bytes`, `flatbuffers`, `serde`, `serde_json`.
-//! - **Wird eingebunden von:** `contextra-core`, `contextra-mcp`, `contextra-py`, `contextra-router`.
+//! - **Wird eingebunden von:** `contextra-mcp`, `contextra-py`, `contextra-router`.
 //! - **Ring-0-Restriktionen:** Gemäß Regel 3 aus `CLAUDE.md` dürfen Zeit, Zufall und IDs nicht direkt
 //!   erzeugt werden; I/O erfolgt über Ports oder übergebene Puffer.
 //!

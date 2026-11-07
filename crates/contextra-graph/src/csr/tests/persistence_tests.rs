@@ -305,17 +305,9 @@ async fn test_staged_edges_invisible_to_concurrent_readers() {
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-008]
 #[tokio::test]
 async fn test_graph_edges_survive_storage_roundtrip() {
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
 
-    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-    let storage = Arc::new(
-        LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(), // unwrap allowed
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_config_and_storage(CsrGraphConfig::default(), storage.clone());
     let tx = TxId::new(1);
     let id_a = EntityId::from_key("alice").unwrap(); // unwrap allowed

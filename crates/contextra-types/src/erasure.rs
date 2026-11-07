@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Löschtypen und typisierter Zeuge (SPEC 7.3, 7.4, 8.1, 11.2, 11.3, 12.1, 12.2, Anhang D, D-69, D-72, I-19, L-5, TY-09, TY-10, TY-13).
 
 use core::fmt;
@@ -9,6 +10,10 @@ use crate::refs::{CollectionRef, DocRef, OperatorRef, SubjectRef, TenantRef};
 
 /// Löschziel (SPEC 7.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum EraseTarget {
     /// Einzelnes Dokument.
     Document {
@@ -42,6 +47,10 @@ pub enum EraseTarget {
 
 /// Zeitliches Verhalten des Vorgangs (SPEC 7.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum Timing {
     /// Sofortige Ausführung im Vordergrund.
     Now,
@@ -51,6 +60,10 @@ pub enum Timing {
 
 /// Löschmodus (SPEC 7.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum EraseMode {
     /// Vollständige physische Bereinigung und Schlüsselvernichtung.
     Erase,
@@ -60,6 +73,10 @@ pub enum EraseMode {
 
 /// Abschließender Aufbewahrungs-Code (SPEC 7.3, E-L12, TY-13).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum RetentionCode {
     /// Es besteht keine Aufbewahrungspflicht.
     NoObligation,
@@ -77,6 +94,10 @@ pub enum RetentionCode {
 
 /// Pflicht-Attestierung zur Aufbewahrung bei jedem Löschauftrag (SPEC 7.3, D-15).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct RetentionAttestation {
     /// Aufbewahrungscode.
     pub code: RetentionCode,
@@ -88,6 +109,10 @@ pub struct RetentionAttestation {
 
 /// Löschauftrag (SPEC 7.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct EraseRequest {
     /// Löschziel.
     pub target: EraseTarget,
@@ -101,6 +126,10 @@ pub struct EraseRequest {
 
 /// Quittung eines Löschauftrags (SPEC 7.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct EraseReceipt {
     /// Eindeutige Kennung des Löschvorgangs.
     pub id: ErasureId,
@@ -112,6 +141,10 @@ pub struct EraseReceipt {
 
 /// Schicht-ID einer beteiligten Speicherschicht (SPEC 8.2).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct LayerId(pub [u8; 16]);
 
 impl LayerId {
@@ -138,6 +171,10 @@ impl fmt::Debug for LayerId {
 
 /// Begründung für Verzögerungen bei der Löschabwicklung (SPEC 11.2).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum PendingReason {
     /// I/O-Fehler bei der Schichtbearbeitung.
     Io,
@@ -153,6 +190,10 @@ pub enum PendingReason {
 
 /// Begründung für die Ablehnung eines Löschauftrags (SPEC 7.3, 7.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum RefusalReason {
     /// Gesetzliche Aufbewahrungspflicht steht der Bereinigung entgegen.
     RetentionObligation,
@@ -162,6 +203,10 @@ pub enum RefusalReason {
 
 /// Phase eines Löschablaufs (SPEC §7.4, D-124 Abs. 5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum Phase {
     /// Intent-Registrierung.
     Intent,
@@ -183,6 +228,10 @@ pub enum Phase {
 
 /// Status der Lösch-Saga (SPEC 7.4, 11.2, D-124 Abs. 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum ErasureStatus {
     /// Auftrag empfangen und validiert.
     Requested,
@@ -213,6 +262,10 @@ pub enum ErasureStatus {
 
 /// Reichweite der Schlüsselabdeckung einer Schicht (SPEC 8.2, D-69).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum KeyCoverage {
     /// Vollständige kryptografische Unlesbarkeit aller Records/Payloads.
     Full,
@@ -224,6 +277,10 @@ pub enum KeyCoverage {
 
 /// Gate-Zustandsvariante (SPEC 11.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum GateVariant {
     /// Klasse P: Physisch gelöscht und gesperrt.
     Erased,
@@ -233,6 +290,10 @@ pub enum GateVariant {
 
 /// Messklasse für unabhängige Löschkontrollen (SPEC 12.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum MeasureClass {
     /// MK1: Logische/funktionale Prüfung.
     Mk1,
@@ -244,6 +305,10 @@ pub enum MeasureClass {
 
 /// Unabhängige Messmethode für Schichtprüfungen (SPEC 3.1, 12.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum ScanMethod {
     /// MK1: Logische Scanmethode (z. B. Iteration über Indexeinträge).
     Mk1,
@@ -266,6 +331,10 @@ impl ScanMethod {
 
 /// Risikobedingung zur Evaluierung von Restrisiken (SPEC Anhang D, AR-4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum RiskCondition {
     /// Bedingung trifft immer zu.
     Always,
@@ -277,6 +346,10 @@ pub enum RiskCondition {
 
 /// Abschließender Katalog von 15 Restrisiken (SPEC Anhang D).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum ResidualRisk {
     /// Flash-Remanenz auf FTL-Ebene.
     FlashRemanence,
@@ -347,13 +420,25 @@ impl ResidualRisk {
 // =========================================================================
 
 /// Typzustand: Scanner ist noch nicht scharfgeschaltet.
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct Unarmed;
 
 /// Typzustand: Scanner ist scharfgeschaltet nach erfolgreicher Positivkontrolle.
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct Armed(());
 
 /// Beleg für eine beobachtete Positivkontrolle (D-72).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct ControlEvidence(());
 
 impl ControlEvidence {
@@ -366,6 +451,10 @@ impl ControlEvidence {
 
 /// Rückstandsbefund bei fehlgeschlagener Verifikation (SPEC 12.2).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct Residue {
     /// Anzahl gefundener Treffer / Rückstände.
     pub matches: u64,
@@ -385,6 +474,10 @@ impl std::error::Error for Residue {}
 
 /// Typisierter Scanner im Typzustandsmuster (TY-10, L-5).
 #[must_use = "Scanner muss mit finish() abgeschlossen werden"]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct Scanner<S> {
     layer: LayerId,
     class: MeasureClass,
@@ -455,6 +548,10 @@ impl Scanner<Armed> {
 /// Unveränderlicher Zeuge einer Schichtmessung (D-72, I-19).
 /// Felder sind privat; matches() ist per Konstruktion immer 0.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct LayerWitness {
     layer: LayerId,
     class: MeasureClass,

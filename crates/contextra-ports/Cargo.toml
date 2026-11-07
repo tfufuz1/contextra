@@ -19,6 +19,7 @@ testkit = []
 
 [dependencies]
 contextra-types = { workspace = true }
+contextra-erasure-spi = { workspace = true }
 blake3 = { workspace = true }
 futures-util = "0.3"
 bytes = { workspace = true }

@@ -1,0 +1,26 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-erasure-spi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Service Provider Interface (SPI) für neutrale physische Bereinigung und Restdatenmessung"
+
+[package.metadata.contextra]
+ring = "0"
+
+[features]
+default = []
+testkit = []
+
+[dependencies]
+contextra-types = { workspace = true }
+blake3 = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

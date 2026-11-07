@@ -431,6 +431,7 @@ Vorhandene Verzeichnisse von `store` (`compaction`, `engine`, `kv`, `lsm`, `mani
 |`wire`|`types`|–|
 |`mvcc`|`types`, `ports`|–|
 |`crypto`|`types`, `ports`, `sys`|`store`|
+|`erasure-spi`|`types`|–|
 |`vector`|`types`, `ports`, `simd`|`store`, `graph`|
 |`text`|`types`, `ports`|`store`, `graph`|
 |`rank`|`types`, `ports`|`graph`, `adapt`|
@@ -447,7 +448,7 @@ Vorhandene Verzeichnisse von `store` (`compaction`, `engine`, `kv`, `lsm`, `mani
 2. **Kerne untereinander** (`vector`, `text`, `rank`, `mvcc`, `crypto`) hängen nur voneinander ab, wenn die Kante in der Tabelle steht und begründet ist.
 3. **Ring 2.** Adapter (`infer-*`, `sandbox`) nutzen nur das Fundament.
 4. **Ring 4.** `mcp` und `py` erreichen Ring 2 und 3 ausschließlich über die Fassade `contextra`; das Lizenz-Gate wird nur über den Port `LicenseGate` genutzt; die Fassade re-exportiert die Offline-Prüfwerkzeuge.
-5. **Löschtypen** (Bericht, Schicht-Beleg, Messung, Receipt) existieren genau einmal in `crypto`/`ports`; andere Crates re-exportieren sie. Eine zweite Typfamilie für Löschung, Schlüssel oder KV-Segmente ist unzulässig.
+5. **Löschtypen und Bereinigungsschnittstellen (Entscheidung D-E1).** Löschschnittstellen (`Purger`, `LayerScanner`) und Schichtmessungstypen (`LayerWitness`, `ScanSession`, `WitnessLayer`, `KeyScope`) liegen kanonisch in `contextra-erasure-spi` (hängt nur an `types`). Datenhalter (`store`, `vector`, `text`, `graph`, `mvcc`) hängen nicht an `spi`. Satelliten (`contextra-erasure-<schicht>`) implementieren `Purger` und `LayerScanner` und rufen dafür die generische Wartungs-API der Schicht auf.
 6. **Test-Doubles.** Mocks, Fake-Uhr, Fehlerinjektion und Platzhalter-Embedder liegen in `testkit` oder hinter dem Feature `testing`; Test-Hooks (Panic-Auslöser, Schlüsselzugänge) nur hinter `cfg(test)` oder `test-hooks`. Beide Features liegen in keinem Release- oder Default-Set.
 7. **Aufwärts-Dev-Kanten** nur als deklarierte Ausnahme in `capabilities.toml`; Ziel: nach `testkit` oder `tests/` des höheren Rings verlagern.
 8. **`db` kennt keine Inferenz-Backends**; Embedder kommen als Port von der Fassade.
@@ -902,9 +903,9 @@ Retention-Reaper/`MemoryType`-Ort (§11.6), BM25-Morphologie für deutsche Kompo
 
 > **Architektur-Entscheidung (Baukastensystem):** Die Löschung über mehrere Ebenen mit kryptografischem Nachweis, Deletion Sagas, FileVault, GateLog, DSGVO-Regelwerken (Art. 17 etc.) und Audit-Chains ist **vollständig in den eigenständigen Baustein `contextra-erasure` modularisiert**.
 >
-> Der Speicherkern (`contextra-store`, `contextra-vector`, `contextra-text`, `contextra-crypto`) ist von dieser Logik befreit. Kern-Datenhalter implementieren lediglich minimale, generische Bereinigungs- und Scan-Ports (`Purger`, `LayerScanner`) aus `contextra-ports`.
+> Der Speicherkern (`contextra-store`, `contextra-vector`, `contextra-text`, `contextra-crypto`) ist von dieser Logik befreit. Kern-Datenhalter hängen gemäß **Entscheidung D-E1** nicht an `contextra-erasure-spi`. Löschschnittstellen (`Purger`, `LayerScanner`) und Schichttypen liegen kanonisch in `contextra-erasure-spi`. Satelliten (`contextra-erasure-<schicht>`) implementieren `Purger` und `LayerScanner` und rufen dafür die generische Wartungs-API der Schicht auf.
 
-### 12.1 Entkopplungsmodell der Löschkette
+### 12.1 Entkopplungsmodell der Löschkette (Entscheidung D-E1)
 
 Das Gesamtsystem trennt die Verantwortung strikt nach dem Baukastenprinzip:
 

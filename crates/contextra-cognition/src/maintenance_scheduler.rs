@@ -29,12 +29,12 @@
 // STAND: TS:2026-08-31T00:00:00Z
 
 use crate::consolidation_executor::{execute_consolidation_pass, ConsolidationLockGuard};
+use crate::engine_local::collection::{Collection, StoredDocument};
+use crate::engine_local::decay_controller::AdaptiveDecayController;
 use crate::maintenance_config::MaintenanceConfig;
 use crate::memory_consolidation::ConsolidationConfig;
-use contextra_engine::collection::{Collection, StoredDocument};
-use contextra_engine::decay_controller::AdaptiveDecayController;
-use contextra_ports::{Clock, StorageEngine, SystemClock, VectorIndex};
-use contextra_types::{ContextraError, DocId, TxId};
+use crate::ports_local::{Clock, StorageEngine, SystemClock, VectorIndex};
+use crate::types_local::{ContextraError, DocId, TxId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -47,7 +47,7 @@ pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex> {
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
     #[cfg(feature = "edge-reinforcement-learning")]
-    edge_reinforcement_buffer: Option<Arc<contextra_graph::EdgeReinforcementBuffer>>,
+    edge_reinforcement_buffer: Option<Arc<crate::graph_local::EdgeReinforcementBuffer>>,
     active_sessions: Arc<AtomicUsize>,
     clock: Arc<dyn Clock>,
 }
@@ -86,7 +86,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     /// Setzt den optionalen Puffer für Kantenverstärkung.
     pub fn with_edge_reinforcement_buffer(
         mut self,
-        buffer: Arc<contextra_graph::EdgeReinforcementBuffer>,
+        buffer: Arc<crate::graph_local::EdgeReinforcementBuffer>,
     ) -> Self {
         self.edge_reinforcement_buffer = Some(buffer);
         self
@@ -263,10 +263,10 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                         .await
                         {
                             Ok(res) => {
-                                if !res.duplicates_tombstoned.is_empty() {
+                                if !res.duplicates_superseded.is_empty() {
                                     tracing::info!(
                                         collection = %self.collection.name(),
-                                        tombstoned = res.duplicates_tombstoned.len(),
+                                        superseded = res.duplicates_superseded.len(),
                                         segments = res.segments_created,
                                         "MaintenanceScheduler: Consolidation pass consolidated turn duplicates"
                                     );
@@ -370,12 +370,13 @@ async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
 )]
 mod tests {
     use super::*;
-    use contextra_graph::CsrGraph;
+    use crate::graph_local::CsrGraph;
     use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
     use std::sync::atomic::AtomicU64;
     use tokio::time::sleep;
 
-    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>> {
+    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>
+    {
         let storage = Arc::new(InMemoryStorageEngine::new());
         let index = Arc::new(InMemoryVectorIndex::new(4));
         Arc::new(Collection::new(
@@ -385,12 +386,12 @@ mod tests {
             Arc::new(CsrGraph::new()),
             Arc::new(AtomicU64::new(1)),
             4,
-            contextra_engine::Language::English,
+            crate::engine_local::Language::English,
         ))
     }
 
-// ANCHOR[contextra-cognition:TEST-MAINTENA-017]
-// Prüft Testfall `test_maintenance_scheduler_tick_writes_wal_intent`.
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-017]
+    // Prüft Testfall `test_maintenance_scheduler_tick_writes_wal_intent`.
     #[tokio::test]
     async fn test_maintenance_scheduler_tick_writes_wal_intent() {
         let col = create_test_collection().await;
@@ -424,8 +425,8 @@ mod tests {
         );
     }
 
-// ANCHOR[contextra-cognition:TEST-MAINTENA-018]
-// Prüft Testfall `test_maintenance_scheduler_step_isolation_on_error`.
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-018]
+    // Prüft Testfall `test_maintenance_scheduler_step_isolation_on_error`.
     #[tokio::test]
     async fn test_maintenance_scheduler_step_isolation_on_error() {
         let col = create_test_collection().await;
@@ -454,8 +455,8 @@ mod tests {
         assert_eq!(val["status"], "completed");
     }
 
-// ANCHOR[contextra-cognition:TEST-MAINTENA-019]
-// Prüft Testfall `test_maintenance_scheduler_background_task_and_cancellation`.
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-019]
+    // Prüft Testfall `test_maintenance_scheduler_background_task_and_cancellation`.
     #[tokio::test]
     async fn test_maintenance_scheduler_background_task_and_cancellation() {
         let col = create_test_collection().await;
@@ -487,8 +488,8 @@ mod tests {
         );
     }
 
-// ANCHOR[contextra-cognition:TEST-MAINTENA-020]
-// Prüft Testfall `test_active_sessions_tracking`.
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-020]
+    // Prüft Testfall `test_active_sessions_tracking`.
     #[tokio::test]
     async fn test_active_sessions_tracking() {
         let col = create_test_collection().await;
@@ -521,8 +522,8 @@ mod tests {
         }
     }
 
-// ANCHOR[contextra-cognition:TEST-MAINTENA-021]
-// Prüft Testfall `test_maintenance_scheduler_with_custom_clock`.
+    // ANCHOR[contextra-cognition:TEST-MAINTENA-021]
+    // Prüft Testfall `test_maintenance_scheduler_with_custom_clock`.
     #[tokio::test]
     async fn test_maintenance_scheduler_with_custom_clock() {
         let col = create_test_collection().await;

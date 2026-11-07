@@ -5,24 +5,21 @@
 // INVARIANTEN: Zero Rust panics cross FFI boundary; GIL released during block_on async calls; Tokio Runtime bound per interpreter module state.
 // NICHT-OFFENSICHTLICH: Per-interpreter Tokio runtime instance attached to Python module state (`PyRuntimeState`) to enforce sub-interpreter isolation (PEP 684).
 // HOTSPOTS: [160-205] contextra_err mapping, [270-650] CRUD & search methods FFI boundary validation.
-// SIEHE AUCH: crates/contextra-db/AGENTS.md
+// SIEHE AUCH: crates/contextra/AGENTS.md
 
 //! # Contextra Python Bindings (`contextra-py`)
 //!
 //! Dieses Crate stellt die offizielle Python-Brücke (FFI = Foreign Function Interface)
 //! für die eingebettete 4-Signal Hybrid-Search Vektordatenbank **Contextra** bereit.
-//! Es verbindet das Python-Ökosystem via PyO3 mit dem Rust-Kern (`contextra-db`).
+//! Es verbindet das Python-Ökosystem via PyO3 mit der Fassade (`contextra`).
 //!
 //! ## Ring-Zugehörigkeit & Architektur
 //!
-//! - **Ring / Klasse:** Ring 4 (Ränder / FFI-Bindings). Laut SPEC §5.2 / CLAUDE.md ist
-//!   `contextra-py` zwar formell archiviert bzw. an der Peripherie angesiedelt, wird jedoch
-//!   weiterhin als vollwertiges Workspace-Mitglied geführt.
+//! - **Ring / Klasse:** Ring 4 (Ränder / FFI-Bindings).
 //! - **Abhängigkeiten (eingehend):** Keine Workspace-Crates hängen von `contextra-py` ab.
 //!   Die Nutzung erfolgt ausschließlich durch Python-Clients / User-Space.
-//! - **Abhängigkeiten (ausgehend):** `contextra-types`, `contextra-db`,
-//!   `contextra-wire` sowie Third-Party Crates wie
-//!   `pyo3`, `numpy`, `tokio`, `parking_lot`, `flatbuffers`, `serde_json`, `pythonize`.
+//! - **Abhängigkeiten (ausgehend):** `contextra-types`, `contextra`, `contextra-wire`
+//!   sowie optionale PyO3-Dependencies (`pyo3`, `numpy`, `pythonize`).
 //!
 //! ## Wichtige Invarianten für Entwickler
 //!
@@ -40,12 +37,17 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "pyo3")]
 use pyo3::prelude::*;
+#[cfg(feature = "pyo3")]
 use std::sync::Arc;
 
+#[cfg(feature = "pyo3")]
 pub mod bindings;
+#[cfg(feature = "pyo3")]
 pub mod kv_links;
 
+#[cfg(feature = "pyo3")]
 pub use bindings::*;
 
 // ANCHOR[contextra-py:MOD-001]
@@ -74,6 +76,7 @@ pub use bindings::*;
 /// - Gibt `PyRuntimeError` zurück, falls die Tokio-Runtime nicht erzeugt werden kann (z.B.
 ///   bei fehlenden OS-Ressourcen für Thread-Erstellung).
 /// - Gibt `PyErr` zurück, falls die Typ- oder Klassenregistrierung im Modul scheitert.
+#[cfg(feature = "pyo3")]
 #[pymodule]
 fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
     check_subinterpreter_guard(_py)?;
@@ -132,3 +135,7 @@ fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult
 
     Ok(())
 }
+
+/// Fallback / Library-Information wenn `contextra-py` ohne `pyo3`-Feature gebaut wird.
+#[cfg(not(feature = "pyo3"))]
+pub const VERSION: &str = "0.1.0";

@@ -210,7 +210,7 @@ impl Wal {
         self.get_integrity_key()
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
         match legacy_integrity_key() {
             Ok(key) => key,

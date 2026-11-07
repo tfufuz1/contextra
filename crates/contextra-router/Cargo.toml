@@ -32,11 +32,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-contextra-db = { workspace = true }
-contextra-vector = { workspace = true }
-bytes = { workspace = true }
-contextra-graph = { workspace = true }
-contextra-text = { workspace = true }
 tempfile = "3"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }

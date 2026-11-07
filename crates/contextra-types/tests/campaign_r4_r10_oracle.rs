@@ -16,7 +16,10 @@ fn test_doc_id_canonical_bit_decomposition_oracle() {
     let doc_id = DocId::from(raw_val);
 
     // Test canonical properties
+    #[cfg(not(feature = "docid-128"))]
     assert_eq!(doc_id.inner(), raw_val);
+    #[cfg(feature = "docid-128")]
+    assert_eq!(doc_id.inner(), u128::from(raw_val));
 }
 
 #[test]

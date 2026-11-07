@@ -27,8 +27,8 @@
 
 use crate::aggregation_phase::{AggregationConfig, AggregationNode};
 use crate::memory_consolidation::{cosine_similarity, detect_near_duplicates};
+use crate::types_local::{DocId, EntityId};
 use ahash::{AHashMap, AHashSet};
-use contextra_types::{DocId, EntityId};
 
 /// Reine, synchrone Funktion, die für drei `AggregationNode`-Kandidaten (A, B, C)
 /// und einen Ähnlichkeits-Schwellenwert prüft, ob eine transitive Verkettung

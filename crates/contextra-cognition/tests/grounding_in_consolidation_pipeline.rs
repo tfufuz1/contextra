@@ -25,9 +25,9 @@ use contextra_ports::{
     BoxFuture, GroundingAssessment, GroundingValidator, LlmTextGenerator,
     ResponseGroundingValidator,
 };
-use contextra_store::LsmStorage;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{ContextChunk, DocId, Result};
-use contextra_vector::HnswIndex;
+
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -152,21 +152,8 @@ async fn test_grounding_validation_pass_and_fail_modes() {
 #[tokio::test]
 async fn test_consolidation_pipeline_rich_validator_wiring() {
     let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new());
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 

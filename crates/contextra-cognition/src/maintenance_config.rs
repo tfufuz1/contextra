@@ -16,10 +16,10 @@
 // INVARIANTEN: P10: Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig) ohne Duplikation.
 // STAND: TS:2026-08-31T00:00:00Z
 
-use contextra_engine::decay_controller::DecayControllerConfig;
+use crate::engine_local::decay_controller::DecayControllerConfig;
 
 #[cfg(feature = "graph-connectivity-health")]
-use contextra_graph::percolation::PercolationConfig;
+use crate::graph_local::percolation::PercolationConfig;
 
 #[cfg(not(feature = "graph-connectivity-health"))]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -61,7 +61,7 @@ pub struct MaintenanceConfig {
     // --- F-03 Edge Reinforcement ---
     /// Edge-Reinforcement-Konfiguration (η, δ, W_max, ρ, Q, α).
     #[cfg(feature = "edge-reinforcement-learning")]
-    pub edge_reinforcement: contextra_graph::EdgeReinforcementConfig,
+    pub edge_reinforcement: crate::graph_local::EdgeReinforcementConfig,
 
     // --- F-06 Perkolation ---
     /// Ob Perkolations-Gesundheitsprüfungen aktiviert sind. Default: true.
@@ -96,7 +96,7 @@ impl Default for MaintenanceConfig {
             decay_enabled: true,
             decay_config: DecayControllerConfig::default(),
             #[cfg(feature = "edge-reinforcement-learning")]
-            edge_reinforcement: contextra_graph::EdgeReinforcementConfig::default(),
+            edge_reinforcement: crate::graph_local::EdgeReinforcementConfig::default(),
             percolation_enabled: true,
             percolation: PercolationConfig::default(),
             replicator_enabled: false,

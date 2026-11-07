@@ -1,6 +1,6 @@
 //! # Retention & Tombstone-Bereinigung (Ring 1)
 //!
-//! Bestimmt anhand aktiver Snapshots, welche geloeschten Schluessel physisch verworfen werden duerfen.
+//! Bestimmt anhand aktiver Snapshots, welche invalidierten Schluessel physisch verworfen werden duerfen.
 
 use contextra_types::TOMBSTONE_BIT;
 

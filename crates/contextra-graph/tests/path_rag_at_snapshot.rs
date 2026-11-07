@@ -59,7 +59,7 @@ async fn test_path_rag_at_edge_visibility_by_seq() {
 // ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-002]
 #[tokio::test]
 async fn test_path_rag_at_deleted_edge_visibility() {
-    // (b) eine zum seq gelöschte Kante ist unsichtbar, vor der Löschung sichtbar
+    // (b) eine zum seq gelöschte Kante ist unsichtbar, vor der Entfernung sichtbar
     let graph = CsrGraph::new();
 
     let e1 = EntityId::new(10);

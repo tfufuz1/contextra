@@ -5,7 +5,6 @@ members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
     "crates/contextra-simd",
-    "crates/contextra-core",
     "crates/contextra-store",
     "crates/contextra-vector",
     "crates/contextra-db",
@@ -37,10 +36,11 @@ members = [
     "crates/contextra-avv-generator",
     "crates/contextra-license",
     "crates/contextra-erasure",
+    "crates/contextra-erasure-spi",
     "crates/contextra-ingest",
 ]
 # Restored archived crates to default-members:
-# contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
+# contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama
 default-members = [
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
@@ -68,7 +68,6 @@ default-members = [
     "crates/contextra-agent",
     "crates/contextra-infer-onnx",
     "crates/contextra-infer-ollama",
-    "crates/contextra-core",
 ]
 
 [workspace.package]
@@ -119,7 +118,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 contextra-wire = { path = "crates/contextra-wire" }
 contextra-sys = { path = "crates/contextra-sys" }
 contextra-simd = { path = "crates/contextra-simd" }
-contextra-core = { path = "crates/contextra-core" }
 contextra-store = { path = "crates/contextra-store" }
 contextra-vector = { path = "crates/contextra-vector" }
 contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
@@ -154,6 +152,7 @@ contextra-audit-export = { path = "crates/contextra-audit-export" }
 contextra-avv-generator = { path = "crates/contextra-avv-generator" }
 contextra-license = { path = "crates/contextra-license" }
 contextra-erasure = { path = "crates/contextra-erasure" }
+contextra-erasure-spi = { path = "crates/contextra-erasure-spi" }
 contextra-ingest = { path = "crates/contextra-ingest" }
 
 # Ingestion dependencies

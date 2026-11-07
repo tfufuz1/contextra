@@ -70,3 +70,6 @@ results/
 .agents/jules/session.env
 .agents/jules/gate_ledger.json
 evidence/
+
+/tmp/
+/target/

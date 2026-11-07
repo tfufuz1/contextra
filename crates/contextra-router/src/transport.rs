@@ -69,6 +69,7 @@ impl Default for Transport {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

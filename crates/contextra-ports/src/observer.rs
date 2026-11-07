@@ -38,7 +38,7 @@ pub enum ObservedPhase {
     Gated,
     /// Physical purge and verification complete.
     Completed,
-    /// Access restriction per Art. 18 DSGVO is activated (D-116).
+    /// Access restriction policy is activated (D-116).
     Restricted,
     /// Access restriction is lifted (D-116).
     Lifted,

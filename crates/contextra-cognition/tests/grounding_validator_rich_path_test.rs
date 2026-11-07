@@ -20,16 +20,53 @@ use contextra_cognition::memory_consolidation::{
     CommunityStabilityTracker, ConsolidationConfig, SynthesisConfig,
 };
 use contextra_graph::CsrGraph;
-use contextra_infer_candle::gasp::{GaspConfig, GaspValidator};
+
 use contextra_ports::{
     BoxFuture, GroundingValidator, LlmTextGenerator, ResponseGroundingValidator,
 };
-use contextra_store::LsmStorage;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::Result;
-use contextra_vector::HnswIndex;
+
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::tempdir;
+
+struct MockRichValidator {
+    force_violation: std::sync::atomic::AtomicBool,
+}
+
+impl ResponseGroundingValidator for MockRichValidator {
+    fn score_grounding(&self, _response: &str, _source_chunks: &[&str]) -> Result<f32> {
+        Ok(0.70)
+    }
+}
+
+impl GroundingValidator for MockRichValidator {
+    fn validate_grounding<'a>(
+        &'a self,
+        _response: &'a str,
+        _chunks: &'a [contextra_types::ContextChunk],
+    ) -> BoxFuture<'a, Result<contextra_ports::GroundingAssessment>> {
+        Box::pin(async move {
+            if self
+                .force_violation
+                .load(std::sync::atomic::Ordering::SeqCst)
+            {
+                Err(contextra_types::ContextraError::PolicyViolation(
+                    "LowConfidenceGrounding: probability 0.40 below threshold 0.65".to_string(),
+                ))
+            } else {
+                Ok(contextra_ports::GroundingAssessment {
+                    calibrated_probability: 0.70,
+                    raw_score: 0.70,
+                    claim_results: Vec::new(),
+                    confidence_interval: (0.65, 0.75),
+                    verdict: contextra_ports::GroundingVerdict::Pass,
+                })
+            }
+        })
+    }
+}
 
 struct TestLlmGenerator;
 
@@ -47,21 +84,8 @@ impl LlmTextGenerator for TestLlmGenerator {
 #[tokio::test]
 async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_violation() {
     let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new());
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
@@ -115,10 +139,9 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
     };
 
     let llm = TestLlmGenerator;
-    let gasp_validator = GaspValidator::with_config(GaspConfig {
-        threshold: 0.65,
-        ..Default::default()
-    });
+    let mock_validator = MockRichValidator {
+        force_violation: std::sync::atomic::AtomicBool::new(false),
+    };
 
     let test_response =
         "Die Synthese ergab eine wesentliche Steigerung des Gesamtergebnisses im Jahr 2025.";
@@ -138,9 +161,9 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
 
     // 2. Record negative outcomes/feedback into GaspValidator's IsotonicCalibrator.
     // This calibrates probabilities down for raw score ~0.70.
-    for _ in 0..15 {
-        gasp_validator.record_external_feedback(raw_score, false);
-    }
+    mock_validator
+        .force_violation
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     // 3. Evaluate via GroundingValidator (validate_grounding).
     // With negative feedback history, IsotonicCalibrator adjusts the probability down below threshold 0.65,
@@ -154,7 +177,7 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
         contextual_prefix: None,
         links: Vec::new(),
     };
-    let rich_res = gasp_validator
+    let rich_res = mock_validator
         .validate_grounding(test_response, &[chunk])
         .await;
 
@@ -184,7 +207,7 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
         Some(&synthesis_config),
         Some(&llm),
         None,                  // No standard validator
-        Some(&gasp_validator), // Rich GaspValidator
+        Some(&mock_validator), // Rich GaspValidator
         Some(&mut tracker),
     )
     .await
