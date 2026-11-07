@@ -1,5 +1,4 @@
 #![cfg(feature = "kv-bridge")]
-
 // ANCHOR[contextra-infer-candle:TEST-KV-BRIDGE-ROUNDTRIP]
 //! Verification test for KV-Bridge roundtrip: Export, serialization, encryption, decryption, and bit-identical restoration.
 

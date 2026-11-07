@@ -314,6 +314,15 @@ impl GroundingValidator for GaspValidator {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn test_score_grounding_trait() {
+        let validator = GaspValidator::new();
+        let sources = ["Umsatz 50 Millionen"];
+        let res = validator.score_grounding("Umsatz 50 Millionen", &sources);
+        assert!(res.is_ok());
+    }
+
     use super::*;
     use contextra_types::DocId;
 

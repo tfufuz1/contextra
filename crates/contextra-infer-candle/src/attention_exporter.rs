@@ -4,7 +4,7 @@
 
 use contextra_ports::{AttentionExporter, RequestId};
 use parking_lot::Mutex;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 /// Maximum number of tracked requests in the attention history ring buffer.
 pub const MAX_TRACKED_REQUESTS: usize = 256;
@@ -19,8 +19,8 @@ pub struct CandleAttentionExporter {
 
 #[derive(Debug, Default)]
 struct ExporterState {
-    weights: HashMap<RequestId, Vec<f32>>,
-    order: VecDeque<RequestId>,
+    weights: BTreeMap<u64, Vec<f32>>,
+    order: VecDeque<u64>,
 }
 
 impl Default for CandleAttentionExporter {
@@ -42,8 +42,8 @@ impl CandleAttentionExporter {
     /// Enforces [`MAX_TRACKED_REQUESTS`] ring-buffer capacity limit.
     pub fn record_attention_weights(&self, request_id: RequestId, weights: Vec<f32>) {
         let mut state = self.state.lock();
-        if let std::collections::hash_map::Entry::Occupied(mut entry) =
-            state.weights.entry(request_id)
+        if let std::collections::btree_map::Entry::Occupied(mut entry) =
+            state.weights.entry(request_id.0)
         {
             entry.insert(weights);
             return;
@@ -55,8 +55,8 @@ impl CandleAttentionExporter {
             }
         }
 
-        state.weights.insert(request_id, weights);
-        state.order.push_back(request_id);
+        state.weights.insert(request_id.0, weights);
+        state.order.push_back(request_id.0);
     }
 
     /// Combines and records attention weights from layer/head score matrices/vectors.
@@ -67,12 +67,17 @@ impl CandleAttentionExporter {
             return;
         }
 
-        let seq_len = scores[0].len();
+        let seq_len = match scores.first() {
+            Some(s) => s.len(),
+            None => return,
+        };
         let mut combined = vec![0.0f32; seq_len];
 
         for head_layer_vec in scores {
             for (i, &score) in head_layer_vec.iter().enumerate().take(seq_len) {
-                combined[i] += score;
+                if let Some(c) = combined.get_mut(i) {
+                    *c += score;
+                }
             }
         }
 
@@ -94,6 +99,21 @@ impl CandleAttentionExporter {
 
 impl AttentionExporter for CandleAttentionExporter {
     fn export_attention_weights(&self, request_id: RequestId) -> Option<Vec<f32>> {
-        self.state.lock().weights.get(&request_id).cloned()
+        self.state.lock().weights.get(&request_id.0).cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_export_attention_weights_internal() {
+        let exporter = CandleAttentionExporter::new();
+        let req_id = RequestId(42);
+        exporter.record_layer_head_scores(req_id, &[vec![1.0, 0.5]]);
+        let weights = exporter.export_attention_weights(req_id);
+        assert!(weights.is_some());
+        assert_eq!(weights.expect("weights present"), vec![1.0, 0.5]);
     }
 }
