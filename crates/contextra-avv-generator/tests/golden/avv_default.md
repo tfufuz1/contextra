@@ -30,7 +30,7 @@ Die Verarbeitung umfasst die automatisierte Vektorisierung, Speicherung, semanti
 2. Die Vertraulichkeitsverpflichtung besteht auch nach Beendigung des Auftragsverarbeitungsvertrages fort.
 
 ## 6. Technische und organisatorische Maßnahmen (TOM)
-Der Auftragsverarbeiter garantiert die Umsetzung folgender produktimmanenter technischer Sicherheitsgarantien gemäß Art. 32 DSGVO:
+Der Auftragsverarbeiter sieht die Umsetzung folgender produktimmanenter technischer Sicherheitsmaßnahmen gemäß Art. 32 DSGVO vor:
 
 ### Kryptografischer Löschbeweis \(Ed25519\) (Art. 32 Abs. 1 lit. b & Art. 17 DSGVO)
 Nach Ausführung einer Löschanforderung wird ein fälschungssicherer, Ed25519\-signierter Löschbeleg generiert, der die unwiderrufliche Löschung aller Datenpunkte mathematisch und auditierbar nachweist.

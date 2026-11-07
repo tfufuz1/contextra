@@ -152,7 +152,7 @@ impl ProcessingRegistryExport {
     // ANCHOR[contextra-privacy:PR-012]
     /// Filtert alle Verarbeitungstätigkeiten nach der angegebenen Mandanten-ID.
     ///
-    /// Garantiert strikte Mandantentrennung bei Auskunftsabfragen, sodass nur Datensätze des Zielmandanten
+    /// Stellt strikte Mandantentrennung bei Auskunftsabfragen sicher, sodass nur Datensätze des Zielmandanten
     /// zurückgegeben werden.
     pub fn filter_by_tenant(&self, tenant_id: TenantId) -> Self {
         let records = self
