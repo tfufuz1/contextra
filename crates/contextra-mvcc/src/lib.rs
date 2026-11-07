@@ -30,6 +30,25 @@
 //! - [`TxBuffer`]: Nach Transaktions-ID partitionierter Staging-Puffer für atomare 2-Phase-Commit-Vorbereitungen.
 //! - [`ReadSet`] / [`SsiValidator`] / [`SequenceLogSsiValidator`]: Serializable Snapshot Isolation (SSI)
 //!   zur Erkennung von Write-Skew-Anomalien und Phantom-Reads bei Transaktionen.
+//!
+//! ## Sperrenordnung & Invarianten (INV-LOCK-ORDER-1)
+//!
+//! Um Verklemmungen (Deadlocks) bei nebenläufigem Zugriff deterministisch auszuschließen,
+//! gilt für `contextra-mvcc` und die darüberliegende Engine eine strikte, totale Sperrenhierarchie:
+//!
+//! 1. **Document / Key Lock**: Externe Zeilen- bzw. Dokumentsperre (z. B. striped Shard-Locks).
+//! 2. **TxBuffer Shards**: Partitionierte Staging-Shards (`shards[0..N-1]`). Es wird **niemals**
+//!    mehr als ein Shard-Lock gleichzeitig erworben. Operationen, die alle Shards durchlaufen
+//!    (z. B. `reap_orphans`, `min_read_snapshot`), sperren streng sequentiell Shard für Shard
+//!    in aufsteigender Index-Reihenfolge (0 bis $N-1$) unter kurzem Lock und verschachteln niemals Locks.
+//! 3. **SnapshotRegistry**: Zentraler Mutex für die aktive Snapshot-Map. Sperre wird nur für
+//!    minimale O(1)-Operationen gehalten (Eintrag einfügen/entfernen, atomares Minimum aktualisieren)
+//!    und ruft keinen externen Code auf.
+//! 4. **SequenceLog / SSI (CommittedWrites)**: Feingranularer `parking_lot::RwLock` zur Verfolgung
+//!    bestätigter Schreibvorgänge und Phantom-Präfixe.
+//!
+//! **Regel (INV-LOCK-ORDER-1):** Kein Sperr-Guard wird über `.await`-Punkte hinweg gehalten
+//! (`contextra-mvcc` ist vollkommen synchron und frei von Async-Runtimes wie Tokio).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

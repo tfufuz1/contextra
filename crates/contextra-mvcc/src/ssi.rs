@@ -627,11 +627,20 @@ impl SequenceLogSsiValidator {
     ///
     /// Aktualisiert den atomaren `pruned_through`-Wasserstand.
     ///
-    /// ### Fail-Closed-Sicherheit:
+    /// ### Fail-Closed-Sicherheit & Sentinel-Schutz:
     /// Sobald ein Stand `bound_seq` bereinigt wurde, schlägt jede Transaktion, die einen Snapshot
     /// mit `snapshot_seq < bound_seq` nutzt, sofort fehl, um unerkannte Write-Skews zu verhindern.
+    ///
+    /// Sentinel-Werte (`u64::MAX`), Sequenzen mit gesetztem Tombstone-Bit oder Werte
+    /// `>= i64::MAX as u64` sind als Prune-Bound unzulässig und werden ignoriert (liefern 0),
+    /// um eine unbeabsichtigte Vorzeit-Invalidierung aller Transaktionen zu verhindern.
     pub fn prune_through(&self, bound_seq: u64) -> usize {
-        let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
+        if bound_seq == u64::MAX
+            || (bound_seq & crate::types::TOMBSTONE_BIT) != 0
+            || bound_seq >= (i64::MAX as u64)
+        {
+            return 0;
+        }
         let mut writes = self.committed_writes.write();
         let removed = writes.prune_through(bound_seq);
         self.pruned_through.fetch_max(bound_seq, Ordering::SeqCst);
