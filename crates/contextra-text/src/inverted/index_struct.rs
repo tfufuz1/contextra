@@ -354,6 +354,40 @@ impl<S: StorageEngine> InvertedIndex<S> {
     ///
     // ANCHOR[contextra-text:INV-016]
     /// Löst aufgelaufene Tombstones (`tbs:{doc_id}:{term}`) auf und bereinigt verwaiste Posting-Listen.
+
+    // ANCHOR[contextra-text:INV-025]
+    /// Schreibt Postinglisten für gegebene Terme neu (Maintenance / Rewrite API).
+    ///
+    /// Konsolidiert unkomprimierte und komprimierte Batches, bereinigt gelöschte Einträge
+    /// und persistiert die optimierten Batches im Speicher-Port.
+    pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize> {
+        let mut rewritten = 0;
+        for &term in terms {
+            self.ensure_term_loaded(term).await?;
+            let plb_key = self.key_batch_posting_list(term);
+            if let Some(plist) = self.resident_index.get(term) {
+                if !plist.is_empty() {
+                    let batch_bytes = plist.encode_compact()?;
+                    self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                    rewritten += 1;
+                } else {
+                    self.storage.delete(tx, &plb_key).await?;
+                    rewritten += 1;
+                }
+            }
+        }
+        Ok(rewritten)
+    }
+
+    // ANCHOR[contextra-text:INV-026]
+    /// Kompaktiert Terme und bereinigt verwaiste Metadaten im Inverted Index (Maintenance / Compaction API).
+    ///
+    /// Führt eine vollständige Bereinigung verwaister Tombstones durch und aktualisiert
+    /// konsolidierte Statistiken.
+    pub async fn compact_terms(&self, tx: TxId) -> Result<u64> {
+        self.resolve_tombstones(tx).await
+    }
+
     pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {
         let tbs_prefix = {
             let mut k = Vec::with_capacity(self.prefix.len() + 4);
