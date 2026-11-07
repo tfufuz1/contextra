@@ -33,6 +33,9 @@ use crate::aggregation_phase::{
     check_compaction_budget, run_aggregation_pass, AggregationConfig, AggregationEdge,
     AggregationNode, AggregationPhaseResult, AlphaNode,
 };
+use crate::engine_local::collection::{Collection, StoredDocument, StoredDocumentMeta};
+use crate::engine_local::decay_controller::AdaptiveDecayController;
+use crate::graph_local::{detect_communities, CommunityDetectionConfig};
 use crate::graph_sink::CsrGraphSuperEdgeSink;
 use crate::leanrag_input::{build_leanrag_inputs, DEFAULT_MAX_LEANRAG_NODES};
 use crate::memory_consolidation::{
@@ -40,14 +43,11 @@ use crate::memory_consolidation::{
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
     SynthesisPhaseResult,
 };
-use ahash::{AHashMap, AHashSet};
-use contextra_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
-use contextra_engine::decay_controller::AdaptiveDecayController;
-use contextra_graph::{detect_communities, CommunityDetectionConfig};
-use contextra_ports::{
+use crate::ports_local::{
     GroundingValidator, LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
 };
-use contextra_types::{DocId, Result};
+use crate::types_local::{DocId, Result};
+use ahash::{AHashMap, AHashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -82,7 +82,7 @@ impl Drop for ConsolidationLockGuard {
     }
 }
 
-async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
+async fn apply_duplicate_supersessions<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     duplicates: &[DocId],
 ) {
@@ -92,26 +92,26 @@ async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
             Ok(Some(val)) => match serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Ok(meta) => meta.id,
                 Err(e) => {
-                    tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to deserialize StoredDocumentMeta for tombstone");
+                    tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to deserialize StoredDocumentMeta for supersession");
                     continue;
                 }
             },
             Ok(None) => {
-                tracing::warn!(doc_id = ?doc_id, "Consolidation pass: doc_id key not found for tombstone");
+                tracing::warn!(doc_id = ?doc_id, "Consolidation pass: doc_id key not found for supersession");
                 continue;
             }
             Err(e) => {
-                tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to lookup doc_id for tombstone");
+                tracing::warn!(doc_id = ?doc_id, error = %e, "Consolidation pass: failed to lookup doc_id for supersession");
                 continue;
             }
         };
 
         match collection.delete(&user_id).await {
             Ok(_) => {
-                tracing::debug!(doc_id = ?doc_id, user_id = %user_id, "Consolidation pass: duplicate tombstoned")
+                tracing::debug!(doc_id = ?doc_id, user_id = %user_id, "Consolidation pass: duplicate superseded")
             }
             Err(e) => {
-                tracing::warn!(doc_id = ?doc_id, user_id = %user_id, error = %e, "Consolidation pass: tombstone failed")
+                tracing::warn!(doc_id = ?doc_id, user_id = %user_id, error = %e, "Consolidation pass: supersession failed")
             }
         }
     }
@@ -130,8 +130,8 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
     if turns.is_empty() {
         return Ok(ConsolidationPhaseResult {
             segments_created: 0,
-            duplicates_tombstoned: Vec::new(),
-            cascade_edge_tombstones_needed: Vec::new(),
+            duplicates_superseded: Vec::new(),
+            cascade_edge_invalidations_needed: Vec::new(),
             cascade_errors: Vec::new(),
         });
     }
@@ -145,8 +145,8 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
             );
             return Ok(ConsolidationPhaseResult {
                 segments_created: 0,
-                duplicates_tombstoned: Vec::new(),
-                cascade_edge_tombstones_needed: Vec::new(),
+                duplicates_superseded: Vec::new(),
+                cascade_edge_invalidations_needed: Vec::new(),
                 cascade_errors: Vec::new(),
             });
         }
@@ -165,12 +165,12 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
                 ))
             })?;
 
-    apply_duplicate_tombstones(collection, &result.duplicates_tombstoned).await;
+    apply_duplicate_supersessions(collection, &result.duplicates_superseded).await;
 
-    if !result.cascade_edge_tombstones_needed.is_empty() {
+    if !result.cascade_edge_invalidations_needed.is_empty() {
         let tx = collection.allocate_tx()?;
         let (_reports, errors) = guard
-            .cascade_invalidate_edges_ordered(&result.cascade_edge_tombstones_needed, tx.inner())
+            .cascade_invalidate_edges_ordered(&result.cascade_edge_invalidations_needed, tx.inner())
             .await;
         result.cascade_errors.extend(errors);
     }
@@ -752,8 +752,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
                     return Ok((
                         ConsolidationPhaseResult {
                             segments_created: 0,
-                            duplicates_tombstoned: Vec::new(),
-                            cascade_edge_tombstones_needed: Vec::new(),
+                            duplicates_superseded: Vec::new(),
+                            cascade_edge_invalidations_needed: Vec::new(),
                             cascade_errors: Vec::new(),
                         },
                         None,
@@ -767,8 +767,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             return Ok((
                 ConsolidationPhaseResult {
                     segments_created: 0,
-                    duplicates_tombstoned: Vec::new(),
-                    cascade_edge_tombstones_needed: Vec::new(),
+                    duplicates_superseded: Vec::new(),
+                    cascade_edge_invalidations_needed: Vec::new(),
                     cascade_errors: Vec::new(),
                 },
                 None,
@@ -828,8 +828,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
 )]
 mod tests {
     use super::*;
-    use contextra_graph::CsrGraph;
-    use contextra_ports::{BoxFuture, LlmTextGenerator};
+    use crate::graph_local::CsrGraph;
+    use crate::ports_local::{BoxFuture, LlmTextGenerator};
     use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
     use serde_json::json;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -868,7 +868,8 @@ mod tests {
         }
     }
 
-    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>> {
+    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>
+    {
         let storage = Arc::new(InMemoryStorageEngine::new());
         let index = Arc::new(InMemoryVectorIndex::new(4));
         let graph = Arc::new(CsrGraph::new());
@@ -881,12 +882,12 @@ mod tests {
             graph,
             next_tx,
             4,
-            contextra_engine::Language::English,
+            crate::engine_local::Language::English,
         ))
     }
 
-// ANCHOR[contextra-cognition:TEST-CONSOLID-040]
-// Prüft Testfall `test_consolidation_engine_concurrency_no_deadlock`.
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-040]
+    // Prüft Testfall `test_consolidation_engine_concurrency_no_deadlock`.
     #[tokio::test]
     async fn test_consolidation_engine_concurrency_no_deadlock() {
         let col = create_test_collection().await;
@@ -938,8 +939,8 @@ mod tests {
         assert_eq!(col.len().await, 20);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONSOLID-041]
-// Prüft Testfall `test_consolidation_engine_fault_injection_resume`.
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-041]
+    // Prüft Testfall `test_consolidation_engine_fault_injection_resume`.
     #[tokio::test]
     async fn test_consolidation_engine_fault_injection_resume() {
         let col = create_test_collection().await;
@@ -1022,8 +1023,8 @@ mod tests {
         cancel_token.cancel();
     }
 
-// ANCHOR[contextra-cognition:TEST-CONSOLID-042]
-// Prüft Testfall `test_execute_consolidation_pass_skips_when_guard_locked`.
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-042]
+    // Prüft Testfall `test_execute_consolidation_pass_skips_when_guard_locked`.
     #[tokio::test]
     async fn test_execute_consolidation_pass_skips_when_guard_locked() {
         let col = create_test_collection().await;
@@ -1044,11 +1045,11 @@ mod tests {
         assert!(res.is_ok(), "Should return Ok when guard is locked");
         let phase_res = res.unwrap();
         assert_eq!(phase_res.segments_created, 0);
-        assert!(phase_res.duplicates_tombstoned.is_empty());
+        assert!(phase_res.duplicates_superseded.is_empty());
     }
 
-// ANCHOR[contextra-cognition:TEST-CONSOLID-043]
-// Prüft Testfall `test_consolidation_nodes_guard_deadlock_regression`.
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-043]
+    // Prüft Testfall `test_consolidation_nodes_guard_deadlock_regression`.
     #[tokio::test]
     async fn test_consolidation_nodes_guard_deadlock_regression() {
         let col = create_test_collection().await;
@@ -1107,8 +1108,8 @@ mod tests {
     ///
     /// Wenn dieser Test unter `#[tokio::test]` läuft und spawn_blocking korrekt ist,
     /// darf der blocking Thread nicht den Tokio-Runtime blockieren.
-// ANCHOR[contextra-cognition:TEST-CONSOLID-044]
-// Prüft Testfall `test_spawn_blocking_consolidation_does_not_block_runtime`.
+    // ANCHOR[contextra-cognition:TEST-CONSOLID-044]
+    // Prüft Testfall `test_spawn_blocking_consolidation_does_not_block_runtime`.
     #[tokio::test]
     async fn test_spawn_blocking_consolidation_does_not_block_runtime() {
         use tokio::time::timeout;

@@ -170,7 +170,7 @@ fn test_budget_boundary_exceeded_skips_veto_and_continues() {
     let result = run_consolidation_pass(&turns, &config);
     assert_eq!(result.segments_created, 2);
     assert!(
-        !result.duplicates_tombstoned.is_empty(),
+        !result.duplicates_superseded.is_empty(),
         "Consolidation continues normally even when transitivity check budget is exceeded"
     );
 }

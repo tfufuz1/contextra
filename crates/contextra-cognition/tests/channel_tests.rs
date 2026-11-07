@@ -62,5 +62,8 @@ async fn test_in_memory_mpsc_channel_intake_and_sink() {
         .expect("sink emit should succeed");
 
     assert_eq!(sink.len(), 1);
-    assert_eq!(sink.collected()[0], "Consolidation finished for tenant-beta");
+    assert_eq!(
+        sink.collected()[0],
+        "Consolidation finished for tenant-beta"
+    );
 }

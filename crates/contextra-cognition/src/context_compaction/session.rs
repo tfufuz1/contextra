@@ -13,10 +13,12 @@
 //!   in das Speichersystem, der bei erfolgreichem Abschluss gelöscht wird.
 //! - **Fail-Closed bei Löschfehlern:** Scheitert das Entfernen von Quelldokumenten, schlägt der Commit fehl.
 
-use contextra_engine::collection::{Collection, StoredDocumentMeta};
-use contextra_engine::transaction::CommitIntent;
-use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
-use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
+use crate::engine_local::collection::{Collection, StoredDocumentMeta};
+use crate::engine_local::transaction::CommitIntent;
+use crate::ports_local::{LlmTextGenerator, StorageEngine, VectorIndex};
+use crate::types_local::{
+    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
+};
 use std::sync::Arc;
 
 use super::compactor::ContextCompactor;
@@ -24,13 +26,12 @@ use super::types::CompactionStrategy;
 
 /// Optimistic Concurrency Control (OCC) Consolidation Session for Sleep-Cycle Memory Compaction.
 ///
-/// Prevents lost updates / phantom erasures by verifying that no source documents were modified
+/// Prevents lost updates / phantom modifications by verifying that no source documents were modified
 /// while asynchronous LLM summarization was in progress. Also journals a `CommitIntent::Consolidation`
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
 // ANCHOR[contextra-cognition:SESS-001]
 /// Transaktionale OCC-Konsolidierungssitzung.
-pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex>
-{
+pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex> {
     /// Reference to the active collection.
     pub collection: &'a Collection<S, V>,
     /// Source document IDs and their transaction IDs captured at read snapshot time.

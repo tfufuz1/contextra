@@ -2,19 +2,25 @@
 
 Hintergrundprozesse für Gedächtniskonsolidierung (Memory Consolidation), Kontextfenster-Kompaktierung (Context Compaction), semantische Aggregation (LeanRAG Stage 3) und periodische Wartungsplanung (Maintenance Scheduling).
 
-## Status und Einordnung
+## Baukasten-Profil (Ring 3)
 
-- **Ring:** 3 (Orchestrierungs- und Kognitionsschicht)
-- **Reifestatus:** `experimental`
-- **Scope Contextra v1:** Laut AGENTS.md §9 sind Kognition und Konsolidierung über Schlafzyklen Nicht-Ziele von v1. Die Scope-Entscheidung über den Einbezug oder die Archivierung ist in **ADR 0009** (`docs/decisions/0009-scope-contextra-v1-14-oder-35-crates.md`) als Status `Proposed` / offen dokumentiert. Das Crate dient dem Nachweis und der Dokumentation bestehender Fähigkeiten.
+| Eigenschaft | Wert |
+|---|---|
+| Ring | Ring 3 (Orchestrierungs- und Kognitionsschicht) |
+| Reifegrad | `experimental` |
+| Erlaubte Abhängigkeiten | `contextra-ports`, `contextra-types`, `contextra-graph`, `contextra-engine` |
+| Speichersicherheit | `#![forbid(unsafe_code)]` (100% sicheres Rust) |
+| Zero-Panic-Doktrin | Keine unwrap/expect in Produktivpfaden, deterministisches Fail-Closed |
+| Standalone-Build | `cargo build -p contextra-cognition --locked` |
 
 ## Architektur und Modulübersicht
 
-Die Quelltexte unter `src/` gliedern sich in folgende Module:
+Die Quelltexte unter `src/` gliedern sich in folgende orthogonale Bausteine:
 
 | Modul | Datei | Beschreibung |
 |---|---|---|
 | `aggregation_phase` | `src/aggregation_phase.rs` | Semantische Aggregationsphase (LeanRAG Stage 3) mit Typ-Denoising, Diagonal-GMM Clustering, Alpha-Knoten-Synthese und Super-Hyperkanten. |
+| `channel` | `src/channel.rs` | Abstrakte Ein- und Ausgabe-Channels (`CognitiveInputChannel`, `CognitiveOutputSink`, `InMemoryCognitiveChannel`) zur framework-agnostischen Entkopplung. |
 | `consolidation_executor` | `src/consolidation_executor.rs` | Koordination von Hintergrund-Konsolidierungsworkern, Sleep-Cycles und Kaskaden-Invalidierung. |
 | `consolidation_locks` | `src/consolidation_locks.rs` | RAII-Sperren zur thread-sicheren Kaskaden-Invalidierung und Verhinderung von Race-Conditions während Konsolidierungsläufen. |
 | `context` | `src/context.rs` | `ContextManager` zur autonomen Kontextverwaltung, Budgetierung und räumlichen Abgrenzung (`SpatialFence`). |
@@ -28,29 +34,21 @@ Die Quelltexte unter `src/` gliedern sich in folgende Module:
 | `synthesis_phase` | `src/synthesis_phase.rs` | Generativer Synthesis Pass (`run_synthesis_pass`) zur LLM-gestützten Abstraktion von Gesprächssegmenten. |
 | `transitivity_veto` | `src/transitivity_veto.rs` | Schutzmechanismus gegen fehlerhafte transitive Duplikat-Verschmelzungen (`validate_transitivity_veto`). |
 
-## Invarianten
+## Invarianten & Baukasten-Garantien
 
 1. **Zero-Panic-Doktrin (P2):** Kein `unwrap`, `expect` oder `panic!` im Produktionscode. Alle Fehler werden über `ContextraError` typisiert zurückgegeben. Teilschritte im Wartungsplaner sind fehlertolerant isoliert.
-2. **Ports für Nicht-Determinismus (Regel 3):**
-   - Zeitmessung und Ticks erfolgen über den `Clock`-Port (in Tests deterministisch über `ManualClock`).
+2. **Ports für Umweltinjektion (M4):**
+   - Zeitmessung und Ticks erfolgen über den `Clock`-Port (`contextra_ports::Clock`).
    - Pseudo-Zufall erfolgt über den `Rng`-Port (`contextra_ports::SeededRng`).
-   - IDs werden deterministisch oder über generierte Hashes abgeleitet.
+   - IDs und Hashes werden deterministisch abgeleitet.
 3. **Mandantenisolierung (VETO-F10):** Strikte Trennung nach `TenantId`. Vorverdichtete Eingaben und Konsolidierungsschritte überschreiten niemals Mandantengrenzen.
-4. **P12-Kostenschutz & Budgetierung:**
+4. **Keine rechtlichen Löschbezüge (M7):** Datenhaltende Konsolidierungsphasen kennen keine physische Löschung als Rechtsakt (DSGVO Art. 17 verbleibt in `contextra-erasure`), sondern nutzen rein neutrale Supersession/Invalidation.
+5. **Kostenschutz & Budgetierung:**
    - Maximale Anzahl an LLM-Aufrufen pro Konsolidierungszyklus ist strikt gedeckelt (`max_llm_calls_per_cycle`).
    - Maximaler Speicherbedarf bei Compaction wird vorab via `check_compaction_budget` validiert.
-5. **Kein Unsafe-Code:** `#![forbid(unsafe_code)]` wird auf Crate-Ebene strikt erzwungen.
+6. **Kein Unsafe-Code:** `#![forbid(unsafe_code)]` wird auf Crate-Ebene strikt erzwungen.
 
-## Nicht-Ziele (SPEC §2.3, AGENTS.md §9)
-
-Folgende Fähigkeiten sind für Contextra v1 explizit als Nicht-Ziele definiert:
-- Graph-Reasoning und autonome Inferenzketten im Anfragepfad.
-- Online-Adaption und Modellgewichtsaktualisierungen während der Laufzeit.
-- Schlafzyklus-Konsolidierung als Pflichtbestandteil des Kern-Workspaces.
-
-## Nutzungsbeispiel
-
-Das folgende Beispiel demonstriert die Konfiguration und Prüfung des Compaction-Speicherbudgets sowie die Erstellung einer Aggregationskonfiguration:
+## Einbettungsbeispiel
 
 ```rust
 use contextra_cognition::aggregation_phase::{check_compaction_budget, AggregationConfig};

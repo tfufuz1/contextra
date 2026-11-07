@@ -23,11 +23,11 @@
 //! Extraktion von LeanRAG-Eingabedaten ([`AggregationNode`], [`AggregationEdge`]) aus einer [`Collection`].
 
 use crate::aggregation_phase::{AggregationEdge, AggregationNode};
+use crate::engine_local::collection::Collection;
+use crate::graph_local::hyperedge::HyperEdgeId;
+use crate::ports_local::{StorageEngine, VectorIndex};
+use crate::types_local::{DocId, EntityId};
 use ahash::{AHashMap, AHashSet};
-use contextra_engine::collection::Collection;
-use contextra_graph::hyperedge::HyperEdgeId;
-use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId};
 
 /// Standardmäßige Obergrenze für die Anzahl extrahierter Knoten im LeanRAG-Input.
 // ANCHOR[contextra-cognition:INPUT-001]

@@ -24,9 +24,9 @@ use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_store::LsmStorage;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{DocId, EntityId};
-use contextra_vector::HnswIndex;
+
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -62,23 +62,13 @@ impl LlmTextGenerator for TestMockLlm {
     }
 }
 
-async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir) {
+async fn create_test_collection() -> (
+    Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>,
+    tempfile::TempDir,
+) {
     let dir = tempdir().expect("tempdir");
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .expect("LsmStorage"),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .expect("HnswIndex"),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new());
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
@@ -94,7 +84,7 @@ async fn create_test_collection() -> (Arc<Collection<LsmStorage, HnswIndex>>, te
     (col, dir)
 }
 
-async fn setup_test_graph_data(col: &Collection<LsmStorage, HnswIndex>) {
+async fn setup_test_graph_data(col: &Collection<InMemoryStorageEngine, InMemoryVectorIndex>) {
     col.insert(
         "doc_10",
         &[1.0, 0.0, 0.0, 0.0],
