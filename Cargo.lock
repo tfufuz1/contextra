@@ -894,7 +894,7 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-crypto",
+ "contextra-cognition",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",
@@ -999,7 +999,6 @@ dependencies = [
  "arc-swap",
  "bincode",
  "blake3",
- "contextra-adapt",
  "contextra-ports",
  "contextra-store",
  "contextra-testkit",
@@ -1242,10 +1241,7 @@ dependencies = [
 name = "contextra-py"
 version = "0.1.0"
 dependencies = [
- "contextra-adapt",
  "contextra-db",
- "contextra-rank",
- "contextra-store",
  "contextra-types",
  "contextra-wire",
  "flatbuffers",
@@ -1262,7 +1258,6 @@ name = "contextra-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "contextra-adapt",
  "contextra-ports",
  "contextra-types",
  "proptest",
@@ -1283,7 +1278,6 @@ dependencies = [
  "contextra-db",
  "contextra-graph",
  "contextra-ports",
- "contextra-privacy",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
