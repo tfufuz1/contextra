@@ -1,11 +1,11 @@
-//! # Manipulationsschutz und Notfall-Löschung (`anti_tamper.rs`)
+//! # Manipulationsschutz und Notfall-Speicherbereinigung (`anti_tamper.rs`)
 //!
 //! Stellt sichere Speicherbehälter bereit, die sensibles Schlüsselmaterial vor
 //! Kaltstart-Angriffen, Speicher-Dumps und unbefugtem Auslesen schützen.
 //!
 //! ## Invarianten
 //! - Automatisches Zeroizing beim Verlassen des Gültigkeitsbereichs (`Drop`).
-//! - Manuelle Notfalllöschung (`emergency_wipe`) überschreibt Speicher deterministisch mit Nullen.
+//! - Manuelle Notfallbereinigung (`emergency_wipe`) überschreibt Speicher deterministisch mit Nullen.
 //! - Debug-Ausgaben maskieren sensible Schlüssel (`[REDACTED]`).
 //! - Strikter Verzicht auf `unsafe`-Code.
 

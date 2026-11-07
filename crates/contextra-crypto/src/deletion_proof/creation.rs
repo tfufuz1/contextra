@@ -1,4 +1,4 @@
-//! # Erzeugung von Löschbeweisen (`deletion_proof/creation.rs`)
+//! # Erzeugung von Attestationsbeweisen (`deletion_proof/creation.rs`)
 //!
 //! Verantwortlich für das Aggregieren der Schicht-Zeugen und die asymmetrische Signierung.
 // FILE-CONTEXT
@@ -533,8 +533,8 @@ impl DeletionProof {
     }
 }
 
-/// Erzeugt eine WAL-Löschquittung H(hmac_prev || delete_event) für den Nachweis
-/// auf WAL-Ebene gemäß DSGVO Art. 17.
+/// Erzeugt eine WAL-Auditquittung H(hmac_prev || delete_event) für den Nachweis
+/// auf WAL-Ebene für kryptografische Konsistenz.
 pub fn compute_wal_delete_receipt(
     prev_hmac: &[u8; 32],
     delete_event_payload: &[u8],

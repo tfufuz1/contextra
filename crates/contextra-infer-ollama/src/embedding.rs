@@ -211,7 +211,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_dimension_validation_mismatch_returns_index_error() {
-        use contextra_ports::TextEmbeddingEngine;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server_url = format!("http://{}", addr);
@@ -237,15 +236,15 @@ mod tests {
         let embedder =
             OllamaEmbedder::new(server_url, "nomic-embed-text").with_expected_dimension(768);
 
-        let result = TextEmbeddingEngine::embed(&embedder, "test text").await;
+        let result = EmbeddingProvider::embed(&embedder, "test text").await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
-            ContextraError::Internal(msg) => {
+            EmbeddingError::ComputationFailed(msg) => {
                 assert!(msg.contains("Ollama returned embedding of dimension 3 but expected 768"));
                 assert!(msg.contains("Model 'nomic-embed-text' may have changed"));
             }
-            _ => panic!("Expected ContextraError::Internal, got {:?}", err),
+            _ => panic!("Expected EmbeddingError::ComputationFailed, got {:?}", err),
         }
     }
 

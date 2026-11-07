@@ -13,7 +13,6 @@
 //!
 //! Verifiziert, dass alle Zeitstempel deterministisch über den injizierten Clock-Port erzeugt werden.
 
-
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
 use contextra_testkit::{InMemoryStorageEngine, ManualClock};
 use contextra_types::TxId;

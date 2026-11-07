@@ -9,7 +9,12 @@
 // INVARIANTEN: kein Inhaltsverlust, UTF-8-Grenzen, token_count <= hard_limit, exakter Span oder Synthese, Monotonie, Determinismus.
 // STAND: TS:2026-10-31T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 
 use contextra_ingest::chunking::common::token_count;
 use contextra_ingest::chunking::config::ChunkingConfig;
