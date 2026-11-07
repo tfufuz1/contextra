@@ -17,7 +17,6 @@
 //! - `contextra-engine`: Koordiniert Transaktionen, ReadSets und SSI-Validierung vor Commits.
 //! - `contextra-vector`: Führt snapshot-isolierte Vektorsuchen (`_at`) durch.
 //! - `contextra-checkpoint`: Schützt Snapshot-Zustände bei Backup-Erstellung.
-//! - `contextra-core`: Exportiert Kern-MVCC-Fähigkeiten für übergeordnete Abfrage-Pipelines.
 //!
 //! ### Wovon hängt diese Crate ab? (Ausgehende Abhängigkeiten)
 //! - `contextra-types`: Domänentypen wie `TxId`, `DocId`, `ContextraError`.

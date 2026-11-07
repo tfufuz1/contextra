@@ -1,7 +1,6 @@
 //! Observability traits and re-exports for memory lifecycle and grounding validation.
 
 // FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
 // ZWECK: Observability-Modul für Grounding-Validierung.
 // INVARIANTEN: Re-exportiert primäre Grounding Trait-Definitionen aus `lifecycle`.
 
