@@ -173,7 +173,7 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
@@ -315,7 +315,7 @@ impl DiskAnnIndex {
                         ContextraError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+                let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 

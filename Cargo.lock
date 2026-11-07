@@ -819,12 +819,9 @@ dependencies = [
  "bytes",
  "contextra-engine",
  "contextra-graph",
- "contextra-infer-candle",
  "contextra-ports",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
- "contextra-vector",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
@@ -833,18 +830,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
-]
-
-[[package]]
-name = "contextra-core"
-version = "0.1.0"
-dependencies = [
- "contextra-mvcc",
- "contextra-ports",
- "contextra-types",
- "contextra-wire",
- "proptest",
- "tokio",
 ]
 
 [[package]]
@@ -890,19 +875,15 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-cognition",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",
- "contextra-rank",
  "contextra-store",
- "contextra-sys",
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
  "criterion",
- "ed25519-dalek",
  "parking_lot 0.12.5",
  "proptest",
  "serde",
@@ -919,7 +900,9 @@ dependencies = [
 name = "contextra-durable-fs"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "contextra-sys",
+ "contextra-types",
  "tempfile",
 ]
 
@@ -941,7 +924,6 @@ dependencies = [
  "contextra-rank",
  "contextra-sandbox",
  "contextra-store",
- "contextra-sys",
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
@@ -995,8 +977,8 @@ dependencies = [
  "arc-swap",
  "bincode",
  "blake3",
+ "bytes",
  "contextra-ports",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
  "criterion",
@@ -1088,7 +1070,6 @@ dependencies = [
  "blake3",
  "calamine",
  "cfb",
- "contextra-engine",
  "contextra-types",
  "csv",
  "encoding_rs",
@@ -1190,7 +1171,6 @@ dependencies = [
  "proptest",
  "serde",
  "thiserror 2.0.20",
- "tokio",
  "tracing",
 ]
 
@@ -1237,7 +1217,7 @@ dependencies = [
 name = "contextra-py"
 version = "0.1.0"
 dependencies = [
- "contextra-db",
+ "contextra",
  "contextra-types",
  "contextra-wire",
  "flatbuffers",
@@ -1246,6 +1226,7 @@ dependencies = [
  "pyo3",
  "pythonize",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -1269,14 +1250,9 @@ name = "contextra-router"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
- "bytes",
  "contextra-adapt",
- "contextra-db",
- "contextra-graph",
  "contextra-ports",
- "contextra-text",
  "contextra-types",
- "contextra-vector",
  "contextra-wire",
  "criterion",
  "parking_lot 0.12.5",
@@ -1324,15 +1300,12 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-crypto",
- "contextra-graph",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-sandbox",
  "contextra-store",
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
- "contextra-vector",
  "crc32fast",
  "criterion",
  "futures",
@@ -1353,7 +1326,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1424,7 +1396,6 @@ dependencies = [
  "ahash",
  "bincode",
  "blake3",
- "contextra-crypto",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-simd",

@@ -1,7 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: WASI fd_read and fd_write implementations
-
 use super::{OutputLimitExceededError, ERRNO_BADF, ERRNO_INVAL, ERRNO_SUCCESS};
 use crate::executor::SandboxState;
 use wasmtime::{Caller, Linker};

@@ -13,9 +13,12 @@
 pub mod approval;
 pub mod capabilities;
 pub mod error;
+#[cfg(feature = "wasm")]
 pub mod executor;
+#[cfg(feature = "wasm")]
 pub mod merge;
 pub mod output;
+#[cfg(feature = "wasm")]
 pub mod wasi;
 
 pub use approval::{
@@ -23,6 +26,8 @@ pub use approval::{
 };
 pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
 pub use error::SandboxError;
+#[cfg(feature = "wasm")]
 pub use executor::WasmExecutor;
+#[cfg(feature = "wasm")]
 pub use merge::WasmMergeFunction;
 pub use output::WasmOutput;

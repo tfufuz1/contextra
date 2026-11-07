@@ -1,3 +1,19 @@
+## [Paket B31] - 2026-11-07
+
+### Removed
+- `contextra-core`: Veraltete Strangler-Fassade (Ring 0, deprecated) vollständig dekommissioniert und gelöscht.
+- Alle Verweise und Abhängigkeiten in `Cargo.toml`, `capabilities.toml`, `deny.toml` und `tests/layering.rs` entfernt.
+
+### Changed
+- `benchmarks/contextra-bench`: Importe von `contextra_core` vollständig auf `contextra_types` und `contextra_ports` umgestellt.
+- `contextra-db/fuzz` und `contextra-store/fuzz`: Ungenutzte Abhängigkeit auf `contextra-core` entfernt.
+
+### Migration Guide
+- Ersetze `use contextra_core::{ContextraError, Result, DocId, TxId, DistanceMetric}` durch `use contextra_types::{...}`.
+- Ersetze `use contextra_core::traits::{StorageEngine, VectorIndex, ...}` durch `use contextra_ports::{...}`.
+- Ersetze `use contextra_core::tx_buffer::{TxBuffer, IndexOp}` und `snapshot::{...}` durch `use contextra_mvcc::{...}`.
+- Ersetze `use contextra_core::ipc::{...}` durch `use contextra_wire::{...}`.
+
 ## [4.1] - 2026-10-31
 
 ### Changed

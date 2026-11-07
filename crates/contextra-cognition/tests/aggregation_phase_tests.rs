@@ -32,7 +32,7 @@ impl LlmTextGenerator for TestMockLlm {
 }
 
 struct TestMockSink {
-    tombstones: Vec<HyperEdgeId>,
+    invalidations: Vec<HyperEdgeId>,
     super_edges: Vec<SuperEdgeDraft>,
     committed: bool,
 }
@@ -40,7 +40,7 @@ struct TestMockSink {
 impl TestMockSink {
     fn new() -> Self {
         Self {
-            tombstones: Vec::new(),
+            invalidations: Vec::new(),
             super_edges: Vec::new(),
             committed: false,
         }
@@ -48,8 +48,8 @@ impl TestMockSink {
 }
 
 impl SuperEdgeSink for TestMockSink {
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()> {
-        self.tombstones.push(id);
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()> {
+        self.invalidations.push(id);
         Ok(())
     }
 
@@ -76,7 +76,7 @@ async fn test_empty_input_behavior() {
         .await
         .expect("empty run_aggregation_pass must succeed");
 
-    assert_eq!(res.raw_edges_tombstoned, 0);
+    assert_eq!(res.raw_edges_invalidated, 0);
     assert_eq!(res.abstract_hyperedges_created, 0);
     assert_eq!(res.peak_memory_used_mb, 0);
     assert_eq!(res.child_edge_ids_written, 0);
@@ -104,7 +104,7 @@ async fn test_single_node_element_behavior() {
         .await
         .expect("single node run_aggregation_pass must succeed");
 
-    assert_eq!(res.raw_edges_tombstoned, 0);
+    assert_eq!(res.raw_edges_invalidated, 0);
     assert_eq!(res.abstract_hyperedges_created, 0);
     assert_eq!(alphas.len(), 1);
     assert_eq!(alphas[0].members, vec![EntityId::new(42)]);
@@ -267,7 +267,7 @@ async fn test_identical_input_and_seed_yields_identical_output() {
 
     assert_eq!(res1, res2);
     assert_eq!(alphas1, alphas2);
-    assert_eq!(sink1.tombstones, sink2.tombstones);
+    assert_eq!(sink1.invalidations, sink2.invalidations);
     assert_eq!(sink1.super_edges, sink2.super_edges);
 }
 
@@ -356,7 +356,7 @@ async fn test_permutation_invariance_of_nodes_and_edges() {
     // Permutation invariance due to canonical input sorting by entity and edge ID
     assert_eq!(res1, res2);
     assert_eq!(alphas1, alphas2);
-    assert_eq!(sink1.tombstones, sink2.tombstones);
+    assert_eq!(sink1.invalidations, sink2.invalidations);
     assert_eq!(sink1.super_edges, sink2.super_edges);
 }
 

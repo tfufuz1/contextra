@@ -42,7 +42,7 @@ spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-agent --locked"
 
 [crates.contextra-audit-export]
-ring = 'Ring 0'
+ring = 'Extension'
 maturity = 'experimental'
 description = 'Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export'
 capabilities = ['gdpr-art30-export']
@@ -54,7 +54,7 @@ spec = ['16']
 test = "cargo test -p contextra-audit-export --locked"
 
 [crates.contextra-avv-generator]
-ring = 'Ring 0'
+ring = 'Extension'
 maturity = 'experimental'
 description = 'AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO'
 capabilities = ['avv-generation']
@@ -89,17 +89,6 @@ ci_class = 'pr'
 spec = ['A2', 'A4', '0', '4', '17', '21']
 test = "cargo test -p contextra-cognition --locked"
 
-[crates.contextra-core]
-ring = 'Ring 0'
-maturity = 'deprecated'
-description = 'Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer'
-capabilities = ['tombstone-semantics', 'tx-buffer']
-path = "crates/contextra-core"
-unsafe_island = false
-may_depend_on = ['contextra-mvcc', 'contextra-ports', 'contextra-types', 'contextra-wire']
-ci_class = 'pr'
-spec = ['A2', 'A3', '0', '4', '13', '20']
-test = "cargo test -p contextra-core --locked"
 
 [crates.contextra-durable-fs]
 ring = 'Ring 0'
@@ -288,7 +277,7 @@ description = 'PyO3 Python Bindings'
 capabilities = ['python-bindings', 'ffi-safe']
 path = "crates/contextra-py"
 unsafe_island = false
-may_depend_on = ['contextra-adapt', 'contextra-core', 'contextra-db', 'contextra-mvcc', 'contextra-ports', 'contextra-rank', 'contextra-router', 'contextra-store', 'contextra-types', 'contextra-wire']
+may_depend_on = ['contextra-adapt', 'contextra-db', 'contextra-mvcc', 'contextra-ports', 'contextra-rank', 'contextra-router', 'contextra-store', 'contextra-types', 'contextra-wire']
 ci_class = 'pr-check-only'
 spec = ['A2', '0', '4', '9', '17', '18', '19', '20']
 test = "cargo test -p contextra-py --locked"

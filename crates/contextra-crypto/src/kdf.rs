@@ -311,7 +311,9 @@ pub fn derive_key_argon2id(passphrase: &str, header: &KdfHeader) -> Result<Deriv
 pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<()> {
     use hkdf::Hkdf;
     use sha2::Sha256;
-    let hk = Hkdf::<Sha256>::from_prk(prk).map_err(|_| CryptoError::Crypto("hkdf from_prk failed".into()))?;
-    hk.expand(info, out).map_err(|_| CryptoError::Crypto("hkdf expand failed".into()))?;
+    let hk = Hkdf::<Sha256>::from_prk(prk)
+        .map_err(|_| CryptoError::Crypto("hkdf from_prk failed".into()))?;
+    hk.expand(info, out)
+        .map_err(|_| CryptoError::Crypto("hkdf expand failed".into()))?;
     Ok(())
 }

@@ -253,6 +253,7 @@ impl DocId {
 
     /// Returns the lower 64 bits of the identifier for backwards compatibility.
     #[inline]
+    #[allow(clippy::cast_possible_truncation)]
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
     }

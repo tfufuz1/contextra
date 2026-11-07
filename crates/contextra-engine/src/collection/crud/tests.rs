@@ -373,3 +373,67 @@ async fn test_insert_does_not_block_on_collection_wide_lock() {
     assert!(res.unwrap().unwrap().is_ok());
     drop(guard_key_1);
 }
+
+/// SPEC: T-CONC-1
+#[tokio::test]
+async fn test_delete_retains_lock_until_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = crate::Contextra::open_with_config(
+        dir.path(),
+        crate::ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let col = Arc::new(db.collection("delete_lock_test").await.unwrap());
+
+    // Insert initial document
+    col.insert("doc_del_1", &[1.0, 0.0, 0.0, 0.0], None)
+        .await
+        .unwrap();
+
+    // Verify delete successfully acquires and releases the key lock
+    col.delete("doc_del_1").await.unwrap();
+
+    // Lock must be free now
+    let guard = col.kv_locks.try_lock_for("doc_del_1");
+    assert!(
+        guard.is_some(),
+        "Key lock must be freed after delete commit"
+    );
+}
+
+/// SPEC: T-CONC-1
+#[tokio::test]
+async fn test_update_retains_lock_until_commit() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = crate::Contextra::open_with_config(
+        dir.path(),
+        crate::ContextraConfig {
+            dimension: 4,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let col = Arc::new(db.collection("update_lock_test").await.unwrap());
+
+    // Insert initial document
+    col.insert("doc_upd_1", &[1.0, 0.0, 0.0, 0.0], None)
+        .await
+        .unwrap();
+
+    // Verify update successfully acquires and releases the key lock
+    col.update("doc_upd_1", &[0.0, 1.0, 0.0, 0.0], None)
+        .await
+        .unwrap();
+
+    // Lock must be free now
+    let guard = col.kv_locks.try_lock_for("doc_upd_1");
+    assert!(
+        guard.is_some(),
+        "Key lock must be freed after update commit"
+    );
+}

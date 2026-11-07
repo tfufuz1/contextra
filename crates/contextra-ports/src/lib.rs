@@ -18,7 +18,15 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use contextra_types::*;
+/// Re-export canonical `contextra-types` submodules explicitly per Contract M3 / AR-10.
+pub use contextra_types::{
+    error, ids, model_fingerprint, refs, tenant_scope, types, witness,
+    CollectionRef, ConfigFingerprint, ContextChunk, ContextraError, DocId, DocKey,
+    EntityId, ErasureId, FileId, GateId, ModelFingerprint, OperatorRef, QueryRewriteOutput,
+    RequestContext, RerankResult, Result, RetrievalStrategy, SagaRecord, ScanMethod,
+    ScoredEntry, Seq, StoreId, SubjectRef, TenantId, TenantRef, TenantScopeViolation,
+    TenantScoped, Timestamp, ContextWindow, ResourceBudget, ResourceTracker, TokenBudget, TxId, WorkflowState, MAX_REF_LEN,
+};
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -72,6 +80,19 @@ pub mod text_index;
 pub mod vector_index;
 /// Virtual File System (VFS) port interface and contracts.
 pub mod vfs;
+
+/// Environment abstractions (Clock, Rng, IdGen, MetricsSink) with sub-prelude.
+pub mod env;
+/// Filesystem abstractions (Vfs, VfsFile) with sub-prelude.
+pub mod fs;
+/// Indexing subsystem abstractions (VectorIndex, TextIndex, GraphIndex) with sub-prelude.
+pub mod index;
+/// Inference subsystem abstractions (Embedding, Reranker, QueryRewriter) with sub-prelude.
+pub mod inference;
+/// Policy subsystem abstractions (LicenseGate, EgressPolicy) with sub-prelude.
+pub mod policy;
+/// Legacy erasure ports isolated under Decision D-E1 prior to relocation to `contextra-erasure-spi`.
+pub mod erasure_legacy;
 
 pub use attention::*;
 pub use checkpoint::*;
@@ -130,6 +151,7 @@ mod dyn_safety {
     fn _assert_dyn_layer_scanner(_: Option<&dyn LayerScanner>) {}
     fn _assert_dyn_purger(_: Option<&dyn Purger>) {}
     fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
+    fn _assert_dyn_egress_policy(_: Option<&dyn crate::policy::EgressPolicy>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -150,6 +172,7 @@ mod dyn_safety {
         _assert_dyn_layer_scanner(None);
         _assert_dyn_purger(None);
         _assert_dyn_vfs(None);
+        _assert_dyn_egress_policy(None);
     }
 }
 

@@ -14,12 +14,12 @@
 //! - **Priorisierung:** Gepinnte Chunks (`is_pinned`) werden bevorzugt behalten,
 //!   Tool-Outputs zuerst kompaktiert.
 
-use contextra_engine::collection::Collection;
-use contextra_engine::ProvenanceRecord;
-use contextra_ports::{
+use crate::engine_local::collection::Collection;
+use crate::engine_local::ProvenanceRecord;
+use crate::ports_local::{
     ContextSegment, LlmTextGenerator, Rng, SeededRng, StorageEngine, VectorIndex,
 };
-use contextra_types::{ContextChunk, DocId, Result, TenantId, TokenBudget};
+use crate::types_local::{ContextChunk, DocId, Result, TenantId, TokenBudget};
 use std::sync::Arc;
 
 use super::session::ConsolidationSession;

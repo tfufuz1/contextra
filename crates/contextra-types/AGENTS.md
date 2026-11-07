@@ -76,3 +76,77 @@ cargo clippy -p contextra-types --all-targets -- -D warnings
 | 2.2 / 3.9 | Doppelte Löschtypen (`EraseTarget`, `LayerId`) mit `ports` vereinen; Löschdomäne aus `types/erasure.rs` nach `contextra-erasure` verlagern, Port-Typen in `ports` belassen |
 | 4.5 | `Language` aus `contextra-text` hierher verlagern (PLAN) |
 | 5.5 | Typen, die heute über `contextra-core` re-exportiert werden, direkt hier beziehen (DEBT-03) |
+
+
+---
+
+
+# Kommentar-Syntax (verbindlich)
+
+| Form | Zweck |
+|---|---|
+| `//!` | Modul-/Crate-Doku am Dateianfang (vor jedem Item, nach `#![...]`-Attributen der Datei; nie mitten in der Datei) |
+| `///` | Rustdoc für das **direkt folgende** Item (Struct, Enum, Variante, Feld, Trait, Methode, Funktion, Konstante). Nie vor `let`, Ausdrücken, Match-Armen oder Makroaufrufen; dort `//` verwenden. |
+| `// NOTE:` | Warum etwas so gebaut ist (nicht was) |
+| `// TODO:` / `// FIXME:` / `// STUB:` | Offene Arbeit / bekanntes Risiko / Platzhalter; immer mit konkreter Aussage |
+| `// SAFETY:` | Pflicht direkt über jedem unsafe-Konstrukt (Invariante, Herstellungsort, Folge bei Verletzung) |
+| `// ANCHOR[contextra-types:<BEREICH>-<NNN>]` | Sprungmarke; vor dem Item/Abschnitt, auf den sie zeigt |
+| `// FILE-CONTEXT` + `// ZWECK:` / `// INVARIANTEN:` / `// HOTSPOTS: <von>-<bis>` / `// STAND: <Datum>` | Repo-Konvention für den Dateikopf. Vorhandene Blöcke ergänzen; `HOTSPOTS`-Zeilenbereiche nach dem Kommentieren auf die neuen Zeilennummern aktualisieren. `STAND` auf das heutige Datum setzen, wenn du den Block änderst. |
+
+Weitere Tags führst du nicht ein. Beim Kommentieren markierter Altlasten gilt: `// NOTE: Deprecated Debt DEBT-NN – <Beschreibung>`.
+
+## ANCHOR-Ids (Kollisionsschutz)
+
+Im Repo existieren ca. 3.900 Anchors; Ids sind workspace-weit eindeutig zu halten. Format: `ANCHOR[contextra-types:<BEREICH>-<NNN>]` mit `<BEREICH>` in Großbuchstaben/Ziffern/Bindestrichen, `<NNN>` dreistellig. Vorgehen:
+
+1. Vor jeder neuen Id: `grep -rnF "ANCHOR[contextra-types:<BEREICH>-<NNN>]" crates benchmarks` muss leer sein.
+2. Nummeriere ab dem Maximum des Bereichs weiter. Höchste bestehende Nummern in dieser Crate:
+
+| Bereich | Höchste Nr. | Nächste freie Id |
+|---|---:|---|
+| `ID-DOC` | 128 | `ANCHOR[contextra-types:ID-DOC-129]` |
+| `SCHEMA` | 8 | `ANCHOR[contextra-types:SCHEMA-009]` |
+| `SCOPE` | 6 | `ANCHOR[contextra-types:SCOPE-007]` |
+| `ERR` | 5 | `ANCHOR[contextra-types:ERR-006]` |
+| `WITNESS` | 5 | `ANCHOR[contextra-types:WITNESS-006]` |
+| `TOMB` | 4 | `ANCHOR[contextra-types:TOMB-005]` |
+| `WIT` | 3 | `ANCHOR[contextra-types:WIT-004]` |
+| `DTO` | 2 | `ANCHOR[contextra-types:DTO-003]` |
+| `FINGERPRINT` | 2 | `ANCHOR[contextra-types:FINGERPRINT-003]` |
+| `RETRIEVAL` | 2 | `ANCHOR[contextra-types:RETRIEVAL-003]` |
+| `SCH` | 2 | `ANCHOR[contextra-types:SCH-003]` |
+| `TS` | 2 | `ANCHOR[contextra-types:TS-003]` |
+
+3. Neue Bereiche nach dem Modul benennen (z. B. `WAL`, `PUT`, `GATE`); fange bei `001` an, nach Prüfung 1. Setze Anchors sparsam: pro Modul, pro öffentlichem Einstiegspunkt und pro nicht-trivialem Ablauf, nicht pro Zeile.
+4. Bereits vorhandene doppelte Ids anderer Stellen nicht „reparieren“; nur im Report melden.
+
+Für Abläufe in Funktionen nutze nummerierte Schritte:
+
+```rust
+// ANCHOR[contextra-types:PUT-001]
+// Ablauf von `put`:
+// 1. Eingabe prüfen (Länge, Schlüsselformat).
+// 2. Snapshot der Transaktion nehmen.
+// 3. Eintrag ins WAL schreiben und mit fsync bestätigen; ein Fehler wird zurückgegeben (Fail-Closed).
+// 4. Erst danach im Speicher übernehmen.
+```
+
+# Was zu dokumentieren ist
+
+Gehe **jede** Rust-Datei unter `crates/contextra-types` durch (`find crates/contextra-types -name "*.rs"`, ohne die generierten Dateien oben) einschließlich `tests/`, `benches/`, `examples/` und `build.rs`:
+
+- **Modul** (`//!`): Zweck, Ring-Zugehörigkeit, Nutzer, wichtigste Typen, Invarianten, Verweis auf Nachbarmodule.
+- **Öffentliche Items:** Zweck in einem Satz, dann bei Bedarf `# Errors` (welcher Fehler wann), `# Panics` nur wenn der Code abbrechen kann (sollte nach Zero-Panic-Regel nicht vorkommen: dann `FIXME`), `# Safety` bei `unsafe fn`, Vorbedingungen, Nachbedingungen, Nebenwirkungen (I/O, Zeit, Zufall, IDs). Zeit, Zufall und IDs laufen nur über `Clock`/`Rng`/`IdGen`; steht es im Code, steht es im Kommentar.
+- **Nicht-triviale private Funktionen:** Warum sie existieren und was sie garantieren.
+- **Nebenläufigkeit:** Sperren, atomare Operationen, Reihenfolge, Warum kein Deadlock.
+- **Persistenz und Fehler:** Wo Daten WAL oder Dateisystem-Port passieren; `fsync`-Fehler werden propagiert.
+- **Tests:** Ein Satz je Testfunktion oder -block: welche Invariante oder welches Verhalten bewiesen wird.
+- **Architektur:** Welche Ports die Crate nutzt/anbietet, welche Abhängigkeitsrichtung gilt (DAG, `may_depend_on`), was bewusst *nicht* hier liegt.
+
+## Rustdoc-Fallen (jeder Punkt bricht sonst `cargo clippy -D warnings` oder `cargo doc`)
+
+- Kein `///` vor Nicht-Items (`unused_doc_comments`); keine Leerzeile zwischen `///` und Item (`empty_line_after_doc_comments`).
+- Fortsetzungszeilen in Listen und Zitaten korrekt einrücken (`doc_lazy_continuation`). **Vier Leerzeichen Einrückung in Doc-Text erzeugen einen Doctest**; Code immer in Fences mit Sprache. Beispiele, die nicht kompilieren oder laufen sollen: `ignore` oder `text`, begründet.
+- Intra-Doc-Links `[`Typ`]` nur auf existierende, erreichbare Items; spitze Klammern im Text (`Vec<u8>`) in Backticks setzen, sonst „unclosed HTML tag“.
+- `// SAFETY:` ohne Leerzeile und ohne dazwischenliegende Zeilen direkt über dem unsafe-Ausdruck.
+- Doc-Beispiele müssen gegen die tatsächliche Signatur kompilieren; im Zweifel `no_run`/`ignore` mit Grund.

@@ -36,7 +36,4 @@ edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "c
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
-contextra-infer-candle = { workspace = true }
 contextra-testkit = { workspace = true }
-contextra-store = { workspace = true }
-contextra-vector = { workspace = true }

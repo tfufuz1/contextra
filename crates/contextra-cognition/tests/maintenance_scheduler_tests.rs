@@ -18,9 +18,9 @@ use contextra_cognition::memory_consolidation::ConsolidationConfig;
 use contextra_engine::collection::Collection;
 use contextra_graph::CsrGraph;
 use contextra_ports::StorageEngine;
-use contextra_store::LsmStorage;
 use contextra_testkit::ManualClock;
-use contextra_vector::HnswIndex;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
+
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,23 +28,10 @@ use tempfile::tempdir;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 
-async fn create_test_collection() -> Arc<Collection<LsmStorage, HnswIndex>> {
+async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>> {
     let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new());
     Arc::new(Collection::new(
         "test-scheduler".to_string(),
         storage,
