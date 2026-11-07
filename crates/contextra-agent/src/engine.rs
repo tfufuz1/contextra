@@ -17,7 +17,6 @@ use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
 use contextra_ports::{Clock, StorageEngine, SystemClock};
-use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, Result};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -48,7 +47,7 @@ pub struct OrchestratorEngine {
 
 impl OrchestratorEngine {
     /// Attempts to construct a new [`OrchestratorEngine`], returning an error if checkpoint store initialization fails.
-    pub fn try_new(storage: Arc<LsmStorage>) -> Result<Self> {
+    pub fn try_new<S: StorageEngine>(storage: Arc<S>) -> Result<Self> {
         let checkpoint_store = PersistentCheckpointStore::new(storage.clone(), "agent")?;
         Ok(Self {
             registry: crate::tools::ToolRegistry::new(),
@@ -79,48 +78,7 @@ impl OrchestratorEngine {
 
     /// Constructs a new [`OrchestratorEngine`] from LSM storage (legacy constructor).
     #[deprecated(note = "Use try_new instead to handle initialization errors without panicking")]
-    pub fn new(storage: Arc<LsmStorage>) -> Self {
-        struct FallbackRegistry;
-        impl CheckpointRegistry for FallbackRegistry {
-            fn save_checkpoint<'a>(
-                &'a self,
-                _meta: CheckpointMeta,
-            ) -> contextra_ports::BoxFuture<'a, Result<()>> {
-                Box::pin(async move { Ok(()) })
-            }
-            fn load_checkpoint<'a>(
-                &'a self,
-                _seq_no: u64,
-            ) -> contextra_ports::BoxFuture<'a, Result<Option<CheckpointMeta>>> {
-                Box::pin(async move { Ok(None) })
-            }
-            fn list_checkpoints<'a>(
-                &'a self,
-            ) -> contextra_ports::BoxFuture<'a, Result<Vec<CheckpointMeta>>> {
-                Box::pin(async move { Ok(Vec::new()) })
-            }
-        }
-        impl contextra_ports::Checkpoint for FallbackRegistry {
-            fn take_snapshot<'a>(
-                &'a self,
-                tx: contextra_types::TxId,
-            ) -> contextra_ports::BoxFuture<'a, Result<contextra_types::WorkflowState>>
-            {
-                Box::pin(async move {
-                    Ok(contextra_types::WorkflowState {
-                        tx,
-                        graph_hash: [0u8; 32],
-                    })
-                })
-            }
-            fn restore<'a>(
-                &'a self,
-                _state: &'a contextra_types::WorkflowState,
-            ) -> contextra_ports::BoxFuture<'a, Result<()>> {
-                Box::pin(async move { Ok(()) })
-            }
-        }
-
+    pub fn new<S: StorageEngine>(storage: Arc<S>) -> Self {
         Self::try_new(storage.clone()).unwrap_or_else(|e| {
             tracing::error!("Failed to initialize OrchestratorEngine: {}", e);
             Self {
@@ -432,7 +390,7 @@ impl OrchestratorEngine {
                 tracing::info!(
                     task_id = %ctx.task_id,
                     completed_subgoal = checkpoint.completed_subgoal_index,
-                    chunks_purged = checkpoint.purge_receipt.chunks_purged,
+                    chunks_purged = checkpoint.reset_receipt.chunks_purged,
                     "CLM Scratchpad checkpointed and reset on goal condition match"
                 );
                 ctx.latest_scratchpad_checkpoint = Some(checkpoint);
@@ -836,3 +794,57 @@ pub use condition::evaluate_condition_expr;
 
 #[cfg(test)]
 mod tests;
+
+struct FallbackRegistry;
+
+impl CheckpointRegistry for FallbackRegistry {
+    fn save_checkpoint<'a>(
+        &'a self,
+        _meta: CheckpointMeta,
+    ) -> contextra_ports::BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+    fn load_checkpoint<'a>(
+        &'a self,
+        _seq_no: u64,
+    ) -> contextra_ports::BoxFuture<'a, Result<Option<CheckpointMeta>>> {
+        Box::pin(async move { Ok(None) })
+    }
+    fn list_checkpoints<'a>(
+        &'a self,
+    ) -> contextra_ports::BoxFuture<'a, Result<Vec<CheckpointMeta>>> {
+        Box::pin(async move { Ok(Vec::new()) })
+    }
+}
+
+impl contextra_ports::Checkpoint for FallbackRegistry {
+    fn take_snapshot<'a>(
+        &'a self,
+        tx: contextra_types::TxId,
+    ) -> contextra_ports::BoxFuture<'a, Result<contextra_types::WorkflowState>> {
+        Box::pin(async move {
+            Ok(contextra_types::WorkflowState {
+                tx,
+                graph_hash: [0u8; 32],
+            })
+        })
+    }
+    fn restore<'a>(
+        &'a self,
+        _state: &'a contextra_types::WorkflowState,
+    ) -> contextra_ports::BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
+    }
+}
+
+#[cfg(test)]
+mod fallback_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_fallback_registry_methods() {
+        let fallback = FallbackRegistry;
+        let _ = fallback.load_checkpoint(0).await;
+        let _ = fallback.take_snapshot(contextra_types::TxId::new(1)).await;
+    }
+}
