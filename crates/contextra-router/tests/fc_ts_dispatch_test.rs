@@ -1,3 +1,9 @@
+#![allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic
+)]
 //! # Integrationstest: Flow-Corrected Thompson Sampling Dispatch
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

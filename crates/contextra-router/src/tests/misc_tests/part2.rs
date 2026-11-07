@@ -16,7 +16,7 @@
 )]
 use super::super::fixtures::*;
 use crate::{DecisionId, DecisionIdGenerator, RoutingOutcome, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
+
 use contextra_types::TokenBudget;
 use serde_json::json;
 use std::sync::Arc;

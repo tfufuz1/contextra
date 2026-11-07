@@ -1,3 +1,8 @@
+#![allow(
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 //! # Integrationstest: Monotonie des kumulativen Regrets beim Bandit-Lernen
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

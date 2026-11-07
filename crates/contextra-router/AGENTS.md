@@ -1,7 +1,7 @@
 # AGENTS.md — `contextra-router`
 
 > **Ring 3** · Klasse Rand `[R]` (SPEC-Katalog: Archiv, Root-§10 K5) · Reifegrad `stable` · Unsafe: nein · Rolle: Adaptives Query-/Modell-Routing (Bandits, Conformal Calibration, Dispatch).
-> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, verifiziert und entkoppelt; Zahlen sind am Code validiert.
 
 ## 1. Baukasten-Profil
 
@@ -15,49 +15,53 @@
 
 ## 2. Abhängigkeiten & Schulden
 
-- Normalkanten = Soll. `capabilities.toml` nennt zusätzlich `privacy` (nicht in Cargo). Dev-Kanten `db`, `graph`, `text`, `vector` (M6).
-- Egress soll über den Port `EgressPolicy` laufen (WP 2.4), nicht über eine Bindung an `privacy`.
+- **Baukasten-Vertrag (M1, M6):** Dev-Kanten auf `db`, `graph`, `text`, `vector` wurden vollständig entfernt. Alle Tests und Benchmarks laufen autark über injizierte Mock-Provider.
+- Normalkanten = Soll (`ports`, `types`, `wire`, `adapt`).
+- Egress-Entscheidungen laufen über den Port `EgressPolicy`, ohne Bindung an `privacy`.
 
 ## 3. Modul-Karte (am Code verifiziert)
 
 | Pfad | Verantwortung |
 |---|---|
-| `router/` (`dispatch_core`, `lifecycle`, `outcomes`) | `RouterEngine` |
-| `profile.rs`, `arm_registry.rs`, `routing_strategy.rs` | Profile, Arme, Strategien |
-| `dispatch.rs`, `fc_ts_dispatch.rs`, `transport.rs`, `outcome.rs` | Dispatch, Transport, Ergebnisse |
+| `router/` (`dispatch_core`, `lifecycle`, `outcomes`) | `RouterEngine`, Lebenszyklus, Conformal Calibration, Drift-Watcher |
+| `profile.rs`, `arm_registry.rs`, `routing_strategy.rs` | Modellprofile, Arm-Mapping, Kaskaden- & Bandit-Strategien |
+| `dispatch.rs`, `fc_ts_dispatch.rs`, `transport.rs`, `outcome.rs` | JSON-RPC Dispatch, Flow-Corrected Thompson Sampling, Transport, Outcomes |
 
 ## 4. Verträge & Invarianten
 
 1. Ein Modell wird nie gewählt, dessen Kontextgrenze das Fenster überschreitet; sonst vorher kompaktieren.
-2. Kalibrierung wird nach jeder Interaktion aktualisiert (Conformal).
-3. Zufall nur über `Rng`, Zeit über `Clock`; Entscheidungen sind reproduzierbar (`id_gen_determinism_test`).
+2. Kalibrierung wird nach jeder Interaktion aktualisiert (Conformal Prediction).
+3. Zufall nur über `Rng`, Zeit über `Clock`, Persistenz über `Vfs`; Entscheidungen sind deterministisch reproduzierbar (`id_gen_determinism_test`).
 4. Cloud-Egress ist standardmäßig aus und budgetiert (INV-EGRESS-BUDGET-1).
 
 ## 5. Ports
 
-Konsumiert `Clock`, `Rng`, `IdGen`, `EgressPolicy` (Soll).
+- **Konsumiert:** `Clock`, `Rng`, `Vfs`, `HybridSearchProvider`, `CommunityResolver`, `ContextPreparer`, `EgressPolicy` (Soll).
+- **Implementiert:** `LocalDriftStatusProvider`.
 
 ## 6. Nebenläufigkeit & Performance
 
-- Profile/Statistiken hinter kurzem `parking_lot::RwLock`; Updates synchron und kurz.
+- Profile und Statistiken hinter kurzem `parking_lot::RwLock` bzw. atomarem `ArcSwap`; Hot-Reloads sind unterbrechungsfrei (Lock-Free Read).
 
 ## 7. Anti-Patterns
 
 - SLM ohne Profil aufrufen.
 - Dispatch ohne Egress-Prüfung.
+- Uninjizierte `std::fs`-Aufrufe in Kernlogik.
 
 ## 8. Tests & Messung
 
 ```bash
 cargo test -p contextra-router --locked
 cargo clippy -p contextra-router --all-targets -- -D warnings
+cargo run --example simple_router -p contextra-router
 ```
-
-- 7 Testdateien; Regret-Tests für Bandits.
 
 ## 9. Offene Arbeit
 
-| WP | Inhalt |
-|---|---|
-| 2.4 | `EgressPolicy` einführen und nutzen |
-| M6 | Dev-Kanten entfernen |
+| WP | Inhalt | Status |
+|---|---|---|
+| M6 | Dev-Kanten (db, graph, text, vector) entfernen | Erledigt |
+| M4 | Vfs-Injektion für persistierte Kalibrierung | Erledigt |
+| M10 | Eigenständiges Beispiel unter `examples/simple_router.rs` | Erledigt |
+| 2.4 | Port `EgressPolicy` in `ports` konsolidieren | Folgepaket B2 |

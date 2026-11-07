@@ -2,6 +2,16 @@
 //! Prüft die Regret-Bounds von LinUCB gegenüber einer statischen Kaskaden-Baseline.
 
 #![cfg(all(test, feature = "bandit-routing"))]
+#![allow(
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic
+)]
+
 
 use crate::bandit::{BanditImplementation, BanditProfileState};
 
