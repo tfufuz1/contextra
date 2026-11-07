@@ -49,9 +49,7 @@ pub mod fsmeta {
 
 /// Baukasten-Zielmodul `map`: Sichere Speicherabbildung (INV-IO-1 / INV-ENCRYPT-REST-2).
 pub mod map {
-    pub use crate::mmap::{
-        mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed,
-    };
+    pub use crate::mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
 }
 
 // ANCHOR[contextra-sys:LIB-REEXPORT-001]

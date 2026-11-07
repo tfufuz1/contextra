@@ -5,7 +5,12 @@
 
 #![allow(
     clippy::type_complexity,
-    clippy::cast_sign_loss,clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    dead_code
+)]
 
 use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
 use contextra_router::{RouterEngine, SlmProfile};
@@ -53,7 +58,11 @@ impl HybridSearchProvider for BenchAdapter {
                 .map(|(key, vec, text, _comm_id)| {
                     let mut score = 0.0f32;
                     if !query_embedding.is_empty() && query_embedding.len() == vec.len() {
-                        let dot: f32 = query_embedding.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
+                        let dot: f32 = query_embedding
+                            .iter()
+                            .zip(vec.iter())
+                            .map(|(a, b)| a * b)
+                            .sum();
                         score += dot.clamp(0.0, 1.0);
                     }
                     if !query_text.is_empty() && text.contains(query_text) {
@@ -83,10 +92,7 @@ impl HybridSearchProvider for BenchAdapter {
 }
 
 impl CommunityResolver for BenchAdapter {
-    fn get_community<'a>(
-        &'a self,
-        entity_id: EntityId,
-    ) -> BoxFuture<'a, Result<Option<u64>>> {
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
         let comm_id = (entity_id.inner() % 5) + 1;
         Box::pin(async move { Ok(Some(comm_id)) })
     }

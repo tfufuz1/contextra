@@ -21,7 +21,10 @@ struct InMemoryFile {
 
 impl VfsFile for InMemoryFile {
     fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        let files = self.files.lock().map_err(|_| std::io::Error::other("lock"))?;
+        let files = self
+            .files
+            .lock()
+            .map_err(|_| std::io::Error::other("lock"))?;
         let data = files.get(&self.path).cloned().unwrap_or_default();
         let off = usize::try_from(offset).map_err(|e| std::io::Error::other(e.to_string()))?;
         if off >= data.len() {
@@ -34,7 +37,10 @@ impl VfsFile for InMemoryFile {
     }
 
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
-        let mut files = self.files.lock().map_err(|_| std::io::Error::other("lock"))?;
+        let mut files = self
+            .files
+            .lock()
+            .map_err(|_| std::io::Error::other("lock"))?;
         let entry = files.entry(self.path.clone()).or_default();
         let off = usize::try_from(offset).map_err(|e| std::io::Error::other(e.to_string()))?;
         if off + buf.len() > entry.len() {
@@ -45,7 +51,10 @@ impl VfsFile for InMemoryFile {
     }
 
     fn set_len(&self, len: u64) -> std::io::Result<()> {
-        let mut files = self.files.lock().map_err(|_| std::io::Error::other("lock"))?;
+        let mut files = self
+            .files
+            .lock()
+            .map_err(|_| std::io::Error::other("lock"))?;
         let entry = files.entry(self.path.clone()).or_default();
         let target_len = usize::try_from(len).map_err(|e| std::io::Error::other(e.to_string()))?;
         entry.resize(target_len, 0);
@@ -53,7 +62,10 @@ impl VfsFile for InMemoryFile {
     }
 
     fn len(&self) -> std::io::Result<u64> {
-        let files = self.files.lock().map_err(|_| std::io::Error::other("lock"))?;
+        let files = self
+            .files
+            .lock()
+            .map_err(|_| std::io::Error::other("lock"))?;
         let len = files.get(&self.path).map(|v| v.len()).unwrap_or(0);
         Ok(u64::try_from(len).map_err(|e| std::io::Error::other(e.to_string()))?)
     }
@@ -69,12 +81,23 @@ impl VfsFile for InMemoryFile {
 
 impl Vfs for InMemoryVfs {
     fn read(&self, path: &Path) -> Result<Vec<u8>, ContextraError> {
-        let files = self.files.lock().map_err(|_| ContextraError::Internal("lock failed".into()))?;
-        files.get(path).cloned().ok_or_else(|| ContextraError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "file not found")))
+        let files = self
+            .files
+            .lock()
+            .map_err(|_| ContextraError::Internal("lock failed".into()))?;
+        files.get(path).cloned().ok_or_else(|| {
+            ContextraError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "file not found",
+            ))
+        })
     }
 
     fn write_atomic(&self, path: &Path, content: &[u8]) -> Result<(), ContextraError> {
-        let mut files = self.files.lock().map_err(|_| ContextraError::Internal("lock failed".into()))?;
+        let mut files = self
+            .files
+            .lock()
+            .map_err(|_| ContextraError::Internal("lock failed".into()))?;
         files.insert(path.to_path_buf(), content.to_vec());
         Ok(())
     }
@@ -84,26 +107,39 @@ impl Vfs for InMemoryVfs {
     }
 
     fn remove_file(&self, path: &Path) -> Result<(), ContextraError> {
-        let mut files = self.files.lock().map_err(|_| ContextraError::Internal("lock failed".into()))?;
+        let mut files = self
+            .files
+            .lock()
+            .map_err(|_| ContextraError::Internal("lock failed".into()))?;
         files.remove(path);
         Ok(())
     }
 
     fn exists(&self, path: &Path) -> Result<bool, ContextraError> {
-        let files = self.files.lock().map_err(|_| ContextraError::Internal("lock failed".into()))?;
+        let files = self
+            .files
+            .lock()
+            .map_err(|_| ContextraError::Internal("lock failed".into()))?;
         Ok(files.contains_key(path))
     }
 
     fn len(&self, path: &Path) -> Result<u64, ContextraError> {
-        let files = self.files.lock().map_err(|_| ContextraError::Internal("lock failed".into()))?;
+        let files = self
+            .files
+            .lock()
+            .map_err(|_| ContextraError::Internal("lock failed".into()))?;
         let len = files.get(path).map(|v| v.len()).unwrap_or(0);
         u64::try_from(len).map_err(|e| ContextraError::Internal(e.to_string()))
     }
 
     fn list_dir(&self, path: &Path) -> Result<Vec<String>, ContextraError> {
-        let files = self.files.lock().map_err(|_| ContextraError::Internal("lock failed".into()))?;
+        let files = self
+            .files
+            .lock()
+            .map_err(|_| ContextraError::Internal("lock failed".into()))?;
         let prefix = path.to_string_lossy();
-        let entries = files.keys()
+        let entries = files
+            .keys()
             .filter(|p| p.to_string_lossy().starts_with(prefix.as_ref()))
             .map(|p| p.to_string_lossy().to_string())
             .collect();
@@ -114,7 +150,11 @@ impl Vfs for InMemoryVfs {
         Ok(())
     }
 
-    fn open(&self, path: &Path, _opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>, ContextraError> {
+    fn open(
+        &self,
+        path: &Path,
+        _opts: &VfsOpenOptions,
+    ) -> Result<Box<dyn VfsFile>, ContextraError> {
         Ok(Box::new(InMemoryFile {
             path: path.to_path_buf(),
             files: self.files.clone(),

@@ -762,7 +762,8 @@ mod tests {
             timestamp_ms: 5000,
         });
 
-        reg.persist_sync().expect("persist_sync via VFS must succeed");
+        reg.persist_sync()
+            .expect("persist_sync via VFS must succeed");
 
         // Neuer Ladevorgang über VFS
         let loaded_reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs);

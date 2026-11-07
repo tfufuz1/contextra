@@ -42,6 +42,7 @@ pub mod scrub;
 /// Abstraktion eines virtuellen Dateisystems (VFS) für entkoppeltes I/O und Testbarkeit.
 pub mod vfs;
 
+pub use contextra_ports::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 pub use fault_injector::{FaultInjector, NoFault};
 pub use health::{AtomicHealthState, HealthEvent, HealthState};
 pub use journal::PendingDeleteJournal;
@@ -49,7 +50,6 @@ pub use journal::PendingDeleteJournal;
 pub use scrub::{
     scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
-pub use contextra_ports::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 pub use vfs::{RealFs, RealFsFile};
 
 use contextra_sys::{durable_flush_dir, durable_flush_file};

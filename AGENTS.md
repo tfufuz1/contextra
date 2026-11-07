@@ -241,7 +241,27 @@ cargo bench -p <crate>
 | K9 | **Werkzeug-Crates.** SPEC §4.2 nennt `testkit`, `xtask`, `xtask-heavy`, `bench`. Im Repository existieren `testkit` und `benchmarks/contextra-bench`; `xtask*` fehlen. | `testkit` und `contextra-bench` gelten als Werkzeug und sind nie Abhängigkeit des Kerns. `xtask` siehe §8. |
 | K10 | **`governance/security_ports.toml` zeigt auf nicht existierende Pfade** (`contextra_ports::kms::*`, `::purger::Purger`, `::log::DurableLog`, `::journal::ErasureJournal`, `contextra_store::vfs::StdVfs`). `StorageRead`/`StorageWrite` (verlangt von `.agents/rules/async-io.md`) existieren nicht. | Pfade nie aus diesen Dateien übernehmen; am Code prüfen. Korrektur in WP 2.2/7. |
 
-## 11. Referenzen
+## 11. Analyse- & Diagnose-Werkzeuge für Agenten (`tools/`)
+
+Für Coding-Agenten und Entwickler stehen spezialisierte Python-Werkzeuge für mikrofeingranulare Code-Introspektion, Architekturprüfungen, Fehlerkartierung und automatisierte Dokumentation zur Verfügung. Alle Werkzeuge exportieren ihre Befunde automatisch nach `docs/diagnostics/<name>.{md,json}` (oder via `--output-dir`), unterstützen `--crate <name>`, `--json` für Pipelines und bieten maschinenlesbare Schnittstellen.
+
+| Werkzeug | Fokus & Anwendungsbereich | Typischer Aufruf |
+|---|---|---|
+| `tools/rust_ast_inspector.py` | Mikrofeingranulare AST-Analyse: Structs, Enums, Traits, Impls, Funktionen, Visibilitäten, Docstrings & Attribute | `python3 tools/rust_ast_inspector.py -c <crate>` |
+| `tools/pattern_diagnostic.py` | Anti-Pattern & Invarianten-Scanner: Zero-Panic (`unwrap/expect`), Determinismus (`Clock/Rng`), `mmap` (D-94), Vfs-Bypass & verbotene Begriffe (§6.4) | `python3 tools/pattern_diagnostic.py --prod-only` |
+| `tools/dead_code_microprobe.py` | Micro-Probe für Dead Code, ungenutzte private Items, `#[allow(dead_code)]` und `#[deprecated]` Relikte | `python3 tools/dead_code_microprobe.py -c <crate>` |
+| `tools/unsafe_boundary_tracer.py` | Audit aller `unsafe`-Blöcke, Verifikation von `// SAFETY:` Beweisen, Pointer-Casts & Insel-Regel (M9) | `python3 tools/unsafe_boundary_tracer.py` |
+| `tools/concurrency_lock_auditor.py` | Prüfung von Mutex/RwLock-Haltedauern über `.await`, Deadlock-Gefahren, Kanälen & `loom` Permutationen | `python3 tools/concurrency_lock_auditor.py -c <crate>` |
+| `tools/error_topology_mapper.py` | Vollständige Kartierung aller Error-Enums (`thiserror`), Varianten, Fehlermeldungen & `impl From` Konvertierungen | `python3 tools/error_topology_mapper.py` |
+| `tools/contract_diff_detector.py` | Audit von canonical Traits in `contextra-ports`, Signaturen, `# Fehler` / `# Crash` Verträgen & Port-Implementierungen | `python3 tools/contract_diff_detector.py` |
+| `tools/cargo_dependency_graph.py` | Transitive Ring-Hierarchie (Ring 0..4), M1 Ring-Regeln, M6 Dev-Dep-Prüfung & Zyklenerkennung | `python3 tools/cargo_dependency_graph.py` |
+| `tools/erasure_leak_prober.py` | Mikrofeine Erkennung von DSGVO/Löschketten-Leaks und DeletionProofs in Speicherkernen (Regel M7) | `python3 tools/erasure_leak_prober.py` |
+| `tools/test_coverage_matrix.py` | Kartierung von Unit-, Tokio-Async-, Proptest-, Benchmark- und Miri-Tests sowie SPEC-Traceability (T-TRACE-1) | `python3 tools/test_coverage_matrix.py -c <crate>` |
+| `tools/agentic_context_pack.py` | Context-Engineering & Prompt-Packager: Bündelt minimale, hochdichte Modulinformationen & Regeln für LLM-Agenten | `python3 tools/agentic_context_pack.py -c <crate>` |
+
+Gemeinsame Bibliothek: `tools/agent_tooling_common.py`. Alle Berichte liegen strukturiert in `docs/diagnostics/`.
+
+## 12. Referenzen
 
 | Dokument | Zweck |
 |---|---|
@@ -252,5 +272,6 @@ cargo bench -p <crate>
 | `docs/VETOES.md`, `docs/CONSTITUTION.md` | Vetos und Verfassung |
 | `docs/TYPE_REGISTRY.md` | Typ-Kollisionsprüfung vor Neuanlage |
 | `docs/MODULAR_DECOUPLING_AUDIT.md`, `docs/crate-coupling-report.md` | Entkopplungsaudit |
+| `docs/diagnostics/` | Automatisch generierte Diagnose- & Analyseberichte (Markdown + JSON) |
 | `governance/`, `.agents/governance/` | Gates, Ratchets, Determinismus-Ausnahmen, Sicherheits-Ports |
 | `crates/<name>/AGENTS.md`, `PLAN.md`, `README.md` | Crate-spezifischer Vertrag, Arbeitspakete, Fremdprojekt-Einstieg |

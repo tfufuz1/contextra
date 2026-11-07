@@ -416,7 +416,6 @@ impl ContextraBuilder {
             Ok(instance)
         }
     }
-
 }
 
 impl Default for ContextraBuilder {

@@ -20,12 +20,12 @@ use std::pin::Pin;
 
 /// Re-export canonical `contextra-types` submodules explicitly per Contract M3 / AR-10.
 pub use contextra_types::{
-    error, ids, model_fingerprint, refs, tenant_scope, types, witness,
-    CollectionRef, ConfigFingerprint, ContextChunk, ContextraError, DocId, DocKey,
-    EntityId, ErasureId, FileId, GateId, ModelFingerprint, OperatorRef, QueryRewriteOutput,
-    RequestContext, RerankResult, Result, RetrievalStrategy, SagaRecord, ScanMethod,
-    ScoredEntry, Seq, StoreId, SubjectRef, TenantId, TenantRef, TenantScopeViolation,
-    TenantScoped, Timestamp, ContextWindow, ResourceBudget, ResourceTracker, TokenBudget, TxId, WorkflowState, MAX_REF_LEN,
+    error, ids, model_fingerprint, refs, tenant_scope, types, witness, CollectionRef,
+    ConfigFingerprint, ContextChunk, ContextWindow, ContextraError, DocId, DocKey, EntityId,
+    ErasureId, FileId, GateId, ModelFingerprint, OperatorRef, QueryRewriteOutput, RequestContext,
+    RerankResult, ResourceBudget, ResourceTracker, Result, RetrievalStrategy, SagaRecord,
+    ScanMethod, ScoredEntry, Seq, StoreId, SubjectRef, TenantId, TenantRef, TenantScopeViolation,
+    TenantScoped, Timestamp, TokenBudget, TxId, WorkflowState, MAX_REF_LEN,
 };
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
@@ -83,6 +83,8 @@ pub mod vfs;
 
 /// Environment abstractions (Clock, Rng, IdGen, MetricsSink) with sub-prelude.
 pub mod env;
+/// Legacy erasure ports isolated under Decision D-E1 prior to relocation to `contextra-erasure-spi`.
+pub mod erasure_legacy;
 /// Filesystem abstractions (Vfs, VfsFile) with sub-prelude.
 pub mod fs;
 /// Indexing subsystem abstractions (VectorIndex, TextIndex, GraphIndex) with sub-prelude.
@@ -91,8 +93,6 @@ pub mod index;
 pub mod inference;
 /// Policy subsystem abstractions (LicenseGate, EgressPolicy) with sub-prelude.
 pub mod policy;
-/// Legacy erasure ports isolated under Decision D-E1 prior to relocation to `contextra-erasure-spi`.
-pub mod erasure_legacy;
 
 pub use attention::*;
 pub use checkpoint::*;

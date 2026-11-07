@@ -48,9 +48,8 @@ pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
 pub use collection_profile::{CollectionProfile, DeploymentTier, KvDeleteMode, LsmTuning};
 pub use contextra_db::{
-    chunker, Collection, CollectionConfig,
-    Contextra, ContextraConfig, ContextraStats, Document, DriftStatusProvider, EmbeddingBackend,
-    SearchResult, TextEmbeddingEngine,
+    chunker, Collection, CollectionConfig, Contextra, ContextraConfig, ContextraStats, Document,
+    DriftStatusProvider, EmbeddingBackend, SearchResult, TextEmbeddingEngine,
 };
 pub use contextra_types::error::ContextraError;
 pub use contextra_types::types::domain::{DocId, ScoredDocument};

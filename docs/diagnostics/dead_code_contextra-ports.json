@@ -1,0 +1,245 @@
+{
+  "tool_name": "dead_code_microprobe.py",
+  "title": "Dead Code & Unused Item Microprobe Diagnostic",
+  "description": "Identifies unreferenced private functions, types, constants, #[allow(dead_code)] suppressions, and deprecated items across crates.",
+  "timestamp": "2026-11-07T23:13:45.704880+00:00",
+  "metrics": {
+    "dead_code_candidates": 19,
+    "allow_dead_code_attributes": 1,
+    "deprecated_attributes": 8,
+    "total_findings": 28
+  },
+  "findings_count": 28,
+  "findings": [
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/conformance.rs",
+      "line": 7,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 7,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 12,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 18,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 21,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 24,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 27,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 30,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure_legacy.rs",
+      "line": 33,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Erasure coordination will relocate to contextra-erasure-spi (Decision D-E1)\")]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 253,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'resolve' appears unused in crate (freq=1)",
+      "snippet": "function resolve"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 262,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'on_gate' appears unused in crate (freq=1)",
+      "snippet": "function on_gate"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 295,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'key_coverage' appears unused in crate (freq=1)",
+      "snippet": "function key_coverage"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 145,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'check_bound' appears unused in crate (freq=1)",
+      "snippet": "function check_bound"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 154,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'variant_for_range' appears unused in crate (freq=1)",
+      "snippet": "function variant_for_range"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 168,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'gate_epoch' appears unused in crate (freq=1)",
+      "snippet": "function gate_epoch"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 175,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'covers' appears unused in crate (freq=1)",
+      "snippet": "function covers"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 188,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'covers_raw' appears unused in crate (freq=1)",
+      "snippet": "function covers_raw"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 196,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'gated_seq_raw' appears unused in crate (freq=1)",
+      "snippet": "function gated_seq_raw"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 136,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'seal' appears unused in crate (freq=1)",
+      "snippet": "function seal"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 169,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'make_slots_durable' appears unused in crate (freq=1)",
+      "snippet": "function make_slots_durable"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 203,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'destroy' appears unused in crate (freq=1)",
+      "snippet": "function destroy"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/ledger.rs",
+      "line": 169,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'read_all' appears unused in crate (freq=1)",
+      "snippet": "function read_all"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/ledger.rs",
+      "line": 178,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prune' appears unused in crate (freq=1)",
+      "snippet": "function prune"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/lib.rs",
+      "line": 143,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_assert_dyn_response_grounding_validator' appears unused in crate (freq=1)",
+      "snippet": "function _assert_dyn_response_grounding_validator"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/license.rs",
+      "line": 110,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_doctest_authorized_ring_private_fields' appears unused in crate (freq=1)",
+      "snippet": "function _doctest_authorized_ring_private_fields"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/storage.rs",
+      "line": 162,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'flush' appears unused in crate (freq=1)",
+      "snippet": "function flush"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/tests/plugin_registry_dependency_cycle.rs",
+      "line": 78,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_dependency_cycle_detected_and_no_plugins_activated' appears unused in crate (freq=1)",
+      "snippet": "function prop_dependency_cycle_detected_and_no_plugins_activated"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/tests/plugin_registry_dependency_cycle.rs",
+      "line": 143,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_dag_dependencies_activated_successfully' appears unused in crate (freq=1)",
+      "snippet": "function prop_dag_dependencies_activated_successfully"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Zusammenfassung der technischen Schulden",
+      "content": "| Kategorie | Anzahl | Beschreibung |\n|---|---|---|\n| Unused Private Items | 19 | Private Funktionen, Structs oder Consts ohne Aufrufer im Crate |\n| `#[allow(dead_code)]` | 1 | Unterdr\u00fcckte Dead-Code-Warnungen |\n| `#[deprecated]` | 8 | Veraltete Relikte zur Entfernung |"
+    }
+  ]
+}

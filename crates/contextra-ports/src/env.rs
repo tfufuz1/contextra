@@ -6,8 +6,7 @@
 pub use crate::clock::{Clock, SystemClock};
 pub use crate::id_gen::{IdGen, SequentialIdGen};
 pub use crate::metrics::{
-    HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, MetricsSink,
-    NoopMetricsSink,
+    HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, MetricsSink, NoopMetricsSink,
 };
 pub use crate::rng::{Rng, SeededRng};
 

@@ -71,15 +71,13 @@ impl TestCollection {
         }
     }
 
-    pub async fn insert(
-        &self,
-        key: &str,
-        vector: &[f32],
-        metadata: Option<Value>,
-    ) -> Result<()> {
+    pub async fn insert(&self, key: &str, vector: &[f32], metadata: Option<Value>) -> Result<()> {
         let entity_id = EntityId::from_key(key).ok();
         let text = metadata
-            .and_then(|m| m.get("text").and_then(|t| t.as_str().map(|s| s.to_string())))
+            .and_then(|m| {
+                m.get("text")
+                    .and_then(|t| t.as_str().map(|s| s.to_string()))
+            })
             .unwrap_or_else(|| key.to_string());
         self.docs.write().push(MockDoc {
             entity_id,
@@ -91,7 +89,7 @@ impl TestCollection {
     }
 
     #[allow(dead_code)]
-pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {
+    pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {
         self.communities.write().insert(entity_id, comm_id);
     }
 
@@ -125,7 +123,9 @@ impl HybridSearchProvider for TestCollection {
                             .sum();
                         score += (dot * 0.3).clamp(0.0, 0.3);
                     }
-                    if !query_text.is_empty() && (doc.text.contains(query_text) || query_text.contains(&doc.text)) {
+                    if !query_text.is_empty()
+                        && (doc.text.contains(query_text) || query_text.contains(&doc.text))
+                    {
                         score += 0.05;
                     }
                     if score <= 0.0 {
@@ -139,9 +139,14 @@ impl HybridSearchProvider for TestCollection {
 
             let mut chunks = Vec::with_capacity(top_k.min(scored.len()));
             for (score, doc) in scored.into_iter().take(top_k) {
-                let doc_id = doc.entity_id.map(|e| contextra_types::DocId::new(e.inner())).unwrap_or_else(|| {
-                    contextra_types::DocId::new(self.next_doc_id.fetch_add(1, Ordering::Relaxed))
-                });
+                let doc_id = doc
+                    .entity_id
+                    .map(|e| contextra_types::DocId::new(e.inner()))
+                    .unwrap_or_else(|| {
+                        contextra_types::DocId::new(
+                            self.next_doc_id.fetch_add(1, Ordering::Relaxed),
+                        )
+                    });
                 let metadata = serde_json::json!({ "key": doc.key });
                 chunks.push(ContextChunk {
                     doc_id,
@@ -184,7 +189,8 @@ impl HybridSearchProvider for CollectionAdapter {
         query_embedding: &'a [f32],
         top_k: usize,
     ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
-        self.collection.search_hybrid(query_text, query_embedding, top_k)
+        self.collection
+            .search_hybrid(query_text, query_embedding, top_k)
     }
 }
 
@@ -239,7 +245,10 @@ pub struct TestInnerStorage {
 impl TestInnerStorage {
     pub async fn put(&self, _tx: TxId, key: &[u8], val: &[u8]) -> Result<()> {
         if let Ok(comm_id) = serde_json::from_slice::<u64>(val) {
-            self.collection.raw_comm_keys.write().insert(key.to_vec(), comm_id);
+            self.collection
+                .raw_comm_keys
+                .write()
+                .insert(key.to_vec(), comm_id);
             if let Ok(key_str) = std::str::from_utf8(key) {
                 if let Some(eid_str) = key_str.strip_prefix("__graph:community:") {
                     if let Ok(eid_num) = eid_str.parse::<u64>() {
@@ -266,7 +275,10 @@ pub struct ContextraConfig {
 
 impl Default for ContextraConfig {
     fn default() -> Self {
-        Self { dimension: 4, _reserved: 0 }
+        Self {
+            dimension: 4,
+            _reserved: 0,
+        }
     }
 }
 
