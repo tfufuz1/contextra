@@ -84,10 +84,10 @@ pub fn global_orphan_registry() -> &'static OrphanRegistry {
 /// Ermittelt das Standard-Datenverzeichnis für verwaiste Statusdateien.
 ///
 /// # Sicherheit & Persistenz
-/// Nutzt `dirs::data_local_dir()`. Falls nicht verfügbar, Fallback auf `std::env::temp_dir()`.
+/// Nutzt `std::env::temp_dir()`.
 /// Im Produktivbetrieb sollte der Pfad explizit konfiguriert werden.
 fn default_data_dir() -> std::path::PathBuf {
-    dirs::data_local_dir().unwrap_or_else(std::env::temp_dir)
+    std::env::temp_dir()
 }
 
 // ANCHOR[contextra-checkpoint:ORP-004]
@@ -242,7 +242,7 @@ pub struct OrphanState {
 }
 
 impl OrphanState {
-    /// Schreibt den Zustand synchron als formatierte JSON-Datei auf die Festplatte.
+    /// Schreibt den Zustand synchron als formatierte JSON-Datei auf die Festplatte (ggf. über Vfs).
     pub fn persist_sync(&self) -> std::io::Result<()> {
         if self.persist_path.as_os_str().is_empty() {
             return Ok(());
@@ -251,11 +251,37 @@ impl OrphanState {
         std::fs::write(&self.persist_path, data)
     }
 
+    /// Schreibt den Zustand über die Vfs-Schnittstelle crash-konsistent (`write_atomic`).
+    pub fn persist_vfs(&self, vfs: &dyn contextra_ports::Vfs) -> std::io::Result<()> {
+        if self.persist_path.as_os_str().is_empty() {
+            return Ok(());
+        }
+        let data = serde_json::to_vec_pretty(self)?;
+        vfs.write_atomic(&self.persist_path, &data)
+            .map_err(|e| std::io::Error::other(e.to_string()))
+    }
+
     /// Lädt den Zustand synchron von der Festplatte oder liefert einen leeren Zustand bei Fehlern.
     pub fn load_sync(path: &std::path::Path) -> Self {
         if let Ok(data) = std::fs::read(path) {
             if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
                 return state;
+            }
+        }
+        Self {
+            checkpoints: Vec::new(),
+            pinned_seq_nos: Vec::new(),
+            persist_path: path.to_path_buf(),
+        }
+    }
+
+    /// Lädt den Zustand über die Vfs-Schnittstelle.
+    pub fn load_vfs(vfs: &dyn contextra_ports::Vfs, path: &std::path::Path) -> Self {
+        if !path.as_os_str().is_empty() {
+            if let Ok(data) = vfs.read(path) {
+                if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
+                    return state;
+                }
             }
         }
         Self {
@@ -278,6 +304,7 @@ pub struct InstanceOrphanRegistry {
     persist_path: std::path::PathBuf,
     is_dirty: AtomicBool,
     clock: Arc<dyn contextra_ports::Clock>,
+    vfs: Option<Arc<dyn contextra_ports::Vfs>>,
 }
 
 impl std::fmt::Debug for InstanceOrphanRegistry {
@@ -305,9 +332,24 @@ impl InstanceOrphanRegistry {
         Self::load_sync(&path)
     }
 
+    /// Erzeugt eine neue instanzgebundene Registry über den VFS-Port.
+    pub fn new_with_vfs(
+        persist_path: impl Into<std::path::PathBuf>,
+        vfs: Arc<dyn contextra_ports::Vfs>,
+    ) -> Self {
+        let path = persist_path.into();
+        Self::load_vfs_internal(&path, vfs)
+    }
+
     /// Konfiguriert die Registry mit einer spezifischen Clock-Implementierung.
     pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Konfiguriert die Registry mit einer VFS-Implementierung.
+    pub fn with_vfs(mut self, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+        self.vfs = Some(vfs);
         self
     }
 
@@ -319,6 +361,11 @@ impl InstanceOrphanRegistry {
     /// Liefert eine Referenz auf den injizierten Clock-Port.
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
+    }
+
+    /// Liefert eine Referenz auf das injizierte VFS (falls vorhanden).
+    pub fn vfs(&self) -> Option<&Arc<dyn contextra_ports::Vfs>> {
+        self.vfs.as_ref()
     }
 
     /// Lädt den Zustand synchron von der Festplatte.
@@ -333,6 +380,7 @@ impl InstanceOrphanRegistry {
                         persist_path: path.to_path_buf(),
                         is_dirty: AtomicBool::new(false),
                         clock,
+                        vfs: None,
                     };
                 }
             }
@@ -343,10 +391,24 @@ impl InstanceOrphanRegistry {
             persist_path: path.to_path_buf(),
             is_dirty: AtomicBool::new(false),
             clock,
+            vfs: None,
         }
     }
 
-    /// Persistiert den aktuellen Zustand synchron auf die Festplatte.
+    fn load_vfs_internal(path: &std::path::Path, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+        let state = OrphanState::load_vfs(vfs.as_ref(), path);
+        Self {
+            pins: Mutex::new(state.pinned_seq_nos),
+            checkpoints: Mutex::new(state.checkpoints),
+            persist_path: path.to_path_buf(),
+            is_dirty: AtomicBool::new(false),
+            clock,
+            vfs: Some(vfs),
+        }
+    }
+
+    /// Persistiert den aktuellen Zustand synchron auf die Festplatte (bevorzugt über Vfs).
     pub fn persist_sync(&self) -> std::io::Result<()> {
         if self.persist_path.as_os_str().is_empty() {
             return Ok(());
@@ -356,8 +418,12 @@ impl InstanceOrphanRegistry {
             pinned_seq_nos: self.pins.lock().clone(),
             persist_path: self.persist_path.clone(),
         };
-        let data = serde_json::to_vec_pretty(&state)?;
-        std::fs::write(&self.persist_path, data)
+        if let Some(ref vfs) = self.vfs {
+            state.persist_vfs(vfs.as_ref())
+        } else {
+            let data = serde_json::to_vec_pretty(&state)?;
+            std::fs::write(&self.persist_path, data)
+        }
     }
 
     // ANCHOR[contextra-checkpoint:ORP-010]
@@ -681,6 +747,28 @@ mod tests {
 
         let state = OrphanState::default();
         assert!(state.persist_sync().is_ok());
+    }
+
+    // Prüft, dass die Orphan-Registry über ein injiziertes Vfs (FaultVfs) sauber lädt und speichert.
+    #[test]
+    fn test_instance_orphan_registry_with_vfs() {
+        use contextra_testkit::FaultVfs;
+        let vfs = Arc::new(FaultVfs::new());
+        let path = std::path::PathBuf::from("/test/orphans.json");
+
+        let reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs.clone());
+        reg.register_orphan_sync(PinnedSeqNoOrphan {
+            seq_no: 777,
+            timestamp_ms: 5000,
+        });
+
+        reg.persist_sync().expect("persist_sync via VFS must succeed");
+
+        // Neuer Ladevorgang über VFS
+        let loaded_reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs);
+        let orphans = loaded_reg.get_orphan_pins();
+        assert_eq!(orphans.len(), 1);
+        assert_eq!(orphans[0].seq_no, 777);
     }
 
     // Prüft die strikte Trennung und gegenseitige Isolation zweier unabhängiger InstanceOrphanRegistry-Instanzen.

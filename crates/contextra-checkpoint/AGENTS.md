@@ -15,9 +15,9 @@
 
 ## 2. Abhängigkeiten & Schulden
 
-- Normalkanten sauber; Dev-Kanten auf `store`, `mvcc`, `testkit` (M6: `store` nach `testkit`/`tests`).
+- Normalkanten sauber (`ports`, `types`). Dev-Kanten beschränkt auf `contextra-testkit`, `criterion`, `proptest`, `serde_json`, `tempfile` (M6: `store` und `mvcc` vollständig entfernt).
 - `capabilities.toml` nennt noch `contextra-core`: entfernen.
-- Direkte Datei-I/O (`hardlink_cloner.rs`, ~7 Treffer) und `tokio` (~17): `Vfs`/synchroner Kern prüfen.
+- Direkte Datei-I/O: `orphan.rs` unterstützt nun `Vfs` (`persist_vfs`, `load_vfs`).
 - Zugriff auf den Store nur über `StorageEngine`-Port, nie über `contextra_store`.
 
 ## 3. Modul-Karte (am Code verifiziert)
