@@ -51,7 +51,7 @@ All current 40 local `#[allow(deprecated)]` call sites in `crates/contextra-db/s
   - *Deprecated Item*: `Collection::hybrid_search_with_strategy`
   - *Justification*: Implementation of deprecated legacy method `Collection::hybrid_search_with_strategy`.
   - *Status*: Deprecated legacy API surface (retained for backward compatibility).
-- **Line 657**: `pub async fn hybrid_search_with_query(&self, query: &contextra_core::HybridQuery) -> Result<Vec<crate::SearchResult>>`
+- **Line 657**: `pub async fn hybrid_search_with_query(&self, query: &contextra_types::HybridQuery) -> Result<Vec<crate::SearchResult>>`
   - *Deprecated Item*: `Collection::hybrid_search_with_query`
   - *Justification*: Internal implementation of low-level `hybrid_search_with_query` called directly by `HybridQueryBuilder::execute()`.
   - *Status*: Permanent internal implementation backing `Collection::query()`.

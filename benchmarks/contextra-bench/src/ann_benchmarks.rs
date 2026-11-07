@@ -7,8 +7,8 @@ use std::path::Path;
 use std::time::Instant;
 
 use anyhow::Result;
-use contextra_core::traits::VectorIndex;
-use contextra_core::types::{DistanceMetric, DocId, TxId};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use hdrhistogram::Histogram;
 use rand::rngs::StdRng;

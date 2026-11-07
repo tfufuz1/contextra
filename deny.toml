@@ -50,7 +50,6 @@ deny = [
         "contextra-bench",
         "contextra-checkpoint", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-cognition",
-        "contextra-core", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-crypto", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-db",
         "contextra-engine",
