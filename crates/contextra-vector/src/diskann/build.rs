@@ -125,7 +125,7 @@ impl DiskAnnIndex {
         }
 
         let id_bytes = id.inner().to_le_bytes();
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&id_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -220,7 +220,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             let computed_hmac = hmac.finalize();
 
@@ -277,7 +277,7 @@ impl DiskAnnIndex {
             entry_bytes.extend_from_slice(&val.to_le_bytes());
         }
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
@@ -404,7 +404,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
+            let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             hmac.update(&buf_dim);
             hmac.update(&vec_bytes);
