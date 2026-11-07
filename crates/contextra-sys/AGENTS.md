@@ -10,8 +10,8 @@
 | Standalone-Build | `cargo build -p contextra-sys --locked` (keine Contextra-Abhängigkeit, keine Features) |
 | Contextra-Abhängigkeiten (Ist = Soll) | keine |
 | Lints | `#![allow(unsafe_code)]` (Insel) mit `#![deny(unsafe_op_in_unsafe_fn)]`, `#![warn(missing_docs)]` |
-| Unsafe-Umfang | ~20 `unsafe`-Treffer, plattformabhängig (`posix.rs`, `mmap.rs`, `mlock.rs`, `acl_win32.rs`) |
-| Konsumenten (Ist, laut Cargo) | `store`, `vector`, `durable-fs`, `engine`, `db` (die Kanten `engine`/`db` entfallen laut D9) |
+| Unsafe-Umfang | 21 `unsafe`-Blöcke (`unsafe {`), 0 `unsafe fn`, 0 `unsafe impl`, ausnahmslos mit `// SAFETY:` |
+| Konsumenten (Ist, laut Cargo) | `store`, `vector`, `durable-fs`, `bench`, `db` (Kommentar), `engine` (tote Kante, 0 Nutzungen im Code) |
 
 ## 2. Abhängigkeiten
 
