@@ -25,7 +25,7 @@ pub use contextra_types::{
     EntityId, ErasureId, FileId, GateId, ModelFingerprint, OperatorRef, QueryRewriteOutput,
     RequestContext, RerankResult, Result, RetrievalStrategy, SagaRecord, ScanMethod,
     ScoredEntry, Seq, StoreId, SubjectRef, TenantId, TenantRef, TenantScopeViolation,
-    TenantScoped, Timestamp, TokenBudget, TxId, WorkflowState, MAX_REF_LEN,
+    TenantScoped, Timestamp, ContextWindow, ResourceBudget, ResourceTracker, TokenBudget, TxId, WorkflowState, MAX_REF_LEN,
 };
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.

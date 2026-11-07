@@ -84,7 +84,7 @@ impl PidLatencyController {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LatencyBudgetGuard {
     start_time_nanos: u64,
     budget_ms: f64,
@@ -121,5 +121,14 @@ impl LatencyBudgetGuard {
 
     pub fn budget_ms(&self) -> f64 {
         self.budget_ms
+    }
+}
+
+impl std::fmt::Debug for LatencyBudgetGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LatencyBudgetGuard")
+            .field("start_time_nanos", &self.start_time_nanos)
+            .field("budget_ms", &self.budget_ms)
+            .finish()
     }
 }
