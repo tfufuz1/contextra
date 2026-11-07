@@ -31,8 +31,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
+#[cfg(feature = "license")]
 use contextra_license::SignedLicenseGate;
-use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
+use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_types::error::ContextraError;
 use contextra_types::DistanceMetric;
 use zeroize::Zeroizing;
@@ -261,6 +262,7 @@ impl ContextraBuilder {
     ///
     /// Überprüft die Signatur des Lizenz-Payloads mit dem angegebenen öffentlichen Verifizierungsschlüssel.
     /// Schlägt die Verifikation fehl, wird ein Fehler gespeichert, der beim Aufruf von `build()` fehlschlägt.
+    #[cfg(feature = "license")]
     pub fn with_signed_license(
         mut self,
         payload_bytes: &[u8],
@@ -280,7 +282,8 @@ impl ContextraBuilder {
                 }
             }
             Err(_) => {
-                self.signed_license_error = Some(LicenseError::InvalidSignature.to_string());
+                self.signed_license_error =
+                    Some(contextra_ports::license::LicenseError::InvalidSignature.to_string());
             }
         }
         self
