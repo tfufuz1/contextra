@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Integrations-Testsuite für Fehlerpfade, RequestContext und Saga-Protokolle.
 //! Stellt sicher, dass Restmessungstypen und Tombstones fehlerfrei interagieren.
 
