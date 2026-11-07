@@ -1,0 +1,497 @@
+[
+  {
+    "crate": "contextra",
+    "error_enums_count": 3,
+    "error_enums": [
+      {
+        "name": "CollectionProfileError",
+        "file": "/app/crates/contextra/src/collection_profile.rs",
+        "line": 92
+      },
+      {
+        "name": "DurabilityConfigError",
+        "file": "/app/crates/contextra/src/performance_profile.rs",
+        "line": 51
+      },
+      {
+        "name": "PerformanceProfileError",
+        "file": "/app/crates/contextra/src/performance_profile.rs",
+        "line": 126
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-adapt",
+    "error_enums_count": 4,
+    "error_enums": [
+      {
+        "name": "FcTsError",
+        "file": "/app/crates/contextra-adapt/src/flow_thompson.rs",
+        "line": 29
+      },
+      {
+        "name": "OffPolicyError",
+        "file": "/app/crates/contextra-adapt/src/flow_thompson.rs",
+        "line": 713
+      },
+      {
+        "name": "BanditError",
+        "file": "/app/crates/contextra-adapt/src/bandit.rs",
+        "line": 36
+      },
+      {
+        "name": "RieGreedyError",
+        "file": "/app/crates/contextra-adapt/src/rie_greedy.rs",
+        "line": 12
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-agent",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-audit-export",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "AuditExportError",
+        "file": "/app/crates/contextra-audit-export/src/error.rs",
+        "line": 7
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-avv-generator",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "AvvError",
+        "file": "/app/crates/contextra-avv-generator/src/error.rs",
+        "line": 32
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-checkpoint",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-cognition",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-core",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-crypto",
+    "error_enums_count": 3,
+    "error_enums": [
+      {
+        "name": "DeletionProofError",
+        "file": "/app/crates/contextra-crypto/src/ed25519_proof.rs",
+        "line": 29
+      },
+      {
+        "name": "CryptoError",
+        "file": "/app/crates/contextra-crypto/src/error.rs",
+        "line": 21
+      },
+      {
+        "name": "VerificationErrorReason",
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/verifier.rs",
+        "line": 14
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-db",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "VaultError",
+        "file": "/app/crates/contextra-db/src/volatile_vault.rs",
+        "line": 154
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-durable-fs",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-engine",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-erasure",
+    "error_enums_count": 3,
+    "error_enums": [
+      {
+        "name": "ErasureError",
+        "file": "/app/crates/contextra-erasure/src/error.rs",
+        "line": 7
+      },
+      {
+        "name": "SignerError",
+        "file": "/app/crates/contextra-erasure/src/types_local.rs",
+        "line": 1073
+      },
+      {
+        "name": "ObserverError",
+        "file": "/app/crates/contextra-erasure/src/types_local.rs",
+        "line": 1153
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-graph",
+    "error_enums_count": 3,
+    "error_enums": [
+      {
+        "name": "HyperedgeSuggestError",
+        "file": "/app/crates/contextra-graph/src/hyperedge_suggest.rs",
+        "line": 45
+      },
+      {
+        "name": "TlHfdError",
+        "file": "/app/crates/contextra-graph/src/tl_hfd/error.rs",
+        "line": 8
+      },
+      {
+        "name": "ApprhError",
+        "file": "/app/crates/contextra-graph/src/apprh/error.rs",
+        "line": 8
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-infer-candle",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-infer-ollama",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-infer-onnx",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-ingest",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "IngestError",
+        "file": "/app/crates/contextra-ingest/src/error.rs",
+        "line": 52
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-kvcache",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-license",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "StepVerificationError",
+        "file": "/app/crates/contextra-license/src/signed_gate.rs",
+        "line": 87
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-mcp",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "McpError",
+        "file": "/app/crates/contextra-mcp/src/protocol.rs",
+        "line": 15
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-mvcc",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-ports",
+    "error_enums_count": 6,
+    "error_enums": [
+      {
+        "name": "SignerError",
+        "file": "/app/crates/contextra-ports/src/report_signer.rs",
+        "line": 30
+      },
+      {
+        "name": "EmbeddingError",
+        "file": "/app/crates/contextra-ports/src/embedding.rs",
+        "line": 65
+      },
+      {
+        "name": "LicenseError",
+        "file": "/app/crates/contextra-ports/src/license.rs",
+        "line": 55
+      },
+      {
+        "name": "GraphMutationError",
+        "file": "/app/crates/contextra-ports/src/graph.rs",
+        "line": 93
+      },
+      {
+        "name": "PluginError",
+        "file": "/app/crates/contextra-ports/src/plugin.rs",
+        "line": 68
+      },
+      {
+        "name": "ObserverError",
+        "file": "/app/crates/contextra-ports/src/observer.rs",
+        "line": 62
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-privacy",
+    "error_enums_count": 3,
+    "error_enums": [
+      {
+        "name": "ContextEditAuditError",
+        "file": "/app/crates/contextra-privacy/src/context_edit_audit.rs",
+        "line": 40
+      },
+      {
+        "name": "EgressVaultError",
+        "file": "/app/crates/contextra-privacy/src/egress_vault.rs",
+        "line": 237
+      },
+      {
+        "name": "EgressError",
+        "file": "/app/crates/contextra-privacy/src/error.rs",
+        "line": 17
+      }
+    ],
+    "suspicious_messages_count": 2,
+    "suspicious_messages": [
+      {
+        "file": "/app/crates/contextra-privacy/src/egress_vault.rs",
+        "line": 244,
+        "suspect_term": "plaintext",
+        "message_format": "Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'"
+      },
+      {
+        "file": "/app/crates/contextra-privacy/src/error.rs",
+        "line": 28,
+        "suspect_term": "plaintext",
+        "message_format": "Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'"
+      }
+    ]
+  },
+  {
+    "crate": "contextra-py",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-rank",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "ConformalError",
+        "file": "/app/crates/contextra-rank/src/calibration/conformal.rs",
+        "line": 15
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-router",
+    "error_enums_count": 2,
+    "error_enums": [
+      {
+        "name": "FcTsDispatchError",
+        "file": "/app/crates/contextra-router/src/fc_ts_dispatch.rs",
+        "line": 21
+      },
+      {
+        "name": "ArmRegistryError",
+        "file": "/app/crates/contextra-router/src/arm_registry.rs",
+        "line": 34
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-sandbox",
+    "error_enums_count": 2,
+    "error_enums": [
+      {
+        "name": "SandboxError",
+        "file": "/app/crates/contextra-sandbox/src/error.rs",
+        "line": 7
+      },
+      {
+        "name": "ApprovalTransitionError",
+        "file": "/app/crates/contextra-sandbox/src/approval.rs",
+        "line": 61
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-simd",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-store",
+    "error_enums_count": 2,
+    "error_enums": [
+      {
+        "name": "DurabilityConfigError",
+        "file": "/app/crates/contextra-store/src/lsm/config.rs",
+        "line": 25
+      },
+      {
+        "name": "WalParseError",
+        "file": "/app/crates/contextra-store/src/wal/encode.rs",
+        "line": 12
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-sys",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-testkit",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-text",
+    "error_enums_count": 0,
+    "error_enums": [],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-types",
+    "error_enums_count": 2,
+    "error_enums": [
+      {
+        "name": "HnswDeletionError",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 38
+      },
+      {
+        "name": "ContextraError",
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 129
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-vector",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "AcornError",
+        "file": "/app/crates/contextra-vector/src/acorn/mod.rs",
+        "line": 30
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  },
+  {
+    "crate": "contextra-wire",
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "FlatBufferError",
+        "file": "/app/crates/contextra-wire/src/verification.rs",
+        "line": 34
+      }
+    ],
+    "suspicious_messages_count": 0,
+    "suspicious_messages": []
+  }
+]
