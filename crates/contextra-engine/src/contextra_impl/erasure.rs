@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! # Modul: erasure.rs
 //!
 //! **Zweck:** Fail-Closed ErasureOrchestrator für gemessene Bereinigungen (DEBT-01).
