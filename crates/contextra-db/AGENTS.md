@@ -8,16 +8,15 @@
 | Aspekt | Wert |
 |---|---|
 | Standalone-Build | `cargo build -p contextra-db --no-default-features --locked` |
-| Contextra-Abhängigkeiten **Ist** (Cargo) | `engine`, `ports`, `sys`, `types` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `engine`, `ports`, `types` |
 | Contextra-Abhängigkeiten **Soll** (PLAN §4) | `engine`, `ports`, `types` |
 | Features | viele (u. a. `onnx`, `reranking`, `sandbox`, `volatile-vault`, `background-maintenance`) |
 | Lints | `#![forbid(unsafe_code)]` |
 
 ## 2. Abhängigkeiten & Schulden
 
-- ~2.100 Zeilen; die frühere Beschreibung als „Collection/RRF/Chunker-Monolith“ ist überholt (diese Logik liegt in `engine`).
-- **Überzählige Kante `sys`** (D9). **10 Dev-Kanten** (`adapt`, `checkpoint`, `cognition`, `graph`, `rank`, `store`, `sys`, `testkit`, `text`, `vector`) verletzen M6: Tests nach `tests/` des höheren Rings oder `testkit` verlagern.
-- Re-exportiert `engine`-Typen und `contextra_checkpoint` (M3-Leck).
+- ~1.500 Zeilen; die frühere Beschreibung als „Collection/RRF/Chunker-Monolith“ ist überholt (diese Logik liegt in `engine`).
+- Überzählige Kante `sys` wurde entfernt (D9). Unbenutzte Dev-Kanten (`cognition`, `rank`, `sys`) und M3-Leck `contextra_checkpoint` wurden bereinigt.
 - `pid_latency_controller.rs`/`homeostat.rs`/`decay_controller` duplizieren Inhalte aus `adapt`/`engine`: DRY prüfen.
 - Alte Aufrufstellen: `crates/contextra-db/DEPRECATED_DEBT.md` (DEBT-05, 40 Stellen).
 
@@ -64,5 +63,5 @@ cargo clippy -p contextra-db --all-targets -- -D warnings
 | WP | Inhalt |
 |---|---|
 | 3.6 | monolithische Löschkaskaden entfernen |
-| 5.x/D9 | `sys`-Kante, Dev-Kanten bereinigen |
+| 5.x/D9 | `sys`-Kante, Dev-Kanten bereinigt |
 | DEBT-05 | Legacy-Such-Fassaden nach Frist entfernen |
