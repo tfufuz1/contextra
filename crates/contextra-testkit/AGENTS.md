@@ -24,7 +24,8 @@
 | `fault_vfs.rs`, `manual_clock.rs` | Fehlerinjektion, deterministische Uhr |
 | `in_memory_{store,vector,text,graph}.rs` | Referenz-Backends |
 | `reference_model.rs` | deterministisches Referenzmodell für MVCC/KV |
-| `conformance/` (`clock`, `rng`, `storage`, `vector`, `text`, `graph`, `metrics`, `failure`) | Konformitätssuiten für Fremdadapter |
+| `conformance/` (`clock`, `rng`, `storage`, `vector`, `text`, `graph`, `metrics`, `vfs`, `failure`) | Konformitätssuiten für Fremdadapter |
+| `examples/standalone_testkit.rs` | Autarkes Baukasten-Minimalbeispiel (M10) |
 | `mocks.rs` | Mocks (nie Produktionsstandard, INV-EMBED-1) |
 
 ## 4. Verträge & Invarianten

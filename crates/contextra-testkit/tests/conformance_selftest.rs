@@ -14,14 +14,15 @@
 
 use contextra_ports::{
     BoxFuture, Clock, GraphIndex, GraphIndexStats, MetricsSink, Rng, SeededRng, StorageEngine,
-    StorageStats, TextIndex, TextIndexStats, VectorIndex, VectorIndexStats,
+    StorageStats, TextIndex, TextIndexStats, VectorIndex, VectorIndexStats, Vfs,
 };
 use contextra_testkit::conformance::*;
 use contextra_testkit::{
-    InMemoryGraphIndex, InMemoryStorageEngine, InMemoryTextIndex, InMemoryVectorIndex, ManualClock,
-    TestMetricsSink,
+    FaultVfs, InMemoryGraphIndex, InMemoryStorageEngine, InMemoryTextIndex, InMemoryVectorIndex,
+    ManualClock, TestMetricsSink,
 };
 use contextra_types::{DocId, Edge, Entity, EntityId, Result, ScoredDocument, TxId};
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // ============================================================================
@@ -499,5 +500,66 @@ fn test_metrics_sink_conformance_mutant_red() {
             assert_eq!(failure.test_case, "record_panic");
         }
         Ok(_) => panic!("PanickingMetricsSink must fail metrics conformance"),
+    }
+}
+
+/// Mutantes VFS, bei dem write_atomic eine No-Op ist (Daten werden verworfen).
+#[derive(Debug)]
+struct BuggyWriteAtomicVfs(FaultVfs);
+
+impl Vfs for BuggyWriteAtomicVfs {
+    fn read(&self, path: &Path) -> contextra_types::Result<Vec<u8>> {
+        self.0.read(path)
+    }
+
+    fn write_atomic(&self, _path: &Path, _data: &[u8]) -> contextra_types::Result<()> {
+        // BUG: Schreibt die Datei nicht ins Dateisystem!
+        Ok(())
+    }
+
+    fn create_dir_all(&self, path: &Path) -> contextra_types::Result<()> {
+        self.0.create_dir_all(path)
+    }
+
+    fn remove_file(&self, path: &Path) -> contextra_types::Result<()> {
+        self.0.remove_file(path)
+    }
+
+    fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
+        self.0.exists(path)
+    }
+
+    fn len(&self, path: &Path) -> contextra_types::Result<u64> {
+        self.0.len(path)
+    }
+
+    fn list_dir(&self, path: &Path) -> contextra_types::Result<Vec<String>> {
+        self.0.list_dir(path)
+    }
+
+    fn sync_dir(&self, path: &Path) -> contextra_types::Result<()> {
+        self.0.sync_dir(path)
+    }
+}
+
+/// SPEC: REQ-VFS-CONFORMANCE
+#[test]
+fn test_vfs_conformance_reference_green() {
+    let vfs = FaultVfs::new();
+    let res = run_vfs_suite(&vfs);
+    assert!(res.is_ok(), "FaultVfs must pass Vfs conformance: {res:?}");
+}
+
+/// SPEC: REQ-VFS-MUTANT-DETECTION
+#[test]
+fn test_vfs_conformance_mutant_red() {
+    let mutant_vfs = BuggyWriteAtomicVfs(FaultVfs::new());
+    let res = run_vfs_suite(&mutant_vfs);
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "Vfs");
+            assert_eq!(failure.test_case, "file_len_and_exists");
+        }
+        Ok(_) => panic!("BuggyWriteAtomicVfs must fail Vfs conformance"),
     }
 }

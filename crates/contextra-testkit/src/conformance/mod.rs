@@ -68,6 +68,9 @@ pub mod text;
 /// Konformitätssuite für den `VectorIndex`-Port.
 pub mod vector;
 
+/// Konformitätssuite für den `Vfs`-Port.
+pub mod vfs;
+
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
@@ -77,3 +80,4 @@ pub use rng::run_rng_suite;
 pub use storage::run_storage_engine_suite;
 pub use text::run_text_index_suite;
 pub use vector::run_vector_index_suite;
+pub use vfs::run_vfs_suite;
