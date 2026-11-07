@@ -42,7 +42,6 @@ all-formats = [
 [dependencies]
 # Workspace crates
 contextra-types = { workspace = true }
-contextra-engine = { workspace = true }
 
 # Always dependencies
 serde = { workspace = true }
