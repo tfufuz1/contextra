@@ -87,7 +87,7 @@ Die Erkennungsqualität wurde mithilfe eines synthetischen Korpus (`tests/fixtur
 1. **Synthetische Testdaten vs. Reale Daten:** Die Erkennungsqualität wurde ausschließlich auf einem kleinen synthetischen Korpus (N = 600) gemessen. Dies stellt **keine Aussage über reale Daten**, reale Sprachvarianz, Dialekte oder komplexe Formatierungsfehler dar.
 2. **Keine vollständige OCR-/Layout-Analyse:** `RuleBasedEntityRecognizer` operiert zeichen- und bytebasiert auf UTF-8-Strings. Formatierungen in Tabellen, PDFs oder Bildern werden nicht erfasst.
 3. **Mehrdeutigkeit kurzer Nummern:** Postleitzahlen (PLZ) und Teilabschnitte von Telefonnummern weisen systembedingt Überlappungen mit Bestellnummern, Versionsnummern oder Geldbeträgen auf (niedrigere Precision bei isolierten 5-Ziffern-Folgen).
-4. **Kein Echtzeit-Schutz gegen alle Inferenz-Modelle:** `EgressGuard` prüft semantische Vektorähnlichkeit gegen gespeicherte Schwellenwerte, garantiert jedoch keinen vollständigen Schutz gegen Prompt-Injection-Evasion oder Steganographie.
+4. **Kein Echtzeit-Schutz gegen alle Inferenz-Modelle:** `EgressGuard` prüft semantische Vektorähnlichkeit gegen gespeicherte Schwellenwerte, schützt jedoch nicht lückenlos gegen Prompt-Injection-Evasion oder Steganographie.
 
 ---
 
