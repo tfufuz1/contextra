@@ -1,5 +1,4 @@
 #![cfg(feature = "kv-bridge")]
-
 // ANCHOR[contextra-infer-candle:TEST-KV-BRIDGE-VERSION-MISMATCH]
 //! Verification test for KV-Bridge mismatch and corruption scenarios: Model fingerprint mismatch, RoPE mismatch, truncated or corrupted bytes.
 
@@ -65,7 +64,7 @@ fn test_version_and_model_mismatch_returns_none_without_panic() {
 fn test_corrupted_or_truncated_bytes_returns_none_without_panic() {
     let cipher = setup_test_cipher();
     let store = Arc::new(TenantIsolatedKvStore::new());
-    let adapter = KvBridgeAdapter::new(store, Arc::clone(&cipher));
+    let adapter = KvBridgeAdapter::new(store, cipher.clone());
 
     let tenant = TenantId::try_new(15).unwrap();
     let chunk_id = 3003;
