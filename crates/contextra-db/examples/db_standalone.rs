@@ -18,7 +18,10 @@ async fn main() -> contextra_types::Result<()> {
     };
 
     let db = Contextra::open_with_config(tmp_dir.path(), config).await?;
-    println!("Contextra-DB standalone instance successfully opened at {:?}", tmp_dir.path());
+    println!(
+        "Contextra-DB standalone instance successfully opened at {:?}",
+        tmp_dir.path()
+    );
 
     db.insert(
         "doc-42",

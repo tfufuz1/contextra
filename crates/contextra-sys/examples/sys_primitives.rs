@@ -20,11 +20,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2. Speicher-Sperrung (mlock) mit RAII-Verwaltung und sicherem Überschreiben
     let mut secret_buf = vec![0x42u8; 64];
     let mut locked_regions = LockedRegions::new();
-    let locked = locked_regions.lock_slice_with_policy(
-        &secret_buf,
-        true,
-        MemLockPolicy::Tolerant,
-    )?;
+    let locked =
+        locked_regions.lock_slice_with_policy(&secret_buf, true, MemLockPolicy::Tolerant)?;
     println!("Sensibler Speicherbereich gesperrt: {}", locked);
 
     // Volatile Zeroization vor Freigabe
@@ -46,7 +43,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let payload = b"Beispieldaten fuer contextra-sys Baukasten";
         write_all_durable(&mut file, payload)?;
         durable_flush_file(&file, true)?;
-        println!("Daten geschrieben und haltbar geflasht ({} Bytes)", payload.len());
+        println!(
+            "Daten geschrieben und haltbar geflasht ({} Bytes)",
+            payload.len()
+        );
     }
 
     // 4. Versiegelte Datei öffnen und als SealedMap einbinden (INV-IO-1)

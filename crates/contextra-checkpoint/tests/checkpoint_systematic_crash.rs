@@ -58,12 +58,7 @@ impl<S: StorageEngine> StorageEngine for FaultInjectingStorage<S> {
         self.inner.get_at_seq(key, seq)
     }
 
-    fn put<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_put.load(Ordering::SeqCst) {
                 return Err(ContextraError::Io(std::io::Error::other(
@@ -164,7 +159,10 @@ async fn systematic_crash_at_every_checkpoint_io_point() {
 
         // Put initial test data in storage
         let tx1 = TxId::new(1);
-        fault_storage.put(tx1, b"doc1", b"content_v1").await.unwrap();
+        fault_storage
+            .put(tx1, b"doc1", b"content_v1")
+            .await
+            .unwrap();
         fault_storage.commit(tx1).await.unwrap();
 
         let store = PersistentCheckpointStore::open(fault_storage.clone(), "test_ns")
@@ -190,14 +188,25 @@ async fn systematic_crash_at_every_checkpoint_io_point() {
             .await;
 
         if crash_mode < 3 {
-            assert!(cp_res.is_err(), "Crash mode {crash_mode} must cause create_checkpoint to fail");
             assert!(
-                store.get_checkpoint("chk_systematic").await.unwrap().is_none(),
+                cp_res.is_err(),
+                "Crash mode {crash_mode} must cause create_checkpoint to fail"
+            );
+            assert!(
+                store
+                    .get_checkpoint("chk_systematic")
+                    .await
+                    .unwrap()
+                    .is_none(),
                 "Failed checkpoint creation must not be queryable"
             );
         } else {
             assert!(cp_res.is_ok(), "Clean run must succeed");
-            let meta = store.get_checkpoint("chk_systematic").await.unwrap().expect("Checkpoint must exist");
+            let meta = store
+                .get_checkpoint("chk_systematic")
+                .await
+                .unwrap()
+                .expect("Checkpoint must exist");
             assert_eq!(meta.name, "chk_systematic");
             assert_eq!(meta.seq_no, 1);
         }
@@ -226,13 +235,22 @@ async fn crash_during_checkpoint_deletion_leaves_clean_state() {
     fault_storage.fail_delete.store(true, Ordering::SeqCst);
 
     let drop_res = store.drop_checkpoint("chk_to_drop").await;
-    assert!(drop_res.is_err(), "Drop with failing storage delete must return error");
+    assert!(
+        drop_res.is_err(),
+        "Drop with failing storage delete must return error"
+    );
 
     // Clear fault and verify drop works cleanly
     fault_storage.fail_delete.store(false, Ordering::SeqCst);
     let retry_drop = store.drop_checkpoint("chk_to_drop").await;
-    assert!(retry_drop.is_ok(), "Retry of drop_checkpoint must succeed cleanly");
+    assert!(
+        retry_drop.is_ok(),
+        "Retry of drop_checkpoint must succeed cleanly"
+    );
 
     let check = store.get_checkpoint("chk_to_drop").await.unwrap();
-    assert!(check.is_none(), "Checkpoint must be removed after successful drop");
+    assert!(
+        check.is_none(),
+        "Checkpoint must be removed after successful drop"
+    );
 }

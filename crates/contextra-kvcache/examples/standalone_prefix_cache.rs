@@ -3,9 +3,7 @@
 //! Demonstriert Prefix-Matching, Segmentverwaltung und Tenant-Isolation
 //! vollkommen ohne Inferenz-Frameworks oder Modell-Gewichte.
 
-use contextra_kvcache::{
-    KvCacheConfig, KvCacheServiceBuilder, KvSegment, TenantIsolatedKvStore,
-};
+use contextra_kvcache::{KvCacheConfig, KvCacheServiceBuilder, KvSegment, TenantIsolatedKvStore};
 use contextra_types::TenantId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,9 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         max_ram_bytes: 1024 * 1024, // 1 MiB RAM Budget
         ..Default::default()
     };
-    let service = KvCacheServiceBuilder::new()
-        .with_config(config)
-        .build()?;
+    let service = KvCacheServiceBuilder::new().with_config(config).build()?;
 
     // 3. Store direkt für Segment-Operationen nutzen
     let store = TenantIsolatedKvStore::new();
@@ -49,11 +45,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 6. Abruf für Tenant Alpha verifizieren
     let retrieved = store.get_segment_bytes(tenant_alpha, 1);
     assert_eq!(retrieved.as_deref(), Some(seg1_data.as_slice()));
-    println!("Segment retrieval verified: retrieved {} bytes for segment 1.", seg1_data.len());
+    println!(
+        "Segment retrieval verified: retrieved {} bytes for segment 1.",
+        seg1_data.len()
+    );
 
     // 7. Service-Statistiken abrufen
     let stats = service.stats();
-    println!("Cache Service initialized successfully. Hits: {}, Misses: {}", stats.hits, stats.misses);
+    println!(
+        "Cache Service initialized successfully. Hits: {}, Misses: {}",
+        stats.hits, stats.misses
+    );
 
     println!("=== Standalone KV-Cache example completed successfully ===");
     Ok(())

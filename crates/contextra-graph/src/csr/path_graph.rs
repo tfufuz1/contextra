@@ -24,7 +24,11 @@ impl crate::provider::GraphProvider for CsrGraph {
 
     fn contains_node(&self, node: EntityId) -> bool {
         let inner = self.inner_read();
-        inner.id_map.get(&node).and_then(|&idx| inner.entity_at(idx)).is_some()
+        inner
+            .id_map
+            .get(&node)
+            .and_then(|&idx| inner.entity_at(idx))
+            .is_some()
     }
 
     fn outgoing_edges(&self, node: EntityId) -> Vec<(EntityId, f32)> {

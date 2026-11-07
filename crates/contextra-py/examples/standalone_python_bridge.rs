@@ -17,7 +17,7 @@ fn main() {
 #[cfg(not(feature = "pyo3"))]
 fn main() {
     println!("contextra-py built in lightweight core mode (without PyO3 bindings).");
-    println!("Version: {}", contextra_py::VERSION);
+    println!("Version: {}", _contextra::VERSION);
 }
 
 #[cfg(feature = "pyo3")]
