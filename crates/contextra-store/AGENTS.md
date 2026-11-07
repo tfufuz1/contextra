@@ -1,48 +1,87 @@
 # AGENTS.md — `contextra-store`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-store` stellt eine hochperformante, crash-resistente Log-Structured Merge-tree (LSM) Storage Engine mit Write-Ahead-Log (WAL), MemTable (Skip-List), SSTable (Block-basiert mit Bloom-Filtern, CRC32, Block-Cache) und Background-Compaction bereit (Ring 1).
-Als autonomer Speicherbaustein implementiert er den Port `StorageEngine` aus `contextra-ports`.
-Im Sinne der modularen Baukasten-Architektur wurde die historische, tief verwobene Löschkette vollständig aus dem Kern entfernt: Der Store fungiert als reiner, robuster Datenhalter mit Append- und Tombstone-Semantik und exportiert standardisierte Bereinigungs-Ports (`Purger`, `LayerScanner`) für `contextra-erasure`.
+> **Ring 1** · Klasse `[K]` · Reifegrad `beta` · Unsafe: nein · Rolle: LSM-Storage: WAL, Memtable, SSTable, Manifest, Kompaktion, Block-Cache. Implementiert `StorageEngine`.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 1 (Persistenz & LSM Storage Engine)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-mvcc`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Durability & fsync Error Propagation (T-FSYNC-1):** JEDER Aufruf von `sync_all()` und `sync_data()` MUSS Fehler strikt mit `?` propagieren. Fatale fsync-Fehler vergiften das Handle dauerhaft.
-- **Single Load Rule:** In `get_at_seq()` und `scan_prefix_at()` wird `last_committed_tx` exakt EINMAL am Anfang gelesen (Snapshot Isolation Garantie).
-- **Flush-before-Visible (ADR-043):** `last_committed_tx` MUSS vor dem Sichtbarmachen neuer SSTables in der Generationen-Liste aktualisiert werden.
-- **TOMBSTONE_BIT-Disziplin (ADR-041):** Bit 63 strikt maskieren (`seq & !TOMBSTONE_BIT`) vor allen `max_seq`-Vergleichen.
-- **WAL-HMAC Chaining & Key Derivation:** Deterministische HMAC-Verkettung pro Log-Record; Schlüsselableitung erfolgt über `contextra-crypto`.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` in produktiven I/O- und Compaction-Pfaden.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-store --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `mvcc`, `ports`, `sys`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `mvcc`, `crypto`, `sys`, `durable-fs` |
+| Features | `block-cache-v2`, `sieve-cache`, `docid-128`, `fault-injection`, `memory-only-storage`, `legacy-wal-key`, `test-hooks` |
+| Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
-## 4. Verbotene Muster
-- **Keine Abhängigkeiten zu `contextra-core`** (Imports erfolgen direkt aus `contextra-types` und `contextra-ports`).
-- Keine direkten Peer-Abhängigkeiten zu `contextra-vector` oder `contextra-text` im Produktionscode.
-- Keine Multi-Level Deletion-Saga-, Rechts- oder DSGVO-Logik im Store (gehört exklusiv nach `contextra-erasure`).
-- Kein Blockieren des asynchronen Tokio-Reactors durch synchrone I/O (SSTable pread läuft via `spawn_blocking`).
-- Kein Ignorieren von Verzeichnis-Syncs beim atomaren File-Rename.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `StorageEngine`, `Purger`, `LayerScanner`.
-- **Konsumiert:** `Clock`-Port, `Vfs`-Port (aus `contextra-durable-fs`), `contextra-mvcc` für Transaktionsverwaltung.
-- **Genutzt von:** `contextra-engine`, `contextra-db`, `contextra-agent`.
+- **Dev-Kanten auf höhere/gleiche Schichten** (M6): `graph`, `sandbox`, `vector` (+ Selbstreferenz). Nach `testkit`/`tests/` verlagern.
+- **Kein Dep auf `durable-fs`**; direkte Datei-I/O (~77 `fs`-Treffer, ~176 `tokio::`-Treffer): Umstellung auf `Vfs` (D4, WP 4.4).
+- **Löschreste:** `kv/segment.rs`, `kv/delete_mode.rs` (Shredding-Bezug, 28 Treffer), `compaction/engine.rs`, `compaction/adaptive.rs` (WP 3.2).
+- Implementierte Ports sind vorhanden: `scanner/` (`LsmPurger`, `MemtableScanner`, `SstableScanner`, `WalScanner`).
 
-## 6. Concurrency, Lock-Hierarchie & Performance
-- **Lock-Ordnung (Deadlock-Prävention):**
-  1. `write_lock` (`tokio::sync::Mutex` — WAL & MemTable Atomizität)
-  2. `memtable` (`Arc<parking_lot::RwLock>`)
-  3. `sstables` (`Arc<parking_lot::RwLock>`)
-  4. `snapshot_registry` (`parking_lot::Mutex`)
-- **Regel:** Niemals einen Lock in umgekehrter Reihenfolge akquirieren. Niemals einen synchronen Lock-Guard über `.await`-Punkte halten.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Tests, Sabotage & Qualitätssicherung
-- **Fault-Injection & Recovery Tests:** WAL-Replay-Validierung und Crash-Simulation mitten im Flush/Compaction-Zyklus.
-- **Fuzzing (REQ-QA-003):** WAL-Decoder- und SSTable-Block-Fuzzer.
-- **Mutations-Testing:** Prüfung der Fehlerfortpflanzung bei sabotierten fsync-Operationen.
+| Pfad | Verantwortung |
+|---|---|
+| `wal/` (`encode`, `flusher`, `hmac`, `io`, `replay`) | Append-only WAL, HMAC-Kette, Flusher-Actor, Replay |
+| `lsm/` (`engine`, `commit`, `flush`, `group_commit`, `guard`, `recovery`, `scan`, `ops/*`, `validate`) | Orchestrierung, Commit, Recovery |
+| `memtable.rs` | Memtable mit Sequenznummern/Tombstones |
+| `sstable/` (`builder`, `reader`, `block_cache`, `bloom`, `stream`, …) | Sortierte Segmente, Block-Cache, Bloom |
+| `manifest/` | transaktionales Manifest |
+| `compaction/` (`engine`, `adaptive`, `config`, `merge_operator`, `retention`) | Level-Merge, `MergeOperator` |
+| `scanner/` (`memtable`, `sstable`, `wal`, `purge`) | **Port-Implementierungen** `LayerScanner`/`Purger` |
+| `kv/` | KV-Segmente, Löschmodus (Schuld) |
+| `fsync.rs`, `util.rs`, `system_pressure.rs`, `tenant_codec.rs`, `engine/` | Sync-Stelle, Hilfen, Druck, Tenant-Präfix, In-Memory-Engine |
 
-## 8. Offene Punkte & Technische Schulden
-- DEBT-01: Bereinigung historischer Lösch-Signaturen zugunsten des reinen `Purger`-Ports.
+## 4. Verträge & Invarianten
+
+1. **`fsync`-Fehler propagieren** (`?`), nie `let _ =`; nach Fehler Handle vergiften (INV-FSYNC-1). `fsync.rs` ist die einzige Stelle für Datei-/Verzeichnis-Sync.
+2. **Atomares Schreiben:** tmp-Datei → `fsync` → `rename` → Parent-`fsync`.
+3. **Tombstone-Disziplin:** Bit 63 maskieren (`seq & !TOMBSTONE_BIT`) vor jedem `max_seq`-Vergleich (verifiziert u. a. in `compaction/adaptive.rs`).
+4. **Single-Load-Regel:** `last_committed_tx` in `get_at_seq`/`scan_prefix_at` **einmal** laden (Snapshot-Isolation). **Flush-before-Visible:** `last_committed_tx` vor dem Sichtbarmachen der SSTable aktualisieren (ADR-043, Altdokument: am Code in `lsm/flush.rs` prüfen).
+5. **WAL-HMAC-Schlüssel** nur über `load_or_create_integrity_key` (`wal/hmac.rs`, `pub(crate)`), nie hartcodiert; `legacy-wal-key` nur für Migration.
+6. **Tenant-Präfix in jedem Schlüssel** (INV-TENANT-1); Schlüssel/Dateinamen nur opake IDs (INV-KEYSPACE-1).
+7. **Neu verboten:** DSGVO-/Proof-/Saga-/Shredding-Logik (M7). Purge-Kompaktion nur über `Purger` (`compact_range(scope)`).
+8. Jede Datei: Magic + Formatversion (INV-FORMAT-1); Prüfsummen erkennen Bit-Rot (kein Korrekturversprechen).
+
+## 5. Ports
+
+**Implementiert:** `StorageEngine`, `Purger`, `LayerScanner`, `BlockCache`, `MergeOperator`. **Konsumiert:** `Clock`, `Vfs` (Soll), `MetricsSink`.
+
+## 6. Nebenläufigkeit & Performance
+
+- **Sperrenordnung** (Altdokument, vor Änderung verifizieren): `write_lock` → `memtable` → `sstables` → `snapshot_registry`. Nie umgekehrt, nie `parking_lot`-Guard über `.await` (`clippy::await_holding_lock`).
+- Schreibpfad über Group-Commit und Flusher-Actor (Message-Passing statt geteiltem Zustand). `loom`: `just loom-store`.
+- Lesepfad Ziel: allokationsfrei (`with_value`, `PinnedBlock`, WP 4.1). Blockierende Datei-I/O in `async` nur via `spawn_blocking`.
+- Komplexität: Punktlesen `O(log n)`-Ebenen + Bloom; Compaction-Schreibverstärkung messen (`tests/amplification_benchmark.rs`).
+
+## 7. Anti-Patterns
+
+- `let _ = file.sync_all()`.
+- `bincode::deserialize(..).unwrap_or_default()` auf WAL-Daten.
+- `std::fs` direkt statt `Vfs`.
+- Neue Abhängigkeit auf `vector`/`text`/`graph` (Peer-Import verboten).
+- Löschlogik/Proof-Typen im Store.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-store --locked
+cargo clippy -p contextra-store --all-targets -- -D warnings
+just loom-store
+cargo bench -p contextra-store            # wal, memtable, sstable, block_cache, lsm
+cargo mutants --config mutants-guarantees.toml -p contextra-store -f "crates/contextra-store/src/wal/**"
+```
+
+- Vorhanden: Chaos (`chaos_*`), Campaign-/Property-Tests, Fuzz (`fuzz_wal_replay`, `wal_roundtrip`, `fuzz_manifest_load`, `wal_mutation_chaos`), Benchmarks inkl. Vergleich `redb`.
+- Ratchet: `tokio::`/`fs`-Treffer dürfen nicht steigen.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 3.2 | Löschketten-/Shredding-Relikte entfernen, nur `Purger`/`LayerScanner` behalten |
+| 4.1 | Compaction als Level-Merge, `PinnedBlock`, `with_value` |
+| 4.4 / D4 | `Vfs` statt `fs`/`tokio::fs`; Dep auf `durable-fs` |
+| M6 | Dev-Kanten `graph`, `sandbox`, `vector` entfernen |

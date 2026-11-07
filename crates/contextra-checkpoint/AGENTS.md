@@ -1,36 +1,71 @@
 # AGENTS.md — `contextra-checkpoint`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-checkpoint` koordiniert transaktionskonsistente Snapshots und Checkpoints über heterogene Speicherkomponenten hinweg (Ring 1).
-Herzstück ist der `CheckpointGuard`, der über RAII-Semantik sicherstellt, dass Transaktionen entweder explizit committet werden oder bei Panic/Drop deterministisch zurückrollen.
-Als isolierter Baustein implementiert er `CheckpointCoordinator` und speichert benannte Snapshots (`PersistentCheckpointStore`) mit BLAKE3-Manifest-Verifikation.
+> **Ring 1** · Klasse `[K]` · Reifegrad `stable` · Unsafe: nein · Rolle: Benannte Checkpoints, RAII-`CheckpointGuard`, Orphan-Reaping, Manifest-Verifikation (BLAKE3).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 1 (Snapshot-Koordination & Time-Travel)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-store`, `contextra-mvcc` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **RAII-Commit-Garantie:** Ein nicht explizit committeter `CheckpointGuard` löst beim Drop deterministisch ein Rollback aus.
-- **Transaktions-Konsistenz:** Checkpoints bilden exakte, zeitpunktbezogene Schnittmengen über LSM-Store und assoziierte Indizes ab.
-- **Manifest-Integrität:** Jeder Checkpoint wird durch einen BLAKE3-Kryptohash geschützt und beim Laden verifiziert.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; Fehler bei Snapshot-Erstellung oder -Wiederherstellung werden als `ContextraError` gemeldet.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-checkpoint --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `mvcc` |
+| Features | keine |
+| Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
-## 4. Verbotene Muster
-- Keine Abhängigkeiten zu `contextra-core` (direkte Nutzung von `contextra-types` und `contextra-ports`).
-- Keine Vermischung mit der internen, privaten Snapshot-Logik von `contextra-store::checkpoint`.
-- Keine unvollständigen Snapshots bei partiellen I/O-Fehlern (alles-oder-nichts Atomizität).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `CheckpointCoordinator`.
-- **Konsumiert:** `Clock`-Port, `StorageEngine`-Port, `contextra-mvcc`.
-- **Bereitgestellt für:** `contextra-engine`, `contextra-agent`.
+- Normalkanten sauber; Dev-Kanten auf `store`, `mvcc`, `testkit` (M6: `store` nach `testkit`/`tests`).
+- `capabilities.toml` nennt noch `contextra-core`: entfernen.
+- Direkte Datei-I/O (`hardlink_cloner.rs`, ~7 Treffer) und `tokio` (~17): `Vfs`/synchroner Kern prüfen.
+- Zugriff auf den Store nur über `StorageEngine`-Port, nie über `contextra_store`.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Rollback-on-Drop Tests:** Verifikation der Rollback-Invariante bei simuliertem Thread-Panic und vorzeitigem Scope-Verlassen.
-- **Crash-Recovery Tests:** Wiederherstellung benannter Checkpoints nach unvollständigen Schreibvorgängen.
-- **Mutations-Testing:** Prüfung der Erkennung manipulierter Manifest-Dateien.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `guard.rs` | `CheckpointGuard<S>`: commit/rollback, Drop registriert Orphan |
+| `store.rs` | `PersistentCheckpointStore`: create/restore/drop, `allocate_tx`, Snapshot-Pinning |
+| `manifest.rs`, `meta.rs` | signiertes/geprüftes Manifest, Metadaten |
+| `orphan.rs` | Reaper für verwaiste Checkpoints |
+| `hardlink_cloner.rs` | Hardlink-Klone für Snapshots |
+
+## 4. Verträge & Invarianten
+
+1. **Guard wird konsumiert:** `commit()` oder `rollback()`; `Drop` kann nicht async, deshalb Orphan-Registrierung und späterer Reaper (`recover_orphaned_checkpoints`).
+2. **Pinning:** gepinnte Checkpoints verhindern Version-GC im Store; beim Löschen unpinnen.
+3. **Restore bringt Gelöschtes nicht zurück:** Restore läuft hinter dem `RestoreGuard` von `contextra-erasure` (INV-NO-RESURRECTION-1, INV-RESTORE-HORIZON-1). `checkpoint` selbst kennt keine Löschlogik.
+4. Zeit/IDs über `Clock`/`IdGen` (Tests `checkpoint_clock_determinism`, `id_gen_determinism_test`).
+5. Manifest mit Prüfsumme; manipuliertes Manifest ⇒ Ablehnung (`manifest_fault_injection.rs`).
+
+## 5. Ports
+
+**Implementiert:** `CheckpointCoordinator`/`Checkpoint`. **Konsumiert:** `StorageEngine`, `Clock`, `IdGen`, `Vfs` (Soll).
+
+## 6. Nebenläufigkeit & Performance
+
+- Offene Guards halten Schreibpuffer und blockieren das MVCC-Watermark: kurz halten, nie über lange `.await`-Ketten.
+- Concurrency-Tests: `cache_concurrency_pinning.rs`, `concurrency.rs`.
+
+## 7. Anti-Patterns
+
+- Guard vor langem `.await` anlegen.
+- `SystemTime` als `TxId`.
+- `contextra_store::checkpoint` importieren (existiert intern, nicht öffentlich).
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-checkpoint --locked
+cargo clippy -p contextra-checkpoint --all-targets -- -D warnings
+cargo bench -p contextra-checkpoint
+```
+
+- Vorhanden: systematische Crash-Tests, Tenant-Isolation, Zeitreise-Korrektheit, Proptests für Guard.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 4.6 | Backup/Snapshot isolieren, Legacy-Löschmarken bereinigen, autarker Wiederanlauf-Test |
+| M6 | Dev-Kante `store` entfernen |

@@ -1,37 +1,63 @@
 # AGENTS.md — `contextra-infer-onnx`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-infer-onnx` stellt vollständig lokale, plattformübergreifende Vektor-Einbettungen und Cross-Encoder Reranking auf Basis der ONNX-Runtime (`ort`) bereit (Ring 2).
-Als autarker Baustein implementiert er `EmbeddingProvider` aus `contextra-ports`.
-Das Modul arbeitet strikt Offline-First (Modelldownloads standardmäßig deaktiviert), erzwingt kryptografische SHA-256-Prüfungen und entkoppelt maschinelles Lernen von externen Server-Infrastrukturen.
+> **Ring 2** · Klasse `[R]` (Rand) · Reifegrad `siehe `capabilities.toml`` · Unsafe: nein · Rolle: ONNX-Embedding- und Cross-Encoder-Reranking-Adapter (`ort`).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 2 (ONNX Inferenz & Reranking)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-rank` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Offline-First & Checksummen-Pflicht:** Downloads standardmäßig blockiert (`allow_download = false`). Wenn aktiviert, nur über HTTPS mit Host-Allowlist, strikter SHA-256-Hash-Prüfung und Größenbeschränkung.
-- **Nicht-blockierendes I/O:** Datei-I/O und Modell-Ladevorgänge laufen über `tokio::task::spawn_blocking` mit atomarem Tempfile-Staging und `fsync`.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; robuste Validierung von Sequenzlängen, Batch-Größen und Thread-Limits.
-- **Fail-Closed Eingabevalidierung:** Rechnen auf fehlerhaften Tensordimensionen wird vorab abgefangen.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-infer-onnx --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `rank`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `rank` |
+| Features | `onnx`, `reranking` (`default` enthält sie nicht zwingend: prüfen) |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Direkte blockierende ONNX-Runtime C-Aufrufe im asynchronen Tokio-Event-Loop.
-- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
-- Ungeprüftes Laden beliebiger `.onnx`-Dateien ohne Validierung.
-- Abhängigkeiten zu höheren Orchestrierungsschichten.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `EmbeddingProvider`, Cross-Encoder Reranker.
-- **Konsumiert:** `contextra-types`, `contextra-ports`, `contextra-rank`.
-- **Bereitgestellt für:** `contextra-engine`, `contextra-db`, `contextra-mcp`.
+- Kanten Ist = Soll. Externe Schwergewichte: `ort`, `reqwest`, `tokio`.
+- `engine` hängt hart an diesem Crate (Ist): Soll nur über Port/Feature (WP 5.3).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Model-Integrity Tests:** Verifikation der Hash-Validierung und Schutz gegen beschädigte Modell-Dateien.
-- **Batching & Latenz-Benchmarks:** Empirische Messung von Throughput und Speicherauslastung.
-- **Sabotage-Testing:** Prüfung der Fehlerfortpflanzung bei Injektion ungültiger Token-Arrays.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `lib.rs` | Embedder, Konfiguration |
+| `reranker/` (`onnx`, `cross_encoder`, `config`) | Cross-Encoder-Reranking |
+
+## 4. Verträge & Invarianten
+
+1. **Feature-Gate:** `onnx` ist nie im Minimalbau (M5); aufrufender Code liegt hinter `cfg(feature = "onnx")`.
+2. **Inferenz blockiert:** `session.run()` nie direkt im Executor, sondern `spawn_blocking`/Compute-Pool.
+3. **Modell-Identität (INV-EMBED-2):** Modell-Hash und Dimension werden gemeldet; abweichender Hash wird von der Collection abgewiesen.
+4. **Nichtdeterministische Ausgabe** geht als Wert ins WAL (INV-NONDET-1); Index-Rebuild ruft das Modell nie erneut.
+5. Session-Pool einmal laden und per `Arc` teilen.
+
+## 5. Ports
+
+**Implementiert:** `EmbeddingProvider`, `Reranker`.
+
+## 6. Nebenläufigkeit & Performance
+
+- Sessions poolen; Thread-Anzahl konfigurierbar; kein Laden pro Request.
+
+## 7. Anti-Patterns
+
+- Modell pro Anfrage laden.
+- Embedder ohne Dimensionsprüfung.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-infer-onnx --locked
+cargo clippy -p contextra-infer-onnx --all-targets -- -D warnings
+```
+
+- Backend-Tests laufen ohne Modell/Netz über Fakes; echte Modelle nur hinter Feature und in separatem CI-Job.
+- Konformitätslauf gegen `ports::contract_tests` für `EmbeddingProvider`.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.3 | Kante `engine → infer-onnx` per Feature/Port lösen |

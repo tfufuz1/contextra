@@ -1,37 +1,63 @@
 # AGENTS.md — `contextra-router`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-router` ist eine dynamische Routing- und Entscheidungs-Engine (Ring 3) zur adaptiven Modellauswahl (Small Language Models / SLM-Routing) und Drift-Kontrolle.
-Er bewertet Modellkapazitäten, Latenzbudgets und Domänen-Affinitäten und wendet `ConformalCalibrator` sowie Lyapunov Drift Watcher an, um Routing-Entscheidungen kontinuierlich nachzuführen.
-Als eigenständiger Baustein kapselt er die Auswahl- und Dispatching-Logik und interagiert über lose gekoppelte Ports mit Inferenz- und Speichermodulen.
+> **Ring 3** · Klasse Rand `[R]` (SPEC-Katalog: Archiv, Root-§10 K5) · Reifegrad `stable` · Unsafe: nein · Rolle: Adaptives Query-/Modell-Routing (Bandits, Conformal Calibration, Dispatch).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 3 (Drift Control & Multi-Candidate Search Routing)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-wire`, `contextra-ports`, `contextra-adapt` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird über das gesamte Crate hinweg erzwungen.
-- **Budget-Einhaltung:** Ein Modell darf niemals ausgewählt werden, wenn das aktuelle Token-Fenster (`ContextWindow`) dessen Kapazitätsgrenzen übersteigt.
-- **Conformal Calibration (ADR-050, ADR-054):** Atomare Updates des Profil-Kalibrierungszustands ohne TOCTOU-Scoring-Rennen.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; robuste Fallbacks bei Ausfall einzelner Inferenz-Ziele.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-router --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `adapt`, `ports`, `types`, `wire` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `wire`, `adapt` |
+| Features | `bandit-routing`, `flow-corrected-thompson`, `egress-sherman-morrison`, `cloud-egress-guard` |
+| Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
-## 4. Verbotene Muster
-- Direkte Abhängigkeiten zu `contextra-privacy` (Entkopplung über den Standard-Port `EgressPolicy`).
-- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
-- Blindes Dispatching ohne vorherige Budget- und Vertrauensbereichs-Prüfung.
-- Geschachtelte Locks über Modulgrenzen hinweg.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `RouterEngine`, `LyapunovDriftWatcher`, `RoutingStrategy`.
-- **Konsumiert:** `Clock`-Port, `EgressPolicy`, `contextra-adapt`.
-- **Bereitgestellt für:** `contextra-mcp`, `contextra-agent`.
+- Normalkanten = Soll. `capabilities.toml` nennt zusätzlich `privacy` (nicht in Cargo). Dev-Kanten `db`, `graph`, `text`, `vector` (M6).
+- Egress soll über den Port `EgressPolicy` laufen (WP 2.4), nicht über eine Bindung an `privacy`.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Conformal Calibration Verifikation:** Tests zur Konvergenz der Nicht-Konformitäts-Scores bei Modell-Drift.
-- **TOCTOU Race Detection:** Paralleltests mit konkurrierenden Profil-Updates unter extremer Last.
-- **Sabotage-Testing:** Gezielte Injektion unerwarteter Modell-Fehlerraten zur Prüfung der Umschaltlogik.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- DEBT-04: Vollständige Entkopplung der temporären `contextra-db` Dev-Dependencies.
+| Pfad | Verantwortung |
+|---|---|
+| `router/` (`dispatch_core`, `lifecycle`, `outcomes`) | `RouterEngine` |
+| `profile.rs`, `arm_registry.rs`, `routing_strategy.rs` | Profile, Arme, Strategien |
+| `dispatch.rs`, `fc_ts_dispatch.rs`, `transport.rs`, `outcome.rs` | Dispatch, Transport, Ergebnisse |
+
+## 4. Verträge & Invarianten
+
+1. Ein Modell wird nie gewählt, dessen Kontextgrenze das Fenster überschreitet; sonst vorher kompaktieren.
+2. Kalibrierung wird nach jeder Interaktion aktualisiert (Conformal).
+3. Zufall nur über `Rng`, Zeit über `Clock`; Entscheidungen sind reproduzierbar (`id_gen_determinism_test`).
+4. Cloud-Egress ist standardmäßig aus und budgetiert (INV-EGRESS-BUDGET-1).
+
+## 5. Ports
+
+Konsumiert `Clock`, `Rng`, `IdGen`, `EgressPolicy` (Soll).
+
+## 6. Nebenläufigkeit & Performance
+
+- Profile/Statistiken hinter kurzem `parking_lot::RwLock`; Updates synchron und kurz.
+
+## 7. Anti-Patterns
+
+- SLM ohne Profil aufrufen.
+- Dispatch ohne Egress-Prüfung.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-router --locked
+cargo clippy -p contextra-router --all-targets -- -D warnings
+```
+
+- 7 Testdateien; Regret-Tests für Bandits.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 2.4 | `EgressPolicy` einführen und nutzen |
+| M6 | Dev-Kanten entfernen |

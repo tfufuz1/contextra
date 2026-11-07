@@ -1,39 +1,68 @@
 # AGENTS.md — `contextra-db`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-db` ist die High-Level Datenbank-Orchestrierungsschicht (Ring 3) für Multi-Signal-Fusion (Reciprocal Rank Fusion über Vektor, Volltext, Graph und Storage), Markdown-Chunking, Token-Budget-Management und iterative Suche.
-Als modularer Baustein orchestriert er die Kernsignale über Ports und traits, ohne proprietäre oder interne Engine-Typen nach außen lecken zu lassen.
-Im Baukastensystem wurde die monolithische Löschkaskade vollständig entfernt: Lösch- und Nachweispfade delegieren an den autarken Baustein `contextra-erasure`.
+> **Ring 3** · Klasse `[K]` (Referenz-Komposition) · Reifegrad `beta` · Unsafe: nein · Rolle: Dünne Referenzkomposition für Single-Node: Prelude/Advanced-API, Regler (`homeostat`, PID), `MultiStepEngine`, `volatile_vault`.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 3 (Main Database Abstraction & Hybrid Search)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-engine`, `contextra-sys`, `contextra-types`, `contextra-ports`, `contextra-vector`, `contextra-store`, `contextra-graph`, `contextra-text`, `contextra-adapt`, `contextra-rank`, `contextra-checkpoint`, `contextra-cognition` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Kausalität & Transaktionen:** `TxId` wird deterministisch und monoton bezogen; Kausalitätsbrüche bei Graph- und Speicherindizes sind ausgeschlossen.
-- **4-Signal Fusion Pipeline:** Standardisierte Normalisierung via RRF (`reciprocal_rank_fusion`) zum Ausgleich von Score-Verzerrungen aus unterschiedlichen Domänen.
-- **Strukturiertes Chunking:** Sauberes Aufteilen von Markdown-Dokumenten entlang semantischer Headings (`MarkdownChunker`).
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; robuste Handhabung leerer Trefferlisten in Fusionsalgorithmen.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-db --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `engine`, `ports`, `sys`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `engine`, `ports`, `types` |
+| Features | viele (u. a. `onnx`, `reranking`, `sandbox`, `volatile-vault`, `background-maintenance`) |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Halten von Locks über `.await`-Punkte hinweg (Fehlerklasse 11 strikt verboten).
-- Monolithische Löschketten im Crate (Delegation an `contextra-erasure`).
-- Aufruf veralteter API-Methoden (siehe DEBT-05).
-- Verwenden von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Lock-Hierarchie & Nebenläufigkeit
-- **Strikte Lock-Reihenfolge zur Deadlock-Prävention:**
-  1. `collections` (RwLock — Registry der aktiven Collections)
-  2. `kv_locks` (KvKeyLocks — Sharded Key Locks pro Collection)
-  3. `embedder` (RwLock — Lazy Embedder Initialization)
-- **Regel:** Niemals Locks in abweichender Reihenfolge akquirieren. Langlaufende Inferenz-Tasks niemals unter Locks ausführen.
+- ~2.100 Zeilen; die frühere Beschreibung als „Collection/RRF/Chunker-Monolith“ ist überholt (diese Logik liegt in `engine`).
+- **Überzählige Kante `sys`** (D9). **10 Dev-Kanten** (`adapt`, `checkpoint`, `cognition`, `graph`, `rank`, `store`, `sys`, `testkit`, `text`, `vector`) verletzen M6: Tests nach `tests/` des höheren Rings oder `testkit` verlagern.
+- Re-exportiert `engine`-Typen und `contextra_checkpoint` (M3-Leck).
+- `pid_latency_controller.rs`/`homeostat.rs`/`decay_controller` duplizieren Inhalte aus `adapt`/`engine`: DRY prüfen.
+- Alte Aufrufstellen: `crates/contextra-db/DEPRECATED_DEBT.md` (DEBT-05, 40 Stellen).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **RRF Bounds & Edge Cases:** Sabotage-Tests mit komplett leeren oder disjunkten Signal-Listen zur Prüfung auf Out-of-Bounds Fehler.
-- **Concurrency & Deadlock-Prüfung:** Parallele Lese- und Schreib-Transaktionen unter extremer Nebenläufigkeit.
-- **Fuzzing (REQ-QA-003):** Markdown-Chunker Fuzzing gegen maliziös geschachtelte Header.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- **DEBT-05:** Rückbau der 40 dokumentierten Legacy-API-Aufrufstellen gemäß Migrationsplan.
+| Pfad | Verantwortung |
+|---|---|
+| `lib.rs` | `prelude`, `advanced`, Re-Exports (`Collection`, `CollectionConfig`) |
+| `multistep.rs` | `MultiStepEngine`, `QueryRewriter` |
+| `homeostat.rs`, `pid_latency_controller.rs` | Regelkreise |
+| `volatile_vault.rs` | flüchtiger, verschlüsselter Ergebnisspeicher (nicht die Lösch-`FileVault`) |
+
+## 4. Verträge & Invarianten
+
+1. **Keine Logik** außer Komposition (SPEC §4.3). Neue Fachlogik gehört in `engine` oder einen Baustein.
+2. Keine Inferenz-Backends in `db`; Embedder kommen als Port von der Fassade (SPEC §4.4 Regel 8).
+3. Keine direkte Bindung an Löschketten-Interna (PLAN 3.6).
+4. LLM-gestützte Operationen (Multi-Step) nie unter Key-Lock oder Lese-Guard.
+
+## 5. Ports
+
+Konsumiert `engine`-Ports; implementiert keine.
+
+## 6. Nebenläufigkeit & Performance
+
+- Lock-Reihenfolge der `Collection` gilt unverändert (siehe `engine`).
+
+## 7. Anti-Patterns
+
+- Fachlogik hier ablegen.
+- Neue Dev-Kanten auf höhere Schichten.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-db --locked
+cargo clippy -p contextra-db --all-targets -- -D warnings
+```
+
+- Tests laufen über `tests/` (54 Dateien/Module). Charakterisierungstests vor jeder Entfernung veralteter Suchmethoden.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 3.6 | monolithische Löschkaskaden entfernen |
+| 5.x/D9 | `sys`-Kante, Dev-Kanten bereinigen |
+| DEBT-05 | Legacy-Such-Fassaden nach Frist entfernen |

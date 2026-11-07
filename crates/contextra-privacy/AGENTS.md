@@ -1,37 +1,65 @@
 # AGENTS.md — `contextra-privacy`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-privacy` ist ein autonomer Sicherheits- und Filtering-Baustein (Ring 3) für Cloud-Egress-Schutz, Data Loss Prevention (DLP), Anonymisierung/Surrogate-Vaulting und Bulk-Exfiltrations-Erkennung.
-Er schützt sensible Daten vor unerlaubtem Abfluss in externe Netze, indem er ausgehende Payloads klassifiziert, maskiert und volumetrisch überwacht.
-Als orthogonaler Sicherheits-Baustein implementiert er `EgressPolicy` aus `contextra-ports` und kann vor beliebige Netzwerk- oder Modell-Aufrufe geschaltet werden.
+> **Ring 3** · Klasse `[R]` (Rand) · Reifegrad `stable` · Unsafe: nein · Rolle: PII-Erkennung, Egress-Gateway/-Guard, Exfiltrationserkennung, Verarbeitungsverzeichnis.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 3 (Egress Filtering, Anonymisierung & DLP)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-ports`, `contextra-types`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird über das gesamte Crate hinweg erzwungen.
-- **Fail-Closed Prinzip:** Bei Timeouts, Filter-Fehlern, unklaren Klassifikationen oder Regex-Fehlern blockiert das Gateway ausgehende Payloads strikt (`Block(...)`).
-- **Surrogate Vaulting:** Anonymisierte Entitäten werden kryptografisch versiegelt und reversibel nur innerhalb autorisierter Session-Grenzen gehalten.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` in allen DLP- und Klassifikations-Pfaden.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-privacy --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types` |
+| Features | keine |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Jegliche Verwendung von `unsafe`.
-- Fail-Open Verhalten bei Sicherheitsprüfungen.
-- Vermischung von DLP-Filterung mit Speicher- oder Transaktions-Logik.
-- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `EgressPolicy`, `EgressGateway`.
-- **Konsumiert:** `Clock`-Port, Krypto-Primitiven aus `contextra-crypto`.
-- **Bereitgestellt für:** `contextra-mcp`, `contextra-router`, `contextra`.
+- Kanten Ist = Soll; `capabilities.toml` nennt zusätzlich `avv-generator` (nicht in Cargo).
+- 6 Treffer mit Shredding-Bezug: prüfen (Zuordnung `erasure`/`kvcache`).
+- Soll: implementiert den Port `EgressPolicy` (WP 2.4), der noch **nicht** in `ports` existiert (hier nur `BlockReason::EgressPolicyDenied`).
+- `mcp` re-exportiert `egress_*`/`bulk_exfiltration_detector` (dünne Wrapper, 4–54 Zeilen).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **DLP Regex Set Fuzzing:** Testen des Erkennungs-Sets gegen hochgradig permutierte sensible Muster (IBAN, Passwörter, API-Keys).
-- **Exfiltrations-Simulation:** Sabotagetests mit volumetrischer Überschreitung zur Prüfung des Sliding-Window Rate-Limiters.
-- **Fail-Closed Verifikation:** Gezielte Injektion von Timeouts zur Bestätigung der strikten Blockierung.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `egress_gateway.rs`, `egress_guard.rs`, `egress_vault.rs`, `guarded_payload.rs` | Egress-Klassifikation, typsichere Payloads |
+| `entity_recognizer.rs`, `bulk_exfiltration_detector.rs` | Erkennung |
+| `processing_registry.rs`, `audit_trace.rs`, `context_edit_audit.rs` | Verarbeitungsverzeichnis, Audit |
+
+## 4. Verträge & Invarianten
+
+1. **Jede externe Wirkung ist budgetiert, auditiert und widerrufbar** (INV-EGRESS-BUDGET-1). Ohne Port ist Egress gesperrt (INV-WIRING-2).
+2. Typestate: nur `Sanitized`-Payloads verlassen das System (`GuardedPayload`).
+3. Keine Nutzinhalte in Audit-/Logtexten (INV-LOG-1).
+4. Kein Rechts-/Löschnachweis hier; das ist `erasure`.
+
+## 5. Ports
+
+**Soll:** implementiert `EgressPolicy`, `EntityRecognizer`, `EgressChannel`, `InjectionDetector` (Sicherheitsports).
+
+## 6. Nebenläufigkeit & Performance
+
+- Hintergrund-Tokio nur in `egress_gateway`; Zustand pro Gateway-Instanz.
+
+## 7. Anti-Patterns
+
+- Egress ohne Klassifikation.
+- Standard-Allow-Implementierung.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-privacy --locked
+cargo clippy -p contextra-privacy --all-targets -- -D warnings
+```
+
+- 11 Testdateien; Dev-Kante `crypto` (M6 prüfen).
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 2.4 | Port `EgressPolicy` implementieren |
+| 3.x | Shredding-Treffer zuordnen |

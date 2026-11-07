@@ -1,36 +1,72 @@
 # AGENTS.md — `contextra-durable-fs`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-durable-fs` stellt ein atomares, crash-konsistentes Dateisystem-Fundament (Ring 0) für das Contextra-Baukastensystem bereit.
-Es implementiert synchrone Disk-Flushes (`fsync`, `fdatasync`), atomare Ersetzungen (`atomic_replace`), sichere Verzeichnis-Synchronisation und feingranulares Verzeichnis-Locking (`DirLock`).
-Als autarker Baustein realisiert es den Standard-Port `Vfs` aus `contextra-ports` und ermöglicht isolierte Datensicherheit für alle Speichermodule.
+> **Ring 0** · Klasse `[K]` · Reifegrad `(in `capabilities.toml` **nicht geführt**, D6)` · Unsafe: nein · Rolle: Dateisystem-Härtung: Durability-Flush, atomares Rename, Health-State-Machine, Fehlerinjektion.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Durability & File System I/O)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-sys` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **INV-DURABLE-FS-SAFE:** Reine sichere Dateisystem-Verwaltung; Fehler werden deterministisch als `std::io::Result` propagiert.
-- **INV-FSYNC-1 (D-55):** Handle-Poisoning bei fatalen fsync-Fehlern in `DurableHandle`; verhindert Folgeoperationen nach I/O-Ausfällen.
-- **INV-ENOSPC-1:** Fail-closed Fehlerbehandlung bei vollen Datenträgern (Disk Full) und I/O-Unterbrechungen bei Schreib-, Rename- und Verzeichnis-Sync-Vorgängen.
-- **Verzeichnis-Locking (INV-DUR-1):** Einheitliches Directory-Locking über `DirLock` mit `LockPolicy::FailClosed` als Standard.
-- **Zero-Panic-Doktrin:** Vollständiges Verbot von `panic!`, `unwrap()` oder `expect()` in produktiven Dateisystem-Pfaden.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-durable-fs --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `sys` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `sys`, `ports` |
+| Features | keine |
+| Lints | `#![forbid(unsafe_code)]`, `deny(clippy::unwrap_used/expect_used/panic)`, `warn(missing_docs)` |
 
-## 4. Verbotene Muster
-- Nicht-atomares Überschreiben von Daten-Dateien ohne `.tmp` Staging und Parent-Directory `fsync`.
-- Verschlucken von fsync- oder flush-Fehlern (`let _ = file.sync_all()` ist strikt verboten).
-- Vermischung von FS-Primitiven mit höherer Domänen- oder Transaktionslogik.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `Vfs`-Port für atomare Datei- und Verzeichnisoperationen.
-- **Bereitgestellt für:** `contextra-store`, `contextra-vector`, `contextra-checkpoint`, `contextra-erasure`.
+- **Eintrag in `capabilities.toml` fehlt** (Ring 0, `may_depend_on = [sys, ports]`): WP 1.1.
+- **Eigene `Vfs`-Typfamilie** (`vfs.rs`: `Vfs`, `VfsFile`, `VfsOpenOptions`, `RealFs`) neben `contextra_ports::Vfs`. Das ist die „zwei historischen Vfs-Konzepte“-Schuld (D7). Kein Dep auf `ports`.
+- `store` hängt **nicht** von diesem Crate ab (nutzt direkt `std::fs`/`tokio::fs`, ~77 Treffer).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Fault-Injection:** `FailpointVfs` und `FaultInjector` für deterministische Simulation von Crash-Szenarien, ENOSPC und I/O-Timeouts.
-- **Sabotage-Tests:** Verifikation der Handle-Poisoning-Invariante nach simulierten fsync-Fehlern.
-- **Conformity Tests:** POSIX- und Windows-Atomizitätsprüfung.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `vfs.rs` | `RealFs`, `RealFsFile`, eigener `Vfs`-Trait |
+| `lib.rs` | `FlushKind`, `FsClass`, `flush_file`, `flush_dir`, `rename_durable`, `DurableHandle<F: FaultInjector>`, `PoisonedHandle` |
+| `health.rs` | `HealthState`, `HealthEvent`, `AtomicHealthState` (Healthy→Degraded→ReadOnly→Poisoned) |
+| `fault_injector.rs` | `FaultInjector`, `NoFault` |
+| `journal.rs` | `PendingDeleteJournal`: aufgeschobene Datei-Löschungen (mechanisch) |
+| `scrub.rs` | `scrub_if_safe`: Überschreiben, nur wenn das Dateisystem es zulässt |
+
+## 4. Verträge & Invarianten
+
+1. **Fehler propagieren (INV-FSYNC-1):** nach `fsync`-Fehler ist der Handle `Poisoned`; weder Ack noch Retry auf demselben Handle.
+2. **Gesundheitsübergänge** laufen ausschließlich über `HealthState::transition`; `allows_writes()` ist die einzige Schreibfreigabe.
+3. `rename_durable` = tmp-Datei schreiben, `fsync`, `rename`, Parent-Verzeichnis `fsync`.
+4. `scrub`/`journal` sind **mechanisch**: keine Rechts- oder Nachweislogik (M7). Nachweise erzeugt `contextra-erasure`.
+5. `FaultInjector` ist generisch (Monomorphisierung): `NoFault` kostet im Produktionspfad nichts.
+
+## 5. Ports
+
+**Ist:** definiert einen eigenen `Vfs`. **Soll (WP 2.1):** implementiert `contextra_ports::Vfs` (`RealFs`) und löscht die eigene Trait-Familie.
+
+## 6. Nebenläufigkeit & Performance
+
+- `AtomicHealthState` ist lock-frei (Atomics). Kein Shared Mutable State außer diesem Zustand.
+- Blockierend: in `async`-Kontext nur über `spawn_blocking`.
+
+## 7. Anti-Patterns
+
+- Zweiten `Vfs`-Trait weiter ausbauen.
+- `let _ = flush_dir(..)`.
+- Plattformabhängiges Verhalten ohne `FsClass`-Prüfung annehmen (z. B. Scrub auf CoW-/Flash-Medien als Beweis werten).
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-durable-fs --locked
+cargo clippy -p contextra-durable-fs --all-targets -- -D warnings
+```
+
+- Vorhanden: 8 Testdateien in `tests/`. Ergänze Konformitätslauf gegen `ports::contract_tests` (feature `contract-tests`) sobald WP 2.1 steht.
+- Chaos: `FaultInjector` für Torn Writes, `ENOSPC`, `fsync`-Fehler.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 1.1 | in `capabilities.toml` aufnehmen |
+| 2.1 | an `ports::Vfs` binden, eigene Vfs-Typen entfernen |
+| 4.4 | `store`/`vector` auf `Vfs` umstellen |

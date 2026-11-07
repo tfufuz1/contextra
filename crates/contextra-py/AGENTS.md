@@ -1,37 +1,62 @@
 # AGENTS.md — `contextra-py`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-py` stellt die offizielle Python-Anbindung (PyO3) für das Contextra-Baukastensystem bereit (Ring 4).
-Es übersetzt die asynchronen Rust-APIs in synchrone und asynchrone Python-Aufrufe, konvertiert Datentypen verlustfrei (NumPy Vektoren, Dicts, Listen) und kapselt die FFI-Sicherheitsgrenze.
-Als eigenständiger Adapter-Baustein fängt er Panics an der Sprachgrenze ab und übersetzt Domain-Fehler in idiomatische Python-Exceptions.
+> **Ring 4** · Klasse Rand `[R]` · Reifegrad `stable` · Unsafe: nein · Rolle: PyO3-Python-Bindings (`_contextra`, abi3-py38) über der Rust-API.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 4 (Sprach-Bindings & FFI-Boundary)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `beta`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-wire`, `contextra-db` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **GIL-Release-Disziplin (AGT-PY-001):** Blockierende oder rechenintensive Rust-Aufrufe geben den Python Global Interpreter Lock zwingend über `py.allow_threads` frei.
-- **FFI Panic-Sicherheit (`run_blocking_ffi`):** Unwinding-Panics im Rust-Code werden an der FFI-Grenze abgefangen, das Instanz-Objekt wird als vergiftet markiert und eine saubere Python-Exception geworfen.
-- **Typisiertes Error-Mapping:** Rust `ContextraError` wird 1:1 auf dedizierte Python-Fehlerklassen abgebildet (`TenantError`, `NotFoundError`, `IntegrityError`, etc.).
-- **NumPy Zero-Copy & Validierung:** NumPy-Arrays müssen 1D, `float32` und C-kontinuierlich sein; NaN- und Inf-Werte werden strikt abgewiesen.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` im produktiven Binding-Code.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-py --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `db`, `types`, `wire` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `types`, `ports`, `contextra` |
+| Features | `docid-128`, `test-hooks` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Halten des Python GIL während asynchroner `.await`- oder schwerer Berechnungsphasen.
-- Rohe Pointer-Arithmetik oder `unsafe` außerhalb der geprüften PyO3-Makros.
-- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
-- Unkontrolliertes Durchreichen unvollständiger FFI-Typen.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Exportiert:** Python-Modul `contextra` (`PyContextra`, `PyCollection`, FlatBuffers-Suchmethoden).
-- **Konsumiert:** `contextra-types`, `contextra-wire`, `contextra-db`.
+- **Dep auf `db` statt auf die Fassade** (dokumentierte Ausnahme `ANCHOR:ARCH:DAG-003`).
+- Workspace-Mitglied (nicht in `default-members`); Release-Profil workspace-weit `panic = "unwind"` für FFI. Frühere Angabe „nicht im Workspace“ ist überholt.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **FFI-Panic-Abfangtests:** Prüfung des Verhaltens bei künstlich injizierten Panics (via `test-hooks`).
-- **Python Integrationstests:** Pytest-Suite zur Validierung von GIL-Freigabe, Multithreading und NumPy-Konvertierungen.
-- **Sabotage-Testing:** Injektion korrumpierter Vektoren (NaN, nicht-kontinuierlich) zur Bestätigung der Fail-Closed Validierung.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- DEBT-04: Übergang von direkter `contextra-db` Kopplung hin zu generischen Ports.
+| Pfad | Verantwortung |
+|---|---|
+| `bindings/` (`db`, `collection`, `document`, `search_result`, `hyperedge`, `crud_macros`, `runtime_state`, …) | PyO3-Klassen |
+| `kv_links.rs`, `lib.rs` | Modulregistrierung |
+
+## 4. Verträge & Invarianten
+
+1. **GIL freigeben** bei I/O und Rechenlast (`py.allow_threads`).
+2. **Panics an der Grenze abfangen** und in `PyErr` übersetzen; keine Unwinds nach Python.
+3. `ContextraError` wird über `ContextraErrorDto` auf Python-Exceptions abgebildet (`NotFound→KeyError` etc.).
+4. Vektoren als `PyReadonlyArray1<f32>` (Zero-Copy).
+5. Globale Zustände (Runtime) isolieren (Sub-Interpreter, PEP 684).
+
+## 5. Ports
+
+Keine eigenen Ports.
+
+## 6. Nebenläufigkeit & Performance
+
+- Eigene Tokio-Runtime, unabhängig von Python-Threads; kein Lock über GIL-Grenzen.
+
+## 7. Anti-Patterns
+
+- `block_on` bei gehaltenem GIL.
+- `Vec<f32>` statt NumPy-Array.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-py --locked
+cargo clippy -p contextra-py --all-targets -- -D warnings
+```
+
+- 13 Testdateien; CI `contextra-py-ci.yml`, Wheels `build-wheels.yml`.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.3 | auf Fassade `contextra` umstellen |

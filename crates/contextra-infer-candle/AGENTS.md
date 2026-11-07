@@ -1,37 +1,64 @@
 # AGENTS.md — `contextra-infer-candle`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-infer-candle` stellt ein lokales, vollständig offline-fähiges Inferenz- und Embedding-Backend auf Basis von Candle (`candle-core`, `candle-transformers`) für native GGUF-Modelle bereit (Ring 2).
-Als autarker Baustein implementiert er `EmbeddingProvider` aus `contextra-ports` und ermöglicht vollständige Datenhoheit ohne externe Dienste oder Netzwerkanfragen.
-Er integriert sich über standardisierte Ports und stellt optionale KV-Cache-Anbindungen (`contextra-kvcache`) über Entkopplungs-Adapter bereit.
+> **Ring 2** · Klasse `[R]` (Rand) · Reifegrad `siehe `capabilities.toml`` · Unsafe: nein · Rolle: Candle/GGUF-Embedding- und Inferenzadapter (lokal, optional CUDA).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 2 (Native Inferenz & Embeddings)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `beta`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-rank`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Async Thread Safety:** Candle-Tensor-Operationen sind CPU-blockierend. Alle Inferenz- und Embed-Aufrufe MÜSSEN strikt via `tokio::task::spawn_blocking` ausgeführt werden, um den async Reactor nicht zu blockieren.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` im Produktionscode. Alle Fehler werden als `ContextraError` abgebildet.
-- **Deterministische Batch-Größen:** Einhaltung von `MAX_CANDLE_EMBED_BATCH_SIZE` zur Vermeidung von Out-of-Memory (OOM) Fehlern.
-- **Offline-First:** Keinerlei Netzwerk-Egress; Modelle werden lokal aus GGUF-Dateien geladen.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-infer-candle --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `ports`, `rank`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `rank` |
+| Features | `candle`, `cuda`, `kv-bridge`, `kv-stage-b`, `test-utils` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Blockierende Tensor-Berechnungen direkt im asynchronen Tokio-Kontext.
-- Verwenden von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
-- Abhängigkeiten zu höheren Schichten wie `contextra-mcp` oder `contextra-engine`.
-- Unkontrollierte GPU/CPU-Allokationen ohne Backpressure-Semaphor.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `EmbeddingProvider`.
-- **Konsumiert:** `contextra-types`, `contextra-ports`.
-- **Optionale Integration:** KV-Bridge zu `contextra-kvcache` via Feature-Gate `kv-bridge`.
+- **Überzählige Kante `crypto`** (Soll entfällt).
+- `contextra` (Fassade) hängt hart an diesem Crate (Ist); Soll: nur optional (Feature `candle`, SPEC §4.5).
+- ~11 direkte `fs`-Treffer (Modell-Laden): über `Vfs` oder klar als Rand-I/O kennzeichnen.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Model-Fingerprint-Validierung:** Integritätstests gegen fehlerhafte oder manipulierte GGUF-Modelldateien.
-- **Concurrency & Backpressure Tests:** Semaphore-Tests zur Verhinderung von Überlastung bei parallelen Inferenz-Anfragen.
-- **Sabotage-Testing:** Prüfung der Fehlerbehandlung bei abgeschnittenen oder inkompatiblen Tensor-Puffern.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `embedding.rs`, `embedding_provider.rs` | Embedder |
+| `inference/`, `model/`, `gguf_loader.rs`, `model_registry.rs` | Inferenz, Modellladen |
+| `kv_bridge.rs`, `kv_state.rs`, `attention_exporter.rs`, `gasp.rs` | Brücke zum KV-Cache, Aufmerksamkeitsexport |
+
+## 4. Verträge & Invarianten
+
+1. Siehe `infer-onnx` (Feature-Gate, Blockierung, Modell-Hash, Nichtdeterminismus als WAL-Wert).
+2. Keine Schlüssel-/Löschlogik hier; KV-Verschlüsselung nur über Ports.
+3. `test-utils` nie im Release-/Default-Set (INV-EMBED-1).
+
+## 5. Ports
+
+**Implementiert:** `EmbeddingProvider`, KV-Brückenports.
+
+## 6. Nebenläufigkeit & Performance
+
+- CPU-lastig: Compute-Pool, nie Executor-Thread.
+- Prefix-Wiederverwendung (`prefix_reuse`) nur innerhalb eines Tenants.
+
+## 7. Anti-Patterns
+
+- Standard-Build der Fassade erzwingt Candle.
+- Mock-Embedder als Produktionsstandard.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-infer-candle --locked
+cargo clippy -p contextra-infer-candle --all-targets -- -D warnings
+```
+
+- Backend-Tests laufen ohne Modell/Netz über Fakes; echte Modelle nur hinter Feature und in separatem CI-Job.
+- Konformitätslauf gegen `ports::contract_tests` für `EmbeddingProvider`.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.3 | `crypto`-Kante und harte Fassadenkante lösen |

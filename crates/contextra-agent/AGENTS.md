@@ -1,37 +1,63 @@
 # AGENTS.md — `contextra-agent`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-agent` bildet eine leichtgewichtige, zustandslose Workflow-Ausführungsumgebung für lokale KI-Agenten (Ring 3).
-Er kapselt `OrchestratorEngine` (Event-Loop), `StateGraph` (Workflow-Definitionen), `AgentContext` und das Append-Only `AuditLog`.
-Historische Relikte (eingebettete SQLite-Tabellen, Robotik-spezifische Feedback-Schleifen gem. DEBT-02) wurden vollständig eliminiert: Der Agent operiert als rein deterministischer Workflow-Orchestrator (`checkpoint -> execute -> commit -> audit`) über generische Ports.
+> **Ring 3** · Klasse Rand `[R]` (SPEC-Katalog: Archiv, Root-§10 K5) · Reifegrad `beta` · Unsafe: nein · Rolle: Workflow-Engine für Agenten: Zustandsgraph, Event-Quellen, Tools, Audit, DLQ.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 3 (Agent Execution Pipeline & Event Loop)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `beta`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-db`, `contextra-graph`, `contextra-checkpoint`, `contextra-store`, `contextra-router` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Deterministische Workflows:** Workflow-Zustände werden über RAII-Guards und Checkpoints gesichert; bei Task-Abbruch erfolgt automatischer Rollback.
-- **Dependency Injection:** Tools (wie `RetrieveTool`) und Speicher-Zugriffe werden über Trait-Ports (`ContextRetriever`) injiziert statt hart verdrahtet.
-- **Audit-Compliance:** Jeder Agenten-Schritt wird unveränderlich im `AuditLog` protokolliert.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; robuste Fehlerfortpflanzung im gesamten Event-Loop.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-agent --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `checkpoint`, `db`, `graph`, `ports`, `router`, `store`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `engine`, `ports`, `types` |
+| Features | `test-utils` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Eingebettete relationale SQL-Engines oder SQLite-Tabellen im Crate (vollständig entfernt gem. DEBT-02).
-- Feste Verdrahtung auf monolithische DB-Interna ohne Trait-Abstraktion.
-- Halten von veränderlichen Zuständen außerhalb des `AgentContext`.
-- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** Agent Execution Engine, Tool-Orchestrierung.
-- **Konsumiert:** `contextra-ports`, `contextra-types`, `StorageEngine`, `CheckpointCoordinator`.
-- **Bereitgestellt für:** MCP-Server (`contextra-mcp`) und CLI.
+- **Fünf Kanten über das Soll:** `checkpoint`, `db`, `graph`, `router`, `store` (harte Bindung an `LsmStorage` in Signaturen, DEBT-04). Dev: `text`, `vector`, `testkit`.
+- DEBT-02: Altlasten (SQLite-/Robotik-Prototyp) vollständig entfernen; Zustand über MVCC-/Storage-Ports.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **State-Graph Transition Tests:** Exhaustive Validierung aller Workflow-Übergänge und Zyklen-Erkennung.
-- **Sabotage-Testing:** Simulation von unvollständigen Tool-Ausführungen und Netzwerk-Abbrüchen zur Prüfung der Rollback-Integrität.
-- **Audit-Log Verifikation:** Prüfung auf lückenlose Aufzeichnung aller Schritte im Fehlerfall.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- **DEBT-02:** Vollständiger Abschluss der Bereinigung verbliebener Übergangs-Mocks.
+| Pfad | Verantwortung |
+|---|---|
+| `engine.rs`, `engine/` | `OrchestratorEngine`: Event-Loop, Replay |
+| `graph.rs`, `context.rs`, `step.rs`, `goal_condition.rs` | `StateGraph`, `AgentContext`, `AgentTool` |
+| `event_source.rs`, `dlq.rs`, `budget.rs`, `clm_scratchpad.rs` | Quellen, Dead-Letter, Budget |
+| `audit.rs`, `tools/` | Audit-Log (Präfix `__agent:audit:`), Tool-Registry |
+
+## 4. Verträge & Invarianten
+
+1. **Zustandsautomat:** `Pending→Running→Suspended/Completed/Failed`; nur die Engine führt Übergänge aus.
+2. **Identifier-Validierung:** `task_id`/`node_id` nicht leer, keine NUL-Bytes, ≤ 256 Byte, keine Pfadtrenner (`try_new`).
+3. **Audit-Pflicht:** jeder Übergang, jede Tool-Ausführung, jeder Fehler wird protokolliert; Puffer sind begrenzt.
+4. Tools nutzen `ContextraError`; kein Lock über Fremdaufrufe.
+
+## 5. Ports
+
+Soll: konsumiert `StorageEngine`/`CheckpointCoordinator` nur als Ports.
+
+## 6. Nebenläufigkeit & Performance
+
+- Engine hält keine globalen Locks; Event-Loop liefert `EventLoopExitReason` und endet kontrolliert.
+
+## 7. Anti-Patterns
+
+- Ungeprüfte Task-IDs.
+- `Arc<LsmStorage>` in Signaturen.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-agent --locked
+cargo clippy -p contextra-agent --all-targets -- -D warnings
+```
+
+- 23 Testdateien.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 4/5 | DEBT-02/04: Kanten auf Ports umstellen |

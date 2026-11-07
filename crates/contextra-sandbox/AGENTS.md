@@ -1,38 +1,63 @@
 # AGENTS.md — `contextra-sandbox`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-sandbox` stellt eine strikt isolierte WebAssembly (WASM) Ausführungsumgebung (`WasmExecutor`) auf Basis von Wasmtime bereit (Ring 2).
-Sie dient als sichere Sandbox für dynamische Berechnungen, untrusted Plugins und MCP-CodeExecution-Befehle (§4.18).
-Als autarker Baustein erzwingt sie Default-Deny-Rechte, deterministisches Fuel-Budgeting und strenge Ressourcen-Limits, ohne Seiteneffekte auf den Host-Prozess zu erlauben.
+> **Ring 2** · Klasse `[R]` · Reifegrad `stable` · Unsafe: nein · Rolle: WASM-Sandbox (Wasmtime) mit Fuel-Begrenzung, Zulassung und Genehmigung von Modulen.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 2 (Sicherheits-Sandbox & WASM Boundary)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** Keine Workspace-Abhängigkeiten (Spec §6.9, `capabilities.toml`) — maximale Autarkie.
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird über das gesamte Crate hinweg erzwungen.
-- **Default-Deny Capabilities:** Kein Dateisystem-, kein Netzwerk-, kein Umgebungs- und kein Systemuhr-Zugriff im Gast (`WasmCapabilities::default()`).
-- **Deterministische Limits:** Strikte Fuel-Obergrenzen (CPU-Fuel), WASM-Stack-Limits (512 KB) und Host-Call-Zähler.
-- **Doppelte Begrenzung:** Jede Ausführung wird durch deterministisches Fuel UND ein synchrones Wall-Clock-Timeout beschränkt.
-- **State Isolation per Execution:** Jeder `execute()`-Aufruf instantiiert einen frischen `Store` und eine neue `Instance`; keinerlei Zustandsleckagen zwischen Läufen.
-- **Zeroize-on-Drop:** Sensibler Host- und Guest-Output (`WasmOutput`) wird beim Verlassen des Scopes genullt.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-sandbox --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | keine |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | keine |
+| Features | keine |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Jegliche Verwendung von `unsafe` im Sandbox-Code.
-- Wiederverwendung von WASM-Stores oder -Instanzen über Aufrufgrenzen hinweg.
-- Weglassen von Fuel-Budgets oder Timeouts bei Guest-Code-Ausführung.
-- Direkte Dateisystem- oder Netzwerkdurchgriffe für den WASM-Gast.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Exportiert:** `WasmExecutor`, `WasmCapabilities`, `WasmOutput`, `ApprovalRequest`.
-- **Bereitgestellt für:** `contextra-mcp`, `contextra-engine`.
+- Keine Contextra-Abhängigkeit (autark). `wasmtime 36` (`async`, `cranelift`), `tokio`.
+- `engine` hängt hart an `sandbox` (Ist, Feature `sandbox`), `store` hat Dev-Kante: beides lösen (M5/M6).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Resource Exhaustion Tests:** Verifikation des Fuel-Erschöpfungs-Abbruchs bei Endlosschleifen im Guest.
-- **Memory Leak & Escape Tests:** Prüfung auf saubere Isolation und Speicherfreigabe nach Guest-Panics.
-- **Sabotage-Testing:** Injektion bösartiger WASM-Binaries mit versuchten Host-Calls.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `executor/` (`runner`, `state`) | Ausführung mit Fuel |
+| `capabilities.rs`, `approval.rs` | Fähigkeiten, Genehmigungsstufen |
+| `wasi/` (`fd`, `sys`), `output.rs`, `merge.rs`, `error.rs` | WASI-Anbindung, Ausgabe, WASM-`MergeOperator` |
+
+## 4. Verträge & Invarianten
+
+1. **Admission (INV-ADMISSION-1):** `AdmittedModule` nur über `ModuleVerifier::verify`; SHA-256 aus den Bytes, nie vom Aufrufer.
+2. **Genehmigung (INV-APPROVAL-1):** `High`/`Elevated` laufen nicht vor `Approved`.
+3. **Determinismus (INV-WASM-DET-1):** gleiches Modul, gleiche Eingabe, gleicher Fuel ⇒ bit-identisches Ergebnis; Wall-Clock-Unterbrechung nur Sicherheitsnetz, fail-closed.
+4. Standard: keine Fähigkeiten (Deny-by-default).
+
+## 5. Ports
+
+**Implementiert:** `ModuleVerifier`, `FilterModule`, WASM-`MergeOperator`.
+
+## 6. Nebenläufigkeit & Performance
+
+- Pro Ausführung eigene Store/Instanz, kein geteilter Zustand; Fuel und Speichergrenzen immer gesetzt.
+
+## 7. Anti-Patterns
+
+- Modul ohne Digest-Prüfung ausführen.
+- Host-Funktionen mit Dateizugriff ohne Capability.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-sandbox --locked
+cargo clippy -p contextra-sandbox --all-targets -- -D warnings
+```
+
+- Fuzzing der Module-Eingabe, Determinismus-Test x86-64/aarch64.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.3 | Kante `engine → sandbox` hinter Port/Feature |
+| M6 | Dev-Kante `store → sandbox` entfernen |

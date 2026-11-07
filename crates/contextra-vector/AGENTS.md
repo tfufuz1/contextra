@@ -1,37 +1,78 @@
 # AGENTS.md — `contextra-vector`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-vector` stellt speichereffiziente Vektorindexierung und Vektor-Ähnlichkeitssuche (HNSW, DiskANN, SQ8-Quantisierung) mit strikter Mandantenisolation bereit (Ring 0).
-Als autarker Baustein implementiert er den standardisierten Port `VectorIndex` aus `contextra-ports`.
-Im Zuge der Baukasten-Transformation wurden sämtliche rechtlichen Löschketten- und DSGVO-Relikte entfernt: Das Modul arbeitet rein append- und supersession-basiert (RoaringBitmap-Tombstones) und stellt für `contextra-erasure` lediglich einen neutralen Bereinigungs-Port (`VectorScanner`, `Purger`) bereit.
+> **Ring 1 (`capabilities.toml`: Ring 0 ≠)** · Klasse `[K]` · Reifegrad `beta` · Unsafe: nein · Rolle: HNSW-Vektorindex, SQ8-Quantisierung, gefilterte Suche (ACORN). Implementiert `VectorIndex`.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Vektorindexierung & Approximate Nearest Neighbor)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-simd` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **VETO-F02:** Vektorknoten-Löschung und Index-Rebuild laufen als Tombstone-Pruning ohne Erzeugung kryptografischer Löschnachweise.
-- **INV-TENANT-IDX-1:** Strikt mandantenisolierte Vektorräume und sichere Partitionierung nach `TenantId`.
-- **REQ-VEC-001:** Eager DiskANN Header Validation (`DISKANN_MAGIC`, Sector Size) vor jedem I/O.
-- **I/O über Ports:** Keine direkten `std::fs`-Aufrufe im Index-Kern; Persistenz erfolgt standardisiert über den `Vfs`-Port.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; saubere Fehlerbehandlung über `ContextraError`.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-vector --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `mvcc`, `ports`, `simd`, `sys`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `mvcc`, `simd`, `sys` |
+| Features | `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `docid-128` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Kein `unsafe` (`#![forbid(unsafe_code)]` erzwungen; SIMD-Operationen delegieren strikt an `contextra-simd`).
-- Keine direkten `Instant::now`-Aufrufe (Zeitstempel ausschließlich über injizierten `Clock`-Port).
-- Keine Erzeugung von DeletionProofs oder DSGVO-Kontexten im Vektor-Pfad.
-- Keine Querabhängigkeiten zu höheren Schichten (Ring 2, 3 oder 4).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `VectorIndex` (`HnswIndex`, `DiskAnnIndex`), `Purger`, `LayerScanner`.
-- **Konsumiert:** `Clock`-Port, `contextra-simd` Primitiven, `Vfs`-Port.
+- **Überzählige Kante `crypto`** (nur `wal_crypto::WalHmac`): lösen (WP 3.3/5.3).
+- Direkte Datei-I/O (~28 Treffer; `persistence/mmap.rs`): `Vfs` (D4, WP 4.4).
+- Ring in `capabilities.toml` steht auf 0, Soll 1 (WP 1.1).
+- Löschbegriffe: Heuristik 0 `DeletionProof`/DSGVO-Treffer, aber `hnsw/deletion.rs` enthält Lösch-Terminologie: auf neutrale Tombstone-Sprache prüfen.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Atomic Save & Rebuild Tests:** Verifikation der Index-Persistenz und des Rebuild-Notifiers nach Crash.
-- **Fuzzing (REQ-QA-003):** HNSW Persistence- und Vektor-Input Fuzzer.
-- **Sabotage-Tests:** Verifikation der Mandantenisolation bei cross-tenant Query-Versuchen.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- DEBT-01: Vollständige Bereinigung verbliebener Übergangs-Purger-Signaturen.
+| Pfad | Verantwortung |
+|---|---|
+| `hnsw/` (`core_insert`, `core_search`, `core_rebuild`, `arena`, `batch`, `adaptive_ef`, `acorn_filtered`, `sq8_bias`, `deletion`, `purge`, `scanner`, `vector_index_impl`) | HNSW; **`purge.rs`/`scanner.rs` = Port-Implementierungen** `HnswPurger`/`HnswScanner` |
+| `quantize/`, `quantize_rabitq.rs` | SQ8, RaBitQ (experimentell) |
+| `persistence/` (`header`, `node`, `mmap`) | Dateiformat, Persistenz |
+| `diskann/` | experimentell, laut SPEC Archiv |
+| `acorn/`, `candidate_stream.rs`, `distance.rs`, `compute_pool.rs`, `partial_rebuild.rs` | gefilterte Suche, Kandidatenstrom, Distanz, Compute-Pool |
+
+## 4. Verträge & Invarianten
+
+1. **VETO-F02:** Löschen = Tombstone + Slot-Nullung + **vollständiger** Rebuild. Kein Rewiring. Slots werden erst nach Rebuild wiederverwendet (INV-HNSW-SLOT-1). **Achtung:** `partial_rebuild.rs`/Feature `partial-index-rebuild` steht in Spannung dazu; nur für Wartung, nie als Löschstrategie.
+2. **Tenant-Trennung (INV-TENANT-IDX-1):** Index physisch je (Tenant, Collection[, Modell-Hash]); keine Kante über Tenants.
+3. **Determinismus:** HNSW-Level folgen aus `hash(doc_id, seed)`, nie aus Laufzeit-RNG (INV-INDEX-APPLY-1); ein Applier in WAL-Reihenfolge.
+4. **Snapshot-Sicht:** `born_seq`/`died_seq` je Eintrag (INV-INDEX-SNAPSHOT-1).
+5. **Filter vor Distanz** (ACL-Bitset), exaktes Nachranking bei SQ8.
+6. Eingaben mit `NaN`/`±Inf` werden abgewiesen (`simd::validate_vector`).
+7. Neu verboten: DSGVO-/Proof-Begriffe; Bereinigung nur über `Purger`.
+
+## 5. Ports
+
+**Implementiert:** `VectorIndex`, `Purger`, `LayerScanner`. **Konsumiert:** `Clock`, `Rng`, `Vfs` (Soll).
+
+## 6. Nebenläufigkeit & Performance
+
+- Suche liest Snapshot lock-arm; Schreiben über einen Applier. Sperren-Contention bei Tombstones: `tests/deleted_nodes_lock_contention.rs`.
+- Rechenlast über `compute_pool` (begrenzt), nie auf dem Executor.
+- Komplexität: Suche ≈ `O(log n · ef · d)`; per `benches/` (hnsw, sq8, distance) und Recall-Tests belegen; Baselines nicht verschlechtern.
+
+## 7. Anti-Patterns
+
+- Nachbarn beim Löschen umverdrahten.
+- `thread_rng` im Aufbau.
+- Index-Dateien mit `std::fs` öffnen.
+- `crypto`-Typen in Signaturen.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-vector --locked
+cargo clippy -p contextra-vector --all-targets -- -D warnings
+cargo bench -p contextra-vector
+cargo test -p contextra-vector --locked --features docid-128
+(cd crates/contextra-vector && cargo +nightly fuzz run hnsw_insert_search -- -max_total_time=60)
+```
+
+- Vorhanden: Differential-/Recall-Tests (ACORN), Determinismus, Ghost-Pointer-Proptest, Fuzz (`fuzz_hnsw_persistence`, `hnsw_insert_search`).
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 3.3 | Lösch-Terminologie neutralisieren, `crypto`-Kante lösen |
+| 4.4 | Supersession-Bitmap (`RoaringBitmap`), `Vfs` |
+| 1.1 | Ring auf 1 |

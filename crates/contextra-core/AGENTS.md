@@ -1,37 +1,58 @@
 # AGENTS.md — `contextra-core`
 
-## 1. Rolle & Zweck (Strangler-Fassade / Deprecated Debt)
-`contextra-core` ist die historische Kern-Bibliothek des Projekts, die sich in aktiver Dekommissionierung befindet (Ring 0, Strangler-Pattern gem. DEBT-03).
-Alle Domänentypen, Schnittstellen und Fehler-Enums wurden in autarke, orthogonale Bausteine überführt:
-- Domänentypen & Fehler -> [`contextra-types`](../contextra-types/)
-- Port-Schnittstellen -> [`contextra-ports`](../contextra-ports/)
-- Transaktions- und MVCC-Primitiven -> [`contextra-mvcc`](../contextra-mvcc/)
-- Wire-Protokolle -> [`contextra-wire`](../contextra-wire/)
+> **– (deprecated)** · Klasse – (Strangler-Fassade) · Reifegrad `deprecated` · Unsafe: nein · Rolle: Re-Export-Hülle (256 Zeilen) für nach `types`/`ports`/`mvcc`/`wire` verlagerte Typen. **Wird entfernt** (DEBT-03, D11).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-`contextra-core` existiert temporär ausschließlich als reine Re-Export-Fassade zur Erhaltung der Abwärtskompatibilität während der Migration.
+## 1. Baukasten-Profil
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Strangler-Fassade)
-- **Klasse:** Kern `[K]` (historisch)
-- **Reifegrad:** `deprecated`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-wire`.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-core --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `mvcc`, `ports`, `types`, `wire` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | entfällt |
+| Features | `test-utils` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 3. Garantien & Architektur-Invarianten
-- **Keine neue Eigenlogik:** Keine neuen Funktionen, Typen oder Implementierungen in diesem Crate.
-- **Transparente Weiterleitung:** Alle Re-Exports müssen typtreu und verhaltensneutral delegieren.
-- **Zero-Panic-Doktrin:** Vollständiges Verbot von `unwrap()` oder `panic!`.
+## 2. Abhängigkeiten & Schulden
 
-## 4. Verbotene Muster
-- **Verbot von Neu-Abhängigkeiten auf `contextra-core`:** Neue Module und refaktorisierte Crates MÜSSEN direkt `contextra-types` und `contextra-ports` importieren.
-- Kein I/O, kein Netzwerk, keine asynchronen Executors im Crate.
-- Keine Zirkulärbezüge zu höheren Ringen.
+- **Keine neuen Abhängigkeiten auf dieses Crate.** Noch in `capabilities.toml` erlaubt für `contextra` und `contextra-checkpoint`; in Cargo hängt es nur noch teilweise.
+- Jede Nutzung migriert auf `contextra-types`/`contextra-ports`.
 
-## 5. Schnittstellen & Datenfluss
-- Reine Re-Export-Hülle für Übergangspfade.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 6. Tests & Verifikation
-- Verifikation, dass alle Re-Exports kompatibel mit Downstream-Crates bleiben.
-- Tracking der Downstream-Referenzen zur Vorbereitung der endgültigen Löschung (Ziel: 0 Konsumenten).
+| Pfad | Verantwortung |
+|---|---|
+| `lib.rs` | Re-Exports; 1 `thread_rng`-Treffer und 1 Zeitaufruf prüfen |
 
-## 7. Offene Punkte & Technische Schulden
-- **DEBT-03:** Vollständige Dekommissionierung und Löschung von `contextra-core`, sobald alle Konsumenten auf `contextra-types` und `contextra-ports` umgestellt sind.
+## 4. Verträge & Invarianten
+
+1. Nur Re-Exports; keine neue Logik, keine neuen Typen.
+2. Löschen, sobald `grep -rn "contextra_core" crates` keinen Konsumenten mehr findet (Gate: 0 Downstream-Konsumenten).
+
+## 5. Ports
+
+Keine.
+
+## 6. Nebenläufigkeit & Performance
+
+- –
+
+## 7. Anti-Patterns
+
+- Neue Funktionalität hier ablegen.
+- Neuen Konsumenten hinzufügen.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-core --locked
+cargo clippy -p contextra-core --all-targets -- -D warnings
+```
+
+- Kein Testaufwand außer Konsumentenzählung.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.5 | vollständig dekommissionieren |

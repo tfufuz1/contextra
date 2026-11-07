@@ -1,36 +1,64 @@
 # AGENTS.md — `contextra-kvcache`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-kvcache` implementiert Prefix-Radix-Bäume, KV-Blöcke, mandantenisoliertes Caching, Tiering und AEAD-Segmentverschlüsselung für modernes KV-Cache-Management (Ring 1).
-Als eigenständiger Baustein beschleunigt er LLM-Inferenz und Context-Prefilling durch deterministisches Teilen und Auslagern von Key-Value-Zuständen.
-Gemäß den Entkopplungs-Richtlinien ist `contextra-kvcache` vollständig von jeglicher Lösch- und DSGVO-Logik getrennt; Speicherbereinigung erfolgt als neutrale Invalidierung/Verdrängung.
+> **Ring 1** · Klasse `[K]` im SPEC-Katalog (SPEC §0.5 archiviert; Root-§10 K5) · Reifegrad `beta` · Unsafe: nein · Rolle: Verschlüsselter KV-Prefix-Cache für LLM-Zustände (Radix, Eviction, KIVI-Quantisierung).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 1 (State & Storage, KV-Block Cache)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird über das gesamte Crate hinweg erzwungen.
-- **Mandanten-Isolation:** Strikte logische und kryptografische Trennung von Cache-Einträgen nach `TenantId`.
-- **Zero-Panic-Doktrin:** Vollständiger Verzicht auf `unwrap()` und `expect()` im Produktionscode.
-- **Entkopplung (Decouple-Inspector):** Völlige Abwesenheit von Löschketten-, Saga- oder Rechtsbegriffen (maschinell geprüft via `tools/decouple_inspector.py`).
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-kvcache --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `crypto` |
+| Features | `kv-encryption`, `kivi-quantization`, `content-addressed-kv-cache`, `kvcache-attention-eviction`, `kvcache-kivi-quant` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Kein `unsafe`-Code.
-- Keine unverschlüsselte Persistenz oder unverschlüsseltes Tiering sensibler Prompt-Tokens.
-- Kein Cross-Tenant Cache-Sharing ohne kryptografische Barriere.
-- Keine direkten Abhängigkeiten zu konkreten Inferenz-Frameworks im Kern des Caches.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Konsumiert:** `Clock`-Port, Verschlüsselungsprimitiven aus `contextra-crypto`.
-- **Bereitgestellt für:** `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-engine`.
+- Kanten Ist = Soll.
+- 6 Treffer mit Shredding-Bezug (`kv_shredding`): Beziehung zu `crypto::kv_shredding` klären, bevor `crypto` bereinigt wird (WP 3.1).
+- Abhängig von `crypto::kv_cipher`/`kv_segment` (Zuordnung ADR).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Mandanten-Isolations-Tests:** Verifikation, dass Tenant A niemals auf Cache-Blöcke von Tenant B zugreifen kann.
-- **Decouple-Inspector Audit:** Automatisierter Leak-Check auf unerwünschte Domänen- oder DSGVO-Begriffe.
-- **Fuzzing & Sabotage:** Cache-Verdrängungs- und Invalidierungs-Tests unter künstlichem Speicherdruck.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `store.rs`, `service.rs`, `prefix_store.rs`, `adapters.rs` | Cache-Dienst, Port-Adapter `KvPrefixStore` |
+| `radix.rs`, `segment.rs`, `eviction_worker.rs` | Radix-Baum, Segmente, Eviction |
+| `quantize_kivi.rs`, `attention_score.rs`, `scratchpad_invalidation.rs` | Quantisierung, Aufmerksamkeits-Score, Invalidierung |
+
+## 4. Verträge & Invarianten
+
+1. **Mandantentrennung:** Inhalts-Adressierung darf nie tenantübergreifend treffen (`content_addressed_cross_tenant_isolation.rs`).
+2. **AEAD vor Quantisierung-Reihenfolge** wie getestet (`kivi_aead_order_enforced.rs`).
+3. Fehlt die Fähigkeit, ist der Cache **inaktiv** (kein stilles Fallback); Löschschicht `KvCache` ist `FeatureDisabled` (SPEC §4.7).
+4. Pinned-Basis bleibt bei Eviction erhalten (`clm_pinned_base_preserved.rs`).
+
+## 5. Ports
+
+**Implementiert:** `KvPrefixStore`. **Konsumiert:** `ports`, `crypto`.
+
+## 6. Nebenläufigkeit & Performance
+
+- Eviction-Worker als Hintergrundakteur mit Abbruch (`cancellation.rs`); keine geteilten Veränderlichen außerhalb der Store-Struktur.
+
+## 7. Anti-Patterns
+
+- Cache-Treffer über Tenant-Grenzen.
+- Eviction ohne Pinning-Prüfung.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-kvcache --locked
+cargo clippy -p contextra-kvcache --all-targets -- -D warnings
+```
+
+- 15 Testdateien (Isolation, Eviction, Golden-Decode, Roundtrip).
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 3.x | Shredding-Bezug klären |
+| 1.1 | Klasse/Reifegrad in `capabilities.toml` verbindlich setzen |

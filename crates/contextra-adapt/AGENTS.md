@@ -1,34 +1,62 @@
 # AGENTS.md — `contextra-adapt`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-adapt` ist ein autonomer Regelungs- und Adaptions-Baustein (Ring 0) zur dynamischen Systemanpassung (PID Latency Controller, Adaptive Candidate Pool Sizing).
-Er modelliert mathematische Feedback-Schleifen zur Laufzeit, um Latenzbudgets deterministisch einzuhalten und Suchpool-Größen adaptiv zu steuern.
-Als orthogonaler Algorithmen-Baustein ist er unabhängig von konkreten Storage- oder Vektortechnologien und kann in beliebige Systeme zur Feedback-Regelung integriert werden.
+> **Ring 0** · Klasse `[K]` laut SPEC-Katalog (SPEC §0.5 archiviert es; Root-§10 K5: aktiv behandeln) · Reifegrad `beta` · Unsafe: nein · Rolle: Adaptive Algorithmen: PID-Latenzregler, Bandits, Drift-/Lyapunov-Wächter, Off-Policy.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Regelungstechnik & Modell-Adaption)
-- **Klasse:** Rand `[R]`
-- **Reifegrad:** `beta`
-- **`may_use` (Obergrenze):** `contextra-ports`, `contextra-types` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Numerische Stabilität:** Bounds-Checking und Sättigungs-Grenzwerte (`saturating_*`, Clamping) für Integratoren und Differentialglieder des PID-Reglers.
-- **Deterministische Latenz-Regelung:** Strikte Konvergenz gegen konfigurierte Latenz-Sollwerte ohne Oszillation.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()`, `expect()` oder Panics; fehlerhafte oder extreme Messwerte führen zu sanfter Dämpfung statt Systemabstürzen.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-adapt --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types` |
+| Features | `bandit-routing`, `flow-corrected-thompson`, `rie-greedy-personalization`, `sketched-bandit` |
+| Lints | `#![forbid(unsafe_code)]`, `warn(missing_docs)` |
 
-## 4. Verbotene Muster
-- Direkte I/O-, Netzwerk- oder Persistenzaufrufe im Regelkern.
-- Halten von globalem ungeschütztem Mutable State.
-- Querabhängigkeiten zu Speicher- oder Inferenz-Engines (nur über Traits).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Konsumiert:** `Clock`-Port zur präzisen Zeitdifferenz-Berechnung.
-- **Bereitgestellt für:** `contextra-router`, `contextra-engine`, `contextra-mcp` (`PoolController`, `DynamicRerankOrchestrator`).
+- Ist = Soll, autark.
+- `pid_latency_controller.rs`, `homeostat.rs`, `decay_controller.rs` erscheinen auch in `db`/`engine` (Re-Exports/Kopien prüfen, DRY).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Mathematische Konvergenztests:** Simulation von Lastspitzen und Verifikation der Einschwingzeit des PID-Controllers.
-- **Sabotage-Tests:** Injektion extremer Ausreißerwerte und NaN/Inf-Werte zur Überprüfung der numerischen Dämpfung.
-- **Property-Based Testing:** Validierung stabiler Regeleigenschaften über Testbereiche.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `pid.rs`, `pid_latency_controller.rs`, `homeostat.rs` | Regler |
+| `bandit.rs`, `flow_thompson.rs`, `rie_greedy.rs`, `off_policy.rs` **und** `offpolicy.rs` | Bandit-/Policy-Lernen (zwei Off-Policy-Dateien: Dopplung klären) |
+| `drift.rs`, `lyapunov.rs`, `shadow_mode.rs`, `decay_controller.rs` | Drift, Stabilität, Schattenmodus |
+
+## 4. Verträge & Invarianten
+
+1. **Determinismus (P28):** Zufall nur über `Rng`, Zeit nur über `Clock` (Heuristik: 1 `Instant::now`/`SystemTime::now`-Treffer prüfen).
+2. **Wirkungsgrenze:** Regler liefern Empfehlungen/Parameter; sie schreiben nie selbst in Speicher.
+3. Alle Regler haben Grenzen (Clamp), Anti-Windup und einen Fallback auf feste Startwerte (SPEC §4.7).
+
+## 5. Ports
+
+Implementiert `AdaptiveController`-artige Rollen; konsumiert `Clock`, `Rng`.
+
+## 6. Nebenläufigkeit & Performance
+
+- Zustand je Regler in der Instanz, kein globaler Zustand; Aufruf aus einem Thread oder hinter Nachrichtenkanal.
+
+## 7. Anti-Patterns
+
+- Globale Singleton-Regler.
+- Stille Anpassung der Ranking-Gewichte ohne Schattenmodus und Messung.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-adapt --locked
+cargo clippy -p contextra-adapt --all-targets -- -D warnings
+```
+
+- Konvergenz-/Stabilitäts-Property-Tests, deterministischer Replay mit `SeededRng`.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.3 | `graph → adapt`-Kante ist in `capabilities.toml` noch deklariert, in Cargo nicht mehr: bereinigen |
+| DRY | `offpolicy.rs` vs `off_policy.rs` zusammenführen |

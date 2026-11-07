@@ -1,33 +1,58 @@
 # AGENTS.md — `contextra-avv-generator`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-avv-generator` ist ein isolierter Dokumentengenerierungs-Baustein (Ring 0 / Tooling) zur deterministischen Erstellung von Auftragsverarbeitungsverträgen (AVV) und technischen Anlagen.
-Er füllt vordefinierte Vorlagen anhand übergebener System-Konfigurationen und Sicherheits-Metadaten aus, ohne Abhängigkeiten zu Datenbank- oder Krypto-Kernen aufzuweisen.
-Als autarker Baustein ist er ohne Seiteneffekte in administrativen Tools oder CI-Pipelines einsetzbar.
+> **Ring 0 laut `capabilities.toml` (Rolle: Extension)** · Klasse `[E]` (Extension) · Reifegrad `experimental` · Unsafe: nein · Rolle: Vorlagengenerator für Auftragsverarbeitungsverträge (Art. 28 DSGVO).
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Template-Generierung & Dokumenten-Tooling)
-- **Klasse:** Rand `[R]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Deterministische Ausgabe:** Identische Konfigurationsparameter erzeugen bit-identische Ausgabedokumente.
-- **Wording-Compliance:** Strikt neutrale und sachliche technische Beschreibungen ohne absolute Rechtsversprechen.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-avv-generator --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `types` |
+| Features | keine |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Direkte I/O- oder Netzwerkoperationen im Generator.
-- Vermischung mit Laufzeit-Speicherdaten oder Transaktionssystemen.
-- Verwendung von `contextra-core`.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Konsumiert:** `contextra-types`.
-- **Bereitgestellt für:** CLI-Administration und Governance-Pipelines.
+- Reine Dokumentgenerierung; keine Laufzeitabhängigkeit des Kerns. `capabilities.toml` nennt `privacy → avv-generator` (nicht in Cargo).
+- Ring 0 widerspricht der Rolle (WP 1.1).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Template-Konsistenztests:** Validierung der Platzhalter-Ersetzung und Schema-Prüfung.
-- **Sabotage-Testing:** Prüfung auf sauberes Fehlerverhalten bei fehlenden Pflichtfeldern.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `template.rs`, `instructions.rs`, `assistance.rs`, `audit.rs`, `confidentiality.rs`, `data_subject_rights.rs`, `termination.rs` | Vertragsbausteine |
+
+## 4. Verträge & Invarianten
+
+1. Generierte Texte sind **Vorlagen, keine Rechtsberatung**; keine Zusage von Konformität.
+2. Deterministische Ausgabe (gleiche Eingabe ⇒ gleicher Text).
+
+## 5. Ports
+
+Keine.
+
+## 6. Nebenläufigkeit & Performance
+
+- Rein funktional.
+
+## 7. Anti-Patterns
+
+- Rechtliche Zusicherungen im Text.
+- Abhängigkeit des Kerns.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-avv-generator --locked
+cargo clippy -p contextra-avv-generator --all-targets -- -D warnings
+```
+
+- 3 Testdateien.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 1.1 | Ring korrigieren |

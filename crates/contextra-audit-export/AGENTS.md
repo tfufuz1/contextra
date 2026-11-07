@@ -1,33 +1,60 @@
 # AGENTS.md — `contextra-audit-export`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-audit-export` stellt einen spezialisierten Export-Baustein für Audit-Logs und Verarbeitungsverzeichnisse (Ring 0 / Tooling) bereit.
-Als isolierter Baustein formatiert er unveränderliche Protokolldaten in standardisierte Berichtsformate (JSON, CSV, PDF), ohne Einfluss auf die Speicher- oder Transaktionsleistung des Systems zu nehmen.
-Er arbeitet rein deklarativ und konsumiert Daten über standardisierte Ports.
+> **Ring 0 laut `capabilities.toml` (Rolle: Extension)** · Klasse `[E]` (Extension) · Reifegrad `experimental` · Unsafe: nein · Rolle: Audit-Log-Export, DSGVO-Art.-30-Verarbeitungsverzeichnis, BSI-Mapping.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Audit-Export & Reporting)
-- **Klasse:** Rand `[R]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Unveränderbarkeit:** Export-Operationen sind rein lesend und verändern niemals den zugrundeliegenden Audit-Datenbestand.
-- **Deterministische Formatierung:** Zeitstempel und Hash-Werte werden in standardisierten, kanonischen Formaten exportiert.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; robuste Fehlerbehandlung bei ungültigen Eingabedaten.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-audit-export --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `types` (laut `capabilities.toml` auch `ports`) |
+| Features | keine |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Direkte I/O- oder Netzwerkoperationen ohne Port-Abstraktion.
-- Veränderung von Transaktions- oder Audit-Zuständen.
-- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Konsumiert:** `contextra-types`, `contextra-ports`.
-- **Bereitgestellt für:** CLI-Tools, Compliance-Auditoren und MCP-Server.
+- Compliance-Dokumentation ist **keine Kernlogik**; sie gehört in dieses Extension-Crate, nicht in Store/Index.
+- 11 `DeletionProof`-Treffer: Verhältnis zu den Berichten aus `contextra-erasure` klären; keine zweite Berichtstypfamilie.
+- Ring 0 widerspricht der Rolle (WP 1.1).
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Format-Konformitätstests:** Prüfung exportierter Schemata gegen offizielle Validatoren.
-- **Fuzzing:** Deserialisierungs-Fuzzing gegen unvollständige Audit-Log-Einträge.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `bsi_mapping.rs`, `markdown_template.rs`, `testkit.rs`, `error.rs` | Mapping, Vorlagen, Testhilfen |
+
+## 4. Verträge & Invarianten
+
+1. Keine absoluten Rechts-/Garantieaussagen; Texte nur aus belegten Messwerten (INV-CLAIMS-1).
+2. Keine Nutzinhalte im Export (INV-LOG-1).
+
+## 5. Ports
+
+Keine.
+
+## 6. Nebenläufigkeit & Performance
+
+- Rein funktional.
+
+## 7. Anti-Patterns
+
+- Eigene Beweis-/Berichtstypen.
+- „DSGVO-konform“-Formulierungen.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-audit-export --locked
+cargo clippy -p contextra-audit-export --all-targets -- -D warnings
+```
+
+- 7 Testdateien.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 1.1 | Ring korrigieren |
+| 3.9 | Berichte aus `erasure` konsumieren |

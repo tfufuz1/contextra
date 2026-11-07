@@ -1,34 +1,72 @@
 # AGENTS.md — `contextra-simd`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-simd` ist ein isolierter High-Performance-Berechnungsbaustein (Ring 0) für SIMD-vektorisierte Distanz- und Ähnlichkeitsberechnungen (Cosine Similarity, Dot Product, L2/Euclidean Distance, Hamming Distance).
-Als genehmigte Unsafe-Insel kapselt es CPU-Intrinsics (AVX2, AVX-512, NEON) und stellt portable, plattformübergreifende Fallbacks bereit, sodass Vektor- und ML-Crates ohne Compiler-Spezifika arbeiten können.
+> **Ring 0 · Unsafe-Insel** · Klasse `[K]` · Reifegrad `beta` · Rolle: SIMD-Distanzkerne (AVX2, AVX-512, NEON) mit skalarem Fallback und sicherer Dispatch-API.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`. Stand 2026-11-07, statisch gelesen, nicht kompiliert.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Hardware-beschleunigte Rechenprimitive, Unsafe-Insel)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Bit-Identität & Numerische Stabilität:** Plattformübergreifend deterministische und numerisch stabile Distanzberechnungen.
-- **Sichere Kernel-Reduktion:** Vermeidung von Sign-Loss-Casts (`u32::from_ne_bytes(hsum.to_ne_bytes())` für SIMD-Reduktionssummen).
-- **Zero-Panic-Doktrin:** Vollständige Vorab-Prüfung von Vektordimensionen und Speicher-Alignments; keine Panics bei Dimensionsmismatches (Rückgabe von `Err` oder NaN-Prävention).
-- **Explizite Sicherheit:** Jeder interne `unsafe`-Block mit CPU-Intrinsics ist durch `// SAFETY:` dokumentiert und auf Alignment/Bounds geprüft.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-simd --locked` |
+| Contextra-Abhängigkeiten (Ist = Soll) | `contextra-types` (für `Result`/Fehler) |
+| Features | keine |
+| Lints | `#![deny(unsafe_op_in_unsafe_fn)]`; Insel erlaubt `unsafe` |
+| Unsafe-Umfang | ~230 `unsafe`-Treffer in `kernels/` |
+| Konsument | `contextra-vector` |
 
-## 4. Verbotene Muster
-- `unsafe`-Code außerhalb der dedizierten Architektur-Target-Module.
-- Direkte I/O- oder Speicherpersistenz-Aufrufe.
-- Dynamische Heap-Allokationen innerhalb heißer Distanz-Berechnungsschleifen.
-- Abhängigkeiten zu höheren Schichten oder konkreten Indizes.
+## 2. Abhängigkeiten
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- Stellt optimierte Vektor-Distanz-Routinen für `contextra-vector`, `contextra-rank` und `contextra-infer-*` bereit.
+Nur `contextra-types`. Keine Ports, kein `std::fs`, keine Uhr, kein Runtime-Bezug.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Empirische Benchmarks:** Messung von Latenz und Durchsatz je CPU-Architektur (AVX2, AVX-512, NEON vs. Fallback).
-- **Numerische Konsistenz-Tests:** Sabotage- und Vergleichstests zwischen SIMD-Pfaden und portablem Skalar-Code.
-- **Miri- & Fuzzing-Prüfungen:** Validierung auf Out-of-Bounds Memory-Reads bei ungeraden Vektorlängen.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Datei | Verantwortung |
+|---|---|
+| `lib.rs` | sichere API: `validate_vector`, `compute_distance`, `compute_distance_trusted`, `compute_distance_f32_bytes_trusted` |
+| `dispatch.rs` | Laufzeit-CPU-Erkennung und Kernel-Auswahl |
+| `kernels/scalar.rs` | **Referenzimplementierung** (sicher, Orakel für alle anderen Kernel) |
+| `kernels/avx2.rs`, `avx512.rs`, `neon.rs` | handgeschriebene SIMD-Kernel (`unsafe`, `#[target_feature]`) |
+| `benches/`, `tests/` | `simd_bench.rs`; `differential_tests.rs`, `simd_cross_validation.rs`, `edge_cases_tests.rs`, `quantized_and_mixed_precision_tests.rs`, `building_block_conformance.rs` |
+
+## 4. Verträge & Invarianten
+
+1. **Skalar ist die Wahrheit.** Jeder SIMD-Kernel muss gegen `kernels/scalar.rs` differenziell getestet sein, über zufällige Längen (inkl. Rest-Elemente `len % lane != 0`), Null-Vektoren, `NaN`, `±Inf` und Denormale.
+2. **Eingaben validieren.** `validate_vector` prüft Endlichkeit (`NaN`/`±Inf` ⇒ `InvalidInput`); die „untrusted“-API `compute_distance` prüft zusätzlich Längengleichheit und Metrik und liefert `Err`. Nur die `*_trusted`-Varianten setzen validierte Eingaben voraus; ihr Aufrufer trägt die Beweislast (dokumentiert im Doc-Kommentar).
+3. **Dispatch ist sicher.** Ein Kernel wird nur gewählt, wenn die CPU-Fähigkeit zur Laufzeit erkannt wurde; `#[target_feature]`-Funktionen werden nie direkt aus sicherem Code ohne Erkennung aufgerufen.
+4. **Alignment.** Alle Annahmen über Ausrichtung (laut Regel `ARENA_ALIGNMENT_BYTES = 64` für Vektor-Slabs, `.agents/rules/simd_safety.md`) werden geprüft oder durch unaligned Loads (`loadu`) vermieden. Kein ungeprüfter `align_to`.
+5. **Determinismus (INV-RING0-DETERMINISM-1).** Float-Reduktionen haben eine **feste** Summationsreihenfolge, unabhängig von Thread-Scheduling. Ergebnisse dürfen sich zwischen Kernen nur in einer dokumentierten Toleranz unterscheiden (ULP-Grenze im Test festschreiben).
+6. **Kein `unsafe` im öffentlichen Vertrag** (M9): keine `pub unsafe fn`, die Aufrufer-Beweise verlangt, außer klar markiert und `// SAFETY:`-dokumentiert.
+
+## 5. Ports
+
+Keine.
+
+## 6. Nebenläufigkeit & Performance
+
+Zustandslos und `Send + Sync`. Hot Path: keine Allokation, keine dynamische Dispatch-Indirektion pro Element; die Kernel-Wahl wird **einmal** gecacht (Funktionszeiger) und nicht pro Aufruf neu ermittelt. Komplexität: Distanz `O(d)` Zeit, `O(1)` Zusatzspeicher. Belege Änderungen mit `cargo bench -p contextra-simd` (Benchmarks in `benches/`) und `simd-cross-validation.yml`.
+
+## 7. Anti-Patterns
+
+- SIMD-Kernel **ohne** Differentialtest gegen `scalar`.
+- Annahme `len % 8 == 0` ohne Rest-Behandlung.
+- `NaN`-Verhalten (`<`-Vergleich mit `NaN`) stillschweigend ändern: es beeinflusst Ranking-Reihenfolge und Recall.
+- CPU-Erkennung pro Distanzaufruf.
+- Neue Kernel-Datei ohne `// SAFETY:` je Block und ohne Miri-fähigen Skalarpfad.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-simd --locked
+cargo +nightly miri test -p contextra-simd            # Skalar- und, soweit emulierbar, SIMD-Pfade
+cargo bench -p contextra-simd
+cargo clippy -p contextra-simd --all-targets -- -D warnings
+```
+
+CI-Workflow `simd-cross-validation.yml` vergleicht die Kernel plattformübergreifend. Cross-Arch-Ergebnisse (x86-64 vs. aarch64) gehören in den Differentialtest.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 5.6 | Unsafe-Audit der ~230 Treffer: `// SAFETY:` je Block, Miri-Lauf dokumentieren |
+| 4.4 | `vector` bindet `simd` nur über die sichere API; keine direkten Kernel-Importe |

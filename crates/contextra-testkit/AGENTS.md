@@ -1,33 +1,62 @@
 # AGENTS.md — `contextra-testkit`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-testkit` stellt ein umfassendes Test- und Verifikations-Harness (Tooling) für das gesamte Contextra-Baukastensystem bereit.
-Es enthält Test-Fixtures, In-Memory Referenz-Implementierungen, Fault-Injection-Mocks (`FailpointVfs`), Chaos-Matrizen und Zero-Trust Conformance-Suiten zur Validierung von Port-Verträgen.
-Als reines Tooling-Crate ist es von Produktionscode entkoppelt und dient ausschließlich der Härtung und Sabotage-Prüfung aller Komponenten.
+> **Werkzeug** · Klasse Werkzeug · Reifegrad `stable` · Unsafe: nein · Rolle: Test-Doubles und Konformitätssuiten: `FaultVfs`, `ManualClock`, In-Memory-Stores, Referenzmodell.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Tooling
-- **Klasse:** Werkzeug `[W]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Zero-Trust Conformance:** Validierung sämtlicher Port-Verträge (`StorageEngine`, `VectorIndex`, `TextIndex`, `Clock`, `Vfs` etc.) gegen fehlerhafte Mutanten; 100 % Erkennungsrate fehlerhafter Implementierungen.
-- **Deterministische Fehlerinjektion:** Präzise steuerbare Fehler-Szenarien (I/O-Timeouts, Corruption, ENOSPC).
-- **Keine Produktiv-Abhängigkeiten:** `contextra-testkit` darf NIEMALS in Produktiv-Abhängigkeiten von Ring 0-3 Crates auftauchen (nur als `dev-dependencies`).
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-testkit --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types` |
+| Features | `testkit` |
+| Lints | `#![forbid(unsafe_code)]` |
 
-## 4. Verbotene Muster
-- Import von `contextra-testkit` als reguläre Abhängigkeit in Bibliotheken.
-- Flaky Tests durch unkontrollierte echte Systemzeit oder echte Zufallsquellen (nur injizierte `Clock`/`Rng`).
-- Verwendung von `contextra-core`.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** Test-Mocks für sämtliche Ports aus `contextra-ports`.
-- **Bereitgestellt für:** Unit- und Integrationstests aller Workspace-Crates.
+- **Nur als `dev-dependency`**; nie in Release-/Default-Features, nie Abhängigkeit eines Kerns im Normalbau.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Conformance Self-Tests:** `conformance_selftest` und `tk_fault_vfs_conformance` beweisen, dass mutierte Fehler deterministisch erkannt werden.
-- **Chaos-Matrix:** Multi-Threaded Stress-Tests unter extremen Fehlerinjektionen.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- Keine.
+| Pfad | Verantwortung |
+|---|---|
+| `fault_vfs.rs`, `manual_clock.rs` | Fehlerinjektion, deterministische Uhr |
+| `in_memory_{store,vector,text,graph}.rs` | Referenz-Backends |
+| `reference_model.rs` | deterministisches Referenzmodell für MVCC/KV |
+| `conformance/` (`clock`, `rng`, `storage`, `vector`, `text`, `graph`, `metrics`, `failure`) | Konformitätssuiten für Fremdadapter |
+| `mocks.rs` | Mocks (nie Produktionsstandard, INV-EMBED-1) |
+
+## 4. Verträge & Invarianten
+
+1. Doubles verhalten sich **wie die Spezifikation**, nicht wie die Implementierung (Orakel unabhängig vom Erzeuger, INV-ORACLE-1).
+2. Deterministisch: keine Systemzeit, kein `thread_rng`.
+3. Konformitätsfunktionen sind für Fremdprojekte nutzbar (Baukasten-Beweis).
+
+## 5. Ports
+
+Implementiert Test-Varianten von `Vfs`, `Clock`, `StorageEngine` u. a.
+
+## 6. Nebenläufigkeit & Performance
+
+- Keine Hintergrund-Threads ohne Join.
+
+## 7. Anti-Patterns
+
+- Mock als Produktionsimplementierung.
+- Systemuhr in Tests.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-testkit --locked
+cargo clippy -p contextra-testkit --all-targets -- -D warnings
+```
+
+- Eigene Tests für die Doubles; Mutation-Score anstreben.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 2.5 | Konformitätssuiten für alle Ports |

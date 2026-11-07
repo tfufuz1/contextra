@@ -1,36 +1,63 @@
 # AGENTS.md — `contextra-cognition`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-cognition` stellt autonome Hintergrund-Dienste (Sleep Passes, Near-Duplicate Detection, Sliding-Window Clustering) und Kontext-Kompaktierung bereit (Ring 3).
-Als entkoppelter Dienst aggregiert und konsolidiert er Langzeit-Gedächtnisstrukturen im Ruhezustand, ohne den Heißpfad der Datenbank zu blockieren.
-Er greift über standardisierte Abstraktionen auf Speicher- und Graph-Indizes zu und ist frei von monolithischen Löschkaskaden.
+> **Ring 3** · Klasse Rand `[R]` (SPEC-Katalog: Archiv, Root-§10 K5) · Reifegrad `experimental` · Unsafe: nein · Rolle: Konsolidierung und Langzeitgedächtnis: Aggregation, Synthese, Kontext-Kompaktierung, Wartungsplaner.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 3 (Memory Consolidation & Synthesis Passes)
-- **Klasse:** Erweiterung `[E]`
-- **Reifegrad:** `beta`
-- **`may_use` (Obergrenze):** `contextra-engine`, `contextra-types`, `contextra-ports`, `contextra-graph` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird an der Crate-Wurzel (`src/lib.rs`) erzwungen.
-- **Nicht-blockierender Betrieb:** Hintergrund-Konsolidierungen laufen mit niedriger Priorität und geben Speicherressourcen bei Last sofort frei.
-- **Kausalitäts-Treue:** Synthetisierte Chunks und Cluster behalten Verweise auf Ursprungstransaktionen und Quell-Dokumente.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; Fehler in Hintergrund-Pässen führen niemals zum Absturz des Hauptsystems.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-cognition --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `engine`, `graph`, `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `engine`, `ports`, `types` |
+| Features | `edge-reinforcement-learning`, `graph-connectivity-health` |
+| Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
-## 4. Verbotene Muster
-- Direkte Blockierung des I/O- oder Transaktions-Heißpfads.
-- Direkte Abhängigkeiten zu `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
-- Monolithische Lösch- oder Nachweislogik im Crate.
-- Unbegrenzte Speichernutzung bei großflächigen Graph-Clustering-Algorithmen.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Konsumiert:** `StorageEngine`, `GraphIndex`, `Clock`-Port.
-- **Bereitgestellt für:** `contextra-engine`, `contextra-db`.
+- **Überzählige Kante `graph`**; Dev-Kanten `infer-candle`, `store`, `vector`, `testkit` (M6).
+- ~37 `async fn`, ~23 `tokio::`-Treffer.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Konsolidierungs-Integritätstests:** Verifikation, dass Cluster-Synthesen semantisch treu und verlustfrei bleiben.
-- **Sabotage-Testing:** Unterbrechung von Hintergrund-Clustering-Durchläufen bei künstlichem Speichermangel.
-- **Mutations-Testing:** Prüfung auf Vermeidung von Zyklen und Duplikat-Explosionen.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- DEBT-02: Bereinigung historischer Konsolidierungs-Schulden aus frühen Prototypen.
+| Pfad | Verantwortung |
+|---|---|
+| `memory_consolidation.rs`, `consolidation_executor.rs`, `consolidation_locks.rs` | Konsolidierung |
+| `aggregation_phase.rs`, `synthesis_phase.rs`, `semantic_aggregation_facade.rs`, `transitivity_veto.rs` | Phasen, Transitivitäts-Veto |
+| `context_compaction/`, `context.rs`, `channel.rs`, `graph_sink.rs`, `leanrag_input.rs` | Kompaktierung, Kanäle, Graph-Senke |
+| `maintenance_scheduler.rs`, `maintenance_config.rs` | Planer |
+
+## 4. Verträge & Invarianten
+
+1. **INV-RETENTION-1:** Ranking-Abwertung löscht nie; Löschung nur durch ausdrückliche Aktion oder opt-in `RetentionPolicy` (Dry-run, Karenz, Audit).
+2. **INV-DERIVED-1:** Ableitungen (Zusammenfassungen, Fakten) hängen an Lineage; bei Löschung der Quelle neu ableiten oder als `stale` markieren: Zuständigkeit liegt bei `erasure`/`engine`-Ports, nicht hier.
+3. LLM-Aufrufe nie unter Locks; Konsolidierungs-Locks haben feste Ordnung (`consolidation_locks.rs`).
+
+## 5. Ports
+
+Konsumiert `engine`, `GraphIndex`, `QueryRewriter`.
+
+## 6. Nebenläufigkeit & Performance
+
+- Hintergrundarbeit über Planer mit Abbruch (`CancelToken`); kein geteilter Veränderlicher außer in `consolidation_locks`.
+
+## 7. Anti-Patterns
+
+- Konsolidierung löscht Quelldaten implizit.
+- Direkter Zugriff auf `store`/`vector` statt über `engine`.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-cognition --locked
+cargo clippy -p contextra-cognition --all-targets -- -D warnings
+```
+
+- 13 Testdateien; Dev-Kanten durch `testkit` ersetzen.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 3.6 | Löschkaskaden entfernen |
+| M6 | Dev-Kanten bereinigen |

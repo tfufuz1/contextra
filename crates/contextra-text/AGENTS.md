@@ -1,36 +1,71 @@
 # AGENTS.md — `contextra-text`
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-text` stellt eine modulare Inverted-Index Volltextsuchmaschine mit BM25-Scoring (normativ k1 = 1.2, b = 0.75), Block-Max-WAND und konfigurierbaren Text-Analyzern bereit (Ring 0).
-Als eigenständiger Baustein implementiert er den standardisierten Port `TextIndex` aus `contextra-ports`.
-Im Sinne der Entkopplung ist der Text-Index frei von rechtlichen Löschketten und Deletion-Proofs: Er arbeitet append-basiert mit Segment-Postings und exportiert neutrale `Purger`- und `LayerScanner`-Schnittstellen für `contextra-erasure`.
+> **Ring 1 (`capabilities.toml`: Ring 0 ≠)** · Klasse `[K]` · Reifegrad `beta` · Unsafe: nein · Rolle: Inverted Index: BM25/BM25F, Block-Max-WAND, Tokenizer, Morphologie. Implementiert `TextIndex`.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Volltextsuche & Inverted Index)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
+## 1. Baukasten-Profil
 
-## 3. Garantien & Architektur-Invarianten
-- **REQ-TXT-001:** Deterministische Inverted Index Postings, BM25/BM25F-Scoring mit Robertson-Spärck-Jones IDF.
-- **Identitäts-Entkopplung (S1 / D-69):** Postings nutzen segment-lokale `doc_ord` ohne rohe `DocId`; Zuordnung erfolgt über verschlüsselte Envelopes.
-- **REQ-TXT-002:** `LayerScanner`-Implementierung (Layer ID 20) für neutrale Speicher-Scans ohne DSGVO-Bindung.
-- **Zero-Panic-Doktrin:** Vorab-Prüfung aller Analyzer-Eingaben; keine Panics bei ungültigen Token-Sequenzen oder leeren Dokumenten.
+| Aspekt | Wert |
+|---|---|
+| Standalone-Build | `cargo build -p contextra-text --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types` |
+| Features | `bm25f`, `docid-128` |
+| Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
-## 4. Verbotene Muster
-- Kein `unsafe` (`#![forbid(unsafe_code)]` strikt erzwungen).
-- Keine unkontrollierte Heap-Allokation bei großen Postings-Listen.
-- Keine Multi-Level Deletion-Logik oder Rechtsbegriffe im Text-Kern.
-- Keine direkten `std::fs`-Aufrufe im Index-Kern (vollständig über den `Vfs`-Port abstrahiert).
+## 2. Abhängigkeiten & Schulden
 
-## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `TextIndex` (`InvertedIndex`), `Analyzer`, `Purger`, `LayerScanner`.
-- **Konsumiert:** `Clock`-Port, `Vfs`-Port.
+- Kanten Ist = Soll; **bereits frei von Löschlogik** (0 Treffer). `inverted/purge.rs` (`TextPurger`) und `inverted/scanner.rs` (`TextScanner`) implementieren die Ports.
+- Datentyp `Language` liegt in `inverted/types.rs`, Soll: `contextra-types` (WP 4.5).
+- 43 `async fn` (Ratchet: nicht steigern, Ziel synchroner Kern).
+- Ring in `capabilities.toml` 0, Soll 1.
 
-## 6. Tests, Sabotage & Qualitätssicherung
-- **Fuzzing (REQ-QA-003):** BM25 Tokenizer, Analyzer und Posting-List Fuzzer.
-- **LayerScan Verification:** Residuen- und Purge-Verifikation im Text-Witness Integrations-Test.
-- **Mutations-Testing:** Prüfung der Scoring-Invarianten und WAND-Frühabbruchkriterien.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Offene Punkte & Technische Schulden
-- DEBT-01: Vollständige Bereinigung der restlichen Dateien mit historischem Löschketten-Bezug.
+| Pfad | Verantwortung |
+|---|---|
+| `inverted/` (`index_struct`, `types`, `morph_index`, `purge`, `scanner`) | Index, Port-Implementierungen |
+| `bm25.rs`, `wand.rs`, `posting_list.rs`, `stream.rs` | Scoring, Block-Max-WAND, Postings, Kandidatenstrom |
+| `tokenizer.rs`, `morphology/`, `domain/legal_de.rs`, `domain/medical_de.rs` | Analyse, Komposita, Domänenvokabular |
+
+## 4. Verträge & Invarianten
+
+1. **Statistik je Tenant** (IDF, Dokumentlängen): keine mandantenübergreifende Posting-Liste oder Statistik (INV-TENANT-IDX-1).
+2. **BM25-Referenzwerte** sind Test-Orakel (`tests/bm25_reference_values.rs`); WAND muss Differentialtest gegen Brute-Force bestehen (`wand_differential.rs`).
+3. **Tokenizer ohne Panics:** Fehler statt `panic!`; ungültiges UTF-8 ist Eingabefehler.
+4. Tombstone-Auflösung mit Read-Your-Writes (`tombstone_read_your_writes.rs`).
+5. Gleichstände deterministisch (`wand_tie_break_threshold.rs`).
+
+## 5. Ports
+
+**Implementiert:** `TextIndex`, `Purger`, `LayerScanner`. **Konsumiert:** `StorageEngine` (generisch `TextPurger<S>`).
+
+## 6. Nebenläufigkeit & Performance
+
+- Posting-Listen unveränderlich je Segment; Updates über Delta/Tombstone; kurzes `parking_lot`-Locking.
+- Komplexität: WAND sublinear in Postings; Allokationsprofil in `tests/alloc_profiler.rs`, Schreibverstärkung in `write_amplification.rs`.
+
+## 7. Anti-Patterns
+
+- Stoppwörter/Analyzer pro Aufruf neu bauen.
+- Dokumentstatistik tenantübergreifend cachen.
+- `Language`-Typ weiter in `text` erweitern.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-text --locked
+cargo clippy -p contextra-text --all-targets -- -D warnings
+cargo test -p contextra-text --locked --features bm25f
+(cd crates/contextra-text && cargo +nightly fuzz run fuzz_bm25_tokenize -- -max_total_time=60)
+```
+
+- Property-Tests (BM25-Invarianten, Purge), Fehlerinjektion (`purge_error_injection_tests.rs`), Fuzz-Korpus vorhanden.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 4.5 | Autarker Index, `Language` nach `types`, BM25F mit Block-Max-WAND |
+| 3.4 | Index-Bereinigung als eigenständiger Baustein |
+| 1.1 | Ring auf 1 |

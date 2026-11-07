@@ -1,62 +1,86 @@
 # AGENTS.md — `contextra-erasure`
-> Ring 3 | Modularer Löschkern: Saga, Vault, GateLog, Ledger, Restore-Guard, Witness & Reports | ~7500 LOC
 
-## 1. Rolle & Zweck (Baukasten-Prinzip)
-`contextra-erasure` ist der autarke, revisionssichere Löschbaustein des Contextra-Ökosystems (Ring 3).
-Er kapselt die vormals im gesamten Speicherkern verstreute mehrstufige Löschkette und stellt die kryptografisch verifizierbare Bereinigung (Saga, Gate-Log, Tresor/Vault, Journal, Witness/Messung und Ed25519-signierte Berichte) als unabhängigen Building Block bereit.
-Speicherkerne (`store`, `vector`, `text`, `graph`, `crypto`, `engine`, `db`) bleiben dadurch vollkommen neutral und implementieren ausschließlich generische Bereinigungs-Ports (`Purger`, `LayerScanner`, `StorageBackend`, `ErasureTarget`) aus `contextra-ports`, während `contextra-erasure` alle regulatorischen und auditierbaren Nachweise orchestriert.
+> **Ring 3** · Klasse `[K]` (Baustein) · Reifegrad `beta` · Unsafe: nein · Rolle: Eigenständiger Löschkern: Saga, Vault, ReadGate/GateLog, Journal, Ledger, Messung/Witness, signierte Berichte, RestoreGuard.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
 
-**Datenpfad**: Löschantrag → Read-Gate (RCU / ErasedSet) → Vault Key-Destruction (DEK Shredding) → Purger-Window (Store, Vector, Text, Graph) → Witness/Layer-Scan → Signierter Deletion-Report (`MFDR`).
+## 1. Baukasten-Profil
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 3 (Lösch-Orchestrierung & Audit-Kryptographie)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
-
-## 3. Modul-Karte
-
-| Datei / Verzeichnis | Verantwortung |
+| Aspekt | Wert |
 |---|---|
-| `lib.rs` | Crate-Root, `#![forbid(unsafe_code)]`, Modul-Deklarationen |
-| `saga.rs` & `saga/` | `ErasureCore` & `DeletionSaga`: Zustandssaga (`Requested -> Gated -> KeyDestroyed -> Purging -> Measured -> Completed`), Seam-Traits (`SagaJournal`, `SagaGate`, etc.) |
-| `vault.rs` & `vault/` | `FileVault`: 16 Shards, 80-Byte Slots, physisches Zeroing/Scrubbing von Dokumentenschlüsseln (DEKs), Sync & Poison-Handling |
-| `gate.rs` & `gate/` | `ReadGate` & `GateLog`: RCU-basierte Lesesperren (`ErasedSet`), atomare lineare Gate-Registrierung |
-| `ledger.rs` & `ledger/` | `ErasureLedger`: Revisionssicheres Append-Only Logbuch aller Löschereignisse |
-| `journal.rs` & `journal/` | Crash-resistentes WAL-Journal für unvollendete Sagas und automatische Wiederaufnahme |
-| `purge.rs` & `purge/` | `PurgeWindow`: Sequenzielle Orchestrierung der Bereinigung über Datenhalter-Purger |
-| `measure.rs` & `measure/` | Restdaten-Messung (`LayerScanner`), Canary-Prüfung, Erzeugung von `LayerWitness` |
-| `report.rs` & `report/` | `DeletionReport`: Ed25519-signierte Zertifikate, V5-Kanonisierung, Nachweise |
-| `restore.rs` & `restore/` | `RestoreGuard`: Schutz gegen unbemerktes Wiederherstellen gelöschter Daten aus Backups |
-| `scope.rs` & `scope/` | Kanonische Serialisierung von `PurgeScope` und TLV-Codec |
-| `backend.rs` | Generische Seams und Schnittstellen zu Speicher- und Index-Backends |
-| `error.rs` | Geschlossenes `ErasureError`-Enum |
+| Standalone-Build | `cargo build -p contextra-erasure --no-default-features --locked` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `ports`, `types` |
+| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `crypto` |
+| Features | keine (`default = []`) |
+| Lints | `#![forbid(unsafe_code)]`; **keine `mod.rs`** (Wurzeldatei `<modul>.rs` neben `<modul>/`) |
 
-## 4. Garantien & Architektur-Invarianten
-- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird über das gesamte Crate hinweg erzwungen.
-- **Saga-Zustandsintegrität:** Feste Zustandsübergänge (Requested -> Gated -> KeyDestroyed -> Purging -> Measured -> Completed); crash-resistent über `ErasureJournal`.
-- **Durable Gate-Log & Ledger:** Revisionssichere Protokollierung aller Read-Gates und Hash-Chaining mit HMAC-Absicherung (`chain = SHA-256(prev || len || ct || tag)`).
-- **Crypto-Shredding & Vault (D-55):** 16 Shards; physisches Zeroing von Schlüsseln; jeder I/O- oder fsync-Fehler vergiftet den Handle unwiderruflich (Fail-Closed).
-- **Messung & Witness:** Physische Speicher-Scans über `LayerScanner` und canary-gestützte Kontrollmessungen.
-- **Signierte Berichte:** Generierung kanonischer JSON-Audit-Berichte mit Ed25519-Signaturen via `ReportSigner`.
-- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` in produktiven Löschpfaden.
+## 2. Abhängigkeiten & Schulden
 
-## 5. Verbotene Muster
-- Jegliche Verwendung von `unsafe`.
-- Direkte Abhängigkeiten zu konkreten Speicher-Engines (`LsmStorage`, `HnswIndex` etc.); Kommunikation erfolgt AUSSCHLIESSLICH über Ports (`Purger`, `LayerScanner`, `StorageBackend`).
-- Fortsetzen von Löschungen bei inkonsistentem Journal-Zustand.
-- Unsignierte oder unvollständig gemessene Abschluss-Berichte.
-- D-90 Verletzungen: Keine `mod.rs`-Dateien verwenden.
+- Kanten Ist = Soll. **Kein Konsument im Workspace** (kein `Cargo.toml` hängt davon ab): Verdrahtung durch `engine`/Fassade fehlt (WP 3.5/3.8/3.9).
+- Dev-Abhängigkeiten: keine; Tests nutzen `test_mocks.rs` und eigene Fakes.
+- **Darf nie** `store`, `vector`, `text`, `graph` importieren; Kommunikation nur über `Purger`/`LayerScanner`/`StorageBackend`/`ErasureTarget` aus `ports`.
+- Wird `crypto::deletion_proof`/`ed25519_proof`/`kv_shredding`/`revocation_log`/`engine::contextra_impl::erasure` übernehmen (Phase 3).
 
-## 6. Schnittstellen & Datenfluss (Ports & Abstraktionen)
-- **Implementiert:** `ErasureCore`, `ErasureJournal`, `ReadGate`.
-- **Konsumiert:** `Purger`, `LayerScanner`, `LedgerSink`, `ReportSigner`, `Clock`, `EntropyRng` aus `contextra-ports`.
-- **Bereitgestellt für:** `contextra-db`, `contextra-mcp`, `contextra`.
+## 3. Modul-Karte (am Code verifiziert)
 
-## 7. Tests, Sabotage & Qualitätssicherung
-- **Saga Crash-Recovery Tests:** Simulation von Systemabstürzen in jedem Zwischenzustand der Lösch-Saga mit lückenlosem Wiederanlauf.
-- **Witness & Canary Tests:** Sabotagetests mit absichtlich platzierten Restfragmenten zur Prüfung der Scanner-Sensitivität.
-- **Signatur-Verifikation:** Striktes Offline-Verification-Testing der erzeugten Audit-Berichte.
+| Pfad | Verantwortung |
+|---|---|
+| `saga/` (`core`, `driver`, `machine`, `seams`, `idempotency`, `retention`) | `ErasureCore`, Zustandsmaschine `Requested→Gated→KeyDestroyed→Purging→Measured→Completed` (bzw. `Restricted`) |
+| `vault/` (`table`, `slot`, `durable`, `keyring`, `sealer`, `rehash`, `scrub`, `open`) | `FileVault`: 16 Shards, Slots, Zeroing, Poisoning |
+| `gate/` (`read_gate`, `erased_set`, `log`, `batch`) | RCU-Lesesperre, `ErasedSet`, `GateLog` |
+| `journal/`, `ledger/` | Crash-sicheres Saga-Journal, append-only Ledger |
+| `purge/` (`window`, `order`, `reserve`, `cx`) | Orchestrierung der `Purger` |
+| `measure/` (`scanner_flow`, `positive_control`, `witness`, `field`) | Positivkontrolle, Messung, `LayerWitness` |
+| `report/` (`build`, `canonical`, `risk`, `signing`) | kanonische, signierte Berichte |
+| `restore/` (`guard`, `replay`) | `RestoreGuard` |
+| `scope/`, `backend.rs`, `io.rs`, `replace.rs`, `restricted.rs`, `supersede.rs`, `error.rs` | Scope-Codec, Seams, I/O, Sonderfälle, `ErasureError` |
 
-## 8. Offene Punkte & Technische Schulden
-- DEBT-01: Vollständige Übernahme aller verbliebenen Bereinigungs-Workflows aus Altbeständen.
+## 4. Verträge & Invarianten
+
+1. **Messen vor Behaupten (A3):** kein Bericht ohne Scanner-Witness; Klasse nie höher als die Messung trägt (INV-CLASS-MEASURED-1). Kein Pfad erzeugt einen Beweis ohne Witness (INV-NO-DUMMY-PROOF-1).
+2. **Reihenfolge (INV-DEL-ORDER-1):** Schlüsselvernichtung erst nach Bereinigung und durablem Inventar (Ausnahme: Notpfad).
+3. **Keine Wiederauferstehung (INV-NO-RESURRECTION-1):** nach Start und Restore kein lebender Schlüssel einer gelöschten Einheit.
+4. **Vault-Poisoning:** jeder I/O-/`fsync`-Fehler beim Überschreiben/Nullen vergiftet den Handle unwiderruflich (fail-closed).
+5. **Lesesperre zuerst:** `ReadGate` ist armiert, bevor ein Lesepfad Verkehr annimmt (INV-BOOT-1); `GateLog` überlebt Neustarts.
+6. **Saga idempotent und crash-sicher:** Wiederanlauf aus dem Journal; Abbruch nur zwischen Schritten (INV-CANCEL-1).
+7. **Signierschlüssel** nur aus KMS/KeyManager, nie als frei übergebener Byte-String (INV-PROOF-KEY-1); Verifikation mit falschem Schlüssel schlägt fehl.
+8. **Wording (INV-CLAIM-BIND-1):** Berichtstexte nur aus fester Satzbibliothek, je Satz an einen Messwert gebunden; Annahmen/Ausschlüsse (Flash, RAM, Swap, externe Backups) stehen im Bericht. Nie „garantiert“, „100 %“, „DSGVO-konform“.
+
+## 5. Ports
+
+**Konsumiert:** `Purger`, `LayerScanner`, `ReadGate`, `LedgerSink`, `ReportSigner`, `RecordSealer`, `FileKeyring`, `Vfs`, `Clock`, `Rng`, `IdGen`. **Implementiert:** `ReadGate`-/`LedgerSink`-Standard (prüfen am Code).
+
+## 6. Nebenläufigkeit & Performance
+
+- Pro Einheit läuft genau eine Saga (Idempotenzschlüssel). Gate-Updates linearisierbar (`gate_linearization_test.rs`, `loom_gate.rs`).
+- Kein globaler Zustand; `tokio`/`futures-util` nur an der Saga-Schale (Heuristik: 12 `async fn`); Kern der Zustandsmaschine rein synchron halten.
+- Benchmark: `benches/bm_erase.rs`.
+
+## 7. Anti-Patterns
+
+- Konkrete Speicher-Crates importieren.
+- `mod.rs` anlegen.
+- Bericht oder Witness von Hand konstruieren (Konstruktoren sind `pub(crate)`).
+- Klasse aus Konfiguration statt aus Messung ableiten.
+- Absolute Rechts-/Garantiesprache.
+
+## 8. Tests & Messung
+
+```bash
+cargo test -p contextra-erasure --locked
+cargo clippy -p contextra-erasure --all-targets -- -D warnings
+RUSTFLAGS="--cfg loom" cargo test -p contextra-erasure --test loom_gate
+cargo bench -p contextra-erasure
+```
+
+- Vorhanden: Crash-Matrix (`crash_matrix_recovery.rs`), Spec-Tests je Modul, echte Scans (`measure_real_scan_tests.rs`), Vault-Konformität.
+- **Sabotage-/Mutationstests** (SPEC §17.11): jeder Fehler in Bereinigung, Vernichtung, Messung oder Berichtsbildung muss mindestens einen Test brechen.
+
+## 9. Offene Arbeit
+
+| WP | Inhalt |
+|---|---|
+| 3.1 | übernimmt `deletion_proof/`, `ed25519_proof.rs`, `kv_shredding.rs`, `revocation_log.rs` aus `crypto` |
+| 3.5 | übernimmt `engine/contextra_impl/erasure.rs` |
+| 3.7/3.8 | MCP-Löschwerkzeuge und Fassaden-API als optionale Brücke |
+| 3.9 | Finalisierung, `example-erasure` (WP 6.1) |
+| 2.2 | Port-Signaturen angleichen (Root-§10 K2/K3) |
