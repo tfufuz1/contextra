@@ -192,18 +192,10 @@ async fn test_ppr_pathological_max_iterations_ceiling() {
 #[tokio::test]
 async fn test_ppr_ignores_deleted_entities() {
     use contextra_ports::StorageEngine;
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
     use std::sync::Arc;
 
-    let dir = tempfile::tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
 
@@ -269,18 +261,10 @@ async fn test_ppr_ignores_deleted_entities() {
 #[tokio::test]
 async fn test_ppr_phantom_node_no_rank_mass() {
     use contextra_ports::StorageEngine;
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
     use std::sync::Arc;
 
-    let dir = tempfile::tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
 
@@ -377,13 +361,10 @@ fn test_deleted_view_methods() {
 #[tokio::test]
 async fn test_deleted_view_tombstone_filtering_all_entry_points() {
     use contextra_ports::StorageEngine;
+    use contextra_testkit::InMemoryStorageEngine;
     use std::sync::Arc;
-    let temp_dir = tempfile::tempdir().unwrap();
-    let config = contextra_store::LsmConfig {
-        path: temp_dir.path().to_path_buf(),
-        ..Default::default()
-    };
-    let storage = Arc::new(contextra_store::LsmStorage::new(config).await.unwrap());
+
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_storage(storage.clone());
     let tx = TxId::new(1);
 

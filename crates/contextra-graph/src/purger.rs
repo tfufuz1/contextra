@@ -1,7 +1,14 @@
-//! Neutrale Purger-Implementierung für den Graph-Baustein (`contextra-ports::scanner::Purger`).
+//! Neutrale Wartungs- und Bereinigungs-Implementierung für den Graph-Baustein (`contextra-ports::scanner::Purger`).
 //!
 //! # Zweck
 //! Ermöglicht die physische Bereinigung von Graph-Kanten und Knoten für ein gegebenes `ScanTarget`.
+//!
+//! # Baukasten-Hinweis (D-E1)
+//! Löschschnittstellen und Löschtypen werden gemäß Architektur-Entscheidung D-E1 künftig
+//! in `contextra-erasure-spi` geführt. Bis dahin bleibt diese Implementierung übergangsweise
+//! als deprecated markiert erhalten, um die Abwärtskompatibilität des Workspace zu wahren.
+
+#![allow(deprecated)]
 
 use std::sync::Arc;
 
@@ -11,6 +18,9 @@ use contextra_types::{DocId, RequestContext, Result, TxId};
 use crate::csr::CsrGraph;
 
 /// Purger-Implementierung für [`CsrGraph`].
+#[deprecated(
+    note = "Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden"
+)]
 pub struct GraphPurger {
     graph: Arc<CsrGraph>,
 }
@@ -23,6 +33,9 @@ impl GraphPurger {
 }
 
 /// Erzeugt einen `Arc<dyn Purger>` für einen gegebenen [`CsrGraph`].
+#[deprecated(
+    note = "Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden"
+)]
 pub fn graph_purger(graph: Arc<CsrGraph>) -> Arc<dyn Purger> {
     Arc::new(GraphPurger::new(graph))
 }
@@ -60,6 +73,7 @@ impl Purger for GraphPurger {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use contextra_ports::GraphIndex;
     use contextra_types::{Edge, Entity, EntityId};
 
     #[tokio::test]
