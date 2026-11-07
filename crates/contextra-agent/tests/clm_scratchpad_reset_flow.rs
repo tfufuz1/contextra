@@ -83,8 +83,8 @@ fn test_scratchpad_reset_flow_and_invariants() {
     assert_eq!(checkpoint.task_id, "task-reset-flow");
     assert_eq!(checkpoint.completed_subgoal_index, 0);
     assert_eq!(checkpoint.chunk_count_at_checkpoint, 2);
-    assert_eq!(checkpoint.purge_receipt.chunks_purged, 2);
-    assert_eq!(checkpoint.purge_receipt.bytes_zeroed, bytes_before);
+    assert_eq!(checkpoint.reset_receipt.chunks_purged, 2);
+    assert_eq!(checkpoint.reset_receipt.bytes_zeroed, bytes_before);
 
     // Verification 2: RAM zeroized/emptied (total_bytes is 0) and subgoal_index incremented
     assert_eq!(scratchpad.total_bytes(), 0);

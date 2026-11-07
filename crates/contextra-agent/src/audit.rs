@@ -13,7 +13,6 @@
 use crate::context::{validate_node_id, validate_task_id};
 use contextra_db::Collection;
 use contextra_ports::StorageEngine;
-use contextra_store::LsmStorage;
 use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -49,7 +48,7 @@ pub struct MigrationStats {
 }
 
 /// Append-only audit log backed by a Contextra collection.
-pub struct AuditLog<S: StorageEngine = LsmStorage> {
+pub struct AuditLog<S: StorageEngine> {
     collection: Arc<Collection<S>>,
 }
 
