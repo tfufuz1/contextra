@@ -1258,14 +1258,9 @@ name = "contextra-router"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
- "bytes",
  "contextra-adapt",
- "contextra-db",
- "contextra-graph",
  "contextra-ports",
- "contextra-text",
  "contextra-types",
- "contextra-vector",
  "contextra-wire",
  "criterion",
  "parking_lot 0.12.5",

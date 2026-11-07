@@ -16,8 +16,7 @@
 )]
 use super::super::fixtures::*;
 use crate::{RouterEngine, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
-use contextra_ports::StorageEngine;
+
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
 use std::sync::Arc;
@@ -26,21 +25,7 @@ use std::sync::Arc;
 // Test `test_router_engine_instantiation_with_mock_storage`: Prüft das erwartete Verhalten und Invarianten für tests für kernfunktionen der routerengine (teil 1).
 #[tokio::test]
 async fn test_router_engine_instantiation_with_mock_storage() {
-    let storage = Arc::new(MockStorageEngine);
-    let mut hnsw_config = contextra_vector::HnswConfig::default();
-    hnsw_config.dimension = 4;
-    let hnsw = Arc::new(contextra_vector::HnswIndex::try_new(hnsw_config).unwrap());
-    let graph = Arc::new(contextra_graph::CsrGraph::new());
-    let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
-    let collection = Arc::new(contextra_db::Collection::new(
-        "test_collection".to_string(),
-        storage,
-        hnsw,
-        graph,
-        next_tx,
-        4,
-        contextra_text::Language::English,
-    ));
+    let collection = Arc::new(TestCollection::new(4));
 
     let profile = SlmProfile::new(
         "mock-slm",
