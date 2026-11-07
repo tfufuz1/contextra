@@ -16,7 +16,6 @@ ring = "0"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-mvcc = { workspace = true }
-contextra-crypto = { workspace = true }
 contextra-simd = { workspace = true }
 contextra-sys = { workspace = true }
 subtle = "2.6"
