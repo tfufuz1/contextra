@@ -71,6 +71,26 @@ pub mod mocks;
 /// Formales Referenzmodell zur Prüfung von MVCC- und Transaktionsisolationsgarantien.
 pub mod reference_model;
 
+/// Baukasten-Zielmodul `doubles`: Test-Doubles, In-Memory-Referenzen und steuerbare Uhren.
+pub mod doubles {
+    pub use crate::in_memory_graph::InMemoryGraphIndex;
+    pub use crate::in_memory_store::InMemoryStorageEngine;
+    pub use crate::in_memory_text::InMemoryTextIndex;
+    pub use crate::in_memory_vector::InMemoryVectorIndex;
+    pub use crate::manual_clock::ManualClock;
+    pub use crate::mocks::*;
+}
+
+/// Baukasten-Zielmodul `fault`: Fehlerinjektion und Fehlersimulation (VFS, I/O, Crashes).
+pub mod fault {
+    pub use crate::fault_vfs::{FaultConfig, FaultVfs};
+}
+
+/// Baukasten-Zielmodul `model`: Formale Orakel und Referenzmodelle für MVCC und KV-Semantik.
+pub mod model {
+    pub use crate::reference_model::{RefOp, ReferenceModel};
+}
+
 // Re-Exports der zentralen Typen für bequemen Zugriff in Testsuiten
 pub use fault_vfs::{FaultConfig, FaultVfs};
 pub use in_memory_graph::InMemoryGraphIndex;
