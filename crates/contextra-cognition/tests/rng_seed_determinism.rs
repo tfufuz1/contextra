@@ -42,22 +42,22 @@ impl LlmTextGenerator for TestMockLlm {
 }
 
 struct TestMockSink {
-    tombstones: Vec<HyperEdgeId>,
+    invalidations: Vec<HyperEdgeId>,
     super_edges: Vec<SuperEdgeDraft>,
 }
 
 impl TestMockSink {
     fn new() -> Self {
         Self {
-            tombstones: Vec::new(),
+            invalidations: Vec::new(),
             super_edges: Vec::new(),
         }
     }
 }
 
 impl SuperEdgeSink for TestMockSink {
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()> {
-        self.tombstones.push(id);
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()> {
+        self.invalidations.push(id);
         Ok(())
     }
 
@@ -208,6 +208,6 @@ async fn test_aggregation_pass_seed_determinism() {
 
     assert_eq!(res1, res2, "Aggregation Phase Results must be identical");
     assert_eq!(alphas1, alphas2, "Alpha Nodes must be identical");
-    assert_eq!(sink1.tombstones, sink2.tombstones);
+    assert_eq!(sink1.invalidations, sink2.invalidations);
     assert_eq!(sink1.super_edges, sink2.super_edges);
 }

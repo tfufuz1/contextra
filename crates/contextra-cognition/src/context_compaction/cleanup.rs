@@ -9,9 +9,9 @@
 //! - **Transaktionale Sicherheit:** Jedes Entfernen erfolgt über eine reguläre, atomare Speicher-Transaktion.
 //! - **Präfix-Scans:** Sucht unter `consolidation_intent:` und `__tx_intent:`.
 
-use contextra_engine::transaction::CommitIntent;
-use contextra_ports::StorageEngine;
-use contextra_types::{Result, TxId};
+use crate::engine_local::transaction::CommitIntent;
+use crate::ports_local::StorageEngine;
+use crate::types_local::{Result, TxId};
 
 /// Aufgerufen beim Öffnen einer Collection / DB. Findet und entfernt verwaiste
 /// ConsolidationIntents aus dem WAL/Storage.

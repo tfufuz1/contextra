@@ -22,10 +22,10 @@ use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
-use contextra_store::LsmStorage;
 use contextra_testkit::MockEmbedder;
+use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
 use contextra_types::{DocId, EntityId};
-use contextra_vector::HnswIndex;
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -56,24 +56,13 @@ impl LlmTextGenerator for CountingMockLlm {
     }
 }
 
-async fn create_test_collection(
-) -> Option<(Arc<Collection<LsmStorage, HnswIndex>>, tempfile::TempDir)> {
+async fn create_test_collection() -> Option<(
+    Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>>,
+    tempfile::TempDir,
+)> {
     let dir = tempdir().ok()?;
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .ok()?,
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .ok()?,
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
+    let index = Arc::new(InMemoryVectorIndex::new());
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 

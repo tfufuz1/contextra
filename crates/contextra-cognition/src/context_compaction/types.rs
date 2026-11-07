@@ -6,7 +6,7 @@
 //! ## Ring-Zugehörigkeit
 //! Teil der Kognitionsschicht (Ring 3). Verwendet Basistypen aus `contextra-types`.
 
-use contextra_types::{ContextChunk, DocId};
+use crate::types_local::{ContextChunk, DocId};
 
 /// Strategie für Context Compaction.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -5,8 +5,8 @@
 //! are accepted as abstract streams, channels, or queues.
 
 use crate::memory_consolidation::{PreCondensedInput, TurnSegment};
-use contextra_ports::BoxFuture;
-use contextra_types::{Result, TenantId};
+use crate::ports_local::BoxFuture;
+use crate::types_local::{Result, TenantId};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -57,7 +57,9 @@ impl CognitiveInputChannel for InMemoryCognitiveChannel {
             self.tx
                 .send((target_tenant, input_vec))
                 .await
-                .map_err(|e| contextra_types::ContextraError::Internal(format!("channel closed: {e}")))?;
+                .map_err(|e| {
+                    contextra_types::ContextraError::Internal(format!("channel closed: {e}"))
+                })?;
             Ok(segments)
         })
     }
