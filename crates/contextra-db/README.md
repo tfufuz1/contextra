@@ -12,8 +12,10 @@ Im Zuge der Transformation zum modularen Baukastensystem wird `contextra-db` von
 ## Baukasten-Einordnung & Status
 
 - **Ring:** Ring 3 (Anwendungskern / Orchestrator)
-- **Status:** 🟡 In Migration (schrittweise Entkopplung in autarke Bausteine: `contextra-engine`, `contextra-cognition`, `contextra-privacy`, `contextra-rank`, `contextra-adapt`)
+- **Status:** 🟢 Modular entkoppelt (Referenz-Komposition)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+- **Abhängigkeiten:** `contextra-engine`, `contextra-ports`, `contextra-types`
+- **Garantien:** Zero-Unsafe, strikt abwärtsgerichtete Kanten (M1), M2 Isolationsbeweis.
 
 ## Deprecated Debt & Entkopplung
 - **Historische Löschkette:** Sämtliche früheren direkten Verknüpfungen mit DSGVO-, Nachweis- und Löschkettenlogiken sind als *Deprecated Debt* (siehe [`DEPRECATED_DEBT.md`](../../DEPRECATED_DEBT.md)) deklariert. Diese Aufgaben werden vollständig von [`contextra-erasure`](../contextra-erasure/) übernommen.
@@ -29,8 +31,15 @@ Im Zuge der Transformation zum modularen Baukastensystem wird `contextra-db` von
 ## Baukasten-Nutzung
 
 ```rust
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 
+let config = ContextraConfig {
+    dimension: 4,
+    distance_metric: DistanceMetric::Cosine,
+    ..Default::default()
+};
 let db = Contextra::open_with_config(path, config).await?;
 let collection = db.collection("documents").await?;
 ```
+
+Ein vollständig isoliertes Minimalbeispiel findet sich unter `examples/db_standalone.rs`.

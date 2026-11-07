@@ -1,7 +1,6 @@
 //! Grounding validator traits and context preparer contracts.
 
 // FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
 // ZWECK: GroundingValidator, ResponseGroundingValidator & ContextPreparer Trait-Definitionen.
 // INVARIANTEN: Zero-panic doctrine, BoxFuture dyn-safety for async validators.
 

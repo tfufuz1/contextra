@@ -69,7 +69,6 @@ Das Gesamtsystem transformiert sich von einem historisch gewachsenen Monolithen 
 | [`contextra-sys`](crates/contextra-sys/) | POSIX Low-Level I/O, mmap und Prozess-Härtung (Unsafe-Insel 2) | 🟢 Autark |
 | [`contextra-wire`](crates/contextra-wire/) | FlatBuffers Zero-Copy IPC-Protokolle (Unsafe-Insel 3) | 🟢 Autark |
 | [`contextra-rank`](crates/contextra-rank/) | Score-Kalibrierung (Platt, Isotonisch) und Fusion-Algorithmen | 🟢 Autark |
-| [`contextra-core`](crates/contextra-core/) | Strangler-Fassade für historische Typen (wird schrittweise ersetzt) | 🟡 Fassade |
 
 ### 🔹 Ring 1: Speicherkerne & Persistenz
 | Crate | Rolle / Funktion | Status |

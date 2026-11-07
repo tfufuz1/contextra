@@ -213,7 +213,7 @@ impl TermCursor {
         while block_idx < blocks.len()
             && blocks
                 .get(block_idx)
-                .map_or(false, |b| b.max_doc_id < target_doc_id)
+                .is_some_and(|b| b.max_doc_id < target_doc_id)
         {
             block_idx += 1;
         }
@@ -458,7 +458,12 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         }
 
         // Sort active cursors by current_doc_id ascending
-        cursors.sort_by_key(|c| c.current_doc_id().unwrap_or(DocIdRaw::MAX));
+        cursors.sort_by(|a, b| {
+            a.current_doc_id()
+                .unwrap_or(DocIdRaw::MAX)
+                .cmp(&b.current_doc_id().unwrap_or(DocIdRaw::MAX))
+                .then_with(|| a.term.cmp(&b.term))
+        });
 
         let threshold = top_k.min_threshold();
 

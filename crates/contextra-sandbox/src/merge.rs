@@ -1,9 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-01T00:00:00Z
-// ZWECK: Pure, deterministic WASM merge function executor (§4.18)
-// INVARIANTEN: No contextra-store dependencies (Ring DAG rule); fresh store/instance per call
-// SIEHE AUCH: AGENTS.md §4.18, MergeOperatorCapabilities
-
 //! Pure WASM Merge Executor (§4.18).
 //!
 //! Provides `WasmMergeFunction` for executing pure WASM merge operations on key-value pairs

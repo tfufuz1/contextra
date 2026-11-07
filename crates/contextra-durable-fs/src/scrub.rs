@@ -80,6 +80,10 @@ pub enum ScrubOutcome {
 
 // ANCHOR[contextra-durable-fs:SCRUB-IF-SAFE-001]
 /// Bereinigt und löscht eine Datei sicher, sofern alle Sicherheitsvorbedingungen erfüllt sind.
+#[deprecated(
+    since = "0.1.0",
+    note = "Scrubbing wird nach contextra-erasure-store (Paket E2) migriert per D-E1."
+)]
 ///
 /// Verwendet den standardmäßigen Null-Kosten-Injektor [`NoFault`].
 ///

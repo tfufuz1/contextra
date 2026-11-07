@@ -1093,9 +1093,9 @@ mod tests {
         assert!(buffer.is_empty());
     }
 
-    #[tokio::test]
+    #[test]
     // Prüft die nebenläufige has_tx-Abfrage parallel zu schreibenden Operationen.
-    async fn test_has_tx_concurrent() {
+    fn test_has_tx_concurrent() {
         let buffer = Arc::new(TxBuffer::<String>::new());
         let num_tasks = 8;
         let mut handles = Vec::new();
@@ -1103,7 +1103,7 @@ mod tests {
         for i in 0..num_tasks {
             let buffer = buffer.clone();
             let tx = TxId::new(u64::try_from(i).expect("valid u64") + 100);
-            handles.push(tokio::spawn(async move {
+            handles.push(std::thread::spawn(move || {
                 buffer.begin(tx);
                 let _ = buffer.stage(
                     tx,
@@ -1118,7 +1118,7 @@ mod tests {
 
         let mut txs = Vec::new();
         for h in handles {
-            let tx = h.await.expect("task failed"); // #[cfg(test)]
+            let tx = h.join().expect("thread join failed");
             txs.push(tx);
         }
 

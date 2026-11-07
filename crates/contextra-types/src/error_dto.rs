@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Serialisierbare DTO-Repräsentation von `ContextraError` für IPC- und FFI-Schnittstellen (ADR-028).
 //!
 //! # Zweck & Architektur-Rolle: Ring 0

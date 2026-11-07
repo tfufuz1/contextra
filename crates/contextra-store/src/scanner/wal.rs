@@ -28,7 +28,7 @@ impl WalScanner {
         Self { storage }
     }
 
-    /// Positivkontrolle für WAL-Segmente: Schreiben, Replay und Löschen
+    /// Positivkontrolle für WAL-Segmente: Schreiben, Replay und Entfernen
     /// einer temporären Canary-WAL-Datei.
     fn run_positive_control(&self, session: &mut ScanSession) {
         block_on_future(async {

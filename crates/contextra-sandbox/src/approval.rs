@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-25T00:00:00Z
-// ZWECK: Human Approval Data Model & Pure State Machine for WASM Guest Execution (§4.18)
-// INVARIANTEN: No internal timestamps (all time injected), zero panic, pure state machine
-
 //! Human Approval Workflow and State Machine for WASM Execution Boundary.
 //!
 //! Defined data model and deterministic state machine for human approval decisions
