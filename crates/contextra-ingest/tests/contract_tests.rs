@@ -16,10 +16,10 @@
     clippy::panic
 )]
 
-use contextra_engine::chunker::{ChunkerConfig as EngineConfig, MarkdownChunker as EngineChunker};
 use contextra_ingest::canonical::sanitize_text;
 use contextra_ingest::chunking::config::ChunkingConfig;
 use contextra_ingest::chunking::fallback::FallbackChunker;
+use contextra_ingest::chunking::prose::ProseChunker;
 use contextra_ingest::chunking::IrChunker;
 use contextra_ingest::error::IngestError;
 use contextra_ingest::extractor::{DocumentExtractor, ExtractContext};
@@ -325,19 +325,12 @@ fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
     cfg.min_tokens = 0;
 
     let fallback_drafts = FallbackChunker.draft(&ir, &canon, &cfg).unwrap();
+    let prose_drafts = ProseChunker.draft(&ir, &canon, &cfg).unwrap();
 
-    let engine_cfg = EngineConfig {
-        max_tokens: 512,
-        min_tokens: 0,
-        include_breadcrumbs: true,
-        split_levels: vec![1, 2, 3],
-    };
-
-    let engine_chunks = EngineChunker::new(engine_cfg).chunk(DocId::new(1), &canon.text);
-
-    assert_eq!(fallback_drafts.len(), engine_chunks.len());
-    for (draft, chunk) in fallback_drafts.iter().zip(engine_chunks.iter()) {
-        assert_eq!(draft.text, chunk.content);
+    assert_eq!(fallback_drafts.len(), prose_drafts.len());
+    for (draft, expected) in fallback_drafts.iter().zip(prose_drafts.iter()) {
+        assert_eq!(draft.text, expected.text);
+        assert_eq!(draft.breadcrumb, expected.breadcrumb);
     }
 }
 
