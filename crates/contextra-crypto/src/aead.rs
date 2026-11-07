@@ -8,12 +8,7 @@ use zeroize::Zeroizing;
 
 pub const REC_AAD: &[u8] = b"ctx/rec/v2";
 
-pub fn seal_record(
-    dek: &Dek,
-    doc: [u8; 16],
-    key_bytes: &[u8],
-    plain: &[u8],
-) -> Vec<u8> {
+pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> Vec<u8> {
     let mut nonce = [0u8; 12];
     use rand::RngCore;
     rand::rngs::OsRng.fill_bytes(&mut nonce);
@@ -40,11 +35,7 @@ pub fn seal_record(
     env
 }
 
-pub fn open_record(
-    dek: &Dek,
-    key_bytes: &[u8],
-    env: &[u8],
-) -> Result<Zeroizing<Vec<u8>>> {
+pub fn open_record(dek: &Dek, key_bytes: &[u8], env: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     if env.len() < 1 + 1 + 16 + 12 + 16 {
         return Err(CryptoError::Crypto("record envelope too short".into()));
     }
@@ -74,4 +65,69 @@ pub fn open_record(
         .decrypt(Nonce::from_slice(nonce), payload)
         .map_err(|e| CryptoError::Crypto(format!("AEAD authentication failed: {e}")))?;
     Ok(Zeroizing::new(pt))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::secret::SecretKey;
+
+    fn test_dek() -> Dek {
+        let secret = SecretKey::new([0x55u8; 32]);
+        Dek(secret)
+    }
+
+    #[test]
+    fn test_aead_seal_open_roundtrip() {
+        let dek = test_dek();
+        let doc = [0xAAu8; 16];
+        let key_bytes = b"sample_record_key";
+        let plaintext = b"cryptographic building block envelope content";
+
+        let env = seal_record(&dek, doc, key_bytes, plaintext);
+        let opened = open_record(&dek, key_bytes, &env).expect("open record");
+        assert_eq!(opened.as_slice(), plaintext);
+    }
+
+    #[test]
+    fn test_aead_negative_wrong_aad_fails() {
+        let dek = test_dek();
+        let doc = [0xAAu8; 16];
+        let key_bytes = b"sample_record_key";
+        let wrong_key_bytes = b"wrong_record_key";
+        let plaintext = b"authenticated payload";
+
+        let env = seal_record(&dek, doc, key_bytes, plaintext);
+        let res = open_record(&dek, wrong_key_bytes, &env);
+        assert!(res.is_err(), "Wrong AAD must fail AEAD verification");
+    }
+
+    #[test]
+    fn test_aead_negative_bit_flip_fails() {
+        let dek = test_dek();
+        let doc = [0xAAu8; 16];
+        let key_bytes = b"sample_record_key";
+        let plaintext = b"authenticated payload";
+
+        let mut env = seal_record(&dek, doc, key_bytes, plaintext);
+        let last_idx = env.len() - 1;
+        env[last_idx] ^= 0x01; // flip 1 bit in tag/ciphertext
+
+        let res = open_record(&dek, key_bytes, &env);
+        assert!(res.is_err(), "Bit-flip must fail AEAD verification");
+    }
+
+    #[test]
+    fn test_aead_negative_truncated_tag_fails() {
+        let dek = test_dek();
+        let doc = [0xAAu8; 16];
+        let key_bytes = b"sample_record_key";
+        let plaintext = b"authenticated payload";
+
+        let env = seal_record(&dek, doc, key_bytes, plaintext);
+        let truncated = &env[..env.len() - 8]; // truncate tag
+
+        let res = open_record(&dek, key_bytes, truncated);
+        assert!(res.is_err(), "Truncated tag must fail AEAD verification");
+    }
 }

@@ -65,6 +65,136 @@ pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
     unsafe { memmap2::Mmap::map(file) }
 }
 
+// ANCHOR[contextra-sys:MMAP-TYPINVARIANT-001]
+/// Typzustands-Marker: Zeigt an, dass eine Datei vollständig versiegelt, unveränderlich
+/// und prüfsummenverifiziert ist (gemäß INV-IO-1 und INV-ENCRYPT-REST-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SealedReadOnly;
+
+/// Typzustands-Marker: Zeigt an, dass eine Datei noch unversiegelt oder potenziell veränderlich ist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Unsealed;
+
+/// Ein typisierter Dateiwächter, der den Versiegelungszustand einer Datei zur Compilezeit
+/// und Laufzeit abbildet.
+///
+/// Invariante gemäß SPEC INV-IO-1:
+/// Eine Datei darf erst per Memory-Mapping eingebunden werden, wenn sie versiegelt (`SealedReadOnly`)
+/// und auf unveränderlichen Zustand geprüft wurde.
+#[derive(Debug)]
+pub struct SealedFile<State = SealedReadOnly> {
+    file: File,
+    expected_len: u64,
+    _marker: std::marker::PhantomData<State>,
+}
+
+impl SealedFile<SealedReadOnly> {
+    /// Erstellt eine versiegelte Dateireferenz nach erfolgreicher Integritäts- und Prüfsummenverifikation.
+    ///
+    /// # Ablauf
+    /// 1. Liest die Dateimetadaten aus `file`.
+    /// 2. Verifiziert, dass die tatsächliche Dateigröße exakt `expected_len` entspricht.
+    /// 3. Gibt bei Übereinstimmung eine versiegelte Dateistruktur zurück.
+    ///
+    /// # Fehler
+    /// Liefert [`std::io::ErrorKind::InvalidData`], wenn die Dateigröße von `expected_len` abweicht.
+    pub fn new_verified(file: File, expected_len: u64) -> io::Result<Self> {
+        let meta = file.metadata()?;
+        if meta.len() != expected_len {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "SealedFile verification failed: expected length {}, actual length {}",
+                    expected_len,
+                    meta.len()
+                ),
+            ));
+        }
+        Ok(Self {
+            file,
+            expected_len,
+            _marker: std::marker::PhantomData,
+        })
+    }
+
+    /// Gibt eine Referenz auf die zugrundeliegende [`File`] zurück.
+    pub fn as_file(&self) -> &File {
+        &self.file
+    }
+
+    /// Gibt die verifizierte Dateilänge in Bytes zurück.
+    pub fn verified_len(&self) -> u64 {
+        self.expected_len
+    }
+
+    /// Mappt die versiegelte Datei über die typgesicherte [`SealedMap`]-Abstraktion.
+    pub fn map_readonly(&self) -> io::Result<SealedMap> {
+        SealedMap::map_sealed(self)
+    }
+}
+
+// ANCHOR[contextra-sys:MMAP-SEALED-MAP-001]
+/// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien (INV-IO-1).
+///
+/// Im Gegensatz zu rohem `mmap` kann eine [`SealedMap`] ausschließlich aus einer [`SealedFile`]
+/// erzeugt werden. Dies erzwingt die Architekturinvariante INV-IO-1 im Typensystem.
+#[derive(Debug)]
+pub struct SealedMap {
+    inner: memmap2::Mmap,
+}
+
+impl SealedMap {
+    /// Mappt eine nachweislich versiegelte Datei in den virtuellen Adressraum.
+    ///
+    /// # Ablauf
+    /// 1. Übergibt die verifizierte Datei an `mmap_readonly`.
+    /// 2. Prüft, ob die gemappte Länge exakt mit der verifizierten Dateilänge übereinstimmt.
+    /// 3. Liefert die gekapselte `SealedMap` zurück.
+    pub fn map_sealed(file: &SealedFile<SealedReadOnly>) -> io::Result<Self> {
+        let inner = mmap_readonly(file.as_file())?;
+        if inner.len() as u64 != file.verified_len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Mmap length mismatch: mapped {} bytes, expected {} bytes",
+                    inner.len(),
+                    file.verified_len()
+                ),
+            ));
+        }
+        Ok(Self { inner })
+    }
+
+    /// Gibt den Speicherinhalt als Byte-Slice zurück.
+    pub fn as_slice(&self) -> &[u8] {
+        &self.inner[..]
+    }
+
+    /// Gibt die Länge der Speicherabbildung in Bytes zurück.
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Prüft, ob die Speicherabbildung leer ist (0 Bytes).
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
+impl std::ops::Deref for SealedMap {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner[..]
+    }
+}
+
+impl AsRef<[u8]> for SealedMap {
+    fn as_ref(&self) -> &[u8] {
+        &self.inner[..]
+    }
+}
+
 // ANCHOR[contextra-sys:MMAP-TESTS-001]
 #[cfg(test)]
 mod tests {
@@ -149,6 +279,40 @@ mod tests {
         let mmap = mmap_readonly(&file)?;
         assert_eq!(mmap.get(..13), Some(&b"short payload"[..]));
         assert_eq!(mmap.get(13), None);
+        let _ = std::fs::remove_file(path);
+        Ok(())
+    }
+
+    // ANCHOR[contextra-sys:MMAP-TEST-SEALED-001]
+    // Prüft die typisierte SealedMap- und SealedFile-Abstraktion (INV-IO-1).
+    #[test]
+    fn test_sealed_map_and_file() -> Result<(), Box<dyn std::error::Error>> {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "contextra_sys_sealed_map_test_{}.bin",
+            std::process::id()
+        ));
+        let payload = b"sealed payload verified content";
+        {
+            let mut file = File::create(&path)?;
+            file.write_all(payload)?;
+        }
+
+        // Test mit korrekter verifizierter Länge
+        let file = File::open(&path)?;
+        let sealed_file = SealedFile::new_verified(file, payload.len() as u64)?;
+        assert_eq!(sealed_file.verified_len(), payload.len() as u64);
+
+        let sealed_map = sealed_file.map_readonly()?;
+        assert_eq!(sealed_map.len(), payload.len());
+        assert_eq!(&sealed_map[..], payload);
+        assert_eq!(sealed_map.as_slice(), payload);
+
+        // Test mit inkorrekter Länge -> InvalidData Fehler (Fail-Closed)
+        let file_wrong = File::open(&path)?;
+        let res_wrong = SealedFile::new_verified(file_wrong, payload.len() as u64 + 10);
+        assert!(res_wrong.is_err());
+
         let _ = std::fs::remove_file(path);
         Ok(())
     }

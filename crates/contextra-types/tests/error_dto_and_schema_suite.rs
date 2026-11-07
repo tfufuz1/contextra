@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Integrations-Testsuite für ContextraErrorDto und Schema-Versionierung.
 //! Prüft JSON-Serialisierung von Fehler-Details und Schema-Kompatibilität.
 

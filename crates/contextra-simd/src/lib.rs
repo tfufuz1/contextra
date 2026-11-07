@@ -34,7 +34,13 @@ pub mod dispatch;
 // Hardwarespezifische Rechenkerne (Scalar, AVX2, AVX-512, NEON).
 pub mod kernels;
 
-pub use dispatch::*;
+pub use dispatch::{
+    cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
+    dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
+    euclidean_distance_f32_bytes, euclidean_distance_sq_u8, Dispatcher, SimdTarget,
+};
+#[cfg(test)]
+pub use dispatch::{get_dispatch_override, set_dispatch_override, SimdPathOverride};
 pub use kernels::scalar::{
     cosine_distance_f32_bytes_scalar, cosine_distance_scalar, cosine_similarity_parts_f32_u8,
     cosine_similarity_parts_u8_scalar, dot_product_f32_bytes_scalar, dot_product_f32_u8,

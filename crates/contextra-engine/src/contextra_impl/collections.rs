@@ -8,6 +8,8 @@
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
+use contextra_vector::HnswConfig;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl Contextra {

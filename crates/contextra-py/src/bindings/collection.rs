@@ -7,7 +7,7 @@
 //! Ring 4 (FFI-Boundary / Bindings).
 //!
 //! ## Architektur
-//! Eine `PyCollection` verweist auf eine zugrundeliegende `contextra_db::Collection`.
+//! Eine `PyCollection` verweist auf eine zugrundeliegende `contextra::Collection`.
 //! Sie hält:
 //! - Einen referenzgezählten Handle (`Arc<ContextraCollection>`) auf die Rust-Engine.
 //! - Den Tokio-Runtime-Handle (`Arc<Runtime>`) zur Ausführung asynchroner Abfragen.
@@ -17,7 +17,7 @@
 //! Die CRUD- und Batch-Methoden werden über die Makros `contextra_crud_methods!` und
 //! `contextra_batch_methods!` generiert.
 
-use contextra_db::Collection as ContextraCollection;
+use contextra::Collection as ContextraCollection;
 use numpy::PyReadonlyArray1;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

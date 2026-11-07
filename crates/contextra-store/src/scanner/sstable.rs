@@ -62,7 +62,7 @@ impl SstableScanner {
 
     /// Positivkontrolle für SSTables: Erzeugt eine temporäre Canary-Datei,
     /// führt die volle Reader-Iterationslogik darüber aus, verifiziert den Treffer
-    /// und löscht die Canary-Datei rückstandslos.
+    /// und entfernt die Canary-Datei rückstandslos.
     fn run_positive_control(&self, session: &mut ScanSession) {
         block_on_future(async {
             let temp_dir = std::env::temp_dir();

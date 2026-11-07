@@ -1,6 +1,6 @@
 //! # Purge-Scanner (Ring 1)
 //!
-//! Identifiziert gezielt zu loeschende Schluesselbereiche ueber Speicherschichten hinweg.
+//! Identifiziert gezielt zu bereinigende Schluesselbereiche ueber Speicherschichten hinweg.
 
 // FILE-CONTEXT
 // ZWECK: Physical Purger implementation für LSM-Storage-Schichten (§12.7.4, INV-WITNESS-MINT-1).
@@ -74,7 +74,7 @@ impl Purger for LsmPurger {
                     // Keine Target-Einträge in dieser SSTable -> behalten
                     new_readers.push(Arc::clone(reader));
                 } else if retained.is_empty() {
-                    // Alle Einträge gehörten zum Target -> Datei löschen
+                    // Alle Einträge gehörten zum Target -> Datei entfernen
                     sst_files_to_purge.push(reader.file_path().to_path_buf());
                 } else {
                     // Datei filtern und neu schreiben
@@ -107,7 +107,7 @@ impl Purger for LsmPurger {
                 *sst_guard = new_readers;
             }
 
-            // Altdateien (.sst) Nullen und Löschen
+            // Altdateien (.sst) Nullen und Entfernen
             let data_dir = self.storage.data_path();
             let mut active_paths = AHashSet::new();
             for r in &self.storage.sstables_for_scanner().await {
@@ -197,7 +197,7 @@ impl Purger for LsmPurger {
                                 .collect();
 
                             if retained_wal.is_empty() {
-                                // WAL enthielt nur Target -> Nullen und Löschen
+                                // WAL enthielt nur Target -> Nullen und Entfernen
                                 if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
                                     let len = metadata.len();
                                     let zeros = vec![0u8; len as usize];

@@ -3,7 +3,9 @@
 //! Reagiert auf erkannte Verteilungsverschiebungen (`DriftDetected`) durch Aufruf von
 //! `apply_drift_penalty` auf der angegebenen `BanditPolicy`.
 
-use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+use crate::lyapunov::LyapunovDriftWatcher;
+#[cfg(feature = "bandit-routing")]
+use crate::lyapunov::LyapunovResult;
 use serde::{Deserialize, Serialize};
 
 /// Drift detection signal returned by a [`DriftDetector`].

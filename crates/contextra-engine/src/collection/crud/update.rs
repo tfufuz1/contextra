@@ -30,12 +30,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         let _guard = self.kv_locks.lock_for(id).await;
-        drop(_guard);
         let db_tx = self.begin_transaction()?;
 
         match self.update_op(&db_tx, id, embedding, metadata).await {
             Ok(_) => {
                 db_tx.commit().await?;
+                drop(_guard);
                 self.check_and_trigger_community_detection(1);
                 Ok(())
             }
@@ -43,6 +43,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback update: {}", rollback_err);
                 }
+                drop(_guard);
                 Err(e)
             }
         }

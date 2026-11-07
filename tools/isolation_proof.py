@@ -3,6 +3,12 @@
 
 Verifies that a crate builds and tests in an isolated workspace with only its
 explicitly allowed dependencies.
+
+Copies the target crate and its allowed dependencies (per capabilities.toml)
+into a clean temporary workspace directory and runs:
+  - cargo build -p <crate> --no-default-features --locked
+  - cargo build -p <crate> --locked
+  - cargo test -p <crate> --locked
 """
 
 import argparse

@@ -72,7 +72,7 @@ description = 'Persistent Checkpoint Engine und Blake3 Manifest-Verifikation'
 capabilities = ['blake3-checkpoints', 'orphan-recovery']
 path = "crates/contextra-checkpoint"
 unsafe_island = false
-may_depend_on = ['contextra-core', 'contextra-mvcc', 'contextra-ports', 'contextra-types', 'contextra-wire']
+may_depend_on = ['contextra-ports', 'contextra-types']
 ci_class = 'pr'
 spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-checkpoint --locked"
@@ -100,6 +100,18 @@ may_depend_on = ['contextra-mvcc', 'contextra-ports', 'contextra-types', 'contex
 ci_class = 'pr'
 spec = ['A2', 'A3', '0', '4', '13', '20']
 test = "cargo test -p contextra-core --locked"
+
+[crates.contextra-durable-fs]
+ring = 'Ring 0'
+maturity = 'beta'
+description = 'Durable filesystem operations, RealFs POSIX implementation and synchronous disk flushing'
+capabilities = ['durable-flush', 'real-fs', 'health-state']
+path = "crates/contextra-durable-fs"
+unsafe_island = false
+may_depend_on = ['contextra-ports', 'contextra-sys', 'contextra-types']
+ci_class = 'pr'
+spec = ['0', '4', '7']
+test = "cargo test -p contextra-durable-fs --locked"
 
 [crates.contextra-crypto]
 ring = 'Ring 0'
@@ -276,7 +288,7 @@ description = 'PyO3 Python Bindings'
 capabilities = ['python-bindings', 'ffi-safe']
 path = "crates/contextra-py"
 unsafe_island = false
-may_depend_on = ['contextra-adapt', 'contextra-core', 'contextra-db', 'contextra-mvcc', 'contextra-ports', 'contextra-rank', 'contextra-router', 'contextra-store', 'contextra-types', 'contextra-wire']
+may_depend_on = ['contextra', 'contextra-types', 'contextra-wire']
 ci_class = 'pr-check-only'
 spec = ['A2', '0', '4', '9', '17', '18', '19', '20']
 test = "cargo test -p contextra-py --locked"
