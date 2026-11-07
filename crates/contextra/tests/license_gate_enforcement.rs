@@ -12,7 +12,10 @@ use std::sync::Arc;
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::PerformanceProfile;
+#[cfg(feature = "license")]
 use contextra_license::OpenFastGate;
+#[cfg(not(feature = "license"))]
+use contextra_ports::license::OpenFastGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_types::error::ContextraError;
 

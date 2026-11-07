@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![cfg(feature = "license")]
 
 //! # Integrationstest: `license_gate_always_enforced`
 //!
