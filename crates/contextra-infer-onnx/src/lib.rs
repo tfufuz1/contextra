@@ -40,7 +40,6 @@ use std::sync::Arc;
 
 #[cfg(feature = "onnx")]
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
-#[cfg(feature = "onnx")]
 use contextra_types::{ContextraError, Result};
 #[cfg(feature = "onnx")]
 use ort::value::Value;
@@ -400,6 +399,31 @@ pub async fn ensure_onnx_model_download(
         reason: "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
             .to_string(),
     })
+}
+
+/// Prüft über die gegebene VFS-Instanz, ob die Modelldateien (`model.onnx` und `tokenizer.json`)
+/// für `model_name` im angegebenen Basisverzeichnis vorhanden sind.
+///
+/// Falls die Dateien nicht vorhanden sind, schlägt die Prüfung offline-first mit `ContextraError::InvalidInput` fehl.
+pub fn ensure_onnx_model_exists_vfs(
+    vfs: &dyn contextra_ports::Vfs,
+    base_dir: &Path,
+    model_name: &str,
+) -> Result<PathBuf> {
+    let model_dir = base_dir.join(model_name);
+    let model_file = model_dir.join("model.onnx");
+    let tokenizer_file = model_dir.join("tokenizer.json");
+
+    let model_exists = vfs.exists(&model_file)?;
+    let tokenizer_exists = vfs.exists(&tokenizer_file)?;
+
+    if model_exists && tokenizer_exists {
+        Ok(model_dir)
+    } else {
+        Err(ContextraError::InvalidInput(format!(
+            "ONNX model files for '{model_name}' missing in {model_dir:?} according to VFS inspection."
+        )))
+    }
 }
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
@@ -1068,9 +1092,18 @@ mod tests {
         let texts = vec!["a", "b", "c"];
         let batch_res = engine.embed_batch(&texts).await?;
         assert_eq!(batch_res.len(), 3);
-        assert_eq!(batch_res[0], vec![1.0, 'a' as u32 as f32]);
-        assert_eq!(batch_res[1], vec![1.0, 'b' as u32 as f32]);
-        assert_eq!(batch_res[2], vec![1.0, 'c' as u32 as f32]);
+        assert_eq!(
+            batch_res.first().cloned(),
+            Some(vec![1.0, 'a' as u32 as f32])
+        );
+        assert_eq!(
+            batch_res.get(1).cloned(),
+            Some(vec![1.0, 'b' as u32 as f32])
+        );
+        assert_eq!(
+            batch_res.get(2).cloned(),
+            Some(vec![1.0, 'c' as u32 as f32])
+        );
 
         // Error propagation test
         let failing_engine = MockOrderedEngine {
@@ -1184,6 +1217,71 @@ mod tests {
                 contextra_types::ContextraError::CapabilityUnsupported { .. }
             ));
         }
+    }
+
+    #[test]
+    /// Prüft die Modellprüfung über eine VFS-Mock-Instanz.
+    fn test_ensure_onnx_model_exists_vfs() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        use contextra_ports::Vfs;
+        use std::collections::BTreeSet;
+        use std::sync::Mutex;
+
+        struct TestMockVfs {
+            existing_files: Mutex<BTreeSet<PathBuf>>,
+        }
+
+        impl Vfs for TestMockVfs {
+            fn read(&self, _path: &Path) -> contextra_types::Result<Vec<u8>> {
+                Ok(vec![])
+            }
+            fn write_atomic(&self, path: &Path, _data: &[u8]) -> contextra_types::Result<()> {
+                self.existing_files
+                    .lock()
+                    .unwrap()
+                    .insert(path.to_path_buf());
+                Ok(())
+            }
+            fn create_dir_all(&self, _path: &Path) -> contextra_types::Result<()> {
+                Ok(())
+            }
+            fn remove_file(&self, _path: &Path) -> contextra_types::Result<()> {
+                Ok(())
+            }
+            fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
+                Ok(self.existing_files.lock().unwrap().contains(path))
+            }
+            fn len(&self, _path: &Path) -> contextra_types::Result<u64> {
+                Ok(0)
+            }
+            fn list_dir(&self, _path: &Path) -> contextra_types::Result<Vec<String>> {
+                Ok(vec![])
+            }
+            fn sync_dir(&self, _path: &Path) -> contextra_types::Result<()> {
+                Ok(())
+            }
+        }
+
+        let base = Path::new("/models");
+        let vfs = TestMockVfs {
+            existing_files: Mutex::new(BTreeSet::new()),
+        };
+        let _ = vfs.remove_file(base);
+        let _ = vfs.list_dir(base);
+        let _ = vfs.sync_dir(base);
+
+        // Missing files -> InvalidInput
+        let res = ensure_onnx_model_exists_vfs(&vfs, base, "bge-reranker");
+        assert!(res.is_err());
+
+        // Add model.onnx and tokenizer.json
+        let model_dir = base.join("bge-reranker");
+        vfs.write_atomic(&model_dir.join("model.onnx"), b"")?;
+        vfs.write_atomic(&model_dir.join("tokenizer.json"), b"")?;
+
+        let res_ok = ensure_onnx_model_exists_vfs(&vfs, base, "bge-reranker");
+        assert!(res_ok.is_ok());
+        assert_eq!(res_ok.unwrap(), model_dir);
+        Ok(())
     }
 }
 

@@ -35,6 +35,7 @@ pub mod calibration;
 pub mod drift;
 pub mod explain;
 pub mod fusion;
+pub mod metrics;
 
 #[cfg(feature = "dibud")]
 pub mod dibud;
@@ -50,6 +51,9 @@ pub use dibud::{
 };
 pub use drift::{DriftDetector, DriftStatus};
 pub use explain::{explain, ExplanationEntry, RetrievalExplanation};
+pub use metrics::{
+    mean_reciprocal_rank, ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank,
+};
 pub use fusion::{
     apply_resonance_bonus, fuse_search_results_with_strategy, g, modulate_and_renormalize_weights,
     reciprocal_rank_fusion, score_normalized_fusion_with_options, weighted_reciprocal_rank_fusion,
