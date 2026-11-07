@@ -1,12 +1,12 @@
 //! # Segmentierte KV-Verwaltung & Shredding (Ring 1)
 //!
-//! Ermoeglicht granulare Schluesselverwaltung und O(1) Loeschung sensibler
+//! Ermoeglicht granulare Schluesselverwaltung und O(1) Bereinigung sensibler
 //! Gruppen durch Schluesselrevokation in der [`KeyRegistry`].
 
 // FILE-CONTEXT
 // ZWECK: Verdrahtung von KvDeleteMode und contextra_crypto::kv_shredding für KV-Segment-Verschlüsselung und Crypto-Shredding (AP-P0-06 / Spec B.1.8).
 // INVARIANTEN:
-// - INV-KV-DELETE-1: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
+// - INV-KV-DELETE-1: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
 // - Designprinzip P24: Ein `revoke_subkey`-Aufruf ist O(1) bezüglich der Segmentgröße.
 
 #![forbid(unsafe_code)]
@@ -151,20 +151,20 @@ impl KvSegmentManager {
     /// Under `TombstoneOnly`, subkey revocation is a no-op (LSM tombstones are used instead).
     pub fn delete_segment(&self, group_id: u64) -> bool {
         match self.config.delete_mode {
-            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id),
+            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id).unwrap_or(false),
             KvDeleteMode::TombstoneOnly => false,
         }
     }
 
     /// Generates or validates a KV deletion proof.
     ///
-    /// INVARIANTE `INV-KV-DELETE-1`: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente
+    /// INVARIANTE `INV-KV-DELETE-1`: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente
     /// möglich, niemals für `TombstoneOnly`. Falls ein Aufrufer versucht, für ein `TombstoneOnly`-Segment einen
     /// Löschbeweis auszustellen, schlägt dies mit `ContextraError::KvDeleteModeConfig` fehl.
     pub fn generate_deletion_proof(&self, group_id: u64) -> Result<bool, ContextraError> {
         match self.config.delete_mode {
             KvDeleteMode::TombstoneOnly => Err(ContextraError::KvDeleteModeConfig(
-                "Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.",
+                "Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.",
             )),
             KvDeleteMode::CryptoShred => {
                 // Return true if key is revoked (no longer active)

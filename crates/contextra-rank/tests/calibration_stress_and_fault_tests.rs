@@ -44,7 +44,7 @@ fn test_isotonic_fifo_eviction_and_force_rebuild() {
     );
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_extreme_finite_logits_monotonicity() {
     let mut obs = Vec::new();
@@ -73,7 +73,7 @@ fn test_platt_scaler_extreme_finite_logits_monotonicity() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_pid_controller_multithreaded_stress() {
     let pid = Arc::new(Mutex::new(PidController::new(150.0, 50, 200, Some(100))));

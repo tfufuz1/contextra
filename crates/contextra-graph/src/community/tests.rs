@@ -242,9 +242,9 @@ async fn test_leiden_vs_lpa_well_connected_communities_comparison() {
 
     // Leiden guarantees that Cluster A and Cluster B are distinct well-connected communities
     assert_ne!(
-            comm_a, comm_b,
-            "Leiden must separate Cluster A and Cluster B into distinct well-connected communities despite weak bridge edge"
-        );
+        comm_a, comm_b,
+        "Leiden must separate Cluster A and Cluster B into distinct well-connected communities despite weak bridge edge"
+    );
 }
 
 #[derive(Clone)]
@@ -273,7 +273,7 @@ impl tracing::field::Visit for StringVisitor {
 proptest::proptest! {
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-004]
     #[test]
-    fn prop_community_detection_never_panics(
+    fn test_prop_community_detection_never_panics(
         node_count in 1usize..50,
         edge_specs in proptest::collection::vec((0..50usize, 0..50usize), 0..150),
         max_iterations in 1u32..50,
@@ -307,7 +307,7 @@ proptest::proptest! {
 
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-005]
     #[test]
-    fn prop_community_detection_every_node_assigned(
+    fn test_prop_community_detection_every_node_assigned(
         node_count in 1usize..30,
         edge_specs in proptest::collection::vec((0..30usize, 0..30usize), 0..60),
         seed in proptest::num::u64::ANY,
@@ -411,7 +411,7 @@ async fn test_community_detection_non_convergence_logs_warning_and_returns_best_
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-007]
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn detect_communities_CASE_empty_graph() {
+async fn test_detect_communities_CASE_empty_graph() {
     let graph = CsrGraph::new();
     let config = CommunityDetectionConfig::default();
 
@@ -425,7 +425,7 @@ async fn detect_communities_CASE_empty_graph() {
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-008]
 #[tokio::test]
 #[allow(non_snake_case)]
-async fn detect_communities_CASE_single_node() {
+async fn test_detect_communities_CASE_single_node() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
     let id = EntityId::new(42);
@@ -447,7 +447,7 @@ async fn detect_communities_CASE_single_node() {
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-009]
 #[test]
 #[allow(non_snake_case)]
-fn serialization_roundtrip_CASE_community_config_and_assignment() {
+fn test_serialization_roundtrip_CASE_community_config_and_assignment() {
     let config = CommunityDetectionConfig {
         max_iterations: 150,
         seed: 987654321,

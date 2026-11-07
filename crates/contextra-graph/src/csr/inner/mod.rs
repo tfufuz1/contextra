@@ -69,7 +69,7 @@ impl Default for GraphInner {
 }
 
 impl GraphInner {
-// ANCHOR[contextra-graph:SRC-CSR-INNER-MOD-002]
+    // ANCHOR[contextra-graph:SRC-CSR-INNER-MOD-002]
     pub fn new() -> Self {
         Self {
             id_map: HashMap::new(),

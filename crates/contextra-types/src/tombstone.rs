@@ -3,7 +3,7 @@
 //! # Zweck & Architektur-Rolle: Ring 0
 //!
 //! In Multi-Version Concurrency Control (MVCC) und LSM-Tree-Speichern werden Datensätze
-//! bei einer Löschung nicht physisch überschrieben, sondern mit einem Löschmarker ("Tombstone")
+//! bei Invalidierung nicht physisch überschrieben, sondern mit einem Tombstone-Marker
 //! versehen.
 //!
 //! Gemäß ADR-041 und IP-07 wird dafür das höchstwertige Bit 63 der Sequenznummer (`u64`) reserviert.

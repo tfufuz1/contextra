@@ -134,7 +134,7 @@ proptest! {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_prop_rrf_tie_breaker_stability_deterministic() {
     // Multiple documents with identical fusion scores must be tie-broken deterministically by DocId ascending.

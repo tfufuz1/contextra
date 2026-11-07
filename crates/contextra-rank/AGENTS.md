@@ -1,30 +1,36 @@
 # AGENTS.md — `contextra-rank`
 
-## 1. Rolle
-`contextra-rank` bietet Score-Kalibrierung (Platt, Isotonisch, Conformal) und Ergebnis-Anreicherungen zur Verfeinerung von Retrieval-Rankings.
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-rank` bietet isolierte Algorithmen für Score-Kalibrierung (Platt Scaling, Isotonische Regression, Conformal Calibration) und Ranking-Anreicherungen (Ring 0).
+Er dient der Verfeinerung und Kalibrierung von Konfidenzwerten über mehrere Retrieval-Signale hinweg.
+Als wiederverwendbarer Algorithmen-Baustein ist er strikt von Persistenz- und Netzwerk-Details entkoppelt und kann in beliebigen Such-Pipelines genutzt werden.
 
 ## 2. Ring, Klasse, Reifegrad & `may_use`
 - **Ring:** Ring 0 (Ranking & Kalibrierung)
 - **Klasse:** Rand `[R]`
-- **Reifegrad:** `experimental` (Anmerkung: In `capabilities.toml` aktuell als `stable` geführt, siehe `docs/status/ABW-L3.md`)
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`).
 
-## 3. Garantien & Anforderungen (§33, §12)
-- **REQ-RNK-001:** Deterministischer Tie-Breaker (bei gleichen Scores Sortierung nach DocId aufsteigend).
-- **REQ-RNK-002:** Konforme Kalibrierung und Platt/Isotonische Skalierung ohne Mutation der Ursprungsscores.
-- **Durchsetzungsmechanismus (§27.6):** `#![forbid(unsafe_code)]`, Ranking Unit-Tests.
+## 3. Garantien & Architektur-Invarianten
+- **REQ-RNK-001:** Deterministischer Tie-Breaker (bei identischen Relevanz-Scores deterministische Sortierung nach `DocId` aufsteigend).
+- **REQ-RNK-002:** Konforme Kalibrierung und Platt/Isotonische Skalierung ohne unerwünschte Mutation von Ursprungsscores.
+- **Score-Isolation:** Keine Halluzination oder Erfindung von Relevanzwerten; Skalierung erfolgt nach strengen statistischen Modellen.
+- **Zero-Panic-Doktrin:** Keine unkontrollierten Panics bei Division durch Null oder leeren Trefferlisten.
 
 ## 4. Verbotene Muster
-- **Keine Hintergrund-Threads ohne Port.**
-- Kein `unsafe` (`#![forbid(unsafe_code)]`).
-- **Keine zweite Standardfusion:** RRF-Standardfusion liegt im Kern (`engine`), `rank` bietet nur Kalibrierer/Erweiterungen (§6.10, Punkt 10).
+- Kein `unsafe` (`#![forbid(unsafe_code)]` strikt erzwungen).
+- **Keine zweite Standardfusion:** RRF-Standardfusion liegt im Kern (`contextra-engine`/`ports`), `rank` bietet reine Kalibrierer und Erweiterungen.
+- Keine Hintergrund-Threads oder asynchronen Event-Loops ohne expliziten Port.
+- Keine Querabhängigkeiten zu Speicher-Engines oder Inferenz-Servern.
 
-## 5. Implementierte & konsumierte Ports (Anhang A)
-- Implementiert: `Calibrator` Port.
-- Konsumiert: Port `Metric`.
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Implementiert:** `Calibrator`-Port, lokale `ImportanceCalibrator`-Traits für Entkopplung.
+- **Bereitgestellt für:** `contextra-engine`, `contextra-router`, `contextra-infer-*`.
 
-## 6. Tests & Gates
-- **Ranking Tie-Breaker Tests:** Determinismus-Tests für identische Fusion-Scores.
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Tie-Breaker Determinismus-Tests:** Validierung stabiler Sortierreihenfolgen bei Score-Gleichständen.
+- **Statistische Kalibrierungstests:** Verifikation der Wahrscheinlichkeitsdichten kalibrierter Scores.
+- **Mutations-Testing:** Prüfung auf Monotonie-Verletzungen nach Kalibrierungsdurchläufen.
 
-## 7. Offene Punkte
-- keine.
+## 7. Offene Punkte & Technische Schulden
+- Keine.

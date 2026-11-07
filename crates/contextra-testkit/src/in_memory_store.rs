@@ -337,39 +337,72 @@ impl StorageEngine for InMemoryStorageEngine {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
     // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-COMMIT-001]
     // Prüft, dass gestagete Werte erst nach dem Commit sichtbar werden.
     #[tokio::test]
-    async fn test_in_memory_store_put_get_commit() {
+    async fn test_in_memory_store_put_get_commit() -> Result<()> {
         let store = InMemoryStorageEngine::new();
         let tx = TxId::new(1);
 
-        assert!(store.get(b"key1").await.unwrap().is_none());
+        assert!(store.get(b"key1").await?.is_none());
 
-        store.put(tx, b"key1", b"value1").await.unwrap();
+        store.put(tx, b"key1", b"value1").await?;
         // Not visible before commit
-        assert!(store.get(b"key1").await.unwrap().is_none());
+        assert!(store.get(b"key1").await?.is_none());
 
-        store.commit(tx).await.unwrap();
-        let val = store.get(b"key1").await.unwrap();
+        store.commit(tx).await?;
+        let val = store.get(b"key1").await?;
         assert_eq!(val, Some(Bytes::from_static(b"value1")));
+        Ok(())
     }
 
     // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-ROLLBACK-001]
     // Prüft, dass ein Rollback unbestätigte Änderungen verwirft und diese nicht sichtbar werden.
     #[tokio::test]
-    async fn test_in_memory_store_rollback() {
+    async fn test_in_memory_store_rollback() -> Result<()> {
         let store = InMemoryStorageEngine::new();
         let tx = TxId::new(2);
 
-        store.put(tx, b"key_rb", b"val").await.unwrap();
-        store.rollback(tx).await.unwrap();
-        store.commit(tx).await.unwrap();
+        store.put(tx, b"key_rb", b"val").await?;
+        store.rollback(tx).await?;
+        store.commit(tx).await?;
 
-        assert!(store.get(b"key_rb").await.unwrap().is_none());
+        assert!(store.get(b"key_rb").await?.is_none());
+        Ok(())
+    }
+
+    // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-COVERAGE-001]
+    // Prüft get_at_seq, put_if_absent, last_seq_no, pin/unpin_checkpoint und scan.
+    #[tokio::test]
+    async fn test_in_memory_store_extended_api() -> Result<()> {
+        let store = InMemoryStorageEngine::new();
+        let tx = TxId::new(10);
+        let inserted = store.put_if_absent(tx, b"k_ext", b"v_ext").await?;
+        assert!(inserted);
+        let inserted_again = store.put_if_absent(tx, b"k_ext", b"v_ext2").await?;
+        assert!(!inserted_again);
+        store.commit(tx).await?;
+
+        let seq = store.last_seq_no().await?;
+        assert!(seq > 0);
+
+        let val_at_seq = store.get_at_seq(b"k_ext", seq).await?;
+        assert_eq!(val_at_seq, Some(Bytes::from_static(b"v_ext")));
+
+        store.pin_checkpoint(seq).await?;
+        store.unpin_checkpoint(seq).await?;
+
+        let range_scan = store
+            .scan(
+                std::ops::Bound::Unbounded,
+                std::ops::Bound::Unbounded,
+                Some(10),
+            )
+            .await?;
+        assert!(!range_scan.is_empty());
+        Ok(())
     }
 }

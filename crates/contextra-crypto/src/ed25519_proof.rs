@@ -13,10 +13,10 @@
 
 #![forbid(unsafe_code)]
 
-//! Asymmetrische Ed25519-Löschbeweis-Signierung und externe Verifikation (Version 3).
+//! Asymmetrische Ed25519-Attestationsbeweis-Signierung und externe Verifikation (Version 3).
 //!
 //! Ermöglicht Dritten (z. B. Datenschutz-Aufsichtsbehörden) die unabhängige Prüfung
-//! von Contextra-Löschbeweisen ohne Zugriff auf interne Systemgeheimnisse.
+//! von Contextra-Attestationsbeweisen ohne Zugriff auf interne Systemgeheimnisse.
 
 use rand::RngCore;
 use thiserror::Error;
@@ -24,7 +24,7 @@ use zeroize::ZeroizeOnDrop;
 
 pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;
 
-/// Fehlerzustände bei der Verifikation von Ed25519-Löschbeweisen.
+/// Fehlerzustände bei der Verifikation von Ed25519-Attestationsbeweisen.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum DeletionProofError {
     /// Ungültiger Ed25519 VerifyingKey (32 Bytes).
@@ -35,12 +35,12 @@ pub enum DeletionProofError {
     #[error("invalid signature: {0}")]
     InvalidSignature(String),
 
-    /// Nicht unterstützte Version der Löschbeweis-Signatur.
+    /// Nicht unterstützte Version der Attestationsbeweis-Signatur.
     #[error("Unsupported DeletionProof signature_version: {0}")]
     UnsupportedVersion(u8),
 }
 
-/// Schlüsselpaar für Ed25519-Löschbeweise.
+/// Schlüsselpaar für Ed25519-Attestationsbeweise.
 ///
 /// Signierschlüssel wird bei Drop automatisch zeroisiert (`ZeroizeOnDrop`).
 #[derive(Debug, ZeroizeOnDrop)]
@@ -96,7 +96,7 @@ impl DeletionProofKeyPair {
     }
 }
 
-/// Signiert den kanonischen Byte-Payload eines Version-3-Löschbeweises mit Ed25519.
+/// Signiert den kanonischen Byte-Payload eines Version-3-Attestationsbeweises mit Ed25519.
 ///
 /// Gibt eine 64-Byte Ed25519-Signatur zurück.
 pub fn sign_deletion_proof_v3(keypair: &DeletionProofKeyPair, proof_payload: &[u8]) -> [u8; 64] {
@@ -105,7 +105,7 @@ pub fn sign_deletion_proof_v3(keypair: &DeletionProofKeyPair, proof_payload: &[u
     signature.to_bytes()
 }
 
-/// Verifiziert eine Ed25519-Signatur eines Version-3-Löschbeweises rein funktional.
+/// Verifiziert eine Ed25519-Signatur eines Version-3-Attestationsbeweises rein funktional.
 ///
 /// Diese Funktion benötigt keine Contextra-internen Zustände oder Geheimnisse.
 /// Dritte (z. B. Datenschutzbeauftragte) können einen Beweis mit nur `verifying_key_bytes`,

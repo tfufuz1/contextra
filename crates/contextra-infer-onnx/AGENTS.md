@@ -1,104 +1,37 @@
-# AGENTS.md — contextra-infer-onnx
-> Layer 3 | Lokale ONNX-Modelle, Embeddings, Cross-Encoder | ~1200 LOC
+# AGENTS.md — `contextra-infer-onnx`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-infer-onnx` stellt vollständig lokale, plattformübergreifende Vektor-Einbettungen und Cross-Encoder Reranking auf Basis der ONNX-Runtime (`ort`) bereit (Ring 2).
+Als autarker Baustein implementiert er `EmbeddingProvider` aus `contextra-ports`.
+Das Modul arbeitet strikt Offline-First (Modelldownloads standardmäßig deaktiviert), erzwingt kryptografische SHA-256-Prüfungen und entkoppelt maschinelles Lernen von externen Server-Infrastrukturen.
 
-Ermöglicht vollständig lokale, offline-fähige Vektor-Einbettungen und Reranking
-(ohne Ollama-Abhängigkeit) mittels ONNX-Runtime (`ort`).
-Implementiert den `TextEmbeddingEngine` Trait aus `contextra-core`.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 2 (ONNX Inferenz & Reranking)
+- **Klasse:** Erweiterung `[E]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-rank` (Spec §6.9, `capabilities.toml`).
 
-## 2. Modul-Karte
+## 3. Garantien & Architektur-Invarianten
+- **Offline-First & Checksummen-Pflicht:** Downloads standardmäßig blockiert (`allow_download = false`). Wenn aktiviert, nur über HTTPS mit Host-Allowlist, strikter SHA-256-Hash-Prüfung und Größenbeschränkung.
+- **Nicht-blockierendes I/O:** Datei-I/O und Modell-Ladevorgänge laufen über `tokio::task::spawn_blocking` mit atomarem Tempfile-Staging und `fsync`.
+- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()`; robuste Validierung von Sequenzlängen, Batch-Größen und Thread-Limits.
+- **Fail-Closed Eingabevalidierung:** Rechnen auf fehlerhaften Tensordimensionen wird vorab abgefangen.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, `TextEmbedder`, `TextEmbedderConfig` |
-| `pool.rs` | `SessionPool` — Thread-sicheres Pooling von ONNX-Sessions (pub(crate)) |
-| `reranker.rs` | `CrossEncoderReranker` — Präzises Re-Scoring der RRF-Ergebnisse |
+## 4. Verbotene Muster
+- Direkte blockierende ONNX-Runtime C-Aufrufe im asynchronen Tokio-Event-Loop.
+- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+- Ungeprüftes Laden beliebiger `.onnx`-Dateien ohne Validierung.
+- Abhängigkeiten zu höheren Orchestrierungsschichten.
 
-## 3. Kritische Invarianten
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Implementiert:** `EmbeddingProvider`, Cross-Encoder Reranker.
+- **Konsumiert:** `contextra-types`, `contextra-ports`, `contextra-rank`.
+- **Bereitgestellt für:** `contextra-engine`, `contextra-db`, `contextra-mcp`.
 
-### Feature-Gate-Protokoll (`onnx`)
-Die gesamte Crate erfordert umfangreiche C++-Abhängigkeiten (`ort`).
-Um Pure-Rust-Builds nicht zu brechen, MUSS jeder Code, der `contextra-infer-onnx` nutzt,
-dies strikt hinter dem `#[cfg(feature = "onnx")]` Gate verstecken.
-Default ist dieses Feature **deaktiviert**.
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Model-Integrity Tests:** Verifikation der Hash-Validierung und Schutz gegen beschädigte Modell-Dateien.
+- **Batching & Latenz-Benchmarks:** Empirische Messung von Throughput und Speicherauslastung.
+- **Sabotage-Testing:** Prüfung der Fehlerfortpflanzung bei Injektion ungültiger Token-Arrays.
 
-### spawn_blocking-Pattern für Inferenz
-ONNX-Runtime-Aufrufe (`session.run()`) sind blockierend und CPU-intensiv.
-Sie DÜRFEN NIEMALS direkt im tokio-Threadpool aufgerufen werden.
-Jeder Embedding-Aufruf muss in `tokio::task::spawn_blocking` gekapselt werden,
-um den async-Executor nicht zu blockieren (`embed_async` Methode).
-
-### SessionPool Architektur
-Das Laden von ONNX-Modellen in den Speicher dauert lange. `SessionPool` (intern)
-hält N Modell-Instanzen vor. Aufrufer dürfen nicht für jeden Aufruf ein
-`TextEmbedder::new()` machen, sondern müssen den `TextEmbedder` via `Arc` teilen.
-
-## 4. Public API Quick-Reference
-
-```rust
-// === TextEmbedder (lib.rs) ===
-pub struct TextEmbedder { ... }
-impl TextEmbedder {
-    pub fn load(model_dir: impl AsRef<Path>) -> Result<Self>;
-    pub fn load_with_config(model_dir: impl AsRef<Path>, config: TextEmbedderConfig) -> Result<Self>;
-    pub async fn embed_async(&self, text: &str) -> Result<Vec<f32>>;
-}
-
-pub struct TextEmbedderConfig {
-    pub intra_op_threads: usize,
-    pub inter_op_threads: usize,
-    pub pooling_strategy: PoolingStrategy, // Mean, CLS
-}
-
-// === Cross-Encoder Reranking (reranker.rs) ===
-pub struct CrossEncoderReranker { ... }
-impl CrossEncoderReranker {
-    pub fn new(config: RerankConfig) -> Result<Self>;
-    pub async fn rerank(&self, query: &str, documents: &[&str]) -> Result<Vec<RerankResult>>;
-}
-pub struct RerankResult {
-    pub index: usize,
-    pub score: f32,
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — Code ohne Feature-Gate nutzen:
-let embedder = contextra_embed::TextEmbedder::load("..."); // Bricht CI ohne --features onnx!
-// ✅ KORREKT:
-#[cfg(feature = "onnx")]
-let embedder = contextra_embed::TextEmbedder::load("...");
-
-// ❌ FALSCH — Modelle pro Request neu laden:
-async fn handle_search(query: &str) {
-    let embedder = TextEmbedder::load("models/all-MiniLM").unwrap();
-    // ...
-}
-// ✅ KORREKT — Einmal beim Start laden und `Arc<TextEmbedder>` teilen.
-
-// ❌ FALSCH — embed() blockierend aufrufen (Fehlt in API-Ref oben absichtlich):
-// ✅ KORREKT — Immer embed_async() nutzen!
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`TextEmbedder` und `CrossEncoderReranker` sind intern zustandslos bzw. verwalten
-ihre ONNX-Sessions thread-safe. Keine Locks nach außen sichtbar. Der C-FFI
-der ONNX-Runtime verwaltet seine eigenen internen Threadpools.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-infer-ollama` (L3 Peer)
-- **Genutzt von**: Optional in `contextra-db` (falls konfiguriert).
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-005 | Sovereign Core Doctrine (Erklärt, warum `onnx` default=off ist) |
-| `COMMON_LLM_ERRORS.md` | Fehler-Klasse 12: Feature-Gate-Vergessen (`onnx`) |
-| `rules/async_drop.md` | spawn_blocking für CPU-bound Workloads |
+## 7. Offene Punkte & Technische Schulden
+- Keine.

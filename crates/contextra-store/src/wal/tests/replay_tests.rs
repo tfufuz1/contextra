@@ -107,7 +107,7 @@ async fn test_wal_crc_middle_corruption() {
 }
 
 #[tokio::test]
-async fn wal_tolerates_truncated_tail() {
+async fn test_wal_tolerates_truncated_tail() {
     let dir = tempdir().expect("tempdir"); // expect
     let path = dir.path().join("test.wal");
 

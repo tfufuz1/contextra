@@ -1,8 +1,24 @@
 //! Shadow mode hook for comparing TL-HFD PPR scores against baseline PPR scores (§12).
 
 use ahash::AHashMap;
-use contextra_adapt::{ShadowDiscrepancy, ShadowSink};
 use contextra_types::EntityId;
+
+/// Diskrepanz-Eintrag: Baseline-Ergebnis vs. Kandidaten-Ergebnis (§12).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShadowDiscrepancy<T> {
+    /// Das Ergebnis des etablierten Baseline-Algorithmus.
+    pub baseline: T,
+    /// Das Ergebnis des neuen Kandidaten-Algorithmus.
+    pub candidate: T,
+    /// Eindeutige Kontext- oder Anfrage-ID für das Tracing.
+    pub context_id: u64,
+}
+
+/// Dyn-kompatibler Port für Diskrepanz-Senken.
+pub trait ShadowSink<T>: Send + Sync {
+    /// Zeichnet einen Diskrepanz-Eintrag auf.
+    fn record(&self, discrepancy: ShadowDiscrepancy<T>);
+}
 
 /// Protokolliert die mittlere absolute Differenz (MAE) zwischen den Baseline- und
 /// TL-HFD-Kandidaten-PPR-Score-Maps über die gegebene Diskrepanz-Senke.
@@ -65,7 +81,7 @@ mod tests {
     }
 
     /// Test (c): log_tl_hfd_vs_baseline_discrepancy berechnet die mittlere absolute Differenz korrekt
-// ANCHOR[contextra-graph:SRC-PPR-SHADOW-HOOK-002]
+    // ANCHOR[contextra-graph:SRC-PPR-SHADOW-HOOK-002]
     #[test]
     fn test_log_tl_hfd_vs_baseline_discrepancy_mae_calculation() {
         let mut baseline = AHashMap::new();

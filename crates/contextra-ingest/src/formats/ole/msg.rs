@@ -223,7 +223,16 @@ fn read_property_filetime(
     let path = format!("{}{}{}", prefix, prop_tag, "0040");
     if reader.exists(&path) {
         if let Ok(bytes) = reader.read_stream(&path, ctx) {
-            if let (Some(&b0), Some(&b1), Some(&b2), Some(&b3), Some(&b4), Some(&b5), Some(&b6), Some(&b7)) = (
+            if let (
+                Some(&b0),
+                Some(&b1),
+                Some(&b2),
+                Some(&b3),
+                Some(&b4),
+                Some(&b5),
+                Some(&b6),
+                Some(&b7),
+            ) = (
                 bytes.first(),
                 bytes.get(1),
                 bytes.get(2),
@@ -329,7 +338,10 @@ fn parse_recipients(
                 format!("/{}", raw_path)
             };
 
-            if path.starts_with(&parent_prefix) && path.contains("__recip_version1.0_#") && reader.is_storage(&path) {
+            if path.starts_with(&parent_prefix)
+                && path.contains("__recip_version1.0_#")
+                && reader.is_storage(&path)
+            {
                 let recip_type = read_property_u32(reader, &path, TAG_RECIP_TYPE, ctx).unwrap_or(1);
                 let name = read_property_string(reader, &path, TAG_RECIP_NAME, ctx);
                 let addr = read_property_string(reader, &path, TAG_RECIP_SMTP, ctx)
@@ -441,9 +453,17 @@ fn parse_attachments(
             if reader.exists(&data_path) {
                 // Embedded MSG binary stream
                 if let Ok(data_bytes) = reader.read_stream(&data_path, ctx) {
-                    match ctx.extract_nested(&embed_msg_name, Some("application/vnd.ms-outlook"), &data_bytes) {
+                    match ctx.extract_nested(
+                        &embed_msg_name,
+                        Some("application/vnd.ms-outlook"),
+                        &data_bytes,
+                    ) {
                         Ok(nested_ir) => {
-                            ir.append_nested(&embed_msg_name, Some("application/vnd.ms-outlook"), nested_ir);
+                            ir.append_nested(
+                                &embed_msg_name,
+                                Some("application/vnd.ms-outlook"),
+                                nested_ir,
+                            );
                         }
                         Err(err) => {
                             ir.warnings.push(ExtractWarning {
@@ -458,7 +478,11 @@ fn parse_attachments(
                 }
             } else if let Ok(nested_ir) = extract_msg_in_storage(reader, &path, ctx) {
                 // Embedded MSG sub-storage
-                ir.append_nested(&embed_msg_name, Some("application/vnd.ms-outlook"), nested_ir);
+                ir.append_nested(
+                    &embed_msg_name,
+                    Some("application/vnd.ms-outlook"),
+                    nested_ir,
+                );
             } else {
                 ir.warnings.push(ExtractWarning {
                     code: WarningCode::AttachmentSkipped,
@@ -491,12 +515,16 @@ fn strip_html_coarse(html: &str) -> String {
         } else if !in_tag && starts_with_chars(remaining, &['<', 's', 'c', 'r', 'i', 'p', 't']) {
             in_script = true;
             in_tag = true;
-        } else if in_style && starts_with_chars(remaining, &['<', '/', 's', 't', 'y', 'l', 'e', '>']) {
+        } else if in_style
+            && starts_with_chars(remaining, &['<', '/', 's', 't', 'y', 'l', 'e', '>'])
+        {
             in_style = false;
             in_tag = false;
             i = i.saturating_add(8);
             continue;
-        } else if in_script && starts_with_chars(remaining, &['<', '/', 's', 'c', 'r', 'i', 'p', 't', '>']) {
+        } else if in_script
+            && starts_with_chars(remaining, &['<', '/', 's', 'c', 'r', 'i', 'p', 't', '>'])
+        {
             in_script = false;
             in_tag = false;
             i = i.saturating_add(9);

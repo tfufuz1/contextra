@@ -11,7 +11,7 @@ pub mod retrieve;
 
 pub use manifest::ToolManifest;
 pub use registry::ToolRegistry;
-pub use retrieve::RetrieveTool;
+pub use retrieve::{ContextRetriever, RetrieveTool};
 
 #[cfg(test)]
 mod tests;

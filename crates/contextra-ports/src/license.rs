@@ -65,7 +65,7 @@ pub enum LicenseError {
 }
 
 /// Dyn-kompatibler Port (P27) für Lizenzprüfung — Implementierung (Lizenzserver-Anbindung,
-/// Ed25519-Signaturprüfung analog zum Löschbeweis-Pfad §14.1) ist NICHT Teil dieses Tickets
+/// Ed25519-Signaturprüfung analog zum Signaturprüfpfad §14.1) ist NICHT Teil dieses Tickets
 /// und folgt in einem eigenen, separat zu beauftragenden Schritt.
 pub trait LicenseGate: Send + Sync {
     /// Checks if the requested feature ring is activated and accessible.

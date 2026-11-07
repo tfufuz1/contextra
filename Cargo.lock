@@ -690,16 +690,12 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra"
 version = "0.1.0"
 dependencies = [
- "contextra-audit-export",
- "contextra-avv-generator",
  "contextra-crypto",
  "contextra-db",
  "contextra-infer-candle",
  "contextra-license",
  "contextra-ports",
- "contextra-privacy",
  "contextra-rank",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
  "serde",
@@ -755,7 +751,6 @@ dependencies = [
 name = "contextra-audit-export"
 version = "0.1.0"
 dependencies = [
- "contextra-ports",
  "contextra-types",
  "serde",
  "serde_json",
@@ -899,7 +894,6 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-cognition",
  "contextra-crypto",
  "contextra-engine",
  "contextra-graph",
@@ -1055,7 +1049,6 @@ name = "contextra-infer-ollama"
 version = "0.1.0"
 dependencies = [
  "contextra-ports",
- "contextra-rank",
  "contextra-types",
  "futures",
  "futures-util",
@@ -1165,7 +1158,6 @@ dependencies = [
  "contextra-infer-candle",
  "contextra-infer-ollama",
  "contextra-infer-onnx",
- "contextra-license",
  "contextra-ports",
  "contextra-privacy",
  "contextra-rank",
@@ -1229,7 +1221,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
- "contextra-avv-generator",
  "contextra-crypto",
  "contextra-ports",
  "contextra-testkit",

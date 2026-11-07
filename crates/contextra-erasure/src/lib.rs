@@ -12,6 +12,8 @@
 
 pub mod crypto_local;
 pub mod error;
+#[cfg(test)]
+pub mod test_mocks;
 pub mod gate;
 pub mod io;
 pub mod journal;

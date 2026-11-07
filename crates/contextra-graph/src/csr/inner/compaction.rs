@@ -9,7 +9,7 @@ use super::super::types::{EdgePayload, InternalIndex};
 use super::GraphInner;
 
 impl GraphInner {
-// ANCHOR[contextra-graph:SRC-CSR-INNER-COMPACTION-001]
+    // ANCHOR[contextra-graph:SRC-CSR-INNER-COMPACTION-001]
     pub fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
         if let Some(&idx) = self.id_map.get(&id) {
             idx
@@ -178,7 +178,7 @@ impl GraphInner {
         }
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-INNER-COMPACTION-002]
+    // ANCHOR[contextra-graph:SRC-CSR-INNER-COMPACTION-002]
     pub fn compact(&mut self) {
         let num_nodes = self.reverse_map.len();
 

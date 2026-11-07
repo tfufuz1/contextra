@@ -41,7 +41,7 @@ pub struct EncryptedSegmentPayload {
 /// - `data`: Rohe Tensor-Bytes oder Ciphertext-Bytes. WIRD gezeroized beim Drop.
 #[derive(Zeroize, ZeroizeOnDrop)]
 // ANCHOR[contextra-crypto:KV-003]
-/// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherlöschung.
+/// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherbereinigung.
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,

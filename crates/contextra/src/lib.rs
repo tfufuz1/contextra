@@ -38,6 +38,7 @@
 #![forbid(unsafe_code)]
 
 pub mod agent_memory;
+pub mod boot;
 pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
@@ -45,6 +46,7 @@ pub mod query_rewriter;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
+pub use collection_profile::{CollectionProfile, DeploymentTier, KvDeleteMode, LsmTuning};
 pub use contextra_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
@@ -53,6 +55,7 @@ pub use contextra_db::{
 pub use contextra_types::error::ContextraError;
 pub use contextra_types::types::domain::{DocId, ScoredDocument};
 pub use contextra_types::DistanceMetric;
+pub use performance_profile::{DurabilityConfigError, DurabilityMode, PerformanceProfile};
 pub use query_rewriter::LlmQueryRewriter;
 
 pub use contextra_rank as rank;

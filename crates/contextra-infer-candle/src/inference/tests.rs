@@ -9,6 +9,8 @@ use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
 use candle_core::Device;
+#[cfg(feature = "kv-bridge")]
+use contextra_ports::ContextSegment;
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
@@ -163,9 +165,6 @@ async fn test_generate_with_context_text_identical_and_kv_bridge_consultation() 
 #[cfg(feature = "kv-bridge")]
 #[tokio::test]
 async fn test_generate_with_context_kv_bridge_consultation() {
-    use crate::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
-
     let fingerprint = ModelFingerprint {
         hash: [9u8; 32],
         model_id: "context_model.gguf".to_string(),
@@ -184,10 +183,7 @@ async fn test_generate_with_context_kv_bridge_consultation() {
         }"#;
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
-    let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::new(master_km));
-    let store = Arc::new(TenantIsolatedKvStore::new());
-    let adapter = KvBridgeAdapter::new(store, cipher);
+    let adapter = crate::kv_bridge::create_test_kv_bridge();
 
     let mock_model = Box::new(MockCandleModel {
         response: "Unified Output".to_string(),
@@ -219,8 +215,7 @@ async fn test_generate_with_context_kv_bridge_consultation() {
 #[cfg(feature = "kv-bridge")]
 #[tokio::test]
 async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
-    use crate::kv_bridge::{KvBridgeAdapter, KvCacheKey};
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
+    use crate::kv_bridge::KvCacheKey;
 
     let fingerprint = ModelFingerprint {
         hash: [9u8; 32],
@@ -240,10 +235,7 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
         }"#;
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
-    let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::new(master_km));
-    let store = Arc::new(TenantIsolatedKvStore::new());
-    let adapter = KvBridgeAdapter::new(store, cipher);
+    let adapter = crate::kv_bridge::create_test_kv_bridge();
 
     let mock_model = Box::new(MockCandleModel {
         response: "Unified Output".to_string(),
@@ -328,9 +320,6 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
 #[cfg(feature = "kv-bridge")]
 #[tokio::test]
 async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_hit() {
-    use crate::kv_bridge::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
-
     let fingerprint = ModelFingerprint {
         hash: [7u8; 32],
         model_id: "metrics_test_model.gguf".to_string(),
@@ -349,10 +338,7 @@ async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_h
         }"#;
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
-    let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::new(master_km));
-    let store = Arc::new(TenantIsolatedKvStore::new());
-    let adapter = KvBridgeAdapter::new(store, cipher);
+    let adapter = crate::kv_bridge::create_test_kv_bridge();
 
     let mock_model = Box::new(MockCandleModel {
         response: "Metrics Completion".to_string(),
@@ -742,9 +728,6 @@ async fn test_inference_zero_concurrency_limit_clamped_to_one() {
 #[cfg(feature = "kv-bridge")]
 #[tokio::test]
 async fn test_candle_llm_client_with_kv_bridge() {
-    use crate::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
-
     let mock_model = Box::new(MockCandleModel {
         response: "KV Response".to_string(),
     });
@@ -766,10 +749,7 @@ async fn test_candle_llm_client_with_kv_bridge() {
         }"#;
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
-    let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::new(master_km));
-    let store = Arc::new(TenantIsolatedKvStore::new());
-    let adapter = KvBridgeAdapter::new(store, cipher);
+    let adapter = crate::kv_bridge::create_test_kv_bridge();
 
     let client =
         CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer).with_kv_bridge(adapter);

@@ -12,6 +12,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod orchestration;
+
 pub use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
 };
@@ -25,11 +27,11 @@ pub use contextra_ports::VectorDeleteMode;
 pub use contextra_store::lsm::DurabilityMode;
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
-use contextra_types::{DocId, TenantId};
-use contextra_vector::{HnswConfig, HnswIndex};
+use contextra_types::TenantId;
+use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 #[cfg(not(loom))]

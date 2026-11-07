@@ -59,7 +59,7 @@ fn test_score_normalized_fallback_empty_signal_list() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_score_normalized_fallback_constant_scores() {
     // (b) Signal with constant scores (MinMax degenerated max_s <= min_s)
@@ -102,7 +102,7 @@ fn test_score_normalized_fallback_constant_scores() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_score_normalized_fallback_non_finite_scores() {
     // (c) Signal with NaN or Infinity doc scores

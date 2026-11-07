@@ -19,7 +19,6 @@ use std::future::Future;
 use std::pin::Pin;
 
 pub use contextra_types::*;
-pub use contextra_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -33,6 +32,8 @@ pub mod attention;
 pub mod checkpoint;
 /// Clock port trait and system time implementation.
 pub mod clock;
+/// Trait conformance assertions and wiring verification matrix.
+pub mod conformance;
 /// Embedding provider and LLM generation traits.
 pub mod embedding;
 /// Graph mutation and CSR traversal port traits.
@@ -61,7 +62,7 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Storage layer scanners and purgers (Vertrag V1, SPEC §12.7.4).
+/// Storage layer scanners and physical purgers (Vertrag V1, SPEC §12.7.4).
 pub mod scanner;
 /// Key-value storage engine traits.
 pub mod storage;
@@ -75,6 +76,7 @@ pub mod vfs;
 pub use attention::*;
 pub use checkpoint::*;
 pub use clock::*;
+pub use conformance::*;
 pub use embedding::*;
 pub use graph::*;
 pub use graph_index::*;
@@ -150,3 +152,24 @@ mod dyn_safety {
         _assert_dyn_vfs(None);
     }
 }
+
+pub mod barrier;
+pub mod erasure;
+pub mod gate;
+pub mod keys;
+pub mod ledger;
+pub mod observer;
+pub mod report_signer;
+
+pub use barrier::{
+    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
+};
+pub use erasure::{
+    EraseTarget as PortEraseTarget, ErasureLayer, ErasureTarget, LayerScope, PurgeCx, PurgeOutcome,
+    StorageBackend,
+};
+pub use gate::{GateDecision, KeyBound, KeyRange, RangeGate, ReadGate};
+pub use keys::{Envelope, FileKey, FileKeyring, FileKind, RecordSealer, SealCtx};
+pub use ledger::{LedgerEntry, LedgerSink, RangeSet};
+pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
+pub use report_signer::ReportSigner;

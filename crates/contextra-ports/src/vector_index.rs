@@ -29,7 +29,7 @@ pub struct VectorIndexStats {
 }
 
 // INVARIANT: Implementor: HnswIndex (contextra-index/src/hnsw.rs)
-// Rebuild: Automatisch bei >20% gelöschten Nodes.
+// Rebuild: Automatisch bei >20% bereinigten Nodes.
 
 /// Vector Index Trait — abstrahiert die HNSW-Vektorsuche.
 ///

@@ -77,7 +77,7 @@ fn test_global_fusion_community_aware_rrf() {
     }
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_global_fusion_max_community_nodes_cap() {
     let config = GlobalFusionConfig {
@@ -99,7 +99,7 @@ fn test_global_fusion_max_community_nodes_cap() {
     assert_eq!(fused.len(), 2);
 }
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
+// Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_global_fusion_empty_community_index_degrades_gracefully() {
     let strategy = GlobalFusionStrategy::default();

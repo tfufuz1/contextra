@@ -79,9 +79,9 @@ pub enum PluginError {
     LicenseDenied(String),
 }
 
-impl From<PluginError> for contextra_types::ContextraError {
+impl From<PluginError> for crate::ContextraError {
     fn from(err: PluginError) -> Self {
-        contextra_types::ContextraError::Plugin(err.to_string())
+        crate::ContextraError::Plugin(err.to_string())
     }
 }
 

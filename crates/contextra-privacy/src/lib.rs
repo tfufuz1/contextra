@@ -13,7 +13,7 @@
 //!
 //! # Einbindung und Abhängigkeiten
 //! - **Eingehend:** Wird eingebunden von `contextra`, `contextra-mcp` und `contextra-router`.
-//! - **Ausgehend:** Hängt ab von `contextra-types`, `contextra-ports`, `contextra-avv-generator`.
+//! - **Ausgehend:** Hängt ab von `contextra-types`, `contextra-ports`.
 //!
 //! # Wichtigste Module
 //! - [`egress_vault`]: DLP-Prüfung, Regex-Klassifikation und `SurrogateVault`-Pseudonymisierung.
@@ -22,11 +22,10 @@
 //! - [`egress_gateway`]: Zentrales Schutzgateway (Egress Shield) vor Weiterleitung in externe Cloud-Dienste.
 //! - [`bulk_exfiltration_detector`]: Sitzungsbasiertes Rate-Limiting gegen Massenabflüsse.
 //! - [`context_edit_audit`]: Kryptografisch verkettete Audit-Aufzeichnungen von Kontextbearbeitungen.
-//! - [`processing_registry`]: Verzeichnis von Verarbeitungstätigkeiten (VVT) nach Art. 30 DSGVO.
+//! - [`processing_registry`]: Verzeichnis von Verarbeitungstätigkeiten (VVT).
 //! - [`guarded_payload`]: Type-State-Muster zur Verhinderung ungesäuberter Datenabflüsse zur Compile-Zeit.
 
 pub mod audit_trace;
-pub mod avv_generator;
 pub mod bulk_exfiltration_detector;
 pub mod context_edit_audit;
 pub mod egress_gateway;
@@ -40,8 +39,6 @@ pub mod processing_registry;
 // ANCHOR[contextra-privacy:LIB-001]
 // Re-Exports für bequemen Zugriff auf die Kernfunktionalitäten
 pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
-#[allow(deprecated)]
-pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
@@ -64,8 +61,7 @@ pub use egress_guard::{
 pub use egress_vault::NoOpRecognizer;
 pub use egress_vault::{
     BlockReason, BoxFuture, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
-    EgressVaultError, EntityRecognizer, PolicyCategory, SurrogateVault,
-    MAX_CLASSIFY_PAYLOAD_BYTES,
+    EgressVaultError, EntityRecognizer, PolicyCategory, SurrogateVault, MAX_CLASSIFY_PAYLOAD_BYTES,
 };
 pub use entity_recognizer::{
     Gazetteer, PatternRecognizer, RuleBasedEntityRecognizer, DEFAULT_MAX_INPUT_LENGTH,

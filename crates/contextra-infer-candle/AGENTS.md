@@ -1,58 +1,37 @@
-# AGENTS.md — contextra-infer-candle
-> Layer 3 | Native Candle GGUF ML Inferenz & Embedding Provider | ~800 LOC
+# AGENTS.md — `contextra-infer-candle`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-infer-candle` stellt ein lokales, vollständig offline-fähiges Inferenz- und Embedding-Backend auf Basis von Candle (`candle-core`, `candle-transformers`) für native GGUF-Modelle bereit (Ring 2).
+Als autarker Baustein implementiert er `EmbeddingProvider` aus `contextra-ports` und ermöglicht vollständige Datenhoheit ohne externe Dienste oder Netzwerkanfragen.
+Er integriert sich über standardisierte Ports und stellt optionale KV-Cache-Anbindungen (`contextra-kvcache`) über Entkopplungs-Adapter bereit.
 
-Inferenz-Backend auf Basis von Candle (`candle-core`, `candle-transformers`) für native GGUF-Modellausführung (Datenhoheit ohne externe Services).
-In `contextra-db` als `EmbeddingBackend::Candle` in die Haupt-Serving-Pipeline eingebunden.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 2 (Native Inferenz & Embeddings)
+- **Klasse:** Erweiterung `[E]`
+- **Reifegrad:** `beta`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-rank`, `contextra-crypto` (Spec §6.9, `capabilities.toml`).
 
-## 2. Modul-Karte
+## 3. Garantien & Architektur-Invarianten
+- **Async Thread Safety:** Candle-Tensor-Operationen sind CPU-blockierend. Alle Inferenz- und Embed-Aufrufe MÜSSEN strikt via `tokio::task::spawn_blocking` ausgeführt werden, um den async Reactor nicht zu blockieren.
+- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` im Produktionscode. Alle Fehler werden als `ContextraError` abgebildet.
+- **Deterministische Batch-Größen:** Einhaltung von `MAX_CANDLE_EMBED_BATCH_SIZE` zur Vermeidung von Out-of-Memory (OOM) Fehlern.
+- **Offline-First:** Keinerlei Netzwerk-Egress; Modelle werden lokal aus GGUF-Dateien geladen.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | Crate-Exports und Initialisierung |
-| `inference.rs` | Candle GGUF LlmTextGenerator Implementierung (Inkrementelle Inferenz-Semaphore & Backpressure-Härtung H-5 geschlossen) |
-| `embedding.rs` | Candle GGUF EmbeddingProvider Implementierung |
+## 4. Verbotene Muster
+- Blockierende Tensor-Berechnungen direkt im asynchronen Tokio-Kontext.
+- Verwenden von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+- Abhängigkeiten zu höheren Schichten wie `contextra-mcp` oder `contextra-engine`.
+- Unkontrollierte GPU/CPU-Allokationen ohne Backpressure-Semaphor.
 
-## 3. Kritische Invarianten
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Implementiert:** `EmbeddingProvider`.
+- **Konsumiert:** `contextra-types`, `contextra-ports`.
+- **Optionale Integration:** KV-Bridge zu `contextra-kvcache` via Feature-Gate `kv-bridge`.
 
-### Zero-Panic-Doctrine
-Keinesfalls `.unwrap()` oder `.expect()` im Produktionscode verwenden.
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Model-Fingerprint-Validierung:** Integritätstests gegen fehlerhafte oder manipulierte GGUF-Modelldateien.
+- **Concurrency & Backpressure Tests:** Semaphore-Tests zur Verhinderung von Überlastung bei parallelen Inferenz-Anfragen.
+- **Sabotage-Testing:** Prüfung der Fehlerbehandlung bei abgeschnittenen oder inkompatiblen Tensor-Puffern.
 
-### Async Thread Safety
-Candle-Tensor-Operationen sind CPU-blockierend. Alle Inferenz- und Embed-Aufrufe MÜSSEN via `tokio::task::spawn_blocking` ausgeführt werden.
-
-### Error Handling
-Alle Fehler sind als `ContextraError` zu strukturieren.
-
-## 4. Public API Quick-Reference
-
-```rust
-pub struct CandleLlmGenerator { ... }
-pub struct CandleEmbedClient { ... }
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — Direct blocking Candle tensor ops inside async:
-let output = model.forward(&input)?;
-
-// ✅ KORREKT — Wrapped in spawn_blocking:
-tokio::task::spawn_blocking(move || model.forward(&input)).await??;
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-Inferenz-Sessions verwalten Thread-sichere Gewichte und Caches. Blocking Thread Pools trennen Heavy ML-Tensors vom Tokio Async Reactor.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-mcp` (L4 Upper)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| Strategy B | Native Candle GGUF Inferenz |
+## 7. Offene Punkte & Technische Schulden
+- Keine.

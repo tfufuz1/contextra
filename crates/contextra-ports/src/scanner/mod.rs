@@ -17,7 +17,7 @@ pub use session::*;
 pub use witness::*;
 
 use crate::clock::Clock;
-use contextra_types::Result;
+use crate::Result;
 
 /// Trait für Storage-Scanner zur Durchführung von Restmengen-Messungen.
 ///
@@ -54,11 +54,7 @@ pub trait LayerScanner: Send + Sync {
     fn layer(&self) -> WitnessLayer;
 
     /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
-    fn scan_units(
-        &self,
-        session: &mut ScanSession,
-        ctx: &contextra_types::RequestContext,
-    ) -> Result<()>;
+    fn scan_units(&self, session: &mut ScanSession, ctx: &crate::RequestContext) -> Result<()>;
 
     /// Default-Implementierung von `scan`, die `begin`, `scan_units` und `finish` ausführt.
     fn scan(
@@ -78,7 +74,7 @@ pub trait LayerScanner: Send + Sync {
 mod tests {
     use super::*;
     use crate::clock::SystemClock;
-    use contextra_types::{RequestContext, TenantId, TxId};
+    use crate::{RequestContext, TenantId, TxId};
 
     struct TestScanner;
 

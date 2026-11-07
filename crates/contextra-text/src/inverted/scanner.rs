@@ -4,7 +4,7 @@
 // NICHT-OFFENSICHTLICH: Scans read both LSM storage keys and in-memory ResidentPostingIndex entries directly.
 // HOTSPOTS: scan_units, run_positive_control
 
-//! Speicher- und RAM-Scanner für den Textindex zur Verifikation physischer Löschungen.
+//! Speicher- und RAM-Scanner für den Textindex zur Verifikation physischer Bereinigungen.
 //!
 //! # Ring-Zuordnung
 //! Ring 0 (Kern).

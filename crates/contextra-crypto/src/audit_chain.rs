@@ -16,7 +16,7 @@
 
 //! Audit-Log als Blake3-Hash-Kette mit periodischer Ed25519-Signatur.
 //!
-//! DSGVO Art. 17 / Art. 30 Compliance:
+//! Revisions- und Integritätsnachweis:
 //! - Jeder Schreibvorgang erzeugt einen AuditChainEntry ohne Personenbezug.
 //! - Optionale Commitments Blake3(salt || attr), wobei salt unter einem Shredding-Schlüssel
 //!   verschlüsselt gespeichert ist. Nach dem Schreddern des Schlüssels ist das salt unöffenbar,
@@ -43,7 +43,7 @@ pub enum DataClass {
     Restricted,
     /// Personenbezogene Daten (im Audit-Log nur pseudonymisiert/entkoppelt).
     Personal,
-    /// Besondere Kategorien personenbezogener Daten (Art. 9 DSGVO).
+    /// Besondere Kategorien personenbezogener Daten mit erhöhtem Schutzbedarf.
     SpecialCategoryPersonal,
 }
 

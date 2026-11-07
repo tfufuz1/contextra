@@ -500,7 +500,7 @@ async fn test_orphan_cleanup_worker_removes_expired() {
 }
 
 #[tokio::test]
-async fn trigger_expiry_cleanup_deletes_expired_documents() {
+async fn test_trigger_expiry_cleanup_deletes_expired_documents() {
     use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;

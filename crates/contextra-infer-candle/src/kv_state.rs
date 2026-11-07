@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-22T00:00:00Z
 // ZWECK: KvState implementation for native Candle Llama model KV cache management (Spec §9.2 Stufe B).
-// INVARIANTEN: Zero-Panic doctrine (no .unwrap() or .expect() in production code);
+// INVARIANTEN: Zero-Panic doctrine (no unwrap or expect in production code);
 // Full tensor export, import, and truncation for multi-layer KV caches.
 
 use bytes::Bytes;

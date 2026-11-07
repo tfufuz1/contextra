@@ -1,11 +1,11 @@
 # contextra-crypto
 
-Kryptographische Vaults, Zeroize, Egress-Verschlüsselung, Audit-Ketten und Löschnachweise.
+Kryptographische Vaults, Zeroize, Egress-Verschlüsselung, Audit-Ketten und kryptographische Attestationen.
 
 Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §20, `capabilities.toml`).
 
 ## Rolle in einem Satz
-`contextra-crypto` stellt I/O-freie kryptographische Primitiven, Schlüsselverwaltung, Zeroization, Audit-Chains und DeletionProof-Erzeugung/Verifikation bereit.
+`contextra-crypto` stellt I/O-freie kryptographische Primitiven, Schlüsselverwaltung, Zeroization, Audit-Chains und kryptographische Attestationssignaturen bereit.
 
 ## Ring, Klasse & Reifegrad
 - **Ring:** Ring 0 (Kryptographie & Nachweislogik, I/O-frei, keine Threads)

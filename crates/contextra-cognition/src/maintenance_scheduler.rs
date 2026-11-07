@@ -42,7 +42,7 @@ use std::time::Duration;
 /// Zentraler Scheduler für die Ausführung der Background-Maintenance-Prozesse (ADR-079).
 // ANCHOR[contextra-cognition:SCHED-001]
 /// Zentraler Scheduler für koordiniertes Ausführen von Background-Maintenance-Prozessen (ADR-079).
-pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
+pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex> {
     config: MaintenanceConfig,
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
@@ -327,13 +327,6 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
     }
 }
 
-#[allow(dead_code)]
-async fn write_tick_intent<S: StorageEngine, V: VectorIndex>(
-    collection: &Collection<S, V>,
-) -> Result<TxId, ContextraError> {
-    write_tick_intent_with_clock(collection, &SystemClock::new()).await
-}
-
 async fn write_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     clock: &dyn Clock,
@@ -349,13 +342,6 @@ async fn write_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
         .await?;
     collection.storage().commit(tx).await?;
     Ok(tx)
-}
-
-#[allow(dead_code)]
-async fn complete_tick_intent<S: StorageEngine, V: VectorIndex>(
-    collection: &Collection<S, V>,
-) -> Result<(), ContextraError> {
-    complete_tick_intent_with_clock(collection, &SystemClock::new()).await
 }
 
 async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
@@ -385,29 +371,13 @@ async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
 mod tests {
     use super::*;
     use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
+    use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
     use std::sync::atomic::AtomicU64;
-    use tempfile::tempdir;
     use tokio::time::sleep;
 
-    async fn create_test_collection() -> Arc<Collection<LsmStorage, HnswIndex>> {
-        let dir = tempdir().unwrap();
-        let storage = Arc::new(
-            LsmStorage::new(contextra_store::LsmConfig {
-                path: dir.path().to_path_buf(),
-                ..Default::default()
-            })
-            .await
-            .unwrap(),
-        );
-        let index = Arc::new(
-            HnswIndex::try_new(contextra_vector::HnswConfig {
-                dimension: 4,
-                ..Default::default()
-            })
-            .unwrap(),
-        );
+    async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>> {
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let index = Arc::new(InMemoryVectorIndex::new(4));
         Arc::new(Collection::new(
             "default".to_string(),
             storage,
@@ -567,6 +537,7 @@ mod tests {
 
         let fixed_nanos = 1_700_000_000_000_000_000u64;
         let test_clock = Arc::new(TestClock { nanos: fixed_nanos });
+        assert_eq!(test_clock.monotonic_nanos(), fixed_nanos);
 
         let scheduler = Arc::new(
             MaintenanceScheduler::new(config, col.clone(), ConsolidationConfig::default())

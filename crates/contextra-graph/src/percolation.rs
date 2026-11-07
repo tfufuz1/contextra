@@ -152,7 +152,7 @@ mod tests {
     use contextra_types::{Entity, TxId};
     use std::sync::Arc;
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-004]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-004]
     #[test]
     fn test_percolation_health_full_graph() {
         // Vollständig verbundener Graph mit N=10 Knoten hat N*(N-1) = 90 gerichtete Kanten
@@ -166,7 +166,7 @@ mod tests {
         assert!(phi > 1.0, "Expected health >> 1.0, got {phi}");
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-005]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-005]
     #[test]
     fn test_percolation_health_empty_graph() {
         let n_nodes = 10;
@@ -177,7 +177,7 @@ mod tests {
         assert_eq!(phi, 0.0);
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-006]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-006]
     #[test]
     fn test_percolation_should_trigger_below_threshold() {
         let config = PercolationConfig::default(); // critical_threshold = 0.7
@@ -185,7 +185,7 @@ mod tests {
         assert!(should_trigger_rebonding(0.69, &config));
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-007]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-007]
     #[test]
     fn test_percolation_no_trigger_above_threshold() {
         let config = PercolationConfig::default(); // critical_threshold = 0.7
@@ -193,7 +193,7 @@ mod tests {
         assert!(!should_trigger_rebonding(0.85, &config));
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-008]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-008]
     #[test]
     fn test_percolation_skips_too_small_graphs() {
         assert!(compute_percolation_health(0, 0).is_none());
@@ -201,7 +201,7 @@ mod tests {
         assert!(compute_percolation_health(10, 0).is_some());
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-009]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-009]
     #[tokio::test]
     async fn test_find_rebonding_candidates() {
         let graph = Arc::new(CsrGraph::new());
@@ -251,7 +251,7 @@ mod tests {
         assert!(*sim > config.rebonding_similarity);
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-010]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-010]
     #[test]
     fn test_cosine_similarity_edge_cases() {
         // Mismatched vector lengths -> 0.0
@@ -266,7 +266,7 @@ mod tests {
         assert!((cosine_similarity(&[1.0, 0.0], &[0.0, 1.0])).abs() < 1e-6);
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-011]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-011]
     #[tokio::test]
     async fn test_find_rebonding_candidates_empty_or_single_node() {
         let graph = Arc::new(CsrGraph::new());
@@ -284,7 +284,7 @@ mod tests {
         assert!(candidates_single.is_empty());
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-012]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-012]
     #[tokio::test]
     async fn test_find_rebonding_candidates_max_new_edges_truncation() {
         let graph = Arc::new(CsrGraph::new());
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(candidates.len(), 1);
     }
 
-// ANCHOR[contextra-graph:SRC-PERCOLATION-013]
+    // ANCHOR[contextra-graph:SRC-PERCOLATION-013]
     #[test]
     fn test_percolation_config_serde_roundtrip() {
         let config = PercolationConfig {

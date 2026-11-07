@@ -8,11 +8,11 @@
 //! Consistency-Enforcement-Modul: lernt wiederkehrende, als fehlerhaft erkannte
 //! Muster (z. B. widersprüchliche oder sich gegenseitig aufhebende Kanten/Fakten
 //! im Wissensgraphen) und meldet sie als Kandidaten für Unterdrückung/Review.
-//! Implementiert reines Pattern-Signal — keine automatische Löschung (siehe
+//! Implementiert reines Pattern-Signal — keine automatische Kanteninvalidierung (siehe
 //! Abgrenzung unten).
 //!
 //! WICHTIGER HINWEIS ZUR TRENNUNG VON ERKENNUNG UND WIRKUNG:
-//! Dieses Modul implementiert KEINE automatische Löschung von Kanten. `ConsistencyEnforcer` liefert
+//! Dieses Modul implementiert KEINE automatische Bereinigung von Kanten. `ConsistencyEnforcer` liefert
 //! lediglich Kandidaten/Signale. Die tatsächliche Tombstone-Ausführung bleibt in der
 //! Verantwortung des Aufrufers.
 
@@ -55,7 +55,7 @@ pub struct EdgeAssertion {
 
 impl EdgeAssertion {
     /// Berechnet den Blake3-Pattern-Hash über (subject, predicate_hash, object_repr).
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-004]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-004]
     pub fn pattern_hash(&self) -> [u8; 32] {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.subject.to_le_bytes());
@@ -97,11 +97,11 @@ pub struct ConsistencyEnforcer {
 
 impl ConsistencyEnforcer {
     /// Standard-Schwellenwert für die Unterdrückung (3 gegenseitige Detektionen).
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-008]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-008]
     pub const DEFAULT_SUPPRESSION_THRESHOLD: u32 = 3;
 
     /// Erstellt einen neuen ConsistencyEnforcer mit konfigurierbarem Schwellenwert.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-009]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-009]
     pub fn new(suppression_threshold: u32) -> Self {
         Self {
             patterns: HashMap::new(),
@@ -111,7 +111,7 @@ impl ConsistencyEnforcer {
 
     /// Prüft eine Kanten-Aussage vor dem Einfügen, registriert das Widerspruchsmuster
     /// und gibt den Konfliktmuster-Eintrag zurück.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-010]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-010]
     pub fn check_before_insert(&mut self, assertion: &EdgeAssertion) -> Option<ConflictPattern> {
         let pattern = assertion.pattern_hash();
         let cp = self.record_contradiction(pattern, TxId::new(0));
@@ -120,7 +120,7 @@ impl ConsistencyEnforcer {
 
     /// Bewertet mit Hilfe des übergebenen [`ContradictionDetector`]s, ob zwei Kanten-Aussagen
     /// einen semantischen Widerspruch darstellen.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-011]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-011]
     pub fn detect_contradiction<D: ContradictionDetector>(
         &self,
         detector: &D,
@@ -134,7 +134,7 @@ impl ConsistencyEnforcer {
     ///
     /// Erhöht `contradiction_count` und setzt `suppressed = true`, sobald der Zähler
     /// den `suppression_threshold` erreicht oder überschreitet.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-012]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-012]
     pub fn record_contradiction(
         &mut self,
         pattern_hash: [u8; 32],
@@ -162,7 +162,7 @@ impl ConsistencyEnforcer {
     }
 
     /// Prüft, ob ein gegebenes Muster unterdrückt wird (`suppressed == true`).
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-013]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-013]
     pub fn is_suppressed(&self, pattern_hash: [u8; 32]) -> bool {
         self.patterns
             .get(&pattern_hash)
@@ -170,19 +170,19 @@ impl ConsistencyEnforcer {
     }
 
     /// Gibt einen Iterator über alle aktuell aktiven (unterdrückenden) Konfliktmuster zurück.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-014]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-014]
     pub fn active_patterns(&self) -> impl Iterator<Item = &ConflictPattern> {
         self.patterns.values().filter(|cp| cp.suppressed)
     }
 
     /// Gibt ein registriertes Konfliktmuster zu einem Muster-Hash zurück, falls vorhanden.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-015]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-015]
     pub fn get_pattern(&self, pattern_hash: &[u8; 32]) -> Option<&ConflictPattern> {
         self.patterns.get(pattern_hash)
     }
 
     /// Gibt die konfigurierte Unterdrückungsschwelle zurück.
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-016]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-016]
     pub fn suppression_threshold(&self) -> u32 {
         self.suppression_threshold
     }
@@ -194,7 +194,7 @@ impl ConsistencyEnforcer {
     ///
     /// HINWEIS: Dies ist eine Passthrough-Funktion. Die Ausführung des Tombstoning (z. B. via
     /// `CsrGraph::remove_edge()`) obliegt ausschließlich dem Aufrufer (Trennung von Erkennung und Wirkung).
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-017]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-017]
     pub fn suggest_tombstone_candidates(
         &self,
         csr_edges_matching_pattern: &[EdgeId],
@@ -213,7 +213,7 @@ impl Default for ConsistencyEnforcer {
 mod tests {
     use super::*;
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-018]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-018]
     #[test]
     fn test_first_contradiction() {
         let mut enforcer = ConsistencyEnforcer::new(3);
@@ -228,7 +228,7 @@ mod tests {
         assert!(!enforcer.is_suppressed(hash));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-019]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-019]
     #[test]
     fn test_three_repeated_contradictions_suppresses_pattern() {
         let mut enforcer = ConsistencyEnforcer::new(3);
@@ -248,7 +248,7 @@ mod tests {
         assert!(enforcer.is_suppressed(hash));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-020]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-020]
     #[test]
     fn test_independent_pattern_hash_counting_no_cross_contamination() {
         let mut enforcer = ConsistencyEnforcer::new(3);
@@ -277,7 +277,7 @@ mod tests {
         assert!(!enforcer.is_suppressed(hash2));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-021]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-021]
     #[test]
     fn test_exact_predicate_conflict_detector() {
         let detector = ExactPredicateConflictDetector;
@@ -323,7 +323,7 @@ mod tests {
         assert!(!detector.conflicts(&a, &b_different_predicate));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-022]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-022]
     #[test]
     fn test_active_patterns_and_suggest_tombstones() {
         let mut enforcer = ConsistencyEnforcer::default();
@@ -348,7 +348,7 @@ mod tests {
         assert_eq!(suggestions, candidate_edges);
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-023]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-023]
     #[test]
     fn test_check_before_insert() {
         let mut enforcer = ConsistencyEnforcer::new(1);
@@ -367,7 +367,7 @@ mod tests {
         assert!(enforcer.is_suppressed(assertion.pattern_hash()));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-024]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-024]
     #[test]
     fn test_zero_threshold_suppresses_immediately() {
         let mut enforcer = ConsistencyEnforcer::new(0);
@@ -377,7 +377,7 @@ mod tests {
         assert!(enforcer.is_suppressed(hash));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-025]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-025]
     #[test]
     fn test_get_pattern_nonexistent() {
         let enforcer = ConsistencyEnforcer::default();
@@ -390,7 +390,7 @@ mod tests {
         );
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-026]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-026]
     #[test]
     fn test_detect_contradiction_delegate() {
         let enforcer = ConsistencyEnforcer::default();
@@ -410,7 +410,7 @@ mod tests {
         assert!(enforcer.detect_contradiction(&detector, &a, &b));
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-027]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-027]
     #[test]
     fn test_conflict_pattern_and_edge_assertion_serde_roundtrip() {
         let cp = ConflictPattern {
@@ -439,7 +439,7 @@ mod tests {
         assert_eq!(assertion, deserialized_assertion);
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-028]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-028]
     #[test]
     fn test_edge_assertion_empty_object_repr() {
         let assertion_empty = EdgeAssertion {
@@ -460,7 +460,7 @@ mod tests {
         assert_ne!(hash1, hash2);
     }
 
-// ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-029]
+    // ANCHOR[contextra-graph:SRC-CONSISTENCY-ENFORCEMENT-029]
     #[test]
     fn test_consistency_enforcer_bincode_serde_roundtrip() {
         let mut enforcer = ConsistencyEnforcer::new(2);

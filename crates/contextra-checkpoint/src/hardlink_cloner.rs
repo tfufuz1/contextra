@@ -26,9 +26,36 @@
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
 // INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
 
-use contextra_mvcc::SnapshotRegistry;
+/// Trait zur Abstraktion von Snapshot-Pinning-Mechanismen während des SSTable-Klonens.
+pub trait SnapshotPinner: Send + Sync {
+    /// Pinnt eine Sequenznummer und liefert einen RAII-Guard zurück.
+    fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync>;
+}
+
+impl<F> SnapshotPinner for F
+where
+    F: Fn(u64) -> Box<dyn std::any::Any + Send + Sync> + Send + Sync,
+{
+    fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
+        (self)(seq_no)
+    }
+}
+
+impl SnapshotPinner for () {
+    fn pin_seq_no(&self, _seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
+        Box::new(())
+    }
+}
+
+#[cfg(any(test, feature = "mvcc"))]
+impl SnapshotPinner for Arc<contextra_mvcc::SnapshotRegistry> {
+    fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
+        Box::new(self.register(seq_no))
+    }
+}
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
+#[cfg(any(test, feature = "mvcc"))]
 use std::sync::Arc;
 
 #[cfg(not(loom))]
@@ -138,7 +165,7 @@ pub trait CheckpointHardlinkCloner: Send + Sync {
         seq_no: u64,
         source_dir: &'a Path,
         target_dir: &'a Path,
-        snapshot_registry: &'a Arc<SnapshotRegistry>,
+        snapshot_pinner: &'a (dyn SnapshotPinner + 'a),
     ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>>;
 }
 
@@ -159,7 +186,7 @@ impl DefaultHardlinkCloner {
 impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     // ANCHOR[contextra-checkpoint:CLONE-004]
     // Ablauf von `clone_sstable_hardlinks`:
-    // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Löschung).
+    // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Bereinigung).
     // 2. Zielverzeichnis anlegen falls noch nicht vorhanden.
     // 3. Quellverzeichnis nach `.sst`-Dateien durchsuchen.
     // 4. Für jede Datei bestehende Zieldatei entfernen und Hardlink setzen.
@@ -171,12 +198,12 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
         seq_no: u64,
         source_dir: &'a Path,
         target_dir: &'a Path,
-        snapshot_registry: &'a Arc<SnapshotRegistry>,
+        snapshot_pinner: &'a (dyn SnapshotPinner + 'a),
     ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
         Box::pin(async move {
             // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
             // NOTE: Der Guard wird über die gesamte Future gehalten, damit kein GC-Lauf SSTables löscht
-            let _guard = snapshot_registry.register(seq_no);
+            let _guard = snapshot_pinner.pin_seq_no(seq_no);
 
             // 2. Ensure target directory exists
             fs::create_dir_all(target_dir)

@@ -572,7 +572,7 @@ async fn test_compaction_cancellation() {
 }
 
 #[tokio::test]
-async fn concurrent_flush_and_compact_is_safe() {
+async fn test_concurrent_flush_and_compact_is_safe() {
     use crate::lsm::{LsmConfig, LsmStorage};
     use contextra_ports::StorageEngine;
 

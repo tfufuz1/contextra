@@ -65,10 +65,7 @@ async fn test_confirm_required_semantics_table_test() {
     let (server, _tmp) = create_mock_server().await;
 
     // Set deletion proof key environment variable for drop_collection tests requiring proof key
-    std::env::set_var(
-        "CONTEXTRA_DELETION_PROOF_KEY",
-        "test_key_32_bytes_long_exact!!",
-    );
+    std::env::set_var("CONTEXTRA_PROOF_KEY", "test_key_32_bytes_long_exact!!");
 
     struct TestCase {
         name: &'static str,
@@ -200,5 +197,5 @@ async fn test_confirm_required_semantics_table_test() {
         }
     }
 
-    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    std::env::remove_var("CONTEXTRA_PROOF_KEY");
 }

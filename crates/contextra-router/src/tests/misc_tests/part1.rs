@@ -270,9 +270,9 @@ fn test_slm_profile_validation() {
 }
 
 // ANCHOR[contextra-router:TST-MSC1-T05]
-// Test `prop_slm_profile_equality`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
+// Test `test_prop_slm_profile_equality`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
-fn prop_slm_profile_equality() {
+fn test_prop_slm_profile_equality() {
     use proptest::prelude::*;
 
     proptest!(|(
@@ -288,9 +288,9 @@ fn prop_slm_profile_equality() {
 }
 
 // ANCHOR[contextra-router:TST-MSC1-T06]
-// Test `prop_slm_profile_serde`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
+// Test `test_prop_slm_profile_serde`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
-fn prop_slm_profile_serde() {
+fn test_prop_slm_profile_serde() {
     use proptest::prelude::*;
 
     proptest!(|(
@@ -307,9 +307,9 @@ fn prop_slm_profile_serde() {
 }
 
 // ANCHOR[contextra-router:TST-MSC1-T07]
-// Test `prop_routing_decision_profile_in_input`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
+// Test `test_prop_routing_decision_profile_in_input`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
-fn prop_routing_decision_profile_in_input() {
+fn test_prop_routing_decision_profile_in_input() {
     use crate::router::select_profile_from_chunks;
     use contextra_types::{ContextChunk, DocId};
     use proptest::prelude::*;

@@ -550,11 +550,7 @@ async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {
     let db = Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
     collection
-        .insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(json!({"text": "test"})),
-        )
+        .insert("doc1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"text": "test"})))
         .await?;
 
     let clock = Arc::new(TestClock::new(1_000_000_000_000));
@@ -750,11 +746,7 @@ async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {
     let db = Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
     collection
-        .insert(
-            "doc1",
-            &[1.0, 0.0, 0.0, 0.0],
-            Some(json!({"text": "test"})),
-        )
+        .insert("doc1", &[1.0, 0.0, 0.0, 0.0], Some(json!({"text": "test"})))
         .await?;
 
     let clock = Arc::new(TestClock::new(1_000_000_000_000));

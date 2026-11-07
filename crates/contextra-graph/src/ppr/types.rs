@@ -24,19 +24,19 @@ impl DeletedView {
     }
 
     #[inline]
-// ANCHOR[contextra-graph:SRC-PPR-TYPES-002]
+    // ANCHOR[contextra-graph:SRC-PPR-TYPES-002]
     pub fn contains(&self, idx: usize) -> bool {
         self.deleted_nodes.contains(&idx)
     }
 
     #[inline]
-// ANCHOR[contextra-graph:SRC-PPR-TYPES-003]
+    // ANCHOR[contextra-graph:SRC-PPR-TYPES-003]
     pub fn len(&self) -> usize {
         self.deleted_nodes.len()
     }
 
     #[inline]
-// ANCHOR[contextra-graph:SRC-PPR-TYPES-004]
+    // ANCHOR[contextra-graph:SRC-PPR-TYPES-004]
     pub fn is_empty(&self) -> bool {
         self.deleted_nodes.is_empty()
     }
@@ -52,7 +52,7 @@ pub struct PprContext {
 }
 
 impl PprContext {
-// ANCHOR[contextra-graph:SRC-PPR-TYPES-006]
+    // ANCHOR[contextra-graph:SRC-PPR-TYPES-006]
     pub fn new() -> Self {
         Self::default()
     }

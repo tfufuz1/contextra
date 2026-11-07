@@ -307,7 +307,7 @@ mod tests {
     // ANCHOR[contextra-text:TEST-LIB-001]
     // Prüft den gesamten Lebenszyklus des Bm25Scorer: Insert, Commit, Suche, Stats, Delete und Rollback.
     #[tokio::test]
-    async fn bm25_scorer_case_full_lifecycle() -> Result<()> {
+    async fn test_bm25_scorer_case_full_lifecycle() -> Result<()> {
         let storage = std::sync::Arc::new(MockStorage::new());
         let scorer = Bm25Scorer::new(storage, "test_ns");
 
