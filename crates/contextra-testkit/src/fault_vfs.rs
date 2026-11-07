@@ -236,6 +236,79 @@ impl FaultVfs {
     }
 }
 
+impl contextra_ports::Vfs for FaultVfs {
+    fn read(&self, path: &Path) -> contextra_types::Result<Vec<u8>> {
+        self.read_file(path)
+            .map_err(contextra_types::ContextraError::Io)
+    }
+
+    fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_types::Result<()> {
+        self.check_write_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        self.sync().map_err(contextra_types::ContextraError::Io)?;
+        self.files.write().insert(path.to_path_buf(), data.to_vec());
+        Ok(())
+    }
+
+    fn create_dir_all(&self, path: &Path) -> contextra_types::Result<()> {
+        self.check_write_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        let _ = path;
+        Ok(())
+    }
+
+    fn remove_file(&self, path: &Path) -> contextra_types::Result<()> {
+        self.check_write_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        let removed = self.files.write().remove(path);
+        if removed.is_some() {
+            Ok(())
+        } else {
+            Err(contextra_types::ContextraError::NotFound(
+                path.display().to_string(),
+            ))
+        }
+    }
+
+    fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
+        self.check_read_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        Ok(self.files.read().contains_key(path))
+    }
+
+    fn len(&self, path: &Path) -> contextra_types::Result<u64> {
+        self.check_read_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        self.files
+            .read()
+            .get(path)
+            .map(|data| data.len() as u64)
+            .ok_or_else(|| contextra_types::ContextraError::NotFound(path.display().to_string()))
+    }
+
+    fn list_dir(&self, path: &Path) -> contextra_types::Result<Vec<String>> {
+        self.check_read_fault()
+            .map_err(contextra_types::ContextraError::Io)?;
+        let files = self.files.read();
+        let mut entries = Vec::new();
+        for key in files.keys() {
+            if let Ok(rel) = key.strip_prefix(path) {
+                if let Some(first_comp) = rel.components().next() {
+                    let name = first_comp.as_os_str().to_string_lossy().to_string();
+                    if !entries.contains(&name) {
+                        entries.push(name);
+                    }
+                }
+            }
+        }
+        Ok(entries)
+    }
+
+    fn sync_dir(&self, _path: &Path) -> contextra_types::Result<()> {
+        self.sync().map_err(contextra_types::ContextraError::Io)
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -274,5 +347,40 @@ mod tests {
 
         assert!(vfs.sync().is_ok());
         assert!(vfs.sync().is_err());
+    }
+    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-PORT-001]
+    // Validiert die Vfs-Port-Implementierung unter normalem und fehlerhaftem Verhalten.
+    #[test]
+    fn test_fault_vfs_port_interface() -> contextra_types::Result<()> {
+        use contextra_ports::Vfs;
+
+        let vfs = FaultVfs::new();
+        let dir = Path::new("my_dir");
+        vfs.create_dir_all(dir)?;
+        vfs.sync_dir(dir)?;
+
+        let path = Path::new("my_dir/vfs_test.txt");
+        assert!(!vfs.exists(path)?);
+        vfs.write_atomic(path, b"hello world")?;
+        assert!(vfs.exists(path)?);
+        assert_eq!(vfs.len(path)?, 11);
+        let read = vfs.read(path)?;
+        assert_eq!(read, b"hello world");
+
+        let entries = vfs.list_dir(dir)?;
+        assert!(entries.contains(&"vfs_test.txt".to_string()));
+
+        vfs.set_config(FaultConfig {
+            fail_reads_after: Some(0),
+            ..Default::default()
+        });
+        assert!(vfs.read(path).is_err());
+
+        vfs.reset_counters();
+        vfs.set_config(FaultConfig::default());
+
+        vfs.remove_file(path)?;
+        assert!(!vfs.exists(path)?);
+        Ok(())
     }
 }

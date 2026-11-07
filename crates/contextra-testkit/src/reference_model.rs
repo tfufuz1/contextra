@@ -149,7 +149,7 @@ impl ReferenceModel {
     /// **Ablauf:**
     /// 1. Sucht die Versionsliste zum Schlüssel in `history`.
     /// 2. Iteriert rückwärts (`rev`), um die jüngste Version mit `version_seq <= seq` zu finden.
-    /// 3. Gibt `Some(bytes)` zurück, falls es ein aktiver Wert war, oder `None` bei Löschung/Nichtexistenz.
+    /// 3. Gibt `Some(bytes)` zurück, falls es ein aktiver Wert war, oder `None` bei Entfernung/Nichtexistenz.
     pub fn get_at(&self, key: &[u8], seq: u64) -> Option<Vec<u8>> {
         let versions = self.history.get(key)?;
         // Find latest version with version_seq <= seq

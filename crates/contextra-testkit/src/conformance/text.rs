@@ -5,7 +5,7 @@
 //!
 //! ## Getestete Verträge
 //! 1. **Indexierung & Wiederauffindbarkeit:** Eingefügte Dokumente können über Teilwörter gefunden werden.
-//! 2. **Löschung (Never retrievable):** Gelöschte und bestätigte Dokumente tauchen bei Folgesuchen nie mehr auf.
+//! 2. **Entfernung (Never retrievable):** Gelöschte und bestätigte Dokumente tauchen bei Folgesuchen nie mehr auf.
 //! 3. **Normalisierung von Umlauten und ß:** Findet "Köln" über "Köln" und "Grüße" über "grüsse".
 //! 4. **Leere Suchanfrage:** Leere Strings als Abfrage führen zu einer leeren Trefferliste ohne Fehler/Panic.
 
