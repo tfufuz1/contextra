@@ -1258,7 +1258,6 @@ name = "contextra-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "contextra-adapt",
  "contextra-ports",
  "contextra-types",
  "proptest",
