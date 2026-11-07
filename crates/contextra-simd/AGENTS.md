@@ -23,7 +23,7 @@ Nur `contextra-types`. Keine Ports, kein `std::fs`, keine Uhr, kein Runtime-Bezu
 | Datei | Verantwortung |
 |---|---|
 | `lib.rs` | sichere API: `validate_vector`, `compute_distance`, `compute_distance_trusted`, `compute_distance_f32_bytes_trusted` |
-| `dispatch.rs` | Laufzeit-CPU-Erkennung und Kernel-Auswahl |
+| `dispatch.rs` | Laufzeit-CPU-Erkennung, injizierbarer `Dispatcher` (`SimdTarget`) und Kernel-Auswahl |
 | `kernels/scalar.rs` | **Referenzimplementierung** (sicher, Orakel für alle anderen Kernel) |
 | `kernels/avx2.rs`, `avx512.rs`, `neon.rs` | handgeschriebene SIMD-Kernel (`unsafe`, `#[target_feature]`) |
 | `benches/`, `tests/` | `simd_bench.rs`; `differential_tests.rs`, `simd_cross_validation.rs`, `edge_cases_tests.rs`, `quantized_and_mixed_precision_tests.rs`, `building_block_conformance.rs` |
