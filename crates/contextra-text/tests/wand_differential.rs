@@ -175,7 +175,7 @@ fn naive_bm25_reference(
     let total_doc_tokens: usize = docs.values().map(|toks| toks.len()).sum();
     // InvertedIndex stores avg_doc_len as fixed-point x1000 in AtomicU64 (FIND-TXT-004)
     let avg_doc_len = if total_docs > 0 {
-        let avg_x1000 = (total_doc_tokens as f64 / total_docs as f64 * 1000.0) as u64;
+        let avg_x1000 = ((total_doc_tokens as f64 / total_docs as f64) * 1000.0).round() as u64;
         avg_x1000 as f32 / 1000.0
     } else {
         0.0
@@ -200,8 +200,10 @@ fn naive_bm25_reference(
         let mut doc_score = 0.0f32;
         let mut matched = false;
 
-        // Note: For each query token (including duplicates), evaluate score_term
-        for token in &query_tokens {
+        // Note: For each query token (including duplicates), evaluate score_term in sorted term order
+        let mut sorted_tokens = query_tokens.clone();
+        sorted_tokens.sort();
+        for token in &sorted_tokens {
             let tf = toks.iter().filter(|&t| t == token).count() as u32;
             if tf > 0 {
                 let df = df_map.get(token).copied().unwrap_or(0);

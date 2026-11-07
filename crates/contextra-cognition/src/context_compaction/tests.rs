@@ -12,14 +12,16 @@
 )]
 
 use super::*;
-use contextra_engine::collection::Collection;
-use contextra_engine::transaction::CommitIntent;
-use contextra_engine::ProvenanceRecord;
-use contextra_graph::CsrGraph;
-use contextra_ports::SeededRng;
-use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
+use crate::engine_local::collection::Collection;
+use crate::engine_local::transaction::CommitIntent;
+use crate::engine_local::ProvenanceRecord;
+use crate::graph_local::CsrGraph;
+use crate::ports_local::SeededRng;
+use crate::ports_local::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
+use crate::types_local::{
+    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
+};
 use contextra_testkit::{InMemoryStorageEngine, InMemoryVectorIndex};
-use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -430,7 +432,7 @@ async fn test_consolidation_aborts_on_delete_failure(
         graph,
         next_tx,
         dim,
-        contextra_engine::Language::English,
+        crate::engine_local::Language::English,
     );
 
     // 1. Insert source document
@@ -481,7 +483,7 @@ async fn test_consolidation_aborts_on_delete_failure(
 // Prüft Testfall `test_compactor_jitter_reproducible_and_in_bounds`.
 #[test]
 fn test_compactor_jitter_reproducible_and_in_bounds() {
-    use contextra_ports::{Rng, SeededRng};
+    use crate::ports_local::{Rng, SeededRng};
 
     let rng1 = SeededRng::new(42);
     let rng2 = SeededRng::new(42);
@@ -516,7 +518,7 @@ fn test_compactor_jitter_reproducible_and_in_bounds() {
 // Prüft Testfall `test_compactor_with_rng_builder`.
 #[test]
 fn test_compactor_with_rng_builder() {
-    use contextra_ports::SeededRng;
+    use crate::ports_local::SeededRng;
 
     let budget = TokenBudget::new(100, 0);
     let rng = Arc::new(SeededRng::new(12345));
@@ -542,10 +544,12 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
     let intent_bytes = serde_json::to_vec(&intent)?;
 
     let setup_tx = TxId::new(1);
-    storage.put(setup_tx, b"consolidation_intent:1", &intent_bytes)
+    storage
+        .put(setup_tx, b"consolidation_intent:1", &intent_bytes)
         .await?;
     storage.commit(setup_tx).await?;
-    storage.put(setup_tx, b"consolidation_intent:2", &intent_bytes)
+    storage
+        .put(setup_tx, b"consolidation_intent:2", &intent_bytes)
         .await?;
     storage.commit(setup_tx).await?;
 
@@ -581,7 +585,7 @@ async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
         Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
-        contextra_engine::Language::English,
+        crate::engine_local::Language::English,
     );
 
     col.insert(

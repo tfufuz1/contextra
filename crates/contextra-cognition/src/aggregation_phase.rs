@@ -20,12 +20,11 @@
 //! - **Deterministische Sortierung:** Alle Knoten und Kanten werden kanonisch sortiert, um identische
 //!   Ergebnisse bei gleichen Ausgangsdaten zu garantieren.
 
-
+use crate::graph_local::HyperEdgeId;
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
+use crate::ports_local::LlmTextGenerator;
+use crate::types_local::{ContextraError, EntityId, Result};
 use ahash::{AHashMap, AHashSet};
-use contextra_graph::HyperEdgeId;
-use contextra_ports::LlmTextGenerator;
-use contextra_types::{ContextraError, EntityId, Result};
 
 /// Konfiguration für die Aggregation-Phase.
 #[derive(Debug, Clone)]
@@ -125,7 +124,7 @@ impl AggregationConfig {
 /// Ergebnis der Aggregationsphase.
 pub struct AggregationPhaseResult {
     /// Anzahl tombstonierter Kanten wegen Inkompatibilität.
-    pub raw_edges_tombstoned: usize,
+    pub raw_edges_invalidated: usize,
     /// Anzahl erzeugter abstrakter Super-Hyperkanten.
     pub abstract_hyperedges_created: usize,
     /// Geschätzter Maximalverbrauch an Speicher in MB.
@@ -205,8 +204,8 @@ pub struct AlphaNode {
 // ANCHOR[contextra-cognition:AGG-008]
 /// Senkentrait für Superkanten und Tombstones.
 pub trait SuperEdgeSink {
-    /// Markiert eine Kante als tombstoned.
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()>;
+    /// Markiert eine Kante als invalidiert (superseded).
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()>;
     /// Schreibt eine neue Super-Hyperkante und gibt deren zugewiesene ID zurück.
     fn write_super_edge(&mut self, draft: SuperEdgeDraft) -> Result<HyperEdgeId>;
     /// Atomarer Commit aller Änderungen.
@@ -335,7 +334,7 @@ fn perform_type_denoising(
     }
 
     let mut active_edges = Vec::new();
-    let mut raw_edges_tombstoned = 0;
+    let mut raw_edges_invalidated = 0;
 
     for edge in sorted_edges {
         let mut min_compat = 1.0f32;
@@ -357,14 +356,14 @@ fn perform_type_denoising(
         }
 
         if min_compat < cfg.min_type_compat_score {
-            sink.tombstone_edge(edge.id)?;
-            raw_edges_tombstoned += 1;
+            sink.invalidate_edge(edge.id)?;
+            raw_edges_invalidated += 1;
         } else {
             active_edges.push(edge);
         }
     }
 
-    Ok((active_edges, raw_edges_tombstoned))
+    Ok((active_edges, raw_edges_invalidated))
 }
 
 fn build_clusters_from_assignments(
@@ -573,7 +572,7 @@ pub async fn run_aggregation_pass(
         sink.commit()?;
         return Ok((
             AggregationPhaseResult {
-                raw_edges_tombstoned: 0,
+                raw_edges_invalidated: 0,
                 abstract_hyperedges_created: 0,
                 peak_memory_used_mb: 0,
                 child_edge_ids_written: 0,
@@ -585,7 +584,7 @@ pub async fn run_aggregation_pass(
     let (sorted_nodes, sorted_edges, dim, node_type_map) =
         validate_and_sort_aggregation_inputs(nodes, edges)?;
 
-    let (active_edges, raw_edges_tombstoned) =
+    let (active_edges, raw_edges_invalidated) =
         perform_type_denoising(sorted_edges, &node_type_map, cfg, sink)?;
 
     let n = sorted_nodes.len();
@@ -620,7 +619,7 @@ pub async fn run_aggregation_pass(
 
     Ok((
         AggregationPhaseResult {
-            raw_edges_tombstoned,
+            raw_edges_invalidated,
             abstract_hyperedges_created,
             peak_memory_used_mb,
             child_edge_ids_written,

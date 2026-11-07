@@ -343,4 +343,34 @@ mod self_tests {
         let key = MetricKey::new("contract_counter", &[("layer", "ring0")]);
         assert_eq!(snap.counters.get(&key), Some(&15));
     }
+
+    #[test]
+    fn test_contract_egress_policy_allow_and_deny() {
+        use crate::policy::{EgressDecision, EgressPolicy};
+
+        struct MockPolicy;
+        impl EgressPolicy for MockPolicy {
+            fn evaluate(&self, _ctx: &crate::RequestContext, payload: &str) -> EgressDecision {
+                if payload.contains("secret") {
+                    EgressDecision::Deny("contains secret".into())
+                } else if payload.contains("pii") {
+                    EgressDecision::Redact("[REDACTED]".into())
+                } else {
+                    EgressDecision::Allow
+                }
+            }
+        }
+
+        let policy = MockPolicy;
+        let ctx = crate::RequestContext::new(crate::TenantId(1), crate::TxId(1));
+        assert_eq!(policy.evaluate(&ctx, "normal data"), EgressDecision::Allow);
+        assert_eq!(
+            policy.evaluate(&ctx, "user secret data"),
+            EgressDecision::Deny("contains secret".into())
+        );
+        assert_eq!(
+            policy.evaluate(&ctx, "has pii here"),
+            EgressDecision::Redact("[REDACTED]".into())
+        );
+    }
 }

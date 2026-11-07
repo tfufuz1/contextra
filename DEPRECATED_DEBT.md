@@ -30,7 +30,7 @@ Dieses Dokument deklariert diese Relikte offiziell als **Deprecated Debt** (tech
 ### DEBT-03: Strangler-Fassade `contextra-core`
 - **Betroffene Crates:** `contextra-core`.
 - **Beschreibung:** `contextra-core` fungiert derzeit als Re-Export-Hülle für ausgelagerte Typen nach `contextra-types`, `contextra-ports` und `contextra-mvcc`.
-- **Zielarchitektur:** Alle Crates müssen direkt auf `contextra-types` und `contextra-ports` zugreifen. Sobald alle Importe migriert sind, wird `contextra-core` archiviert/entfernt.
+- **Status:** ERLEDIGT (Paket B31). Alle Konsumenten wurden auf `contextra-types`, `contextra-ports` und `contextra-mvcc` migriert und `contextra-core` wurde aus dem Workspace entfernt.
 
 ### DEBT-04: Direkte Kernel-Importe (Fehlende Port-Abstraktion)
 - **Betroffene Crates:** `contextra-engine`, `contextra-db`, `contextra-mcp`, `contextra-store`.
@@ -50,7 +50,7 @@ Dieses Dokument deklariert diese Relikte offiziell als **Deprecated Debt** (tech
 |---|---|---|---|
 | **DEBT-01** | Phase 3 & 4 | `contextra-erasure` | 0 Löschketten-/Nachweisimporte in `store`, `vector`, `text`, `crypto`. |
 | **DEBT-02** | Phase 4 & 5 | `contextra-agent` | Reine Port-Nutzung, keine persistenten Tabellen-Altlasten. |
-| **DEBT-03** | Phase 1 & 6 | `contextra-types` / `ports` | `contextra-core` hat 0 Downstream-Konsumenten. |
+| **DEBT-03** | Phase 1 & 6 | `contextra-types` / `ports` | **ERLEDIGT (Paket B31)**: `contextra-core` vollständig dekommissioniert und entfernt. |
 | **DEBT-04** | Phase 2 & 5 | `contextra-ports` | Keine konkreten Cross-Engine-Importe in Engines. |
 | **DEBT-05** | Phase 4 & 5 | `contextra-db` | Entfernung der Legacy-Such-Fassaden nach Deprecation-Frist. |
 

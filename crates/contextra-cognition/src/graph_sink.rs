@@ -15,14 +15,13 @@
 //! - **Generische Rollenbindung:** Bei der Erzeugung synthetischer Hyperkanten wird ein Standard-Rollen-Binding
 //!   mit `RoleId::new(0)` verwendet.
 
-
 use crate::aggregation_phase::{SuperEdgeDraft, SuperEdgeSink};
-use contextra_graph::csr::EdgeType;
-use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
-use contextra_graph::CsrGraph;
-use contextra_types::{ContextraError, Result, TxId};
+use crate::graph_local::csr::EdgeType;
+use crate::graph_local::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
+use crate::graph_local::CsrGraph;
+use crate::types_local::{ContextraError, Result, TxId};
 
-/// Buffered sink implementation writing synthetic superedges and tombstone requests to [`CsrGraph`].
+/// Buffered sink implementation writing synthetic superedges and invalidation requests to [`CsrGraph`].
 ///
 /// # Invariant
 /// Assumes a single active writer per `CsrGraph` during consolidation (enforced externally via
@@ -32,7 +31,7 @@ use contextra_types::{ContextraError, Result, TxId};
 pub struct CsrGraphSuperEdgeSink<'a> {
     graph: &'a CsrGraph,
     wal_tx: TxId,
-    pending_tombstones: Vec<HyperEdgeId>,
+    pending_invalidations: Vec<HyperEdgeId>,
     pending_edges: Vec<HyperEdge>,
 }
 
@@ -44,15 +43,15 @@ impl<'a> CsrGraphSuperEdgeSink<'a> {
         Self {
             graph,
             wal_tx,
-            pending_tombstones: Vec::new(),
+            pending_invalidations: Vec::new(),
             pending_edges: Vec::new(),
         }
     }
 }
 
 impl<'a> SuperEdgeSink for CsrGraphSuperEdgeSink<'a> {
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()> {
-        self.pending_tombstones.push(id);
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()> {
+        self.pending_invalidations.push(id);
         Ok(())
     }
 
@@ -87,11 +86,11 @@ impl<'a> SuperEdgeSink for CsrGraphSuperEdgeSink<'a> {
         Ok(next_id)
     }
 
-    /// Atomically applies all buffered tombstone requests and new superedges in a single batch.
+    /// Atomically applies all buffered invalidation requests and new superedges in a single batch.
     fn commit(&mut self) -> Result<()> {
         let pending_edges = std::mem::take(&mut self.pending_edges);
         let result = self.graph.commit_super_edge_batch(
-            &self.pending_tombstones,
+            &self.pending_invalidations,
             pending_edges,
             self.wal_tx,
         );
@@ -100,7 +99,7 @@ impl<'a> SuperEdgeSink for CsrGraphSuperEdgeSink<'a> {
             return Err(ContextraError::from(e));
         }
 
-        self.pending_tombstones.clear();
+        self.pending_invalidations.clear();
         Ok(())
     }
 }

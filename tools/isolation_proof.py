@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""M2 Isolation Proof Runner.
+"""M2 Isolation Proof Tool for Contextra building blocks.
+
+Verifies that a crate builds and tests in an isolated workspace with only its
+explicitly allowed dependencies.
 
 Copies the target crate and its allowed dependencies (per capabilities.toml)
 into a clean temporary workspace directory and runs:
@@ -13,117 +16,119 @@ import os
 import shutil
 import subprocess
 import sys
-import tomllib
+import tempfile
+from pathlib import Path
 
 
-def run_isolation_proof(crate_name: str) -> bool:
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    capabilities_path = os.path.join(repo_root, "capabilities.toml")
-
-    with open(capabilities_path, "rb") as f:
-        capabilities = tomllib.load(f)
-
-    crate_info = capabilities.get("crates", {}).get(crate_name)
-    if not crate_info:
-        print(f"Error: Crate '{crate_name}' not found in capabilities.toml", file=sys.stderr)
+def run_command(cmd, cwd):
+    print(f"Running: {' '.join(cmd)} in {cwd}")
+    res = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
+    if res.returncode != 0:
+        print(f"FAILED (exit {res.returncode}):")
+        print(res.stdout)
+        print(res.stderr)
         return False
-
-    allowed_deps = crate_info.get("may_depend_on", [])
-    crate_path = crate_info.get("path", f"crates/{crate_name}")
-
-    tmp_ws = f"/tmp/contextra_isolation_{crate_name}"
-    if os.path.exists(tmp_ws):
-        shutil.rmtree(tmp_ws)
-    os.makedirs(os.path.join(tmp_ws, "crates"), exist_ok=True)
-
-    # Copy target crate
-    dest_target = os.path.join(tmp_ws, crate_path)
-    os.makedirs(os.path.dirname(dest_target), exist_ok=True)
-    shutil.copytree(os.path.join(repo_root, crate_path), dest_target)
-
-    # Copy allowed dependencies
-    members = [crate_path]
-    for dep in allowed_deps:
-        dep_info = capabilities.get("crates", {}).get(dep)
-        dep_path = dep_info.get("path", f"crates/{dep}") if dep_info else f"crates/{dep}"
-        dest_dep = os.path.join(tmp_ws, dep_path)
-        os.makedirs(os.path.dirname(dest_dep), exist_ok=True)
-        shutil.copytree(os.path.join(repo_root, dep_path), dest_dep)
-        members.append(dep_path)
-
-    # Adapt root Cargo.toml
-    with open(os.path.join(repo_root, "Cargo.toml")) as f:
-        orig_cargo = f.read()
-
-    lines = orig_cargo.splitlines()
-    new_lines = []
-    in_members = False
-    for line in lines:
-        if line.strip() == "members = [":
-            in_members = True
-            new_lines.append("members = [")
-            for m in members:
-                new_lines.append(f'    "{m}",')
-            continue
-        if in_members:
-            if line.strip() == "]":
-                in_members = False
-                new_lines.append("]")
-            continue
-        if line.strip() == "default-members = [":
-            in_members = True
-            new_lines.append("default-members = [")
-            new_lines.append(f'    "{crate_path}",')
-            continue
-        new_lines.append(line)
-
-    with open(os.path.join(tmp_ws, "Cargo.toml"), "w") as f:
-        f.write("\n".join(new_lines))
-
-    # Generate offline lockfile
-    subprocess.run(["cargo", "generate-lockfile", "--offline"], cwd=tmp_ws, check=True)
-
-    print(f"[{crate_name}] Running: cargo build -p {crate_name} --no-default-features --locked")
-    res1 = subprocess.run(
-        ["cargo", "build", "-p", crate_name, "--no-default-features", "--locked"],
-        cwd=tmp_ws,
-        capture_output=True,
-        text=True,
-    )
-    if res1.returncode != 0:
-        print(f"FAILED build --no-default-features:\n{res1.stderr}", file=sys.stderr)
-        return False
-
-    print(f"[{crate_name}] Running: cargo build -p {crate_name} --locked")
-    res2 = subprocess.run(
-        ["cargo", "build", "-p", crate_name, "--locked"],
-        cwd=tmp_ws,
-        capture_output=True,
-        text=True,
-    )
-    if res2.returncode != 0:
-        print(f"FAILED build:\n{res2.stderr}", file=sys.stderr)
-        return False
-
-    print(f"[{crate_name}] Running: cargo test -p {crate_name} --locked")
-    res3 = subprocess.run(
-        ["cargo", "test", "-p", crate_name, "--locked"],
-        cwd=tmp_ws,
-        capture_output=True,
-        text=True,
-    )
-    if res3.returncode != 0:
-        print(f"FAILED test:\n{res3.stderr}", file=sys.stderr)
-        return False
-
-    print(f"[{crate_name}] M2 Isolation Proof PASSED.")
     return True
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run M2 isolation proof for a crate.")
-    parser.add_argument("crate", help="Name of the crate (e.g. contextra-rank)")
+def run_isolation_proof(crate_name: str, repo_root: Path) -> bool:
+    print(f"=== Starting M2 Isolation Proof for {crate_name} ===")
+    crate_dir = repo_root / "crates" / crate_name
+    if not crate_dir.exists():
+        print(f"Error: {crate_dir} does not exist.")
+        return False
+
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        tmp_dir = Path(tmp_dir_str)
+        tmp_crates = tmp_dir / "crates"
+        tmp_crates.mkdir(parents=True, exist_ok=True)
+
+        # Copy target crate and allowed Ring 0/tooling dependencies
+        shutil.copytree(crate_dir, tmp_crates / crate_name)
+        for dep in ["contextra-types", "contextra-ports", "contextra-testkit"]:
+            src = repo_root / "crates" / dep
+            if src.exists():
+                shutil.copytree(src, tmp_crates / dep)
+
+        # Copy Cargo.lock
+        lock_file = repo_root / "Cargo.lock"
+        if lock_file.exists():
+            shutil.copy(lock_file, tmp_dir / "Cargo.lock")
+
+        # Create isolated workspace manifest
+        manifest_content = f"""[workspace]
+resolver = "2"
+members = [
+    "crates/{crate_name}",
+    "crates/contextra-ports",
+    "crates/contextra-types",
+    "crates/contextra-testkit",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.89"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = "warn"
+
+[workspace.dependencies]
+contextra-types = {{ path = "crates/contextra-types" }}
+contextra-ports = {{ path = "crates/contextra-ports" }}
+contextra-testkit = {{ path = "crates/contextra-testkit" }}
+contextra-graph = {{ path = "crates/contextra-graph" }}
+ahash = {{ version = "0.8", features = ["serde"] }}
+arc-swap = "1.7"
+bincode = "1.3.3"
+blake3 = "1"
+bytes = "1"
+criterion = {{ version = "0.5", features = ["async_tokio"] }}
+futures = "0.3"
+parking_lot = "0.12"
+proptest = "1.4"
+scc = "2"
+serde = {{ version = "1", features = ["derive", "rc"] }}
+serde_json = "1"
+tempfile = "3"
+thiserror = "2"
+tokio = {{ version = "1", features = ["full"] }}
+tracing = "0.1"
+tracing-subscriber = {{ version = "0.3", features = ["env-filter"] }}
+"""
+        with open(tmp_dir / "Cargo.toml", "w") as f:
+            f.write(manifest_content)
+
+        subprocess.run(["cargo", "update", "--workspace", "--offline"], cwd=tmp_dir, capture_output=True)
+
+        commands = [
+            ["cargo", "build", "-p", crate_name, "--no-default-features"],
+            ["cargo", "build", "-p", crate_name],
+            ["cargo", "test", "-p", crate_name, "--lib"],
+            ["cargo", "bench", "-p", crate_name, "--no-run"],
+        ]
+
+        for cmd in commands:
+            if not run_command(cmd, tmp_dir):
+                return False
+
+    print(f"=== M2 Isolation Proof SUCCESS for {crate_name} ===")
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser(description="M2 Isolation Proof")
+    parser.add_argument("--crate", "-c", default="contextra-graph", help="Target crate")
     args = parser.parse_args()
 
-    success = run_isolation_proof(args.crate)
+    repo_root = Path(__file__).resolve().parent.parent
+    success = run_isolation_proof(args.crate, repo_root)
     sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()

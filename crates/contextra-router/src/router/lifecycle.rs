@@ -26,6 +26,25 @@ impl RouterEngine {
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Self {
+        Self::new_with_vfs(
+            search_provider,
+            community_resolver,
+            context_preparer,
+            profiles,
+            calibration_store_path,
+            None,
+        )
+    }
+
+    /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS (M4: I/O-Entkopplung).
+    pub fn new_with_vfs(
+        search_provider: Arc<dyn HybridSearchProvider>,
+        community_resolver: Arc<dyn CommunityResolver>,
+        context_preparer: Arc<dyn ContextPreparer>,
+        profiles: Vec<SlmProfile>,
+        calibration_store_path: Option<std::path::PathBuf>,
+        vfs: Option<Arc<dyn Vfs>>,
+    ) -> Self {
         let mut calibration: BTreeMap<String, ProfileCalibrationState> = profiles
             .iter()
             .map(|p| {
@@ -42,7 +61,12 @@ impl RouterEngine {
             .collect();
 
         if let Some(ref path) = calibration_store_path {
-            if let Ok(bytes) = std::fs::read(path) {
+            let bytes_opt = if let Some(ref v) = vfs {
+                v.read(path).ok()
+            } else {
+                std::fs::read(path).ok()
+            };
+            if let Some(bytes) = bytes_opt {
                 if let Ok(persisted) =
                     serde_json::from_slice::<BTreeMap<String, ProfileCalibrationState>>(&bytes)
                 {
@@ -66,6 +90,7 @@ impl RouterEngine {
             community_resolver,
             context_preparer,
             clock: Arc::new(SystemClock::new()),
+            vfs,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(BTreeMap::new()),
             decision_ids: DecisionIdGenerator::new(0),
@@ -76,6 +101,12 @@ impl RouterEngine {
             #[cfg(feature = "bandit-routing")]
             pending_bandit: RwLock::new(BTreeMap::new()),
         }
+    }
+
+    /// Configures an injected Vfs implementation for virtualized/decoupled file I/O (M4).
+    pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
+        self.vfs = Some(vfs);
+        self
     }
 
     /// Configures a custom Clock implementation for deterministic testing.
@@ -119,15 +150,35 @@ impl RouterEngine {
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Result<Self> {
-        for p in &profiles {
-            p.validate()?;
-        }
-        Ok(Self::new(
+        Self::try_new_with_vfs(
             search_provider,
             community_resolver,
             context_preparer,
             profiles,
             calibration_store_path,
+            None,
+        )
+    }
+
+    /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS und validiert alle Profile.
+    pub fn try_new_with_vfs(
+        search_provider: Arc<dyn HybridSearchProvider>,
+        community_resolver: Arc<dyn CommunityResolver>,
+        context_preparer: Arc<dyn ContextPreparer>,
+        profiles: Vec<SlmProfile>,
+        calibration_store_path: Option<std::path::PathBuf>,
+        vfs: Option<Arc<dyn Vfs>>,
+    ) -> Result<Self> {
+        for p in &profiles {
+            p.validate()?;
+        }
+        Ok(Self::new_with_vfs(
+            search_provider,
+            community_resolver,
+            context_preparer,
+            profiles,
+            calibration_store_path,
+            vfs,
         ))
     }
 

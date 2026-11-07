@@ -11,6 +11,7 @@
 )]
 
 pub mod crypto_local;
+pub mod backend;
 pub mod error;
 #[cfg(test)]
 pub mod test_mocks;

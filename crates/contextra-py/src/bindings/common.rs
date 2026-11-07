@@ -378,12 +378,12 @@ pub fn json_to_py(py: Python<'_>, val: &serde_json::Value) -> PyResult<PyObject>
 }
 
 // ANCHOR[contextra-py:CNV-002]
-/// Konvertiert ein `contextra_db::Document` in ein `PyDocument`.
+/// Konvertiert ein `contextra::Document` in ein `PyDocument`.
 ///
 /// # Ablauf
 /// 1. Metadaten-JSON (falls vorhanden) in ein natives Python-Dictionary überführen.
 /// 2. In eine `PyDocument`-Instanz kapseln.
-pub fn doc_to_py(py: Python<'_>, d: contextra_db::Document) -> PyResult<PyDocument> {
+pub fn doc_to_py(py: Python<'_>, d: contextra::Document) -> PyResult<PyDocument> {
     let meta_py = match d.metadata {
         Some(ref m) => Some(json_to_py(py, m)?),
         None => None,
@@ -395,14 +395,14 @@ pub fn doc_to_py(py: Python<'_>, d: contextra_db::Document) -> PyResult<PyDocume
 }
 
 // ANCHOR[contextra-py:CNV-003]
-/// Konvertiert einen Vektor von internen `contextra_db::SearchResult` in Python-taugliche `PySearchResult`.
+/// Konvertiert einen Vektor von internen `contextra::SearchResult` in Python-taugliche `PySearchResult`.
 ///
 /// # Ablauf
 /// 1. Allokiert einen Vektor mit passender Kapazität.
 /// 2. Iteriert über die Treffer, wandelt Metadaten in Python-Objekte um und erzeugt `PySearchResult`.
 pub fn results_to_py(
     py: Python<'_>,
-    results: Vec<contextra_db::SearchResult>,
+    results: Vec<contextra::SearchResult>,
 ) -> PyResult<Vec<PySearchResult>> {
     let mut py_res = Vec::with_capacity(results.len());
     for r in results {

@@ -20,18 +20,18 @@
 
 //! Guard-Konstrukt fuer typsicheres Locking in der Sleep-Cycle-Konsolidierung.
 //!
-//! # Warum keine direkte Wiederverwendung von `contextra_graph::session_dag::NodesGuard`?
-//! `contextra_graph::session_dag::NodesGuard` ist strikt an `SessionBranchTree`, `AgentStateNode`
+//! # Warum keine direkte Wiederverwendung von `crate::graph_local::session_dag::NodesGuard`?
+//! `crate::graph_local::session_dag::NodesGuard` ist strikt an `SessionBranchTree`, `AgentStateNode`
 //! (`NodeIdx` = `u64`) und `DagEdge` gebunden. In `contextra-db` operieren Konsolidierung und Graph-Invalidierung
 //! hingegen auf `Collection<S, V>`, `CsrGraph`, `DocId` und `EntityId`.
 //! Aufgrund inkompatibler Datentypen, Lifetimes und Methoden kann `session_dag::NodesGuard` nicht direkt
 //! importiert werden. `ConsolidationNodesGuard` implementiert das gleiche strukturelle Muster (einziger
 //! Einstiegspunkt fuer geordnete Graph-/Node-Invalidierung waehrend der Konsolidierung).
 
-use contextra_engine::collection::Collection;
-use contextra_graph::cascade::CascadeInvalidationReport;
-use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, Result};
+use crate::engine_local::collection::Collection;
+use crate::graph_local::cascade::CascadeInvalidationReport;
+use crate::ports_local::{StorageEngine, VectorIndex};
+use crate::types_local::{DocId, Result};
 use tokio::sync::MutexGuard;
 
 /// Guard zur Erzwingung der Lock-Reihenfolge und kanonischen Node-Sortierung waehrend der Konsolidierung.
@@ -95,7 +95,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
         let mut errors = Vec::new();
 
         for doc_id in sorted_doc_ids {
-            match contextra_graph::cascade_invalidate_edges_for_superseded_doc(
+            match crate::graph_local::cascade_invalidate_edges_for_superseded_doc(
                 &self.collection.graph_index(),
                 doc_id,
                 wal_seq,
@@ -105,7 +105,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
                 Ok(report) => {
                     tracing::debug!(
                         doc_id = ?doc_id,
-                        tombstoned_edges = report.tombstoned_edge_count,
+                        invalidated_edges = report.affected_node_ids.len(),
                         "Consolidation pass: cascade edge invalidation successful"
                     );
                     reports.push((doc_id, Ok(report)));

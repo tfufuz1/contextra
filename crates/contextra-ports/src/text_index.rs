@@ -1,7 +1,6 @@
 //! Text index and segment synthesizer traits.
 
 // FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
 // ZWECK: TextIndex & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
 // INVARIANTEN: AFIT for TextIndex, BoxFuture for SegmentSynthesizer.
 

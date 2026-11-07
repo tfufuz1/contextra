@@ -116,7 +116,6 @@ pub use pid_latency_controller::{
 };
 
 pub use collection::{Collection, CollectionConfig};
-pub use contextra_checkpoint;
 
 pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;

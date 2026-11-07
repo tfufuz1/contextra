@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: Sandbox execution state and resource limits enforcement
-// INVARIANTEN: #![forbid(unsafe_code)], zero panics, strict memory and table limits
-
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 

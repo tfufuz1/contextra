@@ -653,17 +653,9 @@ mod tests {
     // ANCHOR[contextra-graph:SRC-SESSION-DAG-037]
     #[tokio::test]
     async fn test_session_dag_survives_restart() {
-        use contextra_store::{LsmConfig, LsmStorage};
+        use contextra_testkit::InMemoryStorageEngine;
 
-        let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-        let storage = Arc::new(
-            LsmStorage::new(LsmConfig {
-                path: dir.path().to_path_buf(),
-                ..Default::default()
-            })
-            .await
-            .unwrap(), // unwrap allowed
-        );
+        let storage = Arc::new(InMemoryStorageEngine::new());
 
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
         let step1 = dag
@@ -792,15 +784,9 @@ mod tests {
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn test_load_CASE_non_existent_namespace_returns_not_found() {
-        use contextra_store::{LsmConfig, LsmStorage};
+        use contextra_testkit::InMemoryStorageEngine;
 
-        let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-        let storage = LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(); // unwrap allowed
+        let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
         let result = SessionBranchTree::load(&storage, "non_existent_ns").await;
         assert!(result.is_err());
@@ -816,15 +802,9 @@ mod tests {
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn test_load_CASE_corrupt_data_returns_serialization_error() {
-        use contextra_store::{LsmConfig, LsmStorage};
+        use contextra_testkit::InMemoryStorageEngine;
 
-        let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-        let storage = LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(); // unwrap allowed
+        let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
         let tx = TxId::new(1);
         // Put invalid corrupt bytes under edges key
