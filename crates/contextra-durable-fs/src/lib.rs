@@ -45,73 +45,20 @@ pub mod vfs;
 pub use fault_injector::{FaultInjector, NoFault};
 pub use health::{AtomicHealthState, HealthEvent, HealthState};
 pub use journal::PendingDeleteJournal;
+#[allow(deprecated)]
 pub use scrub::{
     scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
-pub use vfs::{RealFs, RealFsFile, Vfs, VfsFile, VfsOpenOptions};
+pub use contextra_ports::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
+pub use vfs::{RealFs, RealFsFile};
 
 use contextra_sys::{durable_flush_dir, durable_flush_file};
-
-// ANCHOR[contextra-durable-fs:FLUSH-KIND-001]
-/// Spezifikation des Flush-Umfangs für Datei-Handles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FlushKind {
-    /// Flusht Dateidaten auf dauerhaften Speicher ohne Metadaten-Synchronisation.
-    DataOnly,
-    /// Flusht sowohl Dateidaten als auch Metadaten-Änderungen auf dauerhaften Speicher.
-    DataAndMetadata,
-}
-
-// ANCHOR[contextra-durable-fs:FS-CLASS-001]
-/// Dateisystemklassifikation für Persistenz- und Locking-Garantien (§7.3.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FsClass {
-    /// Lokales Dateisystem mit unterstützten Persistenz- und Locking-Garantien.
-    LocalSupported,
-    /// Netzwerkdateisystem (NFS, SMB, CIFS).
-    Network,
-    /// Dateisystem im Userspace (FUSE).
-    Fuse,
-    /// Cloud-synchronisiertes Verzeichnis.
-    CloudSync,
-    /// Unbekanntes Dateisystem.
-    Unknown,
-}
-
-impl FsClass {
-    /// Prüft, ob das Dateisystem lokale Persistenz- und Locking-Garantien unterstützt.
-    #[must_use]
-    pub const fn is_supported_local(&self) -> bool {
-        matches!(self, Self::LocalSupported)
-    }
-}
-
-/// Ermittelt die [`FsClass`] für einen gegebenen Pfad anhand von Pfadheuristiken.
-pub fn fs_class(path: &Path) -> std::io::Result<FsClass> {
-    let path_str = path.to_string_lossy().to_lowercase();
-    if path_str.contains("onedrive") || path_str.contains("dropbox") || path_str.contains("icloud") {
-        return Ok(FsClass::CloudSync);
-    }
-    Ok(FsClass::LocalSupported)
-}
-
-/// Benennt eine Datei atomar um und flusht das Ziel-Elternverzeichnis.
-pub fn rename_durable(from: &Path, to: &Path) -> std::io::Result<()> {
-    let parent = to.parent().ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "target path has no parent directory",
-        )
-    })?;
-    std::fs::rename(from, to)?;
-    durable_flush_dir(parent)?;
-    Ok(())
-}
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// ANCHOR[contextra-durable-fs:FLUSH-KIND-001]
 /// Spezifikation des Flush-Umfangs für geöffnete Dateihandles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlushKind {
@@ -121,6 +68,7 @@ pub enum FlushKind {
     DataAndMetadata,
 }
 
+// ANCHOR[contextra-durable-fs:FS-CLASS-001]
 /// Dateisystemklassifikation für Persistenz- und Locking-Garantien (§23.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FsClass {

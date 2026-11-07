@@ -2,6 +2,8 @@
 //!
 //! Zweck: Integrationstests für `scrub_if_safe` mit Hardlink-Verweigerung und `PendingDeleteJournal`.
 
+#![allow(deprecated)]
+
 use contextra_durable_fs::{
     durable_remove, scrub_if_safe, PendingDeleteJournal, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
