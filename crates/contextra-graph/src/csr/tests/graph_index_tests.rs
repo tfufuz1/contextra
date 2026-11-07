@@ -14,17 +14,9 @@ use std::sync::Arc;
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
 
-    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-    let storage: Arc<dyn StorageEngine> = Arc::new(
-        LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(), // unwrap allowed
-    );
+    let storage: Arc<dyn StorageEngine> = Arc::new(InMemoryStorageEngine::new());
 
     let config = CsrGraphConfig {
         rebuild_threshold: 50,
@@ -34,15 +26,7 @@ async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
     assert!(graph.storage.is_some());
 
     // Replace storage via set_storage
-    let dir2 = tempfile::tempdir().unwrap(); // unwrap allowed
-    let storage2: Arc<dyn StorageEngine> = Arc::new(
-        LsmStorage::new(LsmConfig {
-            path: dir2.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(), // unwrap allowed
-    );
+    let storage2: Arc<dyn StorageEngine> = Arc::new(InMemoryStorageEngine::new());
 
     graph.set_storage(storage2);
     assert!(graph.storage.is_some());
@@ -81,15 +65,9 @@ async fn test_insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
 
-    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-    let storage = LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    })
-    .await
-    .unwrap(); // unwrap allowed
+    let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
     let graph = CsrGraph::new();
     let tx = TxId::new(10);
@@ -126,15 +104,9 @@ async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_load_from_storage_CASE_legacy_f32_weight_and_invalid_key() {
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
 
-    let dir = tempfile::tempdir().unwrap(); // unwrap allowed
-    let storage = LsmStorage::new(LsmConfig {
-        path: dir.path().to_path_buf(),
-        ..Default::default()
-    })
-    .await
-    .unwrap(); // unwrap allowed
+    let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
     let tx = TxId::new(1);
 
@@ -640,17 +612,9 @@ async fn test_default_csr_graph_no_consistency_check() {
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-016]
 #[tokio::test]
 async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
-    use contextra_store::{LsmConfig, LsmStorage};
+    use contextra_testkit::InMemoryStorageEngine;
 
-    let dir = tempfile::tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
+    let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_storage(storage.clone());
     let entity_live = EntityId::new(10);
     let entity_deleted = EntityId::new(20);
