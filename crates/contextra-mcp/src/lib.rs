@@ -49,6 +49,7 @@ pub use egress_gateway::{
 };
 
 pub use explain::{ExplainRequest, ExplainResponse};
+#[deprecated(note = "Proof key handling moves to contextra-erasure")]
 pub use proof_key::proof_key_from_env;
 
 pub use io::{read_line_bounded, MAX_RPC_BYTES, MAX_SEARCH_QUERY_BYTES};
