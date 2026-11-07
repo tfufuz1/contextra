@@ -12,13 +12,37 @@ description = "WASM Execution Boundary for Contextra MCP CodeExecution Permissio
 ring = "2"
 
 [dependencies]
-wasmtime = { version = "36.0.19", default-features = false, features = ["async", "cranelift"] }
+wasmtime = { version = "36.0.19", default-features = false, features = ["async", "cranelift"], optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
-anyhow = "1"
+anyhow = { version = "1", optional = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["time", "rt"], optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 wat = "1"
+
+[features]
+default = []
+wasm = ["dep:wasmtime", "dep:tokio", "dep:anyhow"]
+
+[[test]]
+name = "abuse_test_matrix"
+required-features = ["wasm"]
+
+[[test]]
+name = "pure_merge_operator_capabilities_test"
+required-features = ["wasm"]
+
+[[test]]
+name = "wasm_boundary_tests"
+required-features = ["wasm"]
+
+[[test]]
+name = "wasm_merge_function"
+required-features = ["wasm"]
+
+[[test]]
+name = "wasm_wasi_io"
+required-features = ["wasm"]

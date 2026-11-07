@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 // FILE-CONTEXT: LSM-backed Inverted Index & Transactional Storage.
 // ZWECK: Speichert Postings-Listen, Dokumentlängen und BM25-Statistiken transaktional im StorageEngine.
 // INVARIANTEN: upsert_document und search_bm25_at beachten MAX_TEXT_BYTES; Lock-Hierarchie: commit_lock (parking_lot::Mutex) > staged_stats (parking_lot::Mutex); k <= MAX_SEARCH_K.

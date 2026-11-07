@@ -335,6 +335,7 @@ impl KeyManager {
     }
 
     /// Derives a deletion proof signing key for cryptographic deletion verification.
+    #[deprecated(note = "Use contextra-erasure for deletion proofs and attestation signing")]
     pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
