@@ -7,7 +7,7 @@
 
 use crate::*;
 use contextra_store::LsmStorage;
-use contextra_types::{FilterExpr, Result};
+use contextra_types::{DocId, FilterExpr, Result};
 use serde_json::Value;
 use std::sync::Arc;
 
