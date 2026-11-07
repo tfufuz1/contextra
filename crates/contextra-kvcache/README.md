@@ -1,27 +1,59 @@
 # contextra-kvcache
 
-Stufenmodell KV-Cache Storage & Offloading.
+> **Ring 1** · Klasse `[K]` (Kern) · Reifegrad `beta` · Unsafe: **nein** (`#![forbid(unsafe_code)]`) · Rolle: Verschlüsselter, mandantenisolierter KV-Prefix-Cache für LLM-Zustände (Radix-Baum, Attention-Eviction, KIVI-Quantisierung).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
+`contextra-kvcache` ist ein eigenständiger, modularer Baukasten für modernes Key-Value-Cache-Management bei LLM-Inferenz und RAG-Workloads. Er beschleunigt Prefill-Phasen durch deterministisches Teilen von Prompt-Präfixen und bietet Tenant-Isolierung sowie verschlüsseltes Tiering.
 
+## 1. Baukasten-Profil & Entkopplung
 
-`contextra-kvcache` stellt den segmentierten KV-Cache und Eviction-Worker bereit (Ring 1).
+- **Keine juristische Löschkettenlogik:** Bereinigung erfolgt als neutrale In-Memory-Freigabe, Verdrängung (Eviction) oder Zeroization.
+- **Fail-Closed Verschlüsselung:** Segment-Verschlüsselung mit deterministischer AAD-Bindung (Segment-ID, Tenant, ModelFingerprint) und Schlüsselableitungs-Versionsprüfung.
+- **Zero Shared Mutable State:** Saubere Sharding- und Lock-Hierarchie ohne globale Singletons.
 
-## Zweck
+## 2. Abhängigkeiten
 
-Verwaltet In-Memory LRU-KV-Caches, Tenant-Isolation, Verschlüsselung von KV-Segmenten und kontrolliertes Auslagern (Tiering) zur Vermeidung von Prefill-Rechenzeit.
+Gemäß `capabilities.toml` und Ring-1-Vorgaben hängt `contextra-kvcache` ausschließlich an:
+- `contextra-types` (Ring 0)
+- `contextra-ports` (Ring 0)
+- `contextra-crypto` (Ring 0)
 
-## Ring-Zugehörigkeit & Status
+Keine Abhängigkeiten zu höheren Ringen oder Inferenz-Frameworks (`candle`, `onnx`, `ollama`).
 
-- **Ring:** Ring 1 (Persistenz & Caching)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** Safe API
+## 3. Features
 
-## Öffentliche API-Übersicht
+- `default = []`: Minimaler Default-Footprint.
+- `kv-encryption`: Aktiviert erweiterte kryptografische Bindung via `contextra-crypto`.
+- `content-addressed-kv-cache`: Inhaltsadressierte KV-Blöcke.
+- `kivi-quantization` / `kvcache-kivi-quant`: 2-Bit/4-Bit KIVI-Quantisierung für KV-Tensoren.
+- `kvcache-attention-eviction`: Attention-basierte Verdrängungspolicies.
 
-- **KV Store:** `TenantIsolatedKvStore`, `SpillHandler`
-- **Segments & Eviction:** `KvSegment`, `EvictionWorker`, `emergency_wipe`
+## 4. Garantien & Invarianten
 
-## Architektur & Verweise
+1. **Mandantentrennung (VETO-F10):** Jede Operation wird strikt über `TenantId` isoliert. Cross-Tenant Cache-Sharing ist unmöglich.
+2. **Speichersicherheit:** `#![forbid(unsafe_code)]` im gesamten Crate.
+3. **Zero-Panic:** Keine unwrap/expect/panic! im Produktivcode.
+4. **Fail-Closed:** Mismatches bei AAD, Schlüsselversionen oder fehlerhafte Entschlüsselung führen deterministisch zu Fehlern.
 
-Details zur KV-Cache v2 Zielarchitektur finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §9.2.
+## 5. Einbettungsbeispiel
+
+```rust
+use contextra_kvcache::{KvCacheConfig, KvCacheServiceBuilder, KvSegment, TenantIsolatedKvStore};
+use contextra_types::TenantId;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let tenant = TenantId::try_new(42)?;
+    let store = TenantIsolatedKvStore::new();
+
+    // Segment isoliert einfügen
+    let segment = KvSegment::new(tenant, 1, vec![0x11; 128]);
+    store.insert_segment(tenant, segment);
+
+    // Segment wieder abrufen
+    let data = store.get_segment_bytes(tenant, 1);
+    assert!(data.is_some());
+
+    Ok(())
+}
+```
+
+Ein ausführliches Standalone-Beispiel findet sich unter `examples/standalone_prefix_cache.rs`.
