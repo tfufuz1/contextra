@@ -1,28 +1,33 @@
 # AGENTS.md — `contextra-testkit`
 
-## 1. Rolle
-`contextra-testkit` stellt Test-Mocks, In-Memory Reference Stores und Injektions-Fixtures ausschließlich für Testumgebungen bereit.
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-testkit` stellt ein umfassendes Test- und Verifikations-Harness (Tooling) für das gesamte Contextra-Baukastensystem bereit.
+Es enthält Test-Fixtures, In-Memory Referenz-Implementierungen, Fault-Injection-Mocks (`FailpointVfs`), Chaos-Matrizen und Zero-Trust Conformance-Suiten zur Validierung von Port-Verträgen.
+Als reines Tooling-Crate ist es von Produktionscode entkoppelt und dient ausschließlich der Härtung und Sabotage-Prüfung aller Komponenten.
 
 ## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Werkzeug / Tooling
-- **Klasse:** Werkzeug (`—`)
-- **Reifegrad:** `—` (Werkzeug-Crate)
-- **`may_use` (Obergrenze):** Beliebig, **nur** als `dev-dependency` zugelassen (INV-EMBED-1, Spec §6.9)
+- **Ring:** Tooling
+- **Klasse:** Werkzeug `[W]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`).
 
-## 3. Garantien & Anforderungen (§33, §6.6)
-- **INV-EMBED-1:** Darf unter keinen Umständen als normale Abhängigkeit in Produktions-Features oder Release-Binaries eingebunden werden.
-- **REQ-TST-001:** Deterministische `ManualClock`, `ReferenceStore` und `TenantMatrixRunner` Test-Fixtures.
-- **Durchsetzungsmechanismus (§27.6):** `#![forbid(unsafe_code)]`, `check-ring-layering` Cargo-Dependency Checks.
+## 3. Garantien & Architektur-Invarianten
+- **Zero-Trust Conformance:** Validierung sämtlicher Port-Verträge (`StorageEngine`, `VectorIndex`, `TextIndex`, `Clock`, `Vfs` etc.) gegen fehlerhafte Mutanten; 100 % Erkennungsrate fehlerhafter Implementierungen.
+- **Deterministische Fehlerinjektion:** Präzise steuerbare Fehler-Szenarien (I/O-Timeouts, Corruption, ENOSPC).
+- **Keine Produktiv-Abhängigkeiten:** `contextra-testkit` darf NIEMALS in Produktiv-Abhängigkeiten von Ring 0-3 Crates auftauchen (nur als `dev-dependencies`).
 
 ## 4. Verbotene Muster
-- Einbindung in `[dependencies]` von Nicht-Testkit Crates.
-- Kein `unsafe` (`#![forbid(unsafe_code)]`).
+- Import von `contextra-testkit` als reguläre Abhängigkeit in Bibliotheken.
+- Flaky Tests durch unkontrollierte echte Systemzeit oder echte Zufallsquellen (nur injizierte `Clock`/`Rng`).
+- Verwendung von `contextra-core`.
 
-## 5. Implementierte & konsumierte Ports (Anhang A)
-- Implementiert: `ManualClock`, Mock Storage & Engine Adapters.
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Implementiert:** Test-Mocks für sämtliche Ports aus `contextra-ports`.
+- **Bereitgestellt für:** Unit- und Integrationstests aller Workspace-Crates.
 
-## 6. Tests & Gates
-- **Self-Tests:** `erasure_harness_selftest.rs`.
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Conformance Self-Tests:** `conformance_selftest` und `tk_fault_vfs_conformance` beweisen, dass mutierte Fehler deterministisch erkannt werden.
+- **Chaos-Matrix:** Multi-Threaded Stress-Tests unter extremen Fehlerinjektionen.
 
-## 7. Offene Punkte
-- keine.
+## 7. Offene Punkte & Technische Schulden
+- Keine.

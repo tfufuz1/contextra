@@ -1,103 +1,37 @@
-# AGENTS.md — contextra-py
-> Layer 3 | PyO3 Python Bindings, FFI-Boundary | ~1500 LOC
+# AGENTS.md — `contextra-py`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-py` stellt die offizielle Python-Anbindung (PyO3) für das Contextra-Baukastensystem bereit (Ring 4).
+Es übersetzt die asynchronen Rust-APIs in synchrone und asynchrone Python-Aufrufe, konvertiert Datentypen verlustfrei (NumPy Vektoren, Dicts, Listen) und kapselt die FFI-Sicherheitsgrenze.
+Als eigenständiger Adapter-Baustein fängt er Panics an der Sprachgrenze ab und übersetzt Domain-Fehler in idiomatische Python-Exceptions.
 
-Die offizielle Python-Anbindung für Contextra. Übersetzt die asynchrone Rust-API (`contextra-db`)
-in eine synchrone und asynchrone Python-API via PyO3. Konvertiert Python-Typen
-(NumPy, Dictionaries, Strings) in native Contextra-Typen und kapselt den tokio-Threadpool.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 4 (Sprach-Bindings & FFI-Boundary)
+- **Klasse:** Erweiterung `[E]`
+- **Reifegrad:** `beta`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-wire`, `contextra-db` (Spec §6.9, `capabilities.toml`).
 
-> **Wichtiger Hinweis zur Workspace-Architektur**:
-> Dieses Crate wird ABSICHTLICH NICHT im Root-Workspace geführt, da es ein abweichendes Panic-Profil (`unwind` statt `abort`) für sichere FFI-Panic-Behandlung benötigt (siehe `run_blocking_ffi`, AGT-PY-d5d2be30). Build separat via `cd crates/contextra-py && cargo build --release`.
+## 3. Garantien & Architektur-Invarianten
+- **GIL-Release-Disziplin (AGT-PY-001):** Blockierende oder rechenintensive Rust-Aufrufe geben den Python Global Interpreter Lock zwingend über `py.allow_threads` frei.
+- **FFI Panic-Sicherheit (`run_blocking_ffi`):** Unwinding-Panics im Rust-Code werden an der FFI-Grenze abgefangen, das Instanz-Objekt wird als vergiftet markiert und eine saubere Python-Exception geworfen.
+- **Typisiertes Error-Mapping:** Rust `ContextraError` wird 1:1 auf dedizierte Python-Fehlerklassen abgebildet (`TenantError`, `NotFoundError`, `IntegrityError`, etc.).
+- **NumPy Zero-Copy & Validierung:** NumPy-Arrays müssen 1D, `float32` und C-kontinuierlich sein; NaN- und Inf-Werte werden strikt abgewiesen.
+- **Zero-Panic-Doktrin:** Vollständiger Ausschluss von `unwrap()` und `expect()` im produktiven Binding-Code.
 
-## 2. Modul-Karte
+## 4. Verbotene Muster
+- Halten des Python GIL während asynchroner `.await`- oder schwerer Berechnungsphasen.
+- Rohe Pointer-Arithmetik oder `unsafe` außerhalb der geprüften PyO3-Makros.
+- Verwendung von `contextra-core` (statdessen direkte Nutzung von `contextra-types` und `contextra-ports`).
+- Unkontrolliertes Durchreichen unvollständiger FFI-Typen.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | `#![deny(unsafe_code)]`, `PyContextra`, `PyCollection`, PyO3 Modul-Registrierung (Dimension Default 768 vereinheitlicht H-8 geschlossen) |
-| `types.rs` | Konvertierung (FFI) für Dokumente, Suchergebnisse, NumPy-Vektoren |
-| `error.rs` | FFI-Error-Mapping: `ContextraError` -> Python Exceptions |
-| `gil.rs` | GIL-Management und Sub-Interpreter State-Isolation |
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Exportiert:** Python-Modul `contextra` (`PyContextra`, `PyCollection`, FlatBuffers-Suchmethoden).
+- **Konsumiert:** `contextra-types`, `contextra-wire`, `contextra-db`.
 
-## 3. Kritische Invarianten
+## 6. Tests, Sabotage & Qualitätssicherung
+- **FFI-Panic-Abfangtests:** Prüfung des Verhaltens bei künstlich injizierten Panics (via `test-hooks`).
+- **Python Integrationstests:** Pytest-Suite zur Validierung von GIL-Freigabe, Multithreading und NumPy-Konvertierungen.
+- **Sabotage-Testing:** Injektion korrumpierter Vektoren (NaN, nicht-kontinuierlich) zur Bestätigung der Fail-Closed Validierung.
 
-### GIL-Release-Protokoll (AGT-PY-001)
-Rust-Code DARF den Python Global Interpreter Lock (GIL) NICHT halten,
-während I/O- oder rechenintensive Operationen ausgeführt werden.
-Blockierende oder asynchrone contextra-Aufrufe MÜSSEN in `py.allow_threads(|| { ... })`
-oder äquivalente PyO3-Mechanismen gewrappt werden, um Python-Threads nicht zu freezen.
-
-### FFI-Error-Mapping
-Fehler aus Rust (`ContextraError`) müssen in semantisch korrekte Python-Exceptions
-übersetzt werden.
-- `ContextraError::NotFound` -> `KeyError` oder `ValueError`
-- `ContextraError::Storage` -> `IOError`
-- `ContextraError::Validation` -> `ValueError`
-- `ContextraError::Internal` -> `RuntimeError`
-
-### NumPy Zero-Copy Pattern
-Vektor-Embeddings sollten, wenn möglich, als `PyReadonlyArray1<f32>` (aus der `numpy` crate)
-entgegengenommen werden, um teure Memory-Kopien an der FFI-Grenze zu vermeiden.
-
-### Sub-Interpreter Isolation
-Globale State-Variablen (wie lazy_statics oder tokio Runtimes) müssen isoliert
-verwaltet werden, um Kompatibilität mit Pythons Sub-Interpretern (PEP 684) zu gewährleisten.
-
-## 4. Public API Quick-Reference
-
-```rust
-// === PyContextra (lib.rs) ===
-#[pyclass]
-pub struct PyContextra { ... }
-#[pymethods]
-impl PyContextra {
-    pub fn collection(&self, name: &str, py: Python<'_>) -> PyResult<PyCollection>;
-    pub fn stats(&self, py: Python<'_>) -> PyResult<PyDbStats>;
-}
-
-// === PyCollection (lib.rs) ===
-#[pyclass]
-pub struct PyCollection { ... }
-#[pymethods]
-impl PyCollection {
-    pub fn insert<'py>(&self, py: Python<'py>, id: &str, text: &str) -> PyResult<()>;
-    pub fn get(&self, py: Python<'_>, id: &str) -> PyResult<Option<PyDocument>>;
-    pub fn hybrid_search<'py>(&self, py: Python<'py>, query: &str) -> PyResult<Vec<PySearchResult>>;
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — GIL über asynchrone Blockierung halten:
-// (Hält den GIL und blockiert alle Python Threads)
-let result = tokio::runtime::Handle::current().block_on(async { self.db.search().await });
-
-// ✅ KORREKT — GIL explizit releasen:
-let result = py.allow_threads(|| {
-    tokio::runtime::Handle::current().block_on(async { self.db.search().await })
-});
-
-// ❌ FALSCH — Rohe Vec<f32> für API erwarten:
-pub fn search(&self, vector: Vec<f32>) { ... }
-// ✅ KORREKT — NumPy Array für Zero-Copy erlauben:
-pub fn search(&self, vector: numpy::PyReadonlyArray1<f32>) { ... }
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`PyContextra` besitzt einen eigenen `tokio` Threadpool für die Ausführung der asynchronen
-contextra-core/-db Tasks. Dieser Threadpool lebt unabhängig von Python-Threads.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: Alle Layer 0-2 Crates (`contextra-core`, `contextra-db`, etc.)
-- **Verbotene Imports**: `contextra-mcp` (L4), `contextra-agent` (L3 Peer)
-- **Genutzt von**: Python User-Space
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-042 | PyO3 Architektur & Async/Sync Bridging |
-| `rules/ffi_boundary.md` | FFI-Panics verhindern, Python Exceptions |
+## 7. Offene Punkte & Technische Schulden
+- DEBT-04: Übergang von direkter `contextra-db` Kopplung hin zu generischen Ports.

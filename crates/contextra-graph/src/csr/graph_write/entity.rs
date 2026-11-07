@@ -8,7 +8,7 @@ use super::CsrGraph;
 use contextra_types::{Entity, Result};
 
 impl CsrGraph {
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-ENTITY-001]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-ENTITY-001]
     pub fn insert_entity_direct(&self, entity: Entity) -> Result<()> {
         let mut inner = self.inner_write();
         let idx = inner.get_or_create_index(entity.id);
@@ -19,7 +19,7 @@ impl CsrGraph {
         Ok(())
     }
 
-// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-ENTITY-002]
+    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-ENTITY-002]
     pub fn load_entity_direct(&self, entity: Entity) -> Result<()> {
         let mut inner = self.inner_write();
         let idx = inner.get_or_create_index(entity.id);

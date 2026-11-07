@@ -767,7 +767,7 @@ async fn test_ppr_hyperedge_expansion_dense_and_forward_push() {
 proptest::proptest! {
 // ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-013]
     #[test]
-    fn prop_ppr_rank_mass_conservation(
+    fn test_prop_ppr_rank_mass_conservation(
         node_count in 1..=20usize,
         edge_specs in proptest::collection::vec((0..20usize, 0..20usize, 0.1f32..5.0f32), 0..40),
         seed_idx in 0..20usize,

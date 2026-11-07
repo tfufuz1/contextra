@@ -1,0 +1,124 @@
+# Implementierungsspezifikation & Arbeitsplan: `contextra-store`
+
+> **Ring:** 1 | **Klasse:** `K` | **Code-Budget:** 13400 LOC | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
+> **Architekturrolle:** Autarke LSM-Storage Engine, WAL, Block-Cache, SSTable-Compaction und Purger/LayerScanner
+> **Spezifikationsbezug:** `docs/SPEC.md` §4, `PLAN.md`
+
+---
+
+## 1. Architektonische Leitprinzipien & Baukasten-Vertrag
+
+Für `contextra-store` gelten im Rahmen der Transformation zum modularen Baukastensystem folgende verbindliche Richtlinien:
+
+1. **Modulare Autarkie & Isolation:** Der Crate funktioniert als eigenständiger, isolierter Baustein. Direkte Kopplungen an Fremd-Crates werden über wohldefinierte Schnittstellen in `contextra-ports` oder generische Abstraktionen gelöst.
+2. **Entkopplung der Löschkette:** Sämtliche juristischen Begrifflichkeiten (DSGVO Art. 17), Nachweisketten, Deletion-Proofs und Saga-Orchestrierungen verbleiben exklusiv in `contextra-erasure`. Datenhaltende Module implementieren ausschließlich neutrale, funktionale Bereinigungs-Ports (`Purger`, `LayerScanner`).
+3. **Design by Contract (DbC) & Invarianten:** Alle Vorbedingungen, Nachbedingungen und Systeminvarianten werden strikt geprüft (Fail-Closed).
+4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
+5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
+
+---
+
+## 2. Modul- & Komponentenarchitektur
+
+### 2.1 Interne Struktur & Verantwortung
+
+| Komponente / Modul | Verantwortung & Schnittstellen |
+|---|---|
+| `lsm` | LsmStorage Orchestrator und API |
+| `wal` | Write-Ahead Log mit Flusher-Actor, Replay und Rollback-Sicherheit |
+| `memtable` | Lock-freie Skip-List MemTable mit atomarer Sichtbarkeit |
+| `sstable` | Block-basierte SSTables, Bloom-Filter, CRC32C, Block-Cache |
+| `compaction` | Tiered & Leveled Compaction, bereichsweise Purge-Kompaktion |
+| `purge` | Purger & LayerScanner Implementierung für contextra-erasure |
+| `fsync` | Zentralisierte Fehler-propagierende Sync-Operationen |
+
+### 2.2 Abhängigkeitsmatrix & Schnittstellen
+
+- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports, contextra-mvcc, contextra-crypto, contextra-sys, contextra-durable-fs`
+- **Verbotene Abhängigkeiten:** Höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
+- **Konsumierte / Implementierte Ports:** Spezifiziert in `AGENTS.md` und `docs/SPEC.md`.
+
+---
+
+## 3. Zerlegung in Arbeitspakete (Work Packages)
+
+### WP-STO-1: Bereinigung der Löschketten-Relikte
+- **Fokus / Betroffene Dateien:** `src/lsm.rs, src/compaction.rs`
+- **Problemstellung & Baukasten-Ziel:** Vollständiges Entfernen von kv_shredding, DSGVO- und Deletion-Proof-Zitaten; Entflechtung der CompactionEngine.
+- **Design by Contract (DbC) & Invarianten:**
+  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
+  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
+- **Akzeptanzkriterien:**
+  - [ ] Implementierung ist modular gekapselt und autark testbar.
+  - [ ] Alle Unit- und Integrationstests sind grün.
+  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+
+### WP-STO-2: Purger & LayerScanner Implementierung
+- **Fokus / Betroffene Dateien:** `src/purge.rs`
+- **Problemstellung & Baukasten-Ziel:** Implementierung der neutralen Ports für bereichsweise Purge-Kompaktion (compact_range) und Residual-Scans.
+- **Design by Contract (DbC) & Invarianten:**
+  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
+  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
+- **Akzeptanzkriterien:**
+  - [ ] Implementierung ist modular gekapselt und autark testbar.
+  - [ ] Alle Unit- und Integrationstests sind grün.
+  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+
+### WP-STO-3: WAL Durability & Commit-Abbruch-Sicherheit
+- **Fokus / Betroffene Dateien:** `src/wal/flusher.rs, src/wal/hmac.rs`
+- **Problemstellung & Baukasten-Ziel:** Synchrones HMAC-Rollback bei Timeout/Abbruch; Flusher prüft geschlossene Acks vor Disk-Sync.
+- **Design by Contract (DbC) & Invarianten:**
+  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
+  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
+- **Akzeptanzkriterien:**
+  - [ ] Implementierung ist modular gekapselt und autark testbar.
+  - [ ] Alle Unit- und Integrationstests sind grün.
+  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+
+### WP-STO-4: Vfs-Port Umstellung
+- **Fokus / Betroffene Dateien:** `src/sstable.rs, src/wal/io.rs`
+- **Problemstellung & Baukasten-Ziel:** Vollständige Umstellung aller Dateioperationen auf contextra_ports::Vfs; In-Memory Testbarkeit.
+- **Design by Contract (DbC) & Invarianten:**
+  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
+  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
+- **Akzeptanzkriterien:**
+  - [ ] Implementierung ist modular gekapselt und autark testbar.
+  - [ ] Alle Unit- und Integrationstests sind grün.
+  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+
+### WP-STO-5: Write-Fencing & Dekker-Ordnung
+- **Fokus / Betroffene Dateien:** `src/lsm/fence.rs`
+- **Problemstellung & Baukasten-Ziel:** SeqCst-Speicherordnung bei Flush- und Purge-Übergängen zur Verhinderung von Race Conditions.
+- **Design by Contract (DbC) & Invarianten:**
+  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
+  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
+- **Akzeptanzkriterien:**
+  - [ ] Implementierung ist modular gekapselt und autark testbar.
+  - [ ] Alle Unit- und Integrationstests sind grün.
+  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+
+---
+
+## 4. Test-, Benchmark- & Qualitätssicherungsplan
+
+### 4.1 Unit-, Integration- & Conformance-Tests
+- **Unit-Tests:** 100% Testabdeckung für Kernfunktionen und Randfall-Behandlungen.
+- **Port-Konformität:** Validierung gegen die Prüfsuiten in `contextra-testkit`.
+- **Traceability:** Jeder Test annotiert die Spezifikationsanforderung (z. B. `/// SPEC: REQ-...`).
+
+### 4.2 Property-Based Testing & Fuzzing
+- Testen aller Invarianten unter zufälligen Eingaben (proptest).
+- Fuzzing aller Parser-, Deserialisierungs- und Eingabepfade.
+
+### 4.3 Mutations-Testing (Sabotage-Checks)
+- Mutanten-Injektion zur Verifikation der Testgüte (Ziel: Mutation-Score >= 85%).
+
+---
+
+## 5. Definition of Done (DoD) für diesen Baustein
+
+1. Alle deklarierten Arbeitspakete sind vollständig implementiert.
+2. `cargo check -p contextra-store`, `cargo test -p contextra-store` und `cargo clippy -p contextra-store` laufen fehlerfrei durch.
+3. Code-Budget von maximal 13400 LOC wird strikt eingehalten.
+4. Keine unzulässigen Querabhängigkeiten oder Lecks von Implementierungsdetails.
+5. Die Crate-README dokumentiert den autarken Einsatz in Drittprojekten mit einem Minimalbeispiel.

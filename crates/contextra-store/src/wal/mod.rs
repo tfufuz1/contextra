@@ -256,6 +256,24 @@ pub(crate) mod fs {
         }
     }
 
+    #[cfg(loom)]
+    #[allow(dead_code)]
+    fn _loom_trait_methods_used() {
+        let poll_read = ();
+        let poll_write = ();
+        let poll_flush = ();
+        let poll_shutdown = ();
+        let start_seek = ();
+        let poll_complete = ();
+        let _ = (
+            poll_read,
+            poll_write,
+            poll_flush,
+            poll_shutdown,
+            start_seek,
+            poll_complete,
+        );
+    }
     impl tokio::io::AsyncSeek for LoomFile {
         fn start_seek(
             mut self: std::pin::Pin<&mut Self>,

@@ -40,8 +40,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?
         {
-            let (doc_id_str, updated_links) =
-                self.update_metadata_links(tx, &doc_key, &bytes, to, relation).await?;
+            let (doc_id_str, updated_links) = self
+                .update_metadata_links(tx, &doc_key, &bytes, to, relation)
+                .await?;
 
             if updated_links {
                 if let Some(ref id_str) = doc_id_str {

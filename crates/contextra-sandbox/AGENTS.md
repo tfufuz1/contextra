@@ -1,61 +1,38 @@
-# AGENTS.md — contextra-sandbox
-> Layer 6.5 | WASM Execution Boundary for MCP CodeExecution Permission | ~500 LOC
+# AGENTS.md — `contextra-sandbox`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-sandbox` stellt eine strikt isolierte WebAssembly (WASM) Ausführungsumgebung (`WasmExecutor`) auf Basis von Wasmtime bereit (Ring 2).
+Sie dient als sichere Sandbox für dynamische Berechnungen, untrusted Plugins und MCP-CodeExecution-Befehle (§4.18).
+Als autarker Baustein erzwingt sie Default-Deny-Rechte, deterministisches Fuel-Budgeting und strenge Ressourcen-Limits, ohne Seiteneffekte auf den Host-Prozess zu erlauben.
 
-Stellt eine eng begrenzte WASM-Ausführungsgrenze für die `CodeExecution`-Permission des MCP-Servers bereit (§4.18).
-Kein WASM-Compiler im Guest — nur Ausführung vorab kompilierter `.wasm`-Binaries.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 2 (Sicherheits-Sandbox & WASM Boundary)
+- **Klasse:** Erweiterung `[E]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** Keine Workspace-Abhängigkeiten (Spec §6.9, `capabilities.toml`) — maximale Autarkie.
 
-## 2. Modul-Karte
+## 3. Garantien & Architektur-Invarianten
+- **Strikte Speichersicherheit:** `#![forbid(unsafe_code)]` wird über das gesamte Crate hinweg erzwungen.
+- **Default-Deny Capabilities:** Kein Dateisystem-, kein Netzwerk-, kein Umgebungs- und kein Systemuhr-Zugriff im Gast (`WasmCapabilities::default()`).
+- **Deterministische Limits:** Strikte Fuel-Obergrenzen (CPU-Fuel), WASM-Stack-Limits (512 KB) und Host-Call-Zähler.
+- **Doppelte Begrenzung:** Jede Ausführung wird durch deterministisches Fuel UND ein synchrones Wall-Clock-Timeout beschränkt.
+- **State Isolation per Execution:** Jeder `execute()`-Aufruf instantiiert einen frischen `Store` und eine neue `Instance`; keinerlei Zustandsleckagen zwischen Läufen.
+- **Zeroize-on-Drop:** Sensibler Host- und Guest-Output (`WasmOutput`) wird beim Verlassen des Scopes genullt.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]`, Modul-Exporte und Crate-Dokumentation |
-| `capabilities.rs` | `WasmCapabilities` Whitelist für WASM-Guest-Capabilities |
-| `executor.rs` | `WasmExecutor` Execution Engine mit Store, Fuel, Limiter und Timeout |
-| `output.rs` | `WasmOutput` mit `ZeroizeOnDrop` für stdout (P9 Invariante) |
-| `error.rs` | `SandboxError` Fehlertypen für Sandbox-Verletzungen |
+## 4. Verbotene Muster
+- Jegliche Verwendung von `unsafe` im Sandbox-Code.
+- Wiederverwendung von WASM-Stores oder -Instanzen über Aufrufgrenzen hinweg.
+- Weglassen von Fuel-Budgets oder Timeouts bei Guest-Code-Ausführung.
+- Direkte Dateisystem- oder Netzwerkdurchgriffe für den WASM-Gast.
 
-## 3. Kritische Invarianten
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Exportiert:** `WasmExecutor`, `WasmCapabilities`, `WasmOutput`, `ApprovalRequest`.
+- **Bereitgestellt für:** `contextra-mcp`, `contextra-engine`.
 
-### Strict Safe Rust
-Strict `#![forbid(unsafe_code)]` — alle WASM-Interaktionen nutzen ausschließlich safe APIs von Wasmtime.
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Resource Exhaustion Tests:** Verifikation des Fuel-Erschöpfungs-Abbruchs bei Endlosschleifen im Guest.
+- **Memory Leak & Escape Tests:** Prüfung auf saubere Isolation und Speicherfreigabe nach Guest-Panics.
+- **Sabotage-Testing:** Injektion bösartiger WASM-Binaries mit versuchten Host-Calls.
 
-### Fuel & Timeout Isolation (§4.18)
-Jede Execution MUSS durch ein Fuel-Budget (CPU, deterministisch) UND ein Wall-Clock-Timeout (tokio::time::timeout) beschränkt sein.
-
-### Zeroize on Drop (P9)
-`WasmOutput.stdout` ist als `ZeroizeOnDrop` / `Zeroizing<Vec<u8>>` abgesichert. Sensitiver Host/Guest-Output verbleibt nach Drop nicht im RAM.
-
-### State Isolation per Execution
-Jeder `execute()`-Aufruf erzeugt eine frische `Store` + `Instance`. Keinerlei Zustandsübertrag oder Memory-Leakage zwischen Execution-Aufrufen.
-
-## 4. Public API Quick-Reference
-
-```rust
-pub struct WasmCapabilities { ... }
-pub struct WasmExecutor { ... }
-impl WasmExecutor {
-    pub fn new() -> Result<Self, SandboxError>;
-    pub async fn execute(
-        &self,
-        wasm_bytes: &[u8],
-        input: &[u8],
-        capabilities: &WasmCapabilities,
-        timeout: Duration,
-    ) -> Result<WasmOutput, SandboxError>;
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-- **Niemals unsafe code in contextra-sandbox verwenden**.
-- **Niemals Fuel-Setups oder Wall-Clock-Timeouts weglassen**.
-- **Niemals Stores über execute()-Aufrufe hinweg wiederverwenden**.
-
-## 6. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| §4.18 Spec | WASM Execution Boundary & Fuel Budgeting |
-| P9 Security Invariant | Zeroize-On-Drop für Exec Output |
+## 7. Offene Punkte & Technische Schulden
+- Keine.

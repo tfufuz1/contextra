@@ -10,19 +10,41 @@ use crate::step::{AgentTool, StepResult};
 use contextra_ports::BoxFuture;
 use contextra_types::Result;
 use serde_json::json;
+use std::sync::Arc;
+
+/// Abstrakter ContextRetriever-Port, um Retrieval unabhängig von konkreten DB-Instanzen auszuführen.
+pub trait ContextRetriever: Send + Sync {
+    /// Sucht Dokumente/Kontexte asynchron anhand eines Präfixes und Limits.
+    fn scan_prefix<'a>(
+        &'a self,
+        prefix: &'a str,
+        limit: Option<usize>,
+    ) -> BoxFuture<'a, Result<Vec<(String, serde_json::Value)>>>;
+}
 
 /// Read-only tenant context retrieval tool implementing [`AgentTool`].
 ///
 /// Searches documents within the tenant's collection context without mutating state.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RetrieveTool {
     name: String,
+    custom_retriever: Option<Arc<dyn ContextRetriever>>,
+}
+
+impl std::fmt::Debug for RetrieveTool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RetrieveTool")
+            .field("name", &self.name)
+            .field("custom_retriever", &self.custom_retriever.is_some())
+            .finish()
+    }
 }
 
 impl Default for RetrieveTool {
     fn default() -> Self {
         Self {
             name: "retrieve".to_string(),
+            custom_retriever: None,
         }
     }
 }
@@ -35,7 +57,18 @@ impl RetrieveTool {
 
     /// Creates a new `RetrieveTool` with a custom handler name.
     pub fn with_name(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+        Self {
+            name: name.into(),
+            custom_retriever: None,
+        }
+    }
+
+    /// Create a `RetrieveTool` with a custom retriever for decoupled execution.
+    pub fn with_retriever(retriever: Arc<dyn ContextRetriever>) -> Self {
+        Self {
+            name: "retrieve".to_string(),
+            custom_retriever: Some(retriever),
+        }
     }
 }
 
@@ -68,9 +101,13 @@ impl AgentTool for RetrieveTool {
 
             let limit = input.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
-            let coll = ctx.db.collection(target_col_name).await?;
+            let raw_results = if let Some(ref retriever) = self.custom_retriever {
+                retriever.scan_prefix("", Some(limit)).await?
+            } else {
+                let coll = ctx.db.collection(target_col_name).await?;
+                coll.scan_prefix("", Some(limit)).await?
+            };
 
-            let raw_results = coll.scan_prefix("", Some(limit)).await?;
             let mut matches = Vec::new();
 
             for (key, val) in raw_results {

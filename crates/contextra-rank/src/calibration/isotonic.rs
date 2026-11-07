@@ -345,13 +345,14 @@ mod tests {
     fn test_isotonic_calibrator_deterministic_clock() {
         let clock = Arc::new(FixedTestClock(1_700_000_000_000_000_000));
         let mut cal1 = IsotonicCalibrator::new(2, 100).with_clock(clock.clone());
-        let mut cal2 = IsotonicCalibrator::new(2, 100).with_clock(clock);
+        let mut cal2 = IsotonicCalibrator::new(2, 100).with_clock(clock.clone());
 
         cal1.record_outcome(0.1, false);
         cal1.record_outcome(0.9, true);
 
         cal2.record_outcome(0.1, false);
         cal2.record_outcome(0.9, true);
+        let _ = clock.monotonic_nanos();
 
         cal1.force_rebuild();
         cal2.force_rebuild();

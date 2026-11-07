@@ -14,10 +14,10 @@ use crate::lsm::LsmStorage;
 use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
 use crate::wal::{Wal, WalConfig, WalOp};
+use ahash::AHashSet;
 use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, RequestContext, Result};
-use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Purger für LSM Storage Engine.
@@ -109,7 +109,7 @@ impl Purger for LsmPurger {
 
             // Altdateien (.sst) Nullen und Löschen
             let data_dir = self.storage.data_path();
-            let mut active_paths = HashSet::new();
+            let mut active_paths = AHashSet::new();
             for r in &self.storage.sstables_for_scanner().await {
                 active_paths.insert(r.file_path().to_path_buf());
             }

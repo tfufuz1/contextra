@@ -64,7 +64,15 @@ pub fn select_profile_fc_ts(
         });
     }
     let idx = arm_set.select_arm(context, rng)? as usize;
-    Ok((idx, profile_names[idx].clone()))
+    let profile_name =
+        profile_names
+            .get(idx)
+            .cloned()
+            .ok_or(FcTsDispatchError::ProfileArmMismatch {
+                profiles: profile_names.len(),
+                arms: arm_set.arms.len(),
+            })?;
+    Ok((idx, profile_name))
 }
 
 // ANCHOR[contextra-router:FCTS-003]

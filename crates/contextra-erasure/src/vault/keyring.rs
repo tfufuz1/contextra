@@ -7,9 +7,9 @@
 //! dauerhaft synchronisiert und verifiziert (D-85, D-113).
 
 use crate::error::ErasureError;
+use crate::types_local::{FileId, FileKey, FileKeyring, FileKind};
 use crate::vault::slot::SlotType;
 use crate::vault::FileVault;
-use contextra_ports::keys::{FileId, FileKey, FileKeyring, FileKind};
 use contextra_ports::BoxFuture;
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -32,7 +32,7 @@ pub fn mask_file_key(raw_key: &[u8; 32], tag: &[u8; 16], k_enc: &[u8; 32]) -> [u
     info.extend_from_slice(tag);
 
     let mut okm = [0u8; 32];
-    if contextra_crypto::hkdf_expand(k_enc, &info, &mut okm).is_err() {
+    if crate::crypto_local::hkdf_expand(k_enc, &info, &mut okm).is_err() {
         // Fallback falls Expand fehlschlägt
         let hash = blake3::keyed_hash(k_enc, &info);
         if let (Some(dest), Some(src)) = (okm.get_mut(..), hash.as_bytes().get(..)) {

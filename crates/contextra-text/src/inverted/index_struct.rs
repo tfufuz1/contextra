@@ -528,7 +528,9 @@ impl<S: StorageEngine> InvertedIndex<S> {
             let docs = self.total_docs.load(Ordering::SeqCst);
             let tokens = self.total_tokens.load(Ordering::SeqCst);
             let avg_len = if docs > 0 {
-                (tokens as f64 / docs as f64 * 1000.0) as u64
+                ((tokens as f64 / docs as f64) * 1000.0)
+                    .round()
+                    .clamp(0.0, u64::MAX as f64) as u64
             } else {
                 0
             };

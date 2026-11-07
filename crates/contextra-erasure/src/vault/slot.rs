@@ -211,7 +211,7 @@ pub fn mask_epoch_key(raw_key: &[u8; 32], epoch_id: &[u8; 16], k_enc: &[u8; 32])
     info.extend_from_slice(epoch_id);
 
     let mut okm = [0u8; 32];
-    if contextra_crypto::hkdf_expand(k_enc, &info, &mut okm).is_err() {
+    if crate::crypto_local::hkdf_expand(k_enc, &info, &mut okm).is_err() {
         let hash = blake3::keyed_hash(k_enc, &info);
         if let (Some(dest), Some(src)) = (okm.get_mut(..), hash.as_bytes().get(..)) {
             dest.copy_from_slice(src);

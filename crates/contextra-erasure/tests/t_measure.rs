@@ -9,7 +9,7 @@ use contextra_erasure::measure::positive_control::{
 use contextra_erasure::measure::{
     arm_scanner, finish_scan, EvidenceKind, MeasurementCoordinator, UnarmedScanner,
 };
-use contextra_types::erasure::{LayerId, MeasureClass, Scanner, Unarmed};
+use contextra_erasure::types_local::{LayerId, MeasureClass, Scanner, Unarmed};
 use std::time::Duration;
 
 /// T-ID: T-RAW-2

@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-22T00:00:00Z
 // ZWECK: Forked Candle Quantized Llama model with explicit KvState management (Spec §9.2 Stufe B).
-// INVARIANTEN: Zero-Panic doctrine (no .unwrap() or .expect() in production code);
+// INVARIANTEN: Zero-Panic doctrine (no unwrap or expect in production code);
 // Full access to layer-wise KV cache tensors via export_kv_state, import_kv_state, and truncate_kv_cache.
 
 //! Quantisierte LLaMA-Modellarchitektur mit direkter KV-Cache-Zustandsverwaltung (Spec §9.2 Stufe B).

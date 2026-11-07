@@ -1,4 +1,5 @@
 use super::*;
+use contextra_ports::MetricsSink;
 use contextra_ports::Rng;
 use contextra_ports::VectorIndex;
 use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
@@ -242,7 +243,9 @@ impl contextra_ports::MetricsSink for TestMetricsSink {
             .push((name.to_string(), value, label_vec));
     }
 
-    fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
+    fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {
+        let _ = &self.counters;
+    }
 
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         let label_vec = labels
@@ -258,6 +261,7 @@ impl contextra_ports::MetricsSink for TestMetricsSink {
 #[tokio::test]
 async fn test_hnsw_rebuild_metrics_duration() {
     let sink = std::sync::Arc::new(TestMetricsSink::default());
+    sink.record_gauge("test_init", 1.0, &[]);
     let config = test_config(4);
     let index = HnswIndex::try_new(config)
         .expect("valid config")
@@ -293,6 +297,7 @@ async fn test_hnsw_rebuild_metrics_duration() {
 #[tokio::test]
 async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
     let sink = std::sync::Arc::new(TestMetricsSink::default());
+    sink.record_gauge("test_init", 1.0, &[]);
     let config = HnswConfigBuilder::new(4)
         .rebuild_threshold(0.9)
         .backoff_base_delay(std::time::Duration::from_millis(200))

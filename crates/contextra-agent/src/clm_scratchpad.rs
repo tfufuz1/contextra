@@ -17,9 +17,7 @@
 //! noch aussteht (siehe ADR-106). Sie verhindern direkte Ring-Verstöße gegen `contextra-privacy`
 //! und `contextra-kvcache`.
 
-use contextra_db::volatile_vault::{
-    PurgeReceipt, SignalModality, VaultChunk, VaultConfig, VolatileContextVault,
-};
+use contextra_db::volatile_vault::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
 use contextra_ports::{Clock, SystemClock};
 use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
@@ -174,6 +172,17 @@ pub enum ScratchpadEditOp {
     },
 }
 
+/// Quittung über das Zurücksetzen des flüchtigen Kontext-Speichers.
+#[derive(Debug)]
+pub struct VaultResetReceipt {
+    /// Anzahl bereinigter Chunks.
+    pub chunks_purged: usize,
+    /// Anzahl überschriebener Bytes im Speicher.
+    pub bytes_zeroed: usize,
+    /// Zeitpunkt des Zurücksetzens.
+    pub reset_at: std::time::Instant,
+}
+
 /// Zusammenfassung eines Subgoal-Checkpoints vor dem Zurücksetzen des Scratchpads.
 ///
 /// Dieser Typ dient als Übergabeobjekt für nachfolgende Stufen (z. B. Speicher-Konsolidierung).
@@ -184,7 +193,7 @@ pub struct ScratchpadCheckpoint {
     /// Index des erfolgreich abgeschlossenen Teilziels.
     pub completed_subgoal_index: u64,
     /// Löschquittung nach dem Leeren des VolatileContextVault.
-    pub purge_receipt: PurgeReceipt,
+    pub reset_receipt: VaultResetReceipt,
     /// Anzahl der Chunks zum Zeitpunkt des Checkpoints.
     pub chunk_count_at_checkpoint: usize,
 }
@@ -481,7 +490,7 @@ impl ClmScratchpad {
 
         let new_vault = VolatileContextVault::open(self.config.clone());
         let old_vault = std::mem::replace(&mut self.vault, new_vault);
-        let purge_receipt = old_vault.purge();
+        let raw_receipt = old_vault.purge();
 
         let completed_subgoal = self.current_subgoal_index;
 
@@ -506,7 +515,11 @@ impl ClmScratchpad {
         Ok(ScratchpadCheckpoint {
             task_id: self.task_id.clone(),
             completed_subgoal_index: completed_subgoal,
-            purge_receipt,
+            reset_receipt: VaultResetReceipt {
+                chunks_purged: raw_receipt.chunks_purged,
+                bytes_zeroed: raw_receipt.bytes_zeroed,
+                reset_at: raw_receipt.purged_at,
+            },
             chunk_count_at_checkpoint: chunk_count,
         })
     }

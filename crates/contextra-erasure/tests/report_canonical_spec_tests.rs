@@ -7,8 +7,8 @@
 use contextra_erasure::report::build::build_report;
 use contextra_erasure::report::canonical::{to_canonical_json_string, verify_canonical_nfc};
 use contextra_erasure::report::signing::{DerivedReportSigner, ReportSigner};
-use contextra_ports::report_signer::ReportSigner as ReportSignerPort;
-use contextra_types::ids::ErasureId;
+use contextra_erasure::types_local::ErasureId;
+use contextra_erasure::types_local::ReportSigner as ReportSignerPort;
 use ed25519_dalek::SigningKey;
 use futures_util::FutureExt;
 
@@ -139,12 +139,12 @@ fn test_t_class_1_lattice_independent_eval() {
 #[test]
 fn test_t_class_1_unrecorded_layer_marked_not_recorded() {
     let erasure_id = ErasureId::new([0x35; 16]);
-    let w = contextra_types::erasure::Scanner::new(
-        contextra_types::erasure::LayerId::new([1; 16]),
-        contextra_types::erasure::MeasureClass::Mk1,
+    let w = contextra_erasure::types_local::Scanner::new(
+        contextra_erasure::types_local::LayerId::new([1; 16]),
+        contextra_erasure::types_local::MeasureClass::Mk1,
         1,
     )
-    .arm(contextra_types::erasure::ControlEvidence::observed())
+    .arm(contextra_erasure::types_local::ControlEvidence::observed())
     .finish(0, std::time::Duration::from_millis(5), [0u8; 32])
     .expect("witness");
 

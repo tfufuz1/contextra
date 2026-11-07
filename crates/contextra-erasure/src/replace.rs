@@ -14,7 +14,7 @@
 //! - **Bericht:** Führt `target = Document`, `replaced = true` und `replacement_tag`.
 
 use crate::error::ErasureError;
-use contextra_types::ids::ErasureId;
+use crate::types_local::ErasureId;
 use serde::{Deserialize, Serialize};
 
 /// Einzelschritte des Ersetzungsprotokolls (SPEC D-115).

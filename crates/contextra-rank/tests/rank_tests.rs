@@ -17,7 +17,7 @@ mod tests {
     use contextra_types::ConfigFingerprint;
 
     // ANCHOR[contextra-rank:RNK-TEST-001]
-#[test]
+    #[test]
     fn test_rrf_k_zero_boundary() {
         let prov = ProvenanceBuilder::new(0.0)
             .vector(0.9, 1, 1.0)

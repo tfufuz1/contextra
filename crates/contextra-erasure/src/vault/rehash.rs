@@ -125,10 +125,16 @@ pub fn rehash_durable_shard(
 
     new_shard.sync_data()?;
 
-    vfs.rename(&temp_path, &old_path).map_err(|e| match e {
+    let temp_bytes = vfs.read(&temp_path).map_err(|e| match e {
         contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),
         other => ErasureError::Io(std::io::Error::other(other.to_string())),
     })?;
+    vfs.write_atomic(&old_path, &temp_bytes)
+        .map_err(|e| match e {
+            contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),
+            other => ErasureError::Io(std::io::Error::other(other.to_string())),
+        })?;
+    let _ = vfs.remove_file(&temp_path);
 
     vfs.sync_dir(parent_dir).map_err(|e| match e {
         contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),

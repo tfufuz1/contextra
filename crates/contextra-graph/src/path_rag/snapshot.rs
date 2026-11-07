@@ -25,7 +25,7 @@ pub struct SnapshotPathGraph<'a> {
 
 impl<'a> SnapshotPathGraph<'a> {
     /// Creates a new `SnapshotPathGraph` borrowing `inner` at transaction `as_of_tx`.
-// ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-002]
+    // ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-002]
     pub fn new(inner: &'a GraphInner, as_of_tx: TxId) -> Self {
         Self { inner, as_of_tx }
     }

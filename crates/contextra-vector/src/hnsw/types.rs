@@ -2,7 +2,6 @@ use roaring::RoaringTreemap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use ahash::AHashMap;
-use contextra_mvcc::TxBuffer;
 use contextra_types::{ContextraError, DocId, Result};
 use parking_lot::{Mutex, RwLock};
 
@@ -173,7 +172,7 @@ impl HnswHotCore {
 pub struct HnswColdCore {
     pub config: HnswConfig,
     pub validation_error: Option<String>,
-    pub tx_buffer: TxBuffer<Vec<f32>>,
+    pub tx_buffer: super::staging::VectorTxBuffer,
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
     pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
@@ -241,7 +240,10 @@ impl HnswIndex {
                 cold: HnswColdCore {
                     config,
                     validation_error: None,
-                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
+                    tx_buffer: super::staging::VectorTxBuffer::new(
+                        16,
+                        std::time::Duration::from_secs(60),
+                    ),
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),
@@ -313,7 +315,10 @@ impl HnswIndex {
                 cold: HnswColdCore {
                     config,
                     validation_error,
-                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
+                    tx_buffer: super::staging::VectorTxBuffer::new(
+                        16,
+                        std::time::Duration::from_secs(60),
+                    ),
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     mmap_index: RwLock::new(None),

@@ -142,7 +142,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Applies post-RRF metadata, memory-type, custom predicate, and bi-temporal validity filters.
-    fn apply_post_rrf_filters(&self, mut results: Vec<crate::SearchResult>) -> Vec<crate::SearchResult> {
+    fn apply_post_rrf_filters(
+        &self,
+        mut results: Vec<crate::SearchResult>,
+    ) -> Vec<crate::SearchResult> {
         if let Some(ref filter_expr) = self.filter {
             results.retain(|res| {
                 let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
@@ -364,7 +367,9 @@ where
             self.collection.snapshot_seq().await?
         };
 
-        let results = self.hydrate_acorn_search_results(acorn_tuples, seq_no).await?;
+        let results = self
+            .hydrate_acorn_search_results(acorn_tuples, seq_no)
+            .await?;
         let results = self.apply_post_rrf_filters(results);
 
         if let Some(reranker) = self.reranker {

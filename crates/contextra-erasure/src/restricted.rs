@@ -15,7 +15,7 @@
 //!   `Restricted` ist zulässig und hebt Restriktion durch Löschung auf (Journal `SupersededByErasure`).
 
 use crate::error::ErasureError;
-use contextra_types::ids::ErasureId;
+use crate::types_local::ErasureId;
 use serde::{Deserialize, Serialize};
 
 /// Gesetzlicher Ausnahmezweck nach Art. 18 Abs. 2 DSGVO (SPEC D-116).

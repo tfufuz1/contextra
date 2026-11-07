@@ -18,14 +18,14 @@ pub use scanner_flow::{run_scanner_flow, scan_with_control};
 pub use witness::{arm_scanner, finish_scan};
 
 // Re-Export der Typen aus `types` für Aufrufer innerhalb dieses Moduls
-pub use contextra_types::erasure::{
+pub use crate::types_local::{
     Armed, ControlEvidence, LayerWitness, MeasureClass, Scanner, Unarmed,
 };
 
 use crate::error::ErasureError;
 
 /// Art des Positivkontroll-Nachweises (ER-25).
-#[deprecated(note = "Verwende contextra_types::erasure::ControlEvidence über die Positivkontrolle")]
+#[deprecated(note = "Verwende crate::types_local::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceKind {
     /// Muster wurde erfolgreich in der Kontrolldatei nachgewiesen
@@ -33,7 +33,7 @@ pub enum EvidenceKind {
 }
 
 /// Nachweis über erfolgreiche Positivkontrolle für Test-Scanner.
-#[deprecated(note = "Verwende contextra_types::erasure::ControlEvidence über die Positivkontrolle")]
+#[deprecated(note = "Verwende crate::types_local::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LocalControlEvidence {
     #[allow(deprecated)]
@@ -49,7 +49,7 @@ impl LocalControlEvidence {
 }
 
 /// Scanner im Zustand `Unarmed` (noch nicht scharfgeschaltet).
-#[deprecated(note = "Verwende contextra_types::erasure::Scanner<Unarmed>")]
+#[deprecated(note = "Verwende crate::types_local::Scanner<Unarmed>")]
 #[derive(Debug, Default)]
 pub struct UnarmedScanner;
 
@@ -83,7 +83,7 @@ impl UnarmedScanner {
 }
 
 /// Scanner im Zustand `Armed` (scharfgeschaltet für Residuenprüfung).
-#[deprecated(note = "Verwende contextra_types::erasure::Scanner<Armed>")]
+#[deprecated(note = "Verwende crate::types_local::Scanner<Armed>")]
 #[derive(Debug)]
 pub struct ArmedScanner;
 
@@ -103,7 +103,7 @@ impl ArmedScanner {
 }
 
 /// Hilfstyp für Zeugen-Prüfung in Tests.
-#[deprecated(note = "Verwende contextra_types::erasure::LayerWitness")]
+#[deprecated(note = "Verwende crate::types_local::LayerWitness")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestWitness {
     hash: [u8; 32],

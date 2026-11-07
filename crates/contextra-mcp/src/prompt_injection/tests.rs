@@ -371,6 +371,7 @@ fn test_clock_injection_guard_timestamp() {
     let test_clock = Arc::new(FixedTestClock {
         unix_nanos: 1_700_000_000_000_000_000,
     });
+    assert_eq!(test_clock.monotonic_nanos(), 0);
 
     let audit_logger = SecurityAuditLogger::default();
     let guard = PromptInjectionGuard::new(

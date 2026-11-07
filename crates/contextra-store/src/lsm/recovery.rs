@@ -612,7 +612,8 @@ impl LsmStorage {
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
             clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),
-            ssi_validator: Arc::clone(&default_ssi_val) as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+            ssi_validator: Arc::clone(&default_ssi_val)
+                as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
             sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
@@ -772,7 +773,8 @@ impl LsmStorage {
                 }
             }
 
-            if !surviving_entries.is_empty() {
+            const MIN_ENTRIES_FOR_SSTABLE_REBUILD: usize = 8;
+            if surviving_entries.len() >= MIN_ENTRIES_FOR_SSTABLE_REBUILD {
                 let count = self.segment_counter.fetch_add(1, Ordering::Relaxed);
                 let seq = self.next_seq_no.load(Ordering::Relaxed);
                 let new_sst_path =
@@ -806,6 +808,12 @@ impl LsmStorage {
                     .await?;
 
                 sstables_lock.push(Arc::new(new_reader));
+            } else if !surviving_entries.is_empty() {
+                for (k, v, seq, tx) in surviving_entries {
+                    state
+                        .memtable
+                        .put(bytes::Bytes::from(k), bytes::Bytes::from(v), seq, tx);
+                }
             }
 
             sst_to_remove.push(spanning.file_path().to_path_buf());

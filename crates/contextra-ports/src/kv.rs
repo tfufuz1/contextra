@@ -1,9 +1,9 @@
 //! KV prefix store port trait definitions and types (Spec §9.2).
 
+use crate::model_fingerprint::ModelFingerprint;
+use crate::types::domain::TenantId;
+use crate::ContextraError;
 use bytes::Bytes;
-use contextra_types::model_fingerprint::ModelFingerprint;
-use contextra_types::types::domain::TenantId;
-use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 
 /// KV cache layer and dimensions layout configuration.
@@ -70,7 +70,7 @@ where
     serializer.serialize_bytes(bytes)
 }
 
-fn deserialize_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
+pub(crate) fn deserialize_bytes<'de, D>(deserializer: D) -> Result<Bytes, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

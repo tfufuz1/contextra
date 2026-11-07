@@ -1,14 +1,15 @@
 //! Dauerhafter Tresor-Shard über VFS nach SPEC §11.5, D-55, D-111, D-113, I-10, I-23.
 
 use crate::error::ErasureError;
+pub use crate::types_local::VerifiedVia;
+use crate::types_local::{VfsFile, VfsOpenOptions};
 use crate::vault::open::{encode_metablock, MetablockParams, VAULT_METABLOCK_SIZE};
 use crate::vault::slot::{
     compute_slot_mac, decode_slot, encode_slot_body, encode_vault_header, slot_probe_start,
     tombstone_image, verify_vault_header, SlotData, SlotType, STATUS_ACTIVE, STATUS_EMPTY,
     STATUS_TOMBSTONE, VAULT_HEADER_SIZE, VAULT_SLOT_SIZE,
 };
-pub use contextra_ports::vfs::VerifiedVia;
-use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
+use contextra_ports::vfs::Vfs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -58,10 +59,7 @@ impl DurableVaultShard {
             append: false,
         };
 
-        let file = vfs.open(&path, &open_opts).map_err(|e| match e {
-            contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),
-            other => ErasureError::Io(std::io::Error::other(other.to_string())),
-        })?;
+        let file = crate::types_local::open_vfs_file(Arc::clone(vfs), &path, &open_opts)?;
 
         // 1. Dateikopf schreiben (64 Bytes)
         let header_buf = encode_vault_header(&vault_id, created_seq, &mac_key);
@@ -127,10 +125,7 @@ impl DurableVaultShard {
             append: false,
         };
 
-        let file = vfs.open(&path, &open_opts).map_err(|e| match e {
-            contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),
-            other => ErasureError::Io(std::io::Error::other(other.to_string())),
-        })?;
+        let file = crate::types_local::open_vfs_file(Arc::clone(vfs), &path, &open_opts)?;
 
         // 1. Kopf lesen und prüfen (Offset 0..64)
         let mut header_buf = [0u8; VAULT_HEADER_SIZE];
@@ -573,15 +568,11 @@ impl DurableVaultShard {
 
         Ok(super::table::Destroyed {
             verified_via: match verified_via {
-                contextra_ports::vfs::VerifiedVia::Direct => {
-                    crate::vault::table::VerifiedVia::Direct
-                }
-                contextra_ports::vfs::VerifiedVia::CacheDropped => {
+                crate::types_local::VerifiedVia::Direct => crate::vault::table::VerifiedVia::Direct,
+                crate::types_local::VerifiedVia::CacheDropped => {
                     crate::vault::table::VerifiedVia::CacheDropped
                 }
-                contextra_ports::vfs::VerifiedVia::Cached => {
-                    crate::vault::table::VerifiedVia::Cached
-                }
+                crate::types_local::VerifiedVia::Cached => crate::vault::table::VerifiedVia::Cached,
             },
         })
     }

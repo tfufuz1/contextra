@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:SSI-ROOT]
 //! # Serializable Snapshot Isolation (SSI) — Read-Set Tracking und Konfliktvalidierung
 //!
 //! Dieses Modul implementiert die serialisierbare Snapshot-Isolation (SSI) im Hauptspeicher.
@@ -22,7 +21,6 @@
 //!   Präfixen aggregiert (0 % False Negatives, konservative Konflikterkennung).
 
 // FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z
 // ZWECK: In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung.
 // INVARIANTEN: INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben (Sequenznummernvergleich) und deterministisch.
 // HOTSPOTS: 35-220
@@ -42,11 +40,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-// ANCHOR[contextra-mvcc:SSI-CONST]
 /// Standard-Höchstgrenze für im Speicher gehaltene bestätigte Schreib-Schlüssel (1.000.000 Schlüssel).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
 
-// ANCHOR[contextra-mvcc:SSI-READ-SET]
 /// Protokolliert gelesene Einzelschlüssel, Präfixe und deren jeweilige Snapshot-Sequenznummer für SSI.
 ///
 /// ### Speicher- und Risikoanalyse:
@@ -68,7 +64,6 @@ pub struct ReadSet {
 }
 
 impl ReadSet {
-    // ANCHOR[contextra-mvcc:READ-SET-NEW]
     /// Erstellt ein neues, leeres [`ReadSet`].
     pub fn new() -> Self {
         Self {
@@ -78,7 +73,6 @@ impl ReadSet {
         }
     }
 
-    // ANCHOR[contextra-mvcc:READ-SET-RECORD-READ]
     /// Zeichnet einen Lesezugriff auf `key` zu einer bestimmten Snapshot-Sequenznummer `snapshot_seq` auf.
     ///
     /// ### Ablauf:
@@ -104,7 +98,6 @@ impl ReadSet {
         );
     }
 
-    // ANCHOR[contextra-mvcc:READ-SET-RECORD-PREFIX]
     /// Zeichnet einen Bereichsscan-Präfix zu `snapshot_seq` auf, um Phantom-Reads zu erkennen.
     ///
     /// Wenn nach diesem Lesezugriff eine andere Transaktion einen neuen Schlüssel committet,
@@ -180,7 +173,6 @@ impl ReadSet {
     }
 }
 
-// ANCHOR[contextra-mvcc:SSI-VALIDATOR-TRAIT]
 /// Schnittstelle (Trait) für die Validierung von Transaktionen unter Serializable Snapshot Isolation (SSI).
 ///
 /// Prüft vor dem Festschreiben (Commit) einer Transaktion, ob nebenläufige Transaktionen
@@ -210,7 +202,6 @@ enum SeqBucket {
     },
 }
 
-// ANCHOR[contextra-mvcc:SSI-PRUNING-BLOCKER]
 /// Diagnoseinformationen über aktive Snapshots oder Sequenznummern, die das Pruning im Validator blockieren.
 ///
 /// Wird erzeugt, wenn der Speicher für Commit-Schlüssel zu mehr als 80 % gefüllt ist,
@@ -502,7 +493,6 @@ impl CommittedWrites {
     }
 }
 
-// ANCHOR[contextra-mvcc:SSI-VALIDATOR-STRUCT]
 /// Referenz-Implementierung von [`SsiValidator`] auf Basis von [`SequenceLog`] und In-Memory-Commit-Tracking.
 ///
 /// Arbeitet vollständig ohne Festplatten-I/O im Arbeitsspeicher und bietet deterministische
@@ -544,7 +534,6 @@ impl Default for SequenceLogSsiValidator {
 }
 
 impl SequenceLogSsiValidator {
-    // ANCHOR[contextra-mvcc:SSI-VALIDATOR-NEW]
     /// Erstellt einen neuen [`SequenceLogSsiValidator`] mit Standard-Obergrenze (1.000.000 Schlüssel)
     /// und Standard-[`SystemClock`].
     pub fn new() -> Self {
@@ -586,7 +575,6 @@ impl SequenceLogSsiValidator {
         &self.clock
     }
 
-    // ANCHOR[contextra-mvcc:SSI-VALIDATOR-WITH-SEQLOG]
     /// Erstellt einen Validator, der an ein bestehendes [`SequenceLog`] angebunden ist.
     pub fn with_sequence_log(seq_log: Arc<RwLock<SequenceLog>>) -> Self {
         Self {
@@ -635,7 +623,6 @@ impl SequenceLogSsiValidator {
         self
     }
 
-    // ANCHOR[contextra-mvcc:SSI-PRUNE-THROUGH]
     /// Bereinigt (prunt) bestätigte Schreib-Einträge mit `commit_seq <= bound_seq`.
     ///
     /// Aktualisiert den atomaren `pruned_through`-Wasserstand.
@@ -651,7 +638,6 @@ impl SequenceLogSsiValidator {
         removed
     }
 
-    // ANCHOR[contextra-mvcc:SSI-FORGET-FROM]
     /// Entfernt alle Commit-Registrierungen mit `commit_seq >= first_seq` (z. B. nach Transaktionsabbruch).
     pub fn forget_from(&self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
@@ -734,7 +720,6 @@ impl SequenceLogSsiValidator {
         }
     }
 
-    // ANCHOR[contextra-mvcc:SSI-DIAGNOSE-PRUNING]
     /// Diagnostiziert, welcher unbereinigte Stand oder aktiver Snapshot das Pruning im Validator blockiert.
     pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
         self.diagnose_pruning_blocker_at(self.clock.monotonic_nanos())
@@ -781,7 +766,6 @@ impl SequenceLogSsiValidator {
         })
     }
 
-    // ANCHOR[contextra-mvcc:SSI-RECORD-COMMIT-KEY]
     /// Zeichnet einen committeten Schlüssel zu einer Sequenznummer auf.
     ///
     /// ### Ablauf:
@@ -796,7 +780,6 @@ impl SequenceLogSsiValidator {
         self.check_and_coarsen_if_needed(&mut writes);
     }
 
-    // ANCHOR[contextra-mvcc:SSI-RECORD-COMMIT-KEYS]
     /// Zeichnet eine Menge committeter Schlüssel stapelweise (Batch) zu einer Commit-Sequenznummer auf.
     pub fn record_commit_keys<'a>(
         &self,
@@ -987,7 +970,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Atomically validates `read_set` and records `write_keys` at `commit_seq` under a single write lock.
-    // ANCHOR[contextra-mvcc:SSI-VALIDATE-AND-RECORD]
     /// Führt die Validierung und das Eintragen der Commit-Schlüssel atomar unter demselben Schreib-Lock aus.
     ///
     /// Verhindert Race Conditions zwischen der Validierung eines ReadSets und dem Hinzufügen

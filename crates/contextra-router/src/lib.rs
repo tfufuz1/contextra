@@ -6,7 +6,7 @@
 //! über konforme Vorhersagen (Conformal Prediction) und steuert Multi-Armed-Bandit-Verfahren (LinUCB / Thompson Sampling).
 //!
 //! **Abhängigkeiten:**
-//! - Upstream: `contextra-types`, `contextra-ports`, `contextra-wire`, `contextra-adapt`, `contextra-privacy`.
+//! - Upstream: `contextra-types`, `contextra-ports`, `contextra-wire`, `contextra-adapt`.
 //! - Downstream: Wird eingebunden von `contextra-agent` und `contextra-mcp`.
 //!
 //! **Hauptkomponenten:**
@@ -44,13 +44,6 @@ pub use contextra_adapt::lyapunov;
 )]
 pub use contextra_adapt::offpolicy;
 
-#[deprecated(
-    since = "0.1.0",
-    note = "Moved to contextra_privacy as part of Ring-Modell Phase 1b"
-)]
-#[cfg(feature = "cloud-egress-guard")]
-pub use contextra_privacy::guarded_payload;
-
 #[cfg(feature = "flow-corrected-thompson")]
 pub mod fc_ts_dispatch;
 #[cfg(any(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
@@ -74,12 +67,6 @@ pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
 pub use contextra_adapt::{BanditImplementation, BanditPolicy, BanditProfileState};
-#[deprecated(
-    since = "0.1.0",
-    note = "Moved to contextra_privacy as part of Ring-Modell Phase 1b"
-)]
-#[cfg(feature = "cloud-egress-guard")]
-pub use contextra_privacy::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 #[cfg(feature = "flow-corrected-thompson")]
 pub use fc_ts_dispatch::{deterministic_fc_ts_rng, select_profile_fc_ts, FcTsDispatchError};
 #[cfg(any(feature = "bandit-routing", feature = "flow-corrected-thompson"))]

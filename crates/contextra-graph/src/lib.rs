@@ -63,7 +63,6 @@ pub use apprh::{
     ApprhShadowComparison, DefaultApprhFlipGate,
 };
 pub use arc_slice::ArcSlice;
-#[allow(deprecated)]
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
     CascadeDeletionRecord, CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket,

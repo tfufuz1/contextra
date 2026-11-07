@@ -28,16 +28,16 @@ use crate::saga::machine::{EraseSaga, SagaState};
 use crate::saga::seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
-use contextra_ports::barrier::{CommitBarrier, PurgeBarrier};
-use contextra_ports::clock::Clock;
-use contextra_ports::erasure::{EraseTarget, ErasureLayer, LayerId, LayerScope, PurgeCx};
-use contextra_ports::id_gen::IdGen;
-use contextra_ports::observer::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
-use contextra_types::erasure::{
+use crate::types_local::{CommitBarrier, PurgeBarrier};
+use crate::types_local::{
     EraseMode, EraseReceipt, ErasureStatus, LayerId as TypesLayerId, PendingReason, Phase,
     RefusalReason, RetentionAttestation, RetentionCode, Timing,
 };
-use contextra_types::ids::{ErasureId, Timestamp};
+use crate::types_local::{EraseTarget, ErasureLayer, LayerId, LayerScope, PurgeCx};
+use crate::types_local::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
+use crate::types_local::{ErasureId, Timestamp};
+use contextra_ports::clock::Clock;
+use contextra_ports::id_gen::IdGen;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -845,10 +845,8 @@ impl ErasureCore {
                     target: EraseTarget::ExactKeys(vec![id.as_bytes().to_vec()]),
                     attestation: RetentionAttestation {
                         code: RetentionCode::NoObligation,
-                        attested_by: contextra_types::refs::OperatorRef::try_new(
-                            b"recovery".to_vec(),
-                        )
-                        .map_err(|e| ErasureError::Internal(format!("{:?}", e)))?,
+                        attested_by: crate::types_local::OperatorRef::try_new(b"recovery".to_vec())
+                            .map_err(|e| ErasureError::Internal(format!("{:?}", e)))?,
                         attested_at: Timestamp(Self::now_millis(self.deps.clock.as_ref())),
                     },
                     scopes: vec![],

@@ -4,7 +4,7 @@
 //! und den Port `Vfs` (D-04). Kein `std::fs`, kein `tokio::fs`.
 
 use crate::error::ErasureError;
-use contextra_ports::vfs::VfsFile;
+use crate::types_local::VfsFile;
 
 /// Schreibt einen vollständigen Puffer an eine Dateiposition und liefert einen Fehler,
 /// wenn weniger als `buf.len()` Bytes geschrieben wurden.

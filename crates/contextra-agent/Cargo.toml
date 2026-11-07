@@ -23,7 +23,6 @@ bytes = { workspace = true }
 contextra-db         = { workspace = true, features = ["volatile-vault"] }
 contextra-graph      = { workspace = true }
 contextra-checkpoint = { workspace = true }
-contextra-store      = { workspace = true }
 contextra-router     = { workspace = true }
 serde              = { workspace = true, features = ["derive"] }
 serde_json         = { workspace = true }
@@ -32,6 +31,7 @@ tokio              = { workspace = true, features = ["full"] }
 tokio-util         = { version = "0.7.18", features = ["rt"] }
 
 [dev-dependencies]
+contextra-store      = { workspace = true }
 contextra-testkit   = { workspace = true }
 tempfile           = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

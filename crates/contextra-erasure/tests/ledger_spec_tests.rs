@@ -3,9 +3,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_erasure::ledger::{finalize_erasure, FinalizeParams};
-use contextra_ports::ledger::LedgerSink;
+use contextra_erasure::types_local::ErasureId;
+use contextra_erasure::types_local::LedgerSink;
 use contextra_ports::vfs::Vfs;
-use contextra_types::ids::ErasureId;
 use ed25519_dalek::SigningKey;
 use std::path::Path;
 use std::sync::Arc;

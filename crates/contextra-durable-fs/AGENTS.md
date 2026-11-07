@@ -1,40 +1,36 @@
-# AGENTS.md — contextra-durable-fs
-> Ring 0 · stable · Quelle: capabilities.toml · Spec: K.8 · Stand: 2026-10-13
+# AGENTS.md — `contextra-durable-fs`
 
-## 1. Zweck
-Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`fsync`/`fdatasync`, atomare Ersetzung, sichere Löschung) für Contextra-Komponenten.
+## 1. Rolle & Zweck (Baukasten-Prinzip)
+`contextra-durable-fs` stellt ein atomares, crash-konsistentes Dateisystem-Fundament (Ring 0) für das Contextra-Baukastensystem bereit.
+Es implementiert synchrone Disk-Flushes (`fsync`, `fdatasync`), atomare Ersetzungen (`atomic_replace`), sichere Verzeichnis-Synchronisation und feingranulares Verzeichnis-Locking (`DirLock`).
+Als autarker Baustein realisiert es den Standard-Port `Vfs` aus `contextra-ports` und ermöglicht isolierte Datensicherheit für alle Speichermodule.
 
-## 2. Modul-Karte
-| Datei/Verzeichnis | Verantwortung |
-|---|---|
-| `src/lib.rs` | Dateisystem-Hilfsfunktionen für atomares Ersetzen (`atomic_replace`) und dauerhaftes Löschen (`durable_remove`) |
-| `src/fault_injector.rs` | Trait `FaultInjector` und Zero-Cost `NoFault` Injektor für I/O-Fehlerinjektion |
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 0 (Durability & File System I/O)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-sys` (Spec §6.9, `capabilities.toml`).
 
-## 3. Invarianten
+## 3. Garantien & Architektur-Invarianten
+- **INV-DURABLE-FS-SAFE:** Reine sichere Dateisystem-Verwaltung; Fehler werden deterministisch als `std::io::Result` propagiert.
+- **INV-FSYNC-1 (D-55):** Handle-Poisoning bei fatalen fsync-Fehlern in `DurableHandle`; verhindert Folgeoperationen nach I/O-Ausfällen.
+- **INV-ENOSPC-1:** Fail-closed Fehlerbehandlung bei vollen Datenträgern (Disk Full) und I/O-Unterbrechungen bei Schreib-, Rename- und Verzeichnis-Sync-Vorgängen.
+- **Verzeichnis-Locking (INV-DUR-1):** Einheitliches Directory-Locking über `DirLock` mit `LockPolicy::FailClosed` als Standard.
+- **Zero-Panic-Doktrin:** Vollständiges Verbot von `panic!`, `unwrap()` oder `expect()` in produktiven Dateisystem-Pfaden.
 
-- `INV-DURABLE-FS-SAFE`: Rein sichere Dateisystem-Verwaltung; Fehler werden deterministisch als `std::io::Result` propagiert.
-- `INV-DURABLE-FS-NO-PANIC`: Keine `panic!`, `unwrap()`, oder `expect()` in Produktions-Dateisystem-Pfaden.
-- `INV-FSYNC-1`: Handle-Poisoning bei fsync-Fehlern in `DurableHandle`; verhindert weitere Flush- oder Schreibzugriffe nach I/O-Fehlern.
-- `INV-ENOSPC-1`: Fail-closed ENOSPC-/Disk-Full- und I/O-Fehlerbehandlung bei Schreiben, fsync, rename und Verzeichnis-Sync; saubere Fehlerpropagation via `std::io::Error` ohne Panics.
+## 4. Verbotene Muster
+- Nicht-atomares Überschreiben von Daten-Dateien ohne `.tmp` Staging und Parent-Directory `fsync`.
+- Verschlucken von fsync- oder flush-Fehlern (`let _ = file.sync_all()` ist strikt verboten).
+- Vermischung von FS-Primitiven mit höherer Domänen- oder Transaktionslogik.
 
-## 4. Verboten / Anti-Patterns
+## 5. Schnittstellen & Datenfluss (Ports & Abstraktionen)
+- **Implementiert:** `Vfs`-Port für atomare Datei- und Verzeichnisoperationen.
+- **Bereitgestellt für:** `contextra-store`, `contextra-vector`, `contextra-checkpoint`, `contextra-erasure`.
 
-- Nicht-atomares Überschreiben von Daten-Dateien ohne `.tmp` Staging.
-- Ignorieren von Dateisystem-Flush-Fehlern.
+## 6. Tests, Sabotage & Qualitätssicherung
+- **Fault-Injection:** `FailpointVfs` und `FaultInjector` für deterministische Simulation von Crash-Szenarien, ENOSPC und I/O-Timeouts.
+- **Sabotage-Tests:** Verifikation der Handle-Poisoning-Invariante nach simulierten fsync-Fehlern.
+- **Conformity Tests:** POSIX- und Windows-Atomizitätsprüfung.
 
-## 5. Nebenläufigkeit, Async- und Lock-Regeln
-
-- Die Dateisystem-Operationen laufen synchron ab.
-- Lock-Sperren werden auf Aufrufer-Ebene in den jeweiligen Storage-/Index-Crates gehalten.
-
-## 6. Verifikation
-
-```bash
-cargo test -p contextra-durable-fs
-cargo xtask check-agents-integrity
-cargo xtask check-unsafe-islands
-```
-
-## 7. Bekannte Lücken / SOLL
-
+## 7. Offene Punkte & Technische Schulden
 - Keine.

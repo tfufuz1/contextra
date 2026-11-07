@@ -9,7 +9,7 @@ use ahash::AHashMap;
 use contextra_types::{ContextChunk, ContextraError, DocId, MemoryLink};
 use serde::{Deserialize, Serialize};
 
-fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
+pub fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
     m.is_empty()
 }
 

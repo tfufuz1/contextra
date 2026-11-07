@@ -649,7 +649,10 @@ async fn test_router_engine_additional_coverage_paths() -> contextra_types::Resu
             id,
             (
                 "p1".to_string(),
-                router.clock.monotonic_nanos().saturating_sub(600_000_000_000),
+                router
+                    .clock
+                    .monotonic_nanos()
+                    .saturating_sub(600_000_000_000),
             ),
         );
     }

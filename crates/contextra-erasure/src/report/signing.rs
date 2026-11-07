@@ -6,7 +6,7 @@
 
 use super::build::{canonicalize_report, ErasureReport};
 use crate::error::ErasureError;
-use contextra_ports::report_signer::{
+use crate::types_local::{
     ReportSignature, ReportSigner as ReportSignerPort, SignerError, SignerId,
 };
 use contextra_ports::vfs::Vfs;

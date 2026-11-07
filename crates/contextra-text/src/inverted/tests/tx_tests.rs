@@ -13,9 +13,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 // ANCHOR[contextra-text:TEST-120]
-// Testfall `staged_insert_not_visible_before_commit`: Prüft das Verhalten und Invarianten der Textverarbeitung.
+// Testfall `test_staged_insert_not_visible_before_commit`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn staged_insert_not_visible_before_commit() -> Result<()> {
+async fn test_staged_insert_not_visible_before_commit() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "staged_test");
     let tx = TxId::new(1);
@@ -44,9 +44,9 @@ async fn staged_insert_not_visible_before_commit() -> Result<()> {
 }
 
 // ANCHOR[contextra-text:TEST-121]
-// Testfall `inverted_index_rollback_cleans_up`: Prüft das Verhalten und Invarianten der Textverarbeitung.
+// Testfall `test_inverted_index_rollback_cleans_up`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn inverted_index_rollback_cleans_up() -> Result<()> {
+async fn test_inverted_index_rollback_cleans_up() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "rollback_test");
 
@@ -313,9 +313,9 @@ async fn test_upsert_document_oversized_text_returns_error() -> Result<()> {
 }
 
 // ANCHOR[contextra-text:TEST-127]
-// Testfall `text_index_metadata_bincode_roundtrip`: Prüft das Verhalten und Invarianten der Textverarbeitung.
+// Testfall `test_text_index_metadata_bincode_roundtrip`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
-fn text_index_metadata_bincode_roundtrip() {
+fn test_text_index_metadata_bincode_roundtrip() {
     let meta = TextIndexMetadata {
         total_docs: 42,
         total_tokens: 1337,
@@ -330,9 +330,9 @@ fn text_index_metadata_bincode_roundtrip() {
 }
 
 // ANCHOR[contextra-text:TEST-128]
-// Testfall `language_from_iso_case_iso_codes_and_fallback`: Prüft das Verhalten und Invarianten der Textverarbeitung.
+// Testfall `test_language_from_iso_case_iso_codes_and_fallback`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
-fn language_from_iso_case_iso_codes_and_fallback() {
+fn test_language_from_iso_case_iso_codes_and_fallback() {
     assert_eq!(Language::from_iso("de"), Language::German);
     assert_eq!(Language::from_iso("DE"), Language::German);
     assert_eq!(Language::from_iso("de-DE"), Language::German);
@@ -348,9 +348,9 @@ fn language_from_iso_case_iso_codes_and_fallback() {
 }
 
 // ANCHOR[contextra-text:TEST-129]
-// Testfall `bm25_morph_index_case_full_lifecycle`: Prüft das Verhalten und Invarianten der Textverarbeitung.
+// Testfall `test_bm25_morph_index_case_full_lifecycle`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn bm25_morph_index_case_full_lifecycle() -> Result<()> {
+async fn test_bm25_morph_index_case_full_lifecycle() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
     let morph_index = BM25MorphIndex::new(
         storage,
@@ -387,9 +387,9 @@ async fn bm25_morph_index_case_full_lifecycle() -> Result<()> {
 }
 
 // ANCHOR[contextra-text:TEST-130]
-// Testfall `inverted_index_case_empty_and_unicode_inputs`: Prüft das Verhalten und Invarianten der Textverarbeitung.
+// Testfall `test_inverted_index_case_empty_and_unicode_inputs`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
+async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
     let storage = Arc::new(MockStorage::new());
     let mut index = InvertedIndex::new(storage, "edge_ns");
     index = index.with_tokenizer(Arc::new(crate::tokenizer::DefaultTokenizer));

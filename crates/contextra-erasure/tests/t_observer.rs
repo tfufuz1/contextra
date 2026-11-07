@@ -4,8 +4,8 @@ use contextra_erasure::purge::reserve::{check_disk_reserve, ReserveCheck};
 use contextra_erasure::purge::{
     ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind,
 };
+use contextra_erasure::types_local::ErasureId;
 use contextra_ports::BoxFuture;
-use contextra_types::ids::ErasureId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

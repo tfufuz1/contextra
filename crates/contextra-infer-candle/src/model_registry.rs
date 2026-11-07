@@ -74,7 +74,9 @@ pub fn compute_fingerprint(
         if count == 0 {
             break;
         }
-        hasher.update(&buffer[..count]);
+        if let Some(slice) = buffer.get(..count) {
+            hasher.update(slice);
+        }
     }
 
     let quant_str = quantization.to_string();
@@ -99,6 +101,24 @@ pub fn compute_fingerprint(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn test_candle_quantization_from_str() {
+        assert_eq!(
+            CandleQuantization::from_str("Q4KM").expect("Q4KM should parse"),
+            CandleQuantization::Q4KM
+        );
+        assert_eq!(
+            CandleQuantization::from_str("Q8_0").expect("Q8_0 should parse"),
+            CandleQuantization::Q8_0
+        );
+        assert_eq!(
+            CandleQuantization::from_str("F16").expect("F16 should parse"),
+            CandleQuantization::F16
+        );
+        assert!(CandleQuantization::from_str("invalid").is_err());
+    }
+
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;

@@ -9,10 +9,10 @@
 
 use contextra_erasure::gate::batch::evaluate_restricted_access;
 use contextra_erasure::saga::{derive_open_key, EraseSaga, SagaState};
+use contextra_erasure::types_local::ErasureId;
 use contextra_erasure::vault::slot::{
     encode_slot, off, SlotType, STATUS_ACTIVE, STATUS_TOMBSTONE, VAULT_SLOT_SIZE,
 };
-use contextra_types::ids::ErasureId;
 
 /// SPEC: T-REPL-1, T-REPL-2, T-REPL-3 (D-115 replace_erasing Protokoll & Statusfolge)
 #[test]
