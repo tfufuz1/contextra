@@ -5,7 +5,7 @@
 //!
 //! ## Getestete Verträge
 //! 1. **Distanz- und Relevanzordnung:** Näher liegende Vektoren erhalten höhere Scores und erscheinen zuerst.
-//! 2. **Löschung & Tombstone-Konsistenz:** Gelöschte Dokumente dürfen weder in `search` noch in `all_doc_ids` auftauchen.
+//! 2. **Entfernung & Tombstone-Konsistenz:** Gelöschte Dokumente dürfen weder in `search` noch in `all_doc_ids` auftauchen.
 //! 3. **Upsert-Verhalten:** Erneutes Einfügen derselben `DocId` aktualisiert den Vektor ohne Duplizierung in `len`.
 //! 4. **Dimensionsprüfung:** Abweichende Vektorlängen bei `insert` und `search` müssen abgewiesen werden.
 //! 5. **NaN-Zurückweisung:** Ungültige Fließkommazahlen (`f32::NAN`) müssen fail-closed abgewiesen werden.
