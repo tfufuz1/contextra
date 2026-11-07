@@ -75,4 +75,4 @@ pub use segment::{
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
 pub use service::{KvCacheConfig, KvCacheService, KvCacheServiceBuilder, KvCacheStats};
-pub use store::{SpillHandler, TenantIsolatedKvStore};
+pub use store::{KvCachePruner, KvCacheScanner, SpillHandler, TenantIsolatedKvStore};

@@ -116,12 +116,10 @@ impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder {
             block_on_simple(future)
         });
 
-        // NOTE: Bei Aktivierung von `content-addressed-kv-cache` schlägt `handle.join()...?`
-        // typmäßig fehl, da `EmbeddingError` nicht in `ContextraError` konvertiert wird.
-        // Gemäß Vorgabe wird der Code nicht modifiziert.
-        handle.join().map_err(|_| {
+        let result = handle.join().map_err(|_| {
             ContextraError::Internal("Thread panic during embedding computation".to_string())
-        })?
+        })?;
+        result.map_err(|e| ContextraError::Internal(e.to_string()))
     }
 }
 
