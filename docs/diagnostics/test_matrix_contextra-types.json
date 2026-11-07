@@ -1,0 +1,1763 @@
+{
+  "tool_name": "test_coverage_matrix.py",
+  "title": "Test Traceability & Invariant Coverage Diagnostic Report",
+  "description": "Maps unit tests, async tokio tests, proptests, benchmarks, and SPEC traceability markers (T-TRACE-1) across workspace crates.",
+  "timestamp": "2026-11-07T23:04:46.712570+00:00",
+  "metrics": {
+    "total_tests_discovered": 193,
+    "tests_with_spec_trace": 0,
+    "unique_spec_invariants_covered": 0,
+    "test_type_unit": 186,
+    "test_type_proptest": 7
+  },
+  "findings_count": 193,
+  "findings": [
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 510,
+      "name": "contextra_error_display_no_panic",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `contextra_error_display_no_panic` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 574,
+      "name": "test_invalid_input_helper",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_invalid_input_helper` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 583,
+      "name": "test_capability_unsupported_helper",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_capability_unsupported_helper` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 599,
+      "name": "test_from_try_from_slice_error",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_from_try_from_slice_error` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 614,
+      "name": "test_error_display_all_variants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_error_display_all_variants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 753,
+      "name": "test_from_conversions",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_from_conversions` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 783,
+      "name": "test_result_alias",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_result_alias` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 803,
+      "name": "test_io_error_message_preserved",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_io_error_message_preserved` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 835,
+      "name": "test_json_error_message_preserved",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_json_error_message_preserved` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 865,
+      "name": "test_wal_corruption_fields_not_transposed",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_wal_corruption_fields_not_transposed` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 895,
+      "name": "test_checksum_mismatch_fields_not_transposed",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_checksum_mismatch_fields_not_transposed` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 929,
+      "name": "test_transaction_timeout_fields_not_transposed",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_transaction_timeout_fields_not_transposed` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 962,
+      "name": "test_memory_budget_exceeded_fields_not_transposed",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_memory_budget_exceeded_fields_not_transposed` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 993,
+      "name": "test_hnsw_connectivity_degraded_preserves_ratio",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hnsw_connectivity_degraded_preserves_ratio` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1019,
+      "name": "test_error_constructor_helpers",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_error_constructor_helpers` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1048,
+      "name": "test_dto_with_details_override",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_dto_with_details_override` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1064,
+      "name": "test_model_load_and_orphaned_vector_display",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_model_load_and_orphaned_vector_display` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1093,
+      "name": "test_step_id_and_cache_directive",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_step_id_and_cache_directive` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1112,
+      "name": "test_pin_budget_exceeded_display_and_helper",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_pin_budget_exceeded_display_and_helper` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1125,
+      "name": "test_cross_device_link_display_and_helper",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_cross_device_link_display_and_helper` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1144,
+      "name": "test_is_occ_conflict",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_is_occ_conflict` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 388,
+      "name": "test_dto_exhaustive_match_coverage",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_dto_exhaustive_match_coverage` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 551,
+      "name": "test_dto_details_serialization",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_dto_details_serialization` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 569,
+      "name": "test_dto_constructors_and_display",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_dto_constructors_and_display` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/model_fingerprint.rs",
+      "line": 67,
+      "name": "test_model_fingerprint_new_and_serde",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_model_fingerprint_new_and_serde` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/retrieval_strategy.rs",
+      "line": 60,
+      "name": "test_retrieval_strategy_display",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_retrieval_strategy_display` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/retrieval_strategy.rs",
+      "line": 77,
+      "name": "test_retrieval_strategy_serde_roundtrip",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_retrieval_strategy_serde_roundtrip` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/schema.rs",
+      "line": 110,
+      "name": "test_manifest_schema_version_roundtrip",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_manifest_schema_version_roundtrip` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/schema.rs",
+      "line": 124,
+      "name": "test_doc_id_width_bytes_len",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_width_bytes_len` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/tombstone.rs",
+      "line": 86,
+      "name": "test_roundtrip_property",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_roundtrip_property` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/tombstone.rs",
+      "line": 108,
+      "name": "test_negative_cases",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_negative_cases` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/tombstone.rs",
+      "line": 129,
+      "name": "test_flags_tombstone_detection",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_flags_tombstone_detection` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/tombstone.rs",
+      "line": 138,
+      "name": "test_edge_case_already_tombstoned_seq",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_edge_case_already_tombstoned_seq` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 459,
+      "name": "test_resource_tracker_basic",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_resource_tracker_basic` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 475,
+      "name": "test_budget_exceeded",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_budget_exceeded` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 495,
+      "name": "test_capacity_threshold",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_capacity_threshold` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 507,
+      "name": "test_concurrent_consumption",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_concurrent_consumption` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 532,
+      "name": "test_release_memory_underflow_safety",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_release_memory_underflow_safety` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 552,
+      "name": "test_consume_memory_overflow_prevention",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_consume_memory_overflow_prevention` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 567,
+      "name": "test_token_budget_for_model",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_token_budget_for_model` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 586,
+      "name": "test_token_budget_edge_cases",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_token_budget_edge_cases` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 613,
+      "name": "test_token_budget_strategies",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_token_budget_strategies` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 631,
+      "name": "test_reservation_successful_settle",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_reservation_successful_settle` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 645,
+      "name": "test_reservation_drop_refund",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_reservation_drop_refund` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 661,
+      "name": "test_reservation_over_budget_leaves_consumed_unchanged",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_reservation_over_budget_leaves_consumed_unchanged` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 672,
+      "name": "test_reservation_concurrent_double_spend",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_reservation_concurrent_double_spend` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 205,
+      "name": "test_filter_serialization",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_serialization` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 223,
+      "name": "test_filter_variants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_variants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 241,
+      "name": "test_filter_expr_evaluate_all_operators",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_expr_evaluate_all_operators` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 365,
+      "name": "test_filter_evaluate_null_and_empty_meta",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_evaluate_null_and_empty_meta` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 392,
+      "name": "test_nested_filter_expression",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_nested_filter_expression` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 225,
+      "name": "test_importance_score_clamping_and_nan",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_importance_score_clamping_and_nan` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 235,
+      "name": "test_decay_factor_none",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_factor_none` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 243,
+      "name": "test_decay_factor_exponential",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_factor_exponential` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 260,
+      "name": "test_decay_factor_step_floor",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_factor_step_floor` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 276,
+      "name": "test_decay_factor_out_of_order_tx",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_factor_out_of_order_tx` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 285,
+      "name": "test_memory_importance_effective_score",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_memory_importance_effective_score` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/importance.rs",
+      "line": 298,
+      "name": "test_decay_factor_wall_clock_exponential",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_factor_wall_clock_exponential` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 640,
+      "name": "test_fusion_weights_valid",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_fusion_weights_valid` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 647,
+      "name": "test_fusion_weights_invalid_sum",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_fusion_weights_invalid_sum` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 658,
+      "name": "test_fusion_weights_default_is_balanced",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_fusion_weights_default_is_balanced` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 676,
+      "name": "test_hybrid_query_builder_default_uses_balanced_weights",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hybrid_query_builder_default_uses_balanced_weights` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 689,
+      "name": "test_hybrid_query_builder_happy_path",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hybrid_query_builder_happy_path` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 708,
+      "name": "test_hybrid_query_builder_custom_weights",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hybrid_query_builder_custom_weights` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 719,
+      "name": "test_hybrid_query_builder_defaults",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hybrid_query_builder_defaults` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 731,
+      "name": "test_token_budget_edge_cases",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_token_budget_edge_cases` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 744,
+      "name": "test_fusion_weights_negative_or_infinite",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_fusion_weights_negative_or_infinite` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 759,
+      "name": "test_fusion_weights_nan",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_fusion_weights_nan` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 770,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 771,
+      "name": "prop_fusion_weights_never_panics",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_fusion_weights_never_panics` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 791,
+      "name": "test_context_window_serialization",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_context_window_serialization` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 819,
+      "name": "test_combined_text_with_prefix",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_combined_text_with_prefix` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 837,
+      "name": "test_combined_text_without_prefix_returns_content",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_combined_text_without_prefix_returns_content` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 852,
+      "name": "test_combined_text_empty_prefix_returns_content",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_combined_text_empty_prefix_returns_content` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 867,
+      "name": "test_serde_backward_compat_no_prefix_field",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_serde_backward_compat_no_prefix_field` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 874,
+      "name": "test_combined_token_count_with_prefix",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_combined_token_count_with_prefix` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 900,
+      "name": "test_hybrid_query_builder_all_options",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hybrid_query_builder_all_options` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 16,
+      "name": "test_core_distance_dimension_mismatch",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_core_distance_dimension_mismatch` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 25,
+      "name": "test_embedding_norm_and_normalize",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_embedding_norm_and_normalize` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 42,
+      "name": "test_distance_metrics_f32",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_distance_metrics_f32` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 58,
+      "name": "test_distance_metrics_u8",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_distance_metrics_u8` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 89,
+      "name": "test_distance_metrics_u8_overflow",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_distance_metrics_u8_overflow` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 142,
+      "name": "test_u8_and_f32_distance_metrics_ranking_and_value_parity",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_u8_and_f32_distance_metrics_ranking_and_value_parity` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 208,
+      "name": "test_distance_metrics_empty_and_single_element",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_distance_metrics_empty_and_single_element` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 245,
+      "name": "test_distance_metric_dimension_mismatch",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_distance_metric_dimension_mismatch` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 270,
+      "name": "test_embedding_normalize_edge_cases",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_embedding_normalize_edge_cases` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 12,
+      "name": "test_tenant_id_defaults_and_constants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_defaults_and_constants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 28,
+      "name": "test_tenant_id_collections_btreemap",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_collections_btreemap` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 50,
+      "name": "test_tenant_id_serde_roundtrip",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_serde_roundtrip` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 62,
+      "name": "test_doc_id_from_key_no_panic",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_from_key_no_panic` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 77,
+      "name": "test_doc_id_determinism",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_determinism` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 86,
+      "name": "test_tenant_and_collection_id",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_and_collection_id` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 100,
+      "name": "test_doc_id_multibyte_unicode_keys",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_multibyte_unicode_keys` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 118,
+      "name": "test_entity_id_methods",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_id_methods` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 140,
+      "name": "doc_id_valid_key_is_ok",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `doc_id_valid_key_is_ok` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 147,
+      "name": "doc_id_from_empty_returns_err",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `doc_id_from_empty_returns_err` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 153,
+      "name": "test_entity_id_from_key_empty_err",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_id_from_key_empty_err` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 160,
+      "name": "tx_id_ordering_is_consistent",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `tx_id_ordering_is_consistent` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 170,
+      "name": "test_tx_id_internal",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_internal` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 183,
+      "name": "test_tx_id_is_valid_origin",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_is_valid_origin` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 203,
+      "name": "test_tx_id_range_boundary_exhaustion_simulation",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_range_boundary_exhaustion_simulation` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 295,
+      "name": "test_doc_id_from_key_collisions_and_distribution",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_from_key_collisions_and_distribution` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 315,
+      "name": "test_doc_id_and_entity_id_unicode_keys",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_and_entity_id_unicode_keys` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 338,
+      "name": "test_tx_id_invalid_sentinel_and_conversion_boundary",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_invalid_sentinel_and_conversion_boundary` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 351,
+      "name": "test_tx_id_ranges_and_internal_boundary_checks",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_ranges_and_internal_boundary_checks` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 366,
+      "name": "test_tx_id_system_range_wraparound_safety",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_system_range_wraparound_safety` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 415,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 416,
+      "name": "prop_tx_id_range_isolation",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_tx_id_range_isolation` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 425,
+      "name": "prop_tx_id_overflow_isolation",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_tx_id_overflow_isolation` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 433,
+      "name": "test_tenant_id_system_reserved",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_system_reserved` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 439,
+      "name": "test_tenant_id_valid",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_valid` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 448,
+      "name": "test_tenant_id_system_constant",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_system_constant` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 455,
+      "name": "test_tenant_id_hardening",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_hardening` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 462,
+      "name": "test_tenant_id_try_from_boundary_and_display",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_try_from_boundary_and_display` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 12,
+      "name": "test_workflow_state_hex_serde_roundtrip",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_workflow_state_hex_serde_roundtrip` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 30,
+      "name": "test_expiry_metadata_key_constant",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_expiry_metadata_key_constant` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 36,
+      "name": "test_serialization_roundtrips",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_serialization_roundtrips` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 69,
+      "name": "test_entity_and_edge",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_and_edge` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 127,
+      "name": "test_entity_and_edge_try_new_validation",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_and_edge_try_new_validation` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 142,
+      "name": "test_memory_type_defaults_and_serde",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_memory_type_defaults_and_serde` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 175,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 226,
+      "name": "test_entity_try_new_invalid_inputs",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_try_new_invalid_inputs` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 240,
+      "name": "test_edge_try_new_invalid_inputs",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_edge_try_new_invalid_inputs` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/campaign_r4_r10_oracle.rs",
+      "line": 11,
+      "name": "test_doc_id_canonical_bit_decomposition_oracle",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_canonical_bit_decomposition_oracle` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/campaign_r4_r10_oracle.rs",
+      "line": 25,
+      "name": "test_tx_id_monotonicity_oracle",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_monotonicity_oracle` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/campaign_r4_r10_oracle.rs",
+      "line": 36,
+      "name": "test_tenant_id_system_reservation_oracle",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_system_reservation_oracle` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 17,
+      "name": "test_cosine_distance_identical_and_opposite_vectors",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_cosine_distance_identical_and_opposite_vectors` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 38,
+      "name": "test_euclidean_distance_properties",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_euclidean_distance_properties` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 52,
+      "name": "test_dot_product_distance_properties",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_dot_product_distance_properties` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 63,
+      "name": "test_embedding_normalization_invariants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_embedding_normalization_invariants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 79,
+      "name": "test_distance_metrics_non_finite_inputs_rejected",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_distance_metrics_non_finite_inputs_rejected` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 97,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 98,
+      "name": "prop_distance_metric_symmetry_and_non_negativity",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_distance_metric_symmetry_and_non_negativity` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 115,
+      "name": "prop_embedding_normalize_is_idempotent",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_embedding_normalize_is_idempotent` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 18,
+      "name": "test_request_context_creation_and_fields",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_request_context_creation_and_fields` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 34,
+      "name": "test_saga_record_and_scan_methods",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_saga_record_and_scan_methods` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 57,
+      "name": "test_tenant_scoped_wrapper_and_checked_extraction",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_scoped_wrapper_and_checked_extraction` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 88,
+      "name": "test_tombstone_bit_manipulations_and_semantics",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tombstone_bit_manipulations_and_semantics` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 107,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 108,
+      "name": "prop_tombstone_bit_invariants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_tombstone_bit_invariants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 120,
+      "name": "prop_tenant_scoped_isolation",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_tenant_scoped_isolation` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_dto_and_schema_suite.rs",
+      "line": 17,
+      "name": "test_error_dto_new_and_with_details",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_error_dto_new_and_with_details` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_dto_and_schema_suite.rs",
+      "line": 43,
+      "name": "test_error_dto_display_and_formatting",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_error_dto_display_and_formatting` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_dto_and_schema_suite.rs",
+      "line": 55,
+      "name": "test_hnsw_deletion_error_variants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_hnsw_deletion_error_variants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_dto_and_schema_suite.rs",
+      "line": 85,
+      "name": "test_manifest_schema_version_and_doc_id_width_properties",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_manifest_schema_version_and_doc_id_width_properties` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/filter_expressions_suite.rs",
+      "line": 17,
+      "name": "test_filter_equality_and_inequality_operators",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_equality_and_inequality_operators` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/filter_expressions_suite.rs",
+      "line": 53,
+      "name": "test_filter_numeric_comparisons",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_numeric_comparisons` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/filter_expressions_suite.rs",
+      "line": 98,
+      "name": "test_filter_set_and_contains_operators",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_set_and_contains_operators` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/filter_expressions_suite.rs",
+      "line": 143,
+      "name": "test_filter_logical_combinators_and_not",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_logical_combinators_and_not` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/filter_expressions_suite.rs",
+      "line": 183,
+      "name": "test_filter_null_and_missing_field_evaluations",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_filter_null_and_missing_field_evaluations` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 13,
+      "name": "test_doc_id_wire_golden_bytes",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_doc_id_wire_golden_bytes` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 45,
+      "name": "test_tx_id_wire_golden_bytes",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tx_id_wire_golden_bytes` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 55,
+      "name": "test_tenant_id_wire_golden_bytes",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_id_wire_golden_bytes` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/importance_decay_suite.rs",
+      "line": 17,
+      "name": "test_importance_score_clamping_boundary_cases",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_importance_score_clamping_boundary_cases` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/importance_decay_suite.rs",
+      "line": 39,
+      "name": "test_decay_function_none_variant",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_function_none_variant` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/importance_decay_suite.rs",
+      "line": 53,
+      "name": "test_decay_function_exponential_variant",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_function_exponential_variant` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/importance_decay_suite.rs",
+      "line": 83,
+      "name": "test_decay_function_wallclock_exponential",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_function_wallclock_exponential` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/importance_decay_suite.rs",
+      "line": 102,
+      "name": "test_decay_function_step_floor_variant",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_decay_function_step_floor_variant` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/importance_decay_suite.rs",
+      "line": 120,
+      "name": "test_memory_importance_effective_score_decay",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_memory_importance_effective_score_decay` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 18,
+      "name": "test_model_fingerprint_hash_uniqueness_and_equality",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_model_fingerprint_hash_uniqueness_and_equality` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 38,
+      "name": "test_retrieval_strategy_variants_and_display",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_retrieval_strategy_variants_and_display` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 63,
+      "name": "test_cache_directive_variants_and_serde",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_cache_directive_variants_and_serde` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 83,
+      "name": "test_config_fingerprint_builder_and_extractors",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_config_fingerprint_builder_and_extractors` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 101,
+      "name": "test_token_budget_reservations_and_concurrent_drops",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_token_budget_reservations_and_concurrent_drops` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 123,
+      "name": "test_resource_tracker_and_budget_backpressure",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_resource_tracker_and_budget_backpressure` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 145,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 146,
+      "name": "prop_config_fingerprint_bit_exact_floats",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_config_fingerprint_bit_exact_floats` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 158,
+      "name": "prop_model_fingerprint_serde_roundtrip",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_model_fingerprint_serde_roundtrip` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 29,
+      "name": "proptest_block",
+      "kind": "proptest",
+      "spec_id": "NONE",
+      "description": "Test `proptest_block` (proptest) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 30,
+      "name": "prop_doc_id_from_key_properties",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_doc_id_from_key_properties` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 52,
+      "name": "prop_entity_id_from_key_properties",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_entity_id_from_key_properties` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 74,
+      "name": "prop_tx_id_ordering_and_display",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_tx_id_ordering_and_display` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 96,
+      "name": "prop_collection_id_invariants",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_collection_id_invariants` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 111,
+      "name": "prop_importance_score_clamping",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_importance_score_clamping` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 123,
+      "name": "prop_token_budget_consumption",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `prop_token_budget_consumption` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 150,
+      "name": "test_entity_construction_and_validation",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_construction_and_validation` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 164,
+      "name": "test_edge_construction_and_builder_chain",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_edge_construction_and_builder_chain` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 199,
+      "name": "test_context_chunk_text_and_token_methods",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_context_chunk_text_and_token_methods` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 237,
+      "name": "test_query_rewrite_output_methods",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_query_rewrite_output_methods` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 257,
+      "name": "test_schema_versions_and_doc_id_width",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_schema_versions_and_doc_id_width` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 279,
+      "name": "test_memory_type_helpers",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_memory_type_helpers` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 295,
+      "name": "test_all_error_variant_constructors_and_helpers",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_all_error_variant_constructors_and_helpers` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 381,
+      "name": "test_retrieval_strategy_and_step_id",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_retrieval_strategy_and_step_id` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 18,
+      "name": "test_exhaustive_serde_json_strings_and_bytes",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_exhaustive_serde_json_strings_and_bytes` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 62,
+      "name": "test_serde_invalid_json_payloads_rejected",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_serde_invalid_json_payloads_rejected` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 80,
+      "name": "test_bincode_binary_payload_sizes",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_bincode_binary_payload_sizes` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 109,
+      "name": "test_serde_complex_nested_structures",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_serde_complex_nested_structures` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 173,
+      "name": "test_workflow_state_hex_serialization",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_workflow_state_hex_serialization` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 190,
+      "name": "test_entity_and_edge_attribute_maps",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_entity_and_edge_attribute_maps` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 8,
+      "name": "test_tenant_scoped_new_and_tenant_id_getter",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_tenant_scoped_new_and_tenant_id_getter` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 17,
+      "name": "test_into_inner_checked_matching_tenant",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_into_inner_checked_matching_tenant` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 29,
+      "name": "test_into_inner_checked_mismatched_tenant_does_not_leak_value",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_into_inner_checked_mismatched_tenant_does_not_leak_value` (unit) -> SPEC: Untraced"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 56,
+      "name": "test_map_preserves_tenant_id",
+      "kind": "unit",
+      "spec_id": "NONE",
+      "description": "Test `test_map_preserves_tenant_id` (unit) -> SPEC: Untraced"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Crate-Test-Matrix",
+      "content": "| Crate | Tests Gesamt | Mit SPEC Trace (T-TRACE-1) | Traceability-Quote |\n|---|---|---|---|\n| `contextra-types` | 193 | 0 | 0.0 % |"
+    },
+    {
+      "header": "Top Abgedeckte Spezifikations-Invarianten",
+      "content": "| Invariante / Spec-ID | Zugeordnete Tests | Beispiel-Dateien |\n|---|---|---|"
+    }
+  ]
+}

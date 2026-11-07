@@ -1,0 +1,1649 @@
+{
+  "tool_name": "erasure_leak_prober.py",
+  "title": "Deletion & GDPR Domain Leak Diagnostic Report",
+  "description": "Audits data-holding storage kernels against rule M7 (no GDPR, Saga, DeletionProof, or report logic outside contextra-erasure).",
+  "timestamp": "2026-11-07T23:03:39.571477+00:00",
+  "metrics": {
+    "kernel_violations": 113,
+    "allowed_mentions": 68,
+    "crates_with_leaks": 8
+  },
+  "findings_count": 181,
+  "findings": [
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/examples/audit_export_standalone.rs",
+      "line": 2,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Demonstriert den Export eines Verzeichnisses von Verarbeitungst\u00e4tigkeiten (Art. 30 DSGVO)"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/bsi_mapping.rs",
+      "line": 5,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! cryptographic mapping table included in the generated GDPR Art. 30 processing register export."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/bsi_mapping.rs",
+      "line": 43,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "note: \"Digitale Signatur f\u00fcr L\u00f6schnachweise (DeletionProof v4). BSI TR-02102-1 \u00a71.5/\u00a73.2 bewertet Ed"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/error.rs",
+      "line": 12,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Missing mandatory field required by GDPR Article 30."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! `contextra-audit-export` \u2014 GDPR Article 30 Processing Register export generator."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 5,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! (Verzeichnis von Verarbeitungst\u00e4tigkeiten nach Art. 30 DSGVO) based on egress gateway logs"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 23,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Contact details for the data controller, representative, and data protection officer (Art. 30 Ab"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 53,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Third country transfer record including legal safeguard guarantees (Art. 30 Abs. 1 lit. e DSGVO)"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 79,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Retention period definition per category of personal data (Art. 30 Abs. 1 lit. f DSGVO)."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 118,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Summary of a cryptographic deletion proof (GDPR Art. 17 / Art. 30 compliance)."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 131,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// A record entry in the GDPR Article 30 processing register."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 152,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Statutory legal basis for processing (e.g. Art. 6 Abs. 1 lit. b DSGVO)."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 163,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Validates all mandatory fields required by GDPR Article 30 Abs. 1."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/lib.rs",
+      "line": 256,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// All entries are validated according to Art. 30 Abs. 1 DSGVO."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/markdown_template.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Markdown table renderer for GDPR Article 30 processing register entries."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/markdown_template.rs",
+      "line": 20,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// a GDPR Article 30 processing register table."
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/markdown_template.rs",
+      "line": 47,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "out.push_str(\"# Verzeichnis von Verarbeitungst\u00e4tigkeiten (Art. 30 DSGVO)\\n\\n\");"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/markdown_template.rs",
+      "line": 49,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"**Exportdatum:** {} | **Rechtsgrundlage:** Art. 30 Abs. 1 DSGVO\\n\\n\","
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/testkit.rs",
+      "line": 56,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "legal_basis: \"Art. 6 Abs. 1 lit. b DSGVO\".to_string(),"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/testkit.rs",
+      "line": 89,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "legal_basis: \"Art. 6 Abs. 1 lit. f DSGVO\".to_string(),"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/examples/avv_generator_standalone.rs",
+      "line": 2,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Demonstriert die Erzeugung eines strukturierten AVV-Vertragsentwurfs gem\u00e4\u00df Art. 28 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Unterst\u00fctzung bei Art. 32\u201336 DSGVO gem\u00e4\u00df Art. 28 Abs. 3 lit. f DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 5,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! sicherheits- und compliancebezogenen Anforderungen der DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 7,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. f DSGVO:"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 9,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - **Art. 32 DSGVO:** Technische und organisatorische Ma\u00dfnahmen zur Sicherheit der Verarbeitung."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 10,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - **Art. 33 & 34 DSGVO:** Meldung von Verletzungen des Schutzes personenbezogener Daten (Data Br"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 12,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - **Art. 35 & 36 DSGVO:** Durchf\u00fchrung von Datenschutz-Folgenabsch\u00e4tzungen (DSFA) sowie"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 22,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Rendert Abschnitt 10: \u201eUnterst\u00fctzung bei Einhaltung der Pflichten gem\u00e4\u00df Art. 32\u201336 DSGVO\u201c."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 30,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// 3. Unterpunkt Art. 32 DSGVO: Gew\u00e4hrleistung der Sicherheit durch TOMs."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 31,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// 4. Unterpunkt Art. 33 & 34 DSGVO: Unverz\u00fcgliche Meldung von Datenschutzvorf\u00e4llen."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 32,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// 5. Unterpunkt Art. 35 & 36 DSGVO: Mitwirkung bei Datenschutz-Folgenabsch\u00e4tzungen."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 39,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"\\n## 10. Unterst\u00fctzung bei Einhaltung der Pflichten gem\u00e4\u00df Art. 32\u201336 DSGVO\""
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 44,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"1. Der Auftragsverarbeiter unterst\u00fctzt den Verantwortlichen unter Ber\u00fccksichtigung der Art der Vera"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 49,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"   - **Art. 32 DSGVO:** Gew\u00e4hrleistung der Sicherheit der Verarbeitung durch geeignete technische u"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 54,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"   - **Art. 33 & 34 DSGVO:** Unverz\u00fcgliche Meldung von Verletzungen des Schutzes personenbezogener "
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/assistance.rs",
+      "line": 59,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"   - **Art. 35 & 36 DSGVO:** Unterst\u00fctzung bei der Durchf\u00fchrung von Datenschutz-Folgenabsch\u00e4tzungen"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/audit.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Nachweis- und Kontrollrechte gem\u00e4\u00df Art. 28 Abs. 3 lit. h DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/audit.rs",
+      "line": 7,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. h DSGVO:"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/audit.rs",
+      "line": 36,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"1. Der Auftragsverarbeiter stellt dem Verantwortlichen alle erforderlichen Informationen zum Nachwe"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/confidentiality.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Vertraulichkeitsverpflichtung gem\u00e4\u00df Art. 28 Abs. 3 lit. b DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/confidentiality.rs",
+      "line": 8,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. b DSGVO:"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/data_subject_rights.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Unterst\u00fctzung bei Betroffenenrechten gem\u00e4\u00df Art. 28 Abs. 3 lit. e DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/data_subject_rights.rs",
+      "line": 5,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! bei Anfragen betroffener Personen nach Kapitel III der DSGVO zu unterst\u00fctzen."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/data_subject_rights.rs",
+      "line": 7,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. e DSGVO:"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/data_subject_rights.rs",
+      "line": 21,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Schreibt die Unterst\u00fctzungszusagen f\u00fcr Rechte betroffener Personen nach Kapitel III DSGVO in den"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/data_subject_rights.rs",
+      "line": 35,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"1. Der Auftragsverarbeiter unterst\u00fctzt den Verantwortlichen unter Ber\u00fccksichtigung der Art der Vera"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/error.rs",
+      "line": 35,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Gesetzliche Grundlage: Nach Art. 28 Abs. 3 DSGVO m\u00fcssen die Vertragsparteien"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/error.rs",
+      "line": 42,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Gesetzliche Grundlage: Nach Art. 28 Abs. 3 DSGVO m\u00fcssen die Vertragsparteien"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/error.rs",
+      "line": 70,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Gesetzliche Grundlage: Art. 28 Abs. 2 DSGVO fordert entweder eine konkrete Genehmigung"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/error.rs",
+      "line": 81,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Tritt auf, wenn Name, Beschreibung oder DSGVO-Referenzartikel leer sind."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/instructions.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Weisungsbindung gem\u00e4\u00df Art. 28 Abs. 3 lit. a DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/instructions.rs",
+      "line": 8,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. a DSGVO:"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/instructions.rs",
+      "line": 49,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"3. Der Auftragsverarbeiter informiert den Verantwortlichen unverz\u00fcglich, wenn er der Auffassung ist"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 3,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! `contextra-avv-generator` \u2014 Generator f\u00fcr Auftragsverarbeitungsvertr\u00e4ge (AVV) nach Art. 28 DSGVO"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 7,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Sie verkn\u00fcpft die formellen rechtlichen Mindestanforderungen nach Art. 28 Abs. 3 DSGVO"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 9,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - **Kryptografischer L\u00f6schbeweis (Ed25519):** Mathematischer Nachweis der physischen L\u00f6schung (A"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 10,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - **Zero-Egress-Default / Egress-Gateway:** Strikt kontrollierter ausgehender Datenverkehr (Art."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 44,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Kontext- und Konfigurationsparameter zur Generierung einer AVV-Vorlage gem\u00e4\u00df Art. 28 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 78,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Liste der technischen und organisatorischen Ma\u00dfnahmen (TOM) gem\u00e4\u00df Art. 32 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 229,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Beschreibung einer technischen und organisatorischen Ma\u00dfnahme (TOM) gem\u00e4\u00df Art. 32 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 239,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Referenzierter Artikel der DSGVO (z. B. \"Art. 32 Abs. 1 lit. b & Art. 17 DSGVO\")."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 285,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "reference_article: \"Art. 32 Abs. 1 lit. b & Art. 17 DSGVO\".to_string(),"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 290,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "reference_article: \"Art. 32 Abs. 1 lit. b DSGVO\".to_string(),"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 295,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "reference_article: \"Art. 32 Abs. 1 lit. b DSGVO\".to_string(),"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/lib.rs",
+      "line": 300,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "reference_article: \"Art. 32 Abs. 1 lit. a DSGVO\".to_string(),"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Vorlagen-Rendering f\u00fcr Vereinbarungen zur Auftragsverarbeitung (AVV) gem\u00e4\u00df Art. 28 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 7,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - Gegenstand, Dauer, Art und Zweck der Verarbeitung (Art. 28 Abs. 3 lit. a-d DSGVO)"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 10,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - Technische und organisatorische Ma\u00dfnahmen (TOM, Art. 32 DSGVO)"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 11,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! - Unterauftragsverarbeiter (Art. 28 Abs. 2 und Abs. 4 DSGVO)"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 141,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"# Vereinbarung zur Auftragsverarbeitung (AVV) gem\u00e4\u00df Art. 28 DSGVO\""
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 232,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "// Rendert Abschnitt 6: Technische und organisatorische Ma\u00dfnahmen (TOM) nach Art. 32 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 246,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "\"Der Auftragsverarbeiter sieht die Umsetzung folgender produktimmanenter technischer Sicherheitsma\u00dfn"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/template.rs",
+      "line": 273,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "// Rendert Abschnitt 7: Regelungen f\u00fcr Unterauftragsverarbeiter nach Art. 28 Abs. 2 und 4 DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/termination.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! L\u00f6schung und R\u00fcckgabe nach Beendigung gem\u00e4\u00df Art. 28 Abs. 3 lit. g DSGVO."
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/termination.rs",
+      "line": 7,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. g DSGVO:"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/termination.rs",
+      "line": 36,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// 2. Absatz 1: Gesetzliche Grundpflicht zur L\u00f6schung oder R\u00fcckgabe nach Art. 28 Abs. 3 lit. g DSGV"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/audit_chain.rs",
+      "line": 28,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "use crate::kv_shredding::KeyRegistry;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/ed25519_proof.rs",
+      "line": 39,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "#[error(\"Unsupported DeletionProof signature_version: {0}\")]"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/ed25519_proof.rs",
+      "line": 134,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// `SignatureVersion`-Enum f\u00fcr typsichere Versionierung von DeletionProof-Signaturen."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_cipher.rs",
+      "line": 106,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "use crate::kv_shredding::KeyRegistry;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 1,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "//! # Kryptographisches Shredding f\u00fcr KV-Daten (`kv_shredding.rs`)"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 22,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "use crate::revocation_log::{RevocationLog, RevocationTarget};"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 125,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "pub revocation_log: Option<std::sync::Arc<RevocationLog>>,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 134,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "revocation_log: None,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 157,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "self.revocation_log = Some(log);"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 187,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "if let Some(ref log) = self.revocation_log {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/kv_shredding.rs",
+      "line": 267,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "if let Some(ref log) = self.revocation_log {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/lib.rs",
+      "line": 54,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "pub mod kv_shredding;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/lib.rs",
+      "line": 55,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "pub mod revocation_log;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/lib.rs",
+      "line": 72,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/lib.rs",
+      "line": 85,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/lib.rs",
+      "line": 86,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/revocation_log.rs",
+      "line": 1,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "//! # Schl\u00fcssel-Widerrufs-Log (`revocation_log.rs`)"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/revocation_log.rs",
+      "line": 12,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "// ABGRENZUNG PROMPT 10: Prompt 10 definiert KEK/DEK Envelope-Datenstrukturen; revocation_log stellt"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/revocation_log.rs",
+      "line": 26,
+      "kind": "LEAK_REVOCATION_LOG",
+      "severity": "CRITICAL",
+      "description": "Legacy revocation_log reference (DEBT-01) (Rule M7)",
+      "snippet": "//! `revocation_log` stellt die kryptographische Widerrufs-Engine und Durchsetzung f\u00fcr Schl\u00fcssel und"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/revocation_log.rs",
+      "line": 327,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "use crate::kv_shredding::KeyRegistry;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/chain.rs",
+      "line": 8,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "use crate::deletion_proof::types::DeletionProof;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/chain.rs",
+      "line": 12,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "pub fn verify_proof_sequence(proofs: &[DeletionProof]) -> Result<bool> {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 15,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "impl DeletionProof {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 16,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Issues a new `DeletionProof` based on verified `LayerWitness` measurements."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 20,
+      "kind": "LEAK_SAGA",
+      "severity": "CRITICAL",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "saga: &contextra_types::SagaRecord,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 212,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Erstellt und signiert einen DeletionProof nach Layer-Bereinigung."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 232,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Erstellt und signiert einen DeletionProof (Version 2) inklusive optionaler WAL-HMAC-Kettenquittu"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 296,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Erstellt und signiert einen DeletionProof (Version 3) mit Ed25519."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 321,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive Verweis auf den Audit-C"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 348,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) inklusive optionaler WAL-HMAC-Ket"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/creation.rs",
+      "line": 375,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Erstellt und signiert einen DeletionProof (Version 3, Ed25519) mit allen optionalen Erweiterunge"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/key_derivation.rs",
+      "line": 11,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "pub const DELETION_PROOF_KEY_PURPOSE: &[u8] = b\"Contextra-v1-DeletionProof-Key-Derivation\";"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/mod.rs",
+      "line": 7,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "//! - `types.rs`: Datenstrukturen und Enums (DeletionProof, DeletionLayer, etc.)."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/mod.rs",
+      "line": 48,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "let proof = DeletionProof::create_v3("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/types.rs",
+      "line": 321,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "pub struct DeletionProof {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verification.rs",
+      "line": 17,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "impl DeletionProof {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verification.rs",
+      "line": 34,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Verifies the signature of this DeletionProof against a provided key."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 5,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "// ZWECK: Public facade for third-party DeletionProof and AuditChain verification without DB access."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 8,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "use crate::deletion_proof::types::DeletionProof;"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 89,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "///     DeletionProof, DeletionProofVerifier, DeletionScope, LayerCleanupProof, DeletionLayer"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 96,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// let proof = DeletionProof::create_v3("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 114,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Verifies a single standalone `DeletionProof` using a public key."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 116,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "proof: &DeletionProof,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 143,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Verifies a `DeletionProof` and checks tenant binding."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 145,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "proof: &DeletionProof,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 10,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope, LayerCleanupProof,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 36,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "if let Ok(proof) = bincode::deserialize::<DeletionProof>(&input.raw_bytes) {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 55,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "let valid_proof = match DeletionProof::create("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 74,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "match bincode::deserialize::<DeletionProof>(&serialized) {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 105,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "if let Ok(mut v3_proof) = DeletionProof::create_v3("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 127,
+      "kind": "LEAK_SAGA",
+      "severity": "CRITICAL",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "use contextra_types::{RequestContext, SagaRecord};"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 131,
+      "kind": "LEAK_SAGA",
+      "severity": "CRITICAL",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "let saga = SagaRecord::new([0xBB; 32]);"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs",
+      "line": 138,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "if let Ok(mut v5_proof) = DeletionProof::issue("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 10,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope, LayerCleanupProof,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 15,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Arbitrary raw bytes to attempt bincode deserialization into DeletionProof"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 19,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Fields to construct synthetic DeletionProof instances"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 35,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "if let Ok(deserialized_proof) = bincode::deserialize::<DeletionProof>(&input.raw_proof_bytes) {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 39,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "// Strategy 2: Construct synthetic DeletionProof with arbitrary/corrupt fields"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 79,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "let synthetic_proof = DeletionProof {"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 106,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "if let Ok(valid_v3) = DeletionProof::create_v3("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs",
+      "line": 123,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "if let Ok(valid_v2) = DeletionProof::create("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/benches/deletion_proof_latency_bench.rs",
+      "line": 3,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "CRITICAL",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Misst Erstellungs- und Verifikationszeiten f\u00fcr DSGVO-L\u00f6schzertifikate unter Last."
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/benches/deletion_proof_latency_bench.rs",
+      "line": 13,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/benches/deletion_proof_latency_bench.rs",
+      "line": 45,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "DeletionProof::create_with_wal_receipt("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/benches/deletion_proof_latency_bench.rs",
+      "line": 86,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "let proof = DeletionProof::create_with_wal_receipt("
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/benches/deletion_proof_latency_bench.rs",
+      "line": 133,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "let proof = DeletionProof::create_with_wal_receipt("
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/lib.rs",
+      "line": 21,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/lib.rs",
+      "line": 393,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/lib.rs",
+      "line": 397,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "summary_from_witness, ErasureFailure, ErasureReport, LayerSummary, ProofKeyProvider,"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/collections.rs",
+      "line": 303,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": ") -> Result<DeletionProof> {"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/collections.rs",
+      "line": 305,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "impl contextra_impl::erasure::ProofKeyProvider for InlineKeyProvider {"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/collections.rs",
+      "line": 327,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "\"ErasureReport was verified but contained no DeletionProof\".to_string(),"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 11,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "// INVARIANTEN: DeletionProof entsteht ausschlie\u00dflich nach unabh\u00e4ngiger LayerWitness-Messung aller S"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 22,
+      "kind": "LEAK_SAGA",
+      "severity": "CRITICAL",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 37,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "pub trait ProofKeyProvider: Send + Sync {"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 98,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "/// Cryptographic DeletionProof issued iff verified == true."
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 99,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "pub proof: Option<DeletionProof>,"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 113,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "/// Sets the [`ProofKeyProvider`] for resolving deletion proof signing keys."
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 114,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "pub fn set_proof_key_provider(&self, provider: Arc<dyn ProofKeyProvider>) {"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 118,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "/// Erg\u00e4nzt die Instanz um einen [`ProofKeyProvider`]."
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 119,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "pub fn with_proof_key_provider(self, provider: Arc<dyn ProofKeyProvider>) -> Self {"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 147,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "\"No ProofKeyProvider registered for deletion proof key resolution\","
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 314,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "// --- STUFE E: DeletionProof::issue ---"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 315,
+      "kind": "LEAK_SAGA",
+      "severity": "CRITICAL",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "let saga = SagaRecord::new(target_hash);"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 316,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "match DeletionProof::issue("
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 337,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "reason: format!(\"DeletionProof issuance failed: {e}\"),"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 356,
+      "kind": "LEAK_PROOF_KEY",
+      "severity": "CRITICAL",
+      "description": "Proof key provider reference in data kernel (Rule M7)",
+      "snippet": "\"No ProofKeyProvider registered for deletion proof key resolution\","
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 573,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "// --- STUFE E: DeletionProof::issue ---"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 574,
+      "kind": "LEAK_SAGA",
+      "severity": "CRITICAL",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "let saga = SagaRecord::new(target_hash);"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 575,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "let proof = match DeletionProof::issue("
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/contextra_impl/erasure.rs",
+      "line": 599,
+      "kind": "LEAK_DELETION_PROOF",
+      "severity": "CRITICAL",
+      "description": "Usage of DeletionProof in data kernel (Rule M7)",
+      "snippet": "reason: format!(\"DeletionProof issuance failed: {e}\"),"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/restricted.rs",
+      "line": 1,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "//! Dom\u00e4nenlogik f\u00fcr eingeschr\u00e4nkte Verarbeitung (Art. 18 DSGVO, SPEC \u00a711.2, D-116)."
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/restricted.rs",
+      "line": 21,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Gesetzlicher Ausnahmezweck nach Art. 18 Abs. 2 DSGVO (SPEC D-116)."
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/restricted.rs",
+      "line": 79,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Erstellt ein neues Zugriffsgesuch nach Art. 18 Abs. 2 DSGVO."
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/restricted.rs",
+      "line": 162,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Zustandsmodell f\u00fcr eingeschr\u00e4nkte Daten (Art. 18 DSGVO, SPEC \u00a711.2, D-116, D-119)."
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/supersede.rs",
+      "line": 26,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Purge: Vorherige Versionen werden gegated und physisch entfernt (Art. 16 DSGVO)."
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/saga/machine.rs",
+      "line": 40,
+      "kind": "LEAK_GDPR_TERMS",
+      "severity": "INFO",
+      "description": "GDPR/DSGVO legal reference in data kernel (Rule M7)",
+      "snippet": "/// Zugriffsbeschr\u00e4nkung aktiv (Art. 18 DSGVO, D-116)."
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/lib.rs",
+      "line": 26,
+      "kind": "LEAK_SAGA",
+      "severity": "INFO",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "RequestContext, RerankResult, Result, RetrievalStrategy, SagaRecord, ScanMethod,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/kv/segment.rs",
+      "line": 7,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "// ZWECK: Verdrahtung von KvDeleteMode und contextra_crypto::kv_shredding f\u00fcr KV-Segment-Verschl\u00fcsse"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/kv/segment.rs",
+      "line": 15,
+      "kind": "LEAK_KV_SHREDDING",
+      "severity": "CRITICAL",
+      "description": "Legacy kv_shredding reference (DEBT-01) (Rule M7)",
+      "snippet": "use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/lib.rs",
+      "line": 77,
+      "kind": "LEAK_SAGA",
+      "severity": "INFO",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "pub use witness::{RequestContext, SagaRecord, ScanMethod};"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/witness.rs",
+      "line": 13,
+      "kind": "LEAK_SAGA",
+      "severity": "INFO",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "//! - `SagaRecord`: Transaktions-Hash-Zusammenfassung f\u00fcr L\u00f6sch-Sagas."
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/witness.rs",
+      "line": 80,
+      "kind": "LEAK_SAGA",
+      "severity": "INFO",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "pub struct SagaRecord {"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/witness.rs",
+      "line": 85,
+      "kind": "LEAK_SAGA",
+      "severity": "INFO",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "impl SagaRecord {"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/witness.rs",
+      "line": 87,
+      "kind": "LEAK_SAGA",
+      "severity": "INFO",
+      "description": "Saga orchestration in data kernel (Rule M7)",
+      "snippet": "/// Creates a new `SagaRecord`."
+    }
+  ],
+  "sections": [
+    {
+      "header": "L\u00f6schketten-Entkopplungs-Status",
+      "content": "| Crate | Schicht/Rolle | Status | L\u00f6schdom\u00e4nen-Bez\u00fcge |\n|---|---|---|---|\n| `contextra-audit-export` | Kernel | **VERLETZUNG (M7)** | 20 |\n| `contextra-avv-generator` | Kernel | Zul\u00e4ssig (L\u00f6schdom\u00e4ne) | 56 |\n| `contextra-crypto` | Kernel | **VERLETZUNG (M7)** | 66 |\n| `contextra-engine` | Kernel | **VERLETZUNG (M7)** | 25 |\n| `contextra-erasure` | Kernel | Zul\u00e4ssig (L\u00f6schdom\u00e4ne) | 6 |\n| `contextra-ports` | Kernel | Zul\u00e4ssig (L\u00f6schdom\u00e4ne) | 1 |\n| `contextra-store` | Kernel | **VERLETZUNG (M7)** | 2 |\n| `contextra-types` | Kernel | Zul\u00e4ssig (L\u00f6schdom\u00e4ne) | 5 |"
+    }
+  ]
+}

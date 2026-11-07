@@ -1,0 +1,701 @@
+{
+  "tool_name": "error_topology_mapper.py",
+  "title": "Error Topology & Conversion Architecture Report",
+  "description": "Maps strongly-typed error definitions (thiserror), variants, error codes, and cross-boundary error conversion implementations (impl From<E>).",
+  "timestamp": "2026-11-07T23:15:42.238646+00:00",
+  "metrics": {
+    "total_error_enums": 43,
+    "total_error_variants": 312,
+    "total_conversions_from": 42
+  },
+  "findings_count": 85,
+  "findings": [
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/agent_memory.rs",
+      "line": 84,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for MemoryId"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/agent_memory.rs",
+      "line": 137,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<SearchResult> for Memory"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/collection_profile.rs",
+      "line": 92,
+      "kind": "ERROR_ENUM",
+      "name": "CollectionProfileError",
+      "variant_count": 2,
+      "description": "Error enum `CollectionProfileError` with 2 variants"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 51,
+      "kind": "ERROR_ENUM",
+      "name": "DurabilityConfigError",
+      "variant_count": 4,
+      "description": "Error enum `DurabilityConfigError` with 4 variants"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 126,
+      "kind": "ERROR_ENUM",
+      "name": "PerformanceProfileError",
+      "variant_count": 3,
+      "description": "Error enum `PerformanceProfileError` with 3 variants"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 60,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<DurabilityConfigError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 332,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<DurabilityMode> for contextra_db::DurabilityMode"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 342,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<contextra_db::DurabilityMode> for DurabilityMode"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/bandit.rs",
+      "line": 36,
+      "kind": "ERROR_ENUM",
+      "name": "BanditError",
+      "variant_count": 8,
+      "description": "Error enum `BanditError` with 8 variants"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/bandit.rs",
+      "line": 61,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<BanditError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/flow_thompson.rs",
+      "line": 29,
+      "kind": "ERROR_ENUM",
+      "name": "FcTsError",
+      "variant_count": 5,
+      "description": "Error enum `FcTsError` with 5 variants"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/flow_thompson.rs",
+      "line": 713,
+      "kind": "ERROR_ENUM",
+      "name": "OffPolicyError",
+      "variant_count": 1,
+      "description": "Error enum `OffPolicyError` with 1 variants"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/flow_thompson.rs",
+      "line": 46,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<FcTsError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/flow_thompson.rs",
+      "line": 719,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<OffPolicyError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/rie_greedy.rs",
+      "line": 12,
+      "kind": "ERROR_ENUM",
+      "name": "RieGreedyError",
+      "variant_count": 5,
+      "description": "Error enum `RieGreedyError` with 5 variants"
+    },
+    {
+      "crate": "contextra-adapt",
+      "file": "crates/contextra-adapt/src/rie_greedy.rs",
+      "line": 29,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<RieGreedyError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-audit-export",
+      "file": "crates/contextra-audit-export/src/error.rs",
+      "line": 7,
+      "kind": "ERROR_ENUM",
+      "name": "AuditExportError",
+      "variant_count": 5,
+      "description": "Error enum `AuditExportError` with 5 variants"
+    },
+    {
+      "crate": "contextra-avv-generator",
+      "file": "crates/contextra-avv-generator/src/error.rs",
+      "line": 32,
+      "kind": "ERROR_ENUM",
+      "name": "AvvError",
+      "variant_count": 11,
+      "description": "Error enum `AvvError` with 11 variants"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/ed25519_proof.rs",
+      "line": 29,
+      "kind": "ERROR_ENUM",
+      "name": "DeletionProofError",
+      "variant_count": 3,
+      "description": "Error enum `DeletionProofError` with 3 variants"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/ed25519_proof.rs",
+      "line": 157,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<SignatureVersion> for u8"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/error.rs",
+      "line": 21,
+      "kind": "ERROR_ENUM",
+      "name": "CryptoError",
+      "variant_count": 18,
+      "description": "Error enum `CryptoError` with 18 variants"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/error.rs",
+      "line": 85,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<CryptoError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/deletion_proof/verifier.rs",
+      "line": 14,
+      "kind": "ERROR_ENUM",
+      "name": "VerificationError",
+      "variant_count": 16,
+      "description": "Error enum `VerificationError` with 16 variants"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/volatile_vault.rs",
+      "line": 154,
+      "kind": "ERROR_ENUM",
+      "name": "VaultError",
+      "variant_count": 5,
+      "description": "Error enum `VaultError` with 5 variants"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/strategy.rs",
+      "line": 71,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<GraphTraversalStrategy> for SearchStrategy"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/weights.rs",
+      "line": 33,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<SignalWeights> for FusionWeights"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/weights.rs",
+      "line": 39,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<FusionWeights> for SignalWeights"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/error.rs",
+      "line": 7,
+      "kind": "ERROR_ENUM",
+      "name": "ErasureError",
+      "variant_count": 21,
+      "description": "Error enum `ErasureError` with 21 variants"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 1073,
+      "kind": "ERROR_ENUM",
+      "name": "SignerError",
+      "variant_count": 3,
+      "description": "Error enum `SignerError` with 3 variants"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 1153,
+      "kind": "ERROR_ENUM",
+      "name": "ObserverError",
+      "variant_count": 3,
+      "description": "Error enum `ObserverError` with 3 variants"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/arc_slice.rs",
+      "line": 123,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<Arc> for ArcSlice"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/arc_slice.rs",
+      "line": 130,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<Vec> for ArcSlice"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/hyperedge_suggest.rs",
+      "line": 45,
+      "kind": "ERROR_ENUM",
+      "name": "HyperedgeSuggestError",
+      "variant_count": 1,
+      "description": "Error enum `HyperedgeSuggestError` with 1 variants"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/hyperedge_suggest.rs",
+      "line": 51,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<HyperedgeSuggestError> for GraphMutationError"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/tl_hfd/error.rs",
+      "line": 8,
+      "kind": "ERROR_ENUM",
+      "name": "TlHfdError",
+      "variant_count": 2,
+      "description": "Error enum `TlHfdError` with 2 variants"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/tl_hfd/error.rs",
+      "line": 18,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<TlHfdError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/apprh/error.rs",
+      "line": 8,
+      "kind": "ERROR_ENUM",
+      "name": "ApprhError",
+      "variant_count": 3,
+      "description": "Error enum `ApprhError` with 3 variants"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/apprh/error.rs",
+      "line": 22,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<ApprhError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-ingest",
+      "file": "crates/contextra-ingest/src/error.rs",
+      "line": 52,
+      "kind": "ERROR_ENUM",
+      "name": "IngestError",
+      "variant_count": 14,
+      "description": "Error enum `IngestError` with 14 variants"
+    },
+    {
+      "crate": "contextra-ingest",
+      "file": "crates/contextra-ingest/src/error.rs",
+      "line": 85,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<IngestError> for ContextraError"
+    },
+    {
+      "crate": "contextra-license",
+      "file": "crates/contextra-license/src/signed_gate.rs",
+      "line": 87,
+      "kind": "ERROR_ENUM",
+      "name": "StepVerificationError",
+      "variant_count": 7,
+      "description": "Error enum `StepVerificationError` with 7 variants"
+    },
+    {
+      "crate": "contextra-license",
+      "file": "crates/contextra-license/src/signed_gate.rs",
+      "line": 288,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<LegacyLicensePayload> for LicensePayload"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/egress_gateway.rs",
+      "line": 11,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<EgressError> for McpError"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/proof_key.rs",
+      "line": 33,
+      "kind": "ERROR_ENUM",
+      "name": "ProofKeyError",
+      "variant_count": 1,
+      "description": "Error enum `ProofKeyError` with 1 variants"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/protocol.rs",
+      "line": 15,
+      "kind": "ERROR_ENUM",
+      "name": "McpError",
+      "variant_count": 5,
+      "description": "Error enum `McpError` with 5 variants"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/protocol.rs",
+      "line": 60,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<contextra_types::ContextraError> for McpError"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/protocol.rs",
+      "line": 70,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for McpError"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/embedding.rs",
+      "line": 65,
+      "kind": "ERROR_ENUM",
+      "name": "EmbeddingError",
+      "variant_count": 5,
+      "description": "Error enum `EmbeddingError` with 5 variants"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/graph.rs",
+      "line": 93,
+      "kind": "ERROR_ENUM",
+      "name": "GraphMutationError",
+      "variant_count": 12,
+      "description": "Error enum `GraphMutationError` with 12 variants"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/graph.rs",
+      "line": 30,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u32> for RoleId"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/graph.rs",
+      "line": 79,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for HyperEdgeId"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/graph.rs",
+      "line": 139,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<GraphMutationError> for ContextraError"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/license.rs",
+      "line": 55,
+      "kind": "ERROR_ENUM",
+      "name": "LicenseError",
+      "variant_count": 3,
+      "description": "Error enum `LicenseError` with 3 variants"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/observer.rs",
+      "line": 62,
+      "kind": "ERROR_ENUM",
+      "name": "ObserverError",
+      "variant_count": 3,
+      "description": "Error enum `ObserverError` with 3 variants"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 68,
+      "kind": "ERROR_ENUM",
+      "name": "PluginError",
+      "variant_count": 3,
+      "description": "Error enum `PluginError` with 3 variants"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 82,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<PluginError> for crate::ContextraError"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/report_signer.rs",
+      "line": 30,
+      "kind": "ERROR_ENUM",
+      "name": "SignerError",
+      "variant_count": 3,
+      "description": "Error enum `SignerError` with 3 variants"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/scanner/layer.rs",
+      "line": 63,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for WitnessLayer"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs",
+      "line": 30,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for SessionId"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+      "line": 40,
+      "kind": "ERROR_ENUM",
+      "name": "ContextEditAuditError",
+      "variant_count": 1,
+      "description": "Error enum `ContextEditAuditError` with 1 variants"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_vault.rs",
+      "line": 237,
+      "kind": "ERROR_ENUM",
+      "name": "EgressVaultError",
+      "variant_count": 7,
+      "description": "Error enum `EgressVaultError` with 7 variants"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/error.rs",
+      "line": 17,
+      "kind": "ERROR_ENUM",
+      "name": "EgressError",
+      "variant_count": 7,
+      "description": "Error enum `EgressError` with 7 variants"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/error.rs",
+      "line": 45,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<crate::egress_vault::EgressVaultError> for EgressError"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/src/calibration/conformal.rs",
+      "line": 15,
+      "kind": "ERROR_ENUM",
+      "name": "ConformalError",
+      "variant_count": 5,
+      "description": "Error enum `ConformalError` with 5 variants"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/arm_registry.rs",
+      "line": 34,
+      "kind": "ERROR_ENUM",
+      "name": "ArmRegistryError",
+      "variant_count": 1,
+      "description": "Error enum `ArmRegistryError` with 1 variants"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/fc_ts_dispatch.rs",
+      "line": 21,
+      "kind": "ERROR_ENUM",
+      "name": "FcTsDispatchError",
+      "variant_count": 2,
+      "description": "Error enum `FcTsDispatchError` with 2 variants"
+    },
+    {
+      "crate": "contextra-sandbox",
+      "file": "crates/contextra-sandbox/src/approval.rs",
+      "line": 61,
+      "kind": "ERROR_ENUM",
+      "name": "ApprovalTransitionError",
+      "variant_count": 7,
+      "description": "Error enum `ApprovalTransitionError` with 7 variants"
+    },
+    {
+      "crate": "contextra-sandbox",
+      "file": "crates/contextra-sandbox/src/error.rs",
+      "line": 7,
+      "kind": "ERROR_ENUM",
+      "name": "SandboxError",
+      "variant_count": 10,
+      "description": "Error enum `SandboxError` with 10 variants"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/config.rs",
+      "line": 25,
+      "kind": "ERROR_ENUM",
+      "name": "DurabilityConfigError",
+      "variant_count": 4,
+      "description": "Error enum `DurabilityConfigError` with 4 variants"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/config.rs",
+      "line": 34,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<DurabilityConfigError> for contextra_types::ContextraError"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/encode.rs",
+      "line": 12,
+      "kind": "ERROR_ENUM",
+      "name": "WalParseError",
+      "variant_count": 9,
+      "description": "Error enum `WalParseError` with 9 variants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 38,
+      "kind": "ERROR_ENUM",
+      "name": "HnswDeletionError",
+      "variant_count": 4,
+      "description": "Error enum `HnswDeletionError` with 4 variants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 129,
+      "kind": "ERROR_ENUM",
+      "name": "ContextraError",
+      "variant_count": 69,
+      "description": "Error enum `ContextraError` with 69 variants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 81,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for StepId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 499,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<std::array::TryFromSliceError> for ContextraError"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 75,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<ContextraError> for ContextraErrorDto"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 81,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for ContextraErrorDto"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 62,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<FusionStrategy> for SignalFusionStrategies"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 152,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for CollectionId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 277,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for DocId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 284,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u128> for DocId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 366,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for EntityId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 401,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for EntityId"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/acorn/mod.rs",
+      "line": 30,
+      "kind": "ERROR_ENUM",
+      "name": "AcornError",
+      "variant_count": 7,
+      "description": "Error enum `AcornError` with 7 variants"
+    },
+    {
+      "crate": "contextra-wire",
+      "file": "crates/contextra-wire/src/verification.rs",
+      "line": 34,
+      "kind": "ERROR_ENUM",
+      "name": "FlatBufferError",
+      "variant_count": 4,
+      "description": "Error enum `FlatBufferError` with 4 variants"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Erfasste Error-Klassen",
+      "content": "| Crate | Error-Typ | Zeile | Varianten | Datei |\n|---|---|---|---|---|\n| `contextra` | `CollectionProfileError` | 92 | 2 | `crates/contextra/src/collection_profile.rs` |\n| `contextra` | `DurabilityConfigError` | 51 | 4 | `crates/contextra/src/performance_profile.rs` |\n| `contextra` | `PerformanceProfileError` | 126 | 3 | `crates/contextra/src/performance_profile.rs` |\n| `contextra-adapt` | `BanditError` | 36 | 8 | `crates/contextra-adapt/src/bandit.rs` |\n| `contextra-adapt` | `FcTsError` | 29 | 5 | `crates/contextra-adapt/src/flow_thompson.rs` |\n| `contextra-adapt` | `OffPolicyError` | 713 | 1 | `crates/contextra-adapt/src/flow_thompson.rs` |\n| `contextra-adapt` | `RieGreedyError` | 12 | 5 | `crates/contextra-adapt/src/rie_greedy.rs` |\n| `contextra-audit-export` | `AuditExportError` | 7 | 5 | `crates/contextra-audit-export/src/error.rs` |\n| `contextra-avv-generator` | `AvvError` | 32 | 11 | `crates/contextra-avv-generator/src/error.rs` |\n| `contextra-crypto` | `DeletionProofError` | 29 | 3 | `crates/contextra-crypto/src/ed25519_proof.rs` |\n| `contextra-crypto` | `CryptoError` | 21 | 18 | `crates/contextra-crypto/src/error.rs` |\n| `contextra-crypto` | `VerificationError` | 14 | 16 | `crates/contextra-crypto/src/deletion_proof/verifier.rs` |\n| `contextra-db` | `VaultError` | 154 | 5 | `crates/contextra-db/src/volatile_vault.rs` |\n| `contextra-erasure` | `ErasureError` | 7 | 21 | `crates/contextra-erasure/src/error.rs` |\n| `contextra-erasure` | `SignerError` | 1073 | 3 | `crates/contextra-erasure/src/types_local.rs` |\n| `contextra-erasure` | `ObserverError` | 1153 | 3 | `crates/contextra-erasure/src/types_local.rs` |\n| `contextra-graph` | `HyperedgeSuggestError` | 45 | 1 | `crates/contextra-graph/src/hyperedge_suggest.rs` |\n| `contextra-graph` | `TlHfdError` | 8 | 2 | `crates/contextra-graph/src/tl_hfd/error.rs` |\n| `contextra-graph` | `ApprhError` | 8 | 3 | `crates/contextra-graph/src/apprh/error.rs` |\n| `contextra-ingest` | `IngestError` | 52 | 14 | `crates/contextra-ingest/src/error.rs` |\n| `contextra-license` | `StepVerificationError` | 87 | 7 | `crates/contextra-license/src/signed_gate.rs` |\n| `contextra-mcp` | `ProofKeyError` | 33 | 1 | `crates/contextra-mcp/src/proof_key.rs` |\n| `contextra-mcp` | `McpError` | 15 | 5 | `crates/contextra-mcp/src/protocol.rs` |\n| `contextra-ports` | `EmbeddingError` | 65 | 5 | `crates/contextra-ports/src/embedding.rs` |\n| `contextra-ports` | `GraphMutationError` | 93 | 12 | `crates/contextra-ports/src/graph.rs` |\n| `contextra-ports` | `LicenseError` | 55 | 3 | `crates/contextra-ports/src/license.rs` |\n| `contextra-ports` | `ObserverError` | 62 | 3 | `crates/contextra-ports/src/observer.rs` |\n| `contextra-ports` | `PluginError` | 68 | 3 | `crates/contextra-ports/src/plugin.rs` |\n| `contextra-ports` | `SignerError` | 30 | 3 | `crates/contextra-ports/src/report_signer.rs` |\n| `contextra-privacy` | `ContextEditAuditError` | 40 | 1 | `crates/contextra-privacy/src/context_edit_audit.rs` |\n| `contextra-privacy` | `EgressVaultError` | 237 | 7 | `crates/contextra-privacy/src/egress_vault.rs` |\n| `contextra-privacy` | `EgressError` | 17 | 7 | `crates/contextra-privacy/src/error.rs` |\n| `contextra-rank` | `ConformalError` | 15 | 5 | `crates/contextra-rank/src/calibration/conformal.rs` |\n| `contextra-router` | `ArmRegistryError` | 34 | 1 | `crates/contextra-router/src/arm_registry.rs` |\n| `contextra-router` | `FcTsDispatchError` | 21 | 2 | `crates/contextra-router/src/fc_ts_dispatch.rs` |\n| `contextra-sandbox` | `ApprovalTransitionError` | 61 | 7 | `crates/contextra-sandbox/src/approval.rs` |\n| `contextra-sandbox` | `SandboxError` | 7 | 10 | `crates/contextra-sandbox/src/error.rs` |\n| `contextra-store` | `DurabilityConfigError` | 25 | 4 | `crates/contextra-store/src/lsm/config.rs` |\n| `contextra-store` | `WalParseError` | 12 | 9 | `crates/contextra-store/src/wal/encode.rs` |\n| `contextra-types` | `HnswDeletionError` | 38 | 4 | `crates/contextra-types/src/error.rs` |\n| `contextra-types` | `ContextraError` | 129 | 69 | `crates/contextra-types/src/error.rs` |\n| `contextra-vector` | `AcornError` | 30 | 7 | `crates/contextra-vector/src/acorn/mod.rs` |\n| `contextra-wire` | `FlatBufferError` | 34 | 4 | `crates/contextra-wire/src/verification.rs` |"
+    }
+  ]
+}
