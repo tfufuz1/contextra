@@ -17,15 +17,81 @@ use crate::chunking::ChunkDraft;
 use crate::error::IngestError;
 use crate::ir::DocumentIr;
 use crate::limits::IngestLimits;
-use contextra_engine::chunker::{chunk_text_with_overlap, estimate_tokens};
 use contextra_types::{ContextChunk, DocId};
 use std::ops::Range;
 
-/// Schätzt die Token-Anzahl eines Textes via engine estimate_tokens.
+/// Schätzt die Token-Anzahl eines Textes mit heuristischen Regeln (autark ohne Engine-Kopplung).
 // ANCHOR[contextra-ingest:CHK-0201]
 // fn `token_count` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn token_count(text: &str) -> usize {
     estimate_tokens(text)
+}
+
+/// Autarke heuristische Token-Schätzung für Fließtext, Codeblöcke und Tabellen.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub fn estimate_tokens(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let mut tokens: f64 = 0.0;
+    let mut in_fence = false;
+    let code_multiplier = 1.8f64;
+
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            tokens += 1.0;
+            continue;
+        }
+
+        let multiplier = if in_fence { code_multiplier } else { 1.0 };
+
+        let mut char_iter = line.chars().peekable();
+        while let Some(c) = char_iter.next() {
+            match c {
+                '\u{4E00}'..='\u{9FFF}'
+                | '\u{3400}'..='\u{4DBF}'
+                | '\u{20000}'..='\u{2A6DF}'
+                | '\u{3040}'..='\u{309F}'
+                | '\u{30A0}'..='\u{30FF}' => {
+                    tokens += 1.0 * multiplier;
+                }
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    let mut word_len = 1usize;
+                    while char_iter
+                        .peek()
+                        .is_some_and(|ch| ch.is_alphanumeric() || *ch == '_')
+                    {
+                        char_iter.next();
+                        word_len += 1;
+                    }
+                    let word_tokens = if word_len <= 4 {
+                        1.0
+                    } else {
+                        1.0 + (word_len as f64 - 4.0) / 4.0
+                    };
+                    tokens += word_tokens * multiplier;
+                }
+                '0'..='9' => {
+                    let mut num_len = 1usize;
+                    while char_iter.peek().is_some_and(|ch| ch.is_ascii_digit()) {
+                        char_iter.next();
+                        num_len += 1;
+                    }
+                    tokens += ((num_len as f64) / 3.0).ceil() * multiplier;
+                }
+                ' ' | '\t' => {}
+                _ => {
+                    tokens += 0.25 * multiplier;
+                }
+            }
+        }
+        tokens += 0.1;
+    }
+
+    (tokens.ceil() as usize).max(1)
 }
 
 /// UTF-8-sicheres Window-Splitting mit Overlap (Span-Mapping).
@@ -48,6 +114,48 @@ pub fn window_split(text: &str, window_chars: usize, overlap_chars: usize) -> Ve
     }
 
     spans
+}
+
+/// Erzeugt überlappende Text-Chunks mit definierter Fenstergröße und Überlappung (autark ohne Engine).
+pub fn chunk_text_with_overlap(text: &str, window_chars: usize, overlap_chars: usize) -> Vec<&str> {
+    if text.is_empty() || window_chars == 0 {
+        return Vec::new();
+    }
+
+    let indices: Vec<usize> = text
+        .char_indices()
+        .map(|(idx, _)| idx)
+        .chain(std::iter::once(text.len()))
+        .collect();
+
+    let total_chars = indices.len().saturating_sub(1);
+    let overlap = overlap_chars.min(window_chars.saturating_sub(1));
+    let step = window_chars.saturating_sub(overlap).max(1);
+
+    let mut chunks = Vec::new();
+    let mut start_char = 0;
+
+    while start_char < total_chars {
+        let end_char = (start_char.saturating_add(window_chars)).min(total_chars);
+        let Some(&start_byte) = indices.get(start_char) else {
+            break;
+        };
+        let Some(&end_byte) = indices.get(end_char) else {
+            break;
+        };
+
+        if let Some(slice) = text.get(start_byte..end_byte) {
+            chunks.push(slice);
+        }
+
+        if end_char == total_chars {
+            break;
+        }
+
+        start_char = start_char.saturating_add(step);
+    }
+
+    chunks
 }
 
 /// Wandelt ChunkDrafts in fertige `ContextChunk`-Instanzen um. Verwirft leere Drafts
