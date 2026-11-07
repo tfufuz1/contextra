@@ -4,7 +4,7 @@
 //! die auf einem `ErasedSet` aufbaut und Lese-Linearisierung unterstützt.
 
 use super::erased_set::ErasedSet;
-use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
+use crate::types_local::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
 use parking_lot::RwLock;
 use std::sync::Arc;
 

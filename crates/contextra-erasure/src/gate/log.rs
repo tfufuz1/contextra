@@ -3,7 +3,7 @@
 //! Das Log enthält `Add` und `Remove`-Einträge für Gates.
 //! Format: AEAD-geschützt, Hash-Kette, ein fsync je Gruppe.
 
-use contextra_ports::gate::Seq;
+use crate::types_local::Seq;
 use serde::{Deserialize, Serialize};
 
 /// Prädikat eines GateLog-Eintrags nach SPEC F.9.
@@ -179,8 +179,8 @@ impl GateLog {
                     }
 
                     // Fallback auf die 16-Byte-Grenzen
-                    let k_lo = contextra_ports::gate::KeyBuf::new(*lo);
-                    let k_hi = contextra_ports::gate::KeyBuf::new(*hi);
+                    let k_lo = crate::types_local::KeyBuf::new(*lo);
+                    let k_hi = crate::types_local::KeyBuf::new(*hi);
                     if *is_erased {
                         set.add_erased(k_lo, k_hi, Seq::new(*gated_seq));
                     } else {

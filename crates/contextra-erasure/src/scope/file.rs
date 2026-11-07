@@ -5,11 +5,11 @@
 
 use super::codec::{decode_scope, encode_scope};
 use super::set::LayerScopeSet;
+use crate::crypto_local::Dek;
+use crate::crypto_local::SecretKey;
+use crate::crypto_local::{open_record, seal_record};
 use crate::error::ErasureError;
-use contextra_crypto::aead::{open_record, seal_record};
-use contextra_crypto::dek::Dek;
-use contextra_crypto::secret::SecretKey;
-use contextra_ports::keys::{FileId, FileKeyring, FileKind as PortFileKind};
+use crate::types_local::{FileId, FileKeyring, FileKind as PortFileKind};
 use contextra_ports::vfs::Vfs;
 use std::path::PathBuf;
 

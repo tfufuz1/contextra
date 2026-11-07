@@ -10,6 +10,7 @@
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
 
+pub mod crypto_local;
 pub mod error;
 pub mod gate;
 pub mod io;
@@ -24,4 +25,5 @@ pub mod restricted;
 pub mod saga;
 pub mod scope;
 pub mod supersede;
+pub mod types_local;
 pub mod vault;

@@ -18,24 +18,24 @@ use contextra_erasure::saga::machine::{EraseSaga, SagaState};
 use contextra_erasure::saga::seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
-use contextra_ports::barrier::{
-    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
-};
-use contextra_ports::clock::Clock;
-use contextra_ports::erasure::{
+use contextra_erasure::types_local::GateDecision;
+use contextra_erasure::types_local::OperatorRef;
+use contextra_erasure::types_local::{
     Armed, EraseTarget, ErasureLayer, KeyCoverage, LayerId, LayerScope, LayerWitness, PurgeCx,
     PurgeOutcome, Scanner,
 };
-use contextra_ports::gate::GateDecision;
-use contextra_ports::id_gen::IdGen;
-use contextra_ports::observer::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError};
-use contextra_ports::BoxFuture;
-use contextra_types::erasure::{
+use contextra_erasure::types_local::{
+    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
+};
+use contextra_erasure::types_local::{
     EraseMode, ErasureStatus, PendingReason, Phase, RefusalReason, RetentionAttestation,
     RetentionCode, Timing,
 };
-use contextra_types::ids::{ErasureId, Timestamp};
-use contextra_types::refs::OperatorRef;
+use contextra_erasure::types_local::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError};
+use contextra_erasure::types_local::{ErasureId, Timestamp};
+use contextra_ports::clock::Clock;
+use contextra_ports::id_gen::IdGen;
+use contextra_ports::BoxFuture;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};

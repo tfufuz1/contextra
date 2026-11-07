@@ -5,8 +5,9 @@
 use contextra_erasure::error::ErasureError;
 use contextra_erasure::measure::field::{Mk3StatusInput, ScanPlan, StructureDecoder};
 use contextra_erasure::measure::scanner_flow::scan_with_control;
-use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
-use contextra_types::erasure::{LayerId, MeasureClass};
+use contextra_erasure::types_local::{LayerId, MeasureClass};
+use contextra_erasure::types_local::{VfsFile, VfsOpenOptions};
+use contextra_ports::vfs::Vfs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -77,17 +78,6 @@ impl VfsFile for TestMemoryVfsFile {
 }
 
 impl Vfs for TestMemoryVfs {
-    fn open(
-        &self,
-        path: &Path,
-        _opts: &VfsOpenOptions,
-    ) -> contextra_ports::Result<Box<dyn VfsFile>> {
-        Ok(Box::new(TestMemoryVfsFile {
-            path: path.to_path_buf(),
-            vfs: self.clone(),
-        }))
-    }
-
     fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
         let files = self.files.lock().unwrap();
         files

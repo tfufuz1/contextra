@@ -3,8 +3,8 @@
 //! Vor dem echten Scan muss der Scanner beweisen, dass er das Kontrollmuster findet.
 //! Nur `measure`-intern erlaubt (L-5).
 
+use crate::types_local::ControlEvidence;
 use contextra_ports::vfs::Vfs;
-use contextra_types::erasure::ControlEvidence;
 use std::path::Path;
 
 /// Führt eine echte Positivkontrolle im Speicher durch:

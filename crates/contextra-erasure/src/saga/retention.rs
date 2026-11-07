@@ -1,6 +1,6 @@
 //! Prüfung von Aufbewahrungspflichten und Restriktionen (SPEC §7.3, §11.2, D-15, ER-19).
 
-use contextra_types::erasure::{RetentionAttestation, RetentionCode};
+use crate::types_local::{RetentionAttestation, RetentionCode};
 
 /// Prüft ob die Attestierung eine aktive Aufbewahrungspflicht anzeigt.
 pub fn is_retention_active(att: &RetentionAttestation) -> bool {

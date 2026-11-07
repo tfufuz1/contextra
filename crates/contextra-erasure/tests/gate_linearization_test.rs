@@ -15,8 +15,8 @@ use contextra_erasure::gate::batch::{
 use contextra_erasure::gate::erased_set::ErasedSet;
 use contextra_erasure::gate::log::GateLog;
 use contextra_erasure::gate::read_gate::GateGuard;
-use contextra_ports::barrier::{BarrierExclusive, BarrierShared, CommitBarrier};
-use contextra_ports::gate::{GateDecision, KeyBuf, ReadGate, Seq};
+use contextra_erasure::types_local::{BarrierExclusive, BarrierShared, CommitBarrier};
+use contextra_erasure::types_local::{GateDecision, KeyBuf, ReadGate, Seq};
 use contextra_ports::BoxFuture;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};

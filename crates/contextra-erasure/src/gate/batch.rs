@@ -15,8 +15,8 @@
 use crate::error::ErasureError;
 use crate::gate::erased_set::ErasedSet;
 use crate::gate::log::{GateLog, GateLogEntry, GatePredicate};
-use contextra_ports::barrier::CommitBarrier;
-use contextra_ports::gate::{KeyBuf, Seq};
+use crate::types_local::CommitBarrier;
+use crate::types_local::{KeyBuf, Seq};
 use parking_lot::RwLock;
 use std::sync::Arc;
 

@@ -12,7 +12,8 @@
 use contextra_erasure::journal::appendlog::DurableJournal;
 use contextra_erasure::journal::epoch::{compute_commitment, EpochKeys};
 use contextra_erasure::journal::record::{JournalRecord, RecordCode, TargetType};
-use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
+use contextra_erasure::types_local::{VfsFile, VfsOpenOptions};
+use contextra_ports::vfs::Vfs;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -84,26 +85,6 @@ impl TrackingVfs {
 }
 
 impl Vfs for TrackingVfs {
-    fn open(
-        &self,
-        path: &Path,
-        opts: &VfsOpenOptions,
-    ) -> contextra_ports::Result<Box<dyn VfsFile>> {
-        let mut files = self.files.write();
-        let entry = files
-            .entry(path.to_path_buf())
-            .or_insert_with(|| Arc::new(RwLock::new(Vec::new())));
-
-        if opts.truncate {
-            entry.write().clear();
-        }
-
-        Ok(Box::new(MemFile {
-            data: Arc::clone(entry),
-            sync_count: Arc::clone(&self.sync_counter),
-        }))
-    }
-
     fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
         let files = self.files.read();
         files

@@ -9,8 +9,8 @@
 
 use contextra_erasure::journal::{ErasureJournal, JournalEntry};
 use contextra_erasure::saga::{EraseSaga, SagaDriver, SagaState, StepOutcome};
-use contextra_types::erasure::PendingReason;
-use contextra_types::ids::ErasureId;
+use contextra_erasure::types_local::ErasureId;
+use contextra_erasure::types_local::PendingReason;
 
 #[tokio::test]
 async fn t_crash_1_and_idempotence() {

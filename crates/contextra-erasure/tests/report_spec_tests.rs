@@ -5,8 +5,8 @@
 use contextra_erasure::report::build::build_report;
 use contextra_erasure::report::canonical::to_canonical_json_string;
 use contextra_erasure::report::signing::ReportSigner;
+use contextra_erasure::types_local::ErasureId;
 use contextra_ports::vfs::Vfs;
-use contextra_types::ids::ErasureId;
 use ed25519_dalek::SigningKey;
 use std::path::Path;
 use std::sync::Arc;

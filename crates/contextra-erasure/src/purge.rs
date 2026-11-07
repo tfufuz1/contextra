@@ -12,6 +12,6 @@ pub use order::{LayerPurgeOrder, PurgePriority};
 pub use reserve::{check_disk_reserve, ReserveCheck};
 pub use window::{run_core_window, run_window, WindowOutcome};
 
-pub use contextra_ports::observer::{
+pub use crate::types_local::{
     ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind,
 };

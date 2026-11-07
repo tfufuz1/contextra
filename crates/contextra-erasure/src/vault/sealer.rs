@@ -6,11 +6,11 @@
 //! Fehlt einer der Ahnen-Slots T/C/S/D im Tresor, ist der DEK nicht ableitbar (`Erased`).
 //! `make_slots_durable`: synchronisiert alle berührten Shards über VFS vor WAL-Schreibvorgängen (I-9).
 
+use crate::crypto_local::{derive_dek, AncestorSalts, UnitKey};
+use crate::types_local::{Envelope, RecordSealer, SealCtx};
+use crate::types_local::{KeyBuf, KeyRange};
 use crate::vault::slot::SlotType;
 use crate::vault::FileVault;
-use contextra_crypto::{derive_dek, AncestorSalts, UnitKey};
-use contextra_ports::gate::{KeyBuf, KeyRange};
-use contextra_ports::keys::{Envelope, RecordSealer, SealCtx};
 use contextra_ports::BoxFuture;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -101,7 +101,7 @@ impl VaultSealer {
             Err(e) => return Err(format!("Vault get failed: {e:?}")),
         };
 
-        let unit_key = UnitKey(contextra_crypto::SecretKey::new(self.k_unit));
+        let unit_key = UnitKey(crate::crypto_local::SecretKey::new(self.k_unit));
         let ancestors = AncestorSalts {
             t: salt_t,
             c: salt_c,
