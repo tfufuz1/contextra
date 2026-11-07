@@ -201,6 +201,12 @@ mod tests {
         assert_eq!(handle_normal.join().unwrap(), 142);
 
         // 3. Verify active_jobs returns to 0 and max_workers capacity is unchanged.
+        // Spin-wait briefly to ensure worker thread has executed fetch_sub on active_jobs.
+        let mut attempts = 0;
+        while pool.active_jobs() > 0 && attempts < 100 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            attempts += 1;
+        }
         assert_eq!(pool.active_jobs(), 0);
         assert_eq!(pool.max_workers(), 1);
     }
