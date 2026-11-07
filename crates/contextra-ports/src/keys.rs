@@ -143,7 +143,7 @@ pub trait RecordSealer: Send + Sync {
     /// Decrypts envelope. If slot was destroyed/missing, returns error indicating erasure.
     ///
     /// # Fehler
-    /// Liefert Fehler falls Schlüssel vernichtet wurde (Löschung) oder Entschlüsselung fehlschlägt.
+    /// Liefert Fehler falls Schlüssel vernichtet wurde oder Entschlüsselung fehlschlägt.
     ///
     /// # Crash
     /// Reiner kryptografischer Entschlüsselungszugriff ohne Seiteneffekte.

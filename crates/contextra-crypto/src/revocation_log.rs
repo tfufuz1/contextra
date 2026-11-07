@@ -518,4 +518,14 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_vfs_conformance() {
+        let vfs = TestVfs::new();
+        let p = Path::new("test");
+        let _ = vfs.create_dir_all(p);
+        let _ = vfs.remove_file(p);
+        let _ = vfs.list_dir(p);
+        let _ = vfs.sync_dir(p);
+    }
 }

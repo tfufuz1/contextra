@@ -121,7 +121,7 @@ impl Default for VaultConfig {
 // ANCHOR[contextra-db:VAULT-007]
 /// Quittung nach erfolgreicher flüchtiger Speicherbereinigung via [`VolatileContextVault::purge_memory()`].
 #[derive(Debug)]
-pub struct PurgeReceipt {
+pub struct VolatileDrainReceipt {
     /// Anzahl überschriebener und verworfener Chunks.
     pub chunks_purged: usize,
     /// Exakte Anzahl an Bytes, die im RAM mit Nullen überschrieben wurden.

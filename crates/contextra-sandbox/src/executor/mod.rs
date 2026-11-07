@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-30T00:00:00Z
-// ZWECK: WasmExecutor API and facade (§4.18)
-// INVARIANTEN: #![forbid(unsafe_code)], fresh store/instance per call, strict fuel & timeout bounds
-
 pub(crate) mod runner;
 pub(crate) mod state;
 

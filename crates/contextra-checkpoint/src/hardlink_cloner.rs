@@ -47,7 +47,7 @@ impl SnapshotPinner for () {
     }
 }
 
-#[cfg(any(test, feature = "mvcc"))]
+#[cfg(feature = "mvcc")]
 impl SnapshotPinner for Arc<contextra_mvcc::SnapshotRegistry> {
     fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
         Box::new(self.register(seq_no))
@@ -55,7 +55,7 @@ impl SnapshotPinner for Arc<contextra_mvcc::SnapshotRegistry> {
 }
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
-#[cfg(any(test, feature = "mvcc"))]
+#[cfg(feature = "mvcc")]
 use std::sync::Arc;
 
 #[cfg(not(loom))]
