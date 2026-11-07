@@ -223,6 +223,9 @@ impl Tier2EncryptedSegment {
 pub struct EncryptedSegmentPayload {
     /// Verschlüsselter KV-Layer-Container aus `contextra-crypto`. Wird beim Drop gezeroized.
     pub layer: EncryptedKvLayer,
+    /// Gespeicherte Schlüsselableitungsversion zum Zeitpunkt der Verschlüsselung.
+    #[zeroize(skip)]
+    pub key_derivation_version: u8,
 }
 
 // ANCHOR[contextra-kvcache:SEG-006]
@@ -397,6 +400,7 @@ impl KvSegment {
             content: KvSegmentContent::Raw(content_bytes),
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
+                key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
             }),
         })
     }
@@ -431,6 +435,12 @@ impl KvSegment {
         }
 
         if let Some(payload) = &self.encrypted_payload {
+            if payload.key_derivation_version != self.key_derivation_version {
+                return Err(CryptoError::Crypto(format!(
+                    "Key derivation version mismatch: segment key_derivation_version is {}, payload key_derivation_version is {}",
+                    self.key_derivation_version, payload.key_derivation_version
+                )));
+            }
             cipher.decrypt_with_version(
                 &payload.layer,
                 self.segment_id,
@@ -601,6 +611,7 @@ mod tests {
             content: KvSegmentContent::Raw(bytes::Bytes::from(ciphertext_copy)),
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
+                key_derivation_version: 0,
             }),
         };
 
