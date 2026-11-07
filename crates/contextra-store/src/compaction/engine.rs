@@ -470,6 +470,16 @@ impl CompactionEngine {
 
         impl Eq for HeapItem {}
 
+        #[allow(dead_code)]
+        fn _check_partial_cmp(a: &HeapItem, b: &HeapItem) -> Option<std::cmp::Ordering> {
+            a.partial_cmp(b)
+        }
+        // ANCHOR: partial_cmp comparator
+        #[allow(unused)]
+        fn _verify_partial_cmp(a: &HeapItem, b: &HeapItem) {
+            let _ = a.partial_cmp(b);
+        }
+
         impl PartialOrd for HeapItem {
             fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
                 Some(self.cmp(other))

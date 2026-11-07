@@ -132,20 +132,22 @@ async fn test_get_at_seq_mvcc_sequence_correctness() {
     let tx2 = TxId::new(2);
     storage.put(tx2, b"key1", b"v2").await.unwrap();
     storage.commit(tx2).await.unwrap();
+    let seq2 = storage.last_seq_no().await.unwrap();
 
     let tx3 = TxId::new(3);
     storage.delete(tx3, b"key1").await.unwrap();
     storage.commit(tx3).await.unwrap();
+    let seq3 = storage.last_seq_no().await.unwrap();
 
     assert_eq!(
         storage.get_at_seq(b"key1", seq1).await.unwrap(),
         Some(bytes::Bytes::from_static(b"v1"))
     );
     assert_eq!(
-        storage.get_at_seq(b"key1", seq1 + 1).await.unwrap(),
+        storage.get_at_seq(b"key1", seq2).await.unwrap(),
         Some(bytes::Bytes::from_static(b"v2"))
     );
-    assert_eq!(storage.get_at_seq(b"key1", seq1 + 2).await.unwrap(), None);
+    assert_eq!(storage.get_at_seq(b"key1", seq3).await.unwrap(), None);
 }
 
 #[tokio::test]
@@ -435,7 +437,7 @@ async fn test_scan_prefix_at_tombstone_isolation() {
 }
 
 #[test]
-fn prop_lsm_scan_prefix_at_consistency() {
+fn test_prop_lsm_scan_prefix_at_consistency() {
     use proptest::prelude::*;
 
     #[derive(Debug, Clone)]
