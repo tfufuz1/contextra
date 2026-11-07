@@ -196,12 +196,9 @@ pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner> {
     Arc::new(HnswScanner::new(index))
 }
 
-impl LayerScanner for HnswScanner {
-    fn layer(&self) -> WitnessLayer {
-        WitnessLayer::HnswIndex
-    }
-
-    fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> Result<()> {
+impl HnswScanner {
+    /// Führt den Schicht-Scan für den HNSW-Index aus.
+    pub fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> Result<()> {
         // 1. Positivkontrolle (Control Match)
         self.run_positive_control(session)?;
 
@@ -209,5 +206,15 @@ impl LayerScanner for HnswScanner {
         Self::scan_index_content(&self.index, session)?;
 
         Ok(())
+    }
+}
+
+impl LayerScanner for HnswScanner {
+    fn layer(&self) -> WitnessLayer {
+        WitnessLayer::HnswIndex
+    }
+
+    fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> Result<()> {
+        HnswScanner::scan_units(self, session, ctx)
     }
 }

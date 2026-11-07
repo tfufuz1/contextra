@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_mvcc::IndexOp;
 use contextra_ports::{VectorIndex, VectorIndexStats};
 use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
 
@@ -30,12 +29,11 @@ impl VectorIndex for HnswIndex {
 
         self.inner.cold.tx_buffer.stage(
             tx,
-            IndexOp::Insert {
+            super::staging::VectorStagingOp::Insert {
                 doc_id: id,
-                data: embedding.to_vec(),
+                embedding: embedding.to_vec(),
             },
-        )?;
-        Ok(())
+        )
     }
 
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
@@ -233,14 +231,10 @@ impl VectorIndex for HnswIndex {
                 err
             )));
         }
-        self.inner.cold.tx_buffer.stage(
-            tx,
-            IndexOp::Delete {
-                doc_id: id,
-                data: None,
-            },
-        )?;
-        Ok(())
+        self.inner
+            .cold
+            .tx_buffer
+            .stage(tx, super::staging::VectorStagingOp::Delete { doc_id: id })
     }
 
     async fn commit(&self, tx: TxId) -> Result<()> {
@@ -256,8 +250,8 @@ impl VectorIndex for HnswIndex {
         if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
             let mut train_data = Vec::with_capacity(256.min(ops.len()));
             for op in &ops {
-                if let IndexOp::Insert { data, .. } = op {
-                    train_data.push(data.clone());
+                if let super::staging::VectorStagingOp::Insert { ref embedding, .. } = op {
+                    train_data.push(embedding.clone());
                     if train_data.len() >= 256 {
                         break;
                     }
@@ -302,25 +296,18 @@ impl VectorIndex for HnswIndex {
 
         for op in &ops {
             match op {
-                IndexOp::Insert { doc_id, data } => {
+                super::staging::VectorStagingOp::Insert { doc_id, embedding } => {
                     let prepared = self.inner.compute_insert_with_context(
                         *doc_id,
-                        data,
+                        embedding,
                         prepared_inserts.len(),
                         &mut prepared_inserts,
                         &mut batch_ctx,
                     )?;
                     prepared_inserts.push(prepared);
                 }
-                IndexOp::Delete { doc_id, .. } => {
+                super::staging::VectorStagingOp::Delete { doc_id } => {
                     deletes_to_apply.push(*doc_id);
-                }
-                other => {
-                    return Err(ContextraError::Index(format!(
-                        "HNSW commit received unsupported IndexOp variant: {:?}. \
-                         Add a handler arm before enabling this operation.",
-                        std::mem::discriminant(other)
-                    )));
                 }
             }
         }
@@ -339,13 +326,12 @@ impl VectorIndex for HnswIndex {
         let mut seq_log = self.inner.cold.seq_log.write();
         for op in &ops {
             match op {
-                IndexOp::Insert { doc_id, .. } => {
+                super::staging::VectorStagingOp::Insert { doc_id, .. } => {
                     seq_log.record_insert(*doc_id, seq);
                 }
-                IndexOp::Delete { doc_id, .. } => {
+                super::staging::VectorStagingOp::Delete { doc_id } => {
                     seq_log.record_delete(*doc_id, seq);
                 }
-                _ => {}
             }
         }
         drop(seq_log);

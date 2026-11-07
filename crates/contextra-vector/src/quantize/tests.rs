@@ -311,7 +311,7 @@ proptest::proptest! {
     /// # Anti-Mirroring: global quantizer reference is independently computed inline.
     /// # FIND-IND-002
     #[test]
-    fn prop_per_dim_mse_le_global_mse(
+    fn test_prop_per_dim_mse_le_global_mse(
         // dim0 values in [0, 1], dim1 values in [100, 1000] — heterogeneous ranges guaranteed
         dim0_vals in proptest::collection::vec(0.0f32..1.0f32, 2..10),
         dim1_vals in proptest::collection::vec(100.0f32..1000.0f32, 2..10),

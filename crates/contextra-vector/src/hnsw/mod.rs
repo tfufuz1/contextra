@@ -22,6 +22,7 @@ mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
+pub mod staging;
 mod types;
 mod vector_index_impl;
 
@@ -39,3 +40,5 @@ pub use types::{
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
+
+pub use staging::{VectorStagingOp, VectorTxBuffer};

@@ -1027,6 +1027,7 @@ mod tests {
             }
 
             clock.advance_nanos(10_000_000_000);
+            assert!(clock.now_unix_nanos() > 0);
             index.inner.rebuild_sync_with_clock(&clock)?;
 
             let ep = index.inner.hot.get_entry_point().unwrap_or(0);

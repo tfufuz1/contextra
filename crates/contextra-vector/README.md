@@ -18,3 +18,8 @@ Der Baustein kann isoliert in beliebigen Rust-Systemen als eigenständige Vektor
 ## Deprecated Debt & Entkopplung
 - **Löschketten-Verdrahtung:** Historische Nachweis- und Deletion-Proof-Logiken sind als *Deprecated Debt* (siehe [`DEPRECATED_DEBT.md`](../../DEPRECATED_DEBT.md)) deklariert.
 - **Zielarchitektur:** `contextra-vector` beschränkt sich auf Mandantenisolation und Tombstone-Pruning via `LayerScanner`/`Purger`-Ports. Sämtliche Nachweis- und Signaturaufgaben liegen in [`contextra-erasure`](../contextra-erasure/).
+
+## Schnittstellen & Modularität
+- Bereinigter Vektorindex-Baustein für Ähnlichkeitssuche und HNSW-Graphtraversierung.
+- Reorganisation und Deletion erfolgen neutral über Tombstone/Rebuild sowie über die standardisierten - und -Ports aus .
+- Keine Abhängigkeiten zu juristischen Löschketten oder externen Audit-Sagas.
