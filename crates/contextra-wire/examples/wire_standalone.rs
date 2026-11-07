@@ -28,7 +28,8 @@ fn main() {
     );
 
     // 2. JSON-RPC 2.0: Parsing, Validierung und Antwort-Generierung
-    let rpc_json = r#"{"jsonrpc": "2.0", "id": 1, "method": "agent.query", "params": {"query": "vector"}}"#;
+    let rpc_json =
+        r#"{"jsonrpc": "2.0", "id": 1, "method": "agent.query", "params": {"query": "vector"}}"#;
     match parse_jsonrpc_payload(rpc_json.as_bytes()) {
         Ok(JsonRpcPayload::Single(req)) => {
             println!(
