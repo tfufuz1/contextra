@@ -13,7 +13,7 @@
 //!
 //! ## Wichtigste Typen
 //! - [`AgentMemory`]: Die zentrale Schnittstelle für Agenten mit Operationen für Speichern, Suchen,
-//!   Löschen und Verknüpfen.
+//!   Entfernen und Verknüpfen.
 //! - [`MemoryId`]: Typisierter Bezeichner für eine gespeicherte Erinnerung.
 //! - [`RelationId`]: Eindeutige Kennung für n-äre Beziehungen (Hyperedges) im Wissensgraphen.
 //! - [`Memory`]: Struktur einer aus dem Speicher abgerufenen Erinnerung inklusive Relevanz-Score,
@@ -152,7 +152,7 @@ impl From<SearchResult> for Memory {
 /// Bietet die Kernoperationen:
 /// - `remember`: Speichern von Texten und Metadaten.
 /// - `recall`: Semantisches Retrieval basierend auf Volltext- und Vektorsuche.
-/// - `forget`: Sicheres Löschen einer Erinnerung.
+/// - `forget`: Neutrales Entfernen einer Erinnerung ohne rechtliche Löschzusagen.
 /// - `relate` & `relate_n_ary`: Verknüpfen von Erinnerungen im Wissensgraphen.
 #[derive(Clone)]
 pub struct AgentMemory {

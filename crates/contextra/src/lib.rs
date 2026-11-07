@@ -15,8 +15,7 @@
 //!
 //! ## Ring-Zugehörigkeit & Abhängigkeiten
 //! - **Ring 4 (Fassade)**: Greift als Composition Root auf Teilsysteme wie `contextra-db` (Ring 3),
-//!   `contextra-types`, `contextra-ports`, `contextra-license`, `contextra-store`
-//!   und `contextra-rank` zu.
+//!   `contextra-types`, `contextra-ports` und optional `contextra-license` zu.
 //! - **Keine zyklischen Abhängigkeiten**: Höhere Ringe hängen von niederen Ringen ab, nie umgekehrt.
 //! - **Eingebunden von**: `contextra-mcp` (Model Context Protocol Adapter für LLM-Agenten).
 //!
@@ -57,8 +56,6 @@ pub use contextra_types::types::domain::{DocId, ScoredDocument};
 pub use contextra_types::DistanceMetric;
 pub use performance_profile::{DurabilityConfigError, DurabilityMode, PerformanceProfile};
 pub use query_rewriter::LlmQueryRewriter;
-
-pub use contextra_rank as rank;
 
 #[cfg(feature = "candle")]
 pub use contextra_infer_candle as candle;
