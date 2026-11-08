@@ -383,4 +383,66 @@ mod tests {
         assert!(!vfs.exists(path)?);
         Ok(())
     }
+
+    // ANCHOR[contextra-testkit:TEST-FAULT-VFS-CRASH-MATRIX-001]
+    // Prüft die deterministische Crash-Matrix: Crash-Zustand blockiert Lese-, Schreib-
+    // und Sync-Operationen vollständig; Reset und fail_all steuern das System feingranular.
+    #[test]
+    fn test_fault_vfs_crash_matrix_invariants() {
+        use contextra_ports::Vfs;
+
+        let vfs = FaultVfs::new();
+        let path = Path::new("matrix_test.bin");
+        assert!(vfs.write_file(path, b"initial").is_ok());
+        assert_eq!(vfs.read_file(path).unwrap(), b"initial");
+
+        // 1. Crash simulieren
+        vfs.trigger_crash();
+
+        // Lese-, Schreib- und Sync-Operationen müssen im Crashzustand fehlschlagen
+        let write_res = vfs.write_file(path, b"after_crash");
+        assert!(write_res.is_err());
+        assert_eq!(write_res.unwrap_err().kind(), ErrorKind::BrokenPipe);
+
+        let read_res = vfs.read_file(path);
+        assert!(read_res.is_err());
+        assert_eq!(read_res.unwrap_err().kind(), ErrorKind::BrokenPipe);
+
+        let sync_res = vfs.sync();
+        assert!(sync_res.is_err());
+        assert_eq!(sync_res.unwrap_err().kind(), ErrorKind::BrokenPipe);
+
+        // Vfs-Port-Aufrufe müssen ebenfalls fehlschlagen
+        assert!(Vfs::read(&vfs, path).is_err());
+        assert!(Vfs::write_atomic(&vfs, path, b"atomic").is_err());
+        assert!(Vfs::exists(&vfs, path).is_err());
+        assert!(Vfs::len(&vfs, path).is_err());
+
+        // 2. Erholung aus Crash über reset_counters
+        vfs.reset_counters();
+        assert_eq!(vfs.read_file(path).unwrap(), b"initial");
+
+        // 3. Zähler nach erfolgreichem Lesen/Schreiben/Sync prüfen
+        assert!(vfs.write_file(Path::new("count_test.txt"), b"data").is_ok());
+        assert!(vfs.sync().is_ok());
+        assert_eq!(vfs.write_count(), 1);
+        assert_eq!(vfs.read_count(), 1);
+        assert_eq!(vfs.sync_count(), 1);
+
+        // 4. fail_all Flag
+        vfs.set_config(FaultConfig {
+            fail_all: true,
+            ..Default::default()
+        });
+        assert!(vfs.write_file(path, b"blocked").is_err());
+        assert!(vfs.read_file(path).is_err());
+        assert!(vfs.sync().is_err());
+
+        // 5. Reset Counters
+        vfs.set_config(FaultConfig::default());
+        vfs.reset_counters();
+        assert_eq!(vfs.write_count(), 0);
+        assert_eq!(vfs.read_count(), 0);
+        assert_eq!(vfs.sync_count(), 0);
+    }
 }
