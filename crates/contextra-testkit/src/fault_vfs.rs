@@ -394,7 +394,7 @@ mod tests {
         let vfs = FaultVfs::new();
         let path = Path::new("matrix_test.bin");
         assert!(vfs.write_file(path, b"initial").is_ok());
-        assert_eq!(vfs.read_file(path).unwrap(), b"initial");
+        assert_eq!(vfs.read_file(path).ok().as_deref(), Some(&b"initial"[..]));
 
         // 1. Crash simulieren
         vfs.trigger_crash();
@@ -402,15 +402,24 @@ mod tests {
         // Lese-, Schreib- und Sync-Operationen müssen im Crashzustand fehlschlagen
         let write_res = vfs.write_file(path, b"after_crash");
         assert!(write_res.is_err());
-        assert_eq!(write_res.unwrap_err().kind(), ErrorKind::BrokenPipe);
+        assert_eq!(
+            write_res.as_ref().err().map(|e| e.kind()),
+            Some(ErrorKind::BrokenPipe)
+        );
 
         let read_res = vfs.read_file(path);
         assert!(read_res.is_err());
-        assert_eq!(read_res.unwrap_err().kind(), ErrorKind::BrokenPipe);
+        assert_eq!(
+            read_res.as_ref().err().map(|e| e.kind()),
+            Some(ErrorKind::BrokenPipe)
+        );
 
         let sync_res = vfs.sync();
         assert!(sync_res.is_err());
-        assert_eq!(sync_res.unwrap_err().kind(), ErrorKind::BrokenPipe);
+        assert_eq!(
+            sync_res.as_ref().err().map(|e| e.kind()),
+            Some(ErrorKind::BrokenPipe)
+        );
 
         // Vfs-Port-Aufrufe müssen ebenfalls fehlschlagen
         assert!(Vfs::read(&vfs, path).is_err());
@@ -420,7 +429,7 @@ mod tests {
 
         // 2. Erholung aus Crash über reset_counters
         vfs.reset_counters();
-        assert_eq!(vfs.read_file(path).unwrap(), b"initial");
+        assert_eq!(vfs.read_file(path).ok().as_deref(), Some(&b"initial"[..]));
 
         // 3. Zähler nach erfolgreichem Lesen/Schreiben/Sync prüfen
         assert!(vfs.write_file(Path::new("count_test.txt"), b"data").is_ok());

@@ -16,7 +16,10 @@
 macro_rules! assert_conformance {
     ($res:expr) => {
         if let Err(failure) = $res {
-            std::panic::panic_any(failure.to_string());
+            #[allow(clippy::panic)]
+            {
+                ::std::panic::panic_any(failure.to_string());
+            }
         }
     };
 }
