@@ -2,6 +2,7 @@
 
 > Generiert durch `tools/orchestrate_diagnostics.py`.
 > Ausführungszeitpunkt: automatisiert durch Principal Agentic Engineering.
+> **Hauptreferenz:** Das umfassende Gesamtkompendium für Entwickler und Architekten befindet sich in [`DIAGNOSTIC_COMPENDIUM.md`](DIAGNOSTIC_COMPENDIUM.md).
 
 ## Übersicht der ausgeführten Diagnose-Module
 
