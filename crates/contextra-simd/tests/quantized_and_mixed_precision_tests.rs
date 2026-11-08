@@ -310,3 +310,29 @@ fn test_u8_dot_product_large_range_values() {
         assert_eq!(dot_d, dot_s);
     }
 }
+
+#[test]
+fn test_avx512_vnni_dpbusd_signed_unsigned_wrapping_semantics() {
+    // In AVX-512 VNNI `_mm512_dpbusd_epi32`:
+    // The instruction computes dot product of pairs of 4 unsigned 8-bit integers (first operand)
+    // and 4 signed 8-bit integers (second operand), accumulating into a 32-bit signed integer.
+    // In our `dot_product_u8_avx512vnni`, both inputs are `u8` (treated as unsigned and accumulated into u32).
+    // This test verifies that the scalar oracle and differential test across varying byte values
+    // (including values >= 128 where MSB is 1) strictly adhere to unsigned wrapping addition semantics.
+    let mut a = Vec::with_capacity(256);
+    let mut b = Vec::with_capacity(256);
+    for i in 0..256 {
+        a.push(i as u8);
+        b.push((255 - i) as u8);
+    }
+
+    let scalar_res = dot_product_u8_scalar(&a, &b);
+    let dispatch_res = dot_product_u8(&a, &b).expect("matching dimensions");
+    assert_eq!(scalar_res, dispatch_res);
+
+    let parts_scalar = cosine_similarity_parts_u8_scalar(&a, &b);
+    let parts_dispatch = cosine_similarity_parts_u8(&a, &b).expect("matching dimensions");
+    assert_eq!(parts_scalar.dot, parts_dispatch.dot);
+    assert_eq!(parts_scalar.norm_a_sq, parts_dispatch.norm_a_sq);
+    assert_eq!(parts_scalar.norm_b_sq, parts_dispatch.norm_b_sq);
+}

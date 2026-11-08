@@ -14,7 +14,7 @@
 //! mit einem einzigen CPU-Befehl auszuführen.
 //!
 //! **Verbindung im System:**
-//! - **Abhängigkeiten (normal):** `contextra-types` (für `Error` und `DistanceMetric`), `bytemuck`, `thiserror`, `tracing`.
+//! - **Abhängigkeiten (normal):** `bytemuck`, `thiserror`. Optional: `contextra-types` (nur transitional via Feature `types-compat`), `serde`, `tracing`.
 //! - **Wird eingebunden von:** `contextra-vector` (Ring 1) zur Beschleunigung von Ähnlichkeitssuchen in Vektorindizes
 //!   (z. B. HNSW = Hierarchical Navigable Small World).
 //!
@@ -27,20 +27,14 @@
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
 
-mod error;
-mod metric;
-
 // ANCHOR[contextra-simd:CORE-MOD-DISPATCH]
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
 pub mod dispatch;
+pub mod error;
 // ANCHOR[contextra-simd:CORE-MOD-KERNELS]
 // Hardwarespezifische Rechenkerne (Scalar, AVX2, AVX-512, NEON).
 pub mod kernels;
-pub mod error;
 pub mod metric;
-
-pub use error::{SimdError, Result};
-pub use metric::DistanceMetric;
 
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
@@ -49,6 +43,7 @@ pub use dispatch::{
 };
 #[cfg(test)]
 pub use dispatch::{get_dispatch_override, set_dispatch_override, SimdPathOverride};
+pub use error::{Result, SimdError};
 pub use kernels::scalar::{
     cosine_distance_f32_bytes_scalar, cosine_distance_scalar, cosine_similarity_parts_f32_u8,
     cosine_similarity_parts_u8_scalar, dot_product_f32_bytes_scalar, dot_product_f32_u8,
@@ -56,8 +51,7 @@ pub use kernels::scalar::{
     euclidean_distance_scalar, euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8_scalar,
     normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
 };
-
-
+pub use metric::DistanceMetric;
 
 // ANCHOR[contextra-simd:CORE-VALIDATE-VEC]
 /// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
@@ -90,7 +84,9 @@ pub use kernels::scalar::{
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
-        return Err(SimdError::InvalidInput("NaN or Infinity detected in vector"));
+        return Err(SimdError::InvalidInput(
+            "NaN or Infinity detected in vector",
+        ));
     }
     Ok(())
 }
@@ -124,11 +120,7 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
 /// # Ok::<(), contextra_simd::SimdError>(())
 /// ```
 #[inline]
-pub fn compute_distance(
-    a: &[f32],
-    b: &[f32],
-    metric: DistanceMetric,
-) -> Result<f32> {
+pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
     validate_vector(a)?;
     validate_vector(b)?;
     compute_distance_trusted(a, b, metric)
@@ -151,11 +143,7 @@ pub fn compute_distance(
 /// # Nebenwirkungen:
 /// Keine.
 #[inline]
-pub fn compute_distance_trusted(
-    a: &[f32],
-    b: &[f32],
-    metric: DistanceMetric,
-) -> Result<f32> {
+pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance(a, b),
         DistanceMetric::Euclidean => euclidean_distance(a, b),
