@@ -1,8 +1,9 @@
 //! Standalone-Beispiel für `contextra-avv-generator` (M10).
 //! Demonstriert die Erzeugung eines strukturierten AVV-Vertragsentwurfs gemäß Art. 28 DSGVO.
 
-use contextra_avv_generator::{default_technical_measures, render_avv_markdown, AvvContext};
-use contextra_types::TenantId;
+use contextra_avv_generator::{
+    default_technical_measures, render_avv_markdown, AvvContext, TenantId,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = AvvContext {

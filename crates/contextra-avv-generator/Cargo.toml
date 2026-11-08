@@ -11,8 +11,20 @@ description = "AVV (Auftragsverarbeitungsvertrag) template generator referencing
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
+
+[features]
+default = ["std"]
+std = []
+serde = ["dep:serde"]
 
 [dependencies]
 thiserror = { workspace = true }
-serde = { workspace = true }
-contextra-types = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "avv_bench"
+harness = false
