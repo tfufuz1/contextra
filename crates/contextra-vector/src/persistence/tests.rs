@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock)]
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für HNSW Persistenz-Schicht.
 

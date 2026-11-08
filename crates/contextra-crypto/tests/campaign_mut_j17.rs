@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `campaign_mut_j17.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_mut_j17`.

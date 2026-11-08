@@ -8,6 +8,7 @@ use parking_lot::{Mutex, RwLock};
 use super::arena::HnswArena;
 use super::config::HnswConfig;
 use super::sq8_bias::Sq8Bias;
+use crate::distance::{DistanceKernel, ScalarKernel};
 
 /// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
@@ -86,10 +87,14 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
     }
 }
 
-/// The HNSW (Hierarchical Navigable Small World) vector index.
-pub struct HnswIndex {
+/// Generic HNSW (Hierarchical Navigable Small World) vector index parameterized by distance kernel.
+pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
+    pub(super) _kernel: std::marker::PhantomData<K>,
 }
+
+/// The default HNSW vector index using the scalar reference distance kernel.
+pub type HnswIndex = GenericHnswIndex<ScalarKernel>;
 
 #[repr(align(64))]
 pub struct HnswHotCore {
@@ -243,6 +248,7 @@ impl HnswIndex {
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
         Ok(Self {
+            _kernel: std::marker::PhantomData,
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
@@ -319,6 +325,15 @@ impl HnswIndex {
         Self::try_new_with_rng(config, rng)
     }
 
+    /// Creates a new HNSW index with a custom distance kernel.
+    pub fn try_new_with_kernel(
+        config: HnswConfig,
+        kernel: std::sync::Arc<dyn DistanceKernel>,
+    ) -> Result<Self> {
+        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        Self::try_new_with_rng_and_kernel(config, rng, kernel)
+    }
+
     /// Creates a new HNSW index.
     #[deprecated(
         note = "Nutze try_new() für sofortige Fehlererkennung — new() versteckt Konfigurationsfehler bis zum ersten insert()/search()"
@@ -335,6 +350,7 @@ impl HnswIndex {
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
         Self {
+            _kernel: std::marker::PhantomData,
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
@@ -507,7 +523,7 @@ impl HnswIndex {
 
         let regions = crate::partial_rebuild::should_trigger_partial_rebuild(
             &tracker,
-            &std_map,
+            &tombstone_map,
             global_tombstone_ratio,
             &self.inner.cold.config.partial_rebuild_config,
         );
@@ -533,6 +549,53 @@ impl HnswIndex {
 
     pub fn unpin_snapshot(&self, seq_no: u64) {
         self.inner.cold.seq_log.write().unpin_snapshot(seq_no);
+    }
+
+    /// Gibt den aktuellen globalen Entry-Point-Knotenindex zurück (falls vorhanden).
+    pub fn entry_point(&self) -> Option<usize> {
+        self.inner.hot.get_entry_point()
+    }
+
+    /// Gibt den internen Knotenindex für eine `DocId` zurück (falls vorhanden und nicht gelöscht).
+    pub fn node_idx_for_doc(&self, doc_id: DocId) -> Option<usize> {
+        let map = self.inner.hot.doc_to_node.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        map.get(&doc_id.inner())
+            .copied()
+            .filter(|&idx| !deleted.contains(idx as u64))
+    }
+
+    /// Gibt die Layer-0-Verbindungen für einen Knotenindex zurück.
+    pub fn layer0_connections(&self, node_idx: usize) -> Vec<u32> {
+        let mmap_count = self
+            .inner
+            .cold
+            .mmap_index
+            .read()
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        let m = self.inner.cold.config.m;
+        if node_idx < mmap_count {
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            if let Some(mmap) = mmap_guard.as_ref() {
+                if let Ok(rec) = mmap.get_node_record(node_idx) {
+                    mmap.get_connections(&rec, 0).unwrap_or_default()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        } else {
+            let ram_idx = node_idx - mmap_count;
+            self.inner.hot.arena.get_ram_node_connections(ram_idx, 0, m)
+        }
+    }
+
+    /// Führt einen synchronen vollständigen Rebuild aus (`INV-HNSW-SLOT-1`).
+    pub fn rebuild_sync(&self) -> Result<()> {
+        self.inner.rebuild_sync()
     }
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {

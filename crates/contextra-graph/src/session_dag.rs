@@ -653,7 +653,7 @@ mod tests {
     // ANCHOR[contextra-graph:SRC-SESSION-DAG-037]
     #[tokio::test]
     async fn test_session_dag_survives_restart() {
-        use contextra_testkit::InMemoryStorageEngine;
+        use crate::test_doubles::InMemoryStorageEngine;
 
         let storage = Arc::new(InMemoryStorageEngine::new());
 
@@ -784,7 +784,7 @@ mod tests {
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn test_load_CASE_non_existent_namespace_returns_not_found() {
-        use contextra_testkit::InMemoryStorageEngine;
+        use crate::test_doubles::InMemoryStorageEngine;
 
         let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
@@ -802,7 +802,7 @@ mod tests {
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn test_load_CASE_corrupt_data_returns_serialization_error() {
-        use contextra_testkit::InMemoryStorageEngine;
+        use crate::test_doubles::InMemoryStorageEngine;
 
         let storage = InMemoryStorageEngine::new(); // unwrap allowed
 

@@ -29,8 +29,10 @@
 //!    pruned edges. Thus, path length across $R$ increases by at most a factor of $\alpha$, maintaining
 //!    small-world navigability.
 //! 3. **Recall Preservation Guarantee:**
-//!    $Recall_{partial}(q, k) \ge Recall_{global}(q, k) - \epsilon$, where $\epsilon \le 0.02$ under $\theta_c \ge 3.0$
-//!    and $ef_{search} \ge M$.
+//!    $Recall_{partial}(q, k) \ge Recall_{global}(q, k) - \epsilon$.
+//!    *Hinweis (INV-CLAIMS-1):* Der Wert $\epsilon \le 0.02$ ist ein vorläufiger Ziel-/Startwert und nicht mathematisch belegt.
+//!    Die empirische Validierung in `tests/partial_rebuild_recall_regression.rs` belegt ein Toleranzband von
+//!    bis zu $\pm 0.05$ (5 Prozentpunkte) bei 20 % Tombstones ohne Re-Wiring.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -167,6 +169,7 @@ pub fn should_trigger_partial_rebuild(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

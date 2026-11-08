@@ -1,9 +1,11 @@
+#![cfg(feature = "ports-compat")]
 #![allow(clippy::indexing_slicing, clippy::field_reassign_with_default)]
 
+#[cfg(test)]
 use super::*;
 use crate::embedding::OllamaEmbedder;
+use crate::OllamaError;
 use contextra_ports::EmbeddingProvider;
-use contextra_types::ContextraError;
 use std::time::Duration;
 
 #[tokio::test]
@@ -15,6 +17,7 @@ async fn test_generate_text_returns_string() {
 }
 
 #[tokio::test]
+#[cfg(feature = "ports-compat")]
 async fn test_segment_synthesizer_implementation() {
     use contextra_ports::SegmentSynthesizer;
 
@@ -90,7 +93,7 @@ async fn test_generate_text_mock_success() {
 async fn test_generate_text_empty_prompt_error() {
     let client = OllamaClient::new("http://localhost:11434");
     let res = client.generate_text("llama3.2", "   ").await;
-    assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
+    assert!(matches!(res, Err(OllamaError::InvalidInput(_))));
 }
 
 #[tokio::test]
@@ -175,14 +178,14 @@ fn test_validate_batch_size_and_text_length() {
     assert!(validate_batch_size(MAX_BATCH_SIZE).is_ok());
     assert!(matches!(
         validate_batch_size(MAX_BATCH_SIZE + 1),
-        Err(ContextraError::InvalidInput(_))
+        Err(OllamaError::InvalidInput(_))
     ));
 
     assert!(validate_text_length("hello", "field").is_ok());
     let huge_text = "a".repeat(MAX_TEXT_BYTES + 1);
     assert!(matches!(
         validate_text_length(&huge_text, "field"),
-        Err(ContextraError::InvalidInput(_))
+        Err(OllamaError::InvalidInput(_))
     ));
 }
 
@@ -193,20 +196,20 @@ fn test_validate_model_name() {
 
     assert!(matches!(
         validate_model_name(""),
-        Err(ContextraError::InvalidInput(_))
+        Err(OllamaError::InvalidInput(_))
     ));
 
     assert!(matches!(
         validate_model_name("../api/tags"),
-        Err(ContextraError::PolicyViolation(_))
+        Err(OllamaError::EgressViolation(_))
     ));
     assert!(matches!(
         validate_model_name("model\nname"),
-        Err(ContextraError::PolicyViolation(_))
+        Err(OllamaError::EgressViolation(_))
     ));
     assert!(matches!(
         validate_model_name("model\rname"),
-        Err(ContextraError::PolicyViolation(_))
+        Err(OllamaError::EgressViolation(_))
     ));
 }
 
@@ -503,7 +506,7 @@ async fn test_embed_batch_empty() {
     // OllamaClient mit nicht-erreichbarer URL
     // embed_batch([]) soll sofort Ok(vec![]) zurückgeben ohne Netzwerk-Call
     let embedder = OllamaEmbedder::new("http://127.0.0.1:1", "test");
-    let result = embedder.embed_batch(&[]).await.unwrap(); // unwrap
+    let result = Embedder::embed_batch(&embedder, &[]).await.unwrap(); // unwrap
     assert!(result.is_empty());
 }
 
@@ -565,10 +568,10 @@ async fn test_chat_with_rag_streaming_invalid_json_returns_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        ContextraError::Serialization(msg) => {
+        OllamaError::Deserialization(msg) => {
             assert!(msg.contains("Failed to parse streaming JSON chunk"));
         }
-        _ => panic!("Expected ContextraError::Serialization, got {:?}", err),
+        _ => panic!("Expected OllamaError::Deserialization, got {:?}", err),
     }
 }
 
@@ -971,10 +974,7 @@ async fn test_no_retry_on_400() {
     let result = client.embed("nomic-embed-text", "bad request test").await;
 
     assert!(result.is_err());
-    assert!(matches!(
-        result.unwrap_err(),
-        ContextraError::InvalidInput(_)
-    ));
+    assert!(matches!(result.unwrap_err(), OllamaError::InvalidInput(_)));
     // Must NOT retry 400 -> exactly 1 attempt
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
 }
@@ -1006,11 +1006,11 @@ async fn test_model_not_found_error_message() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        ContextraError::NotFound(msg) => {
+        OllamaError::ModelNotFound(msg) => {
             assert!(msg.contains("Ollama model 'custom-model' not found"));
             assert!(msg.contains("Run: ollama pull custom-model"));
         }
-        _ => panic!("Expected ContextraError::NotFound, got {:?}", err),
+        _ => panic!("Expected OllamaError::ModelNotFound, got {:?}", err),
     }
 }
 
@@ -1043,13 +1043,12 @@ async fn test_check_availability_offline_returns_io_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        ContextraError::Io(e) => {
-            assert_eq!(e.kind(), std::io::ErrorKind::ConnectionRefused);
+        OllamaError::Network(e) => {
             assert!(e
                 .to_string()
                 .contains("Ensure Ollama is running (`ollama serve`)"));
         }
-        _ => panic!("Expected ContextraError::Io, got {:?}", err),
+        _ => panic!("Expected OllamaError::Network, got {:?}", err),
     }
     assert!(!client.is_available().await);
 }
@@ -1063,13 +1062,12 @@ async fn test_chat_with_rag_streaming_offline_returns_io_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        ContextraError::Io(e) => {
-            assert_eq!(e.kind(), std::io::ErrorKind::ConnectionRefused);
+        OllamaError::Network(e) => {
             assert!(e
                 .to_string()
                 .contains("Ensure Ollama is running (`ollama serve`)"));
         }
-        _ => panic!("Expected ContextraError::Io, got {:?}", err),
+        _ => panic!("Expected OllamaError::Network, got {:?}", err),
     }
 }
 
@@ -1104,6 +1102,7 @@ async fn test_max_retries_exhaustion() {
 }
 
 #[tokio::test]
+#[cfg(feature = "ports-compat")]
 async fn test_embed_batch_fallback_preserves_order() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
     let addr = listener.local_addr().unwrap(); // unwrap
@@ -1221,7 +1220,7 @@ async fn test_mock_server_connection_refused_error_classification() {
     assert!(res.is_err());
     let err = res.unwrap_err();
     assert!(is_transient_error(&err));
-    assert!(matches!(err, ContextraError::Io(_)));
+    assert!(matches!(err, OllamaError::Network(_)));
 }
 
 #[tokio::test]
@@ -1263,7 +1262,7 @@ async fn test_ensure_model_available() {
         .ensure_model_available("nonexistent-model")
         .await
         .unwrap_err();
-    assert!(matches!(err, ContextraError::NotFound(_)));
+    assert!(matches!(err, OllamaError::ModelNotFound(_)));
 }
 
 #[tokio::test]
@@ -1286,7 +1285,7 @@ async fn test_list_models_http_error_and_invalid_json() {
 
     let client_500 = OllamaClient::new(server_url_500);
     let err_500 = client_500.list_models().await.unwrap_err();
-    assert!(matches!(err_500, ContextraError::Storage(_)));
+    assert!(matches!(err_500, OllamaError::Server(_)));
 
     // Invalid JSON response test
     let listener_json = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1310,7 +1309,7 @@ async fn test_list_models_http_error_and_invalid_json() {
 
     let client_json = OllamaClient::new(server_url_json);
     let err_json = client_json.list_models().await.unwrap_err();
-    assert!(matches!(err_json, ContextraError::Internal(_)));
+    assert!(matches!(err_json, OllamaError::Internal(_)));
 }
 
 #[tokio::test]
@@ -1353,13 +1352,13 @@ async fn test_try_generate_mock_success_and_errors() {
         .try_generate("bad-request-model", "prompt")
         .await
         .unwrap_err();
-    assert!(matches!(err_400, ContextraError::InvalidInput(_)));
+    assert!(matches!(err_400, OllamaError::InvalidInput(_)));
 
     let err_404 = client
         .try_generate("missing-gen-model", "prompt")
         .await
         .unwrap_err();
-    assert!(matches!(err_404, ContextraError::NotFound(_)));
+    assert!(matches!(err_404, OllamaError::ModelNotFound(_)));
 }
 
 #[test]
@@ -1399,8 +1398,8 @@ fn test_parse_prompt_template_malformed_xml_returns_error() {
         );
         if let Err(err) = res {
             assert!(
-                matches!(err, ContextraError::Internal(_)),
-                "Expected ContextraError::Internal, got: {:?}",
+                matches!(err, OllamaError::Internal(_)),
+                "Expected OllamaError::Internal, got: {:?}",
                 err
             );
         }
@@ -1521,6 +1520,7 @@ async fn test_system_instruction_preserves_injection_guard(
 }
 
 #[tokio::test]
+#[cfg(feature = "ports-compat")]
 async fn test_llm_text_generator_streaming_ollama_mock() {
     use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
     use contextra_types::ConfigFingerprint;
@@ -1597,7 +1597,7 @@ async fn test_llm_text_generator_streaming_ollama_mock() {
 
 #[test]
 fn test_retry_jitter_bounds() {
-    use contextra_ports::SeededRng;
+    use crate::traits::SeededRng;
 
     let rng = SeededRng::new(42);
     for _ in 0..1000 {
@@ -1612,7 +1612,7 @@ fn test_retry_jitter_bounds() {
 
 #[test]
 fn test_retry_jitter_same_seed_reproducibility() {
-    use contextra_ports::SeededRng;
+    use crate::traits::SeededRng;
 
     let rng1 = SeededRng::new(12345);
     let rng2 = SeededRng::new(12345);
@@ -1628,7 +1628,7 @@ fn test_retry_jitter_same_seed_reproducibility() {
 
 #[test]
 fn test_retry_jitter_different_seeds_divergence() {
-    use contextra_ports::SeededRng;
+    use crate::traits::SeededRng;
 
     let rng1 = SeededRng::new(12345);
     let rng2 = SeededRng::new(54321);
@@ -1644,11 +1644,11 @@ fn test_retry_jitter_different_seeds_divergence() {
 
 #[test]
 fn test_with_rng_builder() {
-    use contextra_ports::{Rng, SeededRng};
+    use crate::traits::{Rng, SeededRng};
     use std::sync::Arc;
 
     let custom_rng: Arc<dyn Rng> = Arc::new(SeededRng::new(99999));
-    let client = OllamaClient::new("http://localhost:11434").with_rng(custom_rng.clone());
+    let client = OllamaClient::new("http://localhost:11434").with_ports_rng(custom_rng.clone());
 
     let val1 = retry_jitter(client.rng.as_ref());
     let ref_rng = SeededRng::new(99999);

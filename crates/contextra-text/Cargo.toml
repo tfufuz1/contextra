@@ -11,13 +11,23 @@ description = "Contextra — Text processing and BM25 search for Hybrid Search"
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
+
+[features]
+default = ["std", "types-compat"]
+std = []
+types-compat = ["dep:contextra-types", "dep:contextra-ports"]
+ports-compat = ["types-compat"]
+inspect = []
+bm25f = []
+docid-128 = []
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }
-itoa = { workspace = true }
-regex = { workspace = true }
+itoa = "1.0"
+regex = "1.10"
 unicode-segmentation = "1.11.0"
 bincode = { workspace = true }
 serde = { workspace = true }
@@ -28,12 +38,12 @@ tracing = { workspace = true }
 blake3 = { workspace = true }
 futures = "0.3"
 
-[features]
-default = []
-bm25f = []
-docid-128 = ["contextra-types/docid-128"]
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
 tempfile = { workspace = true }
 proptest = "1.4"
+criterion = { workspace = true }
+
+[[bench]]
+name = "text_bench"
+harness = false

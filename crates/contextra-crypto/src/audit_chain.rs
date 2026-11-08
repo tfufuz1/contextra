@@ -23,8 +23,10 @@
 //!   womit das Commitment nicht mehr auf Originalattribute zurückführbar ist (Wörterbuchangriff
 //!   unmöglich, da salt unbekannt).
 
+#[cfg(feature = "legacy-erasure")]
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
+#[cfg(feature = "legacy-erasure")]
 use crate::kv_shredding::KeyRegistry;
 use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};
@@ -170,6 +172,7 @@ pub struct EncryptedCommitmentSalt {
     pub nonce: [u8; 12],
 }
 
+#[cfg(feature = "legacy-erasure")]
 impl EncryptedCommitmentSalt {
     /// Verschlüsselt ein Salt-Byte-Array über den `KeyRegistry`-Shredding-Mechanismus.
     pub fn encrypt(

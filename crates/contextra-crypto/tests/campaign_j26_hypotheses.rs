@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `campaign_j26_hypotheses.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_j26_hypotheses`.

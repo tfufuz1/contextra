@@ -547,3 +547,28 @@ async fn test_commit_mutex_released_before_flusher_await() {
         );
     }
 }
+
+#[tokio::test]
+async fn test_snapshot_single_load_invariant() {
+    let tmp = tempfile::tempdir().unwrap();
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));
+
+    // Populate data with tx 1
+    let tx1 = TxId::new(1);
+    storage.put(tx1, b"key:single_load:1", b"val1").await.unwrap();
+    storage.commit(tx1).await.unwrap();
+
+    // Verify get_at_seq reads snapshot consistently
+    let res = storage.get_at_seq(b"key:single_load:1", 100).await.unwrap();
+    assert_eq!(res, Some(bytes::Bytes::from_static(b"val1")));
+
+    // Verify scan_prefix_at reads snapshot consistently
+    let entries = storage.scan_prefix_at(b"key:single_load:", 100).await.unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].0, b"key:single_load:1".to_vec());
+    assert_eq!(entries[0].1, b"val1".to_vec());
+}

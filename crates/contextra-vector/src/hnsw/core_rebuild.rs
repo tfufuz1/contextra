@@ -8,7 +8,6 @@ use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
 use super::sq8_bias::Sq8Bias;
 use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
-use crate::distance::compute_distance_trusted;
 
 fn get_last_rebuild_nanos(core: &HnswIndexCore) -> Option<u64> {
     let val = core.cold.last_rebuild_nanos.load(Ordering::Acquire);
@@ -94,7 +93,9 @@ impl HnswIndexCore {
     ) -> Result<f32> {
         match data {
             VectorData::F32(v) => {
-                compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
+                self.cold
+                    .kernel
+                    .distance_trusted(self.cold.config.distance_metric, query_exact, v)
             }
             VectorData::U8(v) => {
                 let guard;
@@ -140,10 +141,10 @@ impl HnswIndexCore {
                 q.asymmetric_dist(query_exact, vector_bytes, self.cold.config.distance_metric)
             }
         } else {
-            crate::distance::compute_distance_f32_bytes_trusted(
+            self.cold.kernel.distance_f32_bytes_trusted(
+                self.cold.config.distance_metric,
                 query_exact,
                 vector_bytes,
-                self.cold.config.distance_metric,
             )
         }
     }
@@ -151,7 +152,9 @@ impl HnswIndexCore {
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
             (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance_trusted(a, b, self.cold.config.distance_metric)
+                self.cold
+                    .kernel
+                    .distance_trusted(self.cold.config.distance_metric, a, b)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();
@@ -331,7 +334,11 @@ impl HnswIndexCore {
 
         let mut result: Vec<Candidate> = Vec::with_capacity(m);
         let mut sorted_cands = candidates.to_vec();
-        sorted_cands.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+        sorted_cands.sort_by(|a, b| {
+            a.distance
+                .total_cmp(&b.distance)
+                .then_with(|| a.index.cmp(&b.index))
+        });
 
         for closest in sorted_cands {
             if result.len() >= m {
@@ -362,7 +369,11 @@ impl HnswIndexCore {
         if result.len() < min_neighbors && candidates.len() >= min_neighbors {
             let mut fallback = result;
             let mut sorted_fallback = candidates.to_vec();
-            sorted_fallback.sort_by(|a, b| a.distance.total_cmp(&b.distance));
+            sorted_fallback.sort_by(|a, b| {
+                a.distance
+                    .total_cmp(&b.distance)
+                    .then_with(|| a.index.cmp(&b.index))
+            });
 
             for cand in sorted_fallback {
                 if (fallback.len() >= m
@@ -411,8 +422,11 @@ impl HnswIndexCore {
                                 Ok(r) => r,
                                 Err(_) => continue,
                             };
-                            if record.max_layer as usize >= max_layer {
-                                max_layer = record.max_layer as usize;
+                            let rec_layer = record.max_layer as usize;
+                            if rec_layer > max_layer
+                                || (rec_layer == max_layer && best_node.is_none_or(|b| i < b))
+                            {
+                                max_layer = rec_layer;
                                 best_node = Some(i);
                             }
                         }
@@ -422,11 +436,17 @@ impl HnswIndexCore {
                 for (i, node) in nodes.iter().enumerate() {
                     let global_idx = mmap_node_count + i;
                     if global_idx != idx && !deleted.contains(global_idx as u64) {
-                        if node.max_layer >= max_layer {
+                        if node.max_layer > max_layer
+                            || (node.max_layer == max_layer
+                                && best_node.is_none_or(|b| global_idx < b))
+                        {
                             max_layer = node.max_layer;
                             best_node = Some(global_idx);
                         }
-                        if node.max_layer >= max_ram_layer {
+                        if node.max_layer > max_ram_layer
+                            || (node.max_layer == max_ram_layer
+                                && best_ram_node.is_none_or(|b| global_idx < b))
+                        {
                             max_ram_layer = node.max_layer;
                             best_ram_node = Some(global_idx);
                         }

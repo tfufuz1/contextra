@@ -19,6 +19,19 @@ use std::sync::Arc;
 pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
     let _flush_lock = storage.flush_mutex.lock().await;
 
+    // Dekker-Write-Fence: Flush vs Purge Koordination
+    if !storage.flush_purge_fence.enter_flush() {
+        tracing::debug!("Flush postponed: exclusive purge operation currently active");
+        return Ok(());
+    }
+    struct FlushFenceGuard<'a>(&'a super::super::fence::FlushPurgeFence);
+    impl<'a> Drop for FlushFenceGuard<'a> {
+        fn drop(&mut self) {
+            self.0.leave_flush();
+        }
+    }
+    let _fence_guard = FlushFenceGuard(&storage.flush_purge_fence);
+
     // ── Phase 0: Schnellcheck (Read-Lock, kein I/O) ──────────────────────
     let has_active_memtable = {
         let state = storage.state.read().await;

@@ -1,18 +1,18 @@
-//! # Bereinigungsmodi fuer Key-Value-Segmente (Ring 1)
+//! # Bereinigungsmodi fuer Key-Value-Segmente
 //!
-//! Definiert [`KvDeleteMode`], um festzulegen, ob Bereinigung ueber regulaere
+//! Definiert [], um festzulegen, ob Bereinigung ueber regulaere
 //! LSM-Tombstones oder kryptografisches Shredding (Schluesselentwertung) erfolgen.
 
 // FILE-CONTEXT
 // ZWECK: Definition von KvDeleteMode (TombstoneOnly vs CryptoShred).
 // INVARIANTEN:
-// - INV-KV-DELETE-1: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
+// - INV-KV-DELETE-1: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für -Segmente möglich, niemals für .
 
 use serde::{Deserialize, Serialize};
 
 /// Mode specifying KV segment deletion behavior.
 ///
-/// INVARIANTE `INV-KV-DELETE-1`: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
+/// INVARIANTE : Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für -Segmente möglich, niemals für .
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum KvDeleteMode {
