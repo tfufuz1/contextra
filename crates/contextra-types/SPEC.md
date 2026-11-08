@@ -20,6 +20,7 @@ Normatives Spezifikationsdokument für den Klassen-B-Baustein `contextra-types` 
 ## 3. Fehlerdomänen
 * `ContextraError`: Zentraler typisierter Fehler-Enum für alle Kernoperationen des Storage-Bundles.
 * Sub-Fehler: Modul-disjunkte Fehlerstrukturen mit Zero-Panic-Konstruktoren und deterministischer Konvertierung.
+* Modell-Neutralität: Speichermodell-spezifische Fehler wie `HnswDeletionError` sind als deprecated markiert und gehören in die jeweiligen Engines (`contextra-vector`).
 
 ## 4. Garantien
 * **Zero-Panic:** Keine Panics, ungeprüften Indexierungen oder Konstruktor-Abbrüche in Produktionscode.

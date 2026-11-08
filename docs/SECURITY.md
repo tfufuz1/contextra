@@ -1,10 +1,11 @@
-# Contextra – Sicherheitsmodell (Kern v1)
+# Contextra – Sicherheitsmodell (Baukasten-System)
 
-<!-- doc-stamp: 2026-10-30 | Ersetzt: Sicherheitsmodell Fassung 1.2 (Desktop-App, MCP, Ollama). Normativ: docs/SPEC.md §3, §8, §9 -->
+<!-- doc-stamp: 2026-11-08 | Normativ: docs/SPEC.md Fassung 4.1 §3, §6, §10, §12 -->
 
-Dieses Dokument beschreibt das Bedrohungsmodell des **reduzierten Kerns v1**. Das frühere Modell mit Desktop-App, MCP-Server, Ollama-Anbindung und Privacy-Gateway gilt nicht mehr. Es ist entfallen, weil die zugehörigen Crates entfernt wurden (SPEC §5.2).
+Dieses Dokument beschreibt das Bedrohungs- und Sicherheitsmodell des modularen **Contextra Baukastensystems**.
+Als Baukastensystem aus autarken Rust-Bausteinen (Klasse A) und dem persistenten Storage-Bundle (Klasse B) richtet sich das Sicherheitsmodell an Entwickler und Architekten, die Komponenten in eigene Zielanwendungen einbetten.
 
-Dieses Dokument ist eine technische Beschreibung. Es ist keine Zertifizierung und keine Rechtsauskunft.
+Dieses Dokument ist eine technische Beschreibung. Es stellt keine Rechtsberatung und keine formale Zertifizierung dar.
 
 ---
 
@@ -12,59 +13,58 @@ Dieses Dokument ist eine technische Beschreibung. Es ist keine Zertifizierung un
 
 | Schutzgut | Ort | Schutzmechanismus |
 |---|---|---|
-| Dokumente und Metadaten | SSTables, MemTable, WAL | AEAD-Verschlüsselung (`contextra-crypto`), Integritätsprüfung (HMAC-Kette im WAL, CRC32 in Blöcken) |
-| Schlüsselmaterial | Speicher des Prozesses | Ableitung per HKDF, Löschung beim Verwerfen (zeroized) |
-| Mandantentrennung | alle Schichten | Schlüssel-Präfix, Filter vor Indexabfrage, Mandant aus `RequestContext` (VETO-F10) |
-| Suchindex | HNSW, BM25 | Löschung nach VETO-F02 |
-| Build-Integrität | Lieferkette | `deny.toml`, `supply-chain/` (cargo-vet), `Cargo.lock` |
+| Dokumente und Nutzdaten | SSTables, MemTable, WAL (`contextra-store`) | Authenticated Encryption at Rest via AES-256-GCM-SIV (`contextra-crypto`), Integritätsketten (HMAC-SHA256, BLAKE3), CRC32-Prüfsummen in Blöcken |
+| Schlüsselmaterial | Arbeitsspeicher des Prozesses | Verwaltung via typisierte Container (`dek.rs`), automatische Nullung (`ZeroizeOnDrop`), Speichersperren gegen Paging/Swap via `contextra-sys::mlock` (`INV-CRYPTO-ZEROIZE-1`, `INV-SYS-MEMLOCK-1`) |
+| Mandanten- und Bereichsisolation | Indizes und Speicherschichten | Strikt deterministische Trennung nach `TenantId` und Scopes; keine Vermischung über Anfragen hinweg (`VETO-F10`) |
+| Revisionssichere Löschung | Löschkern (`contextra-erasure`) | Kaskadierte Löschsagas, kryptografisches Crypto-Shredding, Ed25519-signierte Löschnachweise, Restore-Guards gegen Wiederherstellung aus Alt-Backups (`docs/SPEC.md` §6) |
+| Datenabflussschutz (Egress) | Anwendungsränder (`contextra-privacy`) | Automatische Erkennung und Maskierung personenbezogener Daten (PII) vor Weitergabe an externe APIs (`INV-PRIVACY-FAILCLOSED-1`) |
+| Ausführungssicherheit | Code-Ausführung (`contextra-sandbox`) | WASM-Isolation (Wasmtime) mit Fuel- und Speichergrenzen (`INV-SANDBOX-FUEL-1`) |
+| Build- und Lieferkettenintegrität | Workspace & Crates | `deny.toml`, Lizenzprüfung (`cargo-deny`), strikte MSRV 1.89 |
 
 ---
 
 ## 2. Vertrauensgrenzen
 
-- **Prozessgrenze:** Contextra läuft als Bibliothek im Prozess der Anwendung. Die Anwendung ist vertrauenswürdig. Angriffe aus dem selben Prozess sind nicht Gegenstand des Modells.
-- **Dateisystemgrenze:** Das Datenverzeichnis wird als nicht vertrauenswürdig behandelt, sobald es außerhalb des Prozesses verändert werden kann. Beschädigte oder manipulierte Dateien müssen zu einem benannten Fehler führen (Regel 10, Fail-Closed).
-- **Mandantengrenze:** Anfragen verschiedener Mandanten dürfen sich nicht beeinflussen oder Daten offenlegen (VETO-F10).
-- **Netzgrenze:** Contextra öffnet keine Netzwerkverbindung. Eine Netzwerkfunktion ist im Kern nicht vorgesehen (Single-Node-Doktrin).
+- **Prozessgrenze:** Contextra-Bausteine laufen als Library im Prozess der Host-Anwendung. Die Host-Anwendung gilt als vertrauenswürdig bezüglich der Speicherallokation. Direkte Angriffe aus demselben Prozesskontext (z. B. willkürliches Memory-Patching) liegen außerhalb des Bibliotheksmodells.
+- **Dateisystemgrenze:** Persistierte Dateien im Datenverzeichnis werden beim Einlesen stets als potenziell korrupt oder manipuliert betrachtet. Manipulierte Blöcke, WAL-Einträge oder Indizes führen zum sofortigen, deterministischen Abbruch (Fail-Closed, `INV-FSYNC-1`).
+- **Netzwerkgrenze:** Bausteine des Fundaments und der Speicherkerne öffnen keine unautorisierten Netzwerkverbindungen (Single-Node-Doktrin für Persistenzkerne). Netzwerkzugriffe sind explizit auf Inferenz-Clients (`contextra-infer-ollama`) und Gateway-Protokolle (`contextra-mcp`) beschränkt.
+- **Mandantengrenze:** Anfragen verschiedener Mandanten dürfen sich unter keinen Umständen gegenseitig beeinflussen (`VETO-F10`). Die `TenantId` wird aus dem autorisierten Kontext bezogen.
 
 ---
 
 ## 3. Bedrohungen und Gegenmaßnahmen
 
-| Bedrohung | Gegenmaßnahme | Status |
+| Bedrohung | Gegenmaßnahme | Normative Referenz |
 |---|---|---|
-| Offenlegung der Daten bei Diebstahl des Datenträgers | Verschlüsselung at rest, in jedem Build aktiv (Regel 8) | Umgesetzt im Code. Feature-Konflikt `encryption-at-rest` offen (SPEC §16, B4) |
-| Manipulation von WAL oder SSTables | HMAC-Verkettung, CRC32, Fail-Closed beim Öffnen | Umgesetzt im Code, Tests in `contextra-store` |
-| Mandantenübergreifende Abfrage | Mandant aus Anfragekontext, Filter vor Indexzugriff | Tests vorhanden, Vollständigkeit wird in PLAN R1 geprüft |
-| Verlust von Daten durch Absturz | WAL-Replay, `repair_on_open`, Fehler bei `fsync` werden propagiert | Umgesetzt, Testabdeckung in `contextra-store` unterschiedlich |
-| Speicherfehler in unsicherem Code | Unsafe nur in `contextra-sys` und `contextra-simd`, jeder Block mit `// SAFETY:` | Prüfung über `tests/unsafe_islands.rs`; SAFETY-Kommentare werden in PLAN R1.5 vervollständigt |
-| Ressourcenerschöpfung durch große Eingaben | Budgets in `contextra-types`, Obergrenzen bei Ergebnissen | Teilweise, Obergrenzen je Pfad in R1 zu prüfen |
-| Schadhafte Abhängigkeit | `cargo deny`, `cargo vet`, `Cargo.lock` | Konfiguration vorhanden, Lauf in R4 |
-| Nicht bereinigte Schlüssel im Speicher | Zeroize beim Verwerfen | Umgesetzt in `contextra-crypto` |
+| Datenoffenlegung bei Verlust des Datenträgers | AES-256-GCM-SIV Verschlüsselung at Rest in `contextra-crypto` / `contextra-store` | `docs/SPEC.md` §12.3, §14.1 |
+| Unbemerkte Daten- oder WAL-Manipulation | BLAKE3- und HMAC-basierte Integritätsketten, Block-Prüfsummen, Fail-Closed beim Recovery | `docs/SPEC.md` §10.1, §12.3, §14.1 |
+| Mandantenübergreifende Datenabflüsse | Isolationsfilter vor Indexabfragen, konsequente Trennung in Scopes | `docs/SPEC.md` §3, `VETO-F10` |
+| Datenverlust oder Inkonsistenz nach Absturz | Append-Only WAL, atomares Rename (`write_atomic`), Fsync-Poisoning bei E/A-Fehlern | `docs/SPEC.md` §3.5, §12.1 (`INV-FSYNC-1`) |
+| Unbeabsichtigtes Wiederaufleben gelöschter Daten | Restore-Guard in `contextra-erasure`, der gelöschte Datenstände in Alt-Snapshots blockiert | `docs/SPEC.md` §6.2, §14.1 |
+| Speichersicherheits-Schwachstellen | `#![forbid(unsafe_code)]` im gesamten Workspace außer den 3 isolierten Unsafe-Inseln (`simd`, `sys`, `wire`) | `docs/SPEC.md` §2 B10, §8 G10 |
+| Ungewollter PII-Abfluss in externe Cloud-Modelle | Egress-Filterung und Fail-Closed-Maskierung in `contextra-privacy` | `docs/SPEC.md` §12.4 |
+| Unberechenbare Schleifen oder Denial-of-Service bei Codeausführung | Strikte Fuel- und Timeout-Budgets in `contextra-sandbox` | `docs/SPEC.md` §13.2 |
+| Schlüsselreste im Arbeitsspeicher | Implementierung von `ZeroizeOnDrop` und Memory-Locking (`mlock`) | `docs/SPEC.md` §10.1, §12.3 |
 
 ---
 
-## 4. Nicht im Modell
+## 4. Nicht im Modell (Ausschlüsse)
 
-- Angriffe auf das Betriebssystem, den Host oder die Hardware.
-- Auslagerungsspeicher (Swap), Core-Dumps und Speicherabbilder außerhalb des gehärteten Prozesses.
-- Datenträger-Firmware, Flash-Wear-Leveling und Überprovisionierung.
-- Externe Sicherungen des Betreibers.
-- Kopien und Übermittlung von Daten durch die Anwendung.
-- Modellparameter und Prompt-Verläufe der Anwendung.
-
-Diese Punkte entsprechen den Ausschlüssen in SPEC §9.3 und §14.
+- Angriffe auf die physische Hardware, CPU-Seitenkanäle auf Hardware-Ebene oder Kernel-Kompromittierungen des Host-Betriebssystems.
+- Auslagerungsspeicher (Swap) und Memory-Dumps, sofern das Betriebssystem `mlock` oder `MADV_DONTDUMP` ignoriert oder einschränkt.
+- Flash-Wear-Leveling und interne Überprovisionierung physischer SSD-Controller bei direktem Speicherüberschreiben.
+- Nicht autorisierte Modifikationen der Anwendungs-Binaries nach dem Kompilieren.
 
 ---
 
-## 5. Meldung von Schwachstellen
+## 5. Meldung von Sicherheitsbefunden
 
-Sicherheitsbefunde bitte nicht öffentlich als Issue melden. Die Meldung geht an den Maintainer des Repositorys. Eine Antwort wird angestrebt, aber nicht zugesichert. Eine Behebung folgt einem Plan nach `docs/PLAN.md`.
+Sicherheitsbefunde bitten wir vertraulich direkt an die Maintainer des Repositories zu übermitteln und nicht über öffentliche GitHub-Issues zu teilen. Befunde werden priorisiert analysiert und gemäß den Baukasten-Qualitätsstandards behoben.
 
 ---
 
 ## 6. Verweise
 
-- `docs/SPEC.md` §3 (Regeln), §8 (Persistenz), §9 (Löschung), §14 (Datenlebenszyklus)
-- `docs/VETOES.md` (VETO-F10, VETO-F02)
-- `deny.toml`, `supply-chain/`
+- `docs/SPEC.md` (Fassung 4.1): §2 (B1–B12), §3 (Architekturprinzipien), §6 (Löschkette & Erasure), §10 (Low-Level), §12 (Krypto & Persistenz)
+- `docs/VETOES.md` (VETO-F10, VETO-F02, VETO-ADR)
+- `docs/CONSTITUTION.md` (Architektur- und Sicherheitsverfassung)

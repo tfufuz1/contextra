@@ -28,6 +28,8 @@ use crate::saga::machine::{EraseSaga, SagaState};
 use crate::saga::seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
+use crate::types_local::Clock;
+use crate::types_local::IdGen;
 use crate::types_local::{CommitBarrier, PurgeBarrier};
 use crate::types_local::{
     EraseMode, EraseReceipt, ErasureStatus, LayerId as TypesLayerId, PendingReason, Phase,
@@ -36,8 +38,6 @@ use crate::types_local::{
 use crate::types_local::{EraseTarget, ErasureLayer, LayerId, LayerScope, PurgeCx};
 use crate::types_local::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
 use crate::types_local::{ErasureId, Timestamp};
-use contextra_ports::clock::Clock;
-use contextra_ports::id_gen::IdGen;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

@@ -1,6 +1,6 @@
 # Contextra Baukasten – Refaktorisierungsplan
 
-Begleitdokument zur „Contextra Baukasten – Spezifikation v3.0“ · Stand 06.11.2026 · Basis: `tfufuz1/contextra`
+Begleitdokument zur „Contextra Baukasten – Spezifikation v4.1“ · Stand 2026-11-08 · Basis: `tfufuz1/contextra`
 
 Dieser Plan legt Reihenfolge, Arbeitspakete, Gates und Risiken zur Transformation des Gesamtsystems in ein entkoppeltes, modulares Baukastensystem (Building Blocks) fest. Aufwände sind als relative Größen (S/M/L/XL) angegeben.
 
@@ -129,7 +129,7 @@ Phase 3 und 4 vollziehen die zentrale Modularisierung: Sie befreien den Speicher
 
 ## 10. Phase 7 – Dokumentation, Governance-Bereinigung und CI-Absicherung
 
-- `docs/SPEC.md` als maßgebliche Baukasten-Spezifikation v3.0 führen; Veraltete Monolith-Zusagen in `docs/` archivieren.
+- `docs/SPEC.md` als maßgebliche Baukasten-Spezifikation v4.1 führen; Veraltete Monolith-Zusagen in `docs/` archivieren.
 - `docs/ARCHITECTURE.md` auf den Baukasten-Zustand aktualisieren.
 - `CHANGELOG.md`: Dokumentation der Entkopplung und Ausgliederung der Löschkette in `contextra-erasure`.
 - `capabilities.toml`, `deny.toml` und Quality Gates final auf den modularen Zustand arretieren.

@@ -24,11 +24,15 @@
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
 use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
-use crate::error::CryptoError;
-use contextra_ports::scanner::{LayerWitness, WitnessLayer};
-use contextra_types::{
-    error::HnswDeletionError, CollectionId, ContextraError, DocId, Result, TenantId, TxId,
+/// Typalias für CryptoError.
+pub type CryptoError = crate::error::ErasureError;
+use crate::error::ErasureError;
+use crate::types_local::{
+    CollectionId, DocId, ScanTechnique,
+    ScanWitness as LayerWitness, TenantId, TxId, WitnessLayer,
 };
+/// Typalias für Result.
+pub type Result<T> = std::result::Result<T, crate::error::ErasureError>;
 use serde::{Deserialize, Serialize};
 
 /// Extension trait providing accessors for `LayerWitness` without mutating `contextra-ports`.
@@ -49,7 +53,10 @@ impl LayerWitnessExt for LayerWitness {
     }
 
     fn control_matches(&self) -> u64 {
-        if matches!(self.method(), contextra_types::ScanMethod::FeatureDisabled) {
+        if matches!(
+            self.method(),
+            crate::types_local::ScanMethod::FeatureDisabled
+        ) {
             0
         } else {
             1
@@ -68,7 +75,7 @@ pub fn map_witness_layer_to_deletion_layer(
         WitnessLayer::HnswIndex => Ok(DeletionLayer::HnswIndex),
         WitnessLayer::WalAllSegments => {
             let seq_after = witness.wal_seq_after().ok_or_else(|| {
-                ContextraError::Internal(
+                ErasureError::Internal(
                     "WalAllSegments witness missing mandatory wal_seq_after sequence number"
                         .to_string(),
                 )
@@ -80,7 +87,7 @@ pub fn map_witness_layer_to_deletion_layer(
         WitnessLayer::EmbeddingCache => Ok(DeletionLayer::EmbeddingCache),
         WitnessLayer::Custom(s) => match s.as_str() {
             "TextIndex" => Ok(DeletionLayer::TextIndex),
-            other => Err(ContextraError::Internal(format!(
+            other => Err(ErasureError::Internal(format!(
                 "Unrecognized custom WitnessLayer: '{other}' cannot be mapped to DeletionLayer"
             ))),
         },
@@ -119,6 +126,7 @@ pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
 #[derive(Debug)]
 pub struct DeletionProofKeyPair {
     signing_key: ed25519_dalek::SigningKey,
+    /// Öffentlicher Verifikationsschlüssel.
     pub verifying_key: ed25519_dalek::VerifyingKey,
 }
 
@@ -235,14 +243,14 @@ impl LayerCleanupProof {
     /// und wird abgelehnt statt stillschweigend akzeptiert.
     ///
     /// # Errors
-    /// Gibt `ContextraError::Internal` zurück, wenn `remaining_live_entries != 0`.
+    /// Gibt `ErasureError::Internal` zurück, wenn `remaining_live_entries != 0`.
     #[deprecated(note = "Umstellung auf DeletionProof::issue, siehe P-19")]
     pub fn new_after_verified_empty(
         layer: DeletionLayer,
         remaining_live_entries: usize,
     ) -> Result<Self> {
         if remaining_live_entries != 0 {
-            return Err(ContextraError::Internal(format!(
+            return Err(ErasureError::Internal(format!(
                 "INV-DELETION-1 violation: attempted to construct LayerCleanupProof for \
                  layer {layer:?} but verification found {remaining_live_entries} \
                  remaining live entries — physical cleanup is incomplete or was not \
@@ -275,7 +283,7 @@ impl LayerCleanupProof {
                 _private: (),
             })
         } else {
-            Err(ContextraError::Internal(format!(
+            Err(ErasureError::Internal(format!(
                 "INV-DELETION-1 violation: physical cleanup verification \
                  failed for layer {layer:?} — refusing to create \
                  LayerCleanupProof"
@@ -324,7 +332,7 @@ pub struct UncoveredLayer {
 }
 
 mod scan_technique_serde {
-    use contextra_ports::scanner::ScanTechnique;
+    use crate::types_local::ScanTechnique;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     #[derive(Serialize, Deserialize)]
@@ -375,7 +383,7 @@ pub struct LayerWitnessMeasurement {
     pub layer: DeletionLayer,
     /// Applied scan technique.
     #[serde(with = "scan_technique_serde")]
-    pub technique: contextra_ports::scanner::ScanTechnique,
+    pub technique: ScanTechnique,
     /// Number of units scanned during measurement.
     pub scanned: u64,
     /// Number of remaining live residual units (MUST be 0).
@@ -495,27 +503,27 @@ impl DeletionProof {
     /// is neither `ScanMethod::Structural` nor `ScanMethod::FeatureDisabled` (e.g. `ScanMethod::NotMeasured`).
     #[allow(clippy::too_many_arguments)]
     pub fn issue<'a>(
-        ctx: &contextra_types::RequestContext,
-        saga: &contextra_types::SagaRecord,
-        witnesses: &[contextra_ports::scanner::LayerWitness],
+        ctx: &crate::types_local::RequestContext,
+        saga: &crate::types_local::SagaRecord,
+        witnesses: &[LayerWitness],
         excluded: &[ExcludedScope],
         custody: CustodyLevel,
         key: impl Into<SigningKeyHandle<'a>>,
-        clock: &dyn contextra_ports::Clock,
+        clock: &dyn crate::types_local::Clock,
     ) -> Result<Self> {
         for w in witnesses {
             if w.remaining() > 0 {
-                return Err(ContextraError::Internal(format!(
+                return Err(ErasureError::Internal(format!(
                     "INV-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
                     w.layer(),
                     w.remaining()
                 )));
             }
             match w.method() {
-                contextra_types::ScanMethod::Structural
-                | contextra_types::ScanMethod::FeatureDisabled => {}
-                contextra_types::ScanMethod::NotMeasured(reason) => {
-                    return Err(ContextraError::Internal(format!(
+                crate::types_local::ScanMethod::Structural
+                | crate::types_local::ScanMethod::FeatureDisabled => {}
+                crate::types_local::ScanMethod::NotMeasured(reason) => {
+                    return Err(ErasureError::Internal(format!(
                         "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
                         w.layer(),
                         reason
@@ -526,7 +534,7 @@ impl DeletionProof {
 
         // 1. witnesses empty -> Err
         if witnesses.is_empty() {
-            return Err(ContextraError::Internal(
+            return Err(ErasureError::Internal(
                 "REQ-PRF-1 violation: witnesses list cannot be empty for deletion proof issuance"
                     .to_string(),
             ));
@@ -534,7 +542,7 @@ impl DeletionProof {
 
         // 2. excluded empty -> Err (REQ-PRF-2)
         if excluded.is_empty() {
-            return Err(ContextraError::Internal(
+            return Err(ErasureError::Internal(
                 "REQ-PRF-2 violation: excluded scopes list cannot be empty".to_string(),
             ));
         }
@@ -548,7 +556,7 @@ impl DeletionProof {
         for w in witnesses {
             // Check for remaining > 0 -> Err
             if w.remaining() > 0 {
-                return Err(ContextraError::Internal(format!(
+                return Err(ErasureError::Internal(format!(
                     "INV-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
                     w.layer(),
                     w.remaining()
@@ -557,10 +565,10 @@ impl DeletionProof {
 
             // Check ScanMethod::NotMeasured -> Err
             match w.method() {
-                contextra_types::ScanMethod::Structural
-                | contextra_types::ScanMethod::FeatureDisabled => {}
-                contextra_types::ScanMethod::NotMeasured(reason) => {
-                    return Err(ContextraError::Internal(format!(
+                crate::types_local::ScanMethod::Structural
+                | crate::types_local::ScanMethod::FeatureDisabled => {}
+                crate::types_local::ScanMethod::NotMeasured(reason) => {
+                    return Err(ErasureError::Internal(format!(
                         "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
                         w.layer(),
                         reason
@@ -570,8 +578,8 @@ impl DeletionProof {
 
             // Check technique == ScanTechnique::NotMeasured / LogicalView for physical storage layers -> Err
             match w.technique() {
-                contextra_ports::scanner::ScanTechnique::NotMeasured(reason) => {
-                    return Err(ContextraError::Internal(format!(
+                ScanTechnique::NotMeasured(reason) => {
+                    return Err(ErasureError::Internal(format!(
                         "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
                         w.layer(),
                         reason
@@ -584,7 +592,7 @@ impl DeletionProof {
 
             // Check for duplicate layers using WitnessLayer -> Err
             if !seen_layers.insert(witness_layer.clone()) {
-                return Err(ContextraError::Internal(format!(
+                return Err(ErasureError::Internal(format!(
                     "INV-WITNESS-MINT-1 violation: duplicate witness layer '{:?}' in witnesses list",
                     witness_layer
                 )));
@@ -605,24 +613,30 @@ impl DeletionProof {
         }
 
         // Check mandatory storage layers: LsmMemtable, SsTableAllLevels, WalAllSegments
-        let has_memtable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::LsmMemtable));
-        let has_sstable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
-        let has_wal = covered_layers.iter().any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
+        let has_memtable = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::LsmMemtable));
+        let has_sstable = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
+        let has_wal = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
 
         if !has_memtable {
-            return Err(ContextraError::Internal(
+            return Err(ErasureError::Internal(
                 "INV-WITNESS-MINT-1 violation: mandatory layer LsmMemtable missing from witnesses"
                     .to_string(),
             ));
         }
         if !has_sstable {
-            return Err(ContextraError::Internal(
+            return Err(ErasureError::Internal(
                 "INV-WITNESS-MINT-1 violation: mandatory layer SsTableAllLevels missing from witnesses"
                     .to_string(),
             ));
         }
         if !has_wal {
-            return Err(ContextraError::Internal(
+            return Err(ErasureError::Internal(
                 "INV-WITNESS-MINT-1 violation: mandatory layer WalAllSegments missing from witnesses"
                     .to_string(),
             ));
@@ -630,13 +644,19 @@ impl DeletionProof {
 
         // Optional layers HnswIndex and TextIndex, if not present in witnesses, add to uncovered_layers
         let mut uncovered_layers = Vec::new();
-        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::HnswIndex)) {
+        if !covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::HnswIndex))
+        {
             uncovered_layers.push(UncoveredLayer {
                 layer: DeletionLayer::HnswIndex,
                 reason: "Scope does not contain vector HnswIndex data".to_string(),
             });
         }
-        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::TextIndex)) {
+        if !covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::TextIndex))
+        {
             uncovered_layers.push(UncoveredLayer {
                 layer: DeletionLayer::TextIndex,
                 reason: "Scope does not contain full-text TextIndex data".to_string(),
@@ -668,7 +688,7 @@ impl DeletionProof {
 
         let payload = proof_stub
             .construct_v5_payload()
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
         let mut proof = proof_stub;
 
@@ -728,16 +748,16 @@ impl DeletionProof {
         let deleted_keys_hash = hash_deleted_keys_length_prefixed(&deleted_keys);
 
         let scope_bytes =
-            bincode::serialize(&scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
+            bincode::serialize(&scope).map_err(|e| ErasureError::Internal(e.to_string()))?;
         let tx_bytes = deleted_after_tx.0.to_le_bytes();
 
         let covered_layers: Vec<DeletionLayer> =
             covered_layers.into_iter().map(|p| p.layer).collect();
 
         let covered_layers_bytes = bincode::serialize(&covered_layers)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| ErasureError::Internal(e.to_string()))?;
         let excluded_scopes_bytes = bincode::serialize(&excluded_scopes)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
         let receipt_bytes = wal_chain_receipt.unwrap_or([0u8; 32]);
         let receipt_part = if wal_chain_receipt.is_some() {
@@ -877,10 +897,8 @@ impl DeletionProof {
             covered_layers.into_iter().map(|p| p.layer).collect();
 
         if covered_layers.contains(&DeletionLayer::HnswIndex) && graph_repair.is_empty() {
-            return Err(ContextraError::GraphRepairFailed(
-                HnswDeletionError::VerificationFailed {
-                    remaining_pointers: 1,
-                },
+            return Err(ErasureError::Internal(
+                "Graph repair attestation missing or incomplete: remaining_pointers: 1".to_string(),
             ));
         }
 
@@ -910,7 +928,7 @@ impl DeletionProof {
 
         let payload = proof_stub
             .construct_v3_payload()
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
         use ed25519_dalek::Signer;
         let sig = signing_key.sign(&payload);
@@ -937,11 +955,11 @@ impl DeletionProof {
     pub fn verify<'a>(&self, key: impl Into<VerificationKey<'a>>) -> Result<bool> {
         let version = self
             .signature_version_typed()
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
         let key = key.into();
         let scope_bytes =
-            bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
+            bincode::serialize(&self.scope).map_err(|e| ErasureError::Internal(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
 
         match version {
@@ -949,7 +967,7 @@ impl DeletionProof {
                 let proof_key = match key {
                     VerificationKey::Hmac(k) => k,
                     VerificationKey::Ed25519(_) => {
-                        return Err(ContextraError::Internal(
+                        return Err(ErasureError::Internal(
                             "Ed25519 key provided for HMAC signature_version 1 proof".to_string(),
                         ))
                     }
@@ -965,15 +983,15 @@ impl DeletionProof {
                 let proof_key = match key {
                     VerificationKey::Hmac(k) => k,
                     VerificationKey::Ed25519(_) => {
-                        return Err(ContextraError::Internal(
+                        return Err(ErasureError::Internal(
                             "Ed25519 key provided for HMAC signature_version 2 proof".to_string(),
                         ))
                     }
                 };
                 let covered_layers_bytes = bincode::serialize(&self.covered_layers)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| ErasureError::Internal(e.to_string()))?;
                 let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| ErasureError::Internal(e.to_string()))?;
                 let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
                 let receipt_part = if self.wal_chain_receipt.is_some() {
                     receipt_bytes.as_slice()
@@ -998,14 +1016,14 @@ impl DeletionProof {
                 let verifying_key = match key {
                     VerificationKey::Ed25519(vk) => vk,
                     VerificationKey::Hmac(_) => {
-                        return Err(ContextraError::Internal(
+                        return Err(ErasureError::Internal(
                             "HMAC key provided for Ed25519 signature_version 3 proof".to_string(),
                         ))
                     }
                 };
                 let payload = self
                     .construct_v3_payload()
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
                 use ed25519_dalek::Verifier;
                 let sig = match ed25519_dalek::Signature::from_slice(&self.signature) {
@@ -1018,7 +1036,7 @@ impl DeletionProof {
             SignatureVersion::V5 => {
                 let payload = self
                     .construct_v5_payload()
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
                 match key {
                     VerificationKey::Ed25519(vk) => {
@@ -1196,7 +1214,7 @@ impl DeletionProof {
         // Typisierte Versionsprüfung über SignatureVersion.
         let version = self
             .signature_version_typed()
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+            .map_err(|e| ErasureError::Internal(e.to_string()))?;
 
         if version == SignatureVersion::V1 {
             let mut clone = self.clone();
@@ -1204,18 +1222,16 @@ impl DeletionProof {
                 "covered_layers/excluded_scopes are not cryptographically signed in this legacy proof version"
                     .to_string(),
             );
-            serde_json::to_string_pretty(&clone)
-                .map_err(|e| ContextraError::Internal(e.to_string()))
+            serde_json::to_string_pretty(&clone).map_err(|e| ErasureError::Internal(e.to_string()))
         } else if version == SignatureVersion::V2 || version == SignatureVersion::V3 {
             let mut clone = self.clone();
             clone.integrity_warning = Some(
                 "covered_layers/excluded_scopes are not bound to a verified witness measurement in this legacy proof version"
                     .to_string(),
             );
-            serde_json::to_string_pretty(&clone)
-                .map_err(|e| ContextraError::Internal(e.to_string()))
+            serde_json::to_string_pretty(&clone).map_err(|e| ErasureError::Internal(e.to_string()))
         } else {
-            serde_json::to_string_pretty(self).map_err(|e| ContextraError::Internal(e.to_string()))
+            serde_json::to_string_pretty(self).map_err(|e| ErasureError::Internal(e.to_string()))
         }
     }
 
@@ -1258,7 +1274,7 @@ fn compute_hmac_sha256(key: &[u8], data_parts: &[&[u8]]) -> Result<[u8; 32]> {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     let mut mac = Hmac::<Sha256>::new_from_slice(key)
-        .map_err(|e| ContextraError::Internal(format!("HMAC key error: {e}")))?;
+        .map_err(|e| ErasureError::Internal(format!("HMAC key error: {e}")))?;
     for part in data_parts {
         mac.update(part);
     }
@@ -1268,8 +1284,31 @@ fn compute_hmac_sha256(key: &[u8], data_parts: &[&[u8]]) -> Result<[u8; 32]> {
 #[cfg(test)]
 #[allow(deprecated)]
 mod tests {
+    use crate::types_local::SystemClock;
+
+    #[cfg(test)]
+    fn mint_witness_for_tests(
+        layer: &str,
+        scanned: u64,
+        remaining: u64,
+        tech: ScanTechnique,
+    ) -> LayerWitness {
+        use crate::types_local::{ScanSession, ScanTarget};
+
+        let target = ScanTarget::new("target", [0x11; 32]);
+        let mut session = ScanSession::begin(WitnessLayer::from(layer), target, tech.clone());
+        if !matches!(tech, ScanTechnique::FeatureDisabled) {
+            session.record_control_match();
+            for i in 0..scanned {
+                session.record_unit([(i % 255) as u8; 32], i < remaining);
+            }
+        }
+        let clock = SystemClock::new();
+        session.finish(&clock).unwrap()
+    }
+
     use super::*;
-    use contextra_types::{DocId, TenantId, TxId};
+    use crate::types_local::{DocId, TenantId, TxId};
 
     fn test_key() -> Vec<u8> {
         vec![0u8; 32]
@@ -1277,13 +1316,10 @@ mod tests {
 
     #[test]
     fn test_deletion_proof_issue_validation() {
-        use contextra_ports::scanner::ScanTechnique;
-        use contextra_ports::SystemClock;
-        use contextra_testkit::mint_witness_for_tests;
-        use contextra_types::{RequestContext, SagaRecord};
+        use crate::types_local::{RequestContext, SagaRecord};
 
         let clock = SystemClock::new();
-        let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));
+        let ctx = RequestContext::new(TenantId::new(1), TxId(100));
         let saga = SagaRecord::new([0xAA; 32]);
         let hmac_key = b"secret_hmac_key_32_bytes_long!!";
 
@@ -1366,7 +1402,10 @@ mod tests {
             hmac_key.as_slice(),
             &clock,
         );
-        assert!(res_missing.is_err(), "missing mandatory SsTableAllLevels MUST return Err");
+        assert!(
+            res_missing.is_err(),
+            "missing mandatory SsTableAllLevels MUST return Err"
+        );
 
         // 6. Duplicate layer -> Err
         let w_duplicate = vec![
@@ -1415,13 +1454,10 @@ mod tests {
 
     #[test]
     fn test_v5_golden_json_serde_and_tamper_rejection() {
-        use contextra_ports::scanner::ScanTechnique;
-        use contextra_ports::SystemClock;
-        use contextra_testkit::mint_witness_for_tests;
-        use contextra_types::{RequestContext, SagaRecord};
+        use crate::types_local::{RequestContext, SagaRecord};
 
         let clock = SystemClock::new();
-        let ctx = RequestContext::new(TenantId::try_new(42).unwrap(), TxId(500));
+        let ctx = RequestContext::new(TenantId::new(42), TxId(500));
         let saga = SagaRecord::new([0x33; 32]);
         let keypair = DeletionProofKeyPair::generate();
 
@@ -1460,13 +1496,17 @@ mod tests {
         let mut tampered_sig = proof.clone();
         tampered_sig.signature[0] ^= 0xFF;
         assert!(!tampered_sig.verify(&keypair.verifying_key).unwrap());
-        assert!(tampered_sig.verify_external(&keypair.verifying_key).is_err());
+        assert!(tampered_sig
+            .verify_external(&keypair.verifying_key)
+            .is_err());
 
         // Tamper test: flip measurement digest -> verify fails
         let mut tampered_digest = proof.clone();
         tampered_digest.measurements[0].digest[0] ^= 0xFF;
         assert!(!tampered_digest.verify(&keypair.verifying_key).unwrap());
-        assert!(tampered_digest.verify_external(&keypair.verifying_key).is_err());
+        assert!(tampered_digest
+            .verify_external(&keypair.verifying_key)
+            .is_err());
     }
 
     #[test]
@@ -1502,7 +1542,7 @@ mod tests {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_v3(
             scope,
@@ -1529,7 +1569,7 @@ mod tests {
         let keypair2 = DeletionProofKeyPair::generate();
 
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_v3(
             scope,
@@ -1550,7 +1590,7 @@ mod tests {
     fn test_v3_tampered_signature_rejects() {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let mut proof = DeletionProof::create_v3(
             scope,
@@ -1573,7 +1613,7 @@ mod tests {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_with_wal_receipt_v3(
             scope,
@@ -1596,7 +1636,7 @@ mod tests {
         let mut tampered = proof.clone();
         tampered.scope = DeletionScope::Document {
             doc_id: DocId(43),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         assert!(!tampered.verify(&keypair.verifying_key).unwrap());
 
@@ -1630,7 +1670,7 @@ mod tests {
     fn test_v3_cannot_verify_with_hmac_key() {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_v3(
             scope,
@@ -1648,10 +1688,10 @@ mod tests {
         let res = proof.verify(&hmac_key);
         assert!(res.is_err());
         match res {
-            Err(ContextraError::Internal(msg)) => {
+            Err(ErasureError::Internal(msg)) => {
                 assert!(msg.contains("HMAC key provided for Ed25519 signature_version 3 proof"));
             }
-            _ => panic!("Expected ContextraError::Internal"),
+            _ => panic!("Expected ErasureError::Internal"),
         }
     }
 
@@ -1659,7 +1699,7 @@ mod tests {
     fn test_v1_v2_still_verify_after_v3_code() {
         // Run existing v1 & v2 tests logic to ensure zero regression
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
 
         // v2
@@ -1710,7 +1750,7 @@ mod tests {
     fn test_v3_uses_length_prefixed_hash() {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
 
         let proof_ab_c = DeletionProof::create_v3(
@@ -1742,7 +1782,7 @@ mod tests {
 
     #[test]
     fn test_deletion_proof_create_and_verify() {
-        let tenant = TenantId::try_new(1).unwrap();
+        let tenant = TenantId::new(1);
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
             tenant_id: tenant,
@@ -1769,18 +1809,18 @@ mod tests {
         let res = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 3);
         assert!(res.is_err());
         match res {
-            Err(ContextraError::Internal(msg)) => {
+            Err(ErasureError::Internal(msg)) => {
                 assert!(msg.contains("INV-DELETION-1 violation"));
                 assert!(msg.contains("found 3 remaining live entries"));
             }
-            _ => panic!("Expected ContextraError::Internal"),
+            _ => panic!("Expected ErasureError::Internal"),
         }
     }
 
     #[test]
     fn test_deletion_proof_wrong_key_fails_verify() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof =
             DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
@@ -1792,7 +1832,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_tampered_data_fails_verify() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create(
             scope,
@@ -1819,7 +1859,7 @@ mod tests {
         // Tamper with scope
         let mut tampered_scope = proof.clone();
         tampered_scope.scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(2).unwrap(),
+            tenant_id: TenantId::new(2),
         };
         assert!(!tampered_scope.verify(&test_key()).unwrap());
 
@@ -1835,7 +1875,7 @@ mod tests {
 
         let proof_a = DeletionProof::create(
             DeletionScope::Tenant {
-                tenant_id: TenantId::try_new(2).unwrap(),
+                tenant_id: TenantId::new(2),
             },
             keys_a,
             TxId(1),
@@ -1846,7 +1886,7 @@ mod tests {
         .unwrap();
         let proof_b = DeletionProof::create(
             DeletionScope::Tenant {
-                tenant_id: TenantId::try_new(2).unwrap(),
+                tenant_id: TenantId::new(2),
             },
             keys_b,
             TxId(1),
@@ -1862,7 +1902,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_audit_export_contains_excluded_scopes() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create(
             scope,
@@ -1884,7 +1924,7 @@ mod tests {
 
     #[test]
     fn test_deletion_proof_tenant_id_extraction() {
-        let t1 = TenantId::try_new(10).unwrap();
+        let t1 = TenantId::new(10);
         let doc_scope = DeletionScope::Document {
             doc_id: DocId(1),
             tenant_id: t1,
@@ -1893,7 +1933,7 @@ mod tests {
             DeletionProof::create(doc_scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
         assert_eq!(p1.tenant_id(), t1);
 
-        let t2 = TenantId::try_new(20).unwrap();
+        let t2 = TenantId::new(20);
         let col_scope = DeletionScope::Collection {
             collection_id: CollectionId(5),
             tenant_id: t2,
@@ -1902,7 +1942,7 @@ mod tests {
             DeletionProof::create(col_scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
         assert_eq!(p2.tenant_id(), t2);
 
-        let t3 = TenantId::try_new(30).unwrap();
+        let t3 = TenantId::new(30);
         let tenant_scope = DeletionScope::Tenant { tenant_id: t3 };
         let p3 = DeletionProof::create(tenant_scope, vec![], TxId(1), vec![], vec![], &test_key())
             .unwrap();
@@ -1912,7 +1952,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_requires_layer_cleanup_proof() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(100).unwrap(),
+            tenant_id: TenantId::new(100),
         };
 
         let cleanup_proofs = vec![
@@ -1946,7 +1986,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_tampered_covered_layers_fails_verify() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create(
             scope,
@@ -1974,7 +2014,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_tampered_excluded_scopes_fails_verify() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create(
             scope,
@@ -2003,7 +2043,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_v1_backward_compatibility() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let deleted_after_tx = TxId(10);
         let deleted_keys = vec![b"k1".to_vec()];
@@ -2066,7 +2106,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_v1_audit_export_integrity_warning() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let deleted_after_tx = TxId(10);
         let deleted_keys = vec![b"k1".to_vec()];
@@ -2118,7 +2158,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_v2_v3_audit_export_integrity_warning() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create(
             scope,
@@ -2168,7 +2208,7 @@ mod tests {
     fn test_deletion_proof_with_wal_receipt_creation_and_tamper_check() {
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let integrity_key = b"integrity-key-32-bytes-wal-rec!";
         let prev_hmac = [0x77u8; 32];
@@ -2209,14 +2249,14 @@ mod tests {
         let proof_fail =
             LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(false));
         assert!(
-            matches!(proof_fail, Err(ContextraError::Internal(ref msg)) if msg.contains("verification failed"))
+            matches!(proof_fail, Err(ErasureError::Internal(ref msg)) if msg.contains("verification failed"))
         );
 
         // Closure returns error
         let proof_err = LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || {
-            Err(ContextraError::Internal("db error".to_string()))
+            Err(ErasureError::Internal("db error".to_string()))
         });
-        assert!(matches!(proof_err, Err(ContextraError::Internal(ref msg)) if msg == "db error"));
+        assert!(matches!(proof_err, Err(ErasureError::Internal(ref msg)) if msg == "db error"));
     }
 
     #[test]
@@ -2224,7 +2264,7 @@ mod tests {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_v3(
             scope,
@@ -2251,7 +2291,7 @@ mod tests {
     #[test]
     fn test_verify_external_v2_hmac() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let hmac_key = b"secret_hmac_key_32_bytes_long!!";
         let proof = DeletionProof::create(
@@ -2271,7 +2311,7 @@ mod tests {
     #[test]
     fn test_deletion_proof_unsupported_signature_version() {
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let mut proof =
             DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();
@@ -2289,7 +2329,7 @@ mod tests {
             // 2. verify() MUST reject unknown version fail-closed with error and no panic
             let verify_res = proof.verify(&test_key());
             assert!(
-                matches!(verify_res, Err(ContextraError::Internal(ref msg)) if msg.contains(&format!("Unsupported DeletionProof signature_version: {unknown_byte}"))),
+                matches!(verify_res, Err(ErasureError::Internal(ref msg)) if msg.contains(&format!("Unsupported DeletionProof signature_version: {unknown_byte}"))),
                 "verify() MUST reject unknown byte 0x{unknown_byte:02X} fail-closed"
             );
 
@@ -2316,7 +2356,7 @@ mod tests {
         // Ein um ein Bit manipulierter Signaturwert schlägt bei allen gültigen Versionen (v1, v2, v3) fehl.
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
 
         // --- Version 1 ---
@@ -2395,7 +2435,7 @@ mod tests {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_v3(
             scope,
@@ -2419,7 +2459,7 @@ mod tests {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let graph_repair = vec![GraphRepairAttestation {
             doc_id: DocId(42),
@@ -2460,7 +2500,7 @@ mod tests {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Document {
             doc_id: DocId(42),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         let proof = DeletionProof::create_with_wal_receipt_v3(
             scope,
@@ -2497,7 +2537,7 @@ mod tests {
         let mut tampered = proof.clone();
         tampered.scope = DeletionScope::Document {
             doc_id: DocId(43),
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
         assert!(matches!(
             tampered.verify_external(&keypair.verifying_key),
@@ -2556,7 +2596,7 @@ mod tests {
     fn test_verify_external_v1_v2_unsupported_version_error() {
         let keypair = DeletionProofKeyPair::generate();
         let scope = DeletionScope::Tenant {
-            tenant_id: TenantId::try_new(1).unwrap(),
+            tenant_id: TenantId::new(1),
         };
 
         // v2 HMAC proof
@@ -2582,5 +2622,123 @@ mod tests {
             proof_v1.verify_external(&keypair.verifying_key),
             Err(CryptoError::UnsupportedProofVersion(1))
         ));
+    }
+}
+
+/// Detailed failure reasons for third-party verification of deletion proofs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VerificationErrorReason {
+    /// Digital signature is invalid or tampered with.
+    InvalidSignature(String),
+    /// Unbroken chain invariant violated.
+    ChainBroken {
+        /// Position in chain where break occurred.
+        position: usize,
+        /// Description of the break.
+        details: String,
+    },
+    /// Audit chain head signature or head hash does not match expected anchor.
+    HeadMismatch {
+        /// Expected head hash.
+        expected_head_hash: [u8; 32],
+        /// Actual head hash found in chain.
+        actual_head_hash: [u8; 32],
+    },
+    /// Unsupported signature version or proof format.
+    UnsupportedVersion(u8),
+    /// Chain has been truncated or is missing trailing entries without anchor update.
+    TruncatedChain {
+        /// Expected minimum chain length.
+        expected_len: usize,
+        /// Actual chain length.
+        actual_len: usize,
+    },
+    /// Tenant mismatch in proof vs expected context.
+    TenantMismatch {
+        /// Expected tenant ID.
+        expected: TenantId,
+        /// Actual tenant ID in proof.
+        actual: TenantId,
+    },
+    /// Provided chain is empty.
+    EmptyChain,
+    /// Invalid or malformed public verification key.
+    InvalidKey(String),
+}
+
+/// Structured outcome of third-party deletion proof verification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationResult {
+    /// `true` if all cryptographic checks, signatures, and chain continuities passed.
+    pub is_valid: bool,
+    /// Detailed error reason if `is_valid` is `false`.
+    pub error_reason: Option<VerificationErrorReason>,
+}
+
+impl VerificationResult {
+    /// Creates a successful verification result.
+    pub fn success() -> Self {
+        Self {
+            is_valid: true,
+            error_reason: None,
+        }
+    }
+
+    /// Creates a failed verification result with an explicit reason.
+    pub fn failure(reason: VerificationErrorReason) -> Self {
+        Self {
+            is_valid: false,
+            error_reason: Some(reason),
+        }
+    }
+}
+
+/// Public facade for standalone third-party verification of deletion proofs.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct DeletionProofVerifier;
+
+impl DeletionProofVerifier {
+    /// Verifies a single standalone `DeletionProof` using a public key.
+    pub fn verify_standalone(
+        proof: &DeletionProof,
+        verifying_key_bytes: &[u8; 32],
+    ) -> VerificationResult {
+        let verifying_key = match ed25519_dalek::VerifyingKey::from_bytes(verifying_key_bytes) {
+            Ok(vk) => vk,
+            Err(e) => {
+                return VerificationResult::failure(VerificationErrorReason::InvalidKey(
+                    e.to_string(),
+                ))
+            }
+        };
+
+        if let Err(e) = proof.verify_external(&verifying_key) {
+            let msg = e.to_string();
+            let reason = if msg.contains("unsupported deletion proof version") {
+                VerificationErrorReason::UnsupportedVersion(proof.signature_version)
+            } else if msg.contains("invalid verifying key") {
+                VerificationErrorReason::InvalidKey(msg)
+            } else {
+                VerificationErrorReason::InvalidSignature(msg)
+            };
+            return VerificationResult::failure(reason);
+        }
+
+        VerificationResult::success()
+    }
+
+    /// Verifies a `DeletionProof` and checks tenant binding.
+    pub fn verify_standalone_for_tenant(
+        proof: &DeletionProof,
+        expected_tenant: TenantId,
+        verifying_key_bytes: &[u8; 32],
+    ) -> VerificationResult {
+        if proof.tenant_id() != expected_tenant {
+            return VerificationResult::failure(VerificationErrorReason::TenantMismatch {
+                expected: expected_tenant,
+                actual: proof.tenant_id(),
+            });
+        }
+        Self::verify_standalone(proof, verifying_key_bytes)
     }
 }

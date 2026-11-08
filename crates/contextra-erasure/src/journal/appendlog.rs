@@ -7,7 +7,7 @@ use crate::crypto_local::{open_record, seal_record};
 use crate::error::ErasureError;
 use crate::saga::{EraseSaga, SagaState};
 use crate::types_local::ErasureId;
-use contextra_ports::vfs::Vfs;
+use crate::types_local::Vfs;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ const FILE_HEADER_MAGIC: &[u8; 8] = b"CTXFILE\0";
 const FILE_KIND_JOURNAL: u8 = 6;
 const JOURNAL_GENESIS_CHAIN: [u8; 32] = [0u8; 32];
 
-fn vfs_err(e: contextra_ports::ContextraError) -> ErasureError {
+fn vfs_err(e: crate::error::ErasureError) -> ErasureError {
     ErasureError::Io(std::io::Error::other(e.to_string()))
 }
 
