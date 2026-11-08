@@ -114,6 +114,10 @@ impl Shard {
 /// INV-TENANT-Analogon für KV-Bridge: Ein Tenant kann niemals Segmente
 /// eines anderen Tenants lesen. Strukturell erzwungen durch getrennte Maps
 /// und Sharding.
+#[deprecated(
+    since = "0.1.0",
+    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
+)]
 pub struct TenantIsolatedKvStore {
     /// 32 cache-line-gepaddete RwLock-Shards. Box<[_]> für flexible Shard-Anzahl.
     shards: Box<[Shard]>,
