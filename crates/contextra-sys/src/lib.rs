@@ -36,11 +36,27 @@ pub mod mmap;
 pub mod posix;
 pub mod vault;
 
+/// Baukasten-Zielmodul `mem`: Kapselt Memory-Locking, Vault-Speicher und Zeroization.
+pub mod mem {
+    pub use crate::mlock::{mem_lock, mem_lock_with_policy, mem_unlock, MemLockPolicy};
+    pub use crate::vault::LockedRegions;
+}
+
+/// Baukasten-Zielmodul `fsmeta`: Plattformspezifische Datei-ACLs und Eigentümerprüfungen.
+pub mod fsmeta {
+    pub use crate::acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
+}
+
+/// Baukasten-Zielmodul `map`: Sichere Speicherabbildung (INV-IO-1 / INV-ENCRYPT-REST-2).
+pub mod map {
+    pub use crate::mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
+}
+
 // ANCHOR[contextra-sys:LIB-REEXPORT-001]
-// Öffentliche Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-engine).
+// Öffentliche Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-vector, contextra-durable-fs).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use durability::{durable_flush_dir, durable_flush_file, write_all_durable};
 pub use mlock::{mem_lock, mem_lock_with_policy, mem_unlock, MemLockPolicy};
-pub use mmap::mmap_readonly;
+pub use mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
 pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};
 pub use vault::LockedRegions;

@@ -6,8 +6,7 @@
 // ANCHOR[contextra-router:TST-ENG2-001]
 use super::super::fixtures::*;
 use crate::{RoutingOutcome, SlmProfile};
-use contextra_db::{Contextra, ContextraConfig};
-use contextra_ports::StorageEngine;
+
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
 use std::sync::Arc;
@@ -617,11 +616,11 @@ async fn test_router_engine_additional_coverage_paths() -> contextra_types::Resu
     use contextra_types::{ContextChunk, DocId, TokenBudget};
 
     let dir = tempfile::tempdir()?;
-    let config = contextra_db::ContextraConfig {
+    let config = crate::tests::tests::ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
-    let db = contextra_db::Contextra::open_with_config(dir.path(), config).await?;
+    let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config).await?;
     let collection = db.collection("default").await?;
 
     // 1. Corrupt calibration_store_path

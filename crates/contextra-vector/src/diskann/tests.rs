@@ -349,7 +349,7 @@ mod tests {
             .copy_from_slice(&corrupt_count.to_le_bytes());
 
         // Recompute HMAC for the modified payload so header & footer integrity passes, allowing load_node to test node parsing
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let footer_start = data.len() - DiskAnnFooter::SIZE;
         hmac.update(&data[..footer_start]);
         let computed = hmac.finalize();
@@ -794,7 +794,7 @@ mod tests {
         assert_eq!(&footer.magic, DISKANN_FOOTER_MAGIC);
 
         // Verify HMAC calculation over payload
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        let mut hmac = crate::diskann::integrity::DiskAnnHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let payload = &file_bytes[..file_bytes.len() - DiskAnnFooter::SIZE];
         hmac.update(payload);
         let expected_hmac = hmac.finalize();

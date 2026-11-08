@@ -10,7 +10,12 @@
 //! - Batching, Grenzwerte, Extreme Logits und Nebenläufigkeit.
 //! - Invalidierung von Kalibrierungen bei Modellwechsel (INV-CAL-2).
 
-#![allow(clippy::unwrap_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 
 use super::config::{
     OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult, MAX_CANDIDATES,
@@ -54,7 +59,9 @@ async fn test_rerank_sorted_by_score_descending() {
         let candidates: Vec<String> = (0..5).map(|i| format!("candidate {i}")).collect();
         let results = reranker.rerank("query", &candidates).await.unwrap(); // unwrap
         for window in results.windows(2) {
-            assert!(window[0].score >= window[1].score);
+            if let (Some(first), Some(second)) = (window.first(), window.get(1)) {
+                assert!(first.score >= second.score);
+            }
         }
     }
 }
@@ -273,9 +280,9 @@ fn test_record_implicit_feedback_top_k_marked_relevant() {
     }
     assert_eq!(reranker.calibration_observation_count(), 3);
     let buf = reranker.calibration_buffer.lock().clone();
-    assert_eq!(buf[0], (2.5, true));
-    assert_eq!(buf[1], (1.8, true));
-    assert_eq!(buf[2], (-0.5, false));
+    assert_eq!(buf.first().copied(), Some((2.5, true)));
+    assert_eq!(buf.get(1).copied(), Some((1.8, true)));
+    assert_eq!(buf.get(2).copied(), Some((-0.5, false)));
 }
 
 // ANCHOR[contextra-infer-onnx:TEST-CALIBRATION-WARMUP]
@@ -358,13 +365,13 @@ async fn test_rerank_exact_boundary_candidates() -> Result<(), Box<dyn std::erro
     let single_candidate = vec!["single_doc".to_string()];
     let res_single = reranker.rerank("query", &single_candidate).await?;
     assert_eq!(res_single.len(), 1);
-    assert_eq!(res_single[0].original_index, 0);
+    assert_eq!(res_single.first().map(|r| r.original_index), Some(0));
 
     // MAX_CANDIDATES boundary (exact limit)
     let max_candidates: Vec<String> = (0..MAX_CANDIDATES).map(|i| format!("doc_{i}")).collect();
     let res_max = reranker.rerank("query", &max_candidates).await?;
     assert_eq!(res_max.len(), MAX_CANDIDATES);
-    assert_eq!(res_max[0].original_index, 0);
+    assert_eq!(res_max.first().map(|r| r.original_index), Some(0));
     Ok(())
 }
 
@@ -447,11 +454,23 @@ fn compute_ece(probs_and_labels: &[(f32, bool)], num_bins: usize) -> f32 {
     let mut bin_conf_sums = vec![0.0f32; num_bins];
 
     for &(p, label) in probs_and_labels {
-        let bin_idx = ((p * num_bins as f32).floor() as usize).min(num_bins - 1);
-        bin_counts[bin_idx] += 1;
-        bin_conf_sums[bin_idx] += p;
+        let p_clamped = p.clamp(0.0, 1.0);
+        let raw_idx = (p_clamped * num_bins as f32).floor();
+        let bin_idx = if raw_idx >= 0.0 {
+            (raw_idx as usize).min(num_bins.saturating_sub(1))
+        } else {
+            0
+        };
+        if let Some(c) = bin_counts.get_mut(bin_idx) {
+            *c += 1;
+        }
+        if let Some(s) = bin_conf_sums.get_mut(bin_idx) {
+            *s += p;
+        }
         if label {
-            bin_acc_sums[bin_idx] += 1.0;
+            if let Some(a) = bin_acc_sums.get_mut(bin_idx) {
+                *a += 1.0;
+            }
         }
     }
 
@@ -459,10 +478,13 @@ fn compute_ece(probs_and_labels: &[(f32, bool)], num_bins: usize) -> f32 {
     let mut ece = 0.0f32;
 
     for i in 0..num_bins {
-        if bin_counts[i] > 0 {
-            let count = bin_counts[i] as f32;
-            let avg_acc = bin_acc_sums[i] / count;
-            let avg_conf = bin_conf_sums[i] / count;
+        let count_val = bin_counts.get(i).copied().unwrap_or(0);
+        if count_val > 0 {
+            let count = count_val as f32;
+            let acc_sum = bin_acc_sums.get(i).copied().unwrap_or(0.0);
+            let conf_sum = bin_conf_sums.get(i).copied().unwrap_or(0.0);
+            let avg_acc = acc_sum / count;
+            let avg_conf = conf_sum / count;
             ece += (count / total) * (avg_acc - avg_conf).abs();
         }
     }

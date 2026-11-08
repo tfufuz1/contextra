@@ -1,0 +1,2134 @@
+{
+  "tool_name": "contract_diff_detector.py",
+  "title": "Port & Contract Interface Drift Diagnostic Report",
+  "description": "Analyzes canonical traits in contextra-ports, verifies '# Fehler' and '# Crash' contract documentation, and maps implementations across the workspace.",
+  "timestamp": "2026-11-07T23:03:01.009917+00:00",
+  "metrics": {
+    "total_port_traits": 45,
+    "total_port_methods": 104,
+    "methods_missing_fehler_doc": 60,
+    "methods_missing_crash_doc": 63,
+    "workspace_port_implementations": 121
+  },
+  "findings_count": 225,
+  "findings": [
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/attention.rs",
+      "line": 11,
+      "trait": "AttentionExporter",
+      "method": "export_attention_weights",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `AttentionExporter::export_attention_weights` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/checkpoint.rs",
+      "line": 26,
+      "trait": "CheckpointCoordinator",
+      "method": "drop_named_checkpoint",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `CheckpointCoordinator::drop_named_checkpoint` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/checkpoint.rs",
+      "line": 26,
+      "trait": "CheckpointCoordinator",
+      "method": "list_named_checkpoints",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `CheckpointCoordinator::list_named_checkpoints` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/clock.rs",
+      "line": 8,
+      "trait": "Clock",
+      "method": "now_unix_nanos",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Clock::now_unix_nanos` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/clock.rs",
+      "line": 8,
+      "trait": "Clock",
+      "method": "monotonic_nanos",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Clock::monotonic_nanos` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/barrier.rs",
+      "line": 91,
+      "trait": "CommitBarrier",
+      "method": "shared",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `CommitBarrier::shared` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/barrier.rs",
+      "line": 91,
+      "trait": "CommitBarrier",
+      "method": "exclusive",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `CommitBarrier::exclusive` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/observability.rs",
+      "line": 10,
+      "trait": "DriftStatusProvider",
+      "method": "overall_drift_status",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `DriftStatusProvider::overall_drift_status` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/policy.rs",
+      "line": 19,
+      "trait": "EgressPolicy",
+      "method": "evaluate",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `EgressPolicy::evaluate` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/embedding.rs",
+      "line": 83,
+      "trait": "EmbeddingProvider",
+      "method": "provider_name",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `EmbeddingProvider::provider_name` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/embedding.rs",
+      "line": 83,
+      "trait": "EmbeddingProvider",
+      "method": "embedding_dim",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `EmbeddingProvider::embedding_dim` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 236,
+      "trait": "ErasureLayer",
+      "method": "id",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ErasureLayer::id` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 236,
+      "trait": "ErasureLayer",
+      "method": "resolve",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ErasureLayer::resolve` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 236,
+      "trait": "ErasureLayer",
+      "method": "on_gate",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ErasureLayer::on_gate` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 236,
+      "trait": "ErasureLayer",
+      "method": "purge",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ErasureLayer::purge` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/erasure.rs",
+      "line": 236,
+      "trait": "ErasureLayer",
+      "method": "key_coverage",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ErasureLayer::key_coverage` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 177,
+      "trait": "FileKeyring",
+      "method": "create",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `FileKeyring::create` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 177,
+      "trait": "FileKeyring",
+      "method": "open",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `FileKeyring::open` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 177,
+      "trait": "FileKeyring",
+      "method": "destroy",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `FileKeyring::destroy` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/id_gen.rs",
+      "line": 7,
+      "trait": "IdGen",
+      "method": "next_id",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `IdGen::next_id` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/kv.rs",
+      "line": 139,
+      "trait": "KvPrefixStore",
+      "method": "lookup",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `KvPrefixStore::lookup` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/kv.rs",
+      "line": 139,
+      "trait": "KvPrefixStore",
+      "method": "evict",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `KvPrefixStore::evict` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/scanner/mod.rs",
+      "line": 52,
+      "trait": "LayerScanner",
+      "method": "layer",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `LayerScanner::layer` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/scanner/mod.rs",
+      "line": 52,
+      "trait": "LayerScanner",
+      "method": "scan_units",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `LayerScanner::scan_units` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/ledger.rs",
+      "line": 152,
+      "trait": "LedgerSink",
+      "method": "append",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `LedgerSink::append` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/ledger.rs",
+      "line": 152,
+      "trait": "LedgerSink",
+      "method": "read_all",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `LedgerSink::read_all` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/ledger.rs",
+      "line": 152,
+      "trait": "LedgerSink",
+      "method": "prune",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `LedgerSink::prune` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/license.rs",
+      "line": 70,
+      "trait": "LicenseGate",
+      "method": "check_ring",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `LicenseGate::check_ring` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/license.rs",
+      "line": 70,
+      "trait": "LicenseGate",
+      "method": "authorize",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `LicenseGate::authorize` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/metrics.rs",
+      "line": 19,
+      "trait": "MetricsSink",
+      "method": "record_counter",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `MetricsSink::record_counter` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/metrics.rs",
+      "line": 19,
+      "trait": "MetricsSink",
+      "method": "record_gauge",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `MetricsSink::record_gauge` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/metrics.rs",
+      "line": 19,
+      "trait": "MetricsSink",
+      "method": "record_histogram",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `MetricsSink::record_histogram` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 40,
+      "trait": "PluginManifest",
+      "method": "name",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `PluginManifest::name` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 40,
+      "trait": "PluginManifest",
+      "method": "requires",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `PluginManifest::requires` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 40,
+      "trait": "PluginManifest",
+      "method": "conflicts",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `PluginManifest::conflicts` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 40,
+      "trait": "PluginManifest",
+      "method": "feature_ring_required",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `PluginManifest::feature_ring_required` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 40,
+      "trait": "PluginManifest",
+      "method": "capability",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `PluginManifest::capability` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/plugin.rs",
+      "line": 40,
+      "trait": "PluginManifest",
+      "method": "activate",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `PluginManifest::activate` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/barrier.rs",
+      "line": 112,
+      "trait": "PurgeBarrier",
+      "method": "compaction",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `PurgeBarrier::compaction` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/barrier.rs",
+      "line": 112,
+      "trait": "PurgeBarrier",
+      "method": "purge",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `PurgeBarrier::purge` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/barrier.rs",
+      "line": 112,
+      "trait": "PurgeBarrier",
+      "method": "purge_waiting",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `PurgeBarrier::purge_waiting` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/scanner/layer.rs",
+      "line": 115,
+      "trait": "Purger",
+      "method": "purge",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Purger::purge` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "check",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ReadGate::check` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "check_bound",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ReadGate::check_bound` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "variant_for_range",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ReadGate::variant_for_range` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "gated_seq",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `ReadGate::gated_seq` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "gate_epoch",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ReadGate::gate_epoch` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "covers",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ReadGate::covers` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "check_raw",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ReadGate::check_raw` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "covers_raw",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ReadGate::covers_raw` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/gate.rs",
+      "line": 128,
+      "trait": "ReadGate",
+      "method": "gated_seq_raw",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ReadGate::gated_seq_raw` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 128,
+      "trait": "RecordSealer",
+      "method": "evict",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `RecordSealer::evict` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/keys.rs",
+      "line": 128,
+      "trait": "RecordSealer",
+      "method": "make_slots_durable",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `RecordSealer::make_slots_durable` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/report_signer.rs",
+      "line": 45,
+      "trait": "ReportSigner",
+      "method": "signer_id",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ReportSigner::signer_id` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/reranker.rs",
+      "line": 7,
+      "trait": "Reranker",
+      "method": "record_implicit_feedback",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Reranker::record_implicit_feedback` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/reranker.rs",
+      "line": 7,
+      "trait": "Reranker",
+      "method": "rerank_deadline_ms",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Reranker::rerank_deadline_ms` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/lifecycle.rs",
+      "line": 38,
+      "trait": "ResponseGroundingValidator",
+      "method": "score_grounding",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `ResponseGroundingValidator::score_grounding` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/rng.rs",
+      "line": 12,
+      "trait": "Rng",
+      "method": "next_u64",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Rng::next_u64` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/rng.rs",
+      "line": 12,
+      "trait": "Rng",
+      "method": "fill_bytes",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Rng::fill_bytes` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/rng.rs",
+      "line": 12,
+      "trait": "Rng",
+      "method": "next_unit_f64",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Rng::next_unit_f64` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 16,
+      "trait": "SegmentSynthesizer",
+      "method": "model_id",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `SegmentSynthesizer::model_id` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/storage.rs",
+      "line": 35,
+      "trait": "StorageEngine",
+      "method": "supports_ssi_tracking",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `StorageEngine::supports_ssi_tracking` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "insert",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::insert` (Fehler-Doc: True, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "delete",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::delete` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "commit",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::commit` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "rollback",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::rollback` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "rollback_to_tx",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::rollback_to_tx` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "last_tx_id",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::last_tx_id` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "len",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::len` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "is_empty",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::is_empty` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/text_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "method": "stats",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `TextIndex::stats` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "all_doc_ids",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::all_doc_ids` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "delete",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::delete` (Fehler-Doc: True, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "commit",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::commit` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "rollback",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::rollback` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "rollback_to_tx",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::rollback_to_tx` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "last_tx_id",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::last_tx_id` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "len",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::len` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "is_empty",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::is_empty` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "stats",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::stats` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "is_rebuild_required",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::is_rebuild_required` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vector_index.rs",
+      "line": 37,
+      "trait": "VectorIndex",
+      "method": "trigger_rebuild_async",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `VectorIndex::trigger_rebuild_async` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "open",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::open` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "read_at",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": false,
+      "description": "Port method `Vfs::read_at` (Fehler-Doc: True, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "read",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::read` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "write_atomic",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::write_atomic` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "create_dir_all",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::create_dir_all` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "remove_file",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::remove_file` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "unlink",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Vfs::unlink` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "rename",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::rename` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "read_dir",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::read_dir` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "exists",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::exists` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "len",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::len` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "list_dir",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::list_dir` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "list",
+      "is_async": false,
+      "has_fehler_doc": false,
+      "has_crash_doc": false,
+      "description": "Port method `Vfs::list` (Fehler-Doc: False, Crash-Doc: False)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 165,
+      "trait": "Vfs",
+      "method": "sync_dir",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `Vfs::sync_dir` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "read_at",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::read_at` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "read_verified",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::read_verified` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "write_at",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::write_at` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "set_len",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::set_len` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "len",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::len` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "is_empty",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::is_empty` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "sync_data",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::sync_data` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/vfs.rs",
+      "line": 76,
+      "trait": "VfsFile",
+      "method": "sync_all",
+      "is_async": false,
+      "has_fehler_doc": true,
+      "has_crash_doc": true,
+      "description": "Port method `VfsFile::sync_all` (Fehler-Doc: True, Crash-Doc: True)"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 209,
+      "trait": "LicenseGate",
+      "target_type": "MockLicenseGate",
+      "description": "Implementation: `MockLicenseGate` implements Port `LicenseGate`"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/query_rewriter.rs",
+      "line": 93,
+      "trait": "QueryRewriter",
+      "target_type": "LlmQueryRewriter",
+      "description": "Implementation: `LlmQueryRewriter` implements Port `QueryRewriter`"
+    },
+    {
+      "crate": "contextra-agent",
+      "file": "crates/contextra-agent/src/engine.rs",
+      "line": 820,
+      "trait": "Checkpoint",
+      "target_type": "FallbackRegistry",
+      "description": "Implementation: `FallbackRegistry` implements Port `Checkpoint`"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/guard.rs",
+      "line": 534,
+      "trait": "StorageEngine",
+      "target_type": "MockStorage",
+      "description": "Implementation: `MockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/guard/tests.rs",
+      "line": 26,
+      "trait": "StorageEngine",
+      "target_type": "MockStorage",
+      "description": "Implementation: `MockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/store/tests.rs",
+      "line": 38,
+      "trait": "StorageEngine",
+      "target_type": "MockStorage",
+      "description": "Implementation: `MockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/benches/checkpoint_bench.rs",
+      "line": 37,
+      "trait": "StorageEngine",
+      "target_type": "BenchStorage",
+      "description": "Implementation: `BenchStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+      "line": 193,
+      "trait": "ResponseGroundingValidator",
+      "target_type": "GroundingValidatorAdapter",
+      "description": "Implementation: `GroundingValidatorAdapter` implements Port `ResponseGroundingValidator`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/consolidation_executor.rs",
+      "line": 853,
+      "trait": "LlmTextGenerator",
+      "target_type": "TestMockLlm",
+      "description": "Implementation: `TestMockLlm` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/maintenance_scheduler.rs",
+      "line": 515,
+      "trait": "Clock",
+      "target_type": "TestClock",
+      "description": "Implementation: `TestClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+      "line": 1057,
+      "trait": "LlmTextGenerator",
+      "target_type": "MockLlmGenerator",
+      "description": "Implementation: `MockLlmGenerator` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/memory_consolidation.rs",
+      "line": 1249,
+      "trait": "ResponseGroundingValidator",
+      "target_type": "MockLowScoreGroundingValidator",
+      "description": "Implementation: `MockLowScoreGroundingValidator` implements Port `ResponseGroundingValidator`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/synthesis_phase.rs",
+      "line": 143,
+      "trait": "SegmentSynthesizer",
+      "target_type": "MockSynthesizer",
+      "description": "Implementation: `MockSynthesizer` implements Port `SegmentSynthesizer`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/context_compaction/tests.rs",
+      "line": 173,
+      "trait": "LlmTextGenerator",
+      "target_type": "UnreachableLlmGenerator",
+      "description": "Implementation: `UnreachableLlmGenerator` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/context_compaction/tests.rs",
+      "line": 236,
+      "trait": "LlmTextGenerator",
+      "target_type": "MockLlmGenerator",
+      "description": "Implementation: `MockLlmGenerator` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-cognition",
+      "file": "crates/contextra-cognition/src/context_compaction/tests.rs",
+      "line": 313,
+      "trait": "StorageEngine",
+      "target_type": "FaultyDeleteStorage",
+      "description": "Implementation: `FaultyDeleteStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/src/revocation_log.rs",
+      "line": 346,
+      "trait": "Vfs",
+      "target_type": "TestVfs",
+      "description": "Implementation: `TestVfs` implements Port `Vfs`"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/lib.rs",
+      "line": 372,
+      "trait": "DriftStatusProvider",
+      "target_type": "DummyRouter",
+      "description": "Implementation: `DummyRouter` implements Port `DriftStatusProvider`"
+    },
+    {
+      "crate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/vfs.rs",
+      "line": 39,
+      "trait": "Vfs",
+      "target_type": "RealFs",
+      "description": "Implementation: `RealFs` implements Port `Vfs`"
+    },
+    {
+      "crate": "contextra-durable-fs",
+      "file": "crates/contextra-durable-fs/src/vfs.rs",
+      "line": 160,
+      "trait": "VfsFile",
+      "target_type": "RealFsFile",
+      "description": "Implementation: `RealFsFile` implements Port `VfsFile`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/tests.rs",
+      "line": 46,
+      "trait": "Reranker",
+      "target_type": "SlowPartialMockReranker",
+      "description": "Implementation: `SlowPartialMockReranker` implements Port `Reranker`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/query_builder/tests.rs",
+      "line": 80,
+      "trait": "Reranker",
+      "target_type": "MockReranker",
+      "description": "Implementation: `MockReranker` implements Port `Reranker`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/crud/auto_extraction.rs",
+      "line": 69,
+      "trait": "LlmTextGenerator",
+      "target_type": "NoopLlmGenerator",
+      "description": "Implementation: `NoopLlmGenerator` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/tests/insert_tests.rs",
+      "line": 244,
+      "trait": "StorageEngine",
+      "target_type": "FailingRollbackMockStorage",
+      "description": "Implementation: `FailingRollbackMockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/tests/link_tests.rs",
+      "line": 73,
+      "trait": "StorageEngine",
+      "target_type": "FailOnStorageCommit",
+      "description": "Implementation: `FailOnStorageCommit` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/tests/link_tests.rs",
+      "line": 188,
+      "trait": "StorageEngine",
+      "target_type": "FailOnPutStorage",
+      "description": "Implementation: `FailOnPutStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/tests/misc_tests.rs",
+      "line": 19,
+      "trait": "TextEmbeddingEngine",
+      "target_type": "FakeEmbedder",
+      "description": "Implementation: `FakeEmbedder` implements Port `TextEmbeddingEngine`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/tests/read_tests.rs",
+      "line": 24,
+      "trait": "StorageEngine",
+      "target_type": "BoundedScanMockStorage",
+      "description": "Implementation: `BoundedScanMockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/collection/tests/search_tests.rs",
+      "line": 69,
+      "trait": "StorageEngine",
+      "target_type": "PinTrackingFailingStorage",
+      "description": "Implementation: `PinTrackingFailingStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/extraction/tests.rs",
+      "line": 34,
+      "trait": "LlmTextGenerator",
+      "target_type": "MockLlmGenerator",
+      "description": "Implementation: `MockLlmGenerator` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/ledger.rs",
+      "line": 170,
+      "trait": "LedgerSink",
+      "target_type": "InMemoryLedger",
+      "description": "Implementation: `InMemoryLedger` implements Port `LedgerSink`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/test_mocks.rs",
+      "line": 32,
+      "trait": "StorageBackend",
+      "target_type": "MockStorageBackend",
+      "description": "Implementation: `MockStorageBackend` implements Port `StorageBackend`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 357,
+      "trait": "CommitBarrier",
+      "target_type": "Arc",
+      "description": "Implementation: `Arc` implements Port `CommitBarrier`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 366,
+      "trait": "PurgeBarrier",
+      "target_type": "Arc",
+      "description": "Implementation: `Arc` implements Port `PurgeBarrier`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 1096,
+      "trait": "ReportSigner",
+      "target_type": "Arc",
+      "description": "Implementation: `Arc` implements Port `ReportSigner`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 1171,
+      "trait": "ErasureObserver",
+      "target_type": "Arc",
+      "description": "Implementation: `Arc` implements Port `ErasureObserver`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/types_local.rs",
+      "line": 1428,
+      "trait": "VfsFile",
+      "target_type": "MemoryVfsFile",
+      "description": "Implementation: `MemoryVfsFile` implements Port `VfsFile`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/vault/keyring.rs",
+      "line": 84,
+      "trait": "FileKeyring",
+      "target_type": "VaultKeyring",
+      "description": "Implementation: `VaultKeyring` implements Port `FileKeyring`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/vault/sealer.rs",
+      "line": 159,
+      "trait": "RecordSealer",
+      "target_type": "VaultSealer",
+      "description": "Implementation: `VaultSealer` implements Port `RecordSealer`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/gate/erased_set.rs",
+      "line": 305,
+      "trait": "ReadGate",
+      "target_type": "ErasedSet",
+      "description": "Implementation: `ErasedSet` implements Port `ReadGate`"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/gate/read_gate.rs",
+      "line": 84,
+      "trait": "ReadGate",
+      "target_type": "GateGuard",
+      "description": "Implementation: `GateGuard` implements Port `ReadGate`"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/purger.rs",
+      "line": 43,
+      "trait": "Purger",
+      "target_type": "GraphPurger",
+      "description": "Implementation: `GraphPurger` implements Port `Purger`"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/graph_write/mod.rs",
+      "line": 213,
+      "trait": "GraphCollectionMutation",
+      "target_type": "CsrGraph",
+      "description": "Implementation: `CsrGraph` implements Port `GraphCollectionMutation`"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/graph_index/mod.rs",
+      "line": 95,
+      "trait": "GraphIndex",
+      "target_type": "CsrGraph",
+      "description": "Implementation: `CsrGraph` implements Port `GraphIndex`"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/fuzz/fuzz_targets/fuzz_graph_persist.rs",
+      "line": 45,
+      "trait": "StorageEngine",
+      "target_type": "FuzzStorage",
+      "description": "Implementation: `FuzzStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/attention_exporter.rs",
+      "line": 100,
+      "trait": "AttentionExporter",
+      "target_type": "CandleAttentionExporter",
+      "description": "Implementation: `CandleAttentionExporter` implements Port `AttentionExporter`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/embedding_provider.rs",
+      "line": 19,
+      "trait": "EmbeddingProvider",
+      "target_type": "CandleEmbedClient",
+      "description": "Implementation: `CandleEmbedClient` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/gasp.rs",
+      "line": 265,
+      "trait": "ResponseGroundingValidator",
+      "target_type": "GaspValidator",
+      "description": "Implementation: `GaspValidator` implements Port `ResponseGroundingValidator`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/gasp.rs",
+      "line": 284,
+      "trait": "GroundingValidator",
+      "target_type": "GaspValidator",
+      "description": "Implementation: `GaspValidator` implements Port `GroundingValidator`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/kv_bridge.rs",
+      "line": 316,
+      "trait": "KvBridgeStorage",
+      "target_type": "MockKvStorage",
+      "description": "Implementation: `MockKvStorage` implements Port `KvBridgeStorage`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/inference/core.rs",
+      "line": 833,
+      "trait": "LlmTextGenerator",
+      "target_type": "CandleLlmClient",
+      "description": "Implementation: `CandleLlmClient` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-infer-candle",
+      "file": "crates/contextra-infer-candle/src/inference/core.rs",
+      "line": 936,
+      "trait": "LlmTextGeneratorStreaming",
+      "target_type": "CandleLlmClient",
+      "description": "Implementation: `CandleLlmClient` implements Port `LlmTextGeneratorStreaming`"
+    },
+    {
+      "crate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/embedding.rs",
+      "line": 110,
+      "trait": "EmbeddingProvider",
+      "target_type": "OllamaEmbedder",
+      "description": "Implementation: `OllamaEmbedder` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/query_rewriter.rs",
+      "line": 71,
+      "trait": "QueryRewriter",
+      "target_type": "OllamaQueryRewriter",
+      "description": "Implementation: `OllamaQueryRewriter` implements Port `QueryRewriter`"
+    },
+    {
+      "crate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/client/trait_impls.rs",
+      "line": 3,
+      "trait": "LlmTextGenerator",
+      "target_type": "OllamaClient",
+      "description": "Implementation: `OllamaClient` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/client/trait_impls.rs",
+      "line": 12,
+      "trait": "LlmTextGeneratorStreaming",
+      "target_type": "OllamaClient",
+      "description": "Implementation: `OllamaClient` implements Port `LlmTextGeneratorStreaming`"
+    },
+    {
+      "crate": "contextra-infer-ollama",
+      "file": "crates/contextra-infer-ollama/src/client/trait_impls.rs",
+      "line": 41,
+      "trait": "SegmentSynthesizer",
+      "target_type": "OllamaClient",
+      "description": "Implementation: `OllamaClient` implements Port `SegmentSynthesizer`"
+    },
+    {
+      "crate": "contextra-infer-onnx",
+      "file": "crates/contextra-infer-onnx/src/lib.rs",
+      "line": 530,
+      "trait": "EmbeddingProvider",
+      "target_type": "TextEmbedder",
+      "description": "Implementation: `TextEmbedder` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-infer-onnx",
+      "file": "crates/contextra-infer-onnx/src/lib.rs",
+      "line": 1052,
+      "trait": "TextEmbeddingEngine",
+      "target_type": "MockEngine",
+      "description": "Implementation: `MockEngine` implements Port `TextEmbeddingEngine`"
+    },
+    {
+      "crate": "contextra-infer-onnx",
+      "file": "crates/contextra-infer-onnx/src/lib.rs",
+      "line": 1075,
+      "trait": "TextEmbeddingEngine",
+      "target_type": "MockOrderedEngine",
+      "description": "Implementation: `MockOrderedEngine` implements Port `TextEmbeddingEngine`"
+    },
+    {
+      "crate": "contextra-infer-onnx",
+      "file": "crates/contextra-infer-onnx/src/lib.rs",
+      "line": 1233,
+      "trait": "Vfs",
+      "target_type": "TestMockVfs",
+      "description": "Implementation: `TestMockVfs` implements Port `Vfs`"
+    },
+    {
+      "crate": "contextra-infer-onnx",
+      "file": "crates/contextra-infer-onnx/src/reranker/cross_encoder.rs",
+      "line": 268,
+      "trait": "Reranker",
+      "target_type": "CrossEncoderReranker",
+      "description": "Implementation: `CrossEncoderReranker` implements Port `Reranker`"
+    },
+    {
+      "crate": "contextra-kvcache",
+      "file": "crates/contextra-kvcache/src/adapters.rs",
+      "line": 52,
+      "trait": "KvBridgeStorage",
+      "target_type": "StorageEngineKvBridge",
+      "description": "Implementation: `StorageEngineKvBridge` implements Port `KvBridgeStorage`"
+    },
+    {
+      "crate": "contextra-kvcache",
+      "file": "crates/contextra-kvcache/src/adapters.rs",
+      "line": 175,
+      "trait": "PluginManifest",
+      "target_type": "KvCachePluginManifest",
+      "description": "Implementation: `KvCachePluginManifest` implements Port `PluginManifest`"
+    },
+    {
+      "crate": "contextra-kvcache",
+      "file": "crates/contextra-kvcache/src/prefix_store.rs",
+      "line": 348,
+      "trait": "KvPrefixStore",
+      "target_type": "TenantPrefixKvStore",
+      "description": "Implementation: `TenantPrefixKvStore` implements Port `KvPrefixStore`"
+    },
+    {
+      "crate": "contextra-kvcache",
+      "file": "crates/contextra-kvcache/src/store.rs",
+      "line": 853,
+      "trait": "LayerScanner",
+      "target_type": "KvCacheScanner",
+      "description": "Implementation: `KvCacheScanner` implements Port `LayerScanner`"
+    },
+    {
+      "crate": "contextra-license",
+      "file": "crates/contextra-license/src/signed_gate.rs",
+      "line": 737,
+      "trait": "LicenseGate",
+      "target_type": "SignedLicenseGate",
+      "description": "Implementation: `SignedLicenseGate` implements Port `LicenseGate`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/config.rs",
+      "line": 562,
+      "trait": "EmbeddingProvider",
+      "target_type": "MockEmbedder",
+      "description": "Implementation: `MockEmbedder` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/config.rs",
+      "line": 602,
+      "trait": "LlmTextGenerator",
+      "target_type": "MockLlmGenerator",
+      "description": "Implementation: `MockLlmGenerator` implements Port `LlmTextGenerator`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/explain.rs",
+      "line": 131,
+      "trait": "EmbeddingProvider",
+      "target_type": "MockEmbedder",
+      "description": "Implementation: `MockEmbedder` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/routing.rs",
+      "line": 8,
+      "trait": "HybridSearchProvider",
+      "target_type": "CollectionAdapter",
+      "description": "Implementation: `CollectionAdapter` implements Port `HybridSearchProvider`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/routing.rs",
+      "line": 38,
+      "trait": "CommunityResolver",
+      "target_type": "CommunityAdapter",
+      "description": "Implementation: `CommunityAdapter` implements Port `CommunityResolver`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/routing.rs",
+      "line": 49,
+      "trait": "ContextPreparer",
+      "target_type": "ContextPreparerAdapter",
+      "description": "Implementation: `ContextPreparerAdapter` implements Port `ContextPreparer`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/routing.rs",
+      "line": 69,
+      "trait": "DriftStatusProvider",
+      "target_type": "RouterDriftAdapter",
+      "description": "Implementation: `RouterDriftAdapter` implements Port `DriftStatusProvider`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/tests.rs",
+      "line": 17,
+      "trait": "EmbeddingProvider",
+      "target_type": "MockEmbedder",
+      "description": "Implementation: `MockEmbedder` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/prompt_injection/tests.rs",
+      "line": 357,
+      "trait": "Clock",
+      "target_type": "FixedTestClock",
+      "description": "Implementation: `FixedTestClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/context_edit_audit.rs",
+      "line": 285,
+      "trait": "Clock",
+      "target_type": "FixedTestClock",
+      "description": "Implementation: `FixedTestClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_guard.rs",
+      "line": 351,
+      "trait": "Clock",
+      "target_type": "MockClock",
+      "description": "Implementation: `MockClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/src/calibration/isotonic.rs",
+      "line": 334,
+      "trait": "Clock",
+      "target_type": "FixedTestClock",
+      "description": "Implementation: `FixedTestClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/examples/simple_router.rs",
+      "line": 13,
+      "trait": "HybridSearchProvider",
+      "target_type": "ExampleSearchProvider",
+      "description": "Implementation: `ExampleSearchProvider` implements Port `HybridSearchProvider`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/examples/simple_router.rs",
+      "line": 36,
+      "trait": "CommunityResolver",
+      "target_type": "ExampleCommunityResolver",
+      "description": "Implementation: `ExampleCommunityResolver` implements Port `CommunityResolver`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/examples/simple_router.rs",
+      "line": 44,
+      "trait": "ContextPreparer",
+      "target_type": "ExampleContextPreparer",
+      "description": "Implementation: `ExampleContextPreparer` implements Port `ContextPreparer`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/tests/fixtures.rs",
+      "line": 35,
+      "trait": "Clock",
+      "target_type": "TestClock",
+      "description": "Implementation: `TestClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/tests/fixtures.rs",
+      "line": 103,
+      "trait": "HybridSearchProvider",
+      "target_type": "TestCollection",
+      "description": "Implementation: `TestCollection` implements Port `HybridSearchProvider`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/tests/fixtures.rs",
+      "line": 161,
+      "trait": "CommunityResolver",
+      "target_type": "TestCollection",
+      "description": "Implementation: `TestCollection` implements Port `CommunityResolver`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/tests/fixtures.rs",
+      "line": 180,
+      "trait": "HybridSearchProvider",
+      "target_type": "CollectionAdapter",
+      "description": "Implementation: `CollectionAdapter` implements Port `HybridSearchProvider`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/tests/fixtures.rs",
+      "line": 191,
+      "trait": "CommunityResolver",
+      "target_type": "CollectionAdapter",
+      "description": "Implementation: `CollectionAdapter` implements Port `CommunityResolver`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/src/tests/fixtures.rs",
+      "line": 199,
+      "trait": "ContextPreparer",
+      "target_type": "TestContextPreparer",
+      "description": "Implementation: `TestContextPreparer` implements Port `ContextPreparer`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/benches/router_bench.rs",
+      "line": 42,
+      "trait": "HybridSearchProvider",
+      "target_type": "BenchAdapter",
+      "description": "Implementation: `BenchAdapter` implements Port `HybridSearchProvider`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/benches/router_bench.rs",
+      "line": 85,
+      "trait": "CommunityResolver",
+      "target_type": "BenchAdapter",
+      "description": "Implementation: `BenchAdapter` implements Port `CommunityResolver`"
+    },
+    {
+      "crate": "contextra-router",
+      "file": "crates/contextra-router/benches/router_bench.rs",
+      "line": 97,
+      "trait": "ContextPreparer",
+      "target_type": "BenchContextPreparer",
+      "description": "Implementation: `BenchContextPreparer` implements Port `ContextPreparer`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 554,
+      "trait": "StorageEngine",
+      "target_type": "TenantScopedStorage",
+      "description": "Implementation: `TenantScopedStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/scanner/memtable.rs",
+      "line": 53,
+      "trait": "LayerScanner",
+      "target_type": "MemtableScanner",
+      "description": "Implementation: `MemtableScanner` implements Port `LayerScanner`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/scanner/purge.rs",
+      "line": 35,
+      "trait": "Purger",
+      "target_type": "LsmPurger",
+      "description": "Implementation: `LsmPurger` implements Port `Purger`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/scanner/sstable.rs",
+      "line": 103,
+      "trait": "LayerScanner",
+      "target_type": "SstableScanner",
+      "description": "Implementation: `SstableScanner` implements Port `LayerScanner`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/scanner/wal.rs",
+      "line": 73,
+      "trait": "LayerScanner",
+      "target_type": "WalScanner",
+      "description": "Implementation: `WalScanner` implements Port `LayerScanner`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops.rs",
+      "line": 12,
+      "trait": "StorageEngine",
+      "target_type": "LsmStorage",
+      "description": "Implementation: `LsmStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/engine/memory_only.rs",
+      "line": 57,
+      "trait": "StorageEngine",
+      "target_type": "InMemoryStorageEngine",
+      "description": "Implementation: `InMemoryStorageEngine` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/fault_vfs.rs",
+      "line": 239,
+      "trait": "Vfs",
+      "target_type": "FaultVfs",
+      "description": "Implementation: `FaultVfs` implements Port `Vfs`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/in_memory_graph.rs",
+      "line": 75,
+      "trait": "GraphIndex",
+      "target_type": "InMemoryGraphIndex",
+      "description": "Implementation: `InMemoryGraphIndex` implements Port `GraphIndex`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/in_memory_store.rs",
+      "line": 95,
+      "trait": "StorageEngine",
+      "target_type": "InMemoryStorageEngine",
+      "description": "Implementation: `InMemoryStorageEngine` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/in_memory_text.rs",
+      "line": 79,
+      "trait": "TextIndex",
+      "target_type": "InMemoryTextIndex",
+      "description": "Implementation: `InMemoryTextIndex` implements Port `TextIndex`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/in_memory_vector.rs",
+      "line": 76,
+      "trait": "VectorIndex",
+      "target_type": "InMemoryVectorIndex",
+      "description": "Implementation: `InMemoryVectorIndex` implements Port `VectorIndex`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/manual_clock.rs",
+      "line": 113,
+      "trait": "Clock",
+      "target_type": "ManualClock",
+      "description": "Implementation: `ManualClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/mocks.rs",
+      "line": 68,
+      "trait": "EmbeddingProvider",
+      "target_type": "MockEmbedder",
+      "description": "Implementation: `MockEmbedder` implements Port `EmbeddingProvider`"
+    },
+    {
+      "crate": "contextra-testkit",
+      "file": "crates/contextra-testkit/src/mocks.rs",
+      "line": 170,
+      "trait": "MetricsSink",
+      "target_type": "TestMetricsSink",
+      "description": "Implementation: `TestMetricsSink` implements Port `MetricsSink`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/lib.rs",
+      "line": 95,
+      "trait": "TextIndex",
+      "target_type": "Bm25Scorer",
+      "description": "Implementation: `Bm25Scorer` implements Port `TextIndex`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/lib.rs",
+      "line": 189,
+      "trait": "StorageEngine",
+      "target_type": "MockStorage",
+      "description": "Implementation: `MockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/wand.rs",
+      "line": 647,
+      "trait": "StorageEngine",
+      "target_type": "MockStorage",
+      "description": "Implementation: `MockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/inverted/index_struct.rs",
+      "line": 669,
+      "trait": "TextIndex",
+      "target_type": "InvertedIndex",
+      "description": "Implementation: `InvertedIndex` implements Port `TextIndex`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/inverted/morph_index.rs",
+      "line": 41,
+      "trait": "TextIndex",
+      "target_type": "BM25MorphIndex",
+      "description": "Implementation: `BM25MorphIndex` implements Port `TextIndex`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/inverted/purge.rs",
+      "line": 485,
+      "trait": "Purger",
+      "target_type": "TextPurger",
+      "description": "Implementation: `TextPurger` implements Port `Purger`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/inverted/scanner.rs",
+      "line": 193,
+      "trait": "LayerScanner",
+      "target_type": "TextScanner",
+      "description": "Implementation: `TextScanner` implements Port `LayerScanner`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/inverted/tests/mock.rs",
+      "line": 31,
+      "trait": "StorageEngine",
+      "target_type": "MockStorage",
+      "description": "Implementation: `MockStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/inverted/tests/search_tests.rs",
+      "line": 615,
+      "trait": "StorageEngine",
+      "target_type": "CountingStorage",
+      "description": "Implementation: `CountingStorage` implements Port `StorageEngine`"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/diskann/vector_index_impl.rs",
+      "line": 14,
+      "trait": "VectorIndex",
+      "target_type": "DiskAnnIndex",
+      "description": "Implementation: `DiskAnnIndex` implements Port `VectorIndex`"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/core_rebuild.rs",
+      "line": 997,
+      "trait": "Clock",
+      "target_type": "TestClock",
+      "description": "Implementation: `TestClock` implements Port `Clock`"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/purge.rs",
+      "line": 43,
+      "trait": "Purger",
+      "target_type": "HnswPurger",
+      "description": "Implementation: `HnswPurger` implements Port `Purger`"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/scanner.rs",
+      "line": 224,
+      "trait": "LayerScanner",
+      "target_type": "HnswScanner",
+      "description": "Implementation: `HnswScanner` implements Port `LayerScanner`"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/tests.rs",
+      "line": 235,
+      "trait": "MetricsSink",
+      "target_type": "TestMetricsSink",
+      "description": "Implementation: `TestMetricsSink` implements Port `MetricsSink`"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/vector_index_impl.rs",
+      "line": 12,
+      "trait": "VectorIndex",
+      "target_type": "HnswIndex",
+      "description": "Implementation: `HnswIndex` implements Port `VectorIndex`"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Port-Implementierungs-Matrix",
+      "content": "| Crate | Anzahl Port-Impls | Implementierte Ports |\n|---|---|---|\n| `contextra` | 2 | `LicenseGate, QueryRewriter` |\n| `contextra-agent` | 1 | `Checkpoint` |\n| `contextra-checkpoint` | 4 | `StorageEngine` |\n| `contextra-cognition` | 9 | `Clock, LlmTextGenerator, ResponseGroundingValidator, SegmentSynthesizer, StorageEngine` |\n| `contextra-crypto` | 1 | `Vfs` |\n| `contextra-db` | 1 | `DriftStatusProvider` |\n| `contextra-durable-fs` | 2 | `Vfs, VfsFile` |\n| `contextra-engine` | 10 | `LlmTextGenerator, Reranker, StorageEngine, TextEmbeddingEngine` |\n| `contextra-erasure` | 11 | `CommitBarrier, ErasureObserver, FileKeyring, LedgerSink, PurgeBarrier, ReadGate, RecordSealer, ReportSigner, StorageBackend, VfsFile` |\n| `contextra-graph` | 4 | `GraphCollectionMutation, GraphIndex, Purger, StorageEngine` |\n| `contextra-infer-candle` | 7 | `AttentionExporter, EmbeddingProvider, GroundingValidator, KvBridgeStorage, LlmTextGenerator, LlmTextGeneratorStreaming, ResponseGroundingValidator` |\n| `contextra-infer-ollama` | 5 | `EmbeddingProvider, LlmTextGenerator, LlmTextGeneratorStreaming, QueryRewriter, SegmentSynthesizer` |\n| `contextra-infer-onnx` | 5 | `EmbeddingProvider, Reranker, TextEmbeddingEngine, Vfs` |\n| `contextra-kvcache` | 4 | `KvBridgeStorage, KvPrefixStore, LayerScanner, PluginManifest` |\n| `contextra-license` | 1 | `LicenseGate` |\n| `contextra-mcp` | 9 | `Clock, CommunityResolver, ContextPreparer, DriftStatusProvider, EmbeddingProvider, HybridSearchProvider, LlmTextGenerator` |\n| `contextra-privacy` | 2 | `Clock` |\n| `contextra-rank` | 1 | `Clock` |\n| `contextra-router` | 12 | `Clock, CommunityResolver, ContextPreparer, HybridSearchProvider` |\n| `contextra-store` | 7 | `LayerScanner, Purger, StorageEngine` |\n| `contextra-testkit` | 8 | `Clock, EmbeddingProvider, GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorIndex, Vfs` |\n| `contextra-text` | 9 | `LayerScanner, Purger, StorageEngine, TextIndex` |\n| `contextra-vector` | 6 | `Clock, LayerScanner, MetricsSink, Purger, VectorIndex` |"
+    }
+  ]
+}

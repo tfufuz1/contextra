@@ -6,6 +6,8 @@
 // STAND: 2026-10-12
 // ZWECK: Integrationstests für PendingDeleteJournal Crash-Resumption und scrub_if_safe Hardlink-Sicherheitsprüfungen (AP-12, ADR-10).
 
+#![allow(deprecated)]
+
 use contextra_durable_fs::{
     durable_remove, scrub_if_safe, PendingDeleteJournal, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };

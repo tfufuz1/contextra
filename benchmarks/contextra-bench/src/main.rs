@@ -8,10 +8,11 @@ use contextra_bench::locomo::{load_locomo_dataset, run_locomo_eval};
 use contextra_bench::long_mem_eval::{
     check_regression, load_from_jsonl, run_long_mem_eval, RegressionSuite, ScoredChunk,
 };
-use contextra_core::{EmbeddingProvider, Result};
 use contextra_db::{Contextra, ContextraConfig};
 #[cfg(feature = "onnx-bench")]
 use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
+use contextra_ports::EmbeddingProvider;
+use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -792,7 +793,7 @@ async fn run_scenario_b(
     _queries: &[GroundTruthQuery],
 ) -> Result<ScenarioComparison> {
     eprintln!("[WARN] Scenario B (Cross-Encoder Reranking) requires the 'onnx-bench' feature.");
-    Err(contextra_core::ContextraError::CapabilityUnsupported {
+    Err(contextra_types::ContextraError::CapabilityUnsupported {
         capability: "onnx-bench".to_string(),
         reason: "Cross-Encoder Reranking benchmark requires 'onnx-bench' feature. Recompile with --features onnx-bench.".to_string(),
     })
@@ -1054,7 +1055,7 @@ async fn run_locomo_cmd(
                 let doc_id = format!("locomo_{}_{}", sample_id, dia_id);
                 let vec = EmbeddingProvider::embed(embedder.as_ref(), turn_text)
                     .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": turn_text,
                     "dia_id": dia_id,
@@ -1073,7 +1074,7 @@ async fn run_locomo_cmd(
                 let doc_id = format!("locomo_doc_{}_{}", case_idx, ev_idx);
                 let vec = EmbeddingProvider::embed(embedder.as_ref(), ev)
                     .await
-                    .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                    .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
                 let metadata = serde_json::json!({
                     "text": ev,
                     "case_id": case.question_id,
@@ -1102,7 +1103,7 @@ async fn run_locomo_cmd(
         Box::pin(async move {
             let q_vec = EmbeddingProvider::embed(embedder_ref.as_ref(), &q_owned)
                 .await
-                .map_err(|e| contextra_core::ContextraError::Internal(e.to_string()))?;
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
             let res = col_ref
                 .query()
                 .text(&q_owned)

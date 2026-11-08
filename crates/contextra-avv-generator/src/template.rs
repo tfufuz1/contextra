@@ -243,7 +243,7 @@ fn render_technical_measures(
     .map_err(|e| AvvError::RenderError(e.to_string()))?;
     writeln!(
         out,
-        "Der Auftragsverarbeiter garantiert die Umsetzung folgender produktimmanenter technischer Sicherheitsgarantien gemäß Art. 32 DSGVO:"
+        "Der Auftragsverarbeiter sieht die Umsetzung folgender produktimmanenter technischer Sicherheitsmaßnahmen gemäß Art. 32 DSGVO vor:"
     )
     .map_err(|e| AvvError::RenderError(e.to_string()))?;
 

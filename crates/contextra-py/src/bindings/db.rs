@@ -15,7 +15,7 @@
 //! 3. **Python Context Manager:** Unterstützt `with contextra.open(...) as db:`, wobei beim
 //!    Verlassen des Blocks in `__exit__` automatisch ein `flush()` auf die Festplatte erfolgt.
 
-use contextra_db::Contextra;
+use contextra::Contextra;
 use numpy::PyReadonlyArray1;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

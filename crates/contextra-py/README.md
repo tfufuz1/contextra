@@ -1,41 +1,57 @@
 # contextra-py
 
-PyO3 Python Bindings.
+PyO3 Python Bindings für Contextra.
 
 Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; §6.0, `capabilities.toml`).
 
+Offizielle Python-Brücke für Contextra — eine eingebettete 4-Signal Hybrid-Search Vektordatenbank.
 
-Official Python bindings for Contextra — an embedded 4-signal hybrid-search vector database built with Rust and PyO3.
+## Zweck & Baukasten-Profil (M1–M11)
 
-## Purpose
+- **Ring & Klasse:** Ring 4 (Ränder / FFI-Bindings).
+- **Abhängigkeiten:** `contextra` (Fassade), `contextra-types`, `contextra-wire`.
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` strikt durchgesetzt (M9).
+- **Entkopplung & Zero-Leak (M7):** Keine Löschzusagen, keine DSGVO- oder Deletion-Proof-Relikte im Crate.
+- **Additive Features & minimale Defaults (M5):**
+  - Standard-Build (`default = []`) ist leichtgewichtig und frei von Schwergewichten.
+  - PyO3 C-Extension Bindings liegen hinter dem optionalen Feature `pyo3`.
+  - Feature `test-hooks` ist isoliert und niemals in Default- oder Release-Konfigurationen enthalten.
+- **FFI-Sicherheit (ADR-N04):** Rust-Panics werden an der Sprachgrenze via `catch_unwind` abgefangen und in strukturierte Python-Exceptions umgewandelt.
 
-Brücke zwischen Rust-Kern und Python-Ökosystem. Ermöglicht NumPy-Zero-Copy-Umschlag, Python-Collection-Management und FFI-Anbindung.
+## Features
 
-## Ring-Zugehörigkeit & Status
+| Feature | Beschreibung | Default |
+|---|---|---|
+| `default` | Leeres Default-Set für minimale Kompilierzeit | Ja (leer) |
+| `pyo3` | Aktiviert PyO3 FFI-Bindings, NumPy-Array-Anbindung und Python-Modul `_contextra` | Nein |
+| `docid-128` | 128-Bit Dokumenten-IDs via `contextra-types` | Nein |
+| `test-hooks` | Interne Hooks für Panik-Isolations- und Sabotage-Tests | Nein |
 
-- **Ring:** Ring 4 (Ränder / FFI Bindings)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+## Installation & Kompilierung
 
-## Installation
+```bash
+# Minimaler Build ohne PyO3:
+cargo build -p contextra-py --no-default-features --locked
 
-> **Hinweis zur Distribution:** Eine PyPI-Distribution dieses Pakets existiert aktuell noch nicht und wird nachgereicht, sobald die Namensfrage für das Gesamtprojekt geklärt ist.
+# Vollständiger Build mit PyO3 C-Extension Bindings:
+cargo build -p contextra-py --features pyo3 --locked
+```
 
-## Quick Start
+## Python-Nutzung
 
 ```python
 import numpy as np
 import contextra
 
-# Initialize database
+# Datenbank initialisieren
 db = contextra.open("./data", dimension=128)
 collection = db.collection("documents")
 
-# Insert document with vector and metadata
+# Dokument mit Vektor und Metadaten einfügen
 vector = np.random.rand(128).astype(np.float32)
 collection.insert("doc_1", vector, metadata={"text": "Contextra provides high-performance embedded vector search."})
 
-# Perform hybrid search
+# Hybride Suche ausführen
 results = collection.hybrid_search("vector search", vector, k=5)
 for res in results:
     print(res.id, res.score, res.metadata)
@@ -43,14 +59,11 @@ for res in results:
 
 ## Öffentliche API-Übersicht
 
-- **Runtime State:** `PyRuntimeState`
-- **PyO3 Types:** `PySearchResult`, `PyDocument`, `PyVectorIndexStats`, `PyStorageStats`, `PyDbStats`
-- **CRUD Operations:** `insert`, `get`, `update`, `upsert`, `delete`
+- **Python-Klassen:** `PyContextra`, `PyCollection`, `PySearchResult`, `PyDocument`, `PyVectorIndexStats`, `PyStorageStats`, `PyDbStats`, `PyRuntimeState`.
+- **CRUD & Suche:** `insert`, `get`, `update`, `upsert`, `delete`, `search`, `hybrid_search`, `search_fb`.
+- **Memory-Links & Relationen:** `link_memories`, `get_links`, `relate_bidirectional`.
+- **Key-Value Primitives:** `put_kv`, `put_kv_if_absent`, `get_kv`.
 
-## Development & Publishing
+## Standalone-Beispiel (M10)
 
-Refer to [PUBLISHING.md](PUBLISHING.md) for instructions on local building, testing, and release management.
-
-## Architektur & Verweise
-
-Details zu FFI-Invarianten und Python-Anbindung finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §9.4.
+Ein eigenständiges Anwendungsbeispiel befindet sich unter `examples/standalone_python_bridge.rs`.

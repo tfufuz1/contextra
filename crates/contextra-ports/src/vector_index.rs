@@ -1,7 +1,6 @@
 //! Vector index trait definition and statistics.
 
 // FILE-CONTEXT
-// STAND: 2026-09-15T00:00:00Z
 // ZWECK: VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes.
 // INVARIANTEN: Rebuild-Triggering & Filtered Search Fallback.
 

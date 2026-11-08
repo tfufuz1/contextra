@@ -90,6 +90,7 @@ pub fn resolve_proof_key(primary: Option<String>, legacy: Option<String>) -> Pro
 
 /// Liest beide Umgebungsvariablen (`CONTEXTRA_CANONICAL_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`),
 /// löst den Schlüssel per `resolve_proof_key` auf und emittiert einmalig Warnungen bei Deprecation oder Konflikt.
+#[deprecated(note = "Proof key environment resolution moves to contextra-erasure")]
 pub fn resolve_proof_key_from_env() -> ProofKeyResolution {
     let primary = std::env::var("CONTEXTRA_CANONICAL_PROOF_KEY").ok();
     let legacy = std::env::var("CONTEXTRA_PROOF_KEY").ok();

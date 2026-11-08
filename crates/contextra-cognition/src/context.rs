@@ -34,7 +34,7 @@
 // TEST: cargo test -p contextra-db
 // DONE: ContextManager nutzt MarkdownChunker zur Dokument-Zerlegung.
 
-use contextra_types::{ContextChunk, ContextWindow, Result, TokenBudget};
+use crate::types_local::{ContextChunk, ContextWindow, Result, TokenBudget};
 
 /// Manages autonomous context preparation for LLM consumption.
 ///
@@ -293,10 +293,10 @@ impl SpatialFence {
 )]
 mod tests {
     use super::*;
-    use contextra_types::DocId;
+    use crate::types_local::DocId;
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-001]
-// Prüft Testfall `test_context_manager_respects_token_budget`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-001]
+    // Prüft Testfall `test_context_manager_respects_token_budget`.
     #[test]
     fn test_context_manager_respects_token_budget() {
         let budget = TokenBudget::new(100, 0); // 100 max, 0 reserved => 100 available
@@ -328,8 +328,8 @@ mod tests {
         assert!(window.total_tokens <= 100);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-002]
-// Prüft Testfall `test_context_manager_budget_truncation`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-002]
+    // Prüft Testfall `test_context_manager_budget_truncation`.
     #[test]
     fn test_context_manager_budget_truncation() {
         let budget = TokenBudget::new(100, 20);
@@ -372,16 +372,16 @@ mod tests {
         assert_eq!(window.total_tokens, 50);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-003]
-// Prüft Testfall `test_token_estimation`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-003]
+    // Prüft Testfall `test_token_estimation`.
     #[test]
     fn test_token_estimation() {
         let tokens = ContextManager::estimate_tokens("hello world foo bar");
         assert!(tokens >= 4); // At least 4 words
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-004]
-// Prüft Testfall `test_prepare_context_equal_scores_deterministic`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-004]
+    // Prüft Testfall `test_prepare_context_equal_scores_deterministic`.
     #[test]
     fn test_prepare_context_equal_scores_deterministic() {
         let budget = TokenBudget::new(10000, 0);
@@ -415,8 +415,8 @@ mod tests {
         }
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-005]
-// Prüft Testfall `test_prepare_context_nan_relevance_safety`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-005]
+    // Prüft Testfall `test_prepare_context_nan_relevance_safety`.
     #[test]
     fn test_prepare_context_nan_relevance_safety() {
         let budget = TokenBudget::new(10000, 0);
@@ -451,8 +451,8 @@ mod tests {
         assert_eq!(window.chunks[1].doc_id, DocId::new(5));
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-006]
-// Prüft Testfall `test_single_document_exceeds_budget`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-006]
+    // Prüft Testfall `test_single_document_exceeds_budget`.
     #[test]
     fn test_single_document_exceeds_budget() {
         let budget = TokenBudget::new(20, 10); // 10 available
@@ -491,17 +491,17 @@ mod tests {
 )]
 mod token_tests {
     use super::*;
-    use contextra_types::DocId;
+    use crate::types_local::DocId;
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-007]
-// Prüft Testfall `test_estimate_tokens_empty`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-007]
+    // Prüft Testfall `test_estimate_tokens_empty`.
     #[test]
     fn test_estimate_tokens_empty() {
         assert_eq!(ContextManager::estimate_tokens(""), 0);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-008]
-// Prüft Testfall `test_estimate_tokens_simple_english`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-008]
+    // Prüft Testfall `test_estimate_tokens_simple_english`.
     #[test]
     fn test_estimate_tokens_simple_english() {
         // "Hello world" → ~2 Tokens
@@ -509,8 +509,8 @@ mod token_tests {
         assert!((2..=4).contains(&t), "expected 2-4, got {t}");
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-009]
-// Prüft Testfall `test_estimate_tokens_cjk`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-009]
+    // Prüft Testfall `test_estimate_tokens_cjk`.
     #[test]
     fn test_estimate_tokens_cjk() {
         // 5 CJK Zeichen → ~5 Tokens
@@ -518,8 +518,8 @@ mod token_tests {
         assert!((4..=7).contains(&t), "expected 4-7, got {t}");
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-010]
-// Prüft Testfall `test_estimate_tokens_code_block`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-010]
+    // Prüft Testfall `test_estimate_tokens_code_block`.
     #[test]
     fn test_estimate_tokens_code_block() {
         let code = "```rust\nfn main() { println!(\"hello\"); }\n```";
@@ -528,24 +528,24 @@ mod token_tests {
         assert!(ContextManager::estimate_tokens(code) > ContextManager::estimate_tokens(plain));
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-011]
-// Prüft Testfall `test_estimate_tokens_never_zero_for_nonempty`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-011]
+    // Prüft Testfall `test_estimate_tokens_never_zero_for_nonempty`.
     #[test]
     fn test_estimate_tokens_never_zero_for_nonempty() {
         assert!(ContextManager::estimate_tokens("a") >= 1);
         assert!(ContextManager::estimate_tokens("   spaces   ") >= 1);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-012]
-// Prüft Testfall `test_context_chunk_try_from_search_result_invalid_id`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-012]
+    // Prüft Testfall `test_context_chunk_try_from_search_result_invalid_id`.
     #[test]
     fn test_context_chunk_try_from_search_result_invalid_id() {
-        let sr = contextra_engine::SearchResult {
+        let sr = crate::engine_local::SearchResult {
             id: "".to_string(),
             score: 0.9,
             metadata: None,
             matched_signals: vec![],
-            provenance: Some(contextra_engine::ProvenanceRecord {
+            provenance: Some(crate::engine_local::ProvenanceRecord {
                 index_type: Some("context".to_string()),
                 ..Default::default()
             }),
@@ -557,18 +557,18 @@ mod token_tests {
         ));
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-013]
-// Prüft Testfall `test_context_chunk_try_from_search_result_valid_id`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-013]
+    // Prüft Testfall `test_context_chunk_try_from_search_result_valid_id`.
     #[test]
     fn test_context_chunk_try_from_search_result_valid_id() {
         let valid_key = "doc_123_sample";
         let expected_doc_id = DocId::from_key(valid_key).unwrap(); // unwrap
-        let sr = contextra_engine::SearchResult {
+        let sr = crate::engine_local::SearchResult {
             id: valid_key.to_string(),
             score: 0.85,
             metadata: Some(serde_json::json!({"text": "sample text content"})),
             matched_signals: vec!["vector".into()],
-            provenance: Some(contextra_engine::ProvenanceRecord {
+            provenance: Some(crate::engine_local::ProvenanceRecord {
                 index_type: Some("context".to_string()),
                 ..Default::default()
             }),
@@ -579,8 +579,8 @@ mod token_tests {
         assert_eq!(chunk.relevance, 0.85);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-014]
-// Prüft Testfall `test_spatial_fence_matching_and_non_matching`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-014]
+    // Prüft Testfall `test_spatial_fence_matching_and_non_matching`.
     #[test]
     fn test_spatial_fence_matching_and_non_matching() {
         let fence = SpatialFence::new("EU");
@@ -617,8 +617,8 @@ mod token_tests {
         assert!(!fence.matches(&chunk_no_meta));
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-015]
-// Prüft Testfall `test_context_manager_relevance_threshold_setter_getter`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-015]
+    // Prüft Testfall `test_context_manager_relevance_threshold_setter_getter`.
     #[test]
     fn test_context_manager_relevance_threshold_setter_getter() {
         let mut mgr = ContextManager::with_defaults();
@@ -627,8 +627,8 @@ mod token_tests {
         assert_eq!(mgr.relevance_threshold(), 0.75);
     }
 
-// ANCHOR[contextra-cognition:TEST-CONTEXT-016]
-// Prüft Testfall `test_context_manager_prepare_context_empty_chunks`.
+    // ANCHOR[contextra-cognition:TEST-CONTEXT-016]
+    // Prüft Testfall `test_context_manager_prepare_context_empty_chunks`.
     #[test]
     fn test_context_manager_prepare_context_empty_chunks() {
         let mgr = ContextManager::with_defaults();

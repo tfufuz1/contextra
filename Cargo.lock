@@ -797,14 +797,10 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
- "contextra-mvcc",
  "contextra-ports",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
  "criterion",
- "dirs",
- "futures-executor",
  "parking_lot 0.12.5",
  "proptest",
  "serde",
@@ -823,12 +819,9 @@ dependencies = [
  "bytes",
  "contextra-engine",
  "contextra-graph",
- "contextra-infer-candle",
  "contextra-ports",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
- "contextra-vector",
  "parking_lot 0.12.5",
  "serde",
  "serde_json",
@@ -837,18 +830,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
-]
-
-[[package]]
-name = "contextra-core"
-version = "0.1.0"
-dependencies = [
- "contextra-mvcc",
- "contextra-ports",
- "contextra-types",
- "contextra-wire",
- "proptest",
- "tokio",
 ]
 
 [[package]]
@@ -894,19 +875,15 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
- "contextra-cognition",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",
- "contextra-rank",
  "contextra-store",
- "contextra-sys",
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
  "contextra-vector",
  "criterion",
- "ed25519-dalek",
  "parking_lot 0.12.5",
  "proptest",
  "serde",
@@ -923,7 +900,9 @@ dependencies = [
 name = "contextra-durable-fs"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "contextra-sys",
+ "contextra-types",
  "tempfile",
 ]
 
@@ -945,7 +924,6 @@ dependencies = [
  "contextra-rank",
  "contextra-sandbox",
  "contextra-store",
- "contextra-sys",
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
@@ -1000,7 +978,6 @@ dependencies = [
  "bincode",
  "blake3",
  "contextra-ports",
- "contextra-store",
  "contextra-testkit",
  "contextra-types",
  "criterion",
@@ -1091,7 +1068,6 @@ dependencies = [
  "blake3",
  "calamine",
  "cfb",
- "contextra-engine",
  "contextra-types",
  "csv",
  "encoding_rs",
@@ -1193,7 +1169,6 @@ dependencies = [
  "proptest",
  "serde",
  "thiserror 2.0.20",
- "tokio",
  "tracing",
 ]
 
@@ -1249,6 +1224,7 @@ dependencies = [
  "pyo3",
  "pythonize",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -1257,7 +1233,6 @@ name = "contextra-rank"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "contextra-adapt",
  "contextra-ports",
  "contextra-types",
  "proptest",
@@ -1273,14 +1248,10 @@ name = "contextra-router"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
- "bytes",
  "contextra-adapt",
- "contextra-db",
- "contextra-graph",
  "contextra-ports",
  "contextra-text",
  "contextra-types",
- "contextra-vector",
  "contextra-wire",
  "criterion",
  "parking_lot 0.12.5",
@@ -1328,15 +1299,12 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-crypto",
- "contextra-graph",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-sandbox",
  "contextra-store",
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
- "contextra-vector",
  "crc32fast",
  "criterion",
  "futures",
@@ -1357,7 +1325,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1428,7 +1395,6 @@ dependencies = [
  "ahash",
  "bincode",
  "blake3",
- "contextra-crypto",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-simd",
@@ -1960,27 +1926,6 @@ dependencies = [
  "block-buffer",
  "crypto-common",
  "subtle",
-]
-
-[[package]]
-name = "dirs"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab"
-dependencies = [
- "libc",
- "option-ext",
- "redox_users",
- "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3243,15 +3188,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
-name = "libredox"
-version = "0.1.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7955dfc218a8afb29dfeffd540e3a6e96baeb94fe7138228dd7cc6937fbbf96"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3867,12 +3803,6 @@ name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
-
-[[package]]
-name = "option-ext"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ort"
@@ -4606,17 +4536,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags 2.13.1",
-]
-
-[[package]]
-name = "redox_users"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
-dependencies = [
- "getrandom 0.2.17",
- "libredox",
- "thiserror 2.0.20",
 ]
 
 [[package]]

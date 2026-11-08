@@ -1,0 +1,20 @@
+{
+  "tool_name": "cargo_dependency_graph.py",
+  "title": "Ring Boundary & Dependency Graph Architecture Audit",
+  "description": "Verifies the Ring model (Ring 4 -> 0), validates capabilities.toml may_depend_on compliance (M1), and prevents dev-dependency leaks (M6).",
+  "timestamp": "2026-11-07T23:03:20.449378+00:00",
+  "metrics": {
+    "total_crates": 37,
+    "m1_ring_violations": 0,
+    "m6_dev_dep_violations": 0,
+    "circular_dependency_cycles": 0
+  },
+  "findings_count": 0,
+  "findings": [],
+  "sections": [
+    {
+      "header": "Crate-Ring-Matrix",
+      "content": "| Crate | Ring | Interne Abh\u00e4ngigkeiten | Dev-Abh\u00e4ngigkeiten |\n|---|---|---|---|\n| `contextra` | ? | 6 | 2 |\n| `contextra-adapt` | ? | 2 | 0 |\n| `contextra-agent` | ? | 6 | 4 |\n| `contextra-audit-export` | ? | 1 | 0 |\n| `contextra-avv-generator` | ? | 1 | 0 |\n| `contextra-bench` | ? | 4 | 1 |\n| `contextra-checkpoint` | ? | 2 | 1 |\n| `contextra-cognition` | ? | 4 | 1 |\n| `contextra-core` | ? | 4 | 0 |\n| `contextra-crypto` | ? | 2 | 2 |\n| `contextra-db` | ? | 3 | 7 |\n| `contextra-durable-fs` | ? | 3 | 1 |\n| `contextra-engine` | ? | 13 | 2 |\n| `contextra-erasure` | ? | 3 | 0 |\n| `contextra-graph` | ? | 2 | 1 |\n| `contextra-infer-candle` | ? | 4 | 1 |\n| `contextra-infer-ollama` | ? | 2 | 0 |\n| `contextra-infer-onnx` | ? | 3 | 0 |\n| `contextra-ingest` | ? | 1 | 0 |\n| `contextra-kvcache` | ? | 3 | 0 |\n| `contextra-license` | ? | 2 | 0 |\n| `contextra-mcp` | ? | 11 | 0 |\n| `contextra-mvcc` | ? | 2 | 1 |\n| `contextra-ports` | ? | 1 | 0 |\n| `contextra-privacy` | ? | 2 | 2 |\n| `contextra-py` | ? | 3 | 0 |\n| `contextra-rank` | ? | 0 | 0 |\n| `contextra-router` | ? | 4 | 0 |\n| `contextra-sandbox` | ? | 0 | 0 |\n| `contextra-simd` | ? | 1 | 0 |\n| `contextra-store` | ? | 5 | 2 |\n| `contextra-sys` | ? | 0 | 0 |\n| `contextra-testkit` | ? | 2 | 0 |\n| `contextra-text` | ? | 2 | 0 |\n| `contextra-types` | ? | 0 | 0 |\n| `contextra-vector` | ? | 5 | 0 |\n| `contextra-wire` | ? | 0 | 0 |"
+    }
+  ]
+}

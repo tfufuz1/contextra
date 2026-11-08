@@ -328,3 +328,24 @@ mod tests {
         assert!(lic_err.to_string().contains("requires a valid license"));
     }
 }
+
+impl From<DurabilityMode> for contextra_db::DurabilityMode {
+    fn from(m: DurabilityMode) -> Self {
+        match m {
+            DurabilityMode::Full => contextra_db::DurabilityMode::Full,
+            DurabilityMode::WalNoHmac => contextra_db::DurabilityMode::WalNoHmac,
+            DurabilityMode::MemoryOnly => contextra_db::DurabilityMode::MemoryOnly,
+        }
+    }
+}
+
+impl From<contextra_db::DurabilityMode> for DurabilityMode {
+    fn from(m: contextra_db::DurabilityMode) -> Self {
+        match m {
+            contextra_db::DurabilityMode::Full => DurabilityMode::Full,
+            contextra_db::DurabilityMode::WalNoHmac => DurabilityMode::WalNoHmac,
+            contextra_db::DurabilityMode::MemoryOnly => DurabilityMode::MemoryOnly,
+            _ => DurabilityMode::Full,
+        }
+    }
+}

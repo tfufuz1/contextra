@@ -46,7 +46,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `EmbeddingOffset` für IPC-Nachrichten.
         pub enum EmbeddingOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-002]
         /// Öffentliches FlatBuffers-Item `Embedding` für IPC-Nachrichten.
         pub struct Embedding<'a> {
@@ -251,7 +250,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `ScoredDocumentOffset` für IPC-Nachrichten.
         pub enum ScoredDocumentOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-019]
         /// Öffentliches FlatBuffers-Item `ScoredDocument` für IPC-Nachrichten.
         pub struct ScoredDocument<'a> {
@@ -489,7 +487,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `SearchResponseOffset` für IPC-Nachrichten.
         pub enum SearchResponseOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-039]
         /// Öffentliches FlatBuffers-Item `SearchResponse` für IPC-Nachrichten.
         pub struct SearchResponse<'a> {
@@ -699,7 +696,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `VectorIndexUpdateOffset` für IPC-Nachrichten.
         pub enum VectorIndexUpdateOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-056]
         /// Öffentliches FlatBuffers-Item `VectorIndexUpdate` für IPC-Nachrichten.
         pub struct VectorIndexUpdate<'a> {
@@ -908,7 +904,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `RoleIdOffset` für IPC-Nachrichten.
         pub enum RoleIdOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-073]
         /// Öffentliches FlatBuffers-Item `RoleId` für IPC-Nachrichten.
         pub struct RoleId<'a> {
@@ -1030,7 +1025,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `HyperEdgeIdOffset` für IPC-Nachrichten.
         pub enum HyperEdgeIdOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-084]
         /// Öffentliches FlatBuffers-Item `HyperEdgeId` für IPC-Nachrichten.
         pub struct HyperEdgeId<'a> {
@@ -1154,7 +1148,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `RoleBindingOffset` für IPC-Nachrichten.
         pub enum RoleBindingOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-095]
         /// Öffentliches FlatBuffers-Item `RoleBinding` für IPC-Nachrichten.
         pub struct RoleBinding<'a> {
@@ -1306,7 +1299,6 @@ pub mod contextra {
         /// Öffentliches FlatBuffers-Item `HyperEdgeOffset` für IPC-Nachrichten.
         pub enum HyperEdgeOffset {}
         #[derive(Copy, Clone, PartialEq)]
-
         // ANCHOR[contextra-wire:FBS-109]
         /// Öffentliches FlatBuffers-Item `HyperEdge` für IPC-Nachrichten.
         pub struct HyperEdge<'a> {

@@ -35,6 +35,7 @@ pub mod calibration;
 pub mod drift;
 pub mod explain;
 pub mod fusion;
+pub mod metrics;
 
 #[cfg(feature = "dibud")]
 pub mod dibud;
@@ -59,3 +60,4 @@ pub use fusion::{
     ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext, SignalContribution,
     SignalKind,
 };
+pub use metrics::{mean_reciprocal_rank, ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank};

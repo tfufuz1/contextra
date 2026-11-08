@@ -3,7 +3,6 @@
 //! Validiert GMM-Clusterung, Permutationsinvarianz, Typ-Denoising, LLM-Budgetierung
 //! und Superkanten-Erzeugung in Stage 3.
 
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -44,7 +43,7 @@ impl LlmTextGenerator for MockLlm {
 }
 
 struct MockSink {
-    tombstoned: Vec<HyperEdgeId>,
+    invalidated: Vec<HyperEdgeId>,
     written_super_edges: Vec<SuperEdgeDraft>,
     committed: bool,
     fail_on_write: bool,
@@ -53,7 +52,7 @@ struct MockSink {
 impl MockSink {
     fn new() -> Self {
         Self {
-            tombstoned: Vec::new(),
+            invalidated: Vec::new(),
             written_super_edges: Vec::new(),
             committed: false,
             fail_on_write: false,
@@ -62,11 +61,11 @@ impl MockSink {
 }
 
 impl SuperEdgeSink for MockSink {
-    fn tombstone_edge(&mut self, id: HyperEdgeId) -> Result<()> {
+    fn invalidate_edge(&mut self, id: HyperEdgeId) -> Result<()> {
         if self.fail_on_write {
             return Err(ContextraError::Internal("Sink write failed".into()));
         }
-        self.tombstoned.push(id);
+        self.invalidated.push(id);
         Ok(())
     }
 
@@ -212,9 +211,9 @@ async fn test_clustering_two_distinct_blobs() {
 }
 
 // ANCHOR[contextra-cognition:TEST-LEANRAG_-064]
-// Prüft Testfall `test_type_denoising_tombstones_inconsistent_edge`.
+// Prüft Testfall `test_type_denoising_invalidates_inconsistent_edge`.
 #[tokio::test]
-async fn test_type_denoising_tombstones_inconsistent_edge() {
+async fn test_type_denoising_invalidates_inconsistent_edge() {
     let nodes = vec![
         AggregationNode {
             entity: EntityId::new(1),
@@ -250,7 +249,7 @@ async fn test_type_denoising_tombstones_inconsistent_edge() {
     });
 
     let cfg = AggregationConfig {
-        min_type_compat_score: 0.2, // 1/20 = 0.05 < 0.2 -> tombstone
+        min_type_compat_score: 0.2, // 1/20 = 0.05 < 0.2 -> invalidate
         min_cluster_size: 1,
         stability_cycles_required: 1,
         ..Default::default()
@@ -266,8 +265,8 @@ async fn test_type_denoising_tombstones_inconsistent_edge() {
         .await
         .unwrap();
 
-    assert_eq!(res.raw_edges_tombstoned, 1);
-    assert_eq!(sink.tombstoned, vec![HyperEdgeId::new(10)]);
+    assert_eq!(res.raw_edges_invalidated, 1);
+    assert_eq!(sink.invalidated, vec![HyperEdgeId::new(10)]);
 }
 
 // ANCHOR[contextra-cognition:TEST-LEANRAG_-065]

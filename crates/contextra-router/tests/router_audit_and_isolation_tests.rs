@@ -5,6 +5,7 @@
 
 // ANCHOR[contextra-router:IT-AUD-001]
 #![allow(
+    clippy::type_complexity,
     clippy::indexing_slicing,
     clippy::unwrap_used,
     clippy::expect_used,
@@ -14,7 +15,6 @@
     clippy::disallowed_types
 )]
 
-use contextra_db::{Collection, Contextra, ContextraConfig};
 use contextra_ports::clock::Clock;
 use contextra_router::profile::ProfileCalibrationState;
 use contextra_router::{
@@ -58,55 +58,100 @@ impl Clock for TestClock {
     }
 }
 
-struct CollectionAdapter<S: contextra_ports::StorageEngine + 'static> {
-    collection: Arc<Collection<S>>,
+#[derive(Clone, Default)]
+struct MockCollection {
+    docs: Arc<parking_lot::RwLock<Vec<(String, Vec<f32>, String)>>>,
+    communities: Arc<parking_lot::RwLock<std::collections::BTreeMap<EntityId, u64>>>,
 }
 
-impl<S: contextra_ports::StorageEngine + 'static> CollectionAdapter<S> {
-    fn new(collection: Arc<Collection<S>>) -> Self {
-        Self { collection }
+impl MockCollection {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    async fn insert(
+        &self,
+        key: &str,
+        vector: &[f32],
+        metadata: Option<serde_json::Value>,
+    ) -> Result<()> {
+        let text = metadata
+            .and_then(|m| {
+                m.get("text")
+                    .and_then(|t| t.as_str().map(|s| s.to_string()))
+            })
+            .unwrap_or_else(|| key.to_string());
+        self.docs
+            .write()
+            .push((key.to_string(), vector.to_vec(), text));
+        Ok(())
     }
 }
 
-impl<S: contextra_ports::StorageEngine + 'static> contextra_ports::HybridSearchProvider
-    for CollectionAdapter<S>
-{
+struct CollectionAdapter {
+    collection: MockCollection,
+}
+
+impl contextra_ports::HybridSearchProvider for CollectionAdapter {
     fn search_hybrid<'a>(
         &'a self,
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
     ) -> contextra_ports::BoxFuture<'a, Result<Vec<ContextChunk>>> {
+        let docs = self.collection.docs.read().clone();
         Box::pin(async move {
-            let search_results = self
-                .collection
-                .query()
-                .text(query_text)
-                .embedding(query_embedding)
-                .k(top_k)
-                .execute()
-                .await?;
-
-            let mut chunks = Vec::with_capacity(search_results.len());
-            for res in search_results {
-                if let Ok(mut chunk) = ContextChunk::try_from(res) {
-                    chunk.content = chunk.combined_text_owned();
-                    chunks.push(chunk);
-                }
+            if docs.is_empty() {
+                return Ok(vec![]);
+            }
+            let mut scored: Vec<(f32, String, String)> = docs
+                .into_iter()
+                .map(|(key, vec, text)| {
+                    let mut score = 0.0f32;
+                    if !query_embedding.is_empty() && query_embedding.len() == vec.len() {
+                        let dot: f32 = query_embedding
+                            .iter()
+                            .zip(vec.iter())
+                            .map(|(a, b)| a * b)
+                            .sum();
+                        score += dot.clamp(0.0, 1.0);
+                    }
+                    if !query_text.is_empty()
+                        && (text.contains(query_text) || query_text.contains(&text))
+                    {
+                        score += 0.5;
+                    }
+                    if score <= 0.0 {
+                        score = 0.1;
+                    }
+                    (score.clamp(0.0, 1.0), key, text)
+                })
+                .collect();
+            scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let mut chunks = Vec::new();
+            for (i, (score, _key, text)) in scored.into_iter().take(top_k).enumerate() {
+                chunks.push(ContextChunk {
+                    doc_id: contextra_types::DocId::new((i + 1) as u64),
+                    content: text,
+                    relevance: score,
+                    token_count: 5,
+                    metadata: None,
+                    contextual_prefix: None,
+                    links: vec![],
+                });
             }
             Ok(chunks)
         })
     }
 }
 
-impl<S: contextra_ports::StorageEngine + 'static> contextra_ports::CommunityResolver
-    for CollectionAdapter<S>
-{
+impl contextra_ports::CommunityResolver for CollectionAdapter {
     fn get_community<'a>(
         &'a self,
         entity_id: EntityId,
     ) -> contextra_ports::BoxFuture<'a, Result<Option<u64>>> {
-        Box::pin(async move { self.collection.get_community(entity_id).await })
+        let comm = self.collection.communities.read().get(&entity_id).copied();
+        Box::pin(async move { Ok(comm) })
     }
 }
 
@@ -119,18 +164,65 @@ impl contextra_ports::ContextPreparer for TestContextPreparer {
         budget: &TokenBudget,
         relevance_threshold: f32,
     ) -> Result<ContextWindow> {
-        let mut manager = contextra_db::ContextManager::new(budget.clone());
-        manager.set_relevance_threshold(relevance_threshold);
-        manager.prepare_context(chunks)
+        let mut filtered: Vec<ContextChunk> = chunks
+            .into_iter()
+            .filter(|c| c.relevance >= relevance_threshold)
+            .collect();
+        filtered.sort_by(|a, b| b.relevance.total_cmp(&a.relevance));
+        let mut total_tokens = 0;
+        let mut selected = Vec::new();
+        let mut truncated = false;
+        for chunk in filtered {
+            if total_tokens + chunk.token_count <= budget.effective_limit() {
+                total_tokens += chunk.token_count;
+                selected.push(chunk);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+        Ok(ContextWindow {
+            chunks: selected,
+            total_tokens,
+            truncated,
+        })
     }
 }
 
-fn create_test_router<S: contextra_ports::StorageEngine + 'static>(
-    collection: Arc<Collection<S>>,
+#[allow(dead_code)]
+struct ContextraConfig {
+    dimension: usize,
+    _reserved: u64,
+}
+impl Default for ContextraConfig {
+    fn default() -> Self {
+        Self {
+            dimension: 4,
+            _reserved: 0,
+        }
+    }
+}
+
+struct Contextra {
+    collection: MockCollection,
+}
+impl Contextra {
+    async fn open_with_config(_path: &std::path::Path, _cfg: ContextraConfig) -> Result<Self> {
+        Ok(Self {
+            collection: MockCollection::new(),
+        })
+    }
+    async fn collection(&self, _name: &str) -> Result<MockCollection> {
+        Ok(self.collection.clone())
+    }
+}
+
+fn create_test_router(
+    collection: MockCollection,
     profiles: Vec<SlmProfile>,
     clock: Arc<dyn Clock>,
 ) -> RouterEngine {
-    let adapter = Arc::new(CollectionAdapter::new(collection));
+    let adapter = Arc::new(CollectionAdapter { collection });
     let preparer = Arc::new(TestContextPreparer);
     RouterEngine::new(adapter.clone(), adapter, preparer, profiles, None).with_clock(clock)
 }

@@ -50,6 +50,8 @@ pub mod consolidation_locks;
 pub mod context;
 /// Modul für Kontext-Kompaktierung.
 pub mod context_compaction;
+mod engine_local;
+mod graph_local;
 /// Modul für Graph-Senken (Super-Hyperkanten).
 pub mod graph_sink;
 /// Modul zur Vorbereitung von LeanRAG-Eingabedaten.
@@ -60,12 +62,14 @@ pub mod maintenance_config;
 pub mod maintenance_scheduler;
 /// Modul für Gedächtniskonsolidierung (Structural Pass).
 pub mod memory_consolidation;
+mod ports_local;
 /// Modul für die Fassadenschnittstelle zur semantischen Aggregation.
 pub mod semantic_aggregation_facade;
 /// Modul für generative Wissenssynthese (LLM-Pass).
 pub mod synthesis_phase;
 /// Modul für Transitivitäts-Veto-Prüfungen.
 pub mod transitivity_veto;
+mod types_local;
 
 pub use aggregation_phase::{
     check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,

@@ -27,6 +27,16 @@ Downstream-Adapter-Crates (z. B. LSM Storage, HNSW Vector Index, Inverted Text I
 5. **`run_clock_suite`**: Monotonie (`monotonic_nanos`), Gültige Unix-Nanosekunden.
 6. **`run_rng_suite`**: Entropie-Verteilung, `fill_bytes` Abdeckung, `next_unit_f64` im Intervall $[0.0, 1.0)$.
 7. **`run_metrics_sink_suite`**: Fehlerfreie Erfassung von Counter, Gauge und Histogramm Metrics.
+8. **`run_vfs_suite`**: Atomares Schreiben (`write_atomic`), Leseverhalten, Dateilängen, Verzeichnis-Lifecycle (`create_dir_all`, `sync_dir`, `list_dir`) und Bereinigungsverhalten (`remove_file`).
+
+### Baukasten-Profil & M2-Isolationsbeweis
+
+`contextra-testkit` erfüllt alle Kriterien des Baukasten-Vertrags:
+- **M1 (Abhängigkeiten):** Hängt ausschließlich an `contextra-ports`, `contextra-types`, `bytes`, `parking_lot` und `tracing`.
+- **M2 (Isolationsbeweis):** Baut und testet isoliert in einem sauberen Workspace via `tools/isolation_proof.py contextra-testkit`.
+- **M6 (Dev-Isolation):** Keine Abhängigkeiten zu höheren Ringen im Produktions- oder Testcode.
+- **M9 (Unsafe):** Strengstes Verbot via `#![forbid(unsafe_code)]`.
+- **M10 (Eigenständiges Beispiel):** Siehe `examples/standalone_testkit.rs`.
 
 ### Einbindungsbeispiel in ein Adapter-Crate
 

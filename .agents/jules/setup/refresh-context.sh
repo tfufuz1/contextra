@@ -123,8 +123,11 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
     echo "✅ Keine CRITICAL/BLOCKER-Tags"
   fi
   # CI-Hauptzweig rot?
-  MAIN_RED=$(echo "$CI_RUNS" | grep -c "❌" 2>/dev/null || echo 0)
-  [ "$MAIN_RED" -gt 0 ] && echo "⚠️  $MAIN_RED CI-Workflow(e) auf main fehlgeschlagen (Details: CI-Status-Abschnitt unten)"
+  MAIN_RED=$(echo "$CI_RUNS" | grep -c "❌" 2>/dev/null || true)
+  MAIN_RED="${MAIN_RED:-0}"
+  # Sicherstellen, dass nur eine Zahl geprüft wird (erste Zeile)
+  MAIN_RED=$(echo "$MAIN_RED" | head -1 | tr -dc '0-9')
+  [ -n "$MAIN_RED" ] && [ "$MAIN_RED" -gt 0 ] 2>/dev/null && echo "⚠️  $MAIN_RED CI-Workflow(e) auf main fehlgeschlagen (Details: CI-Status-Abschnitt unten)"
   echo
 
   # ── GITHUB: Aktiver Sprint / Milestones ───────────────────────────────────
@@ -212,7 +215,26 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
 
   # ── Crate-AGENTS.md Lookup ────────────────────────────────────────────────
   echo "## 📦 Crate-AGENTS.md (vor Code-Edit PFLICHT lesen)"
-  find crates/ -name "AGENTS.md" -printf "  %h → %p\n" 2>/dev/null | sort
+  if command -v fd >/dev/null 2>&1; then
+    fd -g "AGENTS.md" crates/ --exec bash -c 'for f; do printf "  %s → %s\n" "$(dirname "$f")" "$f"; done' _ {} + 2>/dev/null | sort
+  else
+    find crates/ -name "AGENTS.md" -printf "  %h → %p\n" 2>/dev/null | sort
+  fi
+  echo
+
+  # ── Verfügbare Werkzeuge & Analyse-Tools ─────────────────────────────────
+  echo "## 🛠️ Tooling & Optimierungen"
+  echo "- Compiler-Cache (sccache): $(command -v sccache >/dev/null 2>&1 && echo "✅ aktiv" || echo "⚠️ nicht verfügbar")"
+  echo "- Linker (mold):            $(command -v mold >/dev/null 2>&1 && echo "✅ verfügbar" || echo "⚠️ nicht verfügbar")"
+  echo "- AST Search (ast-grep):    $(command -v ast-grep >/dev/null 2>&1 && (ast-grep --version 2>&1 | grep -q "ast-grep" && echo "✅ $(ast-grep --version 2>/dev/null | head -1)" || echo "⚠️ fehlerhaft") || echo "⚠️ nicht verfügbar")"
+  echo "- File Search (fd):         $(command -v fd >/dev/null 2>&1 && echo "✅ $(fd --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo "- Code Viewer (bat):        $(command -v bat >/dev/null 2>&1 && echo "✅ $(bat --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo "- Diff Viewer (delta):      $(command -v delta >/dev/null 2>&1 && echo "✅ $(delta --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo "- Benchmarks (hyperfine):   $(command -v hyperfine >/dev/null 2>&1 && echo "✅ $(hyperfine --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo "- Test Runner (nextest):    $((command -v cargo-nextest >/dev/null 2>&1 || cargo nextest --version >/dev/null 2>&1) && echo "✅ $(cargo nextest --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo "- Coverage (llvm-cov):      $(cargo llvm-cov --version >/dev/null 2>&1 && echo "✅ $(cargo llvm-cov --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo "- Mutation (cargo-mutants): $(cargo mutants --version >/dev/null 2>&1 && echo "✅ $(cargo mutants --version 2>/dev/null | head -1)" || echo "⚠️ nicht verfügbar")"
+  echo
 
   # ── Session-Ende ──────────────────────────────────────────────────────────
   echo
@@ -224,6 +246,8 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
 
 echo "✅ Kontext geschrieben: $CTX/SESSION_START.md ($(wc -l < "$CTX/SESSION_START.md") Zeilen)"
 
-# Working Tree sauber halten
-git reset --hard HEAD -q 2>/dev/null && git clean -fdq 2>/dev/null
-git reset --hard HEAD 2>&1 | tail -1
+# Working Tree sauber halten (nur wenn nicht im Entwicklungsmodus)
+if [ "${CONTEXTRA_SETUP_NO_RESET:-0}" != 1 ]; then
+  git reset --hard HEAD -q 2>/dev/null && git clean -fdq 2>/dev/null
+  git reset --hard HEAD 2>&1 | tail -1
+fi

@@ -13,7 +13,9 @@ pub mod purge;
 pub mod scanner;
 pub mod sq8_bias;
 
+#[allow(deprecated)]
 pub use purge::{hnsw_purger, HnswPurger};
+#[allow(deprecated)]
 pub use scanner::{hnsw_scanner, HnswScanner};
 
 mod acorn_filtered;

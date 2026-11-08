@@ -3,103 +3,141 @@
 //! **Ring:** Ring 3 (Applikations- und Testschicht).
 //! **Zweck:** Benchmark für den Durchsatz der RouterEngine.
 
-// ANCHOR[contextra-router:BN-ROUT-001]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
+#![allow(
+    clippy::type_complexity,
+    clippy::cast_sign_loss,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    dead_code
+)]
 
-use contextra_db::{Collection, Contextra, ContextraConfig};
-use contextra_ports::{BoxFuture, StorageEngine};
-use contextra_router::ports_local::{CommunityResolver, HybridSearchProvider};
+use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
 use contextra_router::{RouterEngine, SlmProfile};
 use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget};
 use criterion::{criterion_group, criterion_main, Criterion};
-use serde_json::json;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-struct CollectionAdapter<S: StorageEngine + 'static> {
-    collection: Arc<Collection<S>>,
+#[derive(Clone, Default)]
+struct BenchCollection {
+    docs: Arc<Vec<(String, Vec<f32>, String, u64)>>,
 }
 
-impl<S: StorageEngine + 'static> CollectionAdapter<S> {
-    fn new(collection: Arc<Collection<S>>) -> Self {
-        Self { collection }
+impl BenchCollection {
+    fn new() -> Self {
+        let mut docs = Vec::new();
+        for i in 0..10 {
+            let key = format!("doc_{i}");
+            let vec = vec![(i as f32) * 0.1, 0.5, 0.2, 0.1];
+            let text = format!("Document text content for entity {i}");
+            let comm_id = (i as u64 % 5) + 1;
+            docs.push((key, vec, text, comm_id));
+        }
+        Self {
+            docs: Arc::new(docs),
+        }
     }
 }
 
-impl<S: StorageEngine + 'static> HybridSearchProvider for CollectionAdapter<S> {
+struct BenchAdapter {
+    collection: BenchCollection,
+}
+
+impl HybridSearchProvider for BenchAdapter {
     fn search_hybrid<'a>(
         &'a self,
         query_text: &'a str,
         query_embedding: &'a [f32],
         top_k: usize,
     ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
+        let docs = self.collection.docs.clone();
         Box::pin(async move {
-            let search_results = self
-                .collection
-                .query()
-                .text(query_text)
-                .embedding(query_embedding)
-                .k(top_k)
-                .execute()
-                .await?;
+            let mut scored: Vec<(f32, &str, &str)> = docs
+                .iter()
+                .map(|(key, vec, text, _comm_id)| {
+                    let mut score = 0.0f32;
+                    if !query_embedding.is_empty() && query_embedding.len() == vec.len() {
+                        let dot: f32 = query_embedding
+                            .iter()
+                            .zip(vec.iter())
+                            .map(|(a, b)| a * b)
+                            .sum();
+                        score += dot.clamp(0.0, 1.0);
+                    }
+                    if !query_text.is_empty() && text.contains(query_text) {
+                        score += 0.5;
+                    }
+                    (score.clamp(0.0, 1.0), key.as_str(), text.as_str())
+                })
+                .collect();
 
-            let mut chunks = Vec::with_capacity(search_results.len());
-            for res in search_results {
-                if let Ok(mut chunk) = ContextChunk::try_from(res) {
-                    chunk.content = chunk.combined_text_owned();
-                    chunks.push(chunk);
-                }
+            scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+
+            let mut chunks = Vec::new();
+            for (i, (score, _key, text)) in scored.into_iter().take(top_k).enumerate() {
+                chunks.push(ContextChunk {
+                    doc_id: contextra_types::DocId::new((i + 1) as u64),
+                    content: text.to_string(),
+                    relevance: score,
+                    token_count: 5,
+                    metadata: None,
+                    contextual_prefix: None,
+                    links: vec![],
+                });
             }
             Ok(chunks)
         })
     }
 }
 
-impl<S: StorageEngine + 'static> CommunityResolver for CollectionAdapter<S> {
+impl CommunityResolver for BenchAdapter {
     fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
-        Box::pin(async move { self.collection.get_community(entity_id).await })
+        let comm_id = (entity_id.inner() % 5) + 1;
+        Box::pin(async move { Ok(Some(comm_id)) })
+    }
+}
+
+struct BenchContextPreparer;
+
+impl ContextPreparer for BenchContextPreparer {
+    fn prepare_context(
+        &self,
+        chunks: Vec<ContextChunk>,
+        budget: &TokenBudget,
+        relevance_threshold: f32,
+    ) -> Result<ContextWindow> {
+        let mut filtered: Vec<ContextChunk> = chunks
+            .into_iter()
+            .filter(|c| c.relevance >= relevance_threshold)
+            .collect();
+        filtered.sort_by(|a, b| b.relevance.total_cmp(&a.relevance));
+
+        let mut total_tokens = 0;
+        let mut selected = Vec::new();
+        let mut truncated = false;
+
+        for chunk in filtered {
+            if total_tokens + chunk.token_count <= budget.effective_limit() {
+                total_tokens += chunk.token_count;
+                selected.push(chunk);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+
+        Ok(ContextWindow {
+            chunks: selected,
+            total_tokens,
+            truncated,
+        })
     }
 }
 
 fn bench_router_engine(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-
-    let (collection, db, _dir) = rt.block_on(async {
-        let dir = tempfile::tempdir().unwrap();
-        let config = ContextraConfig {
-            dimension: 4,
-            ..Default::default()
-        };
-        let db = Contextra::open_with_config(dir.path(), config)
-            .await
-            .unwrap();
-        let collection = db.collection("default").await.unwrap();
-
-        for i in 0..10 {
-            let key = format!("doc_{i}");
-            let vec = vec![(i as f32) * 0.1, 0.5, 0.2, 0.1];
-            collection
-                .insert(
-                    &key,
-                    &vec,
-                    Some(json!({"text": format!("Document text content for entity {i}")})),
-                )
-                .await
-                .unwrap();
-
-            let eid = EntityId::from_key(&key).unwrap();
-            let tx = db.allocate_tx().unwrap();
-            let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
-            let comm_id = u64::try_from(i.max(0)).unwrap_or(0) % 5 + 1;
-            db.inner_storage()
-                .put(tx, &comm_key, &serde_json::to_vec(&comm_id).unwrap())
-                .await
-                .unwrap();
-            db.inner_storage().commit(tx).await.unwrap();
-        }
-
-        (collection, db, dir)
-    });
+    let collection = BenchCollection::new();
 
     let query_vec = vec![0.5, 0.5, 0.2, 0.1];
     let query_text = "Document text content";
@@ -116,66 +154,7 @@ fn bench_router_engine(c: &mut Criterion) {
             ));
         }
 
-        struct BenchCollectionAdapter<S: StorageEngine + 'static> {
-            collection: Arc<contextra_db::Collection<S>>,
-        }
-
-        impl<S: StorageEngine + 'static> contextra_ports::HybridSearchProvider
-            for BenchCollectionAdapter<S>
-        {
-            fn search_hybrid<'a>(
-                &'a self,
-                query_text: &'a str,
-                query_embedding: &'a [f32],
-                top_k: usize,
-            ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
-                Box::pin(async move {
-                    let search_results = self
-                        .collection
-                        .query()
-                        .text(query_text)
-                        .embedding(query_embedding)
-                        .k(top_k)
-                        .execute()
-                        .await?;
-
-                    let mut chunks = Vec::with_capacity(search_results.len());
-                    for res in search_results {
-                        if let Ok(mut chunk) = ContextChunk::try_from(res) {
-                            chunk.content = chunk.combined_text_owned();
-                            chunks.push(chunk);
-                        }
-                    }
-                    Ok(chunks)
-                })
-            }
-        }
-
-        impl<S: StorageEngine + 'static> contextra_ports::CommunityResolver for BenchCollectionAdapter<S> {
-            fn get_community<'a>(
-                &'a self,
-                entity_id: EntityId,
-            ) -> BoxFuture<'a, Result<Option<u64>>> {
-                Box::pin(async move { self.collection.get_community(entity_id).await })
-            }
-        }
-
-        struct BenchContextPreparer;
-
-        impl contextra_ports::ContextPreparer for BenchContextPreparer {
-            fn prepare_context(
-                &self,
-                chunks: Vec<ContextChunk>,
-                budget: &TokenBudget,
-                relevance_threshold: f32,
-            ) -> Result<ContextWindow> {
-                let mut manager = contextra_db::context::ContextManager::new(budget.clone());
-                manager.set_relevance_threshold(relevance_threshold);
-                manager.prepare_context(chunks)
-            }
-        }
-
-        let adapter = Arc::new(BenchCollectionAdapter {
+        let adapter = Arc::new(BenchAdapter {
             collection: collection.clone(),
         });
         let preparer = Arc::new(BenchContextPreparer);
@@ -198,11 +177,7 @@ fn bench_router_engine(c: &mut Criterion) {
             });
         });
     }
-
-    drop(db);
 }
 
-// ANCHOR[contextra-router:BN-ROUT-CRIT]
-// Benchmark-Gruppe für Performance- und Regressionsmessungen.
 criterion_group!(benches, bench_router_engine);
 criterion_main!(benches);

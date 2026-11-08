@@ -21,23 +21,23 @@ doctest = false
 
 [dependencies]
 contextra-types = { workspace = true }
-pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods"] }
-numpy = "0.24"
-tokio = { workspace = true }
-# ANCHOR:ARCH:DAG-003 — Architektur-Layer durchbrochen (Ausnahme für Bindings)
-# WP:NONE PRIO:2 NEEDS:NONE
-# AGENT:06 DATE:2026-05-09 STATUS:DONE
-# RECHTFERTIGUNG: Als High-Level Python-Bridge (Layer 3) benötigt contextra-py Zugriff
-# auf die orchestrating Facade in contextra-db. Dies ist eine beabsichtigte Ausnahme
-# vom Sovereign Core DAG, da Bindings per Definition an der Grenze zum Nutzer stehen.
-parking_lot = { workspace = true }
+contextra = { workspace = true }
 contextra-wire = { workspace = true }
-contextra-db = { workspace = true }
+tokio = { workspace = true }
+parking_lot = { workspace = true }
 flatbuffers = { workspace = true }
 serde_json = { workspace = true }
-pythonize = "0.24"
+
+# PyO3 optional dependencies (M5: Default ohne pyo3 / Schwergewichte)
+pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38", "multiple-pymethods"], optional = true }
+numpy = { version = "0.24", optional = true }
+pythonize = { version = "0.24", optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [features]
 default = []
+pyo3 = ["dep:pyo3", "dep:numpy", "dep:pythonize"]
 docid-128 = ["contextra-types/docid-128"]
 test-hooks = []

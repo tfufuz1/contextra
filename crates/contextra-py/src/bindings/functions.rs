@@ -11,7 +11,7 @@
 //! - `trigger_panic_helper` / `_trigger_panic_for_test`: Interne Testhooks zur Absicherung
 //!   der FFI-Panikgrenze (ADR-N04).
 
-use contextra_db::{Contextra, ContextraConfig};
+use contextra::{Contextra, ContextraConfig};
 use pyo3::prelude::*;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -77,9 +77,9 @@ pub fn open(
 
     if let Some(dm) = distance_metric {
         config.distance_metric = match dm.to_lowercase().as_str() {
-            "cosine" => contextra_db::DistanceMetric::Cosine,
-            "euclidean" | "l2" => contextra_db::DistanceMetric::Euclidean,
-            "dot" | "dotproduct" => contextra_db::DistanceMetric::DotProduct,
+            "cosine" => contextra::DistanceMetric::Cosine,
+            "euclidean" | "l2" => contextra::DistanceMetric::Euclidean,
+            "dot" | "dotproduct" => contextra::DistanceMetric::DotProduct,
             _ => {
                 return Err(pyo3::exceptions::PyValueError::new_err(format!(
                     "Unsupported distance metric: {}",

@@ -1,3 +1,9 @@
+#![allow(
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 //! # Integrationstest: Latenzbudget für Bandit-Routing-Entscheidungen
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

@@ -7,7 +7,6 @@ use contextra_durable_fs::{
     scrub_and_remove_with_injector, scrub_if_safe_with_injector, sync_dir_with_injector,
     DurableHandle, FaultInjector, FlushKind, NoFault, ScrubPolicy,
 };
-use contextra_durable_fs::FlushKind;
 use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::path::Path;

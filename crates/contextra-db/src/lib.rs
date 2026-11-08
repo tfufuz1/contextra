@@ -70,6 +70,8 @@ pub mod advanced {
     };
 
     pub use contextra_engine as engine;
+    pub use contextra_engine::DurabilityMode;
+
     pub use contextra_engine::{
         background_workers, chunker, export, filter, import, temporal_filter, transaction,
         CommunityDetectionConfig, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1,
@@ -116,7 +118,6 @@ pub use pid_latency_controller::{
 };
 
 pub use collection::{Collection, CollectionConfig};
-pub use contextra_checkpoint;
 
 pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;

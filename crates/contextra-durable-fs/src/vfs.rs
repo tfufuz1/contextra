@@ -7,11 +7,8 @@
 //! Ring-Zugehörigkeit: Ring 0 (I/O- und Speicherschnittstellen).
 //! Wird genutzt von: Index- und Speicher-Engines (z. B. HNSW-Vektorindex, Blockmanager).
 //! Wichtigste Typen:
-//! - [`Vfs`]: Der abstrakte Trait für Dateisystemaktionen (Öffnen, Löschen, Umbenennen).
-//! - [`VfsFile`]: Der Trait für positionsabhängige Lese- und Schreibzugriffe auf offene Dateien.
-//! - [`VfsOpenOptions`]: Parameter zum Öffnen von Dateien (Lesen, Schreiben, Erstellen, Kürzen).
-//! - [`RealFs`]: Standardimplementierung, die Aufrufe an das reale Host-Dateisystem weiterleitet.
-//! - [`RealFsFile`]: Dateihandle-Wrapper für [`std::fs::File`] mit plattformspezifischen Erweiterungen.
+//! - [`RealFs`]: Standardimplementierung von [`contextra_ports::Vfs`], die Aufrufe an das reale Host-Dateisystem weiterleitet.
+//! - [`RealFsFile`]: Dateihandle-Wrapper für [`std::fs::File`] mit Implementierung von [`contextra_ports::VfsFile`].
 //!
 //! Invarianten:
 //! - Schnittstellenvertrag: Deterministische I/O-Fehlerweiterleitung ohne `panic!`.
@@ -22,6 +19,7 @@
 // ZWECK: Virtual File System (VFS) Abstraktion fuer deterministische I/O-Injektion und Testbarkeit.
 // INVARIANTEN: Zero-Panic, Fail-Closed, SCHNITTSTELLENVERTRAG exakt eingehalten.
 
+use contextra_ports::{ContextraError, Result, VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
@@ -31,85 +29,17 @@ use std::os::unix::fs::FileExt;
 #[cfg(windows)]
 use std::os::windows::fs::FileExt;
 
-// ANCHOR[contextra-durable-fs:VFS-OPTIONS-001]
-/// Optionen zum Öffnen von Dateien über das virtuelle Dateisystem ([`Vfs::open`]).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct VfsOpenOptions {
-    /// Öffnet die Datei mit Leserechten.
-    pub read: bool,
-    /// Öffnet die Datei mit Schreibrechten.
-    pub write: bool,
-    /// Erstellt eine neue Datei, falls sie noch nicht existiert.
-    pub create: bool,
-    /// Erstellt eine neue Datei und schlägt fehl, falls sie bereits existiert (`create_new`).
-    pub create_new: bool,
-    /// Setzt die Dateilänge beim Öffnen sofort auf 0 zurück (`truncate`).
-    pub truncate: bool,
-    /// Hängt neue Schreiboperationen immer an das Dateiende an (`append`).
-    pub append: bool,
-}
-
-// ANCHOR[contextra-durable-fs:VFS-TRAIT-001]
-/// Abstrakte Schnittstelle für Dateisysteme zur Entkopplung von Speicherkomponenten.
-pub trait Vfs: Send + Sync + 'static {
-    // ANCHOR[contextra-durable-fs:VFS-OPEN]
-    /// Öffnet eine Datei gemäß den übergebenen Optionen.
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> std::io::Result<Box<dyn VfsFile>>;
-    // ANCHOR[contextra-durable-fs:VFS-CREATE-DIR-ALL]
-    /// Erstellt das angegebene Verzeichnis inklusive aller übergeordneten Ordner.
-    fn create_dir_all(&self, path: &Path) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-REMOVE-FILE]
-    /// Entfernt eine Datei dauerhaft aus dem Dateisystem.
-    fn remove_file(&self, path: &Path) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-RENAME]
-    /// Benennt eine Datei atomar von `from` nach `to` um.
-    fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-READ-DIR]
-    /// Liest alle Einträge eines Verzeichnisses aus.
-    fn read_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
-    // ANCHOR[contextra-durable-fs:VFS-EXISTS]
-    /// Prüft, ob ein Pfad (Datei oder Ordner) im Dateisystem existiert.
-    fn exists(&self, path: &Path) -> std::io::Result<bool>;
-    // ANCHOR[contextra-durable-fs:VFS-SYNC-DIR]
-    /// Synchronisiert die Verzeichnismetadaten auf stabile Speichermedien.
-    fn sync_dir(&self, path: &Path) -> std::io::Result<()>;
-}
-
-// ANCHOR[contextra-durable-fs:VFS-FILE-TRAIT-001]
-/// Abstraktes Dateihandle mit Unterstützung für positionsbasiertes I/O (Offset-Zugriff).
-pub trait VfsFile: Send + Sync {
-    // ANCHOR[contextra-durable-fs:VFS-FILE-READ-AT]
-    /// Liest Daten ab einem festen Byte-Offset `offset` in den Puffer `buf`, ohne den Dateizeiger zu verändern.
-    fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-WRITE-AT]
-    /// Schreibt Daten aus `buf` an den festen Byte-Offset `offset`, ohne den Dateizeiger zu verändern.
-    fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-SET-LEN]
-    /// Ändert die physische Größe der Datei (Kürzen oder Erweitern).
-    fn set_len(&self, len: u64) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-LEN]
-    /// Fragt die aktuelle Dateigröße in Bytes ab.
-    fn len(&self) -> std::io::Result<u64>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-IS-EMPTY]
-    /// Prüft, ob die Datei 0 Bytes groß ist.
-    fn is_empty(&self) -> std::io::Result<bool> {
-        Ok(self.len()? == 0)
-    }
-    // ANCHOR[contextra-durable-fs:VFS-FILE-SYNC-DATA]
-    /// Synchronisiert die geschriebenen Nutzdatenblöcke auf die Festplatte (`fdatasync`).
-    fn sync_data(&self) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-SYNC-ALL]
-    /// Synchronisiert Nutzdaten und alle Dateimetadaten auf die Festplatte (`fsync`).
-    fn sync_all(&self) -> std::io::Result<()>;
-}
+pub use contextra_ports::{
+    Vfs as PortsVfs, VfsFile as PortsVfsFile, VfsOpenOptions as PortsVfsOpenOptions,
+};
 
 // ANCHOR[contextra-durable-fs:REAL-FS-001]
-/// Standard-Implementierung des [`Vfs`], die direkt mit dem Host-Betriebssystem interagiert.
+/// Standard-Implementierung von [`contextra_ports::Vfs`], die direkt mit dem Host-Betriebssystem interagiert.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RealFs;
 
 impl Vfs for RealFs {
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> std::io::Result<Box<dyn VfsFile>> {
+    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
         let mut std_opts = OpenOptions::new();
         std_opts
             .read(opts.read)
@@ -119,45 +49,112 @@ impl Vfs for RealFs {
             .truncate(opts.truncate)
             .append(opts.append);
 
-        let file = std_opts.open(path)?;
+        let file = std_opts.open(path).map_err(ContextraError::Io)?;
         Ok(Box::new(RealFsFile { file }))
     }
 
-    fn create_dir_all(&self, path: &Path) -> std::io::Result<()> {
-        fs::create_dir_all(path)
+    fn read(&self, path: &Path) -> Result<Vec<u8>> {
+        std::fs::read(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
     }
 
-    fn remove_file(&self, path: &Path) -> std::io::Result<()> {
-        crate::durable_remove(path)
+    fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
+        crate::atomic_replace(path, data).map_err(ContextraError::Io)
     }
 
-    fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
-        crate::rename_durable(from, to)
+    fn create_dir_all(&self, path: &Path) -> Result<()> {
+        fs::create_dir_all(path).map_err(ContextraError::Io)
     }
 
-    fn read_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>> {
-        let entries = fs::read_dir(path)?;
+    fn remove_file(&self, path: &Path) -> Result<()> {
+        crate::durable_remove(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        crate::rename_durable(from, to).map_err(ContextraError::Io)
+    }
+
+    fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
+        let entries = fs::read_dir(path).map_err(ContextraError::Io)?;
         let mut res = Vec::new();
         for entry in entries {
-            res.push(entry?.path());
+            res.push(entry.map_err(ContextraError::Io)?.path());
         }
         Ok(res)
     }
 
-    fn exists(&self, path: &Path) -> std::io::Result<bool> {
+    fn exists(&self, path: &Path) -> Result<bool> {
         Ok(path.exists())
     }
 
-    fn sync_dir(&self, path: &Path) -> std::io::Result<()> {
-        crate::sync_dir(path)
+    fn len(&self, path: &Path) -> Result<u64> {
+        fs::metadata(path).map(|m| m.len()).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
+    }
+
+    fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
+        let entries = fs::read_dir(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })?;
+        let mut res = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(ContextraError::Io)?;
+            if let Some(name) = entry.file_name().to_str() {
+                res.push(name.to_string());
+            }
+        }
+        res.sort();
+        Ok(res)
+    }
+
+    fn sync_dir(&self, path: &Path) -> Result<()> {
+        crate::sync_dir(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
     }
 }
 
 // ANCHOR[contextra-durable-fs:REAL-FS-FILE-001]
-/// Implementierung von [`VfsFile`] auf Basis von [`std::fs::File`].
+/// Implementierung von [`contextra_ports::VfsFile`] auf Basis von [`std::fs::File`].
 #[derive(Debug)]
 pub struct RealFsFile {
     file: File,
+}
+
+impl RealFsFile {
+    /// Erzeugt ein neues [`RealFsFile`] aus einem offenen Dateihandle.
+    pub fn new(file: File) -> Self {
+        Self { file }
+    }
+
+    /// Gibt eine Referenz auf die zugrundeliegende [`File`] zurück.
+    pub fn file(&self) -> &File {
+        &self.file
+    }
 }
 
 impl VfsFile for RealFsFile {
@@ -174,6 +171,13 @@ impl VfsFile for RealFsFile {
         {
             compile_error!("Unsupported target OS for positional VfsFile");
         }
+    }
+
+    fn read_verified(&self, offset: u64, len: usize) -> std::io::Result<(Vec<u8>, VerifiedVia)> {
+        let mut buf = vec![0u8; len];
+        let n = self.read_at(&mut buf, offset)?;
+        buf.truncate(n);
+        Ok((buf, VerifiedVia::Cached))
     }
 
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
@@ -200,10 +204,10 @@ impl VfsFile for RealFsFile {
     }
 
     fn sync_data(&self) -> std::io::Result<()> {
-        self.file.sync_data()
+        contextra_sys::durable_flush_file(&self.file, false)
     }
 
     fn sync_all(&self) -> std::io::Result<()> {
-        self.file.sync_all()
+        contextra_sys::durable_flush_file(&self.file, true)
     }
 }

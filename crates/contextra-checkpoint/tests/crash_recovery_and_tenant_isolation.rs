@@ -14,16 +14,29 @@
 //!
 //! Verifiziert die strikte Trennung von Checkpoints über verschiedene Mandanten-Namespaces hinweg.
 
+use contextra_checkpoint::SnapshotPinner;
 use contextra_checkpoint::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
     StateCheckpoint,
 };
-use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
+
+/// Minimaler Mock für SnapshotPinner im Testkit-Stil ohne contextra-mvcc Abhängigkeit.
+#[derive(Default)]
+struct MockSnapshotPinner {
+    pinned: Mutex<Vec<u64>>,
+}
+
+impl SnapshotPinner for MockSnapshotPinner {
+    fn pin_seq_no(&self, seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
+        self.pinned.lock().push(seq_no);
+        Box::new(())
+    }
+}
 
 /// In-memory mock storage supporting failpoints and versioned key namespaces.
 struct FaultMockStorage {
@@ -588,11 +601,11 @@ async fn test_crash_recovery_hardlink_clone_fallback_to_copy_on_fault() {
     let sst_path = source_dir.path().join("000001.sst");
     std::fs::write(&sst_path, b"mock sstable content bytes").unwrap();
 
-    let registry = Arc::new(SnapshotRegistry::new());
+    let pinner = MockSnapshotPinner::default();
     let cloner = DefaultHardlinkCloner::new();
 
     let res = cloner
-        .clone_sstable_hardlinks(1, source_dir.path(), target_dir.path(), &registry)
+        .clone_sstable_hardlinks(1, source_dir.path(), target_dir.path(), &pinner)
         .await;
 
     assert!(res.is_ok());
