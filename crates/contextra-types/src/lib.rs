@@ -62,10 +62,13 @@ pub mod ids;
 pub mod refs;
 pub mod witness;
 
+#[allow(deprecated)]
 pub use erasure::*;
+#[allow(deprecated)]
 pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
 pub use refs::{CollectionRef, DocKey, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN};
 
+#[allow(deprecated)]
 pub use error::{ContextraError, HnswDeletionError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
@@ -74,4 +77,5 @@ pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
+#[allow(deprecated)]
 pub use witness::{RequestContext, SagaRecord, ScanMethod};

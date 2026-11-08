@@ -77,12 +77,12 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 
 /// Maximum number of search results that any hybrid/vector/text search may return.
 ///
-/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to HNSW/BM25.
+/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to index sub-searches.
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
 /// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to HNSW and BM25 sub-searches. All upstream layers (contextra-mcp, contextra-py,
-/// contextra-py) MUST reference this constant — never duplicate the literal `1000`.
+/// to vector and lexical sub-searches. All upstream layers (contextra-mcp, contextra-py)
+/// MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
@@ -312,7 +312,7 @@ pub enum MemoryType {
     Episodic,
 
     /// Semantisches Gedächtnis: Fakten, Konzepte, dauerhaftes Wissen.
-    /// Retrieval: Inhaltliche Ähnlichkeit (Vektor + BM25).
+    /// Retrieval: Inhaltliche Ähnlichkeit (Vektor + lexikalischer Text).
     /// Decay: Keine automatische Decay (Fakten bleiben gültig bis Widerspruch).
     #[default]
     #[serde(alias = "Semantic")]

@@ -2,7 +2,7 @@
 //!
 //! # Architektur-Rolle: Ring 0 (Hybride Multi-Signal-Suche)
 //!
-//! Contextra synthetisiert Antworten über vier Suchkanäle (Dense Vector, Sparse Text/BM25, Graph und Recency).
+//! Contextra synthetisiert Antworten über vier Suchkanäle (Dense Vector, Sparse Text, Graph und Recency).
 //!
 //! Dieses Modul stellt bereit:
 //! - `HybridQuery`: Zentrale Abfragestruktur mit Text, Embedding, Startknoten und Filtern.
@@ -248,8 +248,8 @@ pub struct ContextChunk {
 }
 
 impl ContextChunk {
-    /// Kombinierten Text für BM25-Indizierung und Embedding.
-    /// Entspricht dem etablierten Contextual-BM25-Schema: prefix + "\n\n" + content.
+    /// Kombinierten Text für Text-Indizierung und Embedding.
+    /// Entspricht dem etablierten Contextual-Schema: prefix + "\n\n" + content.
     ///
     /// Allokiert nur wenn `contextual_prefix` gesetzt. Akzeptabel für
     /// Ingestion-Pipeline (1× pro Chunk, kein Hot-Path).
@@ -319,7 +319,7 @@ impl std::fmt::Display for ContextWindow {
 pub enum Signal {
     /// Dense vector embedding search signal.
     Vector,
-    /// Lexical full-text BM25 search signal.
+    /// Lexical full-text search signal.
     Text,
     /// Graph traversal / PageRank signal.
     Graph,
@@ -345,7 +345,7 @@ impl std::fmt::Display for Signal {
 ///   fusion across the remaining successful signals. The returned results bear a non-empty
 ///   `degraded_signals` list detailing which signals failed.
 ///
-/// *Note*: An empty but valid result from a signal (e.g. no documents matched BM25 or zero vector)
+/// *Note*: An empty but valid result from a signal (e.g. no documents matched lexical text or zero vector)
 /// is NOT a signal failure and does not trigger this behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 // ANCHOR[contextra-types:SAOS-FAILPOLICY]
@@ -361,7 +361,7 @@ pub enum OnSignalFailure {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 // ANCHOR[contextra-types:SAOS-REWRITE]
 pub struct QueryRewriteOutput {
-    /// Textual reformulation intended for BM25 keyword search.
+    /// Textual reformulation intended for lexical keyword search.
     pub text_query: Option<String>,
     /// Semantic reformulation intended for dense vector embedding search.
     pub semantic_query: Option<String>,

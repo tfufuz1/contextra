@@ -2,41 +2,43 @@
 
 Kanonische Domänenmodelle, Identifikatoren, Budgets, Filter und Fehlerstrukturen.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, `capabilities.toml`).
+Normativitätsklasse: **Klasse B (Storage-Bundle-Kerne)** gemäß SPEC v4.0.
 
 ## Rolle & Zweck
-`contextra-types` ist die Basis aller Typdefinitionen im gesamten Contextra-Ökosystem. Es enthält produkt- und I/O-unabhängige Domänentypen wie Identifikatoren (`DocId`, `TxId`, `TenantId`), Token-Budgets, Tags und den zentralen kanonischen Fehlerbaum (`ContextraError`).
+`contextra-types` ist das typisierte Fundament des Storage-Bundles im Contextra-Baukasten. Es enthält speichermodell-neutrale Domänentypen wie Identifikatoren (`DocId`, `TxId`, `TenantId`), Token-Budgets, Tags und den zentralen kanonischen Fehlerbaum (`ContextraError`).
 
-Der Crate ist vollständig autark, I/O-frei, deterministisch und enthält keine externen Laufzeit-Abhängigkeiten wie `tokio`.
+Der Baustein ist vollständig autark, I/O-frei, deterministisch und enthält keine Laufzeit- oder Speichermodell-Annahmen (LSM, HNSW, BM25).
 
-## Baukasten-Einordnung & Garantien (M1-M11)
-- **Ring:** Ring 0 (Typen-Kern, Fundament)
-- **Status:** 🟢 Vollständig autarker Baustein
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-- **Abhängigkeiten:** Keine internen Workspace-Abhängigkeiten (0 Workspace-Deps).
-  - Externe Crates: `thiserror`, `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes` (dev: `proptest`).
-- **Features:** Minimal per Default (`default = []`), additiv:
-  - `docid-128`: Schaltet `DocId` von 64-Bit (`u64`) auf 128-Bit (`u128`) um (Workspace-weit gespiegelt).
-  - `auto-extraction-opt-out`: Kompatibilitätsfeature für Metadaten-Extraktion.
-- **Determinismus:** Keine Systemzeit (`SystemTime::now`), kein Thread-Zufall (`thread_rng`), keine I/O-Operationen.
-- **Löschentkopplung (D-E1):** Löschtypen sind isoliert und als deprecated markiert (Übergang zu `contextra-erasure-spi`). Es verbleiben nur neutrale Löschmarker (`SeqBitTombstone`, `TOMBSTONE_BIT`).
-
-## Einbettungsbeispiel
-Ein vollständiges, lauffähiges Beispiel findet sich unter `examples/standalone.rs`:
-
+## Autarke Entnahme (B5 / SPEC §7)
 ```bash
-cargo run -p contextra-types --example standalone
+python3 tools/export_crate.py contextra-types --out /tmp/export-contextra-types
 ```
 
-```rust
-use contextra_types::{DocId, RequestContext, TenantId, TxId};
+## Baukasten-Eigenschaften (SPEC v4.0 Klasse B, B3–B12)
+- **Klasse:** Klasse B (Fundament des Storage-Bundles)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+- **Abhängigkeiten:** Keine internen Workspace-Abhängigkeiten (`may_depend_on = []`).
+  - Externe Dependencies: `thiserror`, `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes` (dev: `proptest`, `criterion`).
+- **Features:** Minimal per Default (`default = []`), additiv:
+  - `docid-128`: Schaltet `DocId` von 64-Bit (`u64`) auf 128-Bit (`u128`) um.
+  - `auto-extraction-opt-out`: Kompatibilitätsfeature für Metadaten-Extraktion.
+- **Determinismus:** Keine Systemzeit (`SystemTime::now`), kein Thread-Zufall (`thread_rng`), keine I/O-Operationen.
+- **Zero-Panic:** Panics und unvollständige Fehlerbehandlung in Konstruktoren und Konvertierungen sind eliminiert.
+- **Löschentkopplung (§6 / D-E1):** Löschdomänen-Typen (`erasure.rs`, `witness.rs`) sind als deprecated markiert (Migration nach `contextra-erasure`).
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let tenant = TenantId::try_new(1)?;
-    let tx = TxId::new(100);
-    let ctx = RequestContext::new(tenant, tx);
-    let doc_id = DocId::from_key("document_123")?;
-    println!("Context: Tenant={}, Tx={}, DocId={}", ctx.tenant_id, ctx.tx_id, doc_id);
-    Ok(())
-}
+## Nicht-Ziele
+- Keine Implementierung von Speicher-Engines, Indizes oder Löschprotokollen.
+- Kein I/O, keine Netzwerkaufrufe, keine Abhängigkeit von Async-Runtimes.
+
+## Minimalbeispiel
+```rust
+use contextra_types::{DocId, TenantId, TxId};
+
+let doc = DocId::from_u64(42);
+let tenant = TenantId::system();
+let tx = TxId::from_u64(1);
+
+assert_eq!(doc.as_u64(), 42);
+assert!(tenant.is_system());
+assert_eq!(tx.as_u64(), 1);
 ```
