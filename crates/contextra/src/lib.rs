@@ -49,7 +49,7 @@ pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
 pub use collection_profile::{CollectionProfile, DeploymentTier, KvDeleteMode, LsmTuning};
 pub use contextra_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
-    Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
+    Contextra, ContextraConfig, ContextraStats, Document, DriftStatusProvider, EmbeddingBackend,
     SearchResult, TextEmbeddingEngine,
 };
 pub use contextra_types::error::ContextraError;

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Kanonische IDs, Referenzen und Monotonie-Typen (SPEC 7.2, 7.3, 7.4, 8.1, 8.7, D-08, D-70, I-11, I-12, F.1, F.9, TY-08).
 
 use core::fmt;
@@ -69,6 +70,10 @@ pub struct DocRef {
 
 /// 16-Byte Lösch-Identifikator (SPEC 7.4, TY-09).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct ErasureId(pub [u8; 16]);
 
 impl ErasureId {
@@ -147,6 +152,10 @@ impl fmt::Debug for StoreId {
 
 /// 16-Byte Gate-Kennung für ReadGate-Einträge (SPEC F.9).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub struct GateId(pub [u8; 16]);
 
 impl GateId {

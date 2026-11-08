@@ -14,6 +14,9 @@
 
 pub mod orchestration;
 
+#[deprecated(
+    note = "Attestation and deletion proof types belong to contextra-erasure/contextra-crypto"
+)]
 pub use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
 };
@@ -34,6 +37,7 @@ use serde_json::Value;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+pub mod backends;
 #[cfg(not(loom))]
 pub mod background_workers;
 #[cfg(not(loom))]
@@ -81,6 +85,10 @@ pub use background_workers::start_decay_cleanup_worker;
 pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
 
 #[cfg(not(loom))]
+pub use backends::Backends;
+#[cfg(not(loom))]
+pub use backends::DefaultBackends;
+#[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
 #[cfg(feature = "graph-connectivity-health")]
 pub use collection::maintenance::PercolationConfig;
@@ -89,7 +97,6 @@ pub use collection::maintenance::PercolationConfig;
 pub use collection::maintenance::PercolationResult;
 #[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
-#[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
 pub use contextra_text::Language;

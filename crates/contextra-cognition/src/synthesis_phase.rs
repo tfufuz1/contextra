@@ -13,10 +13,9 @@
 //!   sondern inkrementiert lediglich `skipped_segments` (Fail-Soft).
 //! - **Provenienzerhalt:** Jeder synthetisierte Chunk speichert exakt die Quell-`DocId`s der Ausgangs-Turns.
 
-
 use crate::memory_consolidation::TurnSegment;
-use contextra_ports::SegmentSynthesizer;
-use contextra_types::DocId;
+use crate::ports_local::SegmentSynthesizer;
+use crate::types_local::DocId;
 
 /// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +47,7 @@ pub struct SynthesizedChunk {
 }
 
 /// Trait-Abstraktion für den LLM-Synthesizer (testbar via Mock).
-pub use contextra_ports::SegmentSynthesizer as TraitSegmentSynthesizer;
+pub use crate::ports_local::SegmentSynthesizer as TraitSegmentSynthesizer;
 
 /// Dies ist der LLM-BASIERTE Generative Synthesis Pass (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait). Für den deterministischen Structural Consolidation Pass siehe `memory_consolidation::run_structural_synthesis_pass()`.
 ///
@@ -123,8 +122,8 @@ pub async fn run_synthesis_pass(
 )]
 mod tests {
     use super::*;
-    use contextra_ports::BoxFuture;
-    use contextra_types::Result;
+    use crate::ports_local::BoxFuture;
+    use crate::types_local::Result;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     struct MockSynthesizer {
@@ -162,8 +161,8 @@ mod tests {
         }
     }
 
-// ANCHOR[contextra-cognition:TEST-SYNTHESI-022]
-// Prüft Testfall `test_synthesis_pass_empty_segments_returns_empty`.
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-022]
+    // Prüft Testfall `test_synthesis_pass_empty_segments_returns_empty`.
     #[tokio::test]
     async fn test_synthesis_pass_empty_segments_returns_empty() {
         let synthesizer = MockSynthesizer::new("test-model", false);
@@ -173,8 +172,8 @@ mod tests {
         assert_eq!(res.skipped_segments, 0);
     }
 
-// ANCHOR[contextra-cognition:TEST-SYNTHESI-023]
-// Prüft Testfall `test_synthesis_pass_too_short_segments_skipped`.
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-023]
+    // Prüft Testfall `test_synthesis_pass_too_short_segments_skipped`.
     #[tokio::test]
     async fn test_synthesis_pass_too_short_segments_skipped() {
         let synthesizer = MockSynthesizer::new("test-model", false);
@@ -190,8 +189,8 @@ mod tests {
         assert_eq!(res.skipped_segments, 1);
     }
 
-// ANCHOR[contextra-cognition:TEST-SYNTHESI-024]
-// Prüft Testfall `test_synthesis_pass_llm_error_increments_skipped_not_err`.
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-024]
+    // Prüft Testfall `test_synthesis_pass_llm_error_increments_skipped_not_err`.
     #[tokio::test]
     async fn test_synthesis_pass_llm_error_increments_skipped_not_err() {
         let synthesizer = MockSynthesizer::new("test-model", true); // should_fail = true
@@ -211,8 +210,8 @@ mod tests {
         assert_eq!(res.skipped_segments, 1);
     }
 
-// ANCHOR[contextra-cognition:TEST-SYNTHESI-025]
-// Prüft Testfall `test_synthesis_pass_synthesized_chunk_has_correct_source_ids`.
+    // ANCHOR[contextra-cognition:TEST-SYNTHESI-025]
+    // Prüft Testfall `test_synthesis_pass_synthesized_chunk_has_correct_source_ids`.
     #[tokio::test]
     async fn test_synthesis_pass_synthesized_chunk_has_correct_source_ids() {
         let synthesizer = MockSynthesizer::new("test-model", false);

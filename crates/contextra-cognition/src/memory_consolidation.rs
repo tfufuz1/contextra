@@ -42,9 +42,9 @@
 //! - `synthesis_phase::run_synthesis_pass()` in `synthesis_phase.rs` ist der LLM-basierte Generative Synthesis Pass über Segmenten (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait).
 
 use crate::context_compaction::{CompactedContext, ContextCompactor};
+use crate::ports_local::{LlmTextGenerator, ResponseGroundingValidator};
+use crate::types_local::{ContextChunk, DocId, TxId};
 use ahash::{AHashMap, AHashSet};
-use contextra_ports::{LlmTextGenerator, ResponseGroundingValidator};
-use contextra_types::{ContextChunk, DocId, TxId};
 
 /// Konfiguration für den Structural Consolidation Pass.
 #[derive(Debug, Clone)]
@@ -99,12 +99,12 @@ pub struct TurnSegment {
 pub struct ConsolidationPhaseResult {
     /// Anzahl der erzeugten Segmente.
     pub segments_created: usize,
-    /// Liste aller DocIds, die als Duplikate markiert/tombstoned wurden.
-    pub duplicates_tombstoned: Vec<DocId>,
+    /// Liste aller DocIds, die als Duplikate markiert/superseded wurden.
+    pub duplicates_superseded: Vec<DocId>,
     /// Chunks, für die abhängige Graph-Kanten via Kaskadierungslogik nachgezogen werden müssen.
     /// Zur Einhaltung der P1-DAG-Integrität liefert dieses Modul NUR die Liste und ruft `contextra-graph`
     /// nicht selbst auf, um Crate-Zyklen zu vermeiden.
-    pub cascade_edge_tombstones_needed: Vec<DocId>,
+    pub cascade_edge_invalidations_needed: Vec<DocId>,
     /// Aggregierte Fehler beim Kaskadieren von Graph-Kanten-Tombstones.
     pub cascade_errors: Vec<String>,
 }
@@ -268,7 +268,7 @@ pub fn group_turns_into_segments(
 /// DocId-Zahlenwerts als Ordnungskriterium für älter/neuer verwendet, da DocId via DocId::from_key
 /// aus BLAKE3-Hashes abgeleitet wird und keine Erstellungszeit-Korrelation besitzt. (TS: 2026-09-07T08:00:00Z)
 ///
-/// RÜCKGABE: `Vec<(DocId /* zu tombstonen: älterer Turn */, DocId /* Original: neuerer/wichtigerer Turn */)>`
+/// RÜCKGABE: `Vec<(DocId /* zu superseden: älterer Turn */, DocId /* Original: neuerer/wichtigerer Turn */)>`
 // ANCHOR[contextra-cognition:MEM-005]
 /// Führt segmentlokale Duplikatserkennung via Cosine-Similarity durch.
 pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Vec<(DocId, DocId)> {
@@ -319,8 +319,8 @@ pub fn run_consolidation_pass(
     if turns.is_empty() {
         return ConsolidationPhaseResult {
             segments_created: 0,
-            duplicates_tombstoned: Vec::new(),
-            cascade_edge_tombstones_needed: Vec::new(),
+            duplicates_superseded: Vec::new(),
+            cascade_edge_invalidations_needed: Vec::new(),
             cascade_errors: Vec::new(),
         };
     }
@@ -351,12 +351,12 @@ pub fn run_consolidation_pass(
     duplicates.sort_unstable_by_key(|d| d.inner());
     duplicates.dedup();
 
-    let cascade_edge_tombstones_needed = duplicates.clone();
+    let cascade_edge_invalidations_needed = duplicates.clone();
 
     ConsolidationPhaseResult {
         segments_created: segments.len(),
-        duplicates_tombstoned: duplicates,
-        cascade_edge_tombstones_needed,
+        duplicates_superseded: duplicates,
+        cascade_edge_invalidations_needed,
         cascade_errors: Vec::new(),
     }
 }
@@ -851,8 +851,8 @@ pub fn compact_segment_via_context_compactor(
 mod tests {
     use super::*;
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-026]
-// Prüft Testfall `test_group_turns_into_segments_two_clusters`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-026]
+    // Prüft Testfall `test_group_turns_into_segments_two_clusters`.
     #[test]
     fn test_group_turns_into_segments_two_clusters() {
         // 10 synthetic embeddings: 5 in Cluster A, 5 in Cluster B
@@ -886,10 +886,10 @@ mod tests {
         assert_eq!(segments.get(1).map(|s| s.turn_ids.len()), Some(5));
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-027]
-// Prüft Testfall `test_detect_near_duplicates_older_tombstoned`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-027]
+    // Prüft Testfall `test_detect_near_duplicates_older_superseded`.
     #[test]
-    fn test_detect_near_duplicates_older_tombstoned() {
+    fn test_detect_near_duplicates_older_superseded() {
         let emb = vec![1.0, 0.0, 0.0, 0.0];
         // Index 0 is chronologically older than Index 1
         let turns = vec![(DocId::new(10), emb.clone()), (DocId::new(20), emb.clone())];
@@ -905,8 +905,8 @@ mod tests {
         assert_eq!(newer, DocId::new(20));
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-028]
-// Prüft Testfall `test_detect_near_duplicates_inverse_doc_id_order`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-028]
+    // Prüft Testfall `test_detect_near_duplicates_inverse_doc_id_order`.
     #[test]
     fn test_detect_near_duplicates_inverse_doc_id_order() {
         let emb = vec![1.0, 0.0, 0.0, 0.0];
@@ -928,8 +928,8 @@ mod tests {
         assert_eq!(newer, DocId::new(100));
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-029]
-// Prüft Testfall `test_detect_near_duplicates_sub_threshold`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-029]
+    // Prüft Testfall `test_detect_near_duplicates_sub_threshold`.
     #[test]
     fn test_detect_near_duplicates_sub_threshold() {
         let emb_a = vec![1.0, 0.0, 0.0, 0.0];
@@ -943,19 +943,19 @@ mod tests {
         );
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-030]
-// Prüft Testfall `test_empty_input_no_panic`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-030]
+    // Prüft Testfall `test_empty_input_no_panic`.
     #[test]
     fn test_empty_input_no_panic() {
         let config = ConsolidationConfig::default();
         let res = run_consolidation_pass(&[], &config);
         assert_eq!(res.segments_created, 0);
-        assert!(res.duplicates_tombstoned.is_empty());
-        assert!(res.cascade_edge_tombstones_needed.is_empty());
+        assert!(res.duplicates_superseded.is_empty());
+        assert!(res.cascade_edge_invalidations_needed.is_empty());
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-031]
-// Prüft Testfall `test_min_turns_per_segment_merging`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-031]
+    // Prüft Testfall `test_min_turns_per_segment_merging`.
     #[test]
     fn test_min_turns_per_segment_merging() {
         // Seg 1: 5 turns (Cluster A)
@@ -985,8 +985,8 @@ mod tests {
         assert_eq!(segments.get(0).map(|s| s.turn_ids.len()), Some(6));
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-032]
-// Prüft Testfall `test_group_turns_moderate_similarity_uses_cohesion_threshold`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-032]
+    // Prüft Testfall `test_group_turns_moderate_similarity_uses_cohesion_threshold`.
     #[test]
     fn test_group_turns_moderate_similarity_uses_cohesion_threshold() {
         // Turns mit ~0.75 Ähnlichkeit sollen zu EINEM Segment gruppiert werden
@@ -1025,8 +1025,8 @@ mod tests {
         );
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-033]
-// Prüft Testfall `test_default_config_produces_meaningful_segmentation`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-033]
+    // Prüft Testfall `test_default_config_produces_meaningful_segmentation`.
     #[test]
     fn test_default_config_produces_meaningful_segmentation() {
         // Mit Default-Config müssen semantisch unterschiedliche Turns in separate Segmente
@@ -1072,8 +1072,8 @@ mod tests {
         }
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-034]
-// Prüft Testfall `test_run_synthesis_pass_community_under_min_size_ignored`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-034]
+    // Prüft Testfall `test_run_synthesis_pass_community_under_min_size_ignored`.
     #[tokio::test]
     async fn test_run_synthesis_pass_community_under_min_size_ignored() {
         let llm = MockLlmGenerator {
@@ -1101,8 +1101,8 @@ mod tests {
         assert_eq!(res.deferred_community_hashes.len(), 0);
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-035]
-// Prüft Testfall `test_community_stability_tracker_cycles_and_reset`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-035]
+    // Prüft Testfall `test_community_stability_tracker_cycles_and_reset`.
     #[test]
     fn test_community_stability_tracker_cycles_and_reset() {
         let mut tracker = CommunityStabilityTracker::new();
@@ -1126,8 +1126,8 @@ mod tests {
         assert_eq!(tracker.observe(hash_b), 1);
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-036]
-// Prüft Testfall `test_run_synthesis_pass_max_llm_calls_per_cycle_limits_and_defers`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-036]
+    // Prüft Testfall `test_run_synthesis_pass_max_llm_calls_per_cycle_limits_and_defers`.
     #[tokio::test]
     async fn test_run_synthesis_pass_max_llm_calls_per_cycle_limits_and_defers() {
         let llm = MockLlmGenerator {
@@ -1167,8 +1167,8 @@ mod tests {
         );
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-037]
-// Prüft Testfall `test_run_synthesis_pass_meta_chunk_has_required_prefix_and_abstracts_from`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-037]
+    // Prüft Testfall `test_run_synthesis_pass_meta_chunk_has_required_prefix_and_abstracts_from`.
     #[tokio::test]
     async fn test_run_synthesis_pass_meta_chunk_has_required_prefix_and_abstracts_from() {
         let llm = MockLlmGenerator {
@@ -1206,8 +1206,8 @@ mod tests {
         assert_eq!(chunk.source_community_hash, hash);
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-038]
-// Prüft Testfall `test_run_synthesis_pass_error_on_one_community_continues_others`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-038]
+    // Prüft Testfall `test_run_synthesis_pass_error_on_one_community_continues_others`.
     #[tokio::test]
     async fn test_run_synthesis_pass_error_on_one_community_continues_others() {
         let llm = MockLlmGenerator {
@@ -1256,8 +1256,8 @@ mod tests {
         }
     }
 
-// ANCHOR[contextra-cognition:TEST-MEMORY_C-039]
-// Prüft Testfall `test_run_synthesis_pass_ungrounded_response_discarded`.
+    // ANCHOR[contextra-cognition:TEST-MEMORY_C-039]
+    // Prüft Testfall `test_run_synthesis_pass_ungrounded_response_discarded`.
     #[tokio::test]
     async fn test_run_synthesis_pass_ungrounded_response_discarded() {
         let llm = MockLlmGenerator {

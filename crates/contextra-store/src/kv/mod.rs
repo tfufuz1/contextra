@@ -1,11 +1,11 @@
 //! # Key-Value Speicherabstraktion (Ring 1)
 //!
-//! Enthaelt Untermodule fuer Segmentierung und Loeschmodi (Tombstone vs. CryptoShredding).
+//! Enthaelt Untermodule fuer Segmentierung und Bereinigungsmodi (Tombstone vs. CryptoShredding).
 
 // FILE-CONTEXT
-// ZWECK: Key-Value Segment-Verwaltung und Löschmodi (TombstoneOnly, CryptoShred).
+// ZWECK: Key-Value Segment-Verwaltung und Bereinigungsmodi (TombstoneOnly, CryptoShred).
 // INVARIANTEN:
-// - INV-KV-DELETE-1: Löschbeweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
+// - INV-KV-DELETE-1: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
 
 pub mod delete_mode;
 pub mod segment;

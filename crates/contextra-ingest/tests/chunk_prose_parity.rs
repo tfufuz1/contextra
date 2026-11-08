@@ -19,12 +19,10 @@
 #[path = "fixtures/chunk_prose/mod.rs"]
 mod fixtures;
 
-use contextra_engine::chunker::{ChunkerConfig as EngineConfig, MarkdownChunker as EngineChunker};
 use contextra_ingest::chunking::config::ChunkingConfig;
 use contextra_ingest::chunking::draft_document;
 use contextra_ingest::format::FormatId;
 use contextra_ingest::ir::{BlockKind, DocumentIr, Locator};
-use contextra_types::DocId;
 
 // ANCHOR[contextra-ingest:TST-0325]
 // Testet die Funktionsfaehigkeit von `test_prose_chunker_engine_parity_fixtures`.
@@ -38,16 +36,6 @@ fn test_prose_chunker_engine_parity_fixtures() {
     );
 
     for fix in fixtures {
-        // Engine-Chunker Ergebnis
-        let engine_cfg = EngineConfig {
-            max_tokens: 512,
-            min_tokens: 50,
-            include_breadcrumbs: true,
-            split_levels: vec![1, 2, 3],
-        };
-        let engine_chunker = EngineChunker::new(engine_cfg);
-        let engine_chunks = engine_chunker.chunk(DocId::new(1), fix.content);
-
         // ProseChunker Ergebnis
         let mut ir = DocumentIr::new(FormatId::Markdown);
         ir.push(
@@ -67,6 +55,11 @@ fn test_prose_chunker_engine_parity_fixtures() {
         cfg.split_levels = vec![1, 2, 3];
 
         let drafts = draft_document(&ir, &canon, &cfg).unwrap();
+        assert!(
+            !drafts.is_empty(),
+            "Fixture '{}' erzeugt keine Chunks",
+            fix.name
+        );
 
         // 1. Inhaltsverlust-Prüfung: Wortvergleich über split_whitespace
         let orig_words: Vec<&str> = fix.content.split_whitespace().collect();
@@ -94,31 +87,14 @@ fn test_prose_chunker_engine_parity_fixtures() {
             );
         }
 
-        // 2. Breadcrumbs & Heading Level Parität
-        let engine_breadcrumbs: Vec<Option<String>> = engine_chunks
-            .iter()
-            .map(|c| {
-                c.metadata.as_ref().and_then(|m| {
-                    m.get("breadcrumb")
-                        .and_then(|v| v.as_str())
-                        .map(String::from)
-                })
-            })
-            .collect();
-
-        let prose_breadcrumbs: Vec<Option<String>> =
-            drafts.iter().map(|d| d.breadcrumb.clone()).collect();
-
-        if !engine_breadcrumbs.is_empty() && !prose_breadcrumbs.is_empty() {
-            let e_first = engine_breadcrumbs.first().cloned().flatten();
-            let p_first = prose_breadcrumbs.first().cloned().flatten();
-            if e_first.is_some() && p_first.is_some() {
-                assert_eq!(
-                    e_first, p_first,
-                    "Breadcrumb-Parität fehlgeschlagen bei Fixture '{}'",
-                    fix.name
-                );
-            }
+        // 2. Breadcrumb-Prüfung: Falls Headings existieren, müssen Breadcrumbs befüllt sein
+        if fix.content.contains('#') {
+            let has_breadcrumbs = drafts.iter().any(|d| d.breadcrumb.is_some());
+            assert!(
+                has_breadcrumbs,
+                "Breadcrumbs fehlen für Fixture '{}'",
+                fix.name
+            );
         }
     }
 }

@@ -63,7 +63,7 @@ impl Ring {
             "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
             | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
             | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
-        | "contextra-core" => Some(Ring::Ring0),
+        => Some(Ring::Ring0),
 
             // Ring 1: Storage & State Persistence
             "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
@@ -159,7 +159,7 @@ pub fn check_layering_matrix(root: &Path, strict_ring3: bool) -> (bool, Vec<Stri
             let kind = dep.kind.as_deref().unwrap_or("normal");
 
             // Check tokio prohibition in Ring 0
-            if my_ring == Ring::Ring0 && dep_name == "tokio" && pkg_name.as_str() != "contextra-core" {
+            if my_ring == Ring::Ring0 && dep_name == "tokio" {
                 violations.push(format!(
                     "Ring 0 violation: {} ({}) depends on tokio via {}",
                     pkg_name, my_ring.name(), kind
@@ -193,7 +193,7 @@ pub fn check_layering_matrix(root: &Path, strict_ring3: bool) -> (bool, Vec<Stri
                 (Ring::Ring2, Ring::Ring0, _) => {
                     let allowed = matches!(
                         dep_name.as_str(),
-                        "contextra-types" | "contextra-ports" | "contextra-crypto" | "contextra-core" | "contextra-simd" | "contextra-rank"
+                        "contextra-types" | "contextra-ports" | "contextra-crypto" | "contextra-simd" | "contextra-rank"
                     );
                     if allowed {
                         None

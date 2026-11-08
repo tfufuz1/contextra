@@ -258,15 +258,13 @@ fn inspect_zip_container(data: &[u8]) -> Option<(FormatId, &'static str)> {
         }
 
         let comp_method = u16::from_le_bytes([byte_at(header, 8), byte_at(header, 9)]);
-        let comp_size = match usize::try_from(u32::from_le_bytes([
+        let comp_size = usize::try_from(u32::from_le_bytes([
             byte_at(header, 18),
             byte_at(header, 19),
             byte_at(header, 20),
             byte_at(header, 21),
-        ])) {
-            Ok(s) => s,
-            Err(_) => 0,
-        };
+        ]))
+        .unwrap_or_default();
 
         let fn_len = usize::from(u16::from_le_bytes([
             byte_at(header, 26),
@@ -392,20 +390,14 @@ fn detect_text_heuristics(data: &[u8]) -> Option<ContentMatch> {
     // 1. UTF-16 LE/BE BOM Dekodierung
     let (text_str, has_bom) = if data.starts_with(&[0xff, 0xfe]) {
         // UTF-16 LE BOM
-        let decoded = decode_utf16_le(match data.get(2..) {
-            Some(s) => s,
-            None => return None,
-        });
+        let decoded = decode_utf16_le(data.get(2..)?);
         if decoded.is_empty() {
             return None;
         }
         (decoded, true)
     } else if data.starts_with(&[0xfe, 0xff]) {
         // UTF-16 BE BOM
-        let decoded = decode_utf16_be(match data.get(2..) {
-            Some(s) => s,
-            None => return None,
-        });
+        let decoded = decode_utf16_be(data.get(2..)?);
         if decoded.is_empty() {
             return None;
         }
@@ -536,7 +528,7 @@ fn decode_utf16_le(bytes: &[u8]) -> String {
     let u16s: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|c| {
-            let b0 = match c.get(0) {
+            let b0 = match c.first() {
                 Some(&b) => b,
                 None => 0,
             };
@@ -554,7 +546,7 @@ fn decode_utf16_be(bytes: &[u8]) -> String {
     let u16s: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|c| {
-            let b0 = match c.get(0) {
+            let b0 = match c.first() {
                 Some(&b) => b,
                 None => 0,
             };

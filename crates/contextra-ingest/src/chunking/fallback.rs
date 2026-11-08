@@ -6,21 +6,19 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: FallbackChunker delegierend an contextra_engine::chunker::MarkdownChunker (WP M3).
+// ZWECK: FallbackChunker autonom delegierend an ProseChunker (WP M3).
 // INVARIANTEN: Monotone Suche im kanonischen Text, bei Nichtfund approximativ span_approximate=true.
 // STAND: TS:2026-10-31T00:00:00Z
 
 use crate::canonical::CanonicalText;
 use crate::chunking::config::ChunkingConfig;
+use crate::chunking::prose::ProseChunker;
 use crate::chunking::{ChunkDraft, IrChunker};
 use crate::error::IngestError;
 use crate::format::ChunkStrategy;
 use crate::ir::DocumentIr;
-use contextra_engine::chunker::{ChunkerConfig as EngineConfig, MarkdownChunker as EngineChunker};
-use contextra_types::DocId;
-use serde_json::{Map, Value};
 
-/// Fallback-Chunker, der die kanonische Textrepräsentation an den MarkdownChunker aus contextra-engine übergibt.
+/// Fallback-Chunker, der unstrukturierte Dokumente oder unbekannte Formate über ProseChunker verarbeitet.
 #[derive(Debug, Default)]
 // ANCHOR[contextra-ingest:CHK-0212]
 // struct `FallbackChunker` fuer Fallback-Chunker fuer unstrukturierte oder unbekannte Dokumentarten.
@@ -37,83 +35,9 @@ impl IrChunker for FallbackChunker {
         canon: &CanonicalText,
         cfg: &ChunkingConfig,
     ) -> Result<Vec<ChunkDraft>, IngestError> {
-        let engine_cfg = EngineConfig {
-            max_tokens: cfg.max_tokens,
-            min_tokens: cfg.min_tokens,
-            include_breadcrumbs: cfg.include_breadcrumbs,
-            split_levels: cfg.split_levels.clone(),
-        };
-
-        let chunker = EngineChunker::new(engine_cfg);
-        let dummy_doc_id = DocId::new(1);
-        let engine_chunks = chunker.chunk(dummy_doc_id, &canon.text);
-
-        let mut drafts = Vec::with_capacity(engine_chunks.len());
-        let mut search_cursor = 0usize;
-
-        for chunk in engine_chunks {
-            let chunk_str = &chunk.content;
-            let (span, approx) = find_span(&canon.text, chunk_str, search_cursor);
-            search_cursor = span.end;
-
-            let mut breadcrumb = None;
-            let mut heading_level = None;
-
-            if let Some(ref meta) = chunk.metadata {
-                if let Some(bc) = meta.get("breadcrumb").and_then(|v| v.as_str()) {
-                    breadcrumb = Some(bc.to_string());
-                }
-                if let Some(hl) = meta.get("heading_level").and_then(|v| v.as_u64()) {
-                    heading_level = u8::try_from(hl).ok();
-                }
-            }
-
-            let locator = ir
-                .blocks
-                .first()
-                .map(|b| b.locator.clone())
-                .unwrap_or_default();
-
-            let mut extra = Map::new();
-            if approx {
-                extra.insert("span_approximate".into(), Value::Bool(true));
-            }
-
-            drafts.push(ChunkDraft {
-                text: chunk.content,
-                span,
-                locator,
-                breadcrumb,
-                heading_level,
-                extra,
-            });
-        }
-
-        Ok(drafts)
+        let prose_chunker = ProseChunker;
+        prose_chunker.draft(ir, canon, cfg)
     }
-}
-
-fn find_span(full: &str, sub: &str, cursor: usize) -> (std::ops::Range<usize>, bool) {
-    if sub.is_empty() {
-        return (cursor..cursor, false);
-    }
-
-    // Exakte monotone Suche ab cursor
-    if let Some(rel_pos) = full[cursor..].find(sub) {
-        let start = cursor + rel_pos;
-        let end = start + sub.len();
-        return (start..end, false);
-    }
-
-    // Exakte globale Suche im gesamten Text
-    if let Some(start) = full.find(sub) {
-        let end = start + sub.len();
-        return (start..end, true);
-    }
-
-    // Approximativer Fallback auf cursor bis Ende
-    let end = (cursor + sub.len()).min(full.len());
-    (cursor..end, true)
 }
 
 #[cfg(test)]

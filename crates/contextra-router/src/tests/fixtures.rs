@@ -3,29 +3,30 @@
 //! **Ring:** Ring 3 (Applikations- und Testschicht).
 //! **Zweck:** Gemeinsame Test-Fixtures, Mock-Provider und Hilfsstrukturen.
 
-// ANCHOR[contextra-router:TST-FIX-001]
 use crate::{RouterEngine, SlmProfile};
-use contextra_db::{Collection, ContextManager};
 use contextra_ports::clock::Clock;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use contextra_ports::{BoxFuture, CommunityResolver, ContextPreparer, HybridSearchProvider};
 use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget, TxId};
+use parking_lot::RwLock;
+use serde_json::Value;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 #[derive(Debug, Default)]
-pub(crate) struct TestClock {
-    pub(crate) nanos: AtomicU64,
+pub struct TestClock {
+    pub nanos: AtomicU64,
 }
 
 impl TestClock {
-    pub(crate) fn new(initial_nanos: u64) -> Self {
+    pub fn new(initial_nanos: u64) -> Self {
         Self {
             nanos: AtomicU64::new(initial_nanos),
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn advance(&self, duration: std::time::Duration) {
+    pub fn advance(&self, duration: std::time::Duration) {
         let nanos = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
         self.nanos.fetch_add(nanos, Ordering::Relaxed);
     }
@@ -41,87 +42,65 @@ impl Clock for TestClock {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MockDoc {
+    pub entity_id: Option<EntityId>,
+    pub key: String,
+    pub vector: Vec<f32>,
+    pub text: String,
+}
+
+#[derive(Default)]
 #[allow(dead_code)]
-fn _use_clock_helper(clock: &TestClock) {
-    let _ = clock.now_unix_nanos();
+pub struct TestCollection {
+    pub dimension: usize,
+    pub docs: RwLock<Vec<MockDoc>>,
+    pub communities: RwLock<BTreeMap<EntityId, u64>>,
+    pub raw_comm_keys: RwLock<BTreeMap<Vec<u8>, u64>>,
+    pub next_doc_id: AtomicU64,
 }
 
-pub(crate) struct MockStorageEngine;
+impl TestCollection {
+    pub fn new(dimension: usize) -> Self {
+        Self {
+            dimension,
+            docs: RwLock::new(Vec::new()),
+            communities: RwLock::new(BTreeMap::new()),
+            raw_comm_keys: RwLock::new(BTreeMap::new()),
+            next_doc_id: AtomicU64::new(1),
+        }
+    }
 
-impl StorageEngine for MockStorageEngine {
-    fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { Ok(None) })
+    pub async fn insert(
+        &self,
+        key: &str,
+        vector: &[f32],
+        metadata: Option<Value>,
+    ) -> Result<()> {
+        let entity_id = EntityId::from_key(key).ok();
+        let text = metadata
+            .and_then(|m| m.get("text").and_then(|t| t.as_str().map(|s| s.to_string())))
+            .unwrap_or_else(|| key.to_string());
+        self.docs.write().push(MockDoc {
+            entity_id,
+            key: key.to_string(),
+            vector: vector.to_vec(),
+            text,
+        });
+        Ok(())
     }
-    fn _get_at_seq<'a>(
-        &'a self,
-        _: &'a [u8],
-        _: u64,
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { Ok(None) })
+
+    #[allow(dead_code)]
+pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {
+        self.communities.write().insert(entity_id, comm_id);
     }
-    fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn _delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn _rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn _rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        Box::pin(async move {
-            Ok(StorageStats {
-                num_segments: 0,
-                total_size_bytes: 0,
-                memtable_size_bytes: 0,
-            })
-        })
-    }
-    fn _last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        Box::pin(async move { Ok(0) })
-    }
-    fn _last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        Box::pin(async move { Ok(TxId(0)) })
-    }
-    fn _pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn _unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-    fn _scan_prefix<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { Ok(vec![]) })
-    }
-    fn _scan<'a>(
-        &'a self,
-        _: std::ops::Bound<&'a [u8]>,
-        _: std::ops::Bound<&'a [u8]>,
-        _: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { Ok(vec![]) })
+
+    pub async fn relate(&self, _key_a: &str, _key_b: &str, _relation: &str) -> Result<()> {
+        Ok(())
     }
 }
 
-pub(crate) struct CollectionAdapter<S: StorageEngine + 'static> {
-    collection: Arc<Collection<S>>,
-}
-
-impl<S: StorageEngine + 'static> CollectionAdapter<S> {
-    pub(crate) fn new(collection: Arc<Collection<S>>) -> Self {
-        Self { collection }
-    }
-}
-
-impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for CollectionAdapter<S> {
+impl HybridSearchProvider for TestCollection {
     fn search_hybrid<'a>(
         &'a self,
         query_text: &'a str,
@@ -129,50 +108,199 @@ impl<S: StorageEngine + 'static> crate::ports_local::HybridSearchProvider for Co
         top_k: usize,
     ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
         Box::pin(async move {
-            let search_results = self
-                .collection
-                .query()
-                .text(query_text)
-                .embedding(query_embedding)
-                .k(top_k)
-                .execute()
-                .await?;
+            let docs = self.docs.read().clone();
+            if docs.is_empty() {
+                return Ok(vec![]);
+            }
 
-            let mut chunks = Vec::with_capacity(search_results.len());
-            for res in search_results {
-                if let Ok(mut chunk) = ContextChunk::try_from(res) {
-                    chunk.content = chunk.combined_text_owned();
-                    chunks.push(chunk);
-                }
+            let mut scored: Vec<(f32, MockDoc)> = docs
+                .into_iter()
+                .map(|doc| {
+                    let mut score = 0.0f32;
+                    if !query_embedding.is_empty() && query_embedding.len() == doc.vector.len() {
+                        let dot: f32 = query_embedding
+                            .iter()
+                            .zip(doc.vector.iter())
+                            .map(|(a, b)| a * b)
+                            .sum();
+                        score += (dot * 0.3).clamp(0.0, 0.3);
+                    }
+                    if !query_text.is_empty() && (doc.text.contains(query_text) || query_text.contains(&doc.text)) {
+                        score += 0.05;
+                    }
+                    if score <= 0.0 {
+                        score = 0.1;
+                    }
+                    (score.clamp(0.0, 1.0), doc)
+                })
+                .collect();
+
+            scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+
+            let mut chunks = Vec::with_capacity(top_k.min(scored.len()));
+            for (score, doc) in scored.into_iter().take(top_k) {
+                let doc_id = doc.entity_id.map(|e| contextra_types::DocId::new(e.inner())).unwrap_or_else(|| {
+                    contextra_types::DocId::new(self.next_doc_id.fetch_add(1, Ordering::Relaxed))
+                });
+                let metadata = serde_json::json!({ "key": doc.key });
+                chunks.push(ContextChunk {
+                    doc_id,
+                    content: doc.text.clone(),
+                    relevance: score,
+                    token_count: doc.text.split_whitespace().count().max(1),
+                    metadata: Some(metadata),
+                    contextual_prefix: None,
+                    links: vec![],
+                });
             }
             Ok(chunks)
         })
     }
 }
 
-impl<S: StorageEngine + 'static> crate::ports_local::CommunityResolver for CollectionAdapter<S> {
+impl CommunityResolver for TestCollection {
     fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
-        Box::pin(async move { self.collection.get_community(entity_id).await })
+        let comms = self.communities.read();
+        let comm_id = comms.get(&entity_id).copied();
+        Box::pin(async move { Ok(comm_id) })
     }
 }
 
-pub(crate) struct TestContextPreparer;
+#[derive(Clone)]
+pub struct CollectionAdapter {
+    pub collection: Arc<TestCollection>,
+}
 
-impl crate::ports_local::ContextPreparer for TestContextPreparer {
+impl CollectionAdapter {
+    pub fn new(collection: Arc<TestCollection>) -> Self {
+        Self { collection }
+    }
+}
+
+impl HybridSearchProvider for CollectionAdapter {
+    fn search_hybrid<'a>(
+        &'a self,
+        query_text: &'a str,
+        query_embedding: &'a [f32],
+        top_k: usize,
+    ) -> BoxFuture<'a, Result<Vec<ContextChunk>>> {
+        self.collection.search_hybrid(query_text, query_embedding, top_k)
+    }
+}
+
+impl CommunityResolver for CollectionAdapter {
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, Result<Option<u64>>> {
+        self.collection.get_community(entity_id)
+    }
+}
+
+pub struct TestContextPreparer;
+
+impl ContextPreparer for TestContextPreparer {
     fn prepare_context(
         &self,
         chunks: Vec<ContextChunk>,
         budget: &TokenBudget,
         relevance_threshold: f32,
     ) -> Result<ContextWindow> {
-        let mut manager = ContextManager::new(budget.clone());
-        manager.set_relevance_threshold(relevance_threshold);
-        manager.prepare_context(chunks)
+        let mut filtered: Vec<ContextChunk> = chunks
+            .into_iter()
+            .filter(|c| c.relevance >= relevance_threshold)
+            .collect();
+        filtered.sort_by(|a, b| b.relevance.total_cmp(&a.relevance));
+
+        let max_tokens = budget.effective_limit();
+        let mut total_tokens = 0;
+        let mut selected = Vec::new();
+        let mut truncated = false;
+
+        for chunk in filtered {
+            if total_tokens + chunk.token_count <= max_tokens {
+                total_tokens += chunk.token_count;
+                selected.push(chunk);
+            } else {
+                truncated = true;
+                break;
+            }
+        }
+
+        Ok(ContextWindow {
+            chunks: selected,
+            total_tokens,
+            truncated,
+        })
     }
 }
 
-pub(crate) fn create_test_router<S: StorageEngine + 'static>(
-    collection: Arc<Collection<S>>,
+pub struct TestInnerStorage {
+    pub collection: Arc<TestCollection>,
+}
+
+impl TestInnerStorage {
+    pub async fn put(&self, _tx: TxId, key: &[u8], val: &[u8]) -> Result<()> {
+        if let Ok(comm_id) = serde_json::from_slice::<u64>(val) {
+            self.collection.raw_comm_keys.write().insert(key.to_vec(), comm_id);
+            if let Ok(key_str) = std::str::from_utf8(key) {
+                if let Some(eid_str) = key_str.strip_prefix("__graph:community:") {
+                    if let Ok(eid_num) = eid_str.parse::<u64>() {
+                        self.collection
+                            .communities
+                            .write()
+                            .insert(EntityId::new(eid_num), comm_id);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn commit(&self, _tx: TxId) -> Result<()> {
+        Ok(())
+    }
+}
+
+pub struct ContextraConfig {
+    pub dimension: usize,
+    pub _reserved: u64,
+}
+
+impl Default for ContextraConfig {
+    fn default() -> Self {
+        Self { dimension: 4, _reserved: 0 }
+    }
+}
+
+pub struct Contextra {
+    pub collection: Arc<TestCollection>,
+}
+
+impl Contextra {
+    pub async fn open_with_config(
+        _path: impl AsRef<std::path::Path>,
+        config: ContextraConfig,
+    ) -> Result<Self> {
+        Ok(Self {
+            collection: Arc::new(TestCollection::new(config.dimension)),
+        })
+    }
+
+    pub async fn collection(&self, _name: &str) -> Result<Arc<TestCollection>> {
+        Ok(self.collection.clone())
+    }
+
+    pub fn allocate_tx(&self) -> Result<TxId> {
+        Ok(TxId(1))
+    }
+
+    pub fn inner_storage(&self) -> TestInnerStorage {
+        TestInnerStorage {
+            collection: self.collection.clone(),
+        }
+    }
+}
+
+pub fn create_test_router(
+    collection: Arc<TestCollection>,
     profiles: Vec<SlmProfile>,
     calibration_store_path: Option<std::path::PathBuf>,
 ) -> RouterEngine {
@@ -188,8 +316,8 @@ pub(crate) fn create_test_router<S: StorageEngine + 'static>(
     .with_clock(Arc::new(TestClock::new(1_000_000_000_000)))
 }
 
-pub(crate) fn try_create_test_router<S: StorageEngine + 'static>(
-    collection: Arc<Collection<S>>,
+pub fn try_create_test_router(
+    collection: Arc<TestCollection>,
     profiles: Vec<SlmProfile>,
     calibration_store_path: Option<std::path::PathBuf>,
 ) -> Result<RouterEngine> {
@@ -231,7 +359,10 @@ impl tracing::field::Visit for StringVisitor {
 }
 
 #[allow(dead_code)]
-fn _use_log_visitor_helpers() {
-    let _ = LogCaptureLayer::on_event;
-    let _ = StringVisitor::record_debug;
+fn _use_fixtures_helpers(clock: &TestClock) {
+    use tracing::field::Visit;
+    use tracing_subscriber::Layer;
+    let _ = clock.now_unix_nanos();
+    let _ = <LogCaptureLayer as Layer<tracing_subscriber::Registry>>::on_event;
+    let _ = <StringVisitor as Visit>::record_debug;
 }

@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing)]
 //! # Integrationstest: Vollständiger Durchstich des Bandit-Dispatches
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

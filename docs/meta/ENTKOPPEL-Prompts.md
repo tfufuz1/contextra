@@ -121,7 +121,7 @@ python3 tools/decouple_inspector.py -c contextra --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra --interfaces
-```
+
 
 ---
 
@@ -195,7 +195,7 @@ python3 tools/decouple_inspector.py -c contextra-adapt --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-adapt --interfaces
-```
+
 
 ---
 
@@ -273,7 +273,7 @@ python3 tools/decouple_inspector.py -c contextra-agent --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-agent --interfaces
-```
+
 
 ---
 
@@ -347,7 +347,7 @@ python3 tools/decouple_inspector.py -c contextra-audit-export --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-audit-export --interfaces
-```
+
 
 ---
 
@@ -421,7 +421,7 @@ python3 tools/decouple_inspector.py -c contextra-avv-generator --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-avv-generator --interfaces
-```
+
 
 ---
 
@@ -497,7 +497,7 @@ python3 tools/decouple_inspector.py -c contextra-checkpoint --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-checkpoint --interfaces
-```
+
 
 ---
 
@@ -576,7 +576,7 @@ python3 tools/decouple_inspector.py -c contextra-cognition --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-cognition --interfaces
-```
+
 
 ---
 
@@ -652,7 +652,7 @@ python3 tools/decouple_inspector.py -c contextra-core --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-core --interfaces
-```
+
 
 ---
 
@@ -727,7 +727,7 @@ python3 tools/decouple_inspector.py -c contextra-crypto --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-crypto --interfaces
-```
+
 
 ---
 
@@ -806,7 +806,7 @@ python3 tools/decouple_inspector.py -c contextra-db --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-db --interfaces
-```
+
 
 ---
 
@@ -880,7 +880,7 @@ python3 tools/decouple_inspector.py -c contextra-durable-fs --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-durable-fs --interfaces
-```
+
 
 ---
 
@@ -961,7 +961,7 @@ python3 tools/decouple_inspector.py -c contextra-engine --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-engine --interfaces
-```
+
 
 ---
 
@@ -1039,7 +1039,7 @@ python3 tools/decouple_inspector.py -c contextra-erasure --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-erasure --interfaces
-```
+
 
 ---
 
@@ -1116,7 +1116,7 @@ python3 tools/decouple_inspector.py -c contextra-graph --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-graph --interfaces
-```
+
 
 ---
 
@@ -1192,7 +1192,7 @@ python3 tools/decouple_inspector.py -c contextra-infer-candle --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-infer-candle --interfaces
-```
+
 
 ---
 
@@ -1267,7 +1267,7 @@ python3 tools/decouple_inspector.py -c contextra-infer-ollama --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-infer-ollama --interfaces
-```
+
 
 ---
 
@@ -1341,7 +1341,7 @@ python3 tools/decouple_inspector.py -c contextra-infer-onnx --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-infer-onnx --interfaces
-```
+
 
 ---
 
@@ -1416,7 +1416,7 @@ python3 tools/decouple_inspector.py -c contextra-ingest --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-ingest --interfaces
-```
+
 
 ---
 
@@ -1494,7 +1494,7 @@ python3 tools/decouple_inspector.py -c contextra-kvcache --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-kvcache --interfaces
-```
+
 
 ---
 
@@ -1568,7 +1568,7 @@ python3 tools/decouple_inspector.py -c contextra-license --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-license --interfaces
-```
+
 
 ---
 
@@ -1645,7 +1645,7 @@ python3 tools/decouple_inspector.py -c contextra-mcp --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-mcp --interfaces
-```
+
 
 ---
 
@@ -1720,7 +1720,7 @@ python3 tools/decouple_inspector.py -c contextra-mvcc --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-mvcc --interfaces
-```
+
 
 ---
 
@@ -1796,7 +1796,7 @@ python3 tools/decouple_inspector.py -c contextra-ports --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-ports --interfaces
-```
+
 
 ---
 
@@ -1871,7 +1871,7 @@ python3 tools/decouple_inspector.py -c contextra-privacy --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-privacy --interfaces
-```
+
 
 ---
 
@@ -1945,7 +1945,7 @@ python3 tools/decouple_inspector.py -c contextra-py --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-py --interfaces
-```
+
 
 ---
 
@@ -2019,7 +2019,7 @@ python3 tools/decouple_inspector.py -c contextra-rank --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-rank --interfaces
-```
+
 
 ---
 
@@ -2096,7 +2096,7 @@ python3 tools/decouple_inspector.py -c contextra-router --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-router --interfaces
-```
+
 
 ---
 
@@ -2170,7 +2170,7 @@ python3 tools/decouple_inspector.py -c contextra-sandbox --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-sandbox --interfaces
-```
+
 
 ---
 
@@ -2244,7 +2244,7 @@ python3 tools/decouple_inspector.py -c contextra-simd --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-simd --interfaces
-```
+
 
 ---
 
@@ -2321,7 +2321,7 @@ python3 tools/decouple_inspector.py -c contextra-store --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-store --interfaces
-```
+
 
 ---
 
@@ -2395,7 +2395,7 @@ python3 tools/decouple_inspector.py -c contextra-sys --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-sys --interfaces
-```
+
 
 ---
 
@@ -2471,7 +2471,7 @@ python3 tools/decouple_inspector.py -c contextra-testkit --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-testkit --interfaces
-```
+
 
 ---
 
@@ -2547,7 +2547,7 @@ python3 tools/decouple_inspector.py -c contextra-text --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-text --interfaces
-```
+
 
 ---
 
@@ -2622,7 +2622,7 @@ python3 tools/decouple_inspector.py -c contextra-types --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-types --interfaces
-```
+
 
 ---
 
@@ -2701,7 +2701,7 @@ python3 tools/decouple_inspector.py -c contextra-vector --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-vector --interfaces
-```
+
 
 ---
 
@@ -2775,7 +2775,7 @@ python3 tools/decouple_inspector.py -c contextra-wire --dead-code
 
 # 4. Öffentliche Schnittstellen & API-Lecks prüfen:
 python3 tools/decouple_inspector.py -c contextra-wire --interfaces
-```
+
 
 ---
 

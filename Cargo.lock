@@ -836,18 +836,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-core"
-version = "0.1.0"
-dependencies = [
- "contextra-mvcc",
- "contextra-ports",
- "contextra-types",
- "contextra-wire",
- "proptest",
- "tokio",
-]
-
-[[package]]
 name = "contextra-crypto"
 version = "0.1.0"
 dependencies = [
@@ -919,7 +907,9 @@ dependencies = [
 name = "contextra-durable-fs"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "contextra-sys",
+ "contextra-types",
  "tempfile",
 ]
 
@@ -1190,7 +1180,6 @@ dependencies = [
  "proptest",
  "serde",
  "thiserror 2.0.20",
- "tokio",
  "tracing",
 ]
 
@@ -1269,14 +1258,9 @@ name = "contextra-router"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
- "bytes",
  "contextra-adapt",
- "contextra-db",
- "contextra-graph",
  "contextra-ports",
- "contextra-text",
  "contextra-types",
- "contextra-vector",
  "contextra-wire",
  "criterion",
  "parking_lot 0.12.5",

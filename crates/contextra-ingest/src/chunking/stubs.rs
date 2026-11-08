@@ -12,7 +12,6 @@
 
 use crate::canonical::CanonicalText;
 use crate::chunking::config::ChunkingConfig;
-use crate::chunking::fallback::FallbackChunker;
 use crate::chunking::{ChunkDraft, IrChunker};
 use crate::error::IngestError;
 use crate::format::ChunkStrategy;
@@ -74,24 +73,8 @@ pub use email_impl::EmailChunker;
 #[path = "structured/mod.rs"]
 mod structured_impl;
 
+#[path = "paged/mod.rs"]
+mod paged_impl;
+
+pub use paged_impl::PagedChunker;
 pub use structured_impl::StructuredChunker;
-
-#[derive(Debug, Default)]
-// ANCHOR[contextra-ingest:CHK-0238]
-// struct `PagedChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
-pub struct PagedChunker;
-
-impl IrChunker for PagedChunker {
-    fn strategy(&self) -> ChunkStrategy {
-        ChunkStrategy::Paged
-    }
-
-    fn draft(
-        &self,
-        ir: &DocumentIr,
-        canon: &CanonicalText,
-        cfg: &ChunkingConfig,
-    ) -> Result<Vec<ChunkDraft>, IngestError> {
-        paged_impl::draft_paged(ir, canon, cfg)
-    }
-}

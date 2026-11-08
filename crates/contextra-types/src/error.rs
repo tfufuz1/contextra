@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! Fehlertypen für `Contextra`.
 //!
 //! # Architektur-Rolle: Ring 0 (Kanonische Fehlerdefinition)
@@ -30,6 +31,10 @@ use thiserror::Error;
 /// Errors that can occur during HNSW graph deletion and repair operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-types:ERR-001]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
+)]
 pub enum HnswDeletionError {
     /// Target node with doc_id not found in graph.
     #[error("Node for doc_id {0:?} not found in HNSW index")]

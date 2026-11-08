@@ -22,7 +22,7 @@ pub enum QuarantinePolicy {
     /// `suspicious_injection_detected: true` wird gesetzt.
     ///
     /// Nutze diesen Modus ausschließlich in vertrauenswürdigen, kontrollierten Umgebungen,
-    /// in denen nachgelagerte Komponenten das Flag garantiert auswerten.
+    /// in denen nachgelagerte Komponenten das Flag deterministisch auswerten.
     FlagOnly,
 
     /// Text wird zurückgehalten/redigiert UND der Vorfall wird in ein separates Sicherheits-Audit-Log geschrieben.

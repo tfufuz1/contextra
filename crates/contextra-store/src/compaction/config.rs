@@ -5,7 +5,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-11T10:21:34Z (SESSION: 31ada253)
 // ZWECK: Size-Tiered Compaction Strategy (STCS) für SSTables
-// INVARIANTEN: Compaction löscht nur Tombstones, die von keinem gepinnten Snapshot mehr benötigt werden
+// INVARIANTEN: Compaction bereinigt nur Tombstones, die von keinem gepinnten Snapshot mehr benötigt werden
 // NICHT-OFFENSICHTLICH: Multi-Version-Merging behält die höchste Sequence Number
 // SIEHE AUCH: lsm.rs, sstable.rs, DECISIONS.md
 
@@ -18,10 +18,10 @@
 
 // INVARIANT: Background Compaction (STCS — Size-Tiered Compaction Strategy).
 // ALGORITHMUS: Gruppiere SSTables nach Größenklasse → Merge wenn >= min_sstables_per_tier.
-// TOMBSTONE-GC: Tombstones werden NUR gelöscht wenn seq < min_active_seqno (MVCC-SAFE).
+// TOMBSTONE-GC: Tombstones werden NUR bereinigt wenn seq < min_active_seqno (MVCC-SAFE).
 // ATOMARER SWAP: Merge unter read-lock, SSTable-Liste swap unter write-lock.
 // INVARIANTE-COMP-1: Merge-Iterator liest alle Kandidaten-SSTables vollständig. Kein Key-Value-Paar geht verloren.
-// INVARIANTE-COMP-2: Tombstone-GC löscht Tombstones nur wenn seq < min_active_snapshot.
+// INVARIANTE-COMP-2: Tombstone-GC bereinigt Tombstones nur wenn seq < min_active_snapshot.
 // INVARIANTE-COMP-3: Atomarer SSTable-Swap: Alte SSTables bleiben lesbar (über Arc) bis swap, neue Datei ist vollständig fsynced.
 // LIFECYCLE: run_loop() -> maybe_compact() -> select_candidates() -> merge_sstables()
 //
