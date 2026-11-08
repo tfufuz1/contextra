@@ -300,9 +300,22 @@ impl BlockCache {
             .map(|_| BlockCacheShard::new(cap_shard))
             .collect();
 
+        // P28 / B11: Deterministic documented seeds for BlockCache shard hashing.
+        // Golden ratio & Pi fractional hex constants provide strong avalanche distribution
+        // across shards without non-deterministic entropy initialization.
+        const BLOCK_CACHE_SEED_0: u64 = 0x9e37_79b9_7f4a_7c15;
+        const BLOCK_CACHE_SEED_1: u64 = 0x243f_6a88_85a3_08d3;
+        const BLOCK_CACHE_SEED_2: u64 = 0x1319_8a2e_0370_7344;
+        const BLOCK_CACHE_SEED_3: u64 = 0xa409_3822_299f_31d0;
+
         Self {
             shards,
-            hash_builder: ahash::RandomState::new(),
+            hash_builder: ahash::RandomState::with_seeds(
+                BLOCK_CACHE_SEED_0,
+                BLOCK_CACHE_SEED_1,
+                BLOCK_CACHE_SEED_2,
+                BLOCK_CACHE_SEED_3,
+            ),
         }
     }
 

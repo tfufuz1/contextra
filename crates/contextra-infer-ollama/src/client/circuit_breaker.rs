@@ -1,4 +1,4 @@
-use contextra_ports::Clock;
+use crate::traits::Clock;
 use parking_lot::Mutex;
 use std::time::Duration;
 

@@ -375,9 +375,12 @@ impl<S: StorageEngine + 'static> TextPurger<S> {
             let new_docs = current_docs.saturating_sub(1);
             let new_tokens = current_tokens.saturating_sub(doc_len as u64);
             let new_avg_len = if new_docs > 0 {
-                ((new_tokens as f64 / new_docs as f64) * 1000.0)
-                    .round()
-                    .clamp(0.0, u64::MAX as f64) as u64
+                let ratio = (new_tokens as f64) / (new_docs as f64);
+                if ratio.is_finite() && ratio >= 0.0 {
+                    (ratio * 1000.0).round().clamp(0.0, u64::MAX as f64) as u64
+                } else {
+                    0
+                }
             } else {
                 0
             };

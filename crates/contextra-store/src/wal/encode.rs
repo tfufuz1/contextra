@@ -70,7 +70,7 @@ pub enum WalVersion {
 /// A batch of prepared WAL entries bound to a specific HMAC chain.
 ///
 /// `PreparedBatch` has a private inner field and cannot be constructed outside `wal.rs`.
-/// It can only be created by calling [`Wal::prepare_batch`].
+/// It can only be created by calling [`crate::wal::Wal::prepare_batch`].
 #[derive(Debug, Clone)]
 pub struct PreparedBatch(pub(crate) Vec<WalEntry>);
 

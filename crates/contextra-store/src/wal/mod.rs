@@ -331,7 +331,7 @@ pub static FAIL_APPEND_AFTER_PARTIAL_BYTES: std::sync::atomic::AtomicU64 =
 pub static FAIL_APPEND_PARTIAL_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 // ANCHOR[contextra-store:WAL-CORE-001]
 /// Konfigurationsoptionen für das Write-Ahead-Log (WAL).
 ///
@@ -342,6 +342,19 @@ pub struct WalConfig {
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
+    pub id_gen: Option<Arc<dyn contextra_ports::IdGen>>,
+}
+
+impl std::fmt::Debug for WalConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WalConfig")
+            .field("key_manager", &self.key_manager)
+            .field("allow_legacy_integrity_key_fallback", &self.allow_legacy_integrity_key_fallback)
+            .field("min_wal_version", &self.min_wal_version)
+            .field("flusher_config", &self.flusher_config)
+            .field("id_gen", &self.id_gen.as_ref().map(|_| "Arc<dyn IdGen>"))
+            .finish()
+    }
 }
 
 impl Default for WalConfig {
@@ -351,6 +364,7 @@ impl Default for WalConfig {
             allow_legacy_integrity_key_fallback: false,
             min_wal_version: WalVersion::V3,
             flusher_config: WalFlusherConfig::default(),
+            id_gen: None,
         }
     }
 }
@@ -358,6 +372,11 @@ impl Default for WalConfig {
 impl WalConfig {
     pub fn with_legacy_fallback(mut self, allow: bool) -> Self {
         self.allow_legacy_integrity_key_fallback = allow;
+        self
+    }
+
+    pub fn with_id_gen(mut self, id_gen: Arc<dyn contextra_ports::IdGen>) -> Self {
+        self.id_gen = Some(id_gen);
         self
     }
 }
@@ -561,7 +580,7 @@ impl Wal {
         };
 
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
@@ -621,7 +640,7 @@ impl Wal {
         // the filesystem path — renaming or moving the file cannot cause nonce-
         // reuse between two WAL instances sharing the same master key.
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid(&path).await?;
+            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;

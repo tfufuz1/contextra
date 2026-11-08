@@ -5,7 +5,11 @@ impl contextra_ports::LlmTextGenerator for OllamaClient {
         &'a self,
         prompt: &'a str,
     ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<String>> {
-        Box::pin(async move { self.generate_text(&self.config().model, prompt).await })
+        Box::pin(async move {
+            self.generate_text(&self.config().model, prompt)
+                .await
+                .map_err(Into::into)
+        })
     }
 }
 
@@ -28,7 +32,7 @@ impl contextra_ports::LlmTextGeneratorStreaming for OllamaClient {
                 .await;
 
             if let Err(err) = res {
-                let _ = tx.send(Err(err)).await;
+                let _ = tx.send(Err(err.into())).await;
             }
         });
 
@@ -50,7 +54,9 @@ impl contextra_ports::SegmentSynthesizer for OllamaClient {
                  abstrakten Wissensaussage zusammen (max. 2 Sätze, keine Detailwiederholungen):\n\n\
                  {combined}\n\nAbstrakte Zusammenfassung:"
             );
-            self.generate_text(&self.config().model, &prompt).await
+            self.generate_text(&self.config().model, &prompt)
+                .await
+                .map_err(Into::into)
         })
     }
 

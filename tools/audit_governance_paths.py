@@ -229,6 +229,10 @@ def build_report():
     return "\n".join(output)
 
 def main():
+    if '--help' in sys.argv or '-h' in sys.argv:
+        print('audit_governance_paths.py — Audits governance and harness path structures.')
+        print('Usage: python3 tools/audit_governance_paths.py [--help]')
+        sys.exit(0)
     report = build_report()
     target_doc = "docs/spec/GOVERNANCE-PATHS.md"
     os.makedirs(os.path.dirname(target_doc), exist_ok=True)

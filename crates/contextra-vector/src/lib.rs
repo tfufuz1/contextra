@@ -27,6 +27,9 @@
     clippy::wrong_self_convention
 )]
 
+pub mod error;
+pub mod types;
+
 #[cfg(feature = "experimental-diskann")]
 pub mod diskann;
 pub mod distance;
@@ -55,3 +58,4 @@ pub use persistence::{HnswHeader, MmapIndex};
 pub use quantize::ScalarQuantizer;
 #[cfg(feature = "experimental-rabitq")]
 pub use quantize_rabitq::RaBitQQuantizer;
+pub use types::{Clock, DistanceMetric, DocId, Maintain, MetricsSink, Rng, ScoredDocument, TxId};

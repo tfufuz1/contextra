@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
 """
-loc.py - Counts lines of Rust production code per crate under crates/.
+loc.py - Counts lines of Rust production code per crate under crates/ and benchmarks/.
 
 Rule definition:
-- Target: Rust files (.rs) under crates/
+- Target: Rust files (.rs) under crates/ and benchmarks/
 - Excluded paths: containing /tests/, /benches/, /target/, or files named *_test.rs or *_tests.rs
 - Line definition: Code line if it is non-empty and not purely a comment line (single-line // or block comment /* ... */).
 - No external dependencies, Python 3 standard library only.
 """
 
-import sys
-import os
+from __future__ import annotations
+
+import argparse
 import json
+import os
+import sys
+from pathlib import Path
 
-CORE_CRATES = ['contextra-types', 'contextra-ports', 'contextra-mvcc', 'contextra-crypto', 'contextra-vector', 'contextra-text', 'contextra-store', 'contextra-durable-fs', 'contextra-simd', 'contextra-sys', 'contextra-rank', 'contextra-erasure', 'contextra-engine', 'contextra']
+CORE_CRATES = [
+    'contextra-types', 'contextra-ports', 'contextra-mvcc', 'contextra-crypto',
+    'contextra-vector', 'contextra-text', 'contextra-store', 'contextra-durable-fs',
+    'contextra-simd', 'contextra-sys', 'contextra-rank', 'contextra-erasure',
+    'contextra-engine', 'contextra'
+]
 
-def count_loc(filepath):
+def count_loc(filepath: str) -> int:
     try:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
@@ -57,21 +66,29 @@ def count_loc(filepath):
             loc += 1
     return loc
 
-def analyze_crates(crates_dir="crates"):
+def analyze_directory(base_dir: str, target_crate: str | None = None) -> dict:
     results = {}
-    if not os.path.exists(crates_dir):
+    if not os.path.exists(base_dir):
         return results
 
-    for crate in sorted(os.listdir(crates_dir)):
-        crate_path = os.path.join(crates_dir, crate)
-        if not os.path.isdir(crate_path):
+    for entry in sorted(os.listdir(base_dir)):
+        entry_path = os.path.join(base_dir, entry)
+        if not os.path.isdir(entry_path):
+            continue
+
+        # If Cargo.toml exists, this directory is a crate
+        cargo_path = os.path.join(entry_path, "Cargo.toml")
+        if not os.path.isfile(cargo_path):
+            continue
+
+        crate_name = entry
+        if target_crate and crate_name != target_crate:
             continue
 
         crate_files = []
         total_crate_loc = 0
 
-        for root, dirs, files in os.walk(crate_path):
-            # Prune excluded directories from traversal
+        for root, dirs, files in os.walk(entry_path):
             for excluded in ["target", "tests", "benches"]:
                 if excluded in dirs:
                     dirs.remove(excluded)
@@ -79,10 +96,8 @@ def analyze_crates(crates_dir="crates"):
             for f in sorted(files):
                 if f.endswith('.rs') and not (f.endswith('_test.rs') or f.endswith('_tests.rs')):
                     full_path = os.path.normpath(os.path.join(root, f))
-                    # Normalize path separators to forward slashes for cross-platform consistency
                     rel_path = full_path.replace('\\', '/')
 
-                    # Secondary check for excluded path components
                     path_parts = rel_path.split('/')
                     if 'tests' in path_parts or 'benches' in path_parts:
                         continue
@@ -95,7 +110,7 @@ def analyze_crates(crates_dir="crates"):
                     total_crate_loc += lines
 
         crate_files.sort(key=lambda x: x["path"])
-        results[crate] = {
+        results[crate_name] = {
             "loc": total_crate_loc,
             "files_count": len(crate_files),
             "files": crate_files,
@@ -103,17 +118,20 @@ def analyze_crates(crates_dir="crates"):
 
     return results
 
-def main():
-    as_json = False
-    if "--json" in sys.argv or "-j" in sys.argv:
-        as_json = True
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Zählt produktive Rust-Zeilen (LOC) je Crate.")
+    parser.add_argument("--crate", "-c", help="Nur ein spezifisches Crate analysieren")
+    parser.add_argument("--json", "-j", action="store_true", help="JSON-Format für Maschinenlesbarkeit")
+    args = parser.parse_args()
 
-    crate_data = analyze_crates("crates")
+    crate_data = {}
+    for base in ["crates", "benchmarks"]:
+        crate_data.update(analyze_directory(base, args.crate))
 
     total_loc = sum(v["loc"] for v in crate_data.values())
     core_loc = sum(v["loc"] for k, v in crate_data.items() if k in CORE_CRATES)
 
-    if as_json:
+    if args.json:
         output_obj = {
             "summary": {
                 "core_loc": core_loc,
@@ -125,7 +143,7 @@ def main():
         }
         print(json.dumps(output_obj, indent=2, sort_keys=True))
     else:
-        print("Code-Zeilen (LOC) je Crate unter crates/:")
+        print("Code-Zeilen (LOC) je Crate (crates/ und benchmarks/):")
         print("=" * 60)
         for crate in sorted(crate_data.keys()):
             info = crate_data[crate]
@@ -135,5 +153,7 @@ def main():
         print(f"Gesamtsumme (alle {len(crate_data)} Crates): {total_loc} Zeilen")
         print(f"Kernprodukt-Summe ({len(CORE_CRATES)} Kern-Crates): {core_loc} Zeilen")
 
+    return 0
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
