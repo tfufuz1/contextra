@@ -54,6 +54,8 @@ pub struct LsmStorage {
     pub(super) commit_mutex: tokio::sync::Mutex<()>,
     /// Mutex to serialize flush executions and prevent duplicate SST / double-release races (H4c).
     pub(super) flush_mutex: tokio::sync::Mutex<()>,
+    /// Write-fencing coordinator between Flush and Purge (SPEC §3.5, WP-STO-5).
+    pub(crate) flush_purge_fence: super::fence::FlushPurgeFence,
     /// Pending sealed WAL files awaiting SST flush and cleanup (H4a + H4b).
     pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,

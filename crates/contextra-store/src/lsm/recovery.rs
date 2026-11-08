@@ -600,6 +600,7 @@ impl LsmStorage {
             health,
             commit_mutex: tokio::sync::Mutex::new(()),
             flush_mutex: tokio::sync::Mutex::new(()),
+            flush_purge_fence: super::fence::FlushPurgeFence::new(),
             pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),
             cancel_token,
             task_tracker,

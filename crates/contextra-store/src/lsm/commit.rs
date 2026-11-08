@@ -74,18 +74,7 @@ impl LsmStorage {
             return;
         }
         if tx_id.inner() < TxId::INTERNAL_BASE {
-            let mut current = self.last_committed_tx.load(Ordering::Acquire);
-            while tx_id.inner() > current {
-                match self.last_committed_tx.compare_exchange_weak(
-                    current,
-                    tx_id.inner(),
-                    Ordering::SeqCst,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => break,
-                    Err(actual) => current = actual,
-                }
-            }
+            super::fence::publish_visibility(&self.last_committed_tx, tx_id.inner());
         }
     }
 
