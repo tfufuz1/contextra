@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-09T00:00:00Z (SESSION: CANDLE-EMBEDDING-PROVIDER)
 // ZWECK: Conformance integration tests for CandleEmbedClient as EmbeddingProvider.
 // INVARIANTEN: embedding_dim() strictly equals output vector length to prevent HNSW index corruption.
 
@@ -8,8 +6,6 @@
 //! # Zweck
 //! Verifiziert, dass `CandleEmbedClient` das Port-Trait exakt einhält (Vektordimensionen,
 //! Batch-Grenzen und Fehlerzustände).
-
-// ANCHOR[contextra-infer-candle:TEST-EMBED-CONFORMANCE]
 use candle_core::Device;
 use contextra_infer_candle::embedding::CandleEmbedInner;
 use contextra_infer_candle::model_registry::ModelFingerprint;

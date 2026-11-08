@@ -15,7 +15,6 @@
     clippy::disallowed_types
 )]
 
-
 use contextra_ports::clock::Clock;
 use contextra_router::profile::ProfileCalibrationState;
 use contextra_router::{
@@ -70,11 +69,21 @@ impl MockCollection {
         Self::default()
     }
 
-    async fn insert(&self, key: &str, vector: &[f32], metadata: Option<serde_json::Value>) -> Result<()> {
+    async fn insert(
+        &self,
+        key: &str,
+        vector: &[f32],
+        metadata: Option<serde_json::Value>,
+    ) -> Result<()> {
         let text = metadata
-            .and_then(|m| m.get("text").and_then(|t| t.as_str().map(|s| s.to_string())))
+            .and_then(|m| {
+                m.get("text")
+                    .and_then(|t| t.as_str().map(|s| s.to_string()))
+            })
             .unwrap_or_else(|| key.to_string());
-        self.docs.write().push((key.to_string(), vector.to_vec(), text));
+        self.docs
+            .write()
+            .push((key.to_string(), vector.to_vec(), text));
         Ok(())
     }
 }
@@ -100,10 +109,16 @@ impl contextra_ports::HybridSearchProvider for CollectionAdapter {
                 .map(|(key, vec, text)| {
                     let mut score = 0.0f32;
                     if !query_embedding.is_empty() && query_embedding.len() == vec.len() {
-                        let dot: f32 = query_embedding.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
+                        let dot: f32 = query_embedding
+                            .iter()
+                            .zip(vec.iter())
+                            .map(|(a, b)| a * b)
+                            .sum();
                         score += dot.clamp(0.0, 1.0);
                     }
-                    if !query_text.is_empty() && (text.contains(query_text) || query_text.contains(&text)) {
+                    if !query_text.is_empty()
+                        && (text.contains(query_text) || query_text.contains(&text))
+                    {
                         score += 0.5;
                     }
                     if score <= 0.0 {
@@ -180,7 +195,12 @@ struct ContextraConfig {
     _reserved: u64,
 }
 impl Default for ContextraConfig {
-    fn default() -> Self { Self { dimension: 4, _reserved: 0 } }
+    fn default() -> Self {
+        Self {
+            dimension: 4,
+            _reserved: 0,
+        }
+    }
 }
 
 struct Contextra {
@@ -188,7 +208,9 @@ struct Contextra {
 }
 impl Contextra {
     async fn open_with_config(_path: &std::path::Path, _cfg: ContextraConfig) -> Result<Self> {
-        Ok(Self { collection: MockCollection::new() })
+        Ok(Self {
+            collection: MockCollection::new(),
+        })
     }
     async fn collection(&self, _name: &str) -> Result<MockCollection> {
         Ok(self.collection.clone())

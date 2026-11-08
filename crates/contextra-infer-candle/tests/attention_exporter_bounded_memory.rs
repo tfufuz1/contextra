@@ -5,8 +5,6 @@
 //! # Zweck
 //! Stellt sicher, dass bei Überschreiten des Limits (`MAX_TRACKED_REQUESTS = 256`)
 //! ältere Einträge nach dem FIFO-Prinzip verdrängt werden und kein Speicherleck entsteht.
-
-// ANCHOR[contextra-infer-candle:TEST-ATTENTION-BOUNDED-MEMORY]
 use contextra_infer_candle::{CandleAttentionExporter, MAX_TRACKED_REQUESTS};
 use contextra_ports::{AttentionExporter, RequestId};
 

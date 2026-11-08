@@ -11,11 +11,17 @@ use contextra_types::{DocId, RequestContext, Result};
 use super::config::HnswConfigBuilder;
 use super::types::{HnswIndex, VectorData};
 
-/// LayerScanner-Implementierung für `WitnessLayer::HnswIndex`.
+/// Neutrale Scan- und Validierungsroutine für Vektorknoten.
+///
+/// Gemäß D-E1 als Prüfprimitiv isoliert.
+#[deprecated(
+    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach contextra-erasure"
+)]
 pub struct HnswScanner {
     index: Arc<HnswIndex>,
 }
 
+#[allow(deprecated)]
 impl HnswScanner {
     /// Erzeugt einen neuen `HnswScanner`.
     pub fn new(index: Arc<HnswIndex>) -> Self {
@@ -192,10 +198,15 @@ impl HnswScanner {
 }
 
 /// Erzeugt einen `Arc<dyn LayerScanner>` für einen HNSW Index.
+#[allow(deprecated)]
+#[deprecated(
+    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach contextra-erasure"
+)]
 pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner> {
     Arc::new(HnswScanner::new(index))
 }
 
+#[allow(deprecated)]
 impl HnswScanner {
     /// Führt den Schicht-Scan für den HNSW-Index aus.
     pub fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> Result<()> {
@@ -209,6 +220,7 @@ impl HnswScanner {
     }
 }
 
+#[allow(deprecated)]
 impl LayerScanner for HnswScanner {
     fn layer(&self) -> WitnessLayer {
         WitnessLayer::HnswIndex

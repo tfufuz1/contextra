@@ -82,6 +82,7 @@ contextra-types = {{ path = "crates/contextra-types" }}
 contextra-ports = {{ path = "crates/contextra-ports" }}
 contextra-testkit = {{ path = "crates/contextra-testkit" }}
 contextra-graph = {{ path = "crates/contextra-graph" }}
+contextra-erasure-spi = {{ path = "crates/contextra-erasure-spi" }}
 ahash = {{ version = "0.8", features = ["serde"] }}
 arc-swap = "1.7"
 bincode = "1.3.3"

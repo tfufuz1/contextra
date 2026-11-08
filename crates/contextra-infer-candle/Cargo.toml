@@ -28,14 +28,12 @@ half = "2.4"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-rank = { workspace = true }
-contextra-crypto = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { workspace = true }
-contextra-crypto = { workspace = true, features = ["kv-encryption"] }
 
 [[bench]]
 name = "kv_bridge_bench"
@@ -45,7 +43,7 @@ required-features = ["kv-bridge"]
 [features]
 default = []
 candle = []
-kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
+kv-bridge = ["dep:bincode"]
 kv-stage-b = ["dep:bincode"]
 cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 test-utils = []

@@ -1,0 +1,325 @@
+{
+  "tool_name": "dead_code_microprobe.py",
+  "title": "Dead Code & Unused Item Microprobe Diagnostic",
+  "description": "Identifies unreferenced private functions, types, constants, #[allow(dead_code)] suppressions, and deprecated items across crates.",
+  "timestamp": "2026-11-07T22:58:49.146511+00:00",
+  "metrics": {
+    "dead_code_candidates": 32,
+    "allow_dead_code_attributes": 0,
+    "deprecated_attributes": 6,
+    "total_findings": 38
+  },
+  "findings_count": 38,
+  "findings": [
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 38,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Identisch zu TenantId::SYSTEM \u2014 nutze SYSTEM f\u00fcr Klarheit.\")]"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 41,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Identisch zu TenantId::SYSTEM \u2014 nutze SYSTEM f\u00fcr Klarheit.\")]"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 145,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Nutze inner()\")]"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 207,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Nutze inner()\")]"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 316,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Nutze inner()\")]"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 462,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Nutze inner()\")]"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 511,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'contextra_error_display_no_panic' appears unused in crate (freq=1)",
+      "snippet": "function contextra_error_display_no_panic"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 772,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_fusion_weights_never_panics' appears unused in crate (freq=1)",
+      "snippet": "function prop_fusion_weights_never_panics"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 406,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_sigma' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_sigma"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 409,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_delta' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_delta"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 412,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_gamma' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_gamma"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 415,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_iterations' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_iterations"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 418,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_top_k_expansion' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_top_k_expansion"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 421,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_hyperedge_sort_size' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_hyperedge_sort_size"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 481,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_warn_on_non_convergence' appears unused in crate (freq=1)",
+      "snippet": "function default_warn_on_non_convergence"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 142,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_valid_key_is_ok' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_valid_key_is_ok"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 149,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_from_empty_returns_err' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_from_empty_returns_err"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 162,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'tx_id_ordering_is_consistent' appears unused in crate (freq=1)",
+      "snippet": "function tx_id_ordering_is_consistent"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 418,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tx_id_range_isolation' appears unused in crate (freq=1)",
+      "snippet": "function prop_tx_id_range_isolation"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 427,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tx_id_overflow_isolation' appears unused in crate (freq=1)",
+      "snippet": "function prop_tx_id_overflow_isolation"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 177,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_docid_serialization' appears unused in crate (freq=1)",
+      "snippet": "function prop_docid_serialization"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 185,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_from_key_deterministic' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_from_key_deterministic"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 192,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_from_key_never_panics' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_from_key_never_panics"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 197,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_empty_key_is_err' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_empty_key_is_err"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 202,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_txid_serialization' appears unused in crate (freq=1)",
+      "snippet": "function prop_txid_serialization"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 210,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_entityid_serialization' appears unused in crate (freq=1)",
+      "snippet": "function prop_entityid_serialization"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 100,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_distance_metric_symmetry_and_non_negativity' appears unused in crate (freq=1)",
+      "snippet": "function prop_distance_metric_symmetry_and_non_negativity"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 117,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_embedding_normalize_is_idempotent' appears unused in crate (freq=1)",
+      "snippet": "function prop_embedding_normalize_is_idempotent"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 110,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tombstone_bit_invariants' appears unused in crate (freq=1)",
+      "snippet": "function prop_tombstone_bit_invariants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 122,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tenant_scoped_isolation' appears unused in crate (freq=1)",
+      "snippet": "function prop_tenant_scoped_isolation"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 148,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_config_fingerprint_bit_exact_floats' appears unused in crate (freq=1)",
+      "snippet": "function prop_config_fingerprint_bit_exact_floats"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 160,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_model_fingerprint_serde_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_model_fingerprint_serde_roundtrip"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 32,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_doc_id_from_key_properties' appears unused in crate (freq=1)",
+      "snippet": "function prop_doc_id_from_key_properties"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 54,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_entity_id_from_key_properties' appears unused in crate (freq=1)",
+      "snippet": "function prop_entity_id_from_key_properties"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 76,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tx_id_ordering_and_display' appears unused in crate (freq=1)",
+      "snippet": "function prop_tx_id_ordering_and_display"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 98,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_collection_id_invariants' appears unused in crate (freq=1)",
+      "snippet": "function prop_collection_id_invariants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 113,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_importance_score_clamping' appears unused in crate (freq=1)",
+      "snippet": "function prop_importance_score_clamping"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 125,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_token_budget_consumption' appears unused in crate (freq=1)",
+      "snippet": "function prop_token_budget_consumption"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Zusammenfassung der technischen Schulden",
+      "content": "| Kategorie | Anzahl | Beschreibung |\n|---|---|---|\n| Unused Private Items | 32 | Private Funktionen, Structs oder Consts ohne Aufrufer im Crate |\n| `#[allow(dead_code)]` | 0 | Unterdr\u00fcckte Dead-Code-Warnungen |\n| `#[deprecated]` | 6 | Veraltete Relikte zur Entfernung |"
+    }
+  ]
+}

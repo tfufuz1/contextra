@@ -3,8 +3,6 @@
 //! # Zweck
 //! Prüft die Textgenerierung (Batch und Stream), Modell-Austausch mit Kalibrierungsinvalidierung
 //! (INV-CAL-2), Concurrency-Limits, Backpressure-Verhalten und Timeouts.
-
-// ANCHOR[contextra-infer-candle:TESTS-INFERENCE-MOD]
 use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
@@ -33,7 +31,6 @@ impl CandleModelInner for MockCandleModel {
 }
 
 /// Prüft die synchrone Batch-Textgenerierung über den `CandleLlmClient`.
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-GENERATE]
 #[tokio::test]
 async fn test_candle_llm_client_generate() {
     let mock_model = Box::new(MockCandleModel {
@@ -68,7 +65,6 @@ async fn test_candle_llm_client_generate() {
 }
 
 /// Prüft die Streaming-Textgenerierung und Token-Callbacks über den `CandleLlmClient`.
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-STREAM]
 #[tokio::test]
 async fn test_candle_llm_client_generate_stream() {
     use futures_util::StreamExt;
@@ -505,7 +501,6 @@ fn test_llm_from_dir_corrupt_gguf() {
 }
 
 /// Prüft, dass der Austausch des Modells zur Laufzeit die Kalibrierung des Validators invalidiert (INV-CAL-2).
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-SWAP-MODEL-CALIBRATION]
 #[tokio::test]
 async fn test_candle_llm_client_swap_model_invalidates_validator_calibration() {
     use crate::gasp::GaspConfig;
@@ -662,7 +657,6 @@ async fn test_inference_backpressure_single_permit_awaits() {
 }
 
 /// Prüft die Konfiguration des Concurrency-Limits und die entsprechende Initialisierung des Semaphors.
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-CONCURRENCY-LIMIT]
 #[tokio::test]
 async fn test_inference_configurable_concurrency_limit() {
     let mock_model = Box::new(MockCandleModel {
@@ -694,7 +688,6 @@ async fn test_inference_configurable_concurrency_limit() {
 }
 
 /// Prüft, dass ein Concurrency-Limit von 0 automatisch auf mindestens 1 angehoben wird.
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-ZERO-CONCURRENCY-CLAMP]
 #[tokio::test]
 async fn test_inference_zero_concurrency_limit_clamped_to_one() {
     let mock_model = Box::new(MockCandleModel {
@@ -758,9 +751,7 @@ async fn test_candle_llm_client_with_kv_bridge() {
 }
 
 /// Prüft das Backpressure-Verhalten: Zweite Inferenz wartet asynchron auf die Fertigstellung der ersten.
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-BACKPRESSURE]
 /// Prüft, dass bei Abbruch/Timeout einer Inferenz keine Semaphor-Permits verloren gehen (No Permit Leak).
-// ANCHOR[contextra-infer-candle:TEST-INFERENCE-TIMEOUT-NO-LEAK]
 #[tokio::test]
 async fn test_inference_timeout_cancellation_releases_no_permit_leak() {
     let slow_model = Box::new(SlowCandleModel {

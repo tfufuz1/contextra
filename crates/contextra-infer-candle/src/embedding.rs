@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z (SESSION: BACKPRESSURE-CONTRACT-D1)
 // ZWECK: Native Candle ML vector embedding client implementation.
 // INVARIANTEN: Thread safety via Arc<tokio::sync::Mutex<Box<dyn CandleEmbedInner>>>; vector dimension matches model.dim. Zero unsafe code in production via VarBuilder::from_buffered_safetensors.
 // NICHT-OFFENSICHTLICH: CandleEmbedInner trait enables mock-based unit testing without binary weights in CI.
@@ -8,6 +6,7 @@
 use crate::model_registry::ModelFingerprint;
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
+use crate::CandleQuantization;
 use candle_transformers::models::bert::{BertModel, Config, DTYPE};
 use contextra_types::{ContextraError, Result};
 use std::path::Path;
@@ -85,6 +84,54 @@ impl CandleEmbedClient {
     }
 
     /// Loads a `CandleEmbedClient` from a model directory.
+
+    /// Loads BERT model weights and tokenizer from a Vfs interface.
+    pub fn from_vfs(
+        vfs: &dyn contextra_ports::Vfs,
+        model_dir: &Path,
+        quantization: CandleQuantization,
+    ) -> Result<Self> {
+        let tok_path = model_dir.join("tokenizer.json");
+        let tokenizer = if vfs.exists(&tok_path)? {
+            let tok_bytes = vfs.read(&tok_path)?;
+            tokenizers::Tokenizer::from_bytes(&tok_bytes).map_err(|e| {
+                ContextraError::Internal(format!("Failed to parse tokenizer from Vfs {}: {e}", tok_path.display()))
+            })?
+        } else {
+            let json = r#"{"version": "1.0", "truncation": null, "padding": null, "added_tokens": [], "normalizer": null, "pre_tokenizer": null, "post_processor": null, "decoder": null, "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }}"#;
+            tokenizers::Tokenizer::from_bytes(json.as_bytes()).map_err(|e| {
+                ContextraError::Internal(format!("Failed to parse default tokenizer: {e}"))
+            })?
+        };
+
+        let gguf_path = model_dir.join("model.gguf");
+        let fingerprint = if vfs.exists(&gguf_path)? {
+            crate::model_registry::compute_fingerprint_from_vfs(vfs, &gguf_path, &quantization)?
+        } else {
+            crate::model_registry::ModelFingerprint {
+                hash: [0u8; 32],
+                model_id: model_dir
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+                quantization: quantization.to_string(),
+            }
+        };
+
+        let device = Device::Cpu;
+        let weights_path = model_dir.join("model.safetensors");
+        let config_path = model_dir.join("config.json");
+
+        let model: Box<dyn CandleEmbedInner + Send> = if vfs.exists(&weights_path)? {
+            Box::new(BertEmbedModel::load_from_vfs(vfs, &weights_path, &config_path, &device)?)
+        } else {
+            Box::new(DefaultCandleEmbedModel { dim: 384 })
+        };
+
+        Ok(Self::new(device, model, fingerprint, tokenizer))
+    }
+
     pub fn from_dir(
         model_dir: &std::path::Path,
         quantization: crate::model_registry::CandleQuantization,
@@ -181,6 +228,34 @@ pub struct BertEmbedModel {
 
 impl BertEmbedModel {
     /// Loads BERT model weights from a `.safetensors` file and configuration from `config.json`.
+
+    /// Loads BERT model weights via VFS from `.safetensors`.
+    pub fn load_from_vfs(
+        vfs: &dyn contextra_ports::Vfs,
+        weights_path: &Path,
+        _config_path: &Path,
+        device: &Device,
+    ) -> Result<Self> {
+        let weights_bytes = vfs.read(weights_path)?;
+        let vb = VarBuilder::from_buffered_safetensors(weights_bytes, DTYPE, device).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Failed to load BERT safetensors weights via Vfs from {}: {e}",
+                weights_path.display()
+            ))
+        })?;
+        let config = Config::default();
+        let model = BertModel::load(vb, &config).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Failed to initialize BertModel via Vfs from {}: {e}",
+                weights_path.display()
+            ))
+        })?;
+        Ok(Self {
+            model,
+            dim: config.hidden_size,
+        })
+    }
+
     pub fn load(weights_path: &Path, _config_path: &Path, device: &Device) -> Result<Self> {
         // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         let weights_bytes = std::fs::read(weights_path).map_err(|e| {

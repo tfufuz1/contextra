@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z
 // ZWECK: Robust GGUF model container header parser, metadata extractor, and binary validator for Candle models.
 // INVARIANTEN: Zero panic or unbuffered allocation on corrupt files; memory limits enforced before allocation; SHA-256 verification.
 
@@ -353,6 +351,48 @@ fn validate_gguf_header_and_offsets<R: Read>(
     }
 
     Ok(())
+}
+
+
+/// Inspects a GGUF model file accessed via the `Vfs` port trait and extracts its metadata.
+pub fn parse_gguf_metadata_from_vfs(
+    vfs: &dyn contextra_ports::Vfs,
+    model_path: &Path,
+) -> Result<GgufMetadata, ContextraError> {
+    let bytes = vfs.read(model_path)?;
+    if bytes.len() < 24 {
+        return Err(ContextraError::ModelLoad {
+            path: model_path.display().to_string(),
+            reason: format!("File size too small for GGUF header: {} bytes", bytes.len()),
+        });
+    }
+
+    let mut cursor = std::io::Cursor::new(&bytes);
+    validate_gguf_header_and_offsets(&mut cursor, model_path, bytes.len() as u64)?;
+
+    let mut cursor = std::io::Cursor::new(&bytes);
+    let content = candle_core::quantized::gguf_file::Content::read(&mut cursor).map_err(|e| {
+        ContextraError::ModelLoad {
+            path: model_path.display().to_string(),
+            reason: format!("Failed to parse GGUF container content from Vfs: {e}"),
+        }
+    })?;
+
+    let architecture = content
+        .metadata
+        .get("general.architecture")
+        .and_then(|v| v.to_string().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let metadata_keys = content.metadata.keys().cloned().collect();
+    let tensor_count = content.tensor_infos.len();
+
+    Ok(GgufMetadata {
+        architecture,
+        tensor_count,
+        metadata_keys,
+    })
 }
 
 #[cfg(test)]

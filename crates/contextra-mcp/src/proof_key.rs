@@ -83,6 +83,7 @@ pub(crate) fn resolve_proof_key(
 /// Liest den Proof-Schlüssel aus den Prozess-Umgebungsvariablen
 /// (`CONTEXTRA_PROOF_KEY` und `CONTEXTRA_PROOF_KEY`), ruft die reine Auflösungsfunktion auf
 /// und gibt bei Warnzuständen einmalige `tracing::warn!`-Meldungen aus.
+#[deprecated(note = "Proof key handling moves to contextra-erasure")]
 pub fn proof_key_from_env() -> Result<Zeroizing<String>, McpError> {
     let res = crate::proof_key_env::resolve_proof_key_from_env();
     res.key

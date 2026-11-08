@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z
 // ZWECK: Generation sampling configuration with explicit RNG seed, temperature, top_p, context length, and token budget limits.
 
 use contextra_types::ContextraError;

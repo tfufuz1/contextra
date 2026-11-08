@@ -1,0 +1,2275 @@
+{
+  "tool_name": "pattern_diagnostic.py",
+  "title": "Anti-Pattern & Invariant Violation Diagnostic Report",
+  "description": "Comprehensive audit of Zero-Panic (unwrap/expect), Determinism (Clock/Rng/Hash), Memory Mapping (mmap), Direct I/O, and \u00a76.4 Forbidden Wording invariants.",
+  "timestamp": "2026-11-07T22:58:41.513098+00:00",
+  "metrics": {
+    "total_findings": 225,
+    "production_violations": 49,
+    "test_violations": 176,
+    "category_zero_panic": 223,
+    "category_determinism": 0,
+    "category_memory_mapping": 0,
+    "category_direct_io": 0,
+    "category_forbidden_wording": 2
+  },
+  "findings_count": 225,
+  "findings": [
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 579,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                                 , err),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 595,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                                          , err),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 610,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                               , parse_err),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1008,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "panic!(                                                   );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1059,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "dto.details.expect(                 ).get(          ),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1076,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                              , err_model),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1089,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                                            , err_orphan),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1121,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                                    ),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 1140,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                                  ),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 559,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let details = dto.details.as_ref().expect(                      );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 563,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let json_str = serde_json::to_string(&dto).expect(                 );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 565,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "serde_json::from_str(&json_str).expect(                   );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/model_fingerprint.rs",
+      "line": 74,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let json = serde_json::to_string(&fp).expect(                      );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/model_fingerprint.rs",
+      "line": 76,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "serde_json::from_str(&json).expect(                        );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/schema.rs",
+      "line": 113,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "ManifestSchemaVersion::from_u8(1).unwrap(),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/schema.rs",
+      "line": 117,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "ManifestSchemaVersion::from_u8(2).unwrap(),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/tombstone.rs",
+      "line": 93,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let arr: [u8; 8] = bytes.as_slice().try_into().expect(         );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 128,
+      "category": "FORBIDDEN_WORDING",
+      "severity": "HIGH",
+      "description": "Forbidden wording (\u00a76.4): 'guaranteed'",
+      "snippet": "/// RAII reservation structure for guaranteed atomicity & drop-refund against double-spend.",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 467,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "tracker.consume_memory(500).expect(                );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 480,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "tracker.consume_memory(900).expect(                );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 484,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "match result.err().unwrap() {",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 491,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "_ => panic!(                                     ),",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 500,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "tracker.consume_memory(949).expect(    );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 503,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "tracker.consume_memory(1).expect(    );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 519,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "t.consume_memory(10).expect(         );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 525,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "h.join().unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 548,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": ".expect(                                                );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 562,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "tracker.consume_memory(500).unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 636,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let reservation = budget.reserve(200).expect(                            );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 651,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let _res = budget.reserve(300).expect(                            );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 682,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let res1 = t1.join().unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/budget.rs",
+      "line": 683,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let res2 = t2.join().unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 218,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&filter).unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/filter.rs",
+      "line": 219,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: FilterExpr = serde_json::from_str(&ser).unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 642,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let w = FusionWeights::new(0.5, 0.5, 0.0).expect(       );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 654,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "panic!(                             );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 682,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 696,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": ".expect(          );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 698,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(query.text_query.unwrap(),             );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 699,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(query.vector_query.unwrap(), vec![0.1, 0.2]);",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 710,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let weights = FusionWeights::new(0.4, 0.5, 0.1).unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 714,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 721,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let query = HybridQuery::builder().build().unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 766,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Invocation of panic!() macro",
+      "snippet": "panic!(                             );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 807,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&window).unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 808,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: ContextWindow = serde_json::from_str(&ser).unwrap();",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 814,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": ".expect(       )",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 870,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": "let chunk: ContextChunk = serde_json::from_str(json).expect(             );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 922,
+      "category": "ZERO_PANIC",
+      "severity": "HIGH",
+      "description": "Call to .expect() in code",
+      "snippet": ".expect(                    );",
+      "in_test": false
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 48,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(DistanceMetric::Cosine.compute(&a, &b).unwrap(), 1.0);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 51,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "DistanceMetric::Euclidean.compute(&a, &b).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 55,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(DistanceMetric::DotProduct.compute(&a, &b).unwrap(), 0.0);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 64,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(DistanceMetric::Euclidean.compute_u8(&a, &b).unwrap(), 14);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 67,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "DistanceMetric::DotProduct.compute_u8(&a, &b).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 74,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "DistanceMetric::Cosine.compute_u8(&orth_a, &orth_b).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 78,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(DistanceMetric::Cosine.compute_u8(&a, &a).unwrap(), 0);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 98,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 107,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 116,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 126,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 135,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 160,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let u8_close = metric.compute_u8(&query, &close_vec).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 161,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let u8_far = metric.compute_u8(&query, &far_vec).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 163,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let f32_close = metric.compute(&q_f32, &c_f32).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 164,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let f32_far = metric.compute(&q_f32, &f_f32).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 216,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "DistanceMetric::Cosine.compute(&empty_a, &empty_b).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 222,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 228,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 236,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert!((DistanceMetric::Cosine.compute(&a1, &b1).unwrap() - 0.0).abs() < 1e-6);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 238,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(DistanceMetric::Euclidean.compute(&a1, &b1).unwrap(), 1.0);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/doc_tests.rs",
+      "line": 240,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(DistanceMetric::DotProduct.compute(&a1, &b1).unwrap(), -12.0);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 19,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(TenantId::try_new(42).unwrap().inner(), 42);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 20,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(TenantId::try_new(42).unwrap().as_u64(), 42);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 22,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "TenantId::try_from(100u64).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 23,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "TenantId::try_new(100).unwrap()",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 34,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let t1 = TenantId::try_new(1).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 35,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let t2 = TenantId::try_new(2).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 53,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tenant = TenantId::try_new(987654321).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 54,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let serialized = serde_json::to_string(&tenant).expect(                               );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 58,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "serde_json::from_str(&serialized).expect(                                 );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 81,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id1 = DocId::from_key(key).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 82,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id2 = DocId::from_key(key).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 89,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tenant = TenantId::try_new(1).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 94,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let collection = CollectionId::try_new(42).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 110,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let doc_id = DocId::from_key(key).expect(                                            );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 113,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "EntityId::from_key(key).expect(                                               );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 143,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id = DocId::from_key(               ).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 264,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tx1 = allocate_simulated(&simulated_next_tx).expect(                                      );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 269,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tx2 = allocate_simulated(&simulated_next_tx).expect(                                      );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 274,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tx3 = allocate_simulated(&simulated_next_tx).expect(                                  );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 305,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let doc_id = DocId::from_key(&key).expect(                        );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 326,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let doc_id1 = DocId::from_key(key).expect(                        );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 327,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let doc_id2 = DocId::from_key(key).expect(                        );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 331,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let ent_id1 = EntityId::from_key(key).expect(                           );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 332,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let ent_id2 = EntityId::from_key(key).expect(                           );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 370,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tx0 = TxId::try_from_internal_offset(0).expect(                         );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 374,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tx_mid = TxId::try_from_internal_offset(500_000).expect(                            );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 381,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "TxId::try_from_internal_offset(max_offset).expect(                                 );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 403,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tx = TxId::try_from_internal_offset(offset).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 419,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tx = TxId::try_from_internal_offset(offset).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 442,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let t = TenantId::try_new(42).expect(                 );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 468,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Invocation of panic!() macro",
+      "snippet": "Err(e) => panic!(                                    ),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 21,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let json = serde_json::to_string(&state).expect(                         );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 25,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "serde_json::from_str(&json).expect(                           );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 40,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let t = TenantId::try_new(10).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 41,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&t).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 42,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: TenantId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 46,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&c).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 47,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: CollectionId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 52,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&doc).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 53,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: DocId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 58,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&tx).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 59,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: TxId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 64,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&ent).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 65,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: EntityId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 85,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let entity_json = serde_json::to_string(&entity).expect(                      );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 86,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let deser_entity: Entity = serde_json::from_str(&entity_json).expect(                        );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 103,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let edge_json = serde_json::to_string(&edge).expect(                    );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 104,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let deser_edge_rt: Edge = serde_json::from_str(&edge_json).expect(                      );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 112,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser_edge: Edge = serde_json::from_str(json_legacy).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 120,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser_edge_old: Edge = serde_json::from_str(json_old).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 132,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let valid_ent = Entity::try_new(EntityId::new(1),        ,         ).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 138,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let valid_edge = Edge::try_new(EntityId::new(1), EntityId::new(2),        , 0.8).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 160,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&variant).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 165,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: MemoryType = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 170,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser_legacy: MemoryType = serde_json::from_str(&legacy_json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 179,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&doc).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 180,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: DocId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 186,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id1 = DocId::from_key(&s).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 187,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id2 = DocId::from_key(&s).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 204,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&tx).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 205,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: TxId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 212,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let ser = serde_json::to_string(&ent).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 213,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: EntityId = serde_json::from_str(&ser).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 26,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist_id = DistanceMetric::Cosine.compute(&a, &identical).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 30,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist_opp = DistanceMetric::Cosine.compute(&a, &opposite).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 34,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist_orth = DistanceMetric::Cosine.compute(&a, &orthogonal).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 44,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist = DistanceMetric::Euclidean.compute(&a, &b).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 48,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist_rev = DistanceMetric::Euclidean.compute(&b, &a).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 59,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist = DistanceMetric::DotProduct.compute(&a, &b).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 104,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist_xy = DistanceMetric::Euclidean.compute(&vx, &vy).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 105,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let dist_yx = DistanceMetric::Euclidean.compute(&vy, &vx).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 110,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let cos_xy = DistanceMetric::Cosine.compute(&vx, &vy).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 21,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let t_id = TenantId::try_new(42).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 28,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json = serde_json::to_string(&ctx).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 29,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: RequestContext = serde_json::from_str(&json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 41,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json = serde_json::to_string(&saga).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 42,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: SagaRecord = serde_json::from_str(&json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 50,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_m = serde_json::to_string(&method).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 51,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser_m: ScanMethod = serde_json::from_str(&json_m).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 60,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tenant1 = TenantId::try_new(100).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 61,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tenant2 = TenantId::try_new(200).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 73,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": ".expect(                              );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 84,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Invocation of panic!() macro",
+      "snippet": "panic!(                                     );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 95,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let arr: [u8; 8] = tombstone_bytes.as_slice().try_into().unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 112,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let arr: [u8; 8] = tombstone_bytes.as_slice().try_into().unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 123,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let t1 = TenantId::try_new(t1_raw).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 124,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let t2 = TenantId::try_new(t2_raw).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_dto_and_schema_suite.rs",
+      "line": 35,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let details_val = dto_details.details.unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 16,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let bytes = bincode::serialize(&doc_id).expect(                            );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 24,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "bincode::deserialize(&bytes).expect(                              );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 40,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "bincode::deserialize(&bytes).expect(                              );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 48,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let bytes = bincode::serialize(&tx_id).expect(                            );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 51,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let deserialized: TxId = bincode::deserialize(&bytes).expect(                              );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 57,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tenant_id = TenantId::try_new(100).expect(              );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 58,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let bytes = bincode::serialize(&tenant_id).expect(                            );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/golden_bytes_suite.rs",
+      "line": 62,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "bincode::deserialize(&bytes).expect(                              );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 33,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json1 = serde_json::to_string(&fp1).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 34,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json2 = serde_json::to_string(&fp3).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 107,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let res1 = budget.reserve(300).expect(                   );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 111,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let _res2 = budget.reserve(400).expect(                    );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 135,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "tracker.consume_memory(5 * 1024 * 1024).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 139,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "tracker.consume_memory(4_800_000).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 162,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json = serde_json::to_string(&fp).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 163,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: ModelFingerprint = serde_json::from_str(&json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 172,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let json = serde_json::to_string(val).expect(                );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 173,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let deser: T = serde_json::from_str(&json).expect(                  );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 37,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let id = res.expect(                                         );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 47,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id2 = DocId::from_key(&s).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 59,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let id = res.expect(                                            );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 61,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let id2 = EntityId::from_key(&s).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 104,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let c = res.expect(                                     );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 153,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let e_ok = Entity::try_new(EntityId::new(10),             ,            ).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 167,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let edge_ok = Edge::try_new(EntityId::new(1), EntityId::new(2),             , 1.5).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 271,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let parsed = ManifestSchemaVersion::from_u8(byte).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 21,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tenant = TenantId::try_new(999).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 22,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_t = serde_json::to_string(&tenant).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 24,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(serde_json::from_str::<TenantId>(     ).unwrap(), tenant);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 26,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "serde_json::from_str::<TenantId>(   ).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 30,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let collection = CollectionId::try_new(500).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 31,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_c = serde_json::to_string(&collection).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 34,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "serde_json::from_str::<CollectionId>(     ).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 39,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_d = serde_json::to_string(&doc).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 41,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(serde_json::from_str::<DocId>(           ).unwrap(), doc);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 44,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_e = serde_json::to_string(&entity_id).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 47,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "serde_json::from_str::<EntityId>(           ).unwrap(),",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 52,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_tx = serde_json::to_string(&tx).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 54,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(serde_json::from_str::<TxId>(        ).unwrap(), tx);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 57,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json_step = serde_json::to_string(&step).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 59,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "assert_eq!(serde_json::from_str::<StepId>(    ).unwrap(), step);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 83,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let tenant = TenantId::try_new(42).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 84,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let bytes_t = bincode::serialize(&tenant).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 87,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let coll = CollectionId::try_new(10).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 88,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let bytes_c = bincode::serialize(&coll).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 92,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let bytes_tx = bincode::serialize(&tx).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 98,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let bytes_d = bincode::serialize(&doc).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 104,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let bytes_d = bincode::serialize(&doc).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 130,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 132,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json = serde_json::to_string_pretty(&query).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 133,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: HybridQuery = serde_json::from_str(&json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 157,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let window_json = serde_json::to_string(&window).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 158,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let window_deser: ContextWindow = serde_json::from_str(&window_json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 164,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap()",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 167,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": ".unwrap()",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 182,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json = serde_json::to_string(&state).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 185,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: WorkflowState = serde_json::from_str(&json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 204,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let json = serde_json::to_string(&entity).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/serde_roundtrips_suite.rs",
+      "line": 205,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .unwrap() in code",
+      "snippet": "let deser: Entity = serde_json::from_str(&json).unwrap();",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 2,
+      "category": "FORBIDDEN_WORDING",
+      "severity": "HIGH",
+      "description": "Forbidden wording (\u00a76.4): 'garantiert'",
+      "snippet": "//! Garantiert, dass Werte nicht ohne die korrekte TenantId entpackt werden k\u00f6nnen.",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 11,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tenant_id = TenantId::try_new(42).expect(                 );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 20,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tenant = TenantId::try_new(100).expect(                 );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 26,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "assert_eq!(result.expect(                ), value);",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 32,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let owner_tenant = TenantId::try_new(100).expect(                    );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 33,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let requester_tenant = TenantId::try_new(200).expect(                        );",
+      "in_test": true
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/tenant_scope_isolation.rs",
+      "line": 59,
+      "category": "ZERO_PANIC",
+      "severity": "LOW",
+      "description": "Call to .expect() in code",
+      "snippet": "let tenant_id = TenantId::try_new(777).expect(                 );",
+      "in_test": true
+    }
+  ],
+  "sections": [
+    {
+      "header": "Kategorien-\u00dcbersicht",
+      "content": "| Kategorie | Funde Gesamt | Beschreibung |\n|---|---|---|\n| `ZERO_PANIC` | 223 | `unwrap()`, `expect()`, `panic!()` in Code |\n| `DETERMINISM` | 0 | Zeit/Zufall/Hasher ohne Ports (P28) |\n| `MEMORY_MAPPING` | 0 | Verbotene mmap-Nutzung (D-94) |\n| `DIRECT_IO` | 0 | Direkte std::fs Umgehung von Vfs |\n| `FORBIDDEN_WORDING` | 2 | Garantieversprechen / DSGVO-Labels (\u00a76.4) |"
+    }
+  ]
+}

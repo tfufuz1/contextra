@@ -11,9 +11,9 @@
 //! - Weitergabe von Profil-Durability in die LSM-Konfiguration.
 //! - Crash-/Reopen-Persistenz geschriebener Datensätze.
 
+use contextra::performance_profile::DurabilityMode;
 use contextra::performance_profile::PerformanceProfile;
 use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
-use contextra::performance_profile::DurabilityMode;
 use tempfile::TempDir;
 
 // ANCHOR[contextra:TEST-WIR-001]

@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-22T00:00:00Z
 // ZWECK: Prefix reuse helper structs, context, and key/seed builders for KV cache stage B (Spec §9.2).
 // INVARIANTEN: Zero-Panic doctrine; at least 1 token must be computed forward during prefill to obtain logits.
 
