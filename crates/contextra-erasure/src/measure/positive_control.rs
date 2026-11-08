@@ -4,7 +4,7 @@
 //! Nur `measure`-intern erlaubt (L-5).
 
 use crate::types_local::ControlEvidence;
-use contextra_ports::vfs::Vfs;
+use crate::types_local::Vfs;
 use std::path::Path;
 
 /// Führt eine echte Positivkontrolle im Speicher durch:

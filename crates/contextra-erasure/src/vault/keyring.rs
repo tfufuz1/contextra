@@ -10,7 +10,7 @@ use crate::error::ErasureError;
 use crate::types_local::{FileId, FileKey, FileKeyring, FileKind};
 use crate::vault::slot::SlotType;
 use crate::vault::FileVault;
-use contextra_ports::BoxFuture;
+use futures_util::future::BoxFuture;
 use parking_lot::RwLock;
 use std::sync::Arc;
 

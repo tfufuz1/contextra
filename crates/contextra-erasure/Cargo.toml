@@ -13,15 +13,16 @@ description = "Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Beri
 ring = "3"
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-
+ahash = { workspace = true }
+rand = "0.8"
+subtle = "2.6"
+aes-gcm-siv = "0.11"
 thiserror = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
-blake3 = { workspace = true }
+blake3 = "1.8"
 sha2 = "0.10"
 hmac = "0.12"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
@@ -29,6 +30,7 @@ bytes = { workspace = true }
 parking_lot = { workspace = true }
 futures-util = "0.3"
 tokio = { workspace = true }
+bincode = "1.3"
 
 [dev-dependencies]
 tempfile = { workspace = true }

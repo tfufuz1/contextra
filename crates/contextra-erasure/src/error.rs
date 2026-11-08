@@ -5,9 +5,28 @@ use thiserror::Error;
 /// Oberster Fehlertyp des Löschkerns.
 #[derive(Debug, Error)]
 pub enum ErasureError {
+    /// Nicht unterstützte Beweis-Version.
+    #[error("unsupported proof version: {0}")]
+    UnsupportedProofVersion(u8),
+    /// Ungültige Beweis-Signatur.
+    #[error("invalid proof signature")]
+    InvalidProofSignature,
+    /// Schlüssel wurde widerrufen.
+    #[error("key revoked: {0}")]
+    KeyRevoked(String),
+
     /// I/O-Fehler (D-55): nach diesem Fehler darf derselbe Handle nie wieder verwendet werden.
     #[error("erasure-io: {0}")]
     Io(#[from] std::io::Error),
+    /// Speicherfehler.
+    #[error("storage error: {0}")]
+    Storage(String),
+    /// Integritätsverletzung.
+    #[error("integrity violation")]
+    IntegrityViolation,
+    /// Krypto-Fehler.
+    #[error("crypto error: {0}")]
+    CryptoError(String),
 
     /// Kryptografischer Fehler (AEAD, MAC-Verifizierung fehlgeschlagen).
     #[error("erasure-crypto: {0}")]

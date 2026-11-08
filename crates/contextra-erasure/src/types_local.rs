@@ -1406,7 +1406,7 @@ pub trait VfsExt {
 /// In-Memory-VfsFile Adapter für In-Memory Vfs.
 pub struct MemoryVfsFile {
     data: std::sync::Arc<parking_lot::RwLock<Vec<u8>>>,
-    vfs_raw: std::sync::Arc<dyn contextra_ports::vfs::Vfs>,
+    vfs_raw: std::sync::Arc<dyn crate::types_local::Vfs>,
     path: std::path::PathBuf,
 }
 
@@ -1414,7 +1414,7 @@ impl MemoryVfsFile {
     /// Erzeugt ein MemoryVfsFile aus vorhandenen Bytes.
     pub fn new(
         data: Vec<u8>,
-        vfs_raw: std::sync::Arc<dyn contextra_ports::vfs::Vfs>,
+        vfs_raw: std::sync::Arc<dyn crate::types_local::Vfs>,
         path: std::path::PathBuf,
     ) -> Self {
         Self {
@@ -1538,7 +1538,7 @@ pub trait VfsFile: Send + Sync {
 
 /// Öffnet eine Datei im VFS als positionelles `VfsFile` Handle (In-Memory-Simulation).
 pub fn open_vfs_file(
-    vfs: std::sync::Arc<dyn contextra_ports::vfs::Vfs>,
+    vfs: std::sync::Arc<dyn crate::types_local::Vfs>,
     path: &std::path::Path,
     opts: &VfsOpenOptions,
 ) -> Result<Box<dyn VfsFile>, crate::error::ErasureError> {
@@ -1567,4 +1567,698 @@ pub fn open_vfs_file(
         Vec::new()
     };
     Ok(Box::new(MemoryVfsFile::new(data, vfs, path.to_path_buf())))
+}
+
+// =========================================================================
+// Autarke Basis- & Porttypen (Klasse A Entkopplung)
+// =========================================================================
+
+/// Mandanten-Identifikator.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+pub struct TenantId(pub u64);
+
+impl TenantId {
+    /// Erzeugt eine neue `TenantId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Liefert den internen `u64`-Wert.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for TenantId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TenantId({})", self.0)
+    }
+}
+
+/// Collection-Identifikator.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+pub struct CollectionId(pub u64);
+
+impl CollectionId {
+    /// Erzeugt eine neue `CollectionId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Liefert den internen `u64`-Wert.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for CollectionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CollectionId({})", self.0)
+    }
+}
+
+/// Dokument-Identifikator.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+pub struct DocId(pub u64);
+
+impl DocId {
+    /// Erzeugt eine neue `DocId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Liefert den internen `u64`-Wert.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+
+    /// Erzeugt eine `DocId` aus einem Schlüssel mittels BLAKE3.
+    pub fn from_key(key: &str) -> Result<Self, crate::error::ErasureError> {
+        if key.is_empty() {
+            return Err(crate::error::ErasureError::Internal(
+                "Key cannot be empty".to_string(),
+            ));
+        }
+        let hash = blake3::hash(key.as_bytes());
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(&hash.as_bytes()[..8]);
+        Ok(Self(u64::from_le_bytes(buf)))
+    }
+}
+
+impl fmt::Display for DocId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DocId({})", self.0)
+    }
+}
+
+/// Transaktions-Identifikator.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+pub struct TxId(pub u64);
+
+impl TxId {
+    /// Erzeugt eine neue `TxId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Liefert den internen `u64`-Wert.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for TxId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TxId({})", self.0)
+    }
+}
+
+/// RequestContext für Löschoperationen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequestContext {
+    /// Tenant identifier for authorization and scope isolation.
+    pub tenant_id: TenantId,
+    /// Transaction ID allocated for the operation.
+    pub tx_id: TxId,
+}
+
+impl RequestContext {
+    /// Erzeugt einen neuen `RequestContext`.
+    pub fn new(tenant_id: TenantId, tx_id: TxId) -> Self {
+        Self { tenant_id, tx_id }
+    }
+}
+
+/// Saga record containing deletion tracking state and digests.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SagaRecord {
+    /// BLAKE3 hash of deleted keys.
+    pub deleted_keys_hash: [u8; 32],
+}
+
+impl SagaRecord {
+    /// Erzeugt einen neuen `SagaRecord`.
+    pub fn new(deleted_keys_hash: [u8; 32]) -> Self {
+        Self { deleted_keys_hash }
+    }
+}
+
+/// Identifikator für die physische Storage-Schicht.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WitnessLayer {
+    /// LSM Memtable
+    LsmMemtable,
+    /// SsTable Dateien über alle Level
+    SsTableAllLevels,
+    /// HNSW Vektorgraph-Index
+    HnswIndex,
+    /// Write-Ahead-Log Segmente
+    WalAllSegments,
+    /// Compressed Sparse Row Graph
+    CsrGraph,
+    /// Key-Value Cache Segmente
+    KvCacheSegments,
+    /// In-Memory Embedding Cache
+    EmbeddingCache,
+    /// Benutzerdefinierte Schichtbezeichnung für Erweiterungen
+    Custom(String),
+}
+
+impl WitnessLayer {
+    /// Gibt den String-Namen der Schicht zurück.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::LsmMemtable => "LsmMemtable",
+            Self::SsTableAllLevels => "SsTableAllLevels",
+            Self::HnswIndex => "HnswIndex",
+            Self::WalAllSegments => "WalAllSegments",
+            Self::CsrGraph => "CsrGraph",
+            Self::KvCacheSegments => "KvCacheSegments",
+            Self::EmbeddingCache => "EmbeddingCache",
+            Self::Custom(s) => s.as_str(),
+        }
+    }
+}
+
+impl From<&str> for WitnessLayer {
+    fn from(s: &str) -> Self {
+        match s {
+            "LsmMemtable" => WitnessLayer::LsmMemtable,
+            "SsTableAllLevels" => WitnessLayer::SsTableAllLevels,
+            "HnswIndex" => WitnessLayer::HnswIndex,
+            "WalAllSegments" => WitnessLayer::WalAllSegments,
+            "CsrGraph" => WitnessLayer::CsrGraph,
+            "KvCacheSegments" => WitnessLayer::KvCacheSegments,
+            "EmbeddingCache" => WitnessLayer::EmbeddingCache,
+            other => WitnessLayer::Custom(other.to_string()),
+        }
+    }
+}
+
+impl From<String> for WitnessLayer {
+    fn from(s: String) -> Self {
+        WitnessLayer::from(s.as_str())
+    }
+}
+
+/// Angewandte Methode/Technik während der Verifikation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScanTechnique {
+    /// Direkter struktureller Scan.
+    Structural,
+    /// Scan über entschlüsselte Ansicht.
+    DecryptedView,
+    /// Index-Introspektion.
+    IndexIntrospection,
+    /// Nadel-Scan (Needle Scan).
+    NeedleScan,
+    /// Schicht wurde in der aktuellen Ausführung nicht gemessen mit Begründung.
+    NotMeasured(String),
+    /// Schichtmessung ist aufgrund der Feature-Konfiguration deaktiviert.
+    FeatureDisabled,
+}
+
+/// Scan-Methode für Berichts- und Nachweiszwecke.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScanMethod {
+    /// Direct structural scan of storage files, indices, or tables.
+    Structural,
+    /// Layer was not measured during this execution with specified reason.
+    NotMeasured(String),
+    /// Layer measurement is disabled due to feature configuration.
+    FeatureDisabled,
+}
+
+/// Zielbeschreibung des Scans inklusive Hash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScanTarget {
+    /// Bezeichner des Scan-Ziels (z. B. Tenant, Collection, Path).
+    pub target_id: String,
+    /// BLAKE3 Hash des Scan-Ziels.
+    pub target_hash: [u8; 32],
+}
+
+impl ScanTarget {
+    /// Erzeugt ein neues ScanTarget.
+    pub fn new(target_id: impl Into<String>, target_hash: [u8; 32]) -> Self {
+        Self {
+            target_id: target_id.into(),
+            target_hash,
+        }
+    }
+}
+
+/// Statistiken über bereinigte Einheiten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct PurgeStats {
+    /// Anzahl physisch bereinigter Einheiten.
+    pub purged_units: u64,
+    /// Anzahl freigegebener Bytes.
+    pub bytes_freed: u64,
+}
+
+/// Abstrakter Bezeichner für den zu bereinigenden Schlüsselbereich (SPEC v4.0 §6.2, B3).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum KeyScope {
+    /// Mandanten-Löschung.
+    Tenant(TenantId),
+    /// Collection-weite Löschung.
+    Collection {
+        /// Mandant.
+        tenant: TenantId,
+        /// Collection.
+        collection: CollectionId,
+    },
+    /// Einzelnes Dokument.
+    Document {
+        /// Mandant.
+        tenant: TenantId,
+        /// Collection.
+        collection: CollectionId,
+        /// Dokument-ID.
+        doc_id: DocId,
+    },
+}
+
+/// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
+pub trait Purger: Send + Sync {
+    /// Führt die physische Bereinigung für das gegebene Ziel aus.
+    fn purge(
+        &self,
+        ctx: &RequestContext,
+        target: &ScanTarget,
+    ) -> Result<PurgeStats, crate::error::ErasureError>;
+}
+
+/// Laufende Scan-Session zur kontrollierten Erzeugung eines `ScanWitness`.
+#[derive(Debug)]
+pub struct ScanSession {
+    layer: WitnessLayer,
+    target: ScanTarget,
+    technique: ScanTechnique,
+    scanned: u64,
+    remaining: u64,
+    control_matches: u64,
+    unit_hashes: Vec<[u8; 32]>,
+}
+
+impl ScanSession {
+    /// Startet eine neue ScanSession.
+    pub fn begin(layer: WitnessLayer, target: ScanTarget, technique: ScanTechnique) -> Self {
+        Self {
+            layer,
+            target,
+            technique,
+            scanned: 0,
+            remaining: 0,
+            control_matches: 0,
+            unit_hashes: Vec::new(),
+        }
+    }
+
+    /// Registriert eine gescannte Einheit.
+    pub fn record_unit(&mut self, unit_hash: [u8; 32], is_live_residual: bool) {
+        self.scanned = self.scanned.saturating_add(1);
+        if is_live_residual {
+            self.remaining = self.remaining.saturating_add(1);
+        }
+        self.unit_hashes.push(unit_hash);
+    }
+
+    /// Registriert eine bestandene Positivkontrolle (Control Match).
+    pub fn record_control_match(&mut self) {
+        self.control_matches = self.control_matches.saturating_add(1);
+    }
+
+    /// Schließt die Session ab und erzeugt den `ScanWitness` (gesperrter Mint-Pfad).
+    pub fn finish(mut self, clock: &dyn Clock) -> Result<ScanWitness, crate::error::ErasureError> {
+        match &self.technique {
+            ScanTechnique::FeatureDisabled => {}
+            ScanTechnique::NotMeasured(reason) => {
+                if reason.trim().is_empty() {
+                    return Err(crate::error::ErasureError::Internal(
+                        "INV-WITNESS-MINT-1 violation: NotMeasured technique requires non-empty reason".to_string(),
+                    ));
+                }
+            }
+            _ => {
+                if self.scanned == 0 {
+                    return Err(crate::error::ErasureError::Internal(
+                        "INV-WITNESS-MINT-1 violation: scanned count cannot be 0 for active scan technique".to_string(),
+                    ));
+                }
+                if self.control_matches == 0 {
+                    return Err(crate::error::ErasureError::Internal(
+                        "INV-WITNESS-MINT-1 violation: positive control check failed (control_matches == 0)".to_string(),
+                    ));
+                }
+            }
+        }
+
+        self.unit_hashes.sort();
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(self.layer.as_str().as_bytes());
+        hasher.update(format!("{:?}", self.technique).as_bytes());
+        hasher.update(&self.target.target_hash);
+        for uh in &self.unit_hashes {
+            hasher.update(uh);
+        }
+        let digest: [u8; 32] = *hasher.finalize().as_bytes();
+        let measured_at = clock.now_unix_nanos();
+
+        Ok(ScanWitness::new(
+            self.layer,
+            self.scanned,
+            self.remaining,
+            self.technique,
+            digest,
+            measured_at,
+        ))
+    }
+}
+
+/// Verifiziertes Messergebnis eines Storage-Scanners (SPEC §12.7.4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScanWitness {
+    layer: WitnessLayer,
+    scanned: u64,
+    remaining: u64,
+    technique: ScanTechnique,
+    method: ScanMethod,
+    digest: [u8; 32],
+    measured_at: u64,
+}
+
+impl ScanWitness {
+    /// Erzeugt einen neuen `ScanWitness`.
+    pub fn new(
+        layer: WitnessLayer,
+        scanned: u64,
+        remaining: u64,
+        technique: ScanTechnique,
+        digest: [u8; 32],
+        measured_at: u64,
+    ) -> Self {
+        let method = match &technique {
+            ScanTechnique::Structural
+            | ScanTechnique::DecryptedView
+            | ScanTechnique::IndexIntrospection
+            | ScanTechnique::NeedleScan => ScanMethod::Structural,
+            ScanTechnique::NotMeasured(reason) => ScanMethod::NotMeasured(reason.clone()),
+            ScanTechnique::FeatureDisabled => ScanMethod::FeatureDisabled,
+        };
+        Self {
+            layer,
+            scanned,
+            remaining,
+            technique,
+            method,
+            digest,
+            measured_at,
+        }
+    }
+
+    /// Gibt die gescannte Storage-Schicht als &str zurück.
+    pub fn layer(&self) -> &str {
+        self.layer.as_str()
+    }
+
+    /// Gibt die gescannte Storage-Schicht als &WitnessLayer zurück.
+    pub fn witness_layer(&self) -> &WitnessLayer {
+        &self.layer
+    }
+
+    /// Gibt die Anzahl der während der Verifikation gescannten Einheiten zurück.
+    pub fn scanned(&self) -> u64 {
+        self.scanned
+    }
+
+    /// Gibt die Anzahl der verbleibenden Lebendeinträge zurück.
+    pub fn remaining(&self) -> u64 {
+        self.remaining
+    }
+
+    /// Gibt die angewandte Scantechnik zurück.
+    pub fn technique(&self) -> &ScanTechnique {
+        &self.technique
+    }
+
+    /// Gibt die ScanMethod-Entsprechung zurück.
+    pub fn method(&self) -> &ScanMethod {
+        &self.method
+    }
+
+    /// Gibt den BLAKE3-Digest der Messung zurück.
+    pub fn digest(&self) -> &[u8; 32] {
+        &self.digest
+    }
+
+    /// Gibt den Zeitstempel der Messung (Unix Nanos) zurück.
+    pub fn measured_at(&self) -> u64 {
+        self.measured_at
+    }
+}
+
+/// Trait für Storage-Scanner zur Durchführung von Restmengen-Messungen.
+pub trait LayerScanner: Send + Sync {
+    /// Gibt die von diesem Scanner bediente Schicht zurück.
+    fn layer(&self) -> WitnessLayer;
+
+    /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
+    fn scan_units(
+        &self,
+        session: &mut ScanSession,
+        ctx: &RequestContext,
+    ) -> Result<(), crate::error::ErasureError>;
+
+    /// Default-Implementierung von `scan`.
+    fn scan(
+        &self,
+        ctx: &RequestContext,
+        target: ScanTarget,
+        technique: ScanTechnique,
+        clock: &dyn Clock,
+    ) -> Result<ScanWitness, crate::error::ErasureError> {
+        let mut session = ScanSession::begin(self.layer(), target, technique);
+        self.scan_units(&mut session, ctx)?;
+        session.finish(clock)
+    }
+}
+
+/// Port trait for time operations.
+pub trait Clock: Send + Sync + 'static {
+    /// Returns the current wall-clock time as nanoseconds since the Unix epoch.
+    fn now_unix_nanos(&self) -> u64;
+
+    /// Returns nanoseconds elapsed since a monotonic baseline reference point.
+    fn monotonic_nanos(&self) -> u64;
+}
+
+/// Standard implementation of [`Clock`].
+#[derive(Debug, Clone, Copy)]
+pub struct SystemClock {
+    start_instant: std::time::Instant,
+}
+
+impl SystemClock {
+    /// Creates a new [`SystemClock`].
+    #[allow(clippy::disallowed_methods)]
+    pub fn new() -> Self {
+        Self {
+            start_instant: std::time::Instant::now(),
+        }
+    }
+}
+
+impl Default for SystemClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Clock for SystemClock {
+    #[allow(clippy::disallowed_methods)]
+    fn now_unix_nanos(&self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
+            .unwrap_or(0)
+    }
+
+    #[allow(clippy::disallowed_methods)]
+    fn monotonic_nanos(&self) -> u64 {
+        let nanos = std::time::Instant::now()
+            .saturating_duration_since(self.start_instant)
+            .as_nanos();
+        u64::try_from(nanos).unwrap_or(u64::MAX)
+    }
+}
+
+impl<T: Clock + ?Sized> Clock for Arc<T> {
+    fn now_unix_nanos(&self) -> u64 {
+        (**self).now_unix_nanos()
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        (**self).monotonic_nanos()
+    }
+}
+
+/// Port trait for unique ID generation.
+pub trait IdGen: Send + Sync + 'static {
+    /// Generates and returns the next unique 64-bit unsigned identifier.
+    fn next_id(&self) -> u64;
+}
+
+/// A thread-safe sequential ID generator.
+#[derive(Debug)]
+pub struct SequentialIdGen {
+    next: std::sync::atomic::AtomicU64,
+}
+
+impl SequentialIdGen {
+    /// Creates a new [`SequentialIdGen`].
+    pub fn new(start: u64) -> Self {
+        Self {
+            next: std::sync::atomic::AtomicU64::new(start),
+        }
+    }
+}
+
+impl Default for SequentialIdGen {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
+
+impl IdGen for SequentialIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+impl<T: IdGen + ?Sized> IdGen for Arc<T> {
+    fn next_id(&self) -> u64 {
+        (**self).next_id()
+    }
+}
+
+/// Abstract object-safe Virtual File System interface for `contextra-erasure`.
+pub trait Vfs: Send + Sync + 'static {
+    /// Opens a file according to the specified options.
+    fn open(
+        &self,
+        _path: &std::path::Path,
+        _opts: &VfsOpenOptions,
+    ) -> Result<Box<dyn VfsFile>, crate::error::ErasureError> {
+        Err(crate::error::ErasureError::Io(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "positional VfsFile open is not supported by default",
+        )))
+    }
+
+    /// Reads data from byte offset `offset` into `buf` for file at `path`.
+    fn read_at(
+        &self,
+        path: &std::path::Path,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> Result<usize, crate::error::ErasureError> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_at(buf, offset)
+            .map_err(crate::error::ErasureError::Io)
+    }
+
+    /// Reads the entire contents of a file at `path`.
+    fn read(&self, path: &std::path::Path) -> Result<Vec<u8>, crate::error::ErasureError>;
+
+    /// Atomically writes `data` to `path` with crash-consistency guarantees.
+    fn write_atomic(
+        &self,
+        path: &std::path::Path,
+        data: &[u8],
+    ) -> Result<(), crate::error::ErasureError>;
+
+    /// Creates a directory and all parent directories along `path` if missing.
+    fn create_dir_all(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError>;
+
+    /// Removes a file at `path`.
+    fn remove_file(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError>;
+
+    /// Returns `true` if a file or directory exists at `path`.
+    fn exists(&self, path: &std::path::Path) -> Result<bool, crate::error::ErasureError>;
+
+    /// Returns the length in bytes of the file at `path`.
+    fn len(&self, path: &std::path::Path) -> Result<u64, crate::error::ErasureError>;
+
+    /// Lists entry names inside directory `path`.
+    fn list_dir(&self, path: &std::path::Path) -> Result<Vec<String>, crate::error::ErasureError>;
+
+    /// Flushes directory metadata to persistent storage.
+    fn sync_dir(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError>;
+}
+
+impl<T: Vfs + ?Sized> Vfs for Arc<T> {
+    fn open(
+        &self,
+        path: &std::path::Path,
+        opts: &VfsOpenOptions,
+    ) -> Result<Box<dyn VfsFile>, crate::error::ErasureError> {
+        (**self).open(path, opts)
+    }
+
+    fn read_at(
+        &self,
+        path: &std::path::Path,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> Result<usize, crate::error::ErasureError> {
+        (**self).read_at(path, offset, buf)
+    }
+
+    fn read(&self, path: &std::path::Path) -> Result<Vec<u8>, crate::error::ErasureError> {
+        (**self).read(path)
+    }
+
+    fn write_atomic(
+        &self,
+        path: &std::path::Path,
+        data: &[u8],
+    ) -> Result<(), crate::error::ErasureError> {
+        (**self).write_atomic(path, data)
+    }
+
+    fn create_dir_all(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError> {
+        (**self).create_dir_all(path)
+    }
+
+    fn remove_file(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError> {
+        (**self).remove_file(path)
+    }
+
+    fn exists(&self, path: &std::path::Path) -> Result<bool, crate::error::ErasureError> {
+        (**self).exists(path)
+    }
+
+    fn len(&self, path: &std::path::Path) -> Result<u64, crate::error::ErasureError> {
+        (**self).len(path)
+    }
+
+    fn list_dir(&self, path: &std::path::Path) -> Result<Vec<String>, crate::error::ErasureError> {
+        (**self).list_dir(path)
+    }
+
+    fn sync_dir(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError> {
+        (**self).sync_dir(path)
+    }
 }

@@ -2,6 +2,7 @@
 
 use crate::error::ErasureError;
 pub use crate::types_local::VerifiedVia;
+use crate::types_local::Vfs;
 use crate::types_local::{VfsFile, VfsOpenOptions};
 use crate::vault::open::{encode_metablock, MetablockParams, VAULT_METABLOCK_SIZE};
 use crate::vault::slot::{
@@ -9,7 +10,6 @@ use crate::vault::slot::{
     tombstone_image, verify_vault_header, SlotData, SlotType, STATUS_ACTIVE, STATUS_EMPTY,
     STATUS_TOMBSTONE, VAULT_HEADER_SIZE, VAULT_SLOT_SIZE,
 };
-use contextra_ports::vfs::Vfs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
