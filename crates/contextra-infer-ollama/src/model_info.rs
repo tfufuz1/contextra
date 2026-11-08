@@ -26,7 +26,7 @@ impl OllamaClient {
     pub async fn validate_model_available(&self, model: &str) -> Result<()> {
         crate::client::validate_model_name(model)?;
         if !self.is_model_available(model).await {
-            return Err(OllamaError::NotFound(format!(
+            return Err(OllamaError::ModelNotFound(format!(
                 "Ollama model '{}' not found. Run: ollama pull {}",
                 model, model
             )));
@@ -76,11 +76,11 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
-            return Err(OllamaError::Storage(format!(
+            return Err(OllamaError::Server(format!(
                 "Ollama show_model HTTP {status}: {body}"
             )));
         }
@@ -88,7 +88,7 @@ impl OllamaClient {
         let parsed: ShowResponse = response
             .json()
             .await
-            .map_err(|e| OllamaError::Internal(format!("Invalid Ollama show response: {e}")))?;
+            .map_err(|e| OllamaError::Deserialization(format!("Invalid Ollama show response: {e}")))?;
 
         let (param_size, quant_level) = match parsed.details {
             Some(d) => (d.parameter_size, d.quantization_level),
@@ -125,12 +125,15 @@ pub fn known_dimension(model: &str) -> Option<usize> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
+    #[cfg(feature = "http")]
+    use crate::OllamaClient;
     use super::*;
     #[cfg(feature = "http")]
     use crate::error::OllamaError;
     #[cfg(feature = "http")]
     use crate::OllamaClient;
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     #[cfg(feature = "http")]
     async fn test_validate_model_available() {
@@ -169,14 +172,15 @@ mod tests {
             .await
             .unwrap_err();
         match err {
-            OllamaError::NotFound(msg) => {
+            OllamaError::ModelNotFound(msg) => {
                 assert!(msg.contains("Ollama model 'missing-model' not found"));
                 assert!(msg.contains("Run: ollama pull missing-model"));
             }
-            _ => panic!("Expected OllamaError::NotFound, got {:?}", err),
+            _ => panic!("Expected OllamaError::ModelNotFound, got {:?}", err),
         }
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     #[cfg(feature = "http")]
     async fn test_model_info_fetch_offline_returns_io_error() {
@@ -185,8 +189,8 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
-            OllamaError::Io(e) => {
-                assert_eq!(e.kind(), std::io::ErrorKind::ConnectionRefused);
+            OllamaError::Network(e) => {
+
                 assert!(e
                     .to_string()
                     .contains("Ensure Ollama is running (`ollama serve`)"));
@@ -210,6 +214,7 @@ mod tests {
         assert_eq!(known_dimension("unknown-model-xyz"), None);
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     #[cfg(feature = "http")]
     async fn test_show_model_success_and_error_paths() {
@@ -246,6 +251,7 @@ mod tests {
         assert_eq!(info.quantization_level.as_deref(), Some("Q4_0"));
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     #[cfg(feature = "http")]
     async fn test_show_model_http_404_and_500_error_mappings() {
@@ -271,7 +277,7 @@ mod tests {
 
         let client_404 = OllamaClient::new(server_url_404);
         let err_404 = client_404.show_model("missing-model").await.unwrap_err();
-        assert!(matches!(err_404, OllamaError::NotFound(_)));
+        assert!(matches!(err_404, OllamaError::ModelNotFound(_)));
 
         // HTTP 500 test
         let listener_500 = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -295,9 +301,10 @@ mod tests {
 
         let client_500 = OllamaClient::new(server_url_500);
         let err_500 = client_500.show_model("some-model").await.unwrap_err();
-        assert!(matches!(err_500, OllamaError::Storage(_)));
+        assert!(matches!(err_500, OllamaError::Server(_)));
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     #[cfg(feature = "http")]
     async fn test_show_model_invalid_json_returns_internal_error() {
@@ -322,7 +329,7 @@ mod tests {
 
         let client = OllamaClient::new(server_url);
         let err = client.show_model("test-model").await.unwrap_err();
-        assert!(matches!(err, OllamaError::Internal(_)));
+        assert!(matches!(err, OllamaError::Deserialization(_)));
     }
 
     #[test]

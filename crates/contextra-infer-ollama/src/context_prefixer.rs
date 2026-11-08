@@ -13,9 +13,12 @@
 //! Empirisch: 49% weniger Retrieval-Fehler vs. naïves Chunking.
 //! Mit Cross-Encoder Reranking: 67% Reduktion.
 
+#[cfg(feature = "http")]
 use crate::client::xml_escape;
-use crate::error::{OllamaError, Result};
+#[cfg(feature = "http")]
 use crate::OllamaClient;
+#[cfg(feature = "http")]
+use crate::error::{OllamaError, Result};
 
 /// Konfiguration für Kontext-Präfix-Generierung.
 #[derive(Debug, Clone)]
@@ -45,7 +48,7 @@ impl Default for ContextPrefixConfig {
 /// Generiert LLM-basierte Kontext-Präfixe für Dokument-Chunks.
 ///
 /// # Verwendung
-/// ```no_run
+/// ```ignore
 /// # async fn example() -> Result<(), contextra_infer_ollama::OllamaError> {
 /// use contextra_infer_ollama::{OllamaClient, ContextPrefixEngine, ContextPrefixConfig};
 /// let client = OllamaClient::new("http://localhost:11434");
@@ -54,16 +57,27 @@ impl Default for ContextPrefixConfig {
 /// # Ok(()) }
 /// ```
 pub struct ContextPrefixEngine {
+    #[cfg(feature = "http")]
     client: OllamaClient,
-    config: ContextPrefixConfig,
+    pub config: ContextPrefixConfig,
 }
 
 /// Compatibility alias for ContextPrefixEngine.
 pub type ContextPrefixer = ContextPrefixEngine;
 
 impl ContextPrefixEngine {
+    pub fn config(&self) -> &ContextPrefixConfig {
+        &self.config
+    }
+
+    #[cfg(feature = "http")]
     pub fn new(client: OllamaClient, config: ContextPrefixConfig) -> Self {
         Self { client, config }
+    }
+
+    #[cfg(not(feature = "http"))]
+    pub fn new(config: ContextPrefixConfig) -> Self {
+        Self { config }
     }
 
     /// Generiert ein Kontext-Präfix für einen einzelnen Chunk.
@@ -72,8 +86,9 @@ impl ContextPrefixEngine {
     /// "Describe this chunk in context of the full document (1-2 sentences)."
     ///
     /// # Fehler
-    /// - `OllamaError::Storage` / `OllamaError::Io` wenn Ollama nicht erreichbar
+    /// - `ContextraError::Storage` / `ContextraError::Io` wenn Ollama nicht erreichbar
     /// - `OllamaError::InvalidInput` wenn document oder chunk leer
+    #[cfg(feature = "http")]
     pub async fn generate_prefix(
         &self,
         full_document: &str,
@@ -121,6 +136,7 @@ impl ContextPrefixEngine {
     ///
     /// Nutzt sequentielle Verarbeitung (Ollama ist single-threaded per default).
     /// Für Parallel-Verarbeitung: Mehrere ContextPrefixEngine-Instanzen nutzen.
+    #[cfg(feature = "http")]
     pub async fn generate_prefix_batch(
         &self,
         full_document: &str,
@@ -138,7 +154,7 @@ impl ContextPrefixEngine {
 }
 
 #[inline]
-fn compute_max_prefix_chars(max_prefix_tokens: usize) -> usize {
+pub fn compute_max_prefix_chars(max_prefix_tokens: usize) -> usize {
     max_prefix_tokens * 4
 }
 
@@ -318,6 +334,7 @@ mod tests {
         assert_eq!(truncate_chars("hello", 6), "hello");
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     async fn test_generate_prefix_max_prefix_tokens_prompt_assertion() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
@@ -364,6 +381,7 @@ mod tests {
         assert_eq!(prefix, "Dies ist ein Kontext-Präfix.");
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     async fn test_generate_prefix_mock() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
@@ -404,6 +422,7 @@ mod tests {
         assert_eq!(prefix, "Dies ist ein Kontext-Präfix.");
     }
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     async fn test_generate_prefix_batch_mock() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap

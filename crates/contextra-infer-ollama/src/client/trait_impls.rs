@@ -1,3 +1,4 @@
+#[cfg(feature = "ports-compat")]
 use super::core::OllamaClient;
 
 impl contextra_ports::LlmTextGenerator for OllamaClient {
