@@ -36,7 +36,7 @@ impl HnswScanner {
             .ef_search(16)
             .build()?;
 
-        let canary_index = Arc::new(HnswIndex::try_new(config)?);
+        let canary_index: Arc<HnswIndex> = Arc::new(HnswIndex::try_new(config)?);
         let canary_doc_id = DocId::new(999_999);
         let canary_vector = vec![1.0f32, 2.0, 3.0, 4.0];
 
