@@ -2,7 +2,7 @@
 //!
 //! `PurgeCx` trägt Deadline und Plattenreserve-Budget.
 
-use contextra_ports::clock::{Clock, SystemClock};
+use crate::types_local::{Clock, SystemClock};
 use std::time::Duration;
 
 /// Ausführungskontext eines Purge-Fensters (ER-20, ER-22).
