@@ -14,7 +14,7 @@ pub use reduce::reduce;
 use crate::error::ErasureError;
 use crate::saga::EraseSaga;
 use crate::types_local::ErasureId;
-use contextra_ports::vfs::Vfs;
+use crate::types_local::Vfs;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
