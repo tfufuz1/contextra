@@ -168,6 +168,56 @@ async fn test_traverse_handles_cycles_without_infinite_loop() {
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-005]
 #[tokio::test]
+async fn test_node_budgeted_cyclic_traversal_termination() {
+    let graph = CsrGraph::new();
+    let tx = TxId::new(42);
+
+    let nodes: Vec<EntityId> = (1..=5).map(EntityId::new).collect();
+    for &node in &nodes {
+        graph
+            .add_entity(
+                tx,
+                Entity::new(node, format!("Node_{}", node.inner()), "TestNode"),
+            )
+            .await
+            .unwrap();
+    }
+
+    for i in 0..5 {
+        let from = nodes[i];
+        let to = nodes[(i + 1) % 5];
+        graph
+            .add_edge(tx, Edge::new(from, to, "next").with_weight(0.9))
+            .await
+            .unwrap();
+    }
+    graph.commit(tx).await.unwrap();
+
+    let results = graph.traverse(nodes[0], 100).await.unwrap();
+    assert!(
+        !results.is_empty(),
+        "Traversal must discover reachable cyclic neighbors"
+    );
+    assert!(
+        results.len() <= nodes.len(),
+        "Traversal must not exceed the total number of nodes in cycle"
+    );
+
+    let mut seen = std::collections::HashSet::new();
+    for (entity_id, score) in results {
+        assert!(
+            seen.insert(entity_id),
+            "Duplicate node returned during cyclic traversal"
+        );
+        assert!(
+            score > 0.0 && score <= 1.0,
+            "Score must be bounded within (0.0, 1.0]"
+        );
+    }
+}
+
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-006]
+#[tokio::test]
 async fn test_multi_traverse_keeps_highest_score_per_entity() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -305,7 +355,7 @@ async fn test_staged_edges_invisible_to_concurrent_readers() {
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-008]
 #[tokio::test]
 async fn test_graph_edges_survive_storage_roundtrip() {
-    use contextra_testkit::InMemoryStorageEngine;
+    use crate::test_doubles::InMemoryStorageEngine;
 
     let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_config_and_storage(CsrGraphConfig::default(), storage.clone());
