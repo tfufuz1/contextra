@@ -10,9 +10,9 @@ use super::field::{collect_all_files, read_file_verified, ScanPlan, VerifiedVia}
 use super::positive_control::run_positive_control_vfs;
 use super::witness::{arm_scanner, finish_scan};
 use crate::error::ErasureError;
+use crate::types_local::Vfs;
+use crate::types_local::{Clock, SystemClock};
 use crate::types_local::{LayerId, LayerWitness, MeasureClass, Scanner, Unarmed};
-use contextra_ports::clock::{Clock, SystemClock};
-use contextra_ports::vfs::Vfs;
 use std::time::Duration;
 
 /// Führt einen echten Scan über alle Dateien mit vorangehender Positivkontrolle durch.
