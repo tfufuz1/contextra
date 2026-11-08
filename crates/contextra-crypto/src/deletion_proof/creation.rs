@@ -59,10 +59,11 @@ impl DeletionProof {
         }
 
         use crate::deletion_proof::LayerWitnessExt;
+        use contextra_ports::scanner::WitnessLayer;
 
         let mut covered_layers = Vec::new();
         let mut measurements = Vec::new();
-        let mut seen_layers = std::collections::HashSet::new();
+        let mut seen_layers: Vec<WitnessLayer> = Vec::new();
 
         for w in witnesses {
             if w.remaining() > 0 {
@@ -95,12 +96,13 @@ impl DeletionProof {
 
             let witness_layer = w.witness_layer().clone();
 
-            if !seen_layers.insert(witness_layer.clone()) {
+            if seen_layers.contains(&witness_layer) {
                 return Err(ContextraError::Internal(format!(
                     "INV-WITNESS-MINT-1 violation: duplicate witness layer '{:?}' in witnesses list",
                     witness_layer
                 )));
             }
+            seen_layers.push(witness_layer.clone());
 
             let mapped_layer = map_witness_layer_to_deletion_layer(&witness_layer, w)?;
 

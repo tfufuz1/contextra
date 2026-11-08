@@ -33,6 +33,7 @@
 #![forbid(unsafe_code)]
 
 use crate::crypto::KeyManager;
+#[cfg(feature = "legacy-erasure")]
 use crate::error::{CryptoError, Result};
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
@@ -103,17 +104,20 @@ impl KvCipher for KeyManager {
     }
 }
 
+#[cfg(feature = "legacy-erasure")]
 use crate::kv_shredding::KeyRegistry;
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
 // ANCHOR[contextra-crypto:KV-001]
 /// Chiffre für segmentweise verschlüsselte KV-Einträge.
+#[cfg(feature = "legacy-erasure")]
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
     registry: KeyRegistry,
 }
 
+#[cfg(feature = "legacy-erasure")]
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
@@ -213,6 +217,7 @@ impl KvSegmentCipher {
     }
 }
 
+#[cfg(feature = "legacy-erasure")]
 impl KvCipher for KvSegmentCipher {
     fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
         self.key_manager.seal(plaintext)
@@ -223,9 +228,10 @@ impl KvCipher for KvSegmentCipher {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-erasure"))]
 mod tests {
     use super::*;
+    use crate::CryptoError;
 
     fn dummy_fingerprint(id: &str) -> ModelFingerprint {
         ModelFingerprint::new([0x42u8; 32], id, "Q4_K_M")
