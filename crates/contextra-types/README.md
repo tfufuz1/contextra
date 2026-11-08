@@ -1,51 +1,44 @@
 # contextra-types
 
-Kanonische Domänenmodelle, Identifikatoren, Budgets, Filter und Fehlerstrukturen für Contextra.
+Kanonische Domänenmodelle, Identifikatoren, Budgets, Filter und Fehlerstrukturen.
 
-Normativitätsklasse: **Klasse B (Storage-Bundle)** (Ring 0; SPEC v4.0 §2, §5.2).
+Normativitätsklasse: **Klasse B (Storage-Bundle-Kerne)** gemäß SPEC v4.0.
 
 ## Rolle & Zweck
-`contextra-types` ist die Basis aller Typdefinitionen im gesamten Contextra-Ökosystem. Es enthält produkt- und I/O-unabhängige Domänentypen wie Identifikatoren (`DocId`, `TxId`, `TenantId`), Token-Budgets, Tags und den zentralen kanonischen Fehlerbaum (`ContextraError`).
+`contextra-types` ist das typisierte Fundament des Storage-Bundles im Contextra-Baukasten. Es enthält speichermodell-neutrale Domänentypen wie Identifikatoren (`DocId`, `TxId`, `TenantId`), Token-Budgets, Tags und den zentralen kanonischen Fehlerbaum (`ContextraError`).
 
-Der Crate ist vollständig autark, I/O-frei, deterministisch und enthält keine externen Laufzeit-Abhängigkeiten wie `tokio`.
+Der Baustein ist vollständig autark, I/O-frei, deterministisch und enthält keine Laufzeit- oder Speichermodell-Annahmen (LSM, HNSW, BM25).
 
-## Baukasten-Einordnung & Garantien (B1–B12)
-- **Klasse:** B (Storage-Bundle)
-- **Ring:** 0 (Typen-Kern, Fundament)
-- **Status:** 🟢 Vollständig autarker Baustein
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-- **Zero-Panic (B9):** 0 unhandled Panics oder unwrap im Produktionscode.
-- **Abhängigkeiten (B1, B2):** Keine internen Workspace-Abhängigkeiten (0 Workspace-Deps).
-  - Externe Crates: `thiserror`, `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes` (dev: `proptest`).
-- **Features (B6):** Minimal per Default (`default = []`), additiv:
-  - `docid-128`: Schaltet `DocId` von 64-Bit (`u64`) auf 128-Bit (`u128`) um (Workspace-weit gespiegelt).
-  - `auto-extraction-opt-out`: Kompatibilitätsfeature für Metadaten-Extraktion.
-- **Determinismus (B11):** Keine Systemzeit (`SystemTime::now`), kein Thread-Zufall (`thread_rng`), keine I/O-Operationen.
-- **Löschentkopplung (§6, Welle 3):** Löschtypen in `erasure.rs` und `witness.rs` sind als `#[deprecated(note = "moved to contextra-erasure")]` markiert.
-
-## Export & Standalone-Nutzung
-Der Baustein kann über das Export-Werkzeug isoliert exportiert werden:
-
+## Autarke Entnahme (B5 / SPEC §7)
 ```bash
 python3 tools/export_crate.py contextra-types --out /tmp/export-contextra-types
 ```
 
-## Einbettungsbeispiel
-Ein vollständiges, lauffähiges Beispiel findet sich unter `examples/standalone.rs`:
+## Baukasten-Eigenschaften (SPEC v4.0 Klasse B, B3–B12)
+- **Klasse:** Klasse B (Fundament des Storage-Bundles)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+- **Abhängigkeiten:** Keine internen Workspace-Abhängigkeiten (`may_depend_on = []`).
+  - Externe Dependencies: `thiserror`, `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes` (dev: `proptest`, `criterion`).
+- **Features:** Minimal per Default (`default = []`), additiv:
+  - `docid-128`: Schaltet `DocId` von 64-Bit (`u64`) auf 128-Bit (`u128`) um.
+  - `auto-extraction-opt-out`: Kompatibilitätsfeature für Metadaten-Extraktion.
+- **Determinismus:** Keine Systemzeit (`SystemTime::now`), kein Thread-Zufall (`thread_rng`), keine I/O-Operationen.
+- **Zero-Panic:** Panics und unvollständige Fehlerbehandlung in Konstruktoren und Konvertierungen sind eliminiert.
+- **Löschentkopplung (§6 / D-E1):** Löschdomänen-Typen (`erasure.rs`, `witness.rs`) sind als deprecated markiert (Migration nach `contextra-erasure`).
 
-```bash
-cargo run -p contextra-types --example standalone
-```
+## Nicht-Ziele
+- Keine Implementierung von Speicher-Engines, Indizes oder Löschprotokollen.
+- Kein I/O, keine Netzwerkaufrufe, keine Abhängigkeit von Async-Runtimes.
 
+## Minimalbeispiel
 ```rust
-use contextra_types::{DocId, RequestContext, TenantId, TxId};
+use contextra_types::{DocId, TenantId, TxId};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let tenant = TenantId::try_new(1)?;
-    let tx = TxId::new(100);
-    let ctx = RequestContext::new(tenant, tx);
-    let doc_id = DocId::from_key("document_123")?;
-    println!("Context: Tenant={}, Tx={}, DocId={}", ctx.tenant_id, ctx.tx_id, doc_id);
-    Ok(())
-}
+let doc = DocId::from_u64(42);
+let tenant = TenantId::system();
+let tx = TxId::from_u64(1);
+
+assert_eq!(doc.as_u64(), 42);
+assert!(tenant.is_system());
+assert_eq!(tx.as_u64(), 1);
 ```
