@@ -1,5 +1,8 @@
 #![allow(deprecated)]
 //! Löschtypen und typisierter Zeuge (SPEC 7.3, 7.4, 8.1, 11.2, 11.3, 12.1, 12.2, Anhang D, D-69, D-72, I-19, L-5, TY-09, TY-10, TY-13).
+//!
+//! # Deprecated
+//! Alle Löschdomänen-Typen in diesem Modul sind als deprecated markiert und nach `contextra-erasure` migriert.
 
 use core::fmt;
 use core::time::Duration;

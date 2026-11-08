@@ -1,17 +1,17 @@
 //! Kryptografische Signierung des Berichts mittels Ed25519 (SPEC §11.7, D-13, D-130, F.10, ER-27).
 //!
 //! Signatur-Domain: `"ctx/report/v1" ‖ kanonische Bytes ohne signature`
-//! Port-Integration: `contextra_ports::ReportSigner` (signer_id 0 = K_sign, 1 = Operator)
+//! Port-Integration: `crate::types_local::ReportSigner` (signer_id 0 = K_sign, 1 = Operator)
 //! Felder: `signature` (Base64url), `pub_fingerprint` (SHA-256 von report_pub, 16 Byte hex)
 
 use super::build::{canonicalize_report, ErasureReport};
 use crate::error::ErasureError;
+use crate::types_local::Vfs;
 use crate::types_local::{
     ReportSignature, ReportSigner as ReportSignerPort, SignerError, SignerId,
 };
-use contextra_ports::vfs::Vfs;
-use contextra_ports::BoxFuture;
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::path::Path;

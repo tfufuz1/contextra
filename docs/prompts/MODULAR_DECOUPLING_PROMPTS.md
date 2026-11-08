@@ -1,68 +1,11 @@
 # Contextra Baukasten – Katalog autarker Entkopplungs-Prompts für Coding-Agenten
 
-> **Spezifikation & Architektur-Dokumentation v3.0**
-> **Fokus:** Maschinell fundierte, disjunktive und autarke Prompts für Google-Jules und Subagenten zur vollständigen Modularisierung aller 36 Crates zu einem exportierbaren Baukastensystem (Building Blocks).
+Berücksichtige die angestrebte Architektur jeweils aus docs/SPEC.md um diese Prompts zu überarbeiten.
+Diese Prompts sollen wiederverwendbar sein und autark mit den Tools aus tools/ selbstständig die Refaktorisierungen und Implementierungen identifizieren, du musst pro Prompt die korrekten Befehle für die Tools jeweils geben, damit dieser seinen Bereich jeweils untersuchen kann.
 
----
 
-## 1. Strategischer Kontext & Baukasten-Architektur
 
-Dieses Dokument enthält hochpräzise, kopierbare und autark ausführbare Prompts für jeden Crate des Contextra-Workspaces.
-Ziel ist die vollständige Transformation von einem monolithisch verdrahteten Gesamtsystem zu einem **hochgradig modularen Baukastensystem (Building Blocks)**.
-
-### Kernprinzipien für die Agenten-Ausführung:
-1. **Disjunktivität & Parallelität:** Jeder Prompt adressiert genau ein Crate (`crates/<crate>/**`). Agenten können völlig unabhängig und zeitgleich an verschiedenen Crates arbeiten, ohne Merge-Konflikte zu erzeugen.
-2. **Neutralisierung der Datenkerne:** Datenhaltende Speicherkodule (`store`, `vector`, `text`, `graph`, `crypto`) werden von allen juristischen Löschketten, DSGVO-Regelwerken und Deletion-Reports befreit. Sie implementieren lediglich neutrale Bereinigungs-Ports (`Purger`, `LayerScanner`).
-3. **Kapselung in `contextra-erasure`:** Sämtliche Multi-Layer-Löschungen, Deletion-Sagas, FileVaults, GateLogs und kryptografisch signierten Deletion-Reports sind im modularisierten Baustein `contextra-erasure` isoliert.
-4. **Root Cause Analysis First:** Jeder Prompt zwingt den Agenten, vor der Planerstellung eine maschinelle Ursachenanalyse mit `tools/decouple_inspector.py` durchzuführen.
-5. **Zero-Panic & Fail-Closed:** Absolute Speichersicherheit (`#![forbid(unsafe_code)]` außerhalb der drei Unsafe-Inseln `simd`, `sys`, `wire`).
-
----
-
-## 2. Workspace-Übersicht & Entkopplungs-Prioritäten
-
-| Crate | Ring | Klasse | Modularitäts-Score | LOC | Refactoring-Priorität |
-|---|:---:|---|:---:|---:|---|
-| `contextra` | 4 | Fassade & Composition Root | **15/100** | 1084 | 🔴 Sehr Hoch |
-| `contextra-adapt` | 0 | Adaptive Regelung | **88/100** | 3578 | 🟢 Baustein-Härtung |
-| `contextra-agent` | 3 | Agenten-Laufzeit & Sessions | **39/100** | 4220 | 🟡 Mittel |
-| `contextra-audit-export` | Extensions | Compliance Audit Export | **58/100** | 557 | 🟡 Mittel |
-| `contextra-avv-generator` | Extensions | AVV & Vertrags-Generator | **64/100** | 508 | 🟢 Baustein-Härtung |
-| `contextra-checkpoint` | 1 | Snapshot & Backup | **68/100** | 3475 | 🟢 Baustein-Härtung |
-| `contextra-cognition` | 3 | Gedächtnis-Konsolidierung | **42/100** | 5244 | 🟡 Mittel |
-| `contextra-core` | 0 | Kompatibilitäts-Fassade (Deprecated) | **66/100** | 106 | 🟢 Baustein-Härtung |
-| `contextra-crypto` | 0 | Kryptografie-Kern | **53/100** | 5725 | 🟡 Mittel |
-| `contextra-db` | 3 | Collection- & Transaktions-Fassade | **14/100** | 1713 | 🔴 Sehr Hoch |
-| `contextra-durable-fs` | 0 | Dateisystem-Härtung | **64/100** | 860 | 🟢 Baustein-Härtung |
-| `contextra-engine` | 3 | Generische Orchestrierung | **5/100** | 17573 | 🔴 Sehr Hoch |
-| `contextra-erasure` | 3 | Modularer Löschkern (Building Block) | **65/100** | 7307 | 🟢 Baustein-Härtung |
-| `contextra-graph` | 1 | Graph-Index (CSR) | **37/100** | 16585 | 🟡 Mittel |
-| `contextra-infer-candle` | 2 | Inferenz (Candle Backend) | **69/100** | 4818 | 🟢 Baustein-Härtung |
-| `contextra-infer-ollama` | 2 | Inferenz (Ollama Backend) | **74/100** | 4944 | 🟢 Baustein-Härtung |
-| `contextra-infer-onnx` | 2 | Inferenz (ONNX Backend) | **81/100** | 1905 | 🟢 Baustein-Härtung |
-| `contextra-ingest` | 4 | Dokument-Ingestion & Chunking | **73/100** | 16257 | 🟢 Baustein-Härtung |
-| `contextra-kvcache` | 1 | Präfix-Cache | **46/100** | 4174 | 🟡 Mittel |
-| `contextra-license` | Extensions | Lizenz-Gate & Feature-Aktivierung | **88/100** | 502 | 🟢 Baustein-Härtung |
-| `contextra-mcp` | 4 | MCP-Server & CLI | **17/100** | 5276 | 🔴 Sehr Hoch |
-| `contextra-mvcc` | 0 | Concurrency & Isolation | **55/100** | 2767 | 🟡 Mittel |
-| `contextra-ports` | 0 | Vertragsschicht (Ports) | **49/100** | 3333 | 🟡 Mittel |
-| `contextra-privacy` | 3 | DLP & Datensicherheit | **52/100** | 3703 | 🟡 Mittel |
-| `contextra-py` | 4 | Python Bindings (PyO3) | **64/100** | 2246 | 🟢 Baustein-Härtung |
-| `contextra-rank` | 0 | Ranking & Fusion | **87/100** | 3233 | 🟢 Baustein-Härtung |
-| `contextra-router` | 3 | Modell- & Query-Routing | **47/100** | 5601 | 🟡 Mittel |
-| `contextra-sandbox` | 2 | WASM Execution Sandbox | **100/100** | 1892 | 🟢 Baustein-Härtung |
-| `contextra-simd` | 0 | Unsafe-Insel (Hardware-Beschleunigung) | **94/100** | 1653 | 🟢 Baustein-Härtung |
-| `contextra-store` | 1 | LSM & Storage Engine | **29/100** | 23040 | 🔴 Sehr Hoch |
-| `contextra-sys` | 0 | Unsafe-Insel (OS-Primitive) | **100/100** | 1067 | 🟢 Baustein-Härtung |
-| `contextra-testkit` | Tooling | Test & Simulations-Harness | **65/100** | 2318 | 🟢 Baustein-Härtung |
-| `contextra-text` | 1 | Volltext-Index (BM25) | **43/100** | 5828 | 🟡 Mittel |
-| `contextra-types` | 0 | Fundament | **70/100** | 5068 | 🟢 Baustein-Härtung |
-| `contextra-vector` | 1 | Vektor-Index (HNSW) | **17/100** | 11720 | 🔴 Sehr Hoch |
-| `contextra-wire` | 0 | Unsafe-Insel (Zero-Copy Wire Layout) | **95/100** | 2038 | 🟢 Baustein-Härtung |
-
----
-
-## 3. Disjunktiver Prompt-Katalog je Crate
+## Disjunktiver Prompt-Katalog je Crate
 
 ### Prompt für `contextra` (Ring 4 – Fassade & Composition Root)
 

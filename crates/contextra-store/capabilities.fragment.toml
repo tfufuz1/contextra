@@ -1,0 +1,10 @@
+[crates.contextra-store]
+klasse = "B"
+may_depend_on = [
+    "contextra-crypto",
+    "contextra-mvcc",
+    "contextra-ports",
+    "contextra-sys",
+    "contextra-types",
+]
+transitional = []

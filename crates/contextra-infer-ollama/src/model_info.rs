@@ -128,9 +128,14 @@ mod tests {
     #[cfg(feature = "http")]
     use crate::OllamaClient;
     use super::*;
+    #[cfg(feature = "http")]
+    use crate::error::OllamaError;
+    #[cfg(feature = "http")]
+    use crate::OllamaClient;
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_validate_model_available() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -177,6 +182,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_model_info_fetch_offline_returns_io_error() {
         let client = OllamaClient::new("http://127.0.0.1:1");
         let result = client.show_model("llama3.2").await;
@@ -210,6 +216,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_show_model_success_and_error_paths() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -246,6 +253,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_show_model_http_404_and_500_error_mappings() {
         // HTTP 404 test
         let listener_404 = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -298,6 +306,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_show_model_invalid_json_returns_internal_error() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();

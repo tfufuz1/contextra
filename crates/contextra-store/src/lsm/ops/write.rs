@@ -249,7 +249,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     }
     let _intent_guard = IntentLockGuard(storage, tx_id);
 
-    // LOCK ORDER 1: commit_mutex
+    // LOCK ORDER (SPEC §3.5, INV-LOCK-ORDER-1, see lsm::lock_order::RANK_COMMIT_MUTEX):
     let commit_lock = storage.commit_mutex.lock().await;
 
     // 1. ReadSet VOR drain_kv

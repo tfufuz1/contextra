@@ -17,6 +17,7 @@ async fn test_generate_text_returns_string() {
 }
 
 #[tokio::test]
+#[cfg(feature = "ports-compat")]
 async fn test_segment_synthesizer_implementation() {
     use contextra_ports::SegmentSynthesizer;
 
@@ -505,7 +506,7 @@ async fn test_embed_batch_empty() {
     // OllamaClient mit nicht-erreichbarer URL
     // embed_batch([]) soll sofort Ok(vec![]) zurückgeben ohne Netzwerk-Call
     let embedder = OllamaEmbedder::new("http://127.0.0.1:1", "test");
-    let result = embedder.embed_batch(&[]).await.unwrap(); // unwrap
+    let result = Embedder::embed_batch(&embedder, &[]).await.unwrap(); // unwrap
     assert!(result.is_empty());
 }
 
@@ -1101,6 +1102,7 @@ async fn test_max_retries_exhaustion() {
 }
 
 #[tokio::test]
+#[cfg(feature = "ports-compat")]
 async fn test_embed_batch_fallback_preserves_order() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
     let addr = listener.local_addr().unwrap(); // unwrap
@@ -1518,6 +1520,7 @@ async fn test_system_instruction_preserves_injection_guard(
 }
 
 #[tokio::test]
+#[cfg(feature = "ports-compat")]
 async fn test_llm_text_generator_streaming_ollama_mock() {
     use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
     use contextra_types::ConfigFingerprint;
@@ -1594,7 +1597,7 @@ async fn test_llm_text_generator_streaming_ollama_mock() {
 
 #[test]
 fn test_retry_jitter_bounds() {
-    use contextra_ports::SeededRng;
+    use crate::traits::SeededRng;
 
     let rng = SeededRng::new(42);
     for _ in 0..1000 {
@@ -1609,7 +1612,7 @@ fn test_retry_jitter_bounds() {
 
 #[test]
 fn test_retry_jitter_same_seed_reproducibility() {
-    use contextra_ports::SeededRng;
+    use crate::traits::SeededRng;
 
     let rng1 = SeededRng::new(12345);
     let rng2 = SeededRng::new(12345);
@@ -1625,7 +1628,7 @@ fn test_retry_jitter_same_seed_reproducibility() {
 
 #[test]
 fn test_retry_jitter_different_seeds_divergence() {
-    use contextra_ports::SeededRng;
+    use crate::traits::SeededRng;
 
     let rng1 = SeededRng::new(12345);
     let rng2 = SeededRng::new(54321);
@@ -1641,7 +1644,7 @@ fn test_retry_jitter_different_seeds_divergence() {
 
 #[test]
 fn test_with_rng_builder() {
-    use contextra_ports::{Rng, SeededRng};
+    use crate::traits::{Rng, SeededRng};
     use std::sync::Arc;
 
     let custom_rng: Arc<dyn Rng> = Arc::new(SeededRng::new(99999));

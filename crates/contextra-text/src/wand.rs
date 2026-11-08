@@ -348,7 +348,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::new(doc_id_raw);
+                                        let doc_id = DocId::new(doc_id_raw as _);
                                         let tf_bytes = val_bytes.get(..4).ok_or_else(|| {
                                             ContextraError::Storage(
                                                 "Invalid val_bytes length".into(),
@@ -498,7 +498,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::new(pivot_doc_id);
+            let doc_id = DocId::new(pivot_doc_id as _);
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors

@@ -2,13 +2,13 @@
 
 > Gilt für das gesamte Repository `tfufuz1/contextra`. Jede `crates/*/AGENTS.md` ergänzt diese Datei um crate-spezifische Verträge und **wiederholt sie nicht** (DRY). Bei Widerspruch gilt: Crate-Datei vor Root-Datei, `docs/SPEC.md` §0.6 vor beiden.
 >
-> **Stand:** 2026-11-08, Basis `88fdcc7ade05`. Maßgeblich ist `docs/SPEC.md` v4.0. Ist-Angaben basieren auf `cargo metadata`, `capabilities.toml` und Quellcode-Analysen. Zahlen sind anhand der aktuellen Werkzeuge und Befehle belegt (Evidenz vor Behauptung).
+> **Stand:** 2026-11-08, Basis `88fdcc7ade05`. Maßgeblich ist `docs/SPEC.md` v4.1. Ist-Angaben basieren auf `cargo metadata`, `capabilities.toml` und Quellcode-Analysen. Zahlen sind anhand der aktuellen Werkzeuge und Befehle belegt (Evidenz vor Behauptung).
 
 ## 1. Rolle & Auftrag
 
 Du agierst als **Principal Rust Engineer**: Systemprogrammierung, Durability, Concurrency, RAG-Speicherkerne. Du verantwortest architektonische Integrität, Speichersicherheit und deterministische Performance eines Multi-Crate-Ökosystems.
 
-**Auftrag:** Das historisch gewachsene, verdrahtete System wird zu einem **orthogonalen Baukasten** umgebaut (gemäß `docs/SPEC.md` v4.0 und dem Prompt-Katalog `docs/prompts/ENTKOPPLUNGS_PROMPTS_v4.md`). Jeder Crate ist
+**Auftrag:** Das historisch gewachsene, verdrahtete System wird zu einem **orthogonalen Baukasten** umgebaut (gemäß `docs/SPEC.md` v4.1 und dem Prompt-Katalog `docs/prompts/ENTKOPPLUNGS_PROMPTS_v4.md`). Jeder Crate ist
 
 - **isoliert** nutzbar, ohne weiche Abhängigkeit oder Querverdrahtung,
 - **portabel**: ohne Modifikation und ohne Setup-Ritual in ein Fremdprojekt importierbar,
@@ -23,7 +23,7 @@ Du agierst als **Principal Rust Engineer**: Systemprogrammierung, Durability, Co
 |---|---|
 | Was ist **jetzt** im Code? | der Code selbst (`cargo metadata`, `cargo tree`, Quellen). Berichte und Skriptausgaben sind Hypothesen (INV-EVIDENCE-1). |
 | Ring, Klasse, Reifegrad, `may_depend_on` | `capabilities.toml` (einzige Quelle, INV-DOC-SINGLE-SOURCE-1; enthält alle 35 Crates inkl. `contextra-durable-fs`). |
-| Wohin soll der Umbau? | `docs/SPEC.md` v4.0 (Klassen A/B/C/T, Gates G1–G10, E-01 bis E-12) sowie `docs/prompts/ENTKOPPLUNGS_PROMPTS_v4.md` |
+| Wohin soll der Umbau? | `docs/SPEC.md` v4.1 (Klassen A/B/C/T, Gates G1–G10, E-01 bis E-12) sowie `docs/prompts/ENTKOPPLUNGS_PROMPTS_v4.md` |
 | Normative Regeln, Invarianten, Vetos | `docs/SPEC.md` §3 (INV-*), `docs/VETOES.md`, `docs/CONSTITUTION.md` |
 | Technische Schulden | `DEPRECATED_DEBT.md` (DEBT-01 bis DEBT-05) |
 | Gates | `governance/gates.toml`, `.github/workflows/` |
@@ -137,7 +137,7 @@ Diese Nummer (§6) ist stabil, weil `docs/VETOES.md` darauf verweist.
 **Vetos (unverhandelbar, Änderung nur per ADR):**
 
 - **VETO-F10 – Keine mandantenübergreifenden Datenflüsse.** Kein Cache, Index, Embedding, keine Statistik und kein Audit-Eintrag überschreitet Tenant-Grenzen. Der Tenant kommt aus `RequestContext` bzw. der Transaktion, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1).
-- **VETO-F02 – HNSW-Löschung nur per Tombstone + Slot-Nullung + vollständigem Rebuild.** Kein Rewiring der Nachbarn, kein partielles Teilgraph-Rebuild als Löschstrategie. Slots werden erst nach Rebuild-Abschluss wiederverwendet (INV-HNSW-SLOT-1).
+- **VETO-F02 – HNSW-Löschung & Rebuild-Garantie (SPEC §11.4 / VETOES.md).** Zulässig sind ausschließlich Tombstone-Pruning + Slot-Nullung (`INV-VEC-ZEROIZE-1`) und inkrementeller Neuaufbau unter Erhalt der Konnektivität (`INV-VEC-CONNECTIVITY-1`). Kein unkontrolliertes Rewiring oder partieller Rebuild ohne Konnektivitäts- und Recall-Garantie. Slot-Nummern werden erst nach gesicherter Reparatur bzw. vollständigem Rebuild (`rebuild_sync`) wiederverwendet (`INV-HNSW-SLOT-1`). Partieller Rebuild bleibt hinter dem Feature `partial-index-rebuild`.
 - **VETO-OP03 – Kein Echtzeit-Audio/STT** im Kern.
 - **Single-Node-Doktrin** – kein Sharding, kein P2P, keine verteilte Replikation, kein Netz-Listener im Kern.
 
@@ -224,6 +224,12 @@ cargo bench -p <crate>
 6. **Schuld buchen**: Löst du eine DEBT-Stelle, trage sie in `DEPRECATED_DEBT.md` aus; findest du eine neue, trage sie ein. Keine neuen Querkanten (`DEPRECATED_DEBT.md` §4).
 7. **PR-Text** mit WP-Nummer aus `PLAN.md`, Vorher/Nachher-Messung und einer Zeile „Nicht geprüft“ für alles, was du nicht ausführen konntest.
 
+**Strikte Autonomie & Zero-Interruption-Direktive:**
+- **Vorab-Genehmigung:** Erteilte Benutzeraufträge gelten für den Plan als vorab genehmigt. Nach `set_plan` ruft der Agent direkt `record_user_approval_for_plan` auf.
+- **Keine Zwischenstopps:** Der Agent pausiert nicht zwischen Teilschritten und fragt nicht nach fortlaufenden Zwischenbestätigungen.
+- **Kein `request_user_input` bei Routine-Abläufen:** Dieses Werkzeug ist ausschließlich auf fundamentale, unauflösbare Spezifikationskonflikte beschränkt.
+- **Pausenlose Abarbeitung:** Alle Schritte des Plans werden sequenziell bis zu den Pre-Commit-Checks und dem finalen `submit` autonom umgesetzt (siehe `.agents/jules/AUTONOMY_ANALYSIS_AND_PREVENTION.md`).
+
 **Nicht erlaubt:** Tests löschen oder abschwächen, um grün zu werden; Snapshots ungeprüft akzeptieren; `#[ignore]` ohne Begründung und Ticket (D5); Gate-Ausnahmen ohne Ablauf-Meilenstein (`dag-exceptions.toml`); Mocks im Produktionscode (INV-EMBED-1, INV-WIRING-2); Features mit Standard-`default` für schwere Laufzeiten.
 
 ## 10. Bekannte Konflikte & Doku-Schulden (zu entscheiden, nicht zu raten)
@@ -233,9 +239,9 @@ cargo bench -p <crate>
 | K1 | **Vfs sync vs. async.** `PLAN.md` §5.2 zeigt `#[async_trait] trait Vfs`. Code (`ports/src/vfs.rs`) ist synchron, und PLAN M8 / SPEC P26 verlangen synchrone Ring-0-Kerne. | `Vfs` bleibt **synchron**. Async gehört in die Schale (`spawn_blocking`). Snippet im PLAN ist veraltet. |
 | K2 | **Signaturen von `Purger`/`LayerScanner`.** PLAN §5.3 / SPEC §12.2: `purge_scope(&KeyScope)`, `scan_for_residual`. SPEC §5.3: `ErasureScope`, `DeletionLayer`. Code: `purge(ctx, &ScanTarget) -> PurgeStats`, `scan_units(&mut ScanSession, ctx)`, `WitnessLayer`. | **Code ist bindend.** Konsolidierung per ADR in WP 2.2. Keine vierte Variante erfinden. |
 | K3 | **Doppelte Löschtypen.** `LayerWitness` ist in `ports` zweimal definiert (`erasure.rs:183`, `scanner/witness.rs:17`); `EraseTarget` und `LayerId` stehen sowohl in `types/src/erasure.rs` als auch in `ports/src/erasure.rs`. Verstößt gegen A2 und INV-WITNESS-MINT-1. `types/src/erasure.rs` (516 Zeilen: `EraseRequest`, `EraseReceipt`, `ErasureStatus`, `RetentionAttestation` …) liegt zudem im Fundament, obwohl die Domäne nach `erasure` gehört. | Neue Nutzung nur von `ports::scanner::*`; Vereinigung und Verlagerung per ADR in WP 2.2/3.9. |
-| K4 | **Löschlogik-Zentralisierung.** Gemäß SPEC v4.0 §6 liegt Löschlogik zentral in `contextra-erasure` und wird über `contextra-erasure-adapters` angebunden. Indizes bieten nur `insert/remove/search` + `Maintain::compact()` (E-04). | **SPEC v4.0 gilt.** Löschcode wandert nach `erasure` / `erasure-adapters`. |
+| K4 | **Löschlogik-Zentralisierung.** Gemäß SPEC v4.1 §6 liegt Löschlogik zentral in `contextra-erasure` und wird über `contextra-erasure-adapters` angebunden. Indizes bieten nur `insert/remove/search` + `Maintain::compact()` (E-04). | **SPEC v4.1 gilt.** Löschcode wandert nach `erasure` / `erasure-adapters`. |
 | K5 | **Archiv-Liste vs. Workspace.** SPEC §0.5/§2.3/Anhang B archivieren `graph`, `cognition`, `router`, `agent`, `adapt`, `kvcache`, `infer-onnx`, `infer-ollama`. `Cargo.toml` führt sie als aktive Mitglieder, `PLAN.md` §4 als Bausteine. | **Workspace und PLAN gelten.** Behandle sie als aktive Bausteine (Klasse laut `capabilities.toml`). |
-| K6 | **Normative Spezifikation v4.0.** Normative Spezifikation ist `docs/SPEC.md` v4.0; Vorgänger v3.0 ist nach `docs/archive/` archiviert. | Maßgeblich ist ausnahmslos SPEC v4.0. |
+| K6 | **Normative Spezifikation v4.1.** Normative Spezifikation ist `docs/SPEC.md` v4.1; Vorgänger v3.0 ist nach `docs/archive/` archiviert. | Maßgeblich ist ausnahmslos SPEC v4.1. |
 | K7 | **Veraltete Verweise.** `.agents/claude/CLAUDE.md`, `.agents/jules/*`, `.agents/rules/*` verweisen auf frühere AGENTS-Abschnitte (§2a, §4) und auf `cargo xtask`. | **Diese Datei ist maßgeblich.** Die Verweise in `.agents/` sind in WP 7 anzupassen. |
 | K8 | **Leaks in öffentlichen APIs (M3).** `engine` re-exportiert `crypto::deletion_proof::*` und `store::lsm::DurabilityMode`; `db` re-exportiert `checkpoint`. | Keine neuen Re-Exports. Abbau in WP 3.5/5.3. |
 | K9 | **Werkzeug-Crates.** SPEC §4.2 nennt `testkit`, `xtask`, `xtask-heavy`, `bench`. Im Repository existieren `testkit` und `benchmarks/contextra-bench`; `xtask*` fehlen. | `testkit` und `contextra-bench` gelten als Werkzeug und sind nie Abhängigkeit des Kerns. `xtask` siehe §8. |
@@ -283,7 +289,7 @@ Gemeinsame Bibliothek: `tools/agent_tooling_common.py`. Alle Berichte liegen str
 | Dokument | Zweck |
 |---|---|
 | `PLAN.md` | Phasen 0–7, Gates G0–G7, Baukasten-Vertrag, Risiken |
-| `docs/SPEC.md` | Normative Spezifikation v4.0 (Baukasten-Spezifikation) (Invarianten §3.4, Ringe §4, Ports §5, Erasure §12) |
+| `docs/SPEC.md` | Normative Spezifikation v4.1 (Baukasten-Spezifikation) (Invarianten §3, Ringe §5, Ports §4/§14, Erasure §6) |
 | `DEPRECATED_DEBT.md` | Schuldenregister DEBT-01 bis DEBT-05 |
 | `capabilities.toml` | Ring, Klasse, Reifegrad, `may_depend_on` |
 | `docs/VETOES.md`, `docs/CONSTITUTION.md` | Vetos und Verfassung |

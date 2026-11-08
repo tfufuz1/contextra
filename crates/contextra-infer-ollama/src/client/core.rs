@@ -420,11 +420,11 @@ impl OllamaClient {
             )));
         }
 
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct TagsResponse {
             models: Vec<ModelTagInfo>,
         }
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct ModelTagInfo {
             name: String,
         }

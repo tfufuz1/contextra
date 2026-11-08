@@ -154,7 +154,7 @@ impl EmbeddingProvider for OllamaEmbedder {
     fn embed<'a>(
         &'a self,
         text: &'a str,
-    ) -> BoxFuture<'a, std::result::Result<Vec<f32>, EmbeddingError>> {
+    ) -> PortsBoxFuture<'a, std::result::Result<Vec<f32>, PortsEmbeddingError>> {
         Box::pin(async move {
             let vec = self
                 .client
@@ -164,7 +164,7 @@ impl EmbeddingProvider for OllamaEmbedder {
                     OllamaError::ModelNotFound(msg) | OllamaError::InvalidInput(msg) => {
                         EmbeddingError::Unavailable(msg)
                     }
-                    other => EmbeddingError::ComputationFailed(other.to_string()),
+                    other => PortsEmbeddingError::ComputationFailed(other.to_string()),
                 })?;
 
             self.check_and_lock_dimension(vec.len())?;
@@ -183,7 +183,7 @@ impl EmbeddingProvider for OllamaEmbedder {
     fn embed_batch<'a>(
         &'a self,
         texts: &'a [&'a str],
-    ) -> BoxFuture<'a, std::result::Result<Vec<Vec<f32>>, EmbeddingError>> {
+    ) -> PortsBoxFuture<'a, std::result::Result<Vec<Vec<f32>>, PortsEmbeddingError>> {
         Box::pin(async move {
             if texts.is_empty() {
                 return Ok(Vec::new());
@@ -197,7 +197,7 @@ impl EmbeddingProvider for OllamaEmbedder {
                         OllamaError::ModelNotFound(msg) | OllamaError::InvalidInput(msg) => {
                             EmbeddingError::Unavailable(msg)
                         }
-                        other => EmbeddingError::ComputationFailed(other.to_string()),
+                        other => PortsEmbeddingError::ComputationFailed(other.to_string()),
                     })?;
 
             for vec in &output {
@@ -212,9 +212,9 @@ impl EmbeddingProvider for OllamaEmbedder {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    use super::*;
 
     #[test]
+    #[cfg(feature = "ports-compat")]
     fn test_ollama_embedder_constructors_and_getters() {
         let embedder = OllamaEmbedder::with_defaults();
         assert_eq!(EmbeddingProvider::provider_name(&embedder), "ollama");
@@ -235,6 +235,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     async fn test_embed_batch_empty() {
         let client = OllamaClient::new("http://127.0.0.1:1");
         let embedder = OllamaEmbedder {
@@ -249,6 +250,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     async fn test_dimension_validation_mismatch_returns_index_error() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -275,11 +277,11 @@ mod tests {
         let embedder =
             OllamaEmbedder::new(server_url, "nomic-embed-text").with_expected_dimension(768);
 
-        let result = EmbeddingProvider::embed(&embedder, "test text").await;
+        let result = PortsEmbeddingProvider::embed(&embedder, "test text").await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
-            EmbeddingError::ComputationFailed(msg) => {
+            PortsEmbeddingError::ComputationFailed(msg) => {
                 assert!(msg.contains("Ollama returned embedding of dimension 3 but expected 768"));
                 assert!(msg.contains("Model 'nomic-embed-text' may have changed"));
             }
@@ -288,6 +290,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     async fn test_dynamic_dimension_locking_and_subsequent_mismatch_guard() {
         use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -335,7 +338,7 @@ mod tests {
         assert!(res2.is_err());
         let err = res2.unwrap_err();
         match err {
-            EmbeddingError::ComputationFailed(msg) => {
+            PortsEmbeddingError::ComputationFailed(msg) => {
                 assert!(msg.contains("previously observed 4, but got 2"));
                 assert!(msg.contains("Silent index corruption prevented"));
             }
@@ -344,6 +347,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     async fn test_embedding_provider_embed_and_batch_mock_success() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -387,6 +391,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     async fn test_embedding_provider_error_mapping_and_batch_dimension_mismatch() {
         let dead_config = OllamaConfig {
             base_url: "http://127.0.0.1:1".into(),
@@ -424,13 +429,57 @@ mod tests {
             OllamaEmbedder::new(server_url, "test-model").with_expected_dimension(4);
         let batch_dim_err = EmbeddingProvider::embed_batch(&embedder_mismatch, &["hello"]).await.unwrap_err();
         match batch_dim_err {
-            EmbeddingError::ComputationFailed(msg) => {
+            PortsEmbeddingError::ComputationFailed(msg) => {
                 assert!(msg.contains("Ollama returned embedding of dimension 2 but expected 4"));
             }
             _ => panic!(
                 "Expected OllamaError::Internal, got {:?}",
                 batch_dim_err
             ),
+        }
+    }
+}
+
+impl crate::traits::Embedder for OllamaEmbedder {
+    fn embed<'a>(
+        &'a self,
+        text: &'a str,
+    ) -> crate::traits::BoxFuture<'a, Result<Vec<f32>, crate::error::OllamaError>> {
+        Box::pin(async move {
+            let vec = self.client.embed(&self.model, text).await?;
+            let mut lock = self.observed_dimension.lock();
+            match *lock {
+                None => {
+                    if let Some(exp) = self.expected_dimension {
+                        if exp != vec.len() {
+                            return Err(crate::error::OllamaError::DimensionMismatch(format!(
+                                "Dimension mismatch: expected {exp}, got {}",
+                                vec.len()
+                            )));
+                        }
+                    }
+                    *lock = Some(vec.len());
+                    Ok(vec)
+                }
+                Some(d) => {
+                    if d != vec.len() {
+                        Err(crate::error::OllamaError::DimensionMismatch(format!(
+                            "Dimension mismatch: expected {d}, got {}",
+                            vec.len()
+                        )))
+                    } else {
+                        Ok(vec)
+                    }
+                }
+            }
+        })
+    }
+
+    fn dimension(&self) -> usize {
+        if let Some(exp) = self.expected_dimension {
+            exp
+        } else {
+            (*self.observed_dimension.lock()).unwrap_or_default()
         }
     }
 }

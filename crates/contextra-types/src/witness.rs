@@ -8,9 +8,12 @@
 //! als Geisterdaten verbleiben.
 //!
 //! Dieses Modul definiert:
-//! - `ScanMethod`: Angewandte Methodik bei der Restprüfung der Speicherschichten.
+//! - `ScanMethod`: Angewandte Methodik bei der Restprüfung der Speicherschichten (deprecated).
 //! - `RequestContext`: Autorisierungskontext mit `TenantId` und `TxId`.
-//! - `SagaRecord`: Transaktions-Hash-Zusammenfassung für Lösch-Sagas.
+//! - `SagaRecord`: Transaktions-Hash-Zusammenfassung für Lösch-Sagas (deprecated).
+//!
+//! # Deprecated
+//! Löschdomänen-Typen (`ScanMethod`, `SagaRecord`) sind nach `contextra-erasure` migriert.
 
 // FILE-CONTEXT
 // ZWECK: Typsichere Restmessung und Basistypen für physische Löschnachweise (§4.2, §20.5, INV-WITNESS-MINT-1).

@@ -8,6 +8,7 @@ mod embedding;
 pub mod error;
 pub mod importance;
 pub mod model_info;
+#[cfg(all(feature = "http", feature = "ports-compat"))]
 pub mod query_rewriter;
 pub mod traits;
 

@@ -1,3 +1,24 @@
+# Changelog
+
+Alle relevanten Aenderungen im Contextra Baukastensystem werden in dieser Datei dokumentiert.
+
+## [4.1] - 2026-11-08
+
+### Added
+- **Normative Baukasten-Gesamtspezifikation v4.1 (`docs/SPEC.md`):** Umfassende normative Ausarbeitung aller 36 Crates im Soll-Zustand, Module, Invarianten, Kernel-Funktionen und Fehlermodelle.
+- **Klassifikationsmodell A/B/C/T:**
+  - Klasse A: 21 autarke Bausteine nach Kriterien B1–B12 (0 interne `contextra-*`-Abhaengigkeiten, API in Standardtypen, lokale Fehler, Standalone-Export via `tools/export-crate`).
+  - Klasse B: Kohaerentes Storage-Bundle (`types`, `ports`, `mvcc`, `checkpoint`, `store`).
+  - Klasse C: Kompositions- und Integrationsschicht (`contextra`, `db`, `engine`, `cognition`, `agent`, `mcp`, `py`, `router`).
+  - Klasse T: Tooling und Testkit (`testkit`, `contextra-bench`).
+- **Loeschkapselung (§6):** Vollstaendige Entkopplung der Multi-Layer-Loeschkette und DSGVO-Logik in `contextra-erasure` mit Adapteranbindung (`contextra-erasure-adapters`).
+- **Verifikations-Gates G1–G10:** Maschinelle Pruefung von Klassen, APIs, Standalone-Builds, Feature-Flags, Domaenenreinheit und Zero-Panic.
+- **Entscheidungsregister E-01 bis E-12:** Festhaltung der Kernarchitektur-Entscheidungen (vertikale Autarkie vor DRY, keine Hubs in Klasse A).
+
+### Changed
+- Dokumentation (`docs/SOURCE_OF_TRUTH.md`, `docs/CONSTITUTION.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CONTRIBUTING.md`, `docs/VETOES.md`, `docs/TYPE_REGISTRY.md`, `PLAN.md`, `AGENTS.md`) an die Baukasten-Spezifikation v4.1 angeglichen.
+- **`contextra-store` Spezifikation & Crate-Dokumentation (Paket B8 / M11):** `SPEC.md` nach P01–P10 und SPEC v4.1 mit vollständiger Modulkarte, Invarianten INV-STORE-1 bis 5, Lock-Register und Poison-Matrix verfasst. `README.md` auf Klasse-B Storage-Bundle ausgerichtet; `AGENTS.md`, `PLAN.md` und `lib.rs` konsolidiert; ADR-Index für `contextra-store` erstellt.
+
 ## [Paket B31] - 2026-11-07
 
 ### Removed

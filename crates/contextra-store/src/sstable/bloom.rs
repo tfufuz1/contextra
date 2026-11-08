@@ -24,7 +24,7 @@ impl BloomFilter {
     /// - `fpr = 0.01` (1%) uses ~9.6 bits/element.
     /// - `fpr = 0.001` (0.1%) uses ~14.4 bits/element.
     ///
-    /// Note: The default `fpr` used in [`SstableBuilder`] should be documented as a tunable
+    /// Note: The default `fpr` used in [`crate::sstable::builder::SstableBuilder`] should be documented as a tunable
     /// parameter and referenced in [`crate::lsm::LsmConfig`] where it should be configurable.
     pub fn new(expected_elements: usize, fpr: f64) -> Self {
         let n = expected_elements.max(1);

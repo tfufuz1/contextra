@@ -9,8 +9,8 @@ use crate::crypto_local::Dek;
 use crate::crypto_local::SecretKey;
 use crate::crypto_local::{open_record, seal_record};
 use crate::error::ErasureError;
+use crate::types_local::Vfs;
 use crate::types_local::{FileId, FileKeyring, FileKind as PortFileKind};
-use contextra_ports::vfs::Vfs;
 use std::path::PathBuf;
 
 const FILE_HEADER_MAGIC: &[u8; 8] = b"CTXFILE\0";

@@ -7,8 +7,8 @@
 
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId, HYPEREDGE_PREFIX};
+use contextra_graph::test_doubles::InMemoryStorageEngine;
 use contextra_ports::StorageEngine;
-use contextra_testkit::InMemoryStorageEngine;
 use contextra_types::{DocId, EntityId, TxId};
 use std::sync::Arc;
 

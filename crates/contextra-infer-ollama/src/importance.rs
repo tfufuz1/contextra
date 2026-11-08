@@ -285,6 +285,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_batch_empty_returns_empty() {
         let client = Arc::new(OllamaClient::new("http://localhost:11434"));
         let res = score_importance_batch(&client, &[], None, 8).await;
@@ -293,6 +294,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_batch_preserves_order() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -350,6 +352,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_batch_single_error_doesnt_kill_batch() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -396,6 +399,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_empty_text_error() {
         let client = OllamaClient::new("http://localhost:11434");
         let res = score_importance(&client, "   ").await;
@@ -404,6 +408,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_mock_success() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -441,6 +446,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_mock_invalid_response_error() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -544,6 +550,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_with_calibrator_provenance_and_warmup() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap

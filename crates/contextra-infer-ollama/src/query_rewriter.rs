@@ -1,3 +1,4 @@
+#![cfg(feature = "ports-compat")]
 // FILE-CONTEXT
 // STAND: 2026-11-08
 // ZWECK: LLM-gestütztes Multi-Signal Query-Rewriting für Ollama (Text, Semantik, Graph-Anker)
