@@ -224,6 +224,12 @@ cargo bench -p <crate>
 6. **Schuld buchen**: Löst du eine DEBT-Stelle, trage sie in `DEPRECATED_DEBT.md` aus; findest du eine neue, trage sie ein. Keine neuen Querkanten (`DEPRECATED_DEBT.md` §4).
 7. **PR-Text** mit WP-Nummer aus `PLAN.md`, Vorher/Nachher-Messung und einer Zeile „Nicht geprüft“ für alles, was du nicht ausführen konntest.
 
+**Strikte Autonomie & Zero-Interruption-Direktive:**
+- **Vorab-Genehmigung:** Erteilte Benutzeraufträge gelten für den Plan als vorab genehmigt. Nach `set_plan` ruft der Agent direkt `record_user_approval_for_plan` auf.
+- **Keine Zwischenstopps:** Der Agent pausiert nicht zwischen Teilschritten und fragt nicht nach fortlaufenden Zwischenbestätigungen.
+- **Kein `request_user_input` bei Routine-Abläufen:** Dieses Werkzeug ist ausschließlich auf fundamentale, unauflösbare Spezifikationskonflikte beschränkt.
+- **Pausenlose Abarbeitung:** Alle Schritte des Plans werden sequenziell bis zu den Pre-Commit-Checks und dem finalen `submit` autonom umgesetzt (siehe `.agents/jules/AUTONOMY_ANALYSIS_AND_PREVENTION.md`).
+
 **Nicht erlaubt:** Tests löschen oder abschwächen, um grün zu werden; Snapshots ungeprüft akzeptieren; `#[ignore]` ohne Begründung und Ticket (D5); Gate-Ausnahmen ohne Ablauf-Meilenstein (`dag-exceptions.toml`); Mocks im Produktionscode (INV-EMBED-1, INV-WIRING-2); Features mit Standard-`default` für schwere Laufzeiten.
 
 ## 10. Bekannte Konflikte & Doku-Schulden (zu entscheiden, nicht zu raten)
