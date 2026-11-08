@@ -6,23 +6,40 @@
 // REVIEW-PASS[2/2] STATUS:PASS (TS: 2026-09-16T16:24:19Z) (SESSION: 4b816c9a) PRÜFER-KONTEXT: FRESH - Independent diff review verified: prompt injection XML-escaping, retry & backoff error classification, forbid(unsafe_code) invariant, and 91 tests green.
 #![forbid(unsafe_code)]
 
+pub mod error;
+pub mod traits;
+pub mod xml_escape;
+
+pub use error::{OllamaError, Result};
+pub use traits::{BoxFuture, Clock, Embedder, Generator, Rng, SeededRng, SystemClock};
+pub use xml_escape::xml_escape;
+
+#[cfg(feature = "http")]
 mod client;
+#[cfg(feature = "http")]
 pub mod context_prefixer;
+#[cfg(feature = "http")]
 mod embedding;
 pub mod importance;
 pub mod model_info;
+#[cfg(all(feature = "http", feature = "ports-compat"))]
 pub mod query_rewriter;
 
+#[cfg(feature = "http")]
 pub use client::{
-    build_rag_prompt, read_response_bytes, read_response_text, xml_escape, CircuitBreaker,
-    EgressAuditSink, EndpointPolicy, NoopEgressAuditSink, OllamaClient, OllamaConfig,
-    DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL,
+    build_rag_prompt, read_response_bytes, read_response_text, CircuitBreaker, EgressAuditSink,
+    EndpointPolicy, NoopEgressAuditSink, OllamaClient, OllamaConfig, DEFAULT_BASE_URL,
+    DEFAULT_EMBED_MODEL,
 };
+#[cfg(feature = "http")]
 pub use context_prefixer::{ContextPrefixConfig, ContextPrefixEngine, ContextPrefixer};
+#[cfg(feature = "http")]
 pub use embedding::OllamaEmbedder;
 pub use importance::{
-    parse_importance_score_response, score_importance, score_importance_batch,
-    score_importance_with_calibrator, Confidence, ImportanceAssessment, ImportanceCalibrator,
+    parse_importance_score_response, Confidence, ImportanceAssessment, ImportanceCalibrator,
 };
+#[cfg(feature = "http")]
+pub use importance::{score_importance, score_importance_batch, score_importance_with_calibrator};
 pub use model_info::ModelInfo;
+#[cfg(all(feature = "http", feature = "ports-compat"))]
 pub use query_rewriter::{OllamaQueryRewriter, OllamaQueryRewriterConfig};
