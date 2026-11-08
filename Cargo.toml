@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "xtask",
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",
@@ -41,6 +42,7 @@ members = [
 # Restored archived crates to default-members:
 # contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama
 default-members = [
+    "xtask",
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",

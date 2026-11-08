@@ -690,12 +690,10 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra"
 version = "0.1.0"
 dependencies = [
- "contextra-crypto",
  "contextra-db",
  "contextra-infer-candle",
  "contextra-license",
  "contextra-ports",
- "contextra-rank",
  "contextra-testkit",
  "contextra-types",
  "serde",
@@ -950,7 +948,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
- "contextra-crypto",
  "contextra-ports",
  "contextra-types",
  "ed25519-dalek",
@@ -1288,6 +1285,7 @@ dependencies = [
  "contextra-types",
  "criterion",
  "proptest",
+ "serde",
  "thiserror 2.0.20",
  "tracing",
 ]
@@ -6582,6 +6580,10 @@ dependencies = [
  "mac",
  "markup5ever 0.12.1",
 ]
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
 
 [[package]]
 name = "yaml-rust2"

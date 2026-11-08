@@ -33,6 +33,11 @@ pub mod dispatch;
 // ANCHOR[contextra-simd:CORE-MOD-KERNELS]
 // Hardwarespezifische Rechenkerne (Scalar, AVX2, AVX-512, NEON).
 pub mod kernels;
+pub mod error;
+pub mod metric;
+
+pub use error::{SimdError, Result};
+pub use metric::DistanceMetric;
 
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
@@ -49,7 +54,7 @@ pub use kernels::scalar::{
     normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
 };
 
-use contextra_types::{ContextraError, DistanceMetric};
+
 
 // ANCHOR[contextra-simd:CORE-VALIDATE-VEC]
 /// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
@@ -80,11 +85,9 @@ use contextra_types::{ContextraError, DistanceMetric};
 /// assert!(validate_vector(&invalid).is_err());
 /// ```
 #[inline]
-pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
+pub fn validate_vector(vec: &[f32]) -> Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
-        return Err(ContextraError::invalid_input(
-            "NaN or Infinity detected in vector",
-        ));
+        return Err(SimdError::InvalidInput("NaN or Infinity detected in vector"));
     }
     Ok(())
 }
@@ -110,19 +113,19 @@ pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
 /// # Beispiel:
 /// ```
 /// use contextra_simd::compute_distance;
-/// use contextra_types::DistanceMetric;
+/// use contextra_simd::DistanceMetric;
 ///
 /// let a = [1.0, 0.0, 0.0];
 /// let b = [0.0, 1.0, 0.0];
 /// let dist = compute_distance(&a, &b, DistanceMetric::Cosine)?;
-/// # Ok::<(), contextra_types::ContextraError>(())
+/// # Ok::<(), contextra_simd::SimdError>(())
 /// ```
 #[inline]
 pub fn compute_distance(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_types::Result<f32> {
+) -> Result<f32> {
     validate_vector(a)?;
     validate_vector(b)?;
     compute_distance_trusted(a, b, metric)
@@ -149,12 +152,11 @@ pub fn compute_distance_trusted(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_types::Result<f32> {
+) -> Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance(a, b),
         DistanceMetric::Euclidean => euclidean_distance(a, b),
         DistanceMetric::DotProduct => dot_product_distance(a, b),
-        _ => Err(ContextraError::invalid_input("Unsupported distance metric")),
     }
 }
 
@@ -181,11 +183,10 @@ pub fn compute_distance_f32_bytes_trusted(
     a: &[f32],
     b_bytes: &[u8],
     metric: DistanceMetric,
-) -> contextra_types::Result<f32> {
+) -> Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance_f32_bytes(a, b_bytes),
         DistanceMetric::Euclidean => euclidean_distance_f32_bytes(a, b_bytes),
         DistanceMetric::DotProduct => dot_product_distance_f32_bytes(a, b_bytes),
-        _ => Err(ContextraError::invalid_input("Unsupported distance metric")),
     }
 }
