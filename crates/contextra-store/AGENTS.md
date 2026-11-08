@@ -1,157 +1,123 @@
-# AGENTS.md — `contextra-store`
+// FILE-CONTEXT: Entwicklerhandbuch und Governance-Vertrag für contextra-store
+// ZWECK: Regeln, Invarianten, Abhängigkeiten und Modulkarte für Coding-Agenten
+// INVARIANTEN: #![forbid(unsafe_code)], Zero-Panic, Fail-Closed bei fsync, INV-STORE-1 bis INV-STORE-5
+// STAND: 2026-11-08
 
-> **Ring 1** · Klasse `[K]` · Reifegrad `beta` · Unsafe: nein · Rolle: LSM-Storage: WAL, Memtable, SSTable, Manifest, Kompaktion, Block-Cache. Implementiert `StorageEngine`.
-> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-07, statisch gelesen, **nicht kompiliert**; Zahlen sind grep-Heuristiken.
+# contextra-store — Entwicklerhandbuch & Governance
 
-## 1. Baukasten-Profil
+> **Crate:** `contextra-store` | **Ring:** 1 | **Klasse:** B (Storage Bundle)
+> **Normative Vorgabe:** `docs/SPEC.md` v4.1, `crates/contextra-store/SPEC.md`
 
-| Aspekt | Wert |
+---
+
+## 1. Crate-Steckbrief & Features
+
+| Merkmal | Wert |
 |---|---|
-| Standalone-Build | `cargo build -p contextra-store --no-default-features --locked` |
-| Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `mvcc`, `ports`, `sys`, `types` |
-| Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `mvcc`, `crypto`, `sys`, `durable-fs` |
-| Features | `block-cache-v2`, `sieve-cache`, `docid-128`, `fault-injection`, `memory-only-storage`, `legacy-wal-key`, `test-hooks` |
+| Ring | Ring 1 (Speicherkern) |
+| Klasse | Klasse B (Storage Bundle: `types`, `ports`, `mvcc`, `crypto`, `sys`, `store`) |
+| Abhängigkeiten (`Cargo.toml`) | `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-mvcc`, `contextra-crypto` |
+| Features | `default`, `inspect`, `block-cache-v2`, `memory-only-storage`, `docid-128`, `legacy-wal-key`, `fault-injection`, `test-hooks` |
 | Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
+
+---
 
 ## 2. Abhängigkeiten & Schulden
 
-- **Dev-Kanten auf höhere/gleiche Schichten** (M6): `graph`, `sandbox`, `vector` (+ Selbstreferenz). Nach `testkit`/`tests/` verlagern.
-- **Kein Dep auf `durable-fs`**; direkte Datei-I/O (~77 `fs`-Treffer, ~176 `tokio::`-Treffer): Umstellung auf `Vfs` (D4, WP 4.4).
-- **Löschreste:** `kv/segment.rs`, `kv/delete_mode.rs` (Shredding-Bezug, 28 Treffer), `compaction/engine.rs`, `compaction/adaptive.rs` (WP 3.2).
-- Implementierte Ports sind vorhanden: `scanner/` (`LsmPurger`, `MemtableScanner`, `SstableScanner`, `WalScanner`).
+- **Keine Dev-Kanten auf höhere Ringe:** Frühere Dev-Kanten zu `contextra-graph`, `contextra-sandbox` und `contextra-vector` wurden vollständig entfernt (M6-Konformität).
+- **Dateisystem-I/O (Soll: Vfs-Port):** Derzeitige Datei-I/O verwendet `std::fs` (innerhalb blockierender Tasks via `spawn_blocking`) und `tokio::fs`. Die vollständige Migration auf den `Vfs`-Port (`contextra-ports`) ist für WP 4.4 geplant.
+- **Lösch- & Shredding-Relikte:** Historische Altlasten in `kv/segment.rs` und `kv/delete_mode.rs` sind als Deprecated Debt (DEBT-01) erfasst und werden sukzessive zurückgebaut.
+
+---
 
 ## 3. Modul-Karte (am Code verifiziert)
 
 | Pfad | Verantwortung |
 |---|---|
-| `wal/` (`encode`, `flusher`, `hmac`, `io`, `replay`) | Append-only WAL, HMAC-Kette, Flusher-Actor, Replay |
-| `lsm/` (`engine`, `commit`, `flush`, `group_commit`, `guard`, `recovery`, `scan`, `ops/*`, `validate`) | Orchestrierung, Commit, Recovery |
-| `memtable.rs` | Memtable mit Sequenznummern/Tombstones |
-| `sstable/` (`builder`, `reader`, `block_cache`, `bloom`, `stream`, …) | Sortierte Segmente, Block-Cache, Bloom |
-| `manifest/` | transaktionales Manifest |
-| `compaction/` (`engine`, `adaptive`, `config`, `merge_operator`, `retention`) | Level-Merge, `MergeOperator` |
-| `scanner/` (`memtable`, `sstable`, `wal`, `purge`) | **Port-Implementierungen** `LayerScanner`/`Purger` |
-| `kv/` | KV-Segmente, Löschmodus (Schuld) |
-| `fsync.rs`, `util.rs`, `system_pressure.rs`, `tenant_codec.rs`, `engine/` | Sync-Stelle, Hilfen, Druck, Tenant-Präfix, In-Memory-Engine |
+| `wal/` (`encode`, `flusher`, `hmac`, `io`, `replay`) | Append-Only WAL, HMAC-Kette, asynchroner Flusher-Actor, Replay, Open-Heal |
+| `lsm/` (`engine`, `commit`, `flush`, `group_commit`, `guard`, `recovery`, `scan`, `ops/*`, `validate`, `observer`) | Orchestrierung, Transaktions-Commit, Group-Commit Leader/Follower, Recovery |
+| `memtable.rs` | Nebenläufige, geschardete BTreeMap mit Sequenznummern und Tombstones |
+| `sstable/` (`builder`, `reader`, `block_cache`, `bloom`, `stream`, `block_search`, `reader_ext`, `io`) | Sortierte Segmente auf Platte (Format V4 Standard), Block-Cache, Bloom-Filter |
+| `manifest/` (`core`, `entry`, `recovery`, `rollover`) | Transaktionales Manifest für SSTable-Generationen und Versionierung (`MFMN`) |
+| `compaction/` (`engine`, `adaptive`, `config`, `merge_operator`, `retention`) | Leveled und Adaptive Compaction-Engine, `MergeOperator` |
+| `scanner/` (`memtable`, `sstable`, `wal`, `purge`) | Übergangsweise Port-Implementierungen `LayerScanner` und `Purger` |
+| `fsync.rs` | Zentrale Datei- und Verzeichnis-Sync-Stelle (INV-FSYNC-1) |
+| `tenant_codec.rs` | Mandanten-Präfixierung (`TenantId`) und Schlüssel-Isolation |
+| `system_pressure.rs` | Systemdruck-Monitoring für adaptive Compaction |
+| `engine/` (`memory_only.rs`) | In-Memory-Double (`InMemoryStorageEngine`) für schnelle Tests |
+| `kv/` (`delete_mode.rs`, `segment.rs`) | Deprecated Debt DEBT-01 (historische KV-Segment-Verschlüsselung) |
+
+---
 
 ## 4. Verträge & Invarianten
 
-1. **`fsync`-Fehler propagieren** (`?`), nie `let _ =`; nach Fehler Handle vergiften (INV-FSYNC-1). `fsync.rs` ist die einzige Stelle für Datei-/Verzeichnis-Sync.
-2. **Atomares Schreiben:** tmp-Datei → `fsync` → `rename` → Parent-`fsync`.
-3. **Tombstone-Disziplin:** Bit 63 maskieren (`seq & !TOMBSTONE_BIT`) vor jedem `max_seq`-Vergleich (verifiziert u. a. in `compaction/adaptive.rs`).
-4. **Single-Load-Regel:** `last_committed_tx` in `get_at_seq`/`scan_prefix_at` **einmal** laden (Snapshot-Isolation). **Flush-before-Visible:** `last_committed_tx` vor dem Sichtbarmachen der SSTable aktualisieren (ADR-043, Altdokument: am Code in `lsm/flush.rs` prüfen).
-5. **WAL-HMAC-Schlüssel** nur über `load_or_create_integrity_key` (`wal/hmac.rs`, `pub(crate)`), nie hartcodiert; `legacy-wal-key` nur für Migration.
-6. **Tenant-Präfix in jedem Schlüssel** (INV-TENANT-1); Schlüssel/Dateinamen nur opake IDs (INV-KEYSPACE-1).
-7. **Neu verboten:** DSGVO-/Proof-/Saga-/Shredding-Logik (M7). Purge-Kompaktion nur über `Purger` (`compact_range(scope)`).
-8. Jede Datei: Magic + Formatversion (INV-FORMAT-1); Prüfsummen erkennen Bit-Rot (kein Korrekturversprechen).
+1. **`fsync`-Fehler propagieren** (`?`), nie `let _ =`; nach Fehler Handle vergiften (INV-FSYNC-1 / INV-STORE-1). `fsync.rs` ist die zentrale Stelle für Datei- und Verzeichnis-Sync.
+2. **Atomares Schreiben:** tmp-Datei → `fsync` → atomarer `rename` → Parent-Directory `fsync`.
+3. **Tombstone-Disziplin:** Bit 63 maskieren (`seq & !TOMBSTONE_BIT`) vor jedem `max_seq`-Vergleich (INV-STORE-4).
+4. **Single-Load-Regel:** `last_committed_tx` in `get_at_seq`/`scan_prefix_at` genau einmal zu Beginn der Operation laden (INV-STORE-5). **Flush-before-Visible:** Manifest-Commit muss vor Sichtbarkeit der SSTable abgeschlossen sein.
+5. **WAL-HMAC-Schlüssel** nur über `load_or_create_integrity_key` (`wal/hmac.rs`), nie hartcodiert; `legacy-wal-key` nur für Migration.
+6. **Lock-Handoff Invariante (P06 / ADR-0XX-P0A):** Beim Group-Commit wird `truncate_lock` akquiriert, **bevor** `commit_mutex` freigegeben wird.
+7. **Keine Rechts- oder Löschsagas:** Deletion-Proofs, juristische Begrifflichkeiten und DSGVO-Art.-17-Sagas liegen exklusiv in `contextra-erasure` (M7).
+
+---
 
 ## 5. Ports
 
-**Implementiert:** `StorageEngine`, `Purger`, `LayerScanner`, `BlockCache`, `MergeOperator`. **Konsumiert:** `Clock`, `Vfs` (Soll), `MetricsSink`.
+- **Implementiert:** `StorageEngine`, `Purger`, `LayerScanner`, `BlockCache`, `MergeOperator`.
+- **Konsumiert:** `Clock`, `Vfs` (Soll-Zustand), `MetricsSink`.
+
+---
 
 ## 6. Nebenläufigkeit & Performance
 
-- **Sperrenordnung** (Altdokument, vor Änderung verifizieren): `write_lock` → `memtable` → `sstables` → `snapshot_registry`. Nie umgekehrt, nie `parking_lot`-Guard über `.await` (`clippy::await_holding_lock`).
-- Schreibpfad über Group-Commit und Flusher-Actor (Message-Passing statt geteiltem Zustand). `loom`: `just loom-store`.
-- Lesepfad Ziel: allokationsfrei (`with_value`, `PinnedBlock`, WP 4.1). Blockierende Datei-I/O in `async` nur via `spawn_blocking`.
-- Komplexität: Punktlesen `O(log n)`-Ebenen + Bloom; Compaction-Schreibverstärkung messen (`tests/amplification_benchmark.rs`).
+- **Sperrenordnung:**
+  `commit_mutex` → `wal.truncate_lock` → `memtable_shard_lock` → `sstable_manifest_lock`.
+  Niemals `parking_lot`-Guards über `.await`-Punkte halten (`clippy::await_holding_lock`).
+- **Group-Commit:** Message-Passing und Leader/Follower-Batching über Flusher-Actor.
+- **Komplexität:** Punktlesen $O(\log n)$ pro SSTable-Ebene + Bloom-Filter-Filterung.
 
-## 7. Anti-Patterns
+---
 
-- `let _ = file.sync_all()`.
-- `bincode::deserialize(..).unwrap_or_default()` auf WAL-Daten.
-- `std::fs` direkt statt `Vfs`.
-- Neue Abhängigkeit auf `vector`/`text`/`graph` (Peer-Import verboten).
-- Löschlogik/Proof-Typen im Store.
+## 7. ANCHOR-Ids (Kollisionsschutz)
+
+Workspace-weit eindeutige Anchors nach dem Muster `ANCHOR[contextra-store:<BEREICH>-<NNN>]`. Stand der maximalen Nummern:
+
+| Bereich | Höchste bestehende Nr. | Nächste freie Id |
+|---|---:|---|
+| `WAL-CORE` | 3 | `ANCHOR[contextra-store:WAL-CORE-004]` |
+| `COMP-ENG` | 2 | `ANCHOR[contextra-store:COMP-ENG-003]` |
+| `KV-SEG` | 2 | `ANCHOR[contextra-store:KV-SEG-003]` |
+| `LSM-ENG` | 2 | `ANCHOR[contextra-store:LSM-ENG-003]` |
+| `MAN-CORE` | 2 | `ANCHOR[contextra-store:MAN-CORE-003]` |
+| `SST-BLD` | 2 | `ANCHOR[contextra-store:SST-BLD-003]` |
+| `SST-RDR` | 2 | `ANCHOR[contextra-store:SST-RDR-003]` |
+| `ROOT-UTIL` | 2 | `ANCHOR[contextra-store:ROOT-UTIL-003]` |
+| `PUT` | 1 | `ANCHOR[contextra-store:PUT-002]` |
+
+---
 
 ## 8. Tests & Messung
 
 ```bash
 cargo test -p contextra-store --locked
-cargo clippy -p contextra-store --all-targets -- -D warnings
-just loom-store
-cargo bench -p contextra-store            # wal, memtable, sstable, block_cache, lsm
-cargo mutants --config mutants-guarantees.toml -p contextra-store -f "crates/contextra-store/src/wal/**"
+cargo clippy -p contextra-store --all-targets --all-features -- -D warnings
+cargo bench -p contextra-store
 ```
 
-- Vorhanden: Chaos (`chaos_*`), Campaign-/Property-Tests, Fuzz (`fuzz_wal_replay`, `wal_roundtrip`, `fuzz_manifest_load`, `wal_mutation_chaos`), Benchmarks inkl. Vergleich `redb`.
-- Ratchet: `tokio::`/`fs`-Treffer dürfen nicht steigen.
-
-## 9. Offene Arbeit
-
-| WP | Inhalt |
-|---|---|
-| 3.2 | Löschketten-/Shredding-Relikte entfernen, nur `Purger`/`LayerScanner` behalten |
-| 4.1 | Compaction als Level-Merge, `PinnedBlock`, `with_value` |
-| 4.4 / D4 | `Vfs` statt `fs`/`tokio::fs`; Dep auf `durable-fs` |
-| M6 | Dev-Kanten `graph`, `sandbox`, `vector` entfernen |
-
+Vorhandene Testsuiten:
+- Chaos-Tests (`tests/chaos_*`): Bitflip, Memory Pressure, Dropped Writes, Power Cut.
+- Concurrency- & Loom-Tests: `tests/loom_group_commit.rs`, `tests/loom_commit_flush_visibility.rs`.
+- Durability- & Fsync-Tests: `tests/fsync_syscall_verification.rs`, `tests/flush_durability.rs`.
+- Fuzzing: `crates/contextra-store/fuzz/` (`wal_mutation_chaos`, `fuzz_wal_replay`, `fuzz_manifest_load`).
 
 ---
 
+## 9. Offene Arbeit
 
-# Kommentar-Syntax (verbindlich)
-
-| Form | Zweck |
-|---|---|
-| `//!` | Modul-/Crate-Doku am Dateianfang (vor jedem Item, nach `#![...]`-Attributen der Datei; nie mitten in der Datei) |
-| `///` | Rustdoc für das **direkt folgende** Item (Struct, Enum, Variante, Feld, Trait, Methode, Funktion, Konstante). Nie vor `let`, Ausdrücken, Match-Armen oder Makroaufrufen; dort `//` verwenden. |
-| `// NOTE:` | Warum etwas so gebaut ist (nicht was) |
-| `// TODO:` / `// FIXME:` / `// STUB:` | Offene Arbeit / bekanntes Risiko / Platzhalter; immer mit konkreter Aussage |
-| `// SAFETY:` | Pflicht direkt über jedem unsafe-Konstrukt (Invariante, Herstellungsort, Folge bei Verletzung) |
-| `// ANCHOR[contextra-store:<BEREICH>-<NNN>]` | Sprungmarke; vor dem Item/Abschnitt, auf den sie zeigt |
-| `// FILE-CONTEXT` + `// ZWECK:` / `// INVARIANTEN:` / `// HOTSPOTS: <von>-<bis>` / `// STAND: <Datum>` | Repo-Konvention für den Dateikopf. Vorhandene Blöcke ergänzen; `HOTSPOTS`-Zeilenbereiche nach dem Kommentieren auf die neuen Zeilennummern aktualisieren. `STAND` auf das heutige Datum setzen, wenn du den Block änderst. |
-
-Weitere Tags führst du nicht ein. Beim Kommentieren markierter Altlasten gilt: `// NOTE: Deprecated Debt DEBT-NN – <Beschreibung>`.
-
-## ANCHOR-Ids (Kollisionsschutz)
-
-Im Repo existieren ca. 3.900 Anchors; Ids sind workspace-weit eindeutig zu halten. Format: `ANCHOR[contextra-store:<BEREICH>-<NNN>]` mit `<BEREICH>` in Großbuchstaben/Ziffern/Bindestrichen, `<NNN>` dreistellig. Vorgehen:
-
-1. Vor jeder neuen Id: `grep -rnF "ANCHOR[contextra-store:<BEREICH>-<NNN>]" crates benchmarks` muss leer sein.
-2. Nummeriere ab dem Maximum des Bereichs weiter. Höchste bestehende Nummern in dieser Crate:
-
-| Bereich | Höchste Nr. | Nächste freie Id |
-|---|---:|---|
-| `WAL-CORE` | 2 | `ANCHOR[contextra-store:WAL-CORE-003]` |
-| `COMP-ENG` | 1 | `ANCHOR[contextra-store:COMP-ENG-002]` |
-| `KV-SEG` | 1 | `ANCHOR[contextra-store:KV-SEG-002]` |
-| `LSM-ENG` | 1 | `ANCHOR[contextra-store:LSM-ENG-002]` |
-| `MAN-CORE` | 1 | `ANCHOR[contextra-store:MAN-CORE-002]` |
-| `SST-BLD` | 1 | `ANCHOR[contextra-store:SST-BLD-002]` |
-| `SST-RDR` | 1 | `ANCHOR[contextra-store:SST-RDR-002]` |
-| `ROOT-UTIL` | 1 | `ANCHOR[contextra-store:ROOT-UTIL-002]` |
-
-3. Neue Bereiche nach dem Modul benennen (z. B. `WAL`, `PUT`, `GATE`); fange bei `001` an, nach Prüfung 1. Setze Anchors sparsam: pro Modul, pro öffentlichem Einstiegspunkt und pro nicht-trivialem Ablauf, nicht pro Zeile.
-4. Bereits vorhandene doppelte Ids anderer Stellen nicht „reparieren“; nur im Report melden.
-
-Für Abläufe in Funktionen nutze nummerierte Schritte:
-
-```rust
-// ANCHOR[contextra-store:PUT-001]
-// Ablauf von `put`:
-// 1. Eingabe prüfen (Länge, Schlüsselformat).
-// 2. Snapshot der Transaktion nehmen.
-// 3. Eintrag ins WAL schreiben und mit fsync bestätigen; ein Fehler wird zurückgegeben (Fail-Closed).
-// 4. Erst danach im Speicher übernehmen.
-```
-
-# Was zu dokumentieren ist
-
-Gehe **jede** Rust-Datei unter `crates/contextra-store` durch (`find crates/contextra-store -name "*.rs"`, ohne die generierten Dateien oben) einschließlich `tests/`, `benches/`, `examples/` und `build.rs`:
-
-- **Modul** (`//!`): Zweck, Ring-Zugehörigkeit, Nutzer, wichtigste Typen, Invarianten, Verweis auf Nachbarmodule.
-- **Öffentliche Items:** Zweck in einem Satz, dann bei Bedarf `# Errors` (welcher Fehler wann), `# Panics` nur wenn der Code abbrechen kann (sollte nach Zero-Panic-Regel nicht vorkommen: dann `FIXME`), `# Safety` bei `unsafe fn`, Vorbedingungen, Nachbedingungen, Nebenwirkungen (I/O, Zeit, Zufall, IDs). Zeit, Zufall und IDs laufen nur über `Clock`/`Rng`/`IdGen`; steht es im Code, steht es im Kommentar.
-- **Nicht-triviale private Funktionen:** Warum sie existieren und was sie garantieren.
-- **Nebenläufigkeit:** Sperren, atomare Operationen, Reihenfolge, Warum kein Deadlock.
-- **Persistenz und Fehler:** Wo Daten WAL oder Dateisystem-Port passieren; `fsync`-Fehler werden propagiert.
-- **Tests:** Ein Satz je Testfunktion oder -block: welche Invariante oder welches Verhalten bewiesen wird.
-- **Architektur:** Welche Ports die Crate nutzt/anbietet, welche Abhängigkeitsrichtung gilt (DAG, `may_depend_on`), was bewusst *nicht* hier liegt.
-
-## Rustdoc-Fallen (jeder Punkt bricht sonst `cargo clippy -D warnings` oder `cargo doc`)
-
-- Kein `///` vor Nicht-Items (`unused_doc_comments`); keine Leerzeile zwischen `///` und Item (`empty_line_after_doc_comments`).
-- Fortsetzungszeilen in Listen und Zitaten korrekt einrücken (`doc_lazy_continuation`). **Vier Leerzeichen Einrückung in Doc-Text erzeugen einen Doctest**; Code immer in Fences mit Sprache. Beispiele, die nicht kompilieren oder laufen sollen: `ignore` oder `text`, begründet.
-- Intra-Doc-Links `[`Typ`]` nur auf existierende, erreichbare Items; spitze Klammern im Text (`Vec<u8>`) in Backticks setzen, sonst „unclosed HTML tag“.
-- `// SAFETY:` ohne Leerzeile und ohne dazwischenliegende Zeilen direkt über dem unsafe-Ausdruck.
-- Doc-Beispiele müssen gegen die tatsächliche Signatur kompilieren; im Zweifel `no_run`/`ignore` mit Grund.
+| WP | Inhalt | Status |
+|---|---|---|
+| WP-STO-1 | Bereinigung von Löschketten- und Shredding-Relikten (`src/kv/`) | In Arbeit (DEBT-01) |
+| WP-STO-2 | Auslagerung von `Purger` und `LayerScanner` nach `contextra-erasure-adapters` | Geplant (Welle 4) |
+| WP-STO-3 | Flusher prüft geschlossene Acks vor Disk-Sync und HMAC-Rollback bei Timeout | Abgeschlossen (P01/P03) |
+| WP-STO-4 / D4 | Vollständige Umstellung der Dateisystem-I/O auf den `Vfs`-Port | Geplant (WP 4.4) |
+| WP-STO-5 | Lock-Handoff Invariante und Dekker-Write-Fencing | Abgeschlossen (ADR-0XX-P0A) |
