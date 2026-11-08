@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 /// INVARIANTE : Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für -Segmente möglich, niemals für .
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+#[deprecated(
+    since = "0.1.0",
+    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
+)]
 pub enum KvDeleteMode {
     TombstoneOnly,
     CryptoShred,
