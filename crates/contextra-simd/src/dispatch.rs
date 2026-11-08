@@ -21,9 +21,9 @@
 //! 4. Für Testläufe und Benchmarks existiert ein Thread-lokaler Überschreibungsmechanismus
 //!    (SimdPathOverride), um gezielt einzelne Pfade zu isolieren.
 
-use crate::kernels::*;
-use crate::error::SimdError;
 use crate::error::Result;
+use crate::error::SimdError;
+use crate::kernels::*;
 
 // ANCHOR[contextra-simd:DISP-TARGET-ENUM]
 /// Explicit hardware target configuration for the SIMD dispatcher.
@@ -109,7 +109,10 @@ impl Dispatcher {
     #[inline]
     pub fn cosine_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b.len(),
+            });
         }
 
         match self.target {
@@ -164,7 +167,10 @@ impl Dispatcher {
     #[inline]
     pub fn euclidean_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b.len(),
+            });
         }
 
         match self.target {
@@ -219,7 +225,10 @@ impl Dispatcher {
     #[inline]
     pub fn dot_product_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b.len(),
+            });
         }
 
         match self.target {
@@ -272,13 +281,12 @@ impl Dispatcher {
 
     /// Computes cosine distance between an `f32` slice and raw little-endian `f32` byte slice.
     #[inline]
-    pub fn cosine_distance_f32_bytes(
-        &self,
-        a: &[f32],
-        b_bytes: &[u8],
-    ) -> Result<f32> {
+    pub fn cosine_distance_f32_bytes(&self, a: &[f32], b_bytes: &[u8]) -> Result<f32> {
         if b_bytes.len() < a.len() * 4 {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b_bytes.len() / 4 });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b_bytes.len() / 4,
+            });
         }
 
         match self.target {
@@ -318,13 +326,12 @@ impl Dispatcher {
 
     /// Computes Euclidean distance between an `f32` slice and raw little-endian `f32` byte slice.
     #[inline]
-    pub fn euclidean_distance_f32_bytes(
-        &self,
-        a: &[f32],
-        b_bytes: &[u8],
-    ) -> Result<f32> {
+    pub fn euclidean_distance_f32_bytes(&self, a: &[f32], b_bytes: &[u8]) -> Result<f32> {
         if b_bytes.len() < a.len() * 4 {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b_bytes.len() / 4 });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b_bytes.len() / 4,
+            });
         }
 
         match self.target {
@@ -366,13 +373,12 @@ impl Dispatcher {
 
     /// Computes dot product distance between an `f32` slice and raw little-endian `f32` byte slice.
     #[inline]
-    pub fn dot_product_distance_f32_bytes(
-        &self,
-        a: &[f32],
-        b_bytes: &[u8],
-    ) -> Result<f32> {
+    pub fn dot_product_distance_f32_bytes(&self, a: &[f32], b_bytes: &[u8]) -> Result<f32> {
         if b_bytes.len() < a.len() * 4 {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b_bytes.len() / 4 });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b_bytes.len() / 4,
+            });
         }
 
         match self.target {
@@ -414,7 +420,10 @@ impl Dispatcher {
     #[inline]
     pub fn dot_product_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b.len(),
+            });
         }
 
         match self.target {
@@ -461,7 +470,10 @@ impl Dispatcher {
     #[inline]
     pub fn euclidean_distance_sq_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b.len(),
+            });
         }
 
         match self.target {
@@ -507,7 +519,10 @@ impl Dispatcher {
         b: &[u8],
     ) -> Result<CosineSimilarityPartsU8> {
         if a.len() != b.len() {
-            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
+            return Err(SimdError::DimensionMismatch {
+                left: a.len(),
+                right: b.len(),
+            });
         }
 
         match self.target {
@@ -823,10 +838,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32> {
 ///
 /// Requires runtime detection of `avx512f`+`avx512bw`+`avx512vnni` or `avx2` on `x86_64`.
 #[inline]
-pub fn cosine_similarity_parts_u8(
-    a: &[u8],
-    b: &[u8],
-) -> Result<CosineSimilarityPartsU8> {
+pub fn cosine_similarity_parts_u8(a: &[u8], b: &[u8]) -> Result<CosineSimilarityPartsU8> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).cosine_similarity_parts_u8(a, b);
