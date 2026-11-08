@@ -7,7 +7,7 @@
 //! - `budget`: Token- und Ressourcen-Budgetierung für Inferenz und Abfrageverarbeitung.
 //! - `filter`: Strukturierte Metadaten-Filterausdrücke mit logischen Operatoren.
 //! - `importance`: Relevanzbewertung und zeitlicher Verfall (Decay) von Erinnerungen.
-//! - `saos`: Einheitliche 4-Signal-Suchabfragestrukturen (Semantik, BM25-Text, Graph, Recency).
+//! - `saos`: Einheitliche 4-Signal-Suchabfragestrukturen (Semantik, lexikalischer Text, Graph, Recency).
 
 // ANCHOR[contextra-types:TYPES-BUDGET]
 /// Memory and token resource budget management types.

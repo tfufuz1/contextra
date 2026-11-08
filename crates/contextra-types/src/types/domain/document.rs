@@ -103,7 +103,7 @@ impl DistanceMetric {
     ///   `compute()`'s `-dot` convention so that smaller return values consistently mean higher similarity.
     ///
     /// # Cross-Crate Caller Dependency Notice
-    /// Callers in `contextra-index` (such as `hnsw.rs` or `quantize.rs`) expecting raw squared Euclidean distance or
+    /// Callers in vector indices or quantization layers expecting raw squared Euclidean distance or
     /// non-inverted raw dot products must account for this unified "smaller = closer" distance metric semantics.
     // DECISION-REF: AGT-CORE-001 — Overflow-Schutz in compute_u8() bereits implementiert.
     // KONTEXT: Alle drei Zweige akkumulieren in u64 (Euclidean: diff²-Summe, DotProduct: Produkt-Summe)

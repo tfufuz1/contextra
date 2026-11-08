@@ -22,7 +22,7 @@ use core::fmt;
 pub enum RetrievalStrategy {
     /// Vektorbasiertes semantisches Signal.
     Vector,
-    /// Textbasiertes sparse/BM25 Signal.
+    /// Textbasiertes lexikalisches/sparse Signal.
     Text,
     /// Graphbasiertes Beziehungs-Signal.
     Graph,

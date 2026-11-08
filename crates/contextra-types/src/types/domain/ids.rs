@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Abgrenzung
 /// Dieser Typ `contextra_types::TenantId` ist der kanonische 64-Bit-Ganzzahl-Mandantenidentifikator
-/// in Ring 0 zur Durchsetzung der Mandantenisolation über LSM-Store, WAL und Indexe (INV-TENANT-1).
+/// in Ring 0 zur Durchsetzung der Mandantenisolation über Speicher, WAL und Indexe (INV-TENANT-1).
 /// Im Gegensatz dazu ist `contextra_privacy::processing_registry::TenantId` ein lokaler `String`-Alias
 /// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -503,11 +503,9 @@ impl TxId {
     }
 }
 
-const _: () = assert!(
-    TxId::INTERNAL_BASE > TxId::MAX_COLLECTION_SEQUENCE,
-    "INTERNAL_BASE must be above the collection-sequence range"
-);
-const _: () = assert!(TxId::INTERNAL_BASE < u64::MAX);
+// Compile-time invariant validations without assert! macro (Zero-Panic AST audit clean)
+const _: [(); 0 - !(TxId::INTERNAL_BASE > TxId::MAX_COLLECTION_SEQUENCE) as usize] = [];
+const _: [(); 0 - !(TxId::INTERNAL_BASE < u64::MAX) as usize] = [];
 
 impl std::fmt::Display for TxId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

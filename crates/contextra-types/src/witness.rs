@@ -4,7 +4,7 @@
 //! # Zweck & Architektur-Rolle: Ring 0
 //!
 //! Für gesetzliche und regulatorische Nachweise muss nachgewiesen werden,
-//! dass gelöschte Daten weder im LSM-Tree, noch im WAL oder in Vektor-/Text-Indizes
+//! dass gelöschte Daten weder im Speicher, noch im WAL oder in Vektor-/Text-Indizes
 //! als Geisterdaten verbleiben.
 //!
 //! Dieses Modul definiert:

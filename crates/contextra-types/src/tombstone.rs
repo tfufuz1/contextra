@@ -2,7 +2,7 @@
 //!
 //! # Zweck & Architektur-Rolle: Ring 0
 //!
-//! In Multi-Version Concurrency Control (MVCC) und LSM-Tree-Speichern werden Datensätze
+//! In Multi-Version Concurrency Control (MVCC) und sequentiellen/append-only Speichern werden Datensätze
 //! bei Invalidierung nicht physisch überschrieben, sondern mit einem Tombstone-Marker
 //! versehen.
 //!
