@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-text")]
 //! Integrationstest-Suite: `text_extractors_test.rs`
 //!
 //! # Zweck & Testabdeckung
@@ -9,7 +10,12 @@
 // INVARIANTEN: Zero-Panic, JSON-Snapshots, UTF-16/Windows-1252/Unicode-Tag Handling.
 // STAND: TS:2026-10-31T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::same_item_push
+)]
 
 use contextra_ingest::extractor::{DocumentExtractor, ExtractContext, ResourceBudget};
 use contextra_ingest::format::FormatId;

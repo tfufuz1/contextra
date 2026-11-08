@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-text")]
 //! Integrationstest-Suite: `text_proptest.rs`
 //!
 //! # Zweck & Testabdeckung

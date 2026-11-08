@@ -9,6 +9,13 @@
 // INVARIANTEN: Keine eingecheckten Binärdateien, Zero-Panic, deterministische Fixture-Erzeugung.
 // STAND: TS:2026-10-31T00:00:00Z
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
+
 use contextra_ingest::detect::{detect, Confidence, DetectHints};
 use contextra_ingest::format::FormatId;
 

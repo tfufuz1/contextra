@@ -14,10 +14,10 @@
 // INVARIANTEN: Zero-Panic für beliebige Eingabe-Bytes.
 // STAND: TS:2026-10-31T00:00:00Z
 
+use crate::chunking::types::DocId;
 use crate::format::FormatId;
 use crate::pipeline::{ingest, IngestConfig, IngestRequest};
 use crate::registry::ExtractorRegistry;
-use contextra_types::DocId;
 
 /// Fuzzing-Einstiegspunkt für alle Ingestion-Extraktoren.
 /// Muss für jede beliebige Eingabe panikfrei durchlaufen.

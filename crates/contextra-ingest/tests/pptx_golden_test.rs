@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-pptx")]
 //! Integrationstest-Suite: `pptx_golden_test.rs`
 //!
 //! # Zweck & Testabdeckung

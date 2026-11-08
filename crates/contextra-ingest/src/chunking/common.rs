@@ -13,11 +13,11 @@
 use crate::canonical::CanonicalText;
 use crate::chunking::config::ChunkingConfig;
 use crate::chunking::meta::build_chunk_metadata;
+use crate::chunking::types::{ContextChunk, DocId};
 use crate::chunking::ChunkDraft;
 use crate::error::IngestError;
 use crate::ir::DocumentIr;
 use crate::limits::IngestLimits;
-use contextra_types::{ContextChunk, DocId};
 use std::ops::Range;
 
 /// Schätzt die Token-Anzahl eines Textes mit heuristischen Regeln (autark ohne Engine-Kopplung).

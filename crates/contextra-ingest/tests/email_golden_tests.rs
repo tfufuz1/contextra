@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-email")]
 //! Integrationstest-Suite: `email_golden_tests.rs`
 //!
 //! # Zweck & Testabdeckung

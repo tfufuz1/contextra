@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-sheets")]
 //! Integrationstest-Suite: `sheets_test.rs`
 //!
 //! # Zweck & Testabdeckung
@@ -16,13 +17,13 @@
     clippy::panic
 )]
 
+use contextra_ingest::chunking::types::DocId;
 use contextra_ingest::error::{IngestError, LimitKind};
 use contextra_ingest::extractor::ExtractContext;
 use contextra_ingest::format::FormatId;
 use contextra_ingest::limits::{ExtractPolicy, IngestLimits};
 use contextra_ingest::pipeline::{ingest, IngestConfig, IngestRequest};
 use contextra_ingest::registry::ExtractorRegistry;
-use contextra_types::DocId;
 use std::io::{Cursor, Write};
 use zip::write::FileOptions;
 use zip::ZipWriter;

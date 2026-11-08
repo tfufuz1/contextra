@@ -669,6 +669,7 @@ const ALL_FORMATS: &[FormatId] = &[
 ];
 
 #[cfg(test)]
+#[allow(clippy::panic)]
 mod tests {
     use super::*;
 

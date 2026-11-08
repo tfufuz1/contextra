@@ -15,6 +15,7 @@
 // STAND: TS:2026-10-31T00:00:00Z
 
 use crate::chunking::config::ChunkingConfig;
+use crate::chunking::types::{ContextChunk, DocId};
 use crate::chunking::{common::finalize, draft_document};
 use crate::detect::{detect, DetectHints};
 use crate::error::{IngestError, LimitKind};
@@ -23,7 +24,6 @@ use crate::format::FormatId;
 use crate::ir::{DocMeta, ExtractWarning};
 use crate::limits::{ExtractPolicy, IngestLimits};
 use crate::registry::ExtractorRegistry;
-use contextra_types::{ContextChunk, DocId};
 
 /// Ingestion-Anforderung.
 pub struct IngestRequest<'a> {

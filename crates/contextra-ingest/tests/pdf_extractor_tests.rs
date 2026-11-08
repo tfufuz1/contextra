@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-pdf")]
 //! Integrationstest-Suite: `pdf_extractor_tests.rs`
 //!
 //! # Zweck & Testabdeckung

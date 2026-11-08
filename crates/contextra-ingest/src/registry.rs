@@ -46,6 +46,7 @@ impl ExtractorRegistry {
 
     /// Registriert Standard-Extraktoren gemäß den aktivierten Feature-Flags (`fmt-*`).
     pub fn with_defaults() -> Self {
+        #[allow(unused_mut)]
         let mut registry = Self::new_empty();
 
         #[cfg(feature = "fmt-text")]

@@ -28,5 +28,8 @@ pub mod pipeline;
 pub mod registry;
 pub mod safe;
 
+pub use chunking::types::{ContextChunk, ContextChunkLink, DocId};
+pub use error::{IngestError, LimitKind};
+
 #[doc(hidden)]
 pub mod fuzz_support;

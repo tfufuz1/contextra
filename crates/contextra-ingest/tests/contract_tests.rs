@@ -20,6 +20,7 @@ use contextra_ingest::canonical::sanitize_text;
 use contextra_ingest::chunking::config::ChunkingConfig;
 use contextra_ingest::chunking::fallback::FallbackChunker;
 use contextra_ingest::chunking::prose::ProseChunker;
+use contextra_ingest::chunking::types::DocId;
 use contextra_ingest::chunking::IrChunker;
 use contextra_ingest::error::IngestError;
 use contextra_ingest::extractor::{DocumentExtractor, ExtractContext};
@@ -30,7 +31,6 @@ use contextra_ingest::ir::{
 use contextra_ingest::limits::IngestLimits;
 use contextra_ingest::pipeline::{ingest, IngestConfig, IngestRequest};
 use contextra_ingest::registry::ExtractorRegistry;
-use contextra_types::{ContextraError, DocId};
 
 struct MockTextExtractor;
 impl DocumentExtractor for MockTextExtractor {
@@ -280,8 +280,9 @@ fn test_contract_6_error_mapping() {
         limit: 100,
         observed: 200,
     };
-    let c_err: ContextraError = limit_err.into();
-    assert!(matches!(c_err, ContextraError::LimitExceeded { .. }));
+    assert!(limit_err
+        .to_string()
+        .contains("Ressourcenlimit überschritten"));
 }
 
 // ANCHOR[contextra-ingest:TST-0350]
@@ -350,8 +351,17 @@ fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {
         filename: None,
     };
 
-    let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
-    assert!(matches!(err, IngestError::UnsupportedFormat { .. }));
+    #[cfg(not(feature = "fmt-pptx"))]
+    {
+        let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
+        assert!(matches!(err, IngestError::UnsupportedFormat { .. }));
+    }
+    #[cfg(feature = "fmt-pptx")]
+    {
+        // Wenn fmt-pptx aktiv ist, führt dummy byte input zu Corrupt/Limit
+        let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
+        assert!(matches!(err, IngestError::Corrupt { .. }));
+    }
 
     // Fuzz support muss für beliebige Bytes panikfrei sein
     contextra_ingest::fuzz_support::run(FormatId::Txt, b"random noise 12345");

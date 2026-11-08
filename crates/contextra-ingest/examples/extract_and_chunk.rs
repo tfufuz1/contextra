@@ -4,10 +4,10 @@
 //! Baukasten ohne Datenbank, Engine oder externe Laufzeitabhängigkeiten.
 
 use contextra_ingest::chunking::config::ChunkingConfig;
+use contextra_ingest::chunking::types::DocId;
 use contextra_ingest::format::FormatId;
 use contextra_ingest::pipeline::{ingest, IngestConfig, IngestRequest};
 use contextra_ingest::registry::ExtractorRegistry;
-use contextra_types::DocId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Contextra-Ingest Standalone Building Block Demo ===");

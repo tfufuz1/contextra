@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-structured")]
 //! Integrationstest-Suite: `structured_golden_tests.rs`
 //!
 //! # Zweck & Testabdeckung
