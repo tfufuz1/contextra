@@ -1,26 +1,24 @@
 # contextra-rank
 
-Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen.
+Rangfusion (Reciprocal Rank Fusion, mRRF), Score-Normalisierung, Kalibrierung (Isotonic, Platt, Conformal) und Drift-Erkennung für das Contextra-System.
 
-Normativitätsklasse: **Rand `[R]`** (Ring 0, `experimental`; §6.1, §6.9, §12, `capabilities.toml`).
+Normativitätsklasse: **Klasse A** (Ring 0, autarker Rechnerkern; SPEC v4.0 §2, §5).
 
-## Rolle in einem Satz
-`contextra-rank` bietet Score-Kalibrierung (Platt, Isotonisch, Conformal) und Ergebnis-Anreicherungen zur Verfeinerung von Retrieval-Rankings.
+## Copy-Paste / Standalone-Export
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Ranking & Kalibrierung)
-- **Klasse:** Rand `[R]`
-- **Reifegrad:** `experimental` (abweichend in `capabilities.toml` als `stable` geführt, siehe `docs/status/ABW-L3.md`)
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
+`contextra-rank` ist ein autarker Baustein der Klasse A ohne zwingende interne Workspace-Abhängigkeiten. Zur Extraktion in ein externes Projekt:
 
-## Features & Garantien
-- **Zero-Panic:** Strikte Absicherung (`#![forbid(unsafe_code)]`, keine Panics/Unwraps im Produktivcode).
-- **Deterministische Fusion:** Deterministische Tie-Breaker für RRF und mRRF (Score absteigend, DocId aufsteigend).
-- **Reine Funktionen & Autarkie:** `fusion` und `metrics` arbeiten rein funktional ohne I/O, Netzwerk, Systemzeit oder externe Laufzeit.
-- **Isotonische & Platt-Kalibrierung:** PAVA-Algorithmus zur Score-Kalibrierung sowie Expected Calibration Error (ECE).
-- **Retrieval-Metriken:** Reciprocal Rank, MRR, Precision@k, Recall@k und nDCG@k.
+```bash
+python3 tools/export_crate.py contextra-rank --out /pfad/zu/deinem/projekt
+```
 
-## Einbettungsbeispiel
+## Externe Abhängigkeiten
+- `ahash`
+- `serde`, `serde_json`
+- `thiserror`
+- `tracing`
+
+## Minimalbeispiel (RRF-Fusion)
 
 ```rust
 use ahash::AHashSet;
@@ -54,3 +52,13 @@ let ranked_ids: Vec<&str> = fused.iter().map(|r| r.id.as_str()).collect();
 let rr = reciprocal_rank(&ranked_ids, &relevant);
 assert_eq!(rr, 1.0);
 ```
+
+## Garantien & Nicht-Ziele
+- **Garantien:**
+  - Zero-Panic (`#![forbid(unsafe_code)]`).
+  - Deterministische Gleichstandsauflösung.
+  - Vollständige Autarkie im Standardmodus (`--no-default-features`).
+- **Nicht-Ziele:**
+  - Keine eigene Vektorsuche oder Indexhaltung (gehört in `contextra-vector` / `contextra-text`).
+  - Keine I/O- oder Persistenzoperationen.
+  - Keine Lösch- oder DSGVO-Logik (gehört in `contextra-erasure`).

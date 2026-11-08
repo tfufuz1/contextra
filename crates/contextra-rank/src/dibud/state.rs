@@ -6,8 +6,9 @@
 //! für noch ungesehene Dokumente und bestimmt, welche Top-K-Ränge mathematisch garantiert
 //! stabil sind (Präfix-Zertifizierung).
 
+use crate::error::RankError;
+use crate::local_types::DocId;
 use ahash::AHashMap;
-use contextra_types::{ContextraError, DocId};
 
 use super::types::{BudgetedChannel, DiBudOutcome, FusionBudget};
 use crate::fusion::{ProvenanceBuilder, ProvenanceRecord};
@@ -93,7 +94,7 @@ impl DiBudFusionState {
         item: Option<DocId>,
         er: impl Fn(DocId) -> f32,
         budget: &FusionBudget,
-    ) -> Result<(), ContextraError> {
+    ) -> Result<(), RankError> {
         self.accesses += 1;
         let ch_idx = ch.index();
         self.channel_depths[ch_idx] += 1;
@@ -108,7 +109,7 @@ impl DiBudFusionState {
             if !self.er_cache.contains_key(&doc_id) {
                 let er_val = er(doc_id);
                 if !er_val.is_finite() || er_val < 0.0 {
-                    return Err(ContextraError::InvalidInput(format!(
+                    return Err(RankError::InvalidInput(format!(
                         "Edge reinforcement score for document {doc_id:?} must be a finite non-negative float, got {er_val}"
                     )));
                 }

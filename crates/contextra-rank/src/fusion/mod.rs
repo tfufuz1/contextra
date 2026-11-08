@@ -16,8 +16,10 @@ mod signal;
 mod topk;
 mod types;
 
-pub use contextra_types::{FusionStrategy, SignalFusionStrategies};
+pub use crate::local_types::{FusionStrategy, SignalFusionStrategies};
 pub use global::{GlobalFusionConfig, GlobalFusionStrategy};
+#[cfg(feature = "types-compat")]
+pub use normalized::weights_to_signal_factors_types_compat;
 pub use normalized::{score_normalized_fusion_with_options, weights_to_signal_factors};
 pub use provenance::ProvenanceBuilder;
 pub use resonance::{apply_resonance_bonus, fuse_signals, ResonanceConfig};

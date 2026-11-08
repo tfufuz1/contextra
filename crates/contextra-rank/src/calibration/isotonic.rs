@@ -5,11 +5,64 @@
 //! Implementiert die nicht-parametrische isotonische Regression über den
 //! Pool-Adjacent Violators Algorithm (PAVA) sowie die ECE-Berechnung.
 
-use contextra_ports::{Clock, SystemClock};
-use contextra_types::ConfigFingerprint;
+use crate::local_types::ConfigFingerprint;
 use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
+
+/// Lokaler Clock-Port für deterministische Zeitstempel (B11-Konformität).
+pub trait Clock: Send + Sync {
+    /// Gibt den aktuellen UNIX-Zeitstempel in Nanosekunden zurück.
+    fn now_unix_nanos(&self) -> u64;
+
+    /// Gibt eine monotone Zeit in Nanosekunden zurück.
+    fn monotonic_nanos(&self) -> u64 {
+        self.now_unix_nanos()
+    }
+}
+
+/// Standard SystemClock basierend auf std::time::SystemTime.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SystemClock;
+
+impl SystemClock {
+    /// Erzeugt eine neue `SystemClock`.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Clock for SystemClock {
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
+    fn now_unix_nanos(&self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0)
+    }
+
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
+    fn monotonic_nanos(&self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0)
+    }
+}
+
+#[cfg(feature = "types-compat")]
+struct PortsClockAdapter(Arc<dyn contextra_ports::Clock>);
+
+#[cfg(feature = "types-compat")]
+impl Clock for PortsClockAdapter {
+    fn now_unix_nanos(&self) -> u64 {
+        self.0.now_unix_nanos()
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.0.monotonic_nanos()
+    }
+}
 
 // ADR-098 (PAVA Block-Präzision: f64 -> f32 Konvertierung)
 #[allow(clippy::cast_possible_truncation)]
@@ -86,6 +139,13 @@ impl IsotonicCalibrator {
         self
     }
 
+    #[cfg(feature = "types-compat")]
+    /// Sets a custom clock port from `contextra-ports` (transitional compat).
+    pub fn with_ports_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+        self.clock = Arc::new(PortsClockAdapter(clock));
+        self
+    }
+
     /// Creates an `IsotonicCalibrator` with defaults (Warmup: 50, Max Obs: 2000).
     pub fn with_defaults() -> Self {
         Self::new(DEFAULT_WARMUP_REQUIRED, DEFAULT_MAX_OBSERVATIONS)
@@ -154,7 +214,8 @@ impl IsotonicCalibrator {
     }
 
     /// Resets observations if ConfigFingerprint changes (P8 Compliance).
-    pub fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint) {
+    pub fn invalidate_on_config_change(&mut self, new_fingerprint: impl Into<ConfigFingerprint>) {
+        let new_fingerprint = new_fingerprint.into();
         if self.fingerprint.as_ref() != Some(&new_fingerprint) {
             tracing::warn!(
                 old_fp = ?self.fingerprint,

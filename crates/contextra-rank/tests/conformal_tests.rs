@@ -10,8 +10,8 @@
 // ZWECK: Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs).
 // INVARIANTEN: INV-CALIBRATION-CONFORMAL-1 (marginal coverage guarantee, strict determinism, zero-panic input validation).
 
+use contextra_rank::ConfigFingerprint;
 use contextra_rank::{AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError};
-use contextra_types::ConfigFingerprint;
 
 struct SimpleLcg {
     state: u64,

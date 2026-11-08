@@ -5,7 +5,7 @@
 //! Implementiert das parametrische Platt-Scaling (`sigmoid(A * logit + B)`).
 //! Dient der Umrechnung von Logits in Wahrscheinlichkeiten via Kreuzentropie-Minimierung.
 
-use contextra_types::ConfigFingerprint;
+use crate::local_types::ConfigFingerprint;
 
 /// Platt Scaler for parametric logit/score calibration.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -85,7 +85,8 @@ impl PlattScaler {
     }
 
     /// Resets scaler to identity if ConfigFingerprint changes (P8 Compliance).
-    pub fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint) {
+    pub fn invalidate_on_config_change(&mut self, new_fingerprint: impl Into<ConfigFingerprint>) {
+        let new_fingerprint = new_fingerprint.into();
         if self.fingerprint.as_ref() != Some(&new_fingerprint) {
             tracing::warn!(
                 old_fp = ?self.fingerprint,

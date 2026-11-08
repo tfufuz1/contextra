@@ -11,5 +11,5 @@ pub mod isotonic;
 pub mod platt;
 
 pub use conformal::{AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError};
-pub use isotonic::IsotonicCalibrator;
+pub use isotonic::{Clock, IsotonicCalibrator, SystemClock};
 pub use platt::PlattScaler;

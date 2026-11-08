@@ -30,7 +30,7 @@ pub struct BoundedTopK<T> {
 impl<T: Ord> BoundedTopK<T> {
     /// Creates a new `BoundedTopK` container with maximum capacity `k`.
     pub fn new(capacity: usize) -> Self {
-        let capacity = capacity.min(contextra_types::MAX_SEARCH_K);
+        let capacity = capacity.min(crate::local_types::MAX_SEARCH_K);
         Self {
             heap: std::collections::BinaryHeap::with_capacity(capacity.saturating_add(1)),
             capacity,

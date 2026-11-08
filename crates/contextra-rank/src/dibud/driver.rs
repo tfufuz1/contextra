@@ -5,7 +5,8 @@
 //! Stellt synchrone und asynchrone Treiberfunktionen bereit, um den DiBud-Zustandsautomaten
 //! über konkrete Iterator- bzw. Stream-Kanäle bis zum Erreichen des Budgets auszuführen.
 
-use contextra_types::{ContextraError, DocId};
+use crate::error::RankError;
+use crate::local_types::DocId;
 use core::future::Future;
 
 use super::state::{DiBudFusionState, DiBudStep};
@@ -21,7 +22,7 @@ pub fn fuse_exact_prefix<I1, I2, I3>(
     graph: &mut I3,
     edge_reinforcement: impl Fn(DocId) -> f32,
     budget: &FusionBudget,
-) -> Result<DiBudOutcome, ContextraError>
+) -> Result<DiBudOutcome, RankError>
 where
     I1: Iterator<Item = DocId>,
     I2: Iterator<Item = DocId>,
@@ -53,10 +54,10 @@ pub async fn fuse_exact_prefix_async<P, Fut>(
     mut poll: P,
     edge_reinforcement: impl Fn(DocId) -> f32,
     budget: &FusionBudget,
-) -> Result<DiBudOutcome, ContextraError>
+) -> Result<DiBudOutcome, RankError>
 where
     P: FnMut(BudgetedChannel) -> Fut,
-    Fut: Future<Output = Result<Option<DocId>, ContextraError>>,
+    Fut: Future<Output = Result<Option<DocId>, RankError>>,
 {
     budget.validate()?;
     loop {

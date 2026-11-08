@@ -22,12 +22,17 @@ dibud = []
 [dependencies]
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-serde = { workspace = true }
+serde = { version = "1", features = ["derive"] }
 serde_json = { workspace = true }
-ahash = { workspace = true }
+ahash = { version = "0.8", features = ["serde"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 proptest = "1"
-tokio = { workspace = true, features = ["full"] }
+criterion = { workspace = true }
+tokio = { version = "1", features = ["rt", "macros"] }
+
+[[bench]]
+name = "rank_bench"
+harness = false
