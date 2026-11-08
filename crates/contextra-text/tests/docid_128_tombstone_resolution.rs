@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Testsuite `docid_128_tombstone_resolution.rs` für contextra-text.
 //!
 //! # Ring-Zuordnung
