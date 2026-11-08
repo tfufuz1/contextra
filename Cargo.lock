@@ -711,9 +711,11 @@ dependencies = [
 name = "contextra-adapt"
 version = "0.1.0"
 dependencies = [
+ "ahash",
  "blake3",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "proptest",
  "serde",
  "serde_json",
@@ -750,17 +752,18 @@ name = "contextra-audit-export"
 version = "0.1.0"
 dependencies = [
  "contextra-types",
+ "criterion",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tokio",
 ]
 
 [[package]]
 name = "contextra-avv-generator"
 version = "0.1.0"
 dependencies = [
- "contextra-types",
+ "criterion",
  "serde",
  "thiserror 2.0.20",
 ]
@@ -946,19 +949,22 @@ dependencies = [
 name = "contextra-erasure"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm-siv",
+ "ahash",
+ "bincode",
  "blake3",
  "bytes",
- "contextra-ports",
- "contextra-types",
  "ed25519-dalek",
  "futures-util",
  "hmac",
  "loom",
  "parking_lot 0.12.5",
  "proptest",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
@@ -1067,7 +1073,7 @@ dependencies = [
  "blake3",
  "calamine",
  "cfb",
- "contextra-types",
+ "criterion",
  "csv",
  "encoding_rs",
  "html5ever 0.29.1",
@@ -1115,6 +1121,7 @@ dependencies = [
  "blake3",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "ed25519-dalek",
  "rand 0.8.8",
  "serde",
@@ -1193,10 +1200,9 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
- "contextra-crypto",
  "contextra-ports",
- "contextra-testkit",
  "contextra-types",
+ "criterion",
  "parking_lot 0.12.5",
  "rand 0.8.8",
  "regex",
@@ -1234,6 +1240,7 @@ dependencies = [
  "ahash",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "proptest",
  "serde",
  "serde_json",
@@ -1269,6 +1276,7 @@ name = "contextra-sandbox"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "criterion",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -1282,6 +1290,7 @@ name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "contextra-types",
  "criterion",
  "proptest",
  "serde",
@@ -1329,8 +1338,10 @@ dependencies = [
 name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "libc",
  "memmap2",
+ "tempfile",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -1342,6 +1353,7 @@ dependencies = [
  "bytes",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "parking_lot 0.12.5",
  "tempfile",
  "tokio",
@@ -1379,6 +1391,7 @@ dependencies = [
  "bincode",
  "blake3",
  "bytes",
+ "criterion",
  "proptest",
  "serde",
  "serde_json",
@@ -1395,7 +1408,6 @@ dependencies = [
  "blake3",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-simd",
  "contextra-sys",
  "contextra-types",
  "criterion",
@@ -1418,9 +1430,11 @@ name = "contextra-wire"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "criterion",
  "flatbuffers",
  "serde",
  "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

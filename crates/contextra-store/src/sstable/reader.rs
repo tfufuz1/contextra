@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// Helper function to parse block trailer across format versions v0..v4.
 /// Returns `(num_offsets, offsets_start, bloom_bytes)`.
-pub(super) fn parse_block_trailer(
+pub fn parse_block_trailer(
     block_data: &[u8],
     format_version: u16,
 ) -> Result<(usize, usize, &[u8])> {

@@ -210,6 +210,12 @@ impl Wal {
         self.get_integrity_key()
     }
 
+    /// Exposes internal `last_hmac` lock for concurrency testing.
+    #[cfg(any(test, feature = "test-hooks"))]
+    pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {
+        std::sync::Arc::clone(&self.last_hmac)
+    }
+
     #[cfg(any(test, feature = "test-hooks"))]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
         match legacy_integrity_key() {
@@ -226,6 +232,14 @@ impl Wal {
     /// can also alter or replace `.wal_integrity_key`. For cryptographic tamper resistance,
     /// an active `KeyManager` (passphrase-derived keying) must be supplied.
     pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {
+        let default_source = crate::key_source::OsKeyMaterialSource;
+        Self::load_or_create_integrity_key_with_source(wal_path, &default_source).await
+    }
+
+    pub(crate) async fn load_or_create_integrity_key_with_source(
+        wal_path: &Path,
+        key_source: &dyn crate::key_source::KeyMaterialSource,
+    ) -> Result<[u8; 32]> {
         let parent = wal_path.parent().unwrap_or_else(|| Path::new(""));
         let dir_path = if parent.as_os_str().is_empty() {
             Path::new(".")
@@ -261,16 +275,15 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
-            use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
             let mut key = [0u8; 32];
-            rand::thread_rng().fill_bytes(&mut key);
+            key_source.fill_key_bytes(&mut key)?;
 
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                crate::lsm::recovery::next_temp_file_counter()
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -376,7 +389,6 @@ impl Wal {
             parent
         };
 
-        use rand::RngCore;
         use tokio::io::AsyncWriteExt;
 
         let tmp_path = parent_dir.join(format!(
@@ -386,7 +398,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            rand::thread_rng().next_u64()
+            crate::lsm::recovery::next_temp_file_counter()
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -435,7 +447,15 @@ impl Wal {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
+        Self::load_or_create_wal_uuid_with_gen(wal_path, None).await
+    }
+
+    pub(crate) async fn load_or_create_wal_uuid_with_gen(
+        wal_path: &Path,
+        id_gen: Option<&dyn contextra_ports::IdGen>,
+    ) -> Result<[u8; 16]> {
         let uuid_path = {
             let mut p = wal_path.as_os_str().to_os_string();
             p.push(".uuid");
@@ -460,11 +480,31 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
-            let uuid = uuid::Uuid::new_v4();
-            let bytes = *uuid.as_bytes();
+            let bytes = if let Some(gen) = id_gen {
+                let id1 = gen.next_id();
+                let id2 = gen.next_id();
+                let mut b = [0u8; 16];
+                if let Some(chunk1) = b.get_mut(..8) {
+                    chunk1.copy_from_slice(&id1.to_le_bytes());
+                }
+                if let Some(chunk2) = b.get_mut(8..) {
+                    chunk2.copy_from_slice(&id2.to_le_bytes());
+                }
+                b
+            } else {
+                let counter = crate::lsm::recovery::next_temp_file_counter();
+                let pid = std::process::id() as u64;
+                let mut b = [0u8; 16];
+                if let Some(chunk1) = b.get_mut(..8) {
+                    chunk1.copy_from_slice(&pid.to_le_bytes());
+                }
+                if let Some(chunk2) = b.get_mut(8..) {
+                    chunk2.copy_from_slice(&counter.to_le_bytes());
+                }
+                b
+            };
 
             let uuid_filename = uuid_path
                 .file_name()
@@ -474,7 +514,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                crate::lsm::recovery::next_temp_file_counter()
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));

@@ -30,8 +30,6 @@ pub(super) fn estimate_tokens(text: &str) -> usize {
         0
     }
 }
-
-// ANCHOR[contextra-rank:TYPE-001]
 #[cfg(feature = "types-compat")]
 impl TryFrom<SearchResult> for contextra_types::ContextChunk {
     type Error = contextra_types::ContextraError;
@@ -71,7 +69,6 @@ impl TryFrom<SearchResult> for contextra_types::ContextChunk {
 
 /// Provenance record for fused search result.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-// ANCHOR[contextra-rank:TYPE-004]
 /// Auditierbarer Herkunftsnachweis (Provenance) über alle beteiligten Retrieval-Kanäle.
 pub struct ProvenanceRecord {
     /// Distance score from vector search signal.
@@ -136,7 +133,6 @@ impl ProvenanceRecord {
 
 /// Signal contribution details.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:TYPE-005]
 /// Beitrag eines einzelnen Signals zum aggregierten RRF-Score.
 pub struct SignalContribution {
     /// Raw score before normalization/fusion.
@@ -147,9 +143,59 @@ pub struct SignalContribution {
     pub rrf_contribution: f32,
 }
 
+/// Crate-lokaler Typ für gerankte/fusionierte Elemente.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ScoredItem {
+    /// Eindeutiger Dokument- oder Elementbezeichner.
+    pub id: String,
+    /// Punktwert / Ähnlichkeitswert / Fusionswert.
+    pub score: f32,
+    /// Optionaler strukturierter Herkunftsnachweis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<ProvenanceRecord>,
+}
+
+impl ScoredItem {
+    /// Erzeugt ein neues `ScoredItem` ohne Provenienz.
+    pub fn new(id: impl Into<String>, score: f32) -> Self {
+        Self {
+            id: id.into(),
+            score,
+            provenance: None,
+        }
+    }
+
+    /// Fügt dem Element Provenienzinformationen hinzu.
+    pub fn with_provenance(mut self, provenance: ProvenanceRecord) -> Self {
+        self.provenance = Some(provenance);
+        self
+    }
+}
+
+impl From<SearchResult> for ScoredItem {
+    fn from(r: SearchResult) -> Self {
+        Self {
+            id: r.id,
+            score: r.score,
+            provenance: r.provenance,
+        }
+    }
+}
+
+impl From<ScoredItem> for SearchResult {
+    fn from(item: ScoredItem) -> Self {
+        Self {
+            id: item.id,
+            score: item.score,
+            metadata: None,
+            matched_signals: Vec::new(),
+            provenance: item.provenance,
+        }
+    }
+}
+
 /// Individual search result candidate for fusion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-// ANCHOR[contextra-rank:TYPE-002]
 /// Standard-Suchergebnis eines einzelnen Retrieval-Signals oder einer Fusionsstufe.
 pub struct SearchResult {
     /// Document or memory entry identifier.
@@ -167,7 +213,6 @@ pub struct SearchResult {
 }
 
 /// Type alias for fused score output item.
-// ANCHOR[contextra-rank:TYPE-003]
 /// Aggregierter Fusionswert eines Dokuments (Typ-Alias auf SearchResult).
 pub type FusedScore = SearchResult;
 
@@ -179,7 +224,6 @@ pub type FusedScore = SearchResult;
 /// Er unterscheidet sich von `contextra_types::Signal`, welches temporale bzw. System-Signale
 /// repräsentiert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:TYPE-006]
 /// Kennzeichnung der Signalherkunft.
 pub enum Signal {
     /// Dense vector similarity signal.
@@ -202,7 +246,6 @@ impl std::fmt::Display for Signal {
 
 /// Execution report for search query execution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:TYPE-008]
 /// Detaillierter Audit-Report über den Fusions- und Suchablauf.
 pub struct SearchReport {
     /// List of signals that failed during query execution when using Degrade policy.

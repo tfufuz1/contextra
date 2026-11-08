@@ -5,8 +5,6 @@ use contextra_rank::calibration::{
 };
 use contextra_rank::drift::{DriftDetector, DriftStatus};
 use proptest::prelude::*;
-
-// ANCHOR[contextra-rank:CAL-TEST-002]
 proptest! {
     // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]

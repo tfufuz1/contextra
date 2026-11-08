@@ -4,9 +4,9 @@
 
 //! Arena Allocator for HNSW neighbor lists and O(1) Backlink management.
 
-use ahash::AHashMap;
 use contextra_types::{ContextraError, Result};
 use parking_lot::RwLock;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Slot alignment in bytes (64-byte alignment = 16 u32 elements for SIMD cache-line compatibility).
@@ -17,17 +17,17 @@ pub const ARENA_ALIGNMENT_U32: usize = ARENA_ALIGNMENT_BYTES / std::mem::size_of
 /// Composite key (neighbor_ram_idx, layer) for backlink lookups.
 pub type BacklinkKey = (usize, usize);
 
-/// Thread-safe $O(1)$ backlink connection table using `AHashMap`.
+/// Deterministic backlink connection table using `BTreeMap`.
 #[derive(Debug, Default, Clone)]
 pub struct BacklinkTable {
-    pub map: AHashMap<BacklinkKey, Vec<u32>>,
+    pub map: BTreeMap<BacklinkKey, Vec<u32>>,
 }
 
 impl BacklinkTable {
     /// Creates a new `BacklinkTable`.
     pub fn new() -> Self {
         Self {
-            map: AHashMap::new(),
+            map: BTreeMap::new(),
         }
     }
 
@@ -293,9 +293,9 @@ impl HnswArena {
         false
     }
 
-    /// Zeroizes connection memory for a node slot across all layers, clears counts,
-    /// and then marks the node's slot as free in the free_list.
-    pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
+    /// Zeroizes connection memory for a node slot across all layers and clears counts,
+    /// without releasing to `free_list` (`INV-VEC-ZEROIZE-1`, `INV-HNSW-SLOT-1`).
+    pub fn zeroize_node_connections(&self, ram_idx: usize, max_layer: usize, m: usize) {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();
         let mut counts = self.counts.write();
@@ -322,11 +322,12 @@ impl HnswArena {
                 }
             }
         }
-        drop(offsets);
-        drop(count_offsets);
-        drop(counts);
-        drop(arena);
+    }
 
+    /// Zeroizes connection memory for a node slot across all layers, clears counts,
+    /// and then marks the node's slot as free in the free_list.
+    pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
+        self.zeroize_node_connections(ram_idx, max_layer, m);
         self.free_node(ram_idx);
     }
 

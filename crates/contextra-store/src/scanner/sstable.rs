@@ -14,7 +14,7 @@ use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
 use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
 use contextra_types::{RequestContext, Result};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 pub(crate) fn block_on_future<F: std::future::Future>(fut: F) -> F::Output
@@ -66,7 +66,7 @@ impl SstableScanner {
     fn run_positive_control(&self, session: &mut ScanSession) {
         block_on_future(async {
             let temp_dir = std::env::temp_dir();
-            let canary_path = temp_dir.join(format!("canary_{}.sst", uuid::Uuid::new_v4()));
+            let canary_path = temp_dir.join(format!("canary_{}_{}.sst", std::process::id(), crate::lsm::recovery::next_temp_file_counter()));
             let canary_key = b"t:canary:1:chunk:1";
             let canary_val = b"canary_val";
 
@@ -114,7 +114,7 @@ impl LayerScanner for SstableScanner {
         block_on_future(async {
             // 1. Offene / Aktive SSTables im Store erfassen
             let readers = self.storage.sstables_for_scanner().await;
-            let mut active_paths = HashSet::new();
+            let mut active_paths = BTreeSet::new();
 
             for reader in &readers {
                 active_paths.insert(reader.file_path().to_path_buf());

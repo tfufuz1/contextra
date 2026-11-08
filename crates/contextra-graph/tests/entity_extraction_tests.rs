@@ -10,7 +10,7 @@ use contextra_graph::csr::CsrGraph;
 use contextra_graph::entity_extraction::{
     ingest_extracted_relations, EntityExtractor, RuleBasedEntityExtractor,
 };
-use contextra_types::DocId;
+use contextra_graph::types::DocId;
 
 // ANCHOR[contextra-graph:TESTS-ENTITY-EXTRACTION-TESTS-001]
 #[test]

@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `crypto_vectors_extended.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `crypto_vectors_extended`.

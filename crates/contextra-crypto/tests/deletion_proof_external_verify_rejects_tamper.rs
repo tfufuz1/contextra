@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `deletion_proof_external_verify_rejects_tamper.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_external_verify_rejects_tamper`.

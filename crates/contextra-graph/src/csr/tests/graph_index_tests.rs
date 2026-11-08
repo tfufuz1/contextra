@@ -14,7 +14,7 @@ use std::sync::Arc;
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
-    use contextra_testkit::InMemoryStorageEngine;
+    use crate::test_doubles::InMemoryStorageEngine;
 
     let storage: Arc<dyn StorageEngine> = Arc::new(InMemoryStorageEngine::new());
 
@@ -65,7 +65,7 @@ async fn test_insert_entity_direct_and_edge_direct_CASE_and_boundaries() {
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
-    use contextra_testkit::InMemoryStorageEngine;
+    use crate::test_doubles::InMemoryStorageEngine;
 
     let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
@@ -104,7 +104,7 @@ async fn test_persist_entity_edge_delete_persistence_CASE_direct_calls() {
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_load_from_storage_CASE_legacy_f32_weight_and_invalid_key() {
-    use contextra_testkit::InMemoryStorageEngine;
+    use crate::test_doubles::InMemoryStorageEngine;
 
     let storage = InMemoryStorageEngine::new(); // unwrap allowed
 
@@ -612,7 +612,7 @@ async fn test_default_csr_graph_no_consistency_check() {
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-016]
 #[tokio::test]
 async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
-    use contextra_testkit::InMemoryStorageEngine;
+    use crate::test_doubles::InMemoryStorageEngine;
 
     let storage = Arc::new(InMemoryStorageEngine::new());
     let graph = CsrGraph::with_storage(storage.clone());

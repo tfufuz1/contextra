@@ -33,7 +33,7 @@ impl WalScanner {
     fn run_positive_control(&self, session: &mut ScanSession) {
         block_on_future(async {
             let temp_dir = std::env::temp_dir();
-            let canary_path = temp_dir.join(format!("canary_{}.log", uuid::Uuid::new_v4()));
+            let canary_path = temp_dir.join(format!("canary_{}_{}.log", std::process::id(), crate::lsm::recovery::next_temp_file_counter()));
             let canary_key = b"t:canary:1:chunk:1";
             let canary_val = b"canary_val";
 

@@ -24,7 +24,7 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
 use contextra_simd::dispatch::{
     cosine_distance, cosine_distance_f32_bytes, dot_product_distance,
@@ -32,15 +32,15 @@ use contextra_simd::dispatch::{
     euclidean_distance_f32_bytes, euclidean_distance_sq_u8,
 };
 
-// ANCHOR[contextra-simd:BENCH-SIMD-DISTANCES]
 // Benchmark-Ablauf:
-// 1. Initialisiert synthetische Testvektoren mit deterministischen Werten für Dimensionen 128, 384, 768 und 1536.
-// 2. Misst die Ausführungszeit von f32-, byte-optimierten und u8-Distanzberechnungen im Criterion-Loop.
+// 1. Initialisiert synthetische Testvektoren mit deterministischen Werten für Dimensionen 128, 384, 768, 1024, 1536, 3072.
+// 2. Misst die Ausführungszeit und Durchsatz (Elements/sec) von f32-, byte-optimierten und u8-Distanzberechnungen im Criterion-Loop.
 // 3. Verhindert mit `black_box`, dass der Compiler konstante Berechnungen wegoptimiert.
 fn bench_simd_distances(c: &mut Criterion) {
     let mut group = c.benchmark_group("simd_distances");
 
-    for dim in [128, 384, 768, 1536] {
+    for dim in [128, 384, 768, 1024, 1536, 3072] {
+        group.throughput(Throughput::Elements(dim as u64));
         let a: Vec<f32> = (0..dim).map(|i| (i as f32) * 0.01 + 0.1).collect();
         let b: Vec<f32> = (0..dim).map(|i| ((i + 1) as f32) * 0.01 + 0.2).collect();
         let b_bytes: Vec<u8> = b.iter().flat_map(|x| x.to_le_bytes()).collect();

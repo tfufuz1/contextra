@@ -10,6 +10,7 @@ use super::super::group_commit::{
 use super::super::observer::WriteOrigin;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
+use crate::wal::PoisonCause;
 use contextra_mvcc::IndexOp;
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
@@ -249,7 +250,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     }
     let _intent_guard = IntentLockGuard(storage, tx_id);
 
-    // LOCK ORDER 1: commit_mutex
+    // LOCK ORDER (SPEC §3.5, INV-LOCK-ORDER-1, see lsm::lock_order::RANK_COMMIT_MUTEX):
     let commit_lock = storage.commit_mutex.lock().await;
 
     // 1. ReadSet VOR drain_kv
@@ -392,7 +393,10 @@ async fn single_commit_path(
     impl<'a> Drop for SingleCommitGuard<'a> {
         fn drop(&mut self) {
             if !self.committed {
-                let _ = self.wal.rollback_hmac_sync(self.prev_hmac);
+                if !self.wal.rollback_hmac_sync(self.prev_hmac) {
+                    self.wal
+                        .poison_with_cause(PoisonCause::HmacChainDiverged);
+                }
                 if self.first_seq > 0 {
                     if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
                         seq_val.forget_from(self.first_seq);
@@ -620,8 +624,13 @@ async fn leader_commit_path(
     impl<'a> Drop for LeaderCancelGuard<'a> {
         fn drop(&mut self) {
             if !self.committed {
+                let mut hmac_diverged = false;
                 if let Some(prev) = self.prev_hmac {
-                    let _ = self.wal.rollback_hmac_sync(prev);
+                    if !self.wal.rollback_hmac_sync(prev) {
+                        self.wal
+                            .poison_with_cause(PoisonCause::HmacChainDiverged);
+                        hmac_diverged = true;
+                    }
                 }
                 if let Some(pending_queue) = self.pending_queue.take() {
                     for r in pending_queue.requests {
@@ -636,9 +645,12 @@ async fn leader_commit_path(
                             }
                         }
                         self.storage.cleanup_intent_locks_for_tx(r.tx_id);
-                        let _ = r.sender.send(Err(ContextraError::Storage(
-                            "Leader cancelled group commit".into(),
-                        )));
+                        let err_msg = if hmac_diverged {
+                            "Leader cancelled group commit: WAL HMAC chain diverged (handle poisoned)"
+                        } else {
+                            "Leader cancelled group commit"
+                        };
+                        let _ = r.sender.send(Err(ContextraError::Storage(err_msg.into())));
                     }
                 } else if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
                     if let Some(pending_queue) = queue_guard.take() {
@@ -654,9 +666,12 @@ async fn leader_commit_path(
                                 }
                             }
                             self.storage.cleanup_intent_locks_for_tx(r.tx_id);
-                            let _ = r.sender.send(Err(ContextraError::Storage(
-                                "Leader cancelled group commit".into(),
-                            )));
+                            let err_msg = if hmac_diverged {
+                                "Leader cancelled group commit: WAL HMAC chain diverged (handle poisoned)"
+                            } else {
+                                "Leader cancelled group commit"
+                            };
+                            let _ = r.sender.send(Err(ContextraError::Storage(err_msg.into())));
                         }
                     }
                 }

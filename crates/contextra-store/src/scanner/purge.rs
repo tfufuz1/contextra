@@ -47,6 +47,20 @@ impl Purger for LsmPurger {
         let mut purged_units = 0u64;
         let mut bytes_freed = 0u64;
 
+        // Dekker-Write-Fence: Purge vs Flush Koordination
+        if !self.storage.flush_purge_fence.enter_purge() {
+            return Err(ContextraError::Storage(
+                "Purge conflict: active flush in progress".to_string(),
+            ));
+        }
+        struct PurgeFenceGuard<'a>(&'a crate::lsm::fence::FlushPurgeFence);
+        impl<'a> Drop for PurgeFenceGuard<'a> {
+            fn drop(&mut self) {
+                self.0.leave_purge();
+            }
+        }
+        let _purge_fence_guard = PurgeFenceGuard(&self.storage.flush_purge_fence);
+
         block_on_future(async {
             // 2. Erzwungener Flush der Memtables in SSTables
             self.storage.flush().await?;

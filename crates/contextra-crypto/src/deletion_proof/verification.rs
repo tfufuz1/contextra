@@ -146,7 +146,7 @@ impl DeletionProof {
             );
             serde_json::to_string_pretty(&clone)
                 .map_err(|e| ContextraError::Internal(e.to_string()))
-        } else if version == SignatureVersion::V2 || version == SignatureVersion::V3 {
+        } else if version == SignatureVersion::V2 {
             let mut clone = self.clone();
             clone.integrity_warning = Some(
                 "covered_layers/excluded_scopes are not bound to a verified witness measurement in this legacy proof version"

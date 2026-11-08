@@ -546,7 +546,7 @@ impl CompactionEngine {
 
         // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
         let mut io_token_bytes_written: u64 = 0;
-        let mut io_token_last_reset = std::time::Instant::now();
+        let mut io_token_last_reset_nanos = self.clock.monotonic_nanos();
 
         while let Some(item) = heap.pop() {
             if let Some(ct) = cancel_token {
@@ -575,9 +575,15 @@ impl CompactionEngine {
                 // FIND-STO-002: Budgeted Compaction
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
-                    let wait_start = std::time::Instant::now();
+                    let wait_start_nanos = self.clock.monotonic_nanos();
+                    let max_wait_nanos = u64::try_from(self.config.max_backpressure_wait.as_nanos())
+                        .unwrap_or(u64::MAX);
                     while !self.budget.has_memory_capacity() {
-                        if wait_start.elapsed() >= self.config.max_backpressure_wait {
+                        let wait_elapsed_nanos = self
+                            .clock
+                            .monotonic_nanos()
+                            .saturating_sub(wait_start_nanos);
+                        if wait_elapsed_nanos >= max_wait_nanos {
                             let limit_bytes =
                                 self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
                             let used_mb = limit_bytes.div_ceil(1024 * 1024);
@@ -686,7 +692,11 @@ impl CompactionEngine {
                                     if let Some(max_bps) = self.config.max_io_bytes_per_second {
                                         if max_bps > 0 {
                                             io_token_bytes_written += entry_bytes;
-                                            let elapsed = io_token_last_reset.elapsed();
+                                            let elapsed_nanos = self
+                                                .clock
+                                                .monotonic_nanos()
+                                                .saturating_sub(io_token_last_reset_nanos);
+                                            let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                                             let target = std::time::Duration::from_secs_f64(
                                                 io_token_bytes_written as f64 / max_bps as f64,
                                             );
@@ -694,13 +704,17 @@ impl CompactionEngine {
                                                 let delay = (target - elapsed)
                                                     .min(std::time::Duration::from_millis(100));
                                                 tokio::time::sleep(delay).await;
-                                                let total_elapsed = io_token_last_reset.elapsed();
+                                                let total_elapsed_nanos = self
+                                                    .clock
+                                                    .monotonic_nanos()
+                                                    .saturating_sub(io_token_last_reset_nanos);
+                                                let total_elapsed = std::time::Duration::from_nanos(total_elapsed_nanos);
                                                 let allowed_bytes = (total_elapsed.as_secs_f64()
                                                     * max_bps as f64)
                                                     as u64;
                                                 io_token_bytes_written = io_token_bytes_written
                                                     .saturating_sub(allowed_bytes);
-                                                io_token_last_reset = std::time::Instant::now();
+                                                io_token_last_reset_nanos = self.clock.monotonic_nanos();
                                             }
                                         }
                                     }
@@ -762,7 +776,11 @@ impl CompactionEngine {
                         if let Some(max_bps) = self.config.max_io_bytes_per_second {
                             if max_bps > 0 {
                                 io_token_bytes_written += entry_bytes;
-                                let elapsed = io_token_last_reset.elapsed();
+                                let elapsed_nanos = self
+                                    .clock
+                                    .monotonic_nanos()
+                                    .saturating_sub(io_token_last_reset_nanos);
+                                let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                                 let target = std::time::Duration::from_secs_f64(
                                     io_token_bytes_written as f64 / max_bps as f64,
                                 );
@@ -773,12 +791,16 @@ impl CompactionEngine {
                                     // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
                                     tokio::time::sleep(delay).await;
                                     // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
-                                    let total_elapsed = io_token_last_reset.elapsed();
+                                    let total_elapsed_nanos = self
+                                        .clock
+                                        .monotonic_nanos()
+                                        .saturating_sub(io_token_last_reset_nanos);
+                                    let total_elapsed = std::time::Duration::from_nanos(total_elapsed_nanos);
                                     let allowed_bytes =
                                         (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
                                     io_token_bytes_written =
                                         io_token_bytes_written.saturating_sub(allowed_bytes);
-                                    io_token_last_reset = std::time::Instant::now();
+                                    io_token_last_reset_nanos = self.clock.monotonic_nanos();
                                 }
                             }
                         }

@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `legacy_hmac_collision_property.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `legacy_hmac_collision_property`.

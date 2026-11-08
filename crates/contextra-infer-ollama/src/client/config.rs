@@ -1,4 +1,10 @@
+#[cfg(feature = "http")]
 use super::policy::EndpointPolicy;
+#[cfg(not(feature = "http"))]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EndpointPolicy {
+    pub allow_remote: bool,
+}
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

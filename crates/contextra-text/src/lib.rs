@@ -37,27 +37,47 @@
 
 #![forbid(unsafe_code)]
 
+pub mod contract;
+pub mod error;
+pub mod memory_index;
+pub mod traits;
+pub mod types;
+
+pub use contract::{Clock, DocKey, Epoch, Error as ContractError, Result as ContractResult, Rng};
+
+pub use error::{Result as LocalResult, TextError};
+pub use memory_index::{CompactStats, MemoryTextIndex};
+pub use traits::{Index, Maintain};
+pub use types::{DocId as LocalDocId, TextHit, MAX_SEARCH_K as LOCAL_MAX_SEARCH_K};
+
 pub mod bm25;
 pub mod domain;
+#[cfg(feature = "types-compat")]
 pub mod inverted;
 pub mod morphology;
 pub mod posting_list;
+#[cfg(feature = "types-compat")]
 pub mod stream;
 pub mod tokenizer;
+#[cfg(feature = "types-compat")]
 pub mod wand;
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
+#[cfg(feature = "types-compat")]
 pub use inverted::{
     text_purger, text_scanner, BM25MorphIndex, InvertedIndex, Language, PurgeReport, TextPurger,
     TextScanner,
 };
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
+#[cfg(feature = "types-compat")]
 pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
 pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
+#[cfg(feature = "types-compat")]
 use contextra_ports::{TextIndex, TextIndexStats};
+#[cfg(feature = "types-compat")]
 use contextra_types::{DocId, Result, ScoredDocument, TxId};
 
 // ANCHOR[contextra-text:LIB-001]
@@ -70,10 +90,16 @@ use contextra_types::{DocId, Result, ScoredDocument, TxId};
 /// # Generische Parameter
 /// - `S`: Implementierung von [`contextra_ports::StorageEngine`], über welche
 ///   Posting-Listen und Dokument-Längen persistent abgelegt werden.
+#[cfg(feature = "types-compat")]
+#[deprecated(
+    since = "0.1.0",
+    note = "Ports-Anbindung gehört in contextra-erasure-adapters / contextra-ports Adapter"
+)]
 pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
     index: InvertedIndex<S>,
 }
 
+#[cfg(feature = "types-compat")]
 impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
     // ANCHOR[contextra-text:LIB-002]
     /// Erzeugt eine neue `Bm25Scorer`-Instanz über der angegebenen Speicher-Engine.
@@ -92,6 +118,7 @@ impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
     }
 }
 
+#[cfg(feature = "types-compat")]
 impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
     // ANCHOR[contextra-text:LIB-003]
     /// Führt eine Volltextsuche anhand der Query aus und liefert bis zu `k` Treffer.
@@ -167,6 +194,7 @@ impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "types-compat")]
 mod tests {
     use super::*;
     use contextra_ports::BoxFuture;

@@ -14,7 +14,7 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat"]
+default = ["std"]
 std = []
 serde = ["dep:serde"]
 types-compat = ["dep:contextra-types"]

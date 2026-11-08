@@ -36,7 +36,7 @@ impl HnswScanner {
             .ef_search(16)
             .build()?;
 
-        let canary_index = Arc::new(HnswIndex::try_new(config)?);
+        let canary_index: Arc<HnswIndex> = Arc::new(HnswIndex::try_new(config)?);
         let canary_doc_id = DocId::new(999_999);
         let canary_vector = vec![1.0f32, 2.0, 3.0, 4.0];
 
@@ -228,5 +228,111 @@ impl LayerScanner for HnswScanner {
 
     fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> Result<()> {
         HnswScanner::scan_units(self, session, ctx)
+    }
+}
+
+/// Struktur für die lesende Inspektionssicht (`inspect`-Sicht).
+///
+/// Ermittelt, ob Spuren einer Dokument-ID bzw. eines Vektors noch in ID-Mappings,
+/// Slots (Nicht-Null-Bytes), Graphkanten oder Zwischenpuffern vorkommen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResidualReport {
+    /// Ob die ID noch in der ID-zu-Knoten-Zuordnung auffindbar ist.
+    pub in_id_map: bool,
+    /// Ob im zugehörigen Slot noch Vektordaten ungleich Null liegen.
+    pub non_zero_vector_bytes: bool,
+    /// Anzahl gefundener Kanten im Graphen, die auf diesen Slot verweisen.
+    pub incoming_edge_count: usize,
+    /// Ob noch Operationen im Staging-Buffer verbleiben.
+    pub in_staging: bool,
+}
+
+impl ResidualReport {
+    /// Gibt an, ob noch irgendwelche Restspuren (ID, Vektorbytes, Kanten, Staging) existieren.
+    pub fn has_residual(&self) -> bool {
+        self.in_id_map
+            || self.non_zero_vector_bytes
+            || self.incoming_edge_count > 0
+            || self.in_staging
+    }
+}
+
+impl HnswIndex {
+    /// Lesende Inspektionssicht: Prüft, ob `doc_id` noch in Slots, Kanten oder Puffern vorkommt.
+    pub fn inspect_residual(&self, doc_id: DocId) -> ResidualReport {
+        let doc_map = self.inner.hot.doc_to_node.read();
+        let target_idx_opt = doc_map.get(&doc_id.inner()).copied();
+        let in_id_map = target_idx_opt.is_some();
+
+        let nodes = self.inner.hot.nodes.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_node_count = mmap_guard
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+
+        let mut non_zero_vector_bytes = false;
+        let mut target_global_idx = None;
+
+        if let Some(idx) = target_idx_opt {
+            target_global_idx = Some(idx);
+        } else {
+            for (ram_idx, node) in nodes.iter().enumerate() {
+                if node.doc_id == doc_id {
+                    target_global_idx = Some(mmap_node_count + ram_idx);
+                    break;
+                }
+            }
+        }
+
+        if let Some(target_idx) = target_global_idx {
+            if target_idx >= mmap_node_count {
+                let ram_idx = target_idx - mmap_node_count;
+                if let Some(node) = nodes.get(ram_idx) {
+                    non_zero_vector_bytes = match &node.vector {
+                        VectorData::F32(v) => v.iter().any(|&f| f.abs() > f32::EPSILON),
+                        VectorData::U8(v) => v.iter().any(|&b| b != 0),
+                    };
+                }
+            } else if let Some(mmap) = mmap_guard.as_ref() {
+                if let Ok(rec) = mmap.get_node_record(target_idx) {
+                    if let Ok(vec_bytes) = mmap.get_vector(&rec) {
+                        non_zero_vector_bytes = vec_bytes.iter().any(|&b| b != 0);
+                    }
+                }
+            }
+        }
+
+        let mut incoming_edge_count = 0;
+        if let Some(target_idx) = target_global_idx {
+            let m = self.inner.cold.config.m;
+            let deleted = self.inner.cold.deleted_nodes.read();
+
+            for (ram_idx, node) in nodes.iter().enumerate() {
+                let global_idx = mmap_node_count + ram_idx;
+                if deleted.contains(global_idx as u64) {
+                    continue;
+                }
+                for layer in 0..=node.max_layer {
+                    let conns = self
+                        .inner
+                        .hot
+                        .arena
+                        .get_ram_node_connections(ram_idx, layer, m);
+                    if conns.contains(&(target_idx as u32)) {
+                        incoming_edge_count += 1;
+                    }
+                }
+            }
+        }
+
+        let in_staging = false;
+
+        ResidualReport {
+            in_id_map,
+            non_zero_vector_bytes,
+            incoming_edge_count,
+            in_staging,
+        }
     }
 }

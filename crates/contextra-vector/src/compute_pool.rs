@@ -25,6 +25,8 @@ impl<T> TaskHandle<T> {
 struct PoolState {
     job_tx: Sender<Job>,
     active_jobs: AtomicUsize,
+    active_jobs_condvar: parking_lot::Condvar,
+    active_jobs_mutex: parking_lot::Mutex<()>,
     max_workers: usize,
     is_shutdown: AtomicBool,
 }
@@ -46,6 +48,8 @@ impl ComputePool {
         let state = Arc::new(PoolState {
             job_tx,
             active_jobs: AtomicUsize::new(0),
+            active_jobs_condvar: parking_lot::Condvar::new(),
+            active_jobs_mutex: parking_lot::Mutex::new(()),
             max_workers: workers,
             is_shutdown: AtomicBool::new(false),
         });
@@ -86,6 +90,8 @@ impl ComputePool {
                             }
 
                             state_clone.active_jobs.fetch_sub(1, Ordering::SeqCst);
+                            let _lock = state_clone.active_jobs_mutex.lock();
+                            state_clone.active_jobs_condvar.notify_all();
                         }
                         None => break, // Channel closed when PoolState is dropped
                     }
@@ -152,6 +158,7 @@ impl std::fmt::Debug for ComputePool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -201,11 +208,18 @@ mod tests {
         assert_eq!(handle_normal.join().unwrap(), 142);
 
         // 3. Verify active_jobs returns to 0 and max_workers capacity is unchanged.
-        // Spin-wait briefly to ensure worker thread has executed fetch_sub on active_jobs.
-        let mut attempts = 0;
-        while pool.active_jobs() > 0 && attempts < 100 {
-            std::thread::sleep(std::time::Duration::from_millis(5));
-            attempts += 1;
+        // Wait via condvar instead of polling with thread::sleep.
+        {
+            let mut guard = pool.inner.active_jobs_mutex.lock();
+            while pool.active_jobs() > 0 {
+                let res = pool
+                    .inner
+                    .active_jobs_condvar
+                    .wait_for(&mut guard, std::time::Duration::from_secs(2));
+                if res.timed_out() {
+                    break;
+                }
+            }
         }
         assert_eq!(pool.active_jobs(), 0);
         assert_eq!(pool.max_workers(), 1);

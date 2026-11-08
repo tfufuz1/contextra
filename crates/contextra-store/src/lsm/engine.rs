@@ -54,6 +54,8 @@ pub struct LsmStorage {
     pub(super) commit_mutex: tokio::sync::Mutex<()>,
     /// Mutex to serialize flush executions and prevent duplicate SST / double-release races (H4c).
     pub(super) flush_mutex: tokio::sync::Mutex<()>,
+    /// Write-fencing coordinator between Flush and Purge (SPEC §3.5, WP-STO-5).
+    pub(crate) flush_purge_fence: super::fence::FlushPurgeFence,
     /// Pending sealed WAL files awaiting SST flush and cleanup (H4a + H4b).
     pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,
     pub(super) cancel_token: tokio_util::sync::CancellationToken,
@@ -80,11 +82,34 @@ impl Drop for LsmStorage {
 
 impl LsmStorage {
     /// Opens or recovers an LSM storage instance with the given configuration.
+    ///
+    /// # Errors
+    /// Gibt `ContextraError::Storage` zurück, falls I/O-Fehler, Verzeichnis-Lock-Konflikte
+    /// oder Korruptionen während des Manifest- oder WAL-Replays auftreten.
+    ///
+    /// # Panics
+    /// Panics: keine.
+    ///
+    /// # Crash
+    /// Führt Open-Heal am WAL-Tail durch; stellt den konsistenten Zustand nach Abstürzen wieder her.
+    ///
+    /// # Concurrency & Performance
+    /// Initialisierung blockiert bis zur Freigabe des Verzeichnis-Locks (`DirLock`). Komplexität: $O(N)$
+    /// proportional zur Anzahl unkompaktierter WAL-Frames und Manifest-Einträge.
     pub async fn open(config: LsmConfig) -> Result<Self> {
         Self::new_with_merge_operator(config, None).await
     }
 
     /// Opens or recovers an LSM storage instance with the given configuration and a `MergeOperator`.
+    ///
+    /// # Errors
+    /// Gibt `ContextraError::Storage` zurück bei Initialisierungs-, Format- oder I/O-Fehlern.
+    ///
+    /// # Panics
+    /// Panics: keine.
+    ///
+    /// # Crash
+    /// Validiert bestehende SSTables und stellt WAL-Kettenintegrität über HMAC sicher.
     pub async fn open_with_merge_operator(
         config: LsmConfig,
         merge_operator: Arc<dyn MergeOperator>,
@@ -111,6 +136,15 @@ impl LsmStorage {
     }
 
     /// Gracefully closes the storage engine, stopping background tasks and flushing active memtable to disk.
+    ///
+    /// # Errors
+    /// Gibt `ContextraError::Storage` zurück, falls beim abschließenden Flush I/O- oder Fsync-Fehler auftreten.
+    ///
+    /// # Panics
+    /// Panics: keine.
+    ///
+    /// # Crash
+    /// Schreibt und synchronisiert verbleibende MemTable-Inhalte als SSTable auf Platte.
     pub async fn close(&self) -> Result<()> {
         self.wait_shutdown().await;
         self.flush().await?;
@@ -177,17 +211,17 @@ impl LsmStorage {
         self.observer_registry.max_observer_latency()
     }
 
-    /// Returns the currently configured [`MetricsSink`].
+    /// Returns the currently configured [`contextra_ports::MetricsSink`].
     pub fn metrics_sink(&self) -> Arc<dyn contextra_ports::MetricsSink> {
         self.metrics_sink.read().clone()
     }
 
-    /// Sets the [`MetricsSink`] for recording operational metrics.
+    /// Sets the [`contextra_ports::MetricsSink`] for recording operational metrics.
     pub fn set_metrics_sink(&self, sink: Arc<dyn contextra_ports::MetricsSink>) {
         *self.metrics_sink.write() = sink;
     }
 
-    /// Configures the [`MetricsSink`] fluently on `self` and returns `self`.
+    /// Configures the [`contextra_ports::MetricsSink`] fluently on `self` and returns `self`.
     pub fn with_metrics_sink(self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         *self.metrics_sink.write() = sink;
         self
@@ -210,7 +244,7 @@ impl LsmStorage {
         self
     }
 
-    /// Sets or replaces the [`SsiValidator`] port for transaction conflict detection.
+    /// Sets or replaces the [`contextra_mvcc::SsiValidator`] port for transaction conflict detection.
     pub fn set_ssi_validator(
         &mut self,
         validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
@@ -219,7 +253,7 @@ impl LsmStorage {
         self.sequence_log_ssi_validator = None;
     }
 
-    /// Configures the [`SsiValidator`] fluently on `self` and returns `self`.
+    /// Configures the [`contextra_mvcc::SsiValidator`] fluently on `self` and returns `self`.
     pub fn with_ssi_validator(
         mut self,
         validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,

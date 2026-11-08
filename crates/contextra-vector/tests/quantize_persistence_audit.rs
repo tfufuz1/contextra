@@ -219,9 +219,9 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
     let hnsw_pre_results = hnsw_index.search(query, 5).await.unwrap();
 
     // Save and Reload
-    hnsw_index.save(&hnsw_path).await.unwrap();
+    hnsw_index.save(&hnsw_path).unwrap();
     let hnsw_reloaded = HnswIndex::try_new(hnsw_config).unwrap();
-    hnsw_reloaded.load_mmap(&hnsw_path).await.unwrap();
+    hnsw_reloaded.load_mmap(&hnsw_path).unwrap();
 
     let hnsw_post_results = hnsw_reloaded.search(query, 5).await.unwrap();
 
