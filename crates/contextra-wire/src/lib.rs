@@ -1,11 +1,11 @@
 // FILE-CONTEXT
-// STAND: 2026-10-27T00:00:00Z
-// ZWECK: Main entrypoint for IPC framing and zero-copy wire adapters
-// RELEVANTE SPEZIFIKATION: P7 (Zero-Panic), P2 (Unsafe-Inseln), REQ-QA-010
+// STAND: 2026-11-08T12:00:00Z
+// ZWECK: Main entrypoint for IPC framing, zero-copy wire adapters, and unified error handling
+// RELEVANTE SPEZIFIKATION: P7 (Zero-Panic), P2 (Unsafe-Inseln), B4 (Unified Error), REQ-QA-010
 
 //! # Crate `contextra-wire`
 //!
-//! **Ring & Klasse:** Ring 0 (Unsafe-Insel 3 von 3), Klasse Kern `[K]`.
+//! **Ring & Klasse:** Ring 0 (Unsafe-Insel 3 von 3), Klasse A.
 //!
 //! ## Zweck
 //! `contextra-wire` stellt performante Zero-Copy-Serialisierungs- und Deserialisierungs-Primitiven
@@ -14,12 +14,13 @@
 //! 2. Gehärtete Verifikationsfunktionen (`verification`), die Puffer vor dem Zugriff strikt validieren.
 //! 3. Zero-Copy-Adapter (`adapter`), wie den referenzgezählten `WireBuffer`.
 //! 4. Einen robusten, angriffssicheren JSON-RPC-2.0-Parser (`jsonrpc`) ohne Panics.
+//! 5. Einen einheitlichen Fehlertyp `Error` (`Result<T>`) gemäß SPEC v4.0 B4.
 //!
 //! ## Einbindung und Abhängigkeiten
-//! - **Abhängigkeiten (normal):** `bytes`, `flatbuffers`, `serde`, `serde_json`.
-//! - **Wird eingebunden von:** `contextra-mcp`, `contextra-py`, `contextra-router`.
-//! - **Ring-0-Restriktionen:** Gemäß Regel 3 aus `CLAUDE.md` dürfen Zeit, Zufall und IDs nicht direkt
-//!   erzeugt werden; I/O erfolgt über Ports oder übergebene Puffer.
+//! - **Abhängigkeiten (normal):** `bytes`, `flatbuffers`, `serde`, `serde_json`, `thiserror`.
+//! - **Wird eingebunden von:** `contextra-mcp`, `contextra-py`, `contextra-router`, `contextra-core`.
+//! - **Ring-0-Restriktionen:** Gemäß Regel 3 dürfen Zeit, Zufall und IDs nicht direkt
+//!   erzeugt werden; I/O erfolgt über übergebene Puffer.
 //!
 //! ## Sicherheitsinvariante & Zero-Panic-Garantie
 //! Die Crate erzwingt `#![deny(clippy::unwrap_used)]`, `#![deny(clippy::expect_used)]` und
@@ -50,3 +51,26 @@ pub use generated::contextra_generated;
 pub use generated::contextra_generated::contextra::ipc::*;
 pub use jsonrpc::*;
 pub use verification::*;
+
+// ANCHOR[contextra-wire:LIB-004]
+/// Zentraler, typisierter Fehlertyp für `contextra-wire` gemäß SPEC v4.0 (B4).
+///
+/// Fasst FlatBuffers-Verifikationsfehler und JSON-RPC-Protokollfehler zusammen.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// Fehler bei der FlatBuffers-Validierung oder Strukturprüfung.
+    #[error("flatbuffers error: {0}")]
+    FlatBuffer(#[from] FlatBufferError),
+
+    /// Fehler beim Parsen oder Validieren eines JSON-RPC 2.0 Payloads.
+    #[error("json-rpc error: {0}")]
+    JsonRpc(#[from] JsonRpcError),
+
+    /// Ungültige Eingabedaten oder verletzte Puffer-Invariante.
+    #[error("invalid input: {0}")]
+    InvalidInput(&'static str),
+}
+
+/// Standard-Result-Typ für `contextra-wire`.
+pub type Result<T> = core::result::Result<T, Error>;
