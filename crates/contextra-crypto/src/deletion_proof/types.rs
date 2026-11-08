@@ -347,7 +347,10 @@ pub struct DeletionProof {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub audit_chain_position: Option<u64>,
     /// Custody level recorded during deletion proof generation.
-    #[serde(default = "default_custody_level")]
+    #[serde(
+        default = "default_custody_level",
+        skip_serializing_if = "is_default_custody"
+    )]
     pub custody: CustodyLevel,
     /// Detailed measurements per layer for V5 proofs.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -362,6 +365,10 @@ pub struct DeletionProof {
 
 const fn default_custody_level() -> CustodyLevel {
     CustodyLevel::Local
+}
+
+fn is_default_custody(custody: &CustodyLevel) -> bool {
+    matches!(custody, CustodyLevel::Local)
 }
 
 const fn default_signature_version() -> u8 {

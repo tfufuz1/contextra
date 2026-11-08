@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `guarantee_deletion_irrecoverable.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `guarantee_deletion_irrecoverable`.

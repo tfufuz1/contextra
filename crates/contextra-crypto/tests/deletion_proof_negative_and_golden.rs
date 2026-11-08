@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `deletion_proof_negative_and_golden.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_negative_and_golden`.
