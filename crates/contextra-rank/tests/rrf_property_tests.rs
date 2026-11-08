@@ -15,8 +15,6 @@ fn make_search_result(id: &str, score: f32) -> SearchResult {
         provenance: None,
     }
 }
-
-// ANCHOR[contextra-rank:RRF-TEST-001]
 proptest! {
     // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
