@@ -26,7 +26,7 @@ Im Baukastensystem fungiert `contextra-store` als neutraler, robuster Persistenz
 ## Garantien
 - **ACID / Durability:** Atomare Commits über Write-Ahead-Logging mit synchronen Gruppen-Flushes.
 - **Speichersicherheit:** Striktes `#![forbid(unsafe_code)]` im gesamten Produktionscode.
-- **Neutralität:** Datenhaltung und physische Bereinigung (`Purger`, `LayerScanner`) ohne Rechts- oder Berichtsbegrifflichkeiten (vollständig entkoppelt).
+- **Neutralität:** Datenhaltung und physische Bereinigung ohne Rechts- oder Berichtsbegrifflichkeiten (SPEC §6.1, E-04). Die Port-Namen in `scanner/` (`Purger`, `LayerScanner`, `WitnessLayer`) verbleiben bis zur Bereitstellung von `contextra-erasure-adapters` hier und bilden die einzige dokumentierte Ausnahme.
 
 ## Einbettungsbeispiel
 ```rust
