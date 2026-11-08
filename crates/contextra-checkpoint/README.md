@@ -1,20 +1,44 @@
 # contextra-checkpoint
 
-Persistent Checkpoint Engine und Blake3 Manifest-Verifikation.
+Persistent Checkpoint Engine, Hardlink Cloner und Blake3 Manifest-Verifikation.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **B (Storage Bundle)** (Ring 1, `stable`; SPEC v4.0 §5).
 
-`contextra-checkpoint` verwaltet Time-Travel Checkpoints, Transaktions-Guards und Snapshots für Contextra (Ring 1).
+`contextra-checkpoint` verwaltet Time-Travel Checkpoints, Snapshot-Exporte, Transaktions-Guards und Snapshots für Contextra (Ring 1).
 
 ## Zweck
 
-Ermöglicht deterministische Wiederherstellung von Zuständen, Session-Snapshots und RAII-gesicherte Transaktions-Rollbacks über eine saubere Port-Schnittstelle ohne globalen Zustand.
+Ermöglicht deterministische Wiederherstellung von Zuständen, konsistente Snapshot-Exporte und RAII-gesicherte Transaktions-Rollbacks über eine saubere Port-Schnittstelle (`StorageEngine`, `Vfs`, `Clock`, `IdGen`) ohne globalen Zustand.
+
+## Standalone Copy-Paste-Anleitung (Gate G3)
+
+Um diesen Baustein in einem externen Projekt autark zu nutzen:
+
+```bash
+python3 tools/export_crate.py contextra-checkpoint --out /pfad/zu/deinem/projekt/contextra-checkpoint
+```
+
+## Externe Abhängigkeiten
+
+- `blake3`: Kryptografische Prüfsummen für Manifest-Integrität.
+- `bytes`: Pufferverwaltung für I/O.
+- `parking_lot`: Schnelle, blockierungsfreie In-Memory Mutexe.
+- `serde`, `serde_json`: Serialisierung von Manifesten und Metadaten.
+- `tokio`: Asynchrone Laufzeit und I/O-Primitiven.
+- `tracing`: Strukturierte Diagnose-Logs.
 
 ## Ring-Zugehörigkeit & Status
 
+- **Klasse:** Klasse B (Storage Bundle)
 - **Ring:** Ring 1 (Persistenz)
 - **Status:** 🟢 Stabil / Entkoppelt
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+
+## Nicht-Ziele (Out of Scope)
+
+- **Keine juristische Löschlogik:** Enthält keine DSGVO/GDPR-Konzepte, Saga-Orchestrierung oder Deletion-Proofs. Diese verbleiben exklusiv in `contextra-erasure`.
+- **Keine Schlüsselpersistenz:** Daten-Checkpoints enthalten niemals kryptografische Schlüsselmaterialien (Zwei-Spuren-Prinzip).
+- **Keine direkte Dateisystem-Bindung:** Alle I/O-Operationen laufen über die Ports `StorageEngine` und `Vfs`.
 
 ## Abgrenzung: CheckpointGuard vs. Erasure RestoreGuard
 
