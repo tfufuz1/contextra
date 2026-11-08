@@ -284,10 +284,48 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
+    /// Erstellt einen Puffer mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`), Shard-Anzahl und Konfiguration.
+    pub fn new_with_time_fn_and_config<F>(
+        time_fn: F,
+        shard_count: usize,
+        config: TxBufferConfig,
+    ) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        Self::new_with_clock_and_config(Arc::new(ClosureClock(time_fn)), shard_count, config)
+    }
+
     /// Bindet eine benutzerdefinierte [`Clock`]-Instanz an diesen Puffer an.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
+    }
+
+    /// Bindet eine Zeitstempel-Closure (State-Passing per `Fn() -> u64`) an diesen Puffer an.
+    pub fn with_time_fn<F>(self, time_fn: F) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        self.with_clock(Arc::new(ClosureClock(time_fn)))
     }
 
     /// Liefert eine Referenz auf den aktiven [`Clock`]-Port.

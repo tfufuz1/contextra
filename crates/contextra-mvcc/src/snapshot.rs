@@ -89,6 +89,23 @@ impl SnapshotRegistry {
         }
     }
 
+    /// Erstellt eine neue Snapshot-Registry mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`).
+    pub fn with_time_fn<F>(time_fn: F) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        Self::with_clock(Arc::new(ClosureClock(time_fn)))
+    }
+
     /// Liefert eine Referenz auf den aktiven Zeitport ([`Clock`]).
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
@@ -467,6 +484,59 @@ mod tests {
 
         drop(g_a);
         drop(g_b);
+    }
+
+    // Beweist strikte Tenant-Isolation: Widerruf für Mandant A berührt ausschließlich Snapshots von Mandant A.
+    // Snapshots von Mandant B im selben Sequenzbereich bleiben vollständig aktiv und schützen weiterhin min_active_seqno.
+    #[test]
+    fn test_tenant_isolation_revocation_guarantee() {
+        let registry = Arc::new(SnapshotRegistry::new());
+        let tenant_a = TenantId(10);
+        let tenant_b = TenantId(20);
+
+        // Registriere zwei Guards auf exakt derselben Sequenznummer (150) für verschiedene Mandanten.
+        let guard_a = registry.register_for_tenant(tenant_a, 150);
+        let guard_b = registry.register_for_tenant(tenant_b, 150);
+        assert_eq!(guard_a.tenant(), Some(tenant_a));
+        assert_eq!(guard_b.tenant(), Some(tenant_b));
+        assert_eq!(registry.min_read_snapshot(), Some(150));
+        assert_eq!(registry.min_active_seqno(), 150);
+
+        // Widerrufe Snapshots von Tenant A im Bereich 100..200
+        let revoked_count = registry.revoke_covering(tenant_a, 100..200, 150);
+        assert_eq!(
+            revoked_count, 1,
+            "Exakt 1 Snapshot für Mandant A muss widerrufen werden"
+        );
+
+        // Mandant B ist nach wie vor aktiv auf Sequenz 150!
+        assert_eq!(
+            registry.min_read_snapshot(),
+            Some(150),
+            "Mandant B muss unverändert aktiv bleiben und min_read_snapshot schützen"
+        );
+        assert_eq!(registry.min_active_seqno(), 150);
+
+        // Erneuter Widerruf für Mandant A im selben Bereich bewirkt nichts mehr
+        let revoked_again = registry.revoke_covering(tenant_a, 100..200, 150);
+        assert_eq!(revoked_again, 0);
+
+        // Erst wenn auch Mandant B widerrufen wird, wird die Sequenznummer freigegeben
+        let revoked_b = registry.revoke_covering(tenant_b, 100..200, 150);
+        assert_eq!(revoked_b, 1);
+        assert_eq!(
+            registry.min_read_snapshot(),
+            None,
+            "Nach Widerruf aller Mandanten gibt min_read_snapshot None zurück"
+        );
+        assert_eq!(
+            registry.min_active_seqno(),
+            u64::MAX,
+            "min_active_seqno signalisiert keine aktiven Leser"
+        );
+
+        drop(guard_a);
+        drop(guard_b);
     }
 
     #[test]

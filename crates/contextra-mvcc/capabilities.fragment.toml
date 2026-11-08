@@ -1,0 +1,4 @@
+[crates.contextra-mvcc]
+klasse = "B"
+may_depend_on = ["contextra-types", "contextra-ports"]
+transitional = []

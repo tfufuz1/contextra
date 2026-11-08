@@ -17,16 +17,16 @@ use contextra_erasure::saga::machine::{EraseSaga, SagaState};
 use contextra_erasure::saga::seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
+use contextra_erasure::types_local::Clock;
 use contextra_erasure::types_local::ErasureId;
 use contextra_erasure::types_local::GateDecision;
+use contextra_erasure::types_local::IdGen;
 use contextra_erasure::types_local::PendingReason;
 use contextra_erasure::types_local::{
     BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
 };
 use contextra_erasure::types_local::{EraseTarget, LayerId, LayerWitness};
-use contextra_ports::clock::Clock;
-use contextra_ports::id_gen::IdGen;
-use contextra_ports::BoxFuture;
+use futures_util::future::BoxFuture;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

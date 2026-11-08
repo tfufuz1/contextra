@@ -559,10 +559,44 @@ impl SequenceLogSsiValidator {
         }
     }
 
+    /// Erstellt einen neuen Validator mit einer Zeitstempel-Closure (State-Passing per `Fn() -> u64`) und Kapazitätsgrenze.
+    pub fn new_with_time_fn_and_bounds<F>(time_fn: F, max_tracked_keys: usize) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        Self::new_with_clock_and_bounds(Arc::new(ClosureClock(time_fn)), max_tracked_keys)
+    }
+
     /// Bindet eine benutzerdefinierte Implementierung des [`Clock`]-Ports an den Validator.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
+    }
+
+    /// Bindet eine Zeitstempel-Closure (State-Passing per `Fn() -> u64`) an den Validator.
+    pub fn with_time_fn<F>(self, time_fn: F) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        self.with_clock(Arc::new(ClosureClock(time_fn)))
     }
 
     /// Ersetzt die aktive [`Clock`]-Instanz.

@@ -104,3 +104,55 @@ fn test_disjoint_read_write_sets_succeed() {
     validator.record_commit_key(&key_d, 20);
     buffer.drain(tx2);
 }
+
+// Prüft die Erkennung von Anti-Dependency-Zyklen (Write-Skew) bei atomarem validate_and_record ohne Storage-Kopplung.
+// Szenario: Bankkonto-Invariante Balance(A) + Balance(B) >= 0.
+// Beide Transaktionen lesen Konten A und B. Tx1 hebt von A ab, Tx2 hebt von B ab.
+// Beide heben so viel ab, dass jede Transaktion für sich gültig wäre, aber gemeinsam die Invariante brechen würden.
+#[test]
+fn test_storage_independent_anti_dependency_cycle_detection() {
+    let validator = SequenceLogSsiValidator::new();
+    let tx1 = TxId::new(301);
+    let tx2 = TxId::new(302);
+
+    let key_account_a = b"bank:acc_a".to_vec();
+    let key_account_b = b"bank:acc_b".to_vec();
+
+    // Beide Transaktionen starten mit logischer Snapshot-Sequenz 10
+    let snapshot_seq = 10;
+
+    let mut read_set_1 = contextra_mvcc::ReadSet::new();
+    read_set_1.record_read(key_account_a.clone(), snapshot_seq);
+    read_set_1.record_read(key_account_b.clone(), snapshot_seq);
+
+    let mut read_set_2 = contextra_mvcc::ReadSet::new();
+    read_set_2.record_read(key_account_a.clone(), snapshot_seq);
+    read_set_2.record_read(key_account_b.clone(), snapshot_seq);
+
+    // Tx1 modifiziert Account A und validiert/committet atomar bei Sequenz 12
+    let write_keys_1 = [key_account_a.as_slice()];
+    let res1 = validator.validate_and_record(tx1, &read_set_1, write_keys_1, 12);
+    assert!(
+        res1.is_ok(),
+        "Tx1 muss erfolgreich validieren und committen"
+    );
+
+    // Tx2 versucht Account B bei Sequenz 13 zu verändern und zu committen.
+    // Da Tx2 jedoch Account A gelesen hat (Snapshot 10), welches bei Seq 12 von Tx1 modifiziert wurde,
+    // MUSS die Validierung von Tx2 mit einem Konflikt abbrechen (Anti-Dependency-Cycle unterbrochen).
+    let write_keys_2 = [key_account_b.as_slice()];
+    let res2 = validator.validate_and_record(tx2, &read_set_2, write_keys_2, 13);
+    assert!(
+        res2.is_err(),
+        "Tx2 muss deterministisch abgewiesen werden, um Write-Skew zu verhindern"
+    );
+    match res2 {
+        Err(ContextraError::Conflict(msg)) => {
+            assert!(
+                msg.contains("bank:acc_a") || msg.contains("modified"),
+                "Konfliktmeldung muss den kollidierenden Schlüssel anzeigen: {msg}"
+            );
+        }
+        other => panic!("Erwartete ContextraError::Conflict, erhalten: {other:?}"),
+    }
+}

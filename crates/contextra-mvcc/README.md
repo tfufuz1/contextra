@@ -2,10 +2,15 @@
 
 Multi-Version Concurrency Control (MVCC) und Serializable Snapshot Isolation (SSI).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, `capabilities.toml`).
+Normativitätsklasse: **Klasse B (Storage-Bundle)** (Ring 0, `stable`; SPEC §5.2, `capabilities.toml`).
 
 ## Rolle in einem Satz
 `contextra-mvcc` bietet deterministische Multi-Version Concurrency Control (SequenceLog, SnapshotRegistry, TxBuffer, ReadSet, SSI-Validator) für serielle Transaktionsisolation ohne Tokio-Laufzeitabhängigkeit.
+
+## Baukasten-Export (Copy-Paste)
+```bash
+python3 tools/export_crate.py contextra-mvcc --out /tmp/export-contextra-mvcc
+```
 
 ## Ring, Klasse & Reifegrad
 - **Ring:** Ring 0 (Transaktionsisolation)
