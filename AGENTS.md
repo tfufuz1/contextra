@@ -137,7 +137,7 @@ Diese Nummer (§6) ist stabil, weil `docs/VETOES.md` darauf verweist.
 **Vetos (unverhandelbar, Änderung nur per ADR):**
 
 - **VETO-F10 – Keine mandantenübergreifenden Datenflüsse.** Kein Cache, Index, Embedding, keine Statistik und kein Audit-Eintrag überschreitet Tenant-Grenzen. Der Tenant kommt aus `RequestContext` bzw. der Transaktion, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1).
-- **VETO-F02 – HNSW-Löschung nur per Tombstone + Slot-Nullung + vollständigem Rebuild.** Kein Rewiring der Nachbarn, kein partielles Teilgraph-Rebuild als Löschstrategie. Slots werden erst nach Rebuild-Abschluss wiederverwendet (INV-HNSW-SLOT-1).
+- **VETO-F02 – HNSW-Löschung & Rebuild-Garantie (SPEC §11.4 / VETOES.md).** Zulässig sind ausschließlich Tombstone-Pruning + Slot-Nullung (`INV-VEC-ZEROIZE-1`) und inkrementeller Neuaufbau unter Erhalt der Konnektivität (`INV-VEC-CONNECTIVITY-1`). Kein unkontrolliertes Rewiring oder partieller Rebuild ohne Konnektivitäts- und Recall-Garantie. Slot-Nummern werden erst nach gesicherter Reparatur bzw. vollständigem Rebuild (`rebuild_sync`) wiederverwendet (`INV-HNSW-SLOT-1`). Partieller Rebuild bleibt hinter dem Feature `partial-index-rebuild`.
 - **VETO-OP03 – Kein Echtzeit-Audio/STT** im Kern.
 - **Single-Node-Doktrin** – kein Sharding, kein P2P, keine verteilte Replikation, kein Netz-Listener im Kern.
 
@@ -223,6 +223,12 @@ cargo bench -p <crate>
 5. **Verifizieren**: §8-Befehle für den betroffenen Crate **und** für jeden Crate, der ihn konsumiert.
 6. **Schuld buchen**: Löst du eine DEBT-Stelle, trage sie in `DEPRECATED_DEBT.md` aus; findest du eine neue, trage sie ein. Keine neuen Querkanten (`DEPRECATED_DEBT.md` §4).
 7. **PR-Text** mit WP-Nummer aus `PLAN.md`, Vorher/Nachher-Messung und einer Zeile „Nicht geprüft“ für alles, was du nicht ausführen konntest.
+
+**Strikte Autonomie & Zero-Interruption-Direktive:**
+- **Vorab-Genehmigung:** Erteilte Benutzeraufträge gelten für den Plan als vorab genehmigt. Nach `set_plan` ruft der Agent direkt `record_user_approval_for_plan` auf.
+- **Keine Zwischenstopps:** Der Agent pausiert nicht zwischen Teilschritten und fragt nicht nach fortlaufenden Zwischenbestätigungen.
+- **Kein `request_user_input` bei Routine-Abläufen:** Dieses Werkzeug ist ausschließlich auf fundamentale, unauflösbare Spezifikationskonflikte beschränkt.
+- **Pausenlose Abarbeitung:** Alle Schritte des Plans werden sequenziell bis zu den Pre-Commit-Checks und dem finalen `submit` autonom umgesetzt (siehe `.agents/jules/AUTONOMY_ANALYSIS_AND_PREVENTION.md`).
 
 **Nicht erlaubt:** Tests löschen oder abschwächen, um grün zu werden; Snapshots ungeprüft akzeptieren; `#[ignore]` ohne Begründung und Ticket (D5); Gate-Ausnahmen ohne Ablauf-Meilenstein (`dag-exceptions.toml`); Mocks im Produktionscode (INV-EMBED-1, INV-WIRING-2); Features mit Standard-`default` für schwere Laufzeiten.
 

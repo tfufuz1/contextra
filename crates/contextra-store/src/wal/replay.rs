@@ -2,12 +2,10 @@
 //!
 //! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
 
-#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
-#[cfg(feature = "wal-integrity")]
 use super::{legacy_integrity_key, WalOp};
 use super::{
     Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
@@ -247,7 +245,6 @@ impl Wal {
         }
     }
 
-    #[cfg(feature = "wal-integrity")]
     #[allow(deprecated)]
     fn verify_entry_snapshot(
         &self,
@@ -329,11 +326,9 @@ impl Wal {
             return Ok(version);
         }
 
-        #[cfg(feature = "wal-integrity")]
         let integrity_key = self.get_integrity_key()?;
-        #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
-        let mut _using_legacy_key = false;
+        let mut using_legacy_key = false;
 
         // Detect version from header
         if file_size >= 4 && slice_len >= 4 {
@@ -431,7 +426,6 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
-            #[cfg(feature = "wal-integrity")]
             {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some()
                 {
@@ -676,30 +670,6 @@ impl Wal {
                     if !callback(seq, entry, pos) {
                         break 'scan_loop;
                     }
-                }
-            }
-
-            #[cfg(not(feature = "wal-integrity"))]
-            {
-                let entry = match WalEntry::from_bytes_classified(entry_data_raw) {
-                    Ok(e) => e,
-                    Err(parse_err) => {
-                        if let Some(err) = Self::handle_wal_entry_parse_error(
-                            parse_err,
-                            chunk_start_pos,
-                            pos,
-                            file_size,
-                        ) {
-                            return Err(err);
-                        }
-                        break;
-                    }
-                };
-
-                entries_count += 1;
-                let seq = entry.seq_no;
-                if !callback(seq, entry, pos) {
-                    break 'scan_loop;
                 }
             }
         }

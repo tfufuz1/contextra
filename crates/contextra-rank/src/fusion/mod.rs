@@ -5,8 +5,6 @@
 //! Dieses Modul bündelt alle Algorithmen zur Zusammenführung (Fusion) mehrdimensionaler
 //! Suchergebnisse aus verschiedenen Retrieval-Kanälen (Dense Vector, BM25-Volltext,
 //! Graph-Traversierung, Reranking).
-
-// ANCHOR[contextra-rank:FUS-MOD-001]
 mod global;
 mod normalized;
 mod provenance;
@@ -25,13 +23,13 @@ pub use provenance::ProvenanceBuilder;
 pub use resonance::{apply_resonance_bonus, fuse_signals, ResonanceConfig};
 pub use rrf::{
     fuse_search_results_with_signal_strategies, fuse_search_results_with_strategy, g,
-    modulate_and_renormalize_weights, reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
-    weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
-    weighted_reciprocal_rank_fusion_with_priority,
+    modulate_and_renormalize_weights, reciprocal_rank_fusion, rrf_fuse,
+    weighted_reciprocal_rank_fusion, weighted_reciprocal_rank_fusion_mrrf,
+    weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
 };
 pub use signal::{MetadataMergePriority, SignalCalibrationContext, SignalKind};
 pub use topk::BoundedTopK;
 pub use types::{
-    FusedScore, ProvenanceRecord, SearchReport, SearchResult, Signal, SignalContribution,
-    SignalFailurePolicy,
+    FusedScore, ProvenanceRecord, ScoredItem, SearchReport, SearchResult, Signal,
+    SignalContribution, SignalFailurePolicy,
 };

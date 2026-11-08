@@ -9,8 +9,6 @@ use contextra_rank::fusion::{
     apply_resonance_bonus, g, modulate_and_renormalize_weights, reciprocal_rank_fusion,
     ProvenanceBuilder, ResonanceConfig, SearchResult,
 };
-
-// ANCHOR[contextra-rank:SAFE-TEST-001]
 #[test]
 fn test_g_function_nan_inf_safety() {
     assert_eq!(g(f32::NAN), 0.0);

@@ -13,7 +13,7 @@ Der Baustein kann isoliert in beliebigen Rust-Systemen als eigenständige Vektor
 - **Ring:** Ring 1 (Vektorindexierung)
 - **Status:** 🟢 Autarker Baustein (Kopplungen entkoppelt, keine Abhängigkeit zu `contextra-crypto`)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-simd`, `contextra-mvcc`, `contextra-sys`.
+- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-sys`.
 
 ## Features
 - `default`: Minimale Standardkonfiguration für HNSW und SQ8.
@@ -21,7 +21,7 @@ Der Baustein kann isoliert in beliebigen Rust-Systemen als eigenständige Vektor
 - `experimental-rabitq`: Experimentelle RaBitQ-Quantisierung.
 - `experimental-predicate-augmented-search`: Prädikat-augmentierte Vektorsuche.
 - `docid-128`: Unterstützung für 128-Bit Dokument-IDs via `contextra-types`.
-- `partial-index-rebuild`: Partieller Rebuild (Achtung: VETO-F02 beachten).
+- `partial-index-rebuild`: Partieller Rebuild (Wartungspfad gemäß SPEC §11.4 & VETO-F02 unter Wahrung von INV-VEC-CONNECTIVITY-1).
 
 ## Einbettungsbeispiel
 
@@ -55,4 +55,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Deprecated Debt & Entkopplung
 - **Löschketten-Entkopplung:** Gemäß Entscheidung D-E1 verbleiben Lösch- und Nachweispflichten exklusiv in `contextra-erasure`.
-- **Wartungsprimitive:** `contextra-vector` beschränkt sich auf Mandantenisolation, Tombstone-Pruning und Rebuild-Mechanismen.
+- **Wartungsprimitive:** `contextra-vector` beschränkt sich auf Mandantenisolation, Tombstone-Pruning, budgetierte Nachbarschaftsreparatur (`INV-VEC-CONNECTIVITY-1`), Slot-Nullung (`INV-VEC-ZEROIZE-1`) und Rebuild-Mechanismen (`rebuild_sync`, `INV-HNSW-SLOT-1`).

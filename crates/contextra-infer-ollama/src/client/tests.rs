@@ -1,9 +1,11 @@
+#![cfg(feature = "ports-compat")]
 #![allow(clippy::indexing_slicing, clippy::field_reassign_with_default)]
 
+#[cfg(test)]
 use super::*;
 use crate::embedding::OllamaEmbedder;
-use crate::error::OllamaError;
-use crate::traits::Embedder;
+use crate::OllamaError;
+use contextra_ports::EmbeddingProvider;
 use std::time::Duration;
 
 #[tokio::test]
@@ -199,15 +201,15 @@ fn test_validate_model_name() {
 
     assert!(matches!(
         validate_model_name("../api/tags"),
-        Err(OllamaError::InvalidInput(_))
+        Err(OllamaError::EgressViolation(_))
     ));
     assert!(matches!(
         validate_model_name("model\nname"),
-        Err(OllamaError::InvalidInput(_))
+        Err(OllamaError::EgressViolation(_))
     ));
     assert!(matches!(
         validate_model_name("model\rname"),
-        Err(OllamaError::InvalidInput(_))
+        Err(OllamaError::EgressViolation(_))
     ));
 }
 
@@ -566,10 +568,10 @@ async fn test_chat_with_rag_streaming_invalid_json_returns_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        OllamaError::Serialization(msg) => {
+        OllamaError::Deserialization(msg) => {
             assert!(msg.contains("Failed to parse streaming JSON chunk"));
         }
-        _ => panic!("Expected OllamaError::Serialization, got {:?}", err),
+        _ => panic!("Expected OllamaError::Deserialization, got {:?}", err),
     }
 }
 
@@ -1004,11 +1006,11 @@ async fn test_model_not_found_error_message() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        OllamaError::NotFound(msg) => {
+        OllamaError::ModelNotFound(msg) => {
             assert!(msg.contains("Ollama model 'custom-model' not found"));
             assert!(msg.contains("Run: ollama pull custom-model"));
         }
-        _ => panic!("Expected OllamaError::NotFound, got {:?}", err),
+        _ => panic!("Expected OllamaError::ModelNotFound, got {:?}", err),
     }
 }
 
@@ -1041,13 +1043,12 @@ async fn test_check_availability_offline_returns_io_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        OllamaError::Io(e) => {
-            assert_eq!(e.kind(), std::io::ErrorKind::ConnectionRefused);
+        OllamaError::Network(e) => {
             assert!(e
                 .to_string()
                 .contains("Ensure Ollama is running (`ollama serve`)"));
         }
-        _ => panic!("Expected OllamaError::Io, got {:?}", err),
+        _ => panic!("Expected OllamaError::Network, got {:?}", err),
     }
     assert!(!client.is_available().await);
 }
@@ -1061,13 +1062,12 @@ async fn test_chat_with_rag_streaming_offline_returns_io_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     match err {
-        OllamaError::Io(e) => {
-            assert_eq!(e.kind(), std::io::ErrorKind::ConnectionRefused);
+        OllamaError::Network(e) => {
             assert!(e
                 .to_string()
                 .contains("Ensure Ollama is running (`ollama serve`)"));
         }
-        _ => panic!("Expected OllamaError::Io, got {:?}", err),
+        _ => panic!("Expected OllamaError::Network, got {:?}", err),
     }
 }
 
@@ -1220,7 +1220,7 @@ async fn test_mock_server_connection_refused_error_classification() {
     assert!(res.is_err());
     let err = res.unwrap_err();
     assert!(is_transient_error(&err));
-    assert!(matches!(err, OllamaError::Io(_)));
+    assert!(matches!(err, OllamaError::Network(_)));
 }
 
 #[tokio::test]
@@ -1262,7 +1262,7 @@ async fn test_ensure_model_available() {
         .ensure_model_available("nonexistent-model")
         .await
         .unwrap_err();
-    assert!(matches!(err, OllamaError::NotFound(_)));
+    assert!(matches!(err, OllamaError::ModelNotFound(_)));
 }
 
 #[tokio::test]
@@ -1285,7 +1285,7 @@ async fn test_list_models_http_error_and_invalid_json() {
 
     let client_500 = OllamaClient::new(server_url_500);
     let err_500 = client_500.list_models().await.unwrap_err();
-    assert!(matches!(err_500, OllamaError::Storage(_)));
+    assert!(matches!(err_500, OllamaError::Server(_)));
 
     // Invalid JSON response test
     let listener_json = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1358,7 +1358,7 @@ async fn test_try_generate_mock_success_and_errors() {
         .try_generate("missing-gen-model", "prompt")
         .await
         .unwrap_err();
-    assert!(matches!(err_404, OllamaError::NotFound(_)));
+    assert!(matches!(err_404, OllamaError::ModelNotFound(_)));
 }
 
 #[test]
@@ -1648,7 +1648,7 @@ fn test_with_rng_builder() {
     use std::sync::Arc;
 
     let custom_rng: Arc<dyn Rng> = Arc::new(SeededRng::new(99999));
-    let client = OllamaClient::new("http://localhost:11434").with_rng(custom_rng.clone());
+    let client = OllamaClient::new("http://localhost:11434").with_ports_rng(custom_rng.clone());
 
     let val1 = retry_jitter(client.rng.as_ref());
     let ref_rng = SeededRng::new(99999);

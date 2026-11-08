@@ -22,7 +22,6 @@ fn make_search_result(id: &str, score: f32, community_id: Option<u64>) -> Search
 }
 
 /// ShadowMode Discrepancy Evaluator comparing `Global` fusion against `Hybrid` baseline fusion.
-// ANCHOR[contextra-rank:GLOB-TEST-002]
 #[test]
 fn test_global_shadow_mode_discrepancy_logging() {
     let global_config = GlobalFusionConfig {

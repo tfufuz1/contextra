@@ -9,9 +9,10 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
-use crate::error::{OllamaError, Result};
-use crate::traits::{Clock, Rng, SeededRng, SystemClock};
-use futures::StreamExt;
+use crate::error::{LocalClock, LocalRng, LocalSeededRng, OllamaError, Result, SystemClock};
+
+use futures_util::StreamExt;
+use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -29,12 +30,9 @@ pub async fn read_response_bytes(response: reqwest::Response, max_bytes: usize) 
     while let Some(chunk_res) = stream.next().await {
         let chunk = chunk_res.map_err(|e| {
             if e.is_timeout() {
-                OllamaError::Io(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    format!("Network stream read timed out: {e}"),
-                ))
+                OllamaError::Timeout(format!("Network stream read timed out: {e}"))
             } else {
-                OllamaError::Storage(format!("Network stream read error: {e}"))
+                OllamaError::Server(format!("Network stream read error: {e}"))
             }
         })?;
         if body.len() + chunk.len() > max_bytes {
@@ -51,12 +49,12 @@ pub async fn read_response_bytes(response: reqwest::Response, max_bytes: usize) 
 pub async fn read_response_text(response: reqwest::Response, max_bytes: usize) -> Result<String> {
     let bytes = read_response_bytes(response, max_bytes).await?;
     String::from_utf8(bytes)
-        .map_err(|e| OllamaError::Serialization(format!("Response body is not valid UTF-8: {e}")))
+        .map_err(|e| OllamaError::Deserialization(format!("Response body is not valid UTF-8: {e}")))
 }
 
 /// Private helper to calculate retry jitter bounded to 0..100 ms using the injected RNG port.
 #[inline]
-pub(crate) fn retry_jitter(rng: &dyn Rng) -> Duration {
+pub(crate) fn retry_jitter(rng: &dyn LocalRng) -> Duration {
     Duration::from_millis(rng.next_u64() % 100)
 }
 
@@ -66,8 +64,8 @@ pub struct OllamaClient {
     pub(crate) config: OllamaConfig,
     pub(crate) client: reqwest::Client,
     pub(crate) client_build_error: Option<String>,
-    pub(crate) rng: Arc<dyn Rng>,
-    pub(crate) clock: Arc<dyn Clock>,
+    pub(crate) rng: Arc<dyn LocalRng>,
+    pub(crate) clock: Arc<dyn LocalClock>,
     pub(crate) audit_sink: Arc<dyn EgressAuditSink>,
     pub(crate) circuit_breaker: Arc<CircuitBreaker>,
 }
@@ -78,8 +76,8 @@ impl std::fmt::Debug for OllamaClient {
             .field("config", &self.config)
             .field("client", &self.client)
             .field("client_build_error", &self.client_build_error)
-            .field("rng", &"Arc<dyn Rng>")
-            .field("clock", &"Arc<dyn Clock>")
+            .field("rng", &"Arc<dyn LocalRng>")
+            .field("clock", &"Arc<dyn LocalClock>")
             .field("audit_sink", &"Arc<dyn EgressAuditSink>")
             .field("circuit_breaker", &self.circuit_breaker)
             .finish()
@@ -124,8 +122,8 @@ impl OllamaClient {
             }
         };
 
-        let rng: Arc<dyn Rng> = Arc::new(SeededRng::from_entropy());
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let rng: Arc<dyn LocalRng> = Arc::new(LocalSeededRng::default());
+        let clock: Arc<dyn LocalClock> = Arc::new(SystemClock);
         let audit_sink: Arc<dyn EgressAuditSink> = Arc::new(NoopEgressAuditSink);
         let circuit_breaker = Arc::new(CircuitBreaker::new(
             config.failure_threshold,
@@ -161,14 +159,10 @@ impl OllamaClient {
             .redirect(reqwest::redirect::Policy::none())
             .pool_max_idle_per_host(8)
             .build()
-            .map_err(|e| {
-                OllamaError::Io(std::io::Error::other(format!(
-                    "HTTP client construction failed: {e}"
-                )))
-            })?;
+            .map_err(|e| OllamaError::Internal(format!("HTTP client construction failed: {e}")))?;
 
-        let rng: Arc<dyn Rng> = Arc::new(SeededRng::from_entropy());
-        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let rng: Arc<dyn LocalRng> = Arc::new(LocalSeededRng::default());
+        let clock: Arc<dyn LocalClock> = Arc::new(SystemClock);
         let circuit_breaker = Arc::new(CircuitBreaker::new(
             config.failure_threshold,
             config.circuit_reset_timeout,
@@ -186,13 +180,26 @@ impl OllamaClient {
     }
 
     /// Sets a custom random number generator for retry jitter computation.
-    pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
+    pub fn with_rng(mut self, rng: Arc<dyn LocalRng>) -> Self {
         self.rng = rng;
         self
     }
 
+    /// Sets a custom random number generator from contextra_ports.
+    #[cfg(feature = "ports-compat")]
+    pub fn with_ports_rng(mut self, rng: Arc<dyn contextra_ports::Rng>) -> Self {
+        struct PortsRngAdapter(Arc<dyn contextra_ports::Rng>);
+        impl LocalRng for PortsRngAdapter {
+            fn next_u64(&self) -> u64 {
+                self.0.next_u64()
+            }
+        }
+        self.rng = Arc::new(PortsRngAdapter(rng));
+        self
+    }
+
     /// Sets a custom clock port.
-    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn LocalClock>) -> Self {
         self.clock = clock;
         self
     }
@@ -206,16 +213,16 @@ impl OllamaClient {
     /// Pre-request policy and circuit breaker validation.
     fn prepare_request(&self) -> Result<()> {
         if let Some(ref build_err) = self.client_build_error {
-            return Err(OllamaError::Io(std::io::Error::other(format!(
+            return Err(OllamaError::Internal(format!(
                 "Client construction failed: {build_err}"
-            ))));
+            )));
         }
         self.config
             .policy
             .check_endpoint(self.base_url(), self.audit_sink.as_ref())?;
         self.circuit_breaker
             .check(self.clock.as_ref())
-            .map_err(|msg| OllamaError::Io(std::io::Error::other(msg)))?;
+            .map_err(|_msg| OllamaError::CircuitBreakerOpen)?;
         Ok(())
     }
 
@@ -258,7 +265,7 @@ impl OllamaClient {
                 "Ollama health check at {} returned unsuccessful status",
                 self.base_url()
             );
-            return Err(OllamaError::Storage(format!(
+            return Err(OllamaError::Server(format!(
                 "Ollama health check at {} returned HTTP status {}",
                 self.base_url(),
                 status
@@ -362,7 +369,7 @@ impl OllamaClient {
 
             if status == reqwest::StatusCode::NOT_FOUND || body.to_lowercase().contains("not found")
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
@@ -408,7 +415,7 @@ impl OllamaClient {
             if status.is_server_error() {
                 self.circuit_breaker.record_failure(self.clock.as_ref());
             }
-            return Err(OllamaError::Storage(format!(
+            return Err(OllamaError::Server(format!(
                 "Ollama list_models HTTP {status}"
             )));
         }
@@ -479,7 +486,7 @@ impl OllamaClient {
 
         match last_err {
             Some(e) => Err(e),
-            None => Err(OllamaError::Storage(
+            None => Err(OllamaError::Server(
                 "generate_text retries exhausted with no error captured".into(),
             )),
         }
@@ -536,7 +543,7 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
@@ -558,7 +565,7 @@ impl OllamaClient {
 
         'outer: while let Some(chunk_result) = stream.next().await {
             let bytes = chunk_result
-                .map_err(|e| OllamaError::Storage(format!("Stream interrupted: {e}")))?;
+                .map_err(|e| OllamaError::Server(format!("Stream interrupted: {e}")))?;
 
             total_bytes += bytes.len();
             if total_bytes > max_bytes {
@@ -601,7 +608,7 @@ impl OllamaClient {
                                 chunk.done
                             }
                             Err(e) => {
-                                return Err(OllamaError::Serialization(format!(
+                                return Err(OllamaError::Deserialization(format!(
                                     "Failed to parse streaming JSON chunk: {e}"
                                 )));
                             }
@@ -648,7 +655,7 @@ impl OllamaClient {
                     }
                 }
                 Err(e) => {
-                    return Err(OllamaError::Serialization(format!(
+                    return Err(OllamaError::Deserialization(format!(
                         "Failed to parse streaming JSON chunk: {e}"
                     )));
                 }
@@ -701,7 +708,7 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
@@ -763,7 +770,7 @@ impl OllamaClient {
 
         match last_err {
             Some(e) => Err(e),
-            None => Err(OllamaError::Storage(
+            None => Err(OllamaError::Server(
                 "generate retries exhausted with no error captured".into(),
             )),
         }
@@ -805,7 +812,7 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
@@ -827,11 +834,11 @@ impl OllamaClient {
         Ok(parsed.response)
     }
 
-    /// Ensures that the specified model exists; returns `OllamaError::NotFound` with helpful instruction if missing.
+    /// Ensures that the specified model exists; returns `OllamaError::ModelNotFound` with helpful instruction if missing.
     pub async fn ensure_model_available(&self, model: &str) -> Result<()> {
         validate_model_name(model)?;
         if !self.is_model_available(model).await {
-            return Err(OllamaError::NotFound(format!(
+            return Err(OllamaError::ModelNotFound(format!(
                 "Ollama model '{model}' not found. Run: ollama pull {model}"
             )));
         }
@@ -871,7 +878,7 @@ impl OllamaClient {
 
         match last_err {
             Some(e) => Err(e),
-            None => Err(OllamaError::Storage(
+            None => Err(OllamaError::Server(
                 "Embed retries exhausted with no error captured".into(),
             )),
         }
@@ -912,7 +919,7 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
@@ -993,7 +1000,7 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(OllamaError::NotFound(format!(
+                return Err(OllamaError::ModelNotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
@@ -1015,7 +1022,7 @@ impl OllamaClient {
 
         'outer: while let Some(chunk_result) = stream.next().await {
             let bytes = chunk_result
-                .map_err(|e| OllamaError::Storage(format!("Stream interrupted: {e}")))?;
+                .map_err(|e| OllamaError::Server(format!("Stream interrupted: {e}")))?;
 
             total_bytes += bytes.len();
             if total_bytes > max_bytes {
@@ -1054,7 +1061,7 @@ impl OllamaClient {
                                 chunk.done
                             }
                             Err(e) => {
-                                return Err(OllamaError::Serialization(format!(
+                                return Err(OllamaError::Deserialization(format!(
                                     "Failed to parse streaming JSON chunk: {e}"
                                 )));
                             }
@@ -1099,7 +1106,7 @@ impl OllamaClient {
                     }
                 }
                 Err(e) => {
-                    return Err(OllamaError::Serialization(format!(
+                    return Err(OllamaError::Deserialization(format!(
                         "Failed to parse streaming JSON chunk: {e}"
                     )));
                 }
