@@ -16,8 +16,7 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_ports::Clock;
-use contextra_types::TenantId;
+use crate::types::{Clock, TenantId};
 use serde::{Deserialize, Serialize};
 
 // ANCHOR[contextra-privacy:CEA-001]
@@ -124,7 +123,7 @@ pub fn compute_record_hash(
     hasher.update(task_id_bytes);
 
     // 3. Mandant (TenantId u64)
-    hasher.update(&input.tenant_id.0.to_le_bytes());
+    hasher.update(&input.tenant_id.as_u64().to_le_bytes());
 
     // 4. Operation (Kind)
     let kind_byte = match input.kind {

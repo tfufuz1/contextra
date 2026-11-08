@@ -1,0 +1,4 @@
+[crates.contextra-avv-generator]
+klasse = "A"
+may_depend_on = []          # Soll nach Abschluss dieses Auftrags (interne Crates, nur Namen)
+transitional = []           # Features/Kanten mit internen Deps, Entfernung in Welle 6

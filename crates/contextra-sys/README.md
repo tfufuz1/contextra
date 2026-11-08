@@ -1,26 +1,48 @@
 # contextra-sys
 
-Systemnahe Bindings, Low-Level I/O, Durability-Flush, Memory-Locking und Memory-Mapping.
+Systemnahe OS-Bindings, Durability-Flush, Memory-Locking und Memory-Mapping hinter einer sicheren Rust-Fassade.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.7, §6.9, `capabilities.toml`).
+Normativitätsklasse: **Klasse A (Isolierter Baustein, B1–B12 nach SPEC v4.0 §5.1 / §2)**
+Ring: **Ring 0 (Unsafe-Insel)**
+Reifegrad: **Stabil**
 
-## Rolle in einem Satz
-`contextra-sys` bietet systemnahes Memory-Mapping (`mmap`, `SealedMap`), Durability-Flushes (`fsync`, `fdatasync`, `F_FULLFSYNC`, `FlushFileBuffers`), Prozess-Härtung (`rlimit`) und plattformspezifische I/O-Primitiven über eine sichere, typisierte Fassade.
+---
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Unsafe-Insel, `#![deny(unsafe_code)]` ausgenommen)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Abhängigkeiten:** Keine internen Workspace-Abhängigkeiten. Externe Crates: `libc` (POSIX), `windows-sys` (Windows), `memmap2`, `tracing`.
+## Zweck & Rolle
+`contextra-sys` stellt autarke, hardware- und betriebssystemnahe Betriebssystem-Primitive bereit:
+- **Durability-Synchronisation:** Plattformgerechte Flushes (`fdatasync`, `F_FULLFSYNC`, `FlushFileBuffers`, Verzeichnis-Sync).
+- **Speicherabbildung:** Sichere, typisierte Nur-Lese-Speicherabbildung (`mmap_readonly`, `SealedFile`, `SealedMap`).
+- **RAM-Sperrung:** Schutz sensibler Speicherseiten vor Paging/Swapping via `mlock` / `VirtualLock` mit Richtlinien (`MemLockPolicy`).
+- **Tresor-Speicher (Vault):** RAII-verwaltete Regionen (`LockedRegions`) und flüchtiges Nullsetzen (`write_volatile`).
+- **POSIX-Limits:** Dateideskriptor-Limits (`ensure_fd_limit`, `set_fd_limit`) und atomare Umleitung (`reopen_and_dup2`).
+- **Zugriffsbeschränkungen:** Strikte Dateizugriffsrechte (`0600` und UID-Verifikation unter Unix, restriktive DACL unter Windows).
 
-## Zielmodule & Baukasten-Architektur
-- `mem`: Kapselt `mlock`, `munlock`, `MemLockPolicy`, `LockedRegions` und volatile Zeroization (`zeroize_slice`).
-- `durability`: Plattformspezifische Synchronisation (`durable_flush_file`, `durable_flush_dir`, `write_all_durable`).
-- `fsmeta`: Plattformspezifische Datei-ACLs (`set_restrictive_file_acl`, `verify_file_acl_owner_only`).
-- `map`: Sichere Speicherabbildung via `mmap_readonly` sowie typgestützte `SealedFile` / `SealedMap` (gemäß INV-IO-1 / INV-ENCRYPT-REST-2).
-- `posix`: Dateideskriptorlimits (`ensure_fd_limit`, `set_fd_limit`) und atomare Umleitung (`reopen_and_dup2`).
+---
 
-## Einbettungsbeispiel
+## Baukasten-Export & Copy-Paste-Anleitung
+Dieses Crate ist ein vollkommen autarker Baustein (Klasse A) und hat **keine internen Workspace-Abhängigkeiten** zu anderen `contextra-*`-Crates. Es kann direkt exportiert und in beliebige externe Rust-Projekte kopiert werden:
+
+```bash
+python3 tools/export_crate.py contextra-sys --out /pfad/zu/deinem/projekt/contextra-sys
+```
+
+Oder alternativ via Cargo aus einem beliebigen Verzeichnis eingebunden werden:
+```toml
+[dependencies]
+contextra-sys = { path = "pfad/zu/contextra-sys" }
+```
+
+---
+
+## Externe Abhängigkeiten
+- `libc` (0.2, POSIX/Unix)
+- `windows-sys` (0.61, Windows-Plattformfunktionen)
+- `memmap2` (0.9, Speicherabbildung)
+- `tracing` (0.1, optionale Logging-Fassade)
+
+---
+
+## Minimalbeispiel
 ```rust,no_run
 use contextra_sys::{durable_flush_file, SealedFile, write_all_durable};
 use std::fs::{File, OpenOptions};
@@ -41,3 +63,11 @@ fn main() -> std::io::Result<()> {
 ```
 
 Ein vollständiges, autark lauffähiges Beispiel findet sich unter `examples/sys_primitives.rs`.
+
+---
+
+## Nicht-Ziele (Out of Scope)
+- **Keine Transaktionsverwaltung:** WAL-Segmentierung, ACID-Semantiken und MVCC gehören in `contextra-store` / `contextra-mvcc`.
+- **Keine Kryptografie:** Schlüsselableitung, Signaturerstellung und Verschlüsselungs-Chiffren gehören in `contextra-crypto`.
+- **Keine Löschorchestration:** DSGVO-Sagas und Deletion-Proofs gehören ausschließlich in `contextra-erasure`.
+- **Keine asynchronen Laufzeitabhängigkeiten:** Kein Tokio, keine Thread-Pools im Crate-Kern; blockierende Operationen müssen vom Aufrufer über `spawn_blocking` gekapselt werden.

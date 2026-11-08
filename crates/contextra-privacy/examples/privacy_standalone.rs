@@ -1,7 +1,7 @@
 //! Standalone-Beispiel für `contextra-privacy` (M10).
 //! Demonstriert PII-Erkennung und Egress-Vaulting mit Surrogat-Ersetzung.
 
-use contextra_privacy::{EgressVault, EntityRecognizer, NoOpRecognizer, RuleBasedEntityRecognizer};
+use contextra_privacy::{EgressVault, NoOpRecognizer, RuleBasedEntityRecognizer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. PII-Erkennung mit regelbasiertem Erkenner

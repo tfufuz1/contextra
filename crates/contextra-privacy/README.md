@@ -1,14 +1,17 @@
 # contextra-privacy
 
-Cloud Egress Security, Data Loss Prevention (DLP), Pseudonymisierung/Surrogate-Vaulting und Bulk-Exfiltrations-Schutz für Contextra.
+Autarker Baustein (**Klasse A**, SPEC v4.0 Welle 1) für Cloud-Egress-Sicherheit, Data Loss Prevention (DLP), PII-Erkennung, Surrogat-Token-Vaulting und Schutz vor Datenexfiltration. Schaltbar vor jedes LLM- oder Cloud-Gateway.
 
-## Zweck & Einordnung (Ring 3)
+## Baukasten-Eigenschaften (Klasse A)
 
-`contextra-privacy` liegt in **Ring 3** (Domain / Application Services). Es schützt ausgehende Datenflüsse (Cloud Egress) vor unbeabsichtigtem Datenabfluss und Exfiltration, pseudonymisiert sensible Entitäten über Surrogat-Token und stellt revisionssichere Audit-Spuren bereit.
-
-- **Eingehend:** Wird eingebunden von `contextra`, `contextra-mcp` und `contextra-router`.
-- **Ausgehend:** Basiert auf `contextra-types`, `contextra-ports`.
-- **Sicherheitsdoktrin:** `#![forbid(unsafe_code)]`, Zero-Panic in Produktionspfaden, striktes Fail-Closed.
+- **Vollkommen autark (B1, B2):** Keine internen Normal- oder Dev-Dependencies zu anderen Contextra-Crates.
+- **Eigene & Standardtypen (B3):** Alle Schnittstellen basieren auf Standardtypen oder crate-eigenen Typen (`Clock`, `TenantId`, `TenantScoped`, `EgressPolicy`, `EgressDecision`).
+- **Typisierte Fehler (B4):** Hauptfehlertyp `EgressError` (`thiserror`, `#[non_exhaustive]`).
+- **Autarker Export (B5):** Vollständig lauffähig außerhalb des Workspace-Repos via `tools/export_crate.py` und `tools/extract_probe.py`.
+- **Transitionales Feature (B6):** `ports-compat` für vorübergehende Typkonvertierungen zu `contextra-ports` und `contextra-types` (bis Welle 6).
+- **Keine Fremdfachlogik (B7):** Reine Maskierung und Egress-Sicherheit; keine DSGVO-Löschkette oder Shredding-Logik (gehört exklusiv in `contextra-erasure`).
+- **Zero-Panic & Sicherheit (B9, B10):** `#![forbid(unsafe_code)]`, striktes Fail-Closed, null Panics auf beliebigen UTF-8-Grenzen.
+- **P28-Determinismus (B11):** Zeitmessung über den `Clock`-Port; interne HashMaps nutzen deterministische BLAKE3-Hasher (`DeterministicBuildHasher`).
 
 ---
 
@@ -79,6 +82,32 @@ Die Erkennungsqualität wurde mithilfe eines synthetischen Korpus (`tests/fixtur
 | `PLZ_ORT` | 25 | 1 | 0 | 96.15% | 100.00% | 0.98 |
 | `STEUER_ID` | 25 | 1 | 0 | 96.15% | 100.00% | 0.98 |
 | **GESAMT** | **299** | **36** | **1** | **89.25%** | **99.67%** | **0.94** |
+
+---
+
+## Minimalbeispiel (Eigenständig ohne Contextra-Workspace)
+
+```rust
+use contextra_privacy::{EgressVault, RuleBasedEntityRecognizer};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let vault = EgressVault::try_default()?;
+    let recognizer = RuleBasedEntityRecognizer::new();
+
+    let outbound_text = "Bitte überweisen an IBAN DE89370400440532013000 für max@example.com";
+    let (sanitized, count) = vault.sanitize_and_vault(outbound_text, &recognizer)?;
+
+    println!("Maskierter Text: {sanitized}");
+    println!("Ersetzte Entitäten: {count}");
+    Ok(())
+}
+```
+
+## Export in ein eigenständiges Projekt
+
+```bash
+python3 tools/export_crate.py contextra-privacy --out /pfad/zu/deinem/projekt/libs/contextra-privacy
+```
 
 ---
 

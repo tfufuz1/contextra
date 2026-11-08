@@ -11,9 +11,22 @@ description = "Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC code and zer
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
+
+[features]
+default = ["std"]
+std = []
 
 [dependencies]
 flatbuffers = { workspace = true }
 bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "wire_bench"
+harness = false

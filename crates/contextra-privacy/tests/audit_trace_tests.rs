@@ -1,5 +1,5 @@
 //! Tests für die deterministische Audit-Trace-Generierung nach INV-EGRESS-AUDIT-1.
-use contextra_ports::Clock;
+use contextra_privacy::Clock;
 use contextra_privacy::{
     compute_audit_trace, extract_rule_id, BlockReason, EgressClassification, EgressClassifier,
     EgressClassifierTrace, EgressVault, MAX_CLASSIFY_PAYLOAD_BYTES,

@@ -15,7 +15,7 @@
 //!   RegEx-Überlastung (ReDoS-Schutz) oder internen Fehlern wird strikt blockiert (`Block`).
 //! - **Zeroize-on-Drop**: Sitzungssalts und sensitive Surrogat-Mappings werden beim Verlassen des Scopes
 //!   sicher aus dem Speicher genullt (Zeroization via `zeroize`).
-//! - **Mandantentrennung**: Egress-Operationen erzwingen explizite Mandantenprüfungen ([`contextra_types::TenantScoped`]).
+//! - **Mandantentrennung**: Egress-Operationen erzwingen explizite Mandantenprüfungen ([`TenantScoped`]).
 
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -137,6 +137,27 @@ impl SurrogateVault {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    // ANCHOR[contextra-privacy:EV-019]
+    /// Clears and zeroizes all cached surrogate mappings (neutral maintenance / B8 / SPEC §6).
+    pub fn clear(&self) {
+        if let Ok(mut guard) = self.map.lock() {
+            let old_map = std::mem::take(&mut *guard);
+            for (mut k, mut v) in old_map {
+                k.zeroize();
+                v.zeroize();
+            }
+        }
+    }
+
+    // ANCHOR[contextra-privacy:EV-020]
+    /// Compacts the internal mapping storage (neutral maintenance / SPEC §6).
+    pub fn compact(&self) {
+        if let Ok(mut guard) = self.map.lock() {
+            let cloned = guard.clone();
+            *guard = cloned;
+        }
+    }
 }
 
 impl Drop for SurrogateVault {
@@ -240,7 +261,7 @@ pub enum EgressVaultError {
     #[error("Payload size exceeds limit: {size} bytes > {limit} limit")]
     PayloadTooLarge { size: usize, limit: usize },
     #[error("Tenant scope violation: {0}")]
-    TenantScopeViolation(#[from] contextra_types::TenantScopeViolation),
+    TenantScopeViolation(#[from] crate::types::TenantScopeViolation),
     #[error("Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'")]
     SurrogateCollision {
         surrogate: String,
@@ -419,8 +440,8 @@ impl EgressVault {
     /// matches `expected_tenant_id`. If a tenant scope violation occurs, returns `Block(BlockReason::PolicyDenied(...))`.
     pub async fn classify_scoped(
         &self,
-        payload: contextra_types::TenantScoped<&str>,
-        expected_tenant_id: &contextra_types::TenantId,
+        payload: crate::types::TenantScoped<&str>,
+        expected_tenant_id: &crate::types::TenantId,
     ) -> EgressClassification {
         match payload.into_inner_checked(expected_tenant_id) {
             Ok(unpacked) => self.classify(unpacked).await,
@@ -432,14 +453,14 @@ impl EgressVault {
     /// `TenantId` matches `expected_tenant_id`. Re-wraps the sanitized output in a `TenantScoped<String>`.
     pub fn sanitize_and_vault_scoped(
         &self,
-        payload: contextra_types::TenantScoped<&str>,
-        expected_tenant_id: &contextra_types::TenantId,
+        payload: crate::types::TenantScoped<&str>,
+        expected_tenant_id: &crate::types::TenantId,
         recognizer: &dyn EntityRecognizer,
-    ) -> Result<(contextra_types::TenantScoped<String>, usize), EgressVaultError> {
+    ) -> Result<(crate::types::TenantScoped<String>, usize), EgressVaultError> {
         let text = payload.into_inner_checked(expected_tenant_id)?;
         let (sanitized_text, count) = self.sanitize_and_vault(text, recognizer)?;
         Ok((
-            contextra_types::TenantScoped::new(*expected_tenant_id, sanitized_text),
+            crate::types::TenantScoped::new(*expected_tenant_id, sanitized_text),
             count,
         ))
     }
@@ -552,7 +573,13 @@ impl EgressClassifier for EgressVault {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
     use std::time::Instant;
@@ -825,7 +852,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_classify_scoped_and_sanitize_scoped_tenant_isolation() {
-        use contextra_types::{TenantId, TenantScoped};
+        use crate::types::{TenantId, TenantScoped};
 
         let vault = EgressVault::try_default().expect("valid vault");
         let tenant_a = TenantId::try_new(10).expect("valid tenant_a");

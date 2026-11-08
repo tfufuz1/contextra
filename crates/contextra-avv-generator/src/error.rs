@@ -29,6 +29,7 @@ use thiserror::Error;
 /// assert_eq!(ctx.validate(), Err(AvvError::EmptyControllerName));
 /// ```
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[non_exhaustive]
 pub enum AvvError {
     /// Name des Verantwortlichen (Auftraggebers) ist leer oder enthält nur Whitespace.
     ///
