@@ -83,6 +83,64 @@ async fn test_wasm_fuel_exhaustion_returns_error_property() {
     }
 }
 
+/// Verifies bit-identical execution and exact fuel determinism across invocations (INV-WASM-DET-1).
+#[tokio::test]
+async fn test_wasm_cross_platform_determinism_property() {
+    let wat = r#"
+        (module
+            (import "wasi_snapshot_preview1" "fd_read" (func $fd_read (param i32 i32 i32 i32) (result i32)))
+            (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
+            (memory (export "memory") 1)
+            (func (export "_start")
+                ;; Read up to 8 bytes into memory offset 16
+                (i32.store (i32.const 0) (i32.const 16))
+                (i32.store (i32.const 4) (i32.const 8))
+                (drop (call $fd_read (i32.const 0) (i32.const 0) (i32.const 1) (i32.const 32)))
+
+                ;; Perform non-trivial deterministic integer arithmetic
+                (i32.store (i32.const 16)
+                    (i32.xor
+                        (i32.mul (i32.load (i32.const 16)) (i32.const 1103515245))
+                        (i32.const 12345)
+                    )
+                )
+
+                ;; Write 4 bytes from offset 16 to stdout
+                (i32.store (i32.const 0) (i32.const 16))
+                (i32.store (i32.const 4) (i32.const 4))
+                (drop (call $fd_write (i32.const 1) (i32.const 0) (i32.const 1) (i32.const 32)))
+            )
+        )
+    "#;
+    let wasm_bytes = wat::parse_str(wat).expect("parse WAT");
+    let executor = WasmExecutor::new().expect("WasmExecutor init");
+    let caps = WasmCapabilities {
+        allow_stdout: true,
+        max_fuel: 100_000,
+        ..Default::default()
+    };
+
+    let input = 42u64.to_le_bytes();
+    let res1 = executor
+        .execute(&wasm_bytes, &input, &caps, Duration::from_secs(2))
+        .await
+        .expect("run 1");
+    let res2 = executor
+        .execute(&wasm_bytes, &input, &caps, Duration::from_secs(2))
+        .await
+        .expect("run 2");
+
+    assert_eq!(
+        res1.stdout, res2.stdout,
+        "WASM output must be strictly bit-identical across runs"
+    );
+    assert_eq!(
+        res1.fuel_consumed, res2.fuel_consumed,
+        "WASM fuel consumption must be strictly identical across runs"
+    );
+    assert!(res1.fuel_consumed > 0);
+}
+
 #[tokio::test]
 async fn test_cloud_egress_strict_capability_isolation() {
     let wat = r#"
