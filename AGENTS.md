@@ -137,7 +137,7 @@ Diese Nummer (§6) ist stabil, weil `docs/VETOES.md` darauf verweist.
 **Vetos (unverhandelbar, Änderung nur per ADR):**
 
 - **VETO-F10 – Keine mandantenübergreifenden Datenflüsse.** Kein Cache, Index, Embedding, keine Statistik und kein Audit-Eintrag überschreitet Tenant-Grenzen. Der Tenant kommt aus `RequestContext` bzw. der Transaktion, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1).
-- **VETO-F02 – HNSW-Löschung nur per Tombstone + Slot-Nullung + vollständigem Rebuild.** Kein Rewiring der Nachbarn, kein partielles Teilgraph-Rebuild als Löschstrategie. Slots werden erst nach Rebuild-Abschluss wiederverwendet (INV-HNSW-SLOT-1).
+- **VETO-F02 – HNSW-Löschung & Rebuild-Garantie (SPEC §11.4 / VETOES.md).** Zulässig sind ausschließlich Tombstone-Pruning + Slot-Nullung (`INV-VEC-ZEROIZE-1`) und inkrementeller Neuaufbau unter Erhalt der Konnektivität (`INV-VEC-CONNECTIVITY-1`). Kein unkontrolliertes Rewiring oder partieller Rebuild ohne Konnektivitäts- und Recall-Garantie. Slot-Nummern werden erst nach gesicherter Reparatur bzw. vollständigem Rebuild (`rebuild_sync`) wiederverwendet (`INV-HNSW-SLOT-1`). Partieller Rebuild bleibt hinter dem Feature `partial-index-rebuild`.
 - **VETO-OP03 – Kein Echtzeit-Audio/STT** im Kern.
 - **Single-Node-Doktrin** – kein Sharding, kein P2P, keine verteilte Replikation, kein Netz-Listener im Kern.
 

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock)]
 use super::*;
 use contextra_ports::MetricsSink;
 use contextra_ports::Rng;

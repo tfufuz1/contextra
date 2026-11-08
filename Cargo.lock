@@ -1353,6 +1353,7 @@ dependencies = [
  "bytes",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "parking_lot 0.12.5",
  "tempfile",
  "tokio",
