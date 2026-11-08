@@ -64,20 +64,14 @@ pub fn render_register_csv(
         let tenant_id = entry.tenant_id.as_u64().to_string();
         let controller_name = escape_csv_field(&entry.controller_contact.controller_name);
         let controller_contact = escape_csv_field(&entry.controller_contact.controller_contact);
-        let representative = escape_csv_field(
-            entry
-                .controller_contact
-                .representative_contact
-                .as_deref()
-                .unwrap_or(""),
-        );
-        let dpo = escape_csv_field(
-            entry
-                .controller_contact
-                .dpo_contact
-                .as_deref()
-                .unwrap_or(""),
-        );
+        let representative = match entry.controller_contact.representative_contact.as_deref() {
+            Some(rep) => escape_csv_field(rep),
+            None => String::new(),
+        };
+        let dpo = match entry.controller_contact.dpo_contact.as_deref() {
+            Some(dpo_contact) => escape_csv_field(dpo_contact),
+            None => String::new(),
+        };
         let purpose = escape_csv_field(&entry.processing_purpose);
 
         let subjects = escape_csv_field(&entry.data_subject_categories.join("; "));

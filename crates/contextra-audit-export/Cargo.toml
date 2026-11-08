@@ -15,17 +15,16 @@ klasse = "A"
 
 [features]
 default = ["std", "types-compat"]
-std = []
+std = ["serde/std"]
 types-compat = ["dep:contextra-types"]
 
 [dependencies]
 contextra-types = { workspace = true, optional = true }
-serde = { workspace = true }
+serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros"] }
 proptest = "1.4"
 criterion = "0.5"
 
