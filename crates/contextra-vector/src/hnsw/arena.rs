@@ -293,9 +293,9 @@ impl HnswArena {
         false
     }
 
-    /// Zeroizes connection memory for a node slot across all layers, clears counts,
-    /// and then marks the node's slot as free in the free_list.
-    pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
+    /// Zeroizes connection memory for a node slot across all layers and clears counts,
+    /// without releasing to `free_list` (`INV-VEC-ZEROIZE-1`, `INV-HNSW-SLOT-1`).
+    pub fn zeroize_node_connections(&self, ram_idx: usize, max_layer: usize, m: usize) {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();
         let mut counts = self.counts.write();
@@ -322,11 +322,12 @@ impl HnswArena {
                 }
             }
         }
-        drop(offsets);
-        drop(count_offsets);
-        drop(counts);
-        drop(arena);
+    }
 
+    /// Zeroizes connection memory for a node slot across all layers, clears counts,
+    /// and then marks the node's slot as free in the free_list.
+    pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
+        self.zeroize_node_connections(ram_idx, max_layer, m);
         self.free_node(ram_idx);
     }
 

@@ -443,11 +443,9 @@ impl HnswIndex {
             tombstone_map.insert(id, deleted_guard.contains(id));
         }
 
-        let std_map: std::collections::HashMap<u64, bool> = tombstone_map.into_iter().collect();
-
         let regions = crate::partial_rebuild::should_trigger_partial_rebuild(
             &tracker,
-            &std_map,
+            &tombstone_map,
             global_tombstone_ratio,
             &self.inner.cold.config.partial_rebuild_config,
         );
@@ -473,6 +471,53 @@ impl HnswIndex {
 
     pub fn unpin_snapshot(&self, seq_no: u64) {
         self.inner.cold.seq_log.write().unpin_snapshot(seq_no);
+    }
+
+    /// Gibt den aktuellen globalen Entry-Point-Knotenindex zurück (falls vorhanden).
+    pub fn entry_point(&self) -> Option<usize> {
+        self.inner.hot.get_entry_point()
+    }
+
+    /// Gibt den internen Knotenindex für eine `DocId` zurück (falls vorhanden und nicht gelöscht).
+    pub fn node_idx_for_doc(&self, doc_id: DocId) -> Option<usize> {
+        let map = self.inner.hot.doc_to_node.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        map.get(&doc_id.inner())
+            .copied()
+            .filter(|&idx| !deleted.contains(idx as u64))
+    }
+
+    /// Gibt die Layer-0-Verbindungen für einen Knotenindex zurück.
+    pub fn layer0_connections(&self, node_idx: usize) -> Vec<u32> {
+        let mmap_count = self
+            .inner
+            .cold
+            .mmap_index
+            .read()
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        let m = self.inner.cold.config.m;
+        if node_idx < mmap_count {
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            if let Some(mmap) = mmap_guard.as_ref() {
+                if let Ok(rec) = mmap.get_node_record(node_idx) {
+                    mmap.get_connections(&rec, 0).unwrap_or_default()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        } else {
+            let ram_idx = node_idx - mmap_count;
+            self.inner.hot.arena.get_ram_node_connections(ram_idx, 0, m)
+        }
+    }
+
+    /// Führt einen synchronen vollständigen Rebuild aus (`INV-HNSW-SLOT-1`).
+    pub fn rebuild_sync(&self) -> Result<()> {
+        self.inner.rebuild_sync()
     }
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
