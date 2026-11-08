@@ -6,11 +6,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use contextra_license::Clock;
+use contextra_license::TenantId;
 use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
 };
-use contextra_ports::clock::Clock;
-use contextra_types::TenantId;
 use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
 
@@ -42,7 +42,7 @@ fn test_valid_signature_allowed_ring_sovereign() {
     let (signing_key, verifying_key) = generate_keypair();
 
     let payload = LicensePayload {
-        tenant_id: TenantId::try_new(42).expect("valid tenant"),
+        tenant_id: TenantId::new(42),
         allowed_rings: vec![FeatureRing::Fast, FeatureRing::Sovereign],
         expires_at: Some(2000000000), // Year 2033
         feature_flags: BTreeMap::from([("audit_export".to_string(), true)]),
@@ -74,7 +74,7 @@ fn test_valid_signature_missing_ring_compliance() {
     let (signing_key, verifying_key) = generate_keypair();
 
     let payload = LicensePayload {
-        tenant_id: TenantId::try_new(42).expect("valid tenant"),
+        tenant_id: TenantId::new(42),
         allowed_rings: vec![FeatureRing::Sovereign],
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
@@ -109,7 +109,7 @@ fn test_invalid_signature_rejected() {
     let (signing_key, verifying_key) = generate_keypair();
 
     let payload = LicensePayload {
-        tenant_id: TenantId::try_new(42).expect("valid tenant"),
+        tenant_id: TenantId::new(42),
         allowed_rings: vec![FeatureRing::Sovereign],
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
@@ -135,7 +135,7 @@ fn test_expired_license() {
 
     let expires_at = 1600000000;
     let payload = LicensePayload {
-        tenant_id: TenantId::try_new(42).expect("valid tenant"),
+        tenant_id: TenantId::new(42),
         allowed_rings: vec![FeatureRing::Sovereign],
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
@@ -172,7 +172,7 @@ fn test_inv_license_2_fast_ring_always_allowed() {
 
     let expires_at = 1600000000;
     let payload = LicensePayload {
-        tenant_id: TenantId::try_new(42).expect("valid tenant"),
+        tenant_id: TenantId::new(42),
         allowed_rings: vec![], // Fast ring NOT listed, expired
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
@@ -206,4 +206,31 @@ fn test_verify_ring_inherent_method() {
         gate.verify_ring(FeatureRing::Sovereign),
         Err(LicenseError::NotActivated(FeatureRing::Sovereign))
     );
+}
+
+// Invariante: Non-Destructive Degradation (Ablauf führt NIE zu Datenverlust oder Datensperre im Basispfad)
+#[test]
+fn test_invariant_non_destructive_degradation() {
+    use contextra_license::signed_gate::VerifyingKey;
+    use contextra_license::SignedActivation;
+
+    // 1. Initialisiere ein Gate mit abgelaufener Lizenz
+    let verifying_key_bytes = [1u8; 32];
+    let verifying_key = VerifyingKey::from_bytes(&verifying_key_bytes).unwrap();
+    let activation = SignedActivation {
+        ring: FeatureRing::Sovereign,
+        installation_id_hash: [0u8; 32],
+        expires_at_unix: 1_000,
+        signature: [0u8; 64],
+    };
+    let expired_clock = std::sync::Arc::new(contextra_license::FixedClock(2_000_000_000_000));
+    let gate =
+        SignedLicenseGate::from_activation_with_clock(activation, verifying_key, expired_clock);
+
+    // 2. Sovereign-Ring scheitert (Fail-Closed)
+    assert!(gate.check_ring(FeatureRing::Sovereign).is_err());
+
+    // 3. Fast-Ring bleibt vollkommen funktionsfähig (INV-LICENSE-2 / Non-Destructive Degradation)
+    assert!(gate.check_ring(FeatureRing::Fast).is_ok());
+    assert!(gate.authorize(FeatureRing::Fast).is_ok());
 }

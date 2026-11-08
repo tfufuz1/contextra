@@ -10,10 +10,10 @@
 
 use std::collections::BTreeMap;
 
+use contextra_license::TenantId;
 use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedActivation, SignedLicenseGate,
 };
-use contextra_types::TenantId;
 use ed25519_dalek::{Signer, SigningKey};
 
 /// Hilfsfunktion zur Generierung eines deterministischen Schlüsselpaars aus einem 32-Byte-Seed.

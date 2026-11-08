@@ -9,8 +9,8 @@
 //!   und kryptografische BLAKE3-Hashes (REQ-LIC-001). Keine externen Netzwerkaufrufe.
 //! - **Hardware- & Installations-Bindung:** Lizenzen können an eine konkrete Maschine oder
 //!   Installation gebunden werden (`installation_id_hash`). Ein Kopieren auf fremde Hosts schlägt fehl.
-//! - **Deterministische Zeitprüfung:** Zeitabfragen erfolgen strikt über den [`Clock`]-Port
-//!   (Regel 3: Ports für Zeit, Zufall und IDs). Dies erlaubt deterministische Tests sowie Schutz vor Replay.
+//! - **Deterministische Zeitprüfung:** Zeitabfragen erfolgen strikt über den [`Clock`]-Trait
+//!   (B11: Crate-lokaler Trait für Zeit). Dies erlaubt deterministische Tests sowie Schutz vor Replay.
 //! - **Fail-Closed Prinzip:** Tritt ein Fehler, eine fehlende Aktivierung oder ein ungültiger Hash auf,
 //!   wird der Zugriff verweigert (`Err(LicenseError::...)`). Nur der freie `Fast`-Ring ist immer freigeschaltet (INV-LICENSE-2).
 
@@ -18,12 +18,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use bincode::Options;
-use contextra_ports::clock::{Clock, SystemClock};
-use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
-use contextra_types::TenantId;
 pub use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::types::{Clock, FeatureRing, LicenseError, LicenseGate, SystemClock, TenantId};
 
 // ANCHOR[contextra-license:CONST-MAX-PAYLOAD]
 /// Maximale zulässige Payload-Größe in Bytes (64 KiB) für die Lizenzverifikation.
@@ -398,9 +397,9 @@ pub fn verify_step_4_signature(
 }
 
 // ANCHOR[contextra-license:STEP-5-EXPIRATION]
-/// Schritt 5: Ablaufdatumsprüfung über den Zeit-Port ([`Clock`]).
+/// Schritt 5: Ablaufdatumsprüfung über den Zeit-Port oder Clock-Trait ([`Clock`]).
 ///
-/// Liest die aktuelle Zeit über `clock.now_unix_nanos()` (Regel 3: kein direkter OS-Zugriff).
+/// Liest die aktuelle Zeit über `clock.now_unix_nanos()` (B11: keine direkte Wanduhr in Kernlogik).
 ///
 /// **Fehler:** Gibt [`StepVerificationError::Expired`] zurück, falls `current_time >= expires_at`.
 ///
@@ -469,7 +468,7 @@ pub fn verify_step_7_success() -> Result<(), StepVerificationError> {
 /// Kryptografisches Lizenz-Gate zur Durchsetzung von Feature-Ringen.
 ///
 /// Verifiziert Ed25519-Signaturen über Aktivierungsdatensätze ([`SignedActivation`])
-/// oder signierte Payloads ([`LicensePayload`]) und implementiert den [`LicenseGate`]-Port.
+/// oder signierte Payloads ([`LicensePayload`]) und implementiert den [`LicenseGate`]-Trait.
 #[derive(Clone)]
 pub struct SignedLicenseGate {
     verifying_key: Option<VerifyingKey>,
@@ -778,7 +777,7 @@ impl LicenseGate for SignedLicenseGate {
         )
         .map_err(|e| e.into_license_error())?;
 
-        // (5) Step 5: Expiration check using clock port (P28)
+        // (5) Step 5: Expiration check using clock (B11)
         verify_step_5_expiration(
             self.activation.as_ref(),
             self.license_payload.as_ref(),
@@ -796,5 +795,15 @@ impl LicenseGate for SignedLicenseGate {
 
         // (7) Step 7: Success confirmation
         verify_step_7_success().map_err(|e| e.into_license_error())
+    }
+}
+
+#[cfg(feature = "ports-compat")]
+impl contextra_ports::license::LicenseGate for SignedLicenseGate {
+    fn check_ring(
+        &self,
+        ring: contextra_ports::license::FeatureRing,
+    ) -> std::result::Result<(), contextra_ports::license::LicenseError> {
+        LicenseGate::check_ring(self, ring.into()).map_err(Into::into)
     }
 }

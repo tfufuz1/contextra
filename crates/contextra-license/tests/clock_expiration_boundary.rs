@@ -11,10 +11,10 @@
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
+use contextra_license::Clock;
 use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, SignedActivation, SignedLicenseGate,
 };
-use contextra_ports::clock::Clock;
 use ed25519_dalek::SigningKey;
 
 struct AdjustableClock {

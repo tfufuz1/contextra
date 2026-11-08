@@ -11,6 +11,12 @@ description = "License and activation enforcement gate layer for Contextra featu
 
 [package.metadata.contextra]
 ring = "4"
+klasse = "A"
+
+[features]
+default = ["std", "ports-compat"]
+std = []
+ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
 
 [dependencies]
 thiserror = { workspace = true }
@@ -19,8 +25,13 @@ bincode = { workspace = true }
 blake3 = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 tracing = { workspace = true }
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 
 [dev-dependencies]
 rand = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "license_benchmark"
+harness = false

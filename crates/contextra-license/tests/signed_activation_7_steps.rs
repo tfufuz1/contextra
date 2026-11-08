@@ -5,11 +5,11 @@
 
 use std::sync::Arc;
 
+use contextra_license::Clock;
 use contextra_license::{
     derive_local_installation_id_hash, FeatureRing, LicenseError, LicenseGate, SignedActivation,
     SignedLicenseGate,
 };
-use contextra_ports::clock::Clock;
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 
