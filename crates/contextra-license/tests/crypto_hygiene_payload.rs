@@ -11,12 +11,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use contextra_license::Clock;
+use contextra_license::TenantId;
 use contextra_license::{
     constant_time_eq_32, FeatureRing, LicenseError, LicensePayload, SignedLicenseGate,
     SignedLicenseOptions, MAX_PAYLOAD_BYTES,
 };
-use contextra_ports::clock::Clock;
-use contextra_types::TenantId;
 use ed25519_dalek::{Signer, SigningKey};
 
 struct TestClock {

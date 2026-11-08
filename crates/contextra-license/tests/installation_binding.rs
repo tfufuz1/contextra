@@ -6,11 +6,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use contextra_license::Clock;
+use contextra_license::TenantId;
 use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate, SignedLicenseOptions,
 };
-use contextra_ports::clock::Clock;
-use contextra_types::TenantId;
 use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
