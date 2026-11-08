@@ -1,0 +1,1968 @@
+{
+  "tool_name": "concurrency_lock_auditor.py",
+  "title": "Concurrency & Lock Safety Audit Report",
+  "description": "Audits synchronization primitives, Mutex/RwLock guards across .await (INV-LOCK-ORDER-1), channel architectures, and Loom model-checking support.",
+  "timestamp": "2026-11-08T15:35:25.930502+00:00",
+  "metrics": {
+    "locks_held_across_await": 77,
+    "std_sync_locks": 15,
+    "parking_lot_locks": 41,
+    "tokio_sync_locks": 29,
+    "channels_used": 26,
+    "loom_verification_points": 28,
+    "total_concurrency_items": 216
+  },
+  "findings_count": 216,
+  "findings": [
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 47,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 52,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 54,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 56,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 58,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 60,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 62,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 64,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 74,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 82,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 87,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 89,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lib.rs",
+      "line": 91,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/memtable.rs",
+      "line": 43,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "use parking_lot::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/system_pressure.rs",
+      "line": 137,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/util.rs",
+      "line": 12,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/util.rs",
+      "line": 14,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/util.rs",
+      "line": 20,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/util.rs",
+      "line": 28,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 21,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "use tokio::sync::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 52,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "pub(super) health: Arc<parking_lot::RwLock<StorageHealth>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 54,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub(super) commit_mutex: tokio::sync::Mutex<()>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 56,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub(super) flush_mutex: tokio::sync::Mutex<()>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 60,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 66,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub(super) pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 69,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 71,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 74,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 488,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 488) held across .await",
+      "snippet": "let state = self.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 182,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "observers: parking_lot::RwLock<Vec<Arc<BoundedObserverWorker>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 184,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "max_observer_latency: parking_lot::RwLock<Duration>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 185,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "clock: parking_lot::RwLock<Arc<dyn Clock>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 191,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "observers: parking_lot::RwLock::new(Vec::new()),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 193,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "max_observer_latency: parking_lot::RwLock::new(DEFAULT_MAX_OBSERVER_LATENCY),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 194,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 202,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "sender: tokio::sync::mpsc::Sender<(u64, TxId, WriteOrigin)>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/observer.rs",
+      "line": 210,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx, mut rx) = tokio::sync::mpsc::channel::<(u64, TxId, WriteOrigin)>(capacity);"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 17,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "use tokio::sync::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 497,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts_read' (line 497) held across .await",
+      "snippet": "let ssts_read = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 505,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'initial_wal_hmac' (line 505) held across .await",
+      "snippet": "let initial_wal_hmac = *wal.last_hmac.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 525,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let metrics_sink_container = Arc::new(parking_lot::RwLock::new(Arc::new("
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 572,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let health = Arc::new(parking_lot::RwLock::new(StorageHealth::Healthy));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 601,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "commit_mutex: tokio::sync::Mutex::new(()),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 602,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "flush_mutex: tokio::sync::Mutex::new(()),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 604,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 610,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pending_commit_queue: tokio::sync::Mutex::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 613,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 615,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 634,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 634) held across .await",
+      "snippet": "let wal = storage.wal.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 685,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_commit_lock' (line 685) held across .await",
+      "snippet": "let _commit_lock = self.commit_mutex.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 728,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 728) held across .await",
+      "snippet": "let state = self.state.write().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/recovery.rs",
+      "line": 729,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 729) held across .await",
+      "snippet": "let wal = self.wal.read().await.clone();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/scan.rs",
+      "line": 48,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 48) held across .await",
+      "snippet": "let sstables = self.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/scan.rs",
+      "line": 98,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 98) held across .await",
+      "snippet": "let state = self.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/scan.rs",
+      "line": 99,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 99) held across .await",
+      "snippet": "let sstables = self.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/compaction.rs",
+      "line": 20,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_flush_lock' (line 20) held across .await",
+      "snippet": "let _flush_lock = storage.flush_mutex.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/compaction.rs",
+      "line": 37,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 37) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/compaction.rs",
+      "line": 59,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_commit_lock' (line 59) held across .await",
+      "snippet": "let _commit_lock = storage.commit_mutex.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/compaction.rs",
+      "line": 85,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'hmac' (line 85) held across .await",
+      "snippet": "let hmac = *old_wal.last_hmac.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/compaction.rs",
+      "line": 147,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'pending' (line 147) held across .await",
+      "snippet": "let pending = storage.pending_sealed_wals.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/compaction.rs",
+      "line": 197,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal_read' (line 197) held across .await",
+      "snippet": "let wal_read = storage.wal.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/maintenance.rs",
+      "line": 31,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 31) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/maintenance.rs",
+      "line": 32,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 32) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/read.rs",
+      "line": 90,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 90) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/read.rs",
+      "line": 122,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 122) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await.clone();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 253,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'commit_lock' (line 253) held across .await",
+      "snippet": "let commit_lock = storage.commit_mutex.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 277,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 277) held across .await",
+      "snippet": "let wal = storage.wal.read().await.clone();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 283,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'queue_guard' (line 283) held across .await",
+      "snippet": "let queue_guard = storage.pending_commit_queue.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 417,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'truncate_guard' (line 417) held across .await",
+      "snippet": "let truncate_guard = wal.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 464,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 464) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 502,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx, mut rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 690,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'commit_lock' (line 690) held across .await",
+      "snippet": "let commit_lock = storage.commit_mutex.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 734,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'truncate_guard' (line 734) held across .await",
+      "snippet": "let truncate_guard = wal.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/write.rs",
+      "line": 799,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 799) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/commit_tests.rs",
+      "line": 210,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 210) held across .await",
+      "snippet": "let wal = storage.wal.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/commit_tests.rs",
+      "line": 221,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 221) held across .await",
+      "snippet": "let wal = storage.wal.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/commit_tests.rs",
+      "line": 487,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 487) held across .await",
+      "snippet": "let wal = storage.wal.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/commit_tests.rs",
+      "line": 495,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'wal' (line 495) held across .await",
+      "snippet": "let wal = storage.wal.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/flush_tests.rs",
+      "line": 237,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 237) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/mvcc_tests.rs",
+      "line": 383,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'commit_guard' (line 383) held across .await",
+      "snippet": "let commit_guard = storage.commit_mutex.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 112,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 112) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 119,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 119) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 129,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 129) held across .await",
+      "snippet": "let ssts = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 178,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 178) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 190,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 190) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 259,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 259) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 409,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 409) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 555,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sst_count_before' (line 555) held across .await",
+      "snippet": "let sst_count_before = storage.sstables.read().await.len();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 566,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sst_count_after' (line 566) held across .await",
+      "snippet": "let sst_count_after = storage.sstables.read().await.len();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 840,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 840) held across .await",
+      "snippet": "let ssts = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/recovery_tests.rs",
+      "line": 851,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 851) held across .await",
+      "snippet": "let ssts = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/scan_tests.rs",
+      "line": 504,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'state' (line 504) held across .await",
+      "snippet": "let state = storage.state.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/tests/scan_tests.rs",
+      "line": 517,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables' (line 517) held across .await",
+      "snippet": "let sstables = storage.sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 18,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "use tokio::sync::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 139,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 139) held across .await",
+      "snippet": "let ssts = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 335,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 335) held across .await",
+      "snippet": "let ssts = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 824,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 824) held across .await",
+      "snippet": "let ssts = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/tests.rs",
+      "line": 14,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "use tokio::sync::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/tests/advanced.rs",
+      "line": 255,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 255) held across .await",
+      "snippet": "let ssts = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/tests/advanced.rs",
+      "line": 324,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "let _sstables = Arc::new(tokio::sync::RwLock::new(vec!["
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/tests/advanced.rs",
+      "line": 546,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "let sstables = Arc::new(tokio::sync::RwLock::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/tests/basic.rs",
+      "line": 604,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts' (line 604) held across .await",
+      "snippet": "let ssts = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/tests/basic.rs",
+      "line": 861,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'ssts_read' (line 861) held across .await",
+      "snippet": "let ssts_read = sstables.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/flusher.rs",
+      "line": 39,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "item_tx: tokio::sync::mpsc::UnboundedSender<(u64, WalEntry, u64)>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/flusher.rs",
+      "line": 174,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx, mut rx) = tokio::sync::mpsc::channel::<WalCommand>(config.queue_capacity);"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 636,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'truncate_guard' (line 636) held across .await",
+      "snippet": "let truncate_guard = self.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 658,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 673,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 679,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 666) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 701,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'truncate_guard' (line 701) held across .await",
+      "snippet": "let truncate_guard = self.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 723,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 738,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 745,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "tokio::sync::mpsc::error::TrySendError::Full(_) => {"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 748,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "tokio::sync::mpsc::error::TrySendError::Closed(_) => {"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 788,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (item_tx, mut item_rx) = tokio::sync::mpsc::unbounded_channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 789,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 796,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 781) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 828,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 834,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 821) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 845,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_truncate_guard' (line 845) held across .await",
+      "snippet": "let _truncate_guard = self.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 861,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 867,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 855) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/io.rs",
+      "line": 891,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 20,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 25,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 259,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 376,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 377,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 377,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 378,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 380,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub truncate_lock: Arc<tokio::sync::Mutex<()>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 587,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 588,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "flusher_tx: std::sync::RwLock::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 589,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "flusher_task: std::sync::Mutex::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 591,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "truncate_lock: Arc::new(tokio::sync::Mutex::new(())),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 692,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 693,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "flusher_tx: std::sync::RwLock::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 694,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "flusher_task: std::sync::Mutex::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 696,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "truncate_lock: Arc::new(tokio::sync::Mutex::new(())),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 909,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 923,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 924,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "flusher_tx: std::sync::RwLock::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 925,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "flusher_task: std::sync::Mutex::new(None),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/mod.rs",
+      "line": 927,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "truncate_lock: Arc::new(tokio::sync::Mutex::new(())),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/tests/flusher_tests.rs",
+      "line": 212,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack1_tx, _ack1_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/tests/flusher_tests.rs",
+      "line": 213,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack2_tx, _ack2_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/tests/flusher_tests.rs",
+      "line": 222,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 208) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/tests/flusher_tests.rs",
+      "line": 379,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/tests/flusher_tests.rs",
+      "line": 387,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'flusher_tx' (line 380) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/manifest/core.rs",
+      "line": 29,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "pub(super) file: tokio::sync::Mutex<tokio::fs::File>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/manifest/core.rs",
+      "line": 100,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "file: tokio::sync::Mutex::new(file),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/sstable/block_cache.rs",
+      "line": 8,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "use parking_lot::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/engine/memory_only.rs",
+      "line": 6,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "use parking_lot::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/fuzz/fuzz_targets/fuzz_memtable_concurrent.rs",
+      "line": 52,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx, rx) = mpsc::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/benches/memtable_bench.rs",
+      "line": 8,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "use parking_lot::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/amplification_benchmark.rs",
+      "line": 17,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "tracked_files: std::sync::Mutex<HashSet<PathBuf>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/amplification_benchmark.rs",
+      "line": 25,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "tracked_files: std::sync::Mutex::new(HashSet::new()),"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/blocking_util_pool_measurement.rs",
+      "line": 7,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "use parking_lot::RwLock;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_fuzzregress_memtable_concurrent.rs",
+      "line": 92,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_j21_hypotheses.rs",
+      "line": 113,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "let winner_val = Arc::new(tokio::sync::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_j21_hypotheses.rs",
+      "line": 156,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'expected_val' (line 156) held across .await",
+      "snippet": "let expected_val = winner_val.lock().await.clone();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_memory_pressure.rs",
+      "line": 164,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "let ground_truth = Arc::new(tokio::sync::Mutex::new(Vec::<(Vec<u8>, Vec<u8>)>::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_memory_pressure.rs",
+      "line": 195,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'gt_keys' (line 195) held across .await",
+      "snippet": "let gt_keys = ground_truth.lock().await.clone();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_task_massacre.rs",
+      "line": 8,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "use parking_lot::Mutex;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_task_massacre.rs",
+      "line": 126,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'confirmed' (line 120) held across .await",
+      "snippet": "let actual_val = storage.get(key).await.expect(\"get failed\");"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/commit_rollback_batch_scoped.rs",
+      "line": 12,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/commit_rollback_batch_scoped.rs",
+      "line": 16,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_guard' (line 16) held across .await",
+      "snippet": "let _guard = TEST_LOCK.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/commit_rollback_batch_scoped.rs",
+      "line": 74,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_guard' (line 74) held across .await",
+      "snippet": "let _guard = TEST_LOCK.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/compaction_contiguous_selection.rs",
+      "line": 49,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'sstables_guard' (line 49) held across .await",
+      "snippet": "let sstables_guard = sstables_lock.read().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/executor_starvation_test.rs",
+      "line": 33,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let sample_history = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/group_commit_timeout.rs",
+      "line": 19,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "static TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/group_commit_timeout.rs",
+      "line": 23,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_lock_guard' (line 23) held across .await",
+      "snippet": "let _lock_guard = TEST_LOCK.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/group_commit_timeout.rs",
+      "line": 112,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_lock_guard' (line 112) held across .await",
+      "snippet": "let _lock_guard = TEST_LOCK.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_commit_flush_visibility.rs",
+      "line": 7,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_commit_flush_visibility.rs",
+      "line": 100,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_group_commit.rs",
+      "line": 7,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_group_commit.rs",
+      "line": 72,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_group_commit_handoff.rs",
+      "line": 12,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(loom)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_group_commit_handoff.rs",
+      "line": 95,
+      "kind": "LOOM_CONCURRENCY_TEST",
+      "severity": "POSITIVE",
+      "description": "Loom permutation concurrency verification present",
+      "snippet": "#[cfg(not(loom))]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/metrics_sink_test.rs",
+      "line": 246,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let sink_container = Arc::new(parking_lot::RwLock::new("
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 85,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (in_scan_tx, in_scan_rx) = mpsc::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 86,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (resume_scan_tx, resume_scan_rx) = mpsc::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 87,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "let resume_scan_rx = Arc::new(std::sync::Mutex::new(resume_scan_rx));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 116,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx_in_enqueue1, rx_in_enqueue1) = mpsc::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 117,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx_resume_enqueue1, rx_resume_enqueue1) = mpsc::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 118,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "let rx_resume_enqueue1 = Arc::new(std::sync::Mutex::new(rx_resume_enqueue1));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 121,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 121) held across .await",
+      "snippet": "let guard = wal_c1.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_backpressure.rs",
+      "line": 136,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'guard' (line 136) held across .await",
+      "snippet": "let guard = wal_c2.truncate_lock.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_legacy_key_tests.rs",
+      "line": 222,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'captured_logs' (line 208) held across .await",
+      "snippet": ".await"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 12,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "invocations: Arc<parking_lot::Mutex<Vec<(usize, u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 19,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "invocations: Arc<parking_lot::Mutex<Vec<(usize, u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 30,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "invocations: Arc<parking_lot::Mutex<Vec<(usize, u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 62,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let invocations = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 91,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let invocations = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 122,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let invocations = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer.rs",
+      "line": 167,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let invocations = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_contract.rs",
+      "line": 85,
+      "kind": "CHANNEL_PIPELINE",
+      "severity": "INFO",
+      "description": "Message-passing channel initialized",
+      "snippet": "let (tx_done, rx_done) = tokio::sync::oneshot::channel();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 14,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "records: Arc<parking_lot::Mutex<Vec<(u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 23,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "records: Arc<parking_lot::Mutex<Vec<(u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 36,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "records: Arc<parking_lot::Mutex<Vec<(u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 50,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "records: Arc<parking_lot::Mutex<Vec<(u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 63,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "records: Arc<parking_lot::Mutex<Vec<(u64, TxId, WriteOrigin, usize)>>>,"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 109,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 125,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'recs' (line 117) held across .await",
+      "snippet": "storage.close().await.unwrap();"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 134,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records1 = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 167,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records2 = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 206,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records_slow = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 207,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records_fast = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 254,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records_panic = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 255,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records_healthy = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_integration.rs",
+      "line": 295,
+      "kind": "PARKING_LOT_LOCK",
+      "severity": "INFO",
+      "description": "Usage of parking_lot::{Mutex, RwLock} (efficient spin/parking)",
+      "snippet": "let records = Arc::new(parking_lot::Mutex::new(Vec::new()));"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_observer_test.rs",
+      "line": 133,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard 'order' (line 130) held across .await",
+      "snippet": "storage.close().await.expect(\"close\");"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_recovery_runtime_stall.rs",
+      "line": 10,
+      "kind": "STD_SYNC_LOCK",
+      "severity": "LOW",
+      "description": "Usage of std::sync::{Mutex, RwLock} (parking_lot preferred for non-async)",
+      "snippet": "use std::sync::Mutex;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_torn_write_fault_injection.rs",
+      "line": 7,
+      "kind": "TOKIO_ASYNC_LOCK",
+      "severity": "INFO",
+      "description": "Usage of tokio::sync::{Mutex, RwLock} for async boundaries",
+      "snippet": "static TEST_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_torn_write_fault_injection.rs",
+      "line": 11,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_guard' (line 11) held across .await",
+      "snippet": "let _guard = TEST_MUTEX.lock().await;"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_torn_write_fault_injection.rs",
+      "line": 83,
+      "kind": "LOCK_HELD_ACROSS_AWAIT",
+      "severity": "HIGH",
+      "description": "Potential lock inversion / deadlock: Guard '_guard' (line 83) held across .await",
+      "snippet": "let _guard = TEST_MUTEX.lock().await;"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Synchronisations-\u00dcbersicht",
+      "content": "| Mechanismus / Risiko | Anzahl | Relevanz |\n|---|---|---|\n| **Lock \u00fcber `.await`** | 77 | Kritische Deadlock-Gefahr / Async-Invariante |\n| `std::sync::{Mutex, RwLock}` | 15 | Standardbibliothek Sperren |\n| `parking_lot::{Mutex, RwLock}` | 41 | Schnelle synchrone Locks |\n| `tokio::sync::{Mutex, RwLock}` | 29 | Kooperative asynchrone Sperren |\n| Kan\u00e4le (`mpsc`/`broadcast`) | 26 | Message-Passing Architekturen |\n| `loom` Test-Konfigurationen | 28 | Deterministische Nebenl\u00e4ufigkeitspr\u00fcfung |"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ mod config;
 mod core;
 mod errors;
 pub mod policy;
+#[cfg(feature = "ports-compat")]
 mod trait_impls;
 mod validation;
 mod wire;

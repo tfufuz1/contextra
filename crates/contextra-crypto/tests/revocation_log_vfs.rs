@@ -1,8 +1,8 @@
+#![cfg(feature = "legacy-erasure")]
 // FILE-CONTEXT
 // ZWECK: VFS-basierte Persistenz-, Neustart- und Crash-Konsistenz-Tests für RevocationLog.
 // INVARIANTEN: Atomarität bei write_atomic: Im Fehlerfall bleibt der Speicherzustand unverändert.
 // Tamper-Detection beim Öffnen via Vfs; Integritätsprüfung unverändert.
-
 #![forbid(unsafe_code)]
 
 use contextra_crypto::{

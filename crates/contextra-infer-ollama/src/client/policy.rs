@@ -1,4 +1,4 @@
-use contextra_types::{ContextraError, Result};
+use crate::error::{OllamaError, Result};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
@@ -53,14 +53,14 @@ impl EndpointPolicy {
     /// Every remote usage triggers a call to `audit_sink.audit_egress`.
     pub fn check_endpoint(&self, endpoint: &str, audit_sink: &dyn EgressAuditSink) -> Result<()> {
         let url = Url::parse(endpoint).map_err(|e| {
-            ContextraError::PolicyViolation(format!("Invalid endpoint URL '{endpoint}': {e}"))
+            OllamaError::InvalidInput(format!("Invalid endpoint URL '{endpoint}': {e}"))
         })?;
 
         // 1. Userinfo check (user:pass@...)
         if !url.username().is_empty() || url.password().is_some() {
             let reason = "Userinfo in endpoint URL is forbidden";
             audit_sink.audit_egress(endpoint, false, reason);
-            return Err(ContextraError::PolicyViolation(reason.to_string()));
+            return Err(OllamaError::InvalidInput(reason.to_string()));
         }
 
         let scheme = url.scheme().to_lowercase();
@@ -73,7 +73,7 @@ impl EndpointPolicy {
             } else {
                 let reason = "Unix socket path is not in allowed_unix_sockets";
                 audit_sink.audit_egress(endpoint, false, reason);
-                return Err(ContextraError::PolicyViolation(format!(
+                return Err(OllamaError::InvalidInput(format!(
                     "Unix socket path '{}' is not allowed by policy",
                     socket_path.display()
                 )));
@@ -83,7 +83,7 @@ impl EndpointPolicy {
         if scheme != "http" && scheme != "https" {
             let reason = "Unsupported scheme in endpoint URL";
             audit_sink.audit_egress(endpoint, false, reason);
-            return Err(ContextraError::PolicyViolation(format!(
+            return Err(OllamaError::InvalidInput(format!(
                 "Unsupported scheme '{scheme}' in endpoint URL"
             )));
         }
@@ -93,7 +93,7 @@ impl EndpointPolicy {
             None => {
                 let reason = "Missing host in endpoint URL";
                 audit_sink.audit_egress(endpoint, false, reason);
-                return Err(ContextraError::PolicyViolation(reason.to_string()));
+                return Err(OllamaError::InvalidInput(reason.to_string()));
             }
         };
 
@@ -139,7 +139,7 @@ impl EndpointPolicy {
             let reason =
                 "AuditSinkRequired: Remote egress requires an explicit non-noop audit sink";
             audit_sink.audit_egress(endpoint, false, reason);
-            return Err(ContextraError::PolicyViolation(format!(
+            return Err(OllamaError::InvalidInput(format!(
                 "AuditSinkRequired: Remote egress to '{endpoint}' rejected because NoopEgressAuditSink is active"
             )));
         }
@@ -148,7 +148,7 @@ impl EndpointPolicy {
         if !self.allow_remote {
             let reason = "Remote egress rejected: allow_remote is false";
             audit_sink.audit_egress(endpoint, false, reason);
-            return Err(ContextraError::PolicyViolation(format!(
+            return Err(OllamaError::InvalidInput(format!(
                 "Remote egress to host '{host_str}' rejected by policy (allow_remote = false)"
             )));
         }
@@ -161,7 +161,7 @@ impl EndpointPolicy {
         if !matches_allowlist {
             let reason = "Remote host is not in allowed_remote_hosts allowlist";
             audit_sink.audit_egress(endpoint, false, reason);
-            return Err(ContextraError::PolicyViolation(format!(
+            return Err(OllamaError::InvalidInput(format!(
                 "Remote host '{host_str}' (or '{host_port}') is not in allowed_remote_hosts allowlist"
             )));
         }

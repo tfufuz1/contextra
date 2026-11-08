@@ -15,6 +15,9 @@
 //! URLs und E-Mail-Adressen werden über reguläre Ausdrücke geschützt, damit sie
 //! nicht fälschlich an Interpunktionszeichen aufgespalten werden.
 
+#[cfg(not(feature = "types-compat"))]
+use crate::error::{Result, TextError as ContextraError};
+#[cfg(feature = "types-compat")]
 use contextra_types::{ContextraError, Result};
 use regex::Regex;
 use std::collections::HashSet;

@@ -80,8 +80,10 @@ pub mod observer;
 mod validate;
 
 pub mod commit;
+pub mod fence;
 pub mod flush;
 pub mod group_commit;
+pub mod lock_order;
 pub mod recovery;
 pub mod scan;
 
