@@ -1,0 +1,1 @@
+Dieses Projekt wurde über viele Monate entwickelt dabei sind Funktionen und Komponenten implementiert und wieder entfernt worden, in "components/" sind tiefere Github-Analysen und Referezen für wiederherstellbare Funktionen und Komponenten. Diese müssen aber in die entkoppelte und isolierte Architektur sauber ohne Abhängigkeiten implementiert werden.
