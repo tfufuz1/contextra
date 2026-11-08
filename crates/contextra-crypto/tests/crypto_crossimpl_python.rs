@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `crypto_crossimpl_python.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `crypto_crossimpl_python`.

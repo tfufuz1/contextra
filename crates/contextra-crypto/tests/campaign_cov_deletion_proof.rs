@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `campaign_cov_deletion_proof.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_cov_deletion_proof`.

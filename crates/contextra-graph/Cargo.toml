@@ -11,10 +11,13 @@ description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fus
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
 
 [features]
-default = []
-docid-128 = ["contextra-types/docid-128"]
+default = ["types-compat", "ports-compat"]
+types-compat = ["dep:contextra-types", "dep:contextra-ports"]
+ports-compat = ["types-compat"]
+docid-128 = []
 graph-connectivity-health = []
 edge-reinforcement-learning = []
 # Retained for CI compatibility (.github/workflows/rust-ci.yml); PPR forward-push is baseline in ppr.rs
@@ -26,8 +29,9 @@ apprh-diffusion = []
 physio-percolation = ["graph-connectivity-health"]
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
+bytes = { workspace = true }
 parking_lot = { workspace = true }
 tracing = { workspace = true }
 ahash = { workspace = true }
@@ -40,9 +44,7 @@ scc = "2"
 thiserror = { workspace = true }
 
 [dev-dependencies]
-bytes = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
-contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 proptest = "1.4"
 tracing-subscriber = { workspace = true }

@@ -31,7 +31,7 @@
 
 ## 4. Verträge & Invarianten
 
-1. **VETO-F02:** Löschen = Tombstone + Slot-Nullung + **vollständiger** Rebuild. Kein Rewiring. Slots werden erst nach Rebuild wiederverwendet (INV-HNSW-SLOT-1). **Achtung:** `partial_rebuild.rs`/Feature `partial-index-rebuild` steht in Spannung dazu; nur für Wartung, nie als Löschstrategie.
+1. **VETO-F02 & Konnektivität (SPEC §11.4):** Löschen = Tombstone + Slot-Nullung (`INV-VEC-ZEROIZE-1`) + budgetierte Nachbarschaftsreparatur unter Erhalt der Konnektivität (`INV-VEC-CONNECTIVITY-1`). Vollständiger Rebuild (`rebuild_sync`) reorganisiert den Graph; erst danach werden Slots wiederverwendet (`INV-HNSW-SLOT-1`). `partial_rebuild.rs`/Feature `partial-index-rebuild` dient als Wartungspfad hinter dem Feature-Flag (E-05) und wird nicht als Default aktiviert.
 2. **Tenant-Trennung (INV-TENANT-IDX-1):** Index physisch je (Tenant, Collection[, Modell-Hash]); keine Kante über Tenants.
 3. **Determinismus:** HNSW-Level folgen aus `hash(doc_id, seed)`, nie aus Laufzeit-RNG (INV-INDEX-APPLY-1); ein Applier in WAL-Reihenfolge.
 4. **Snapshot-Sicht:** `born_seq`/`died_seq` je Eintrag (INV-INDEX-SNAPSHOT-1).

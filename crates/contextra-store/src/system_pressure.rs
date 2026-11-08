@@ -60,10 +60,21 @@ pub struct SystemPressureMonitor {
     pressure_tx: tokio::sync::watch::Sender<SystemPressure>,
     pub pressure_rx: tokio::sync::watch::Receiver<SystemPressure>,
     sampling_interval: Duration,
+    pub(crate) clock: Arc<dyn contextra_ports::Clock>,
 }
 
 impl SystemPressureMonitor {
     pub fn new(sampling_interval: Duration) -> Self {
+        Self::new_with_clock(
+            sampling_interval,
+            Arc::new(contextra_ports::SystemClock::new()),
+        )
+    }
+
+    pub fn new_with_clock(
+        sampling_interval: Duration,
+        clock: Arc<dyn contextra_ports::Clock>,
+    ) -> Self {
         let default_pressure = SystemPressure {
             wal_queue_depth: 0,
             scheduler_queue_depth: 0.0,
@@ -76,7 +87,13 @@ impl SystemPressureMonitor {
             pressure_tx,
             pressure_rx,
             sampling_interval,
+            clock,
         }
+    }
+
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+        self.clock = clock;
+        self
     }
 
     pub fn compute_pressure(
@@ -160,15 +177,16 @@ impl SystemPressureMonitor {
 
                     // Sample blocking thread pool utilization using a probe task with timeout.
                     // Probe measures task execution/dispatch latency through the blocking queue.
-                    let sample_start = std::time::Instant::now();
+                    let sample_start_nanos = self.clock.monotonic_nanos();
                     let blocking_probe = tokio::task::spawn_blocking(|| {
                         // Minimal work in blocking thread
                     });
                     let blocking_util = match tokio::time::timeout(Duration::from_millis(100), blocking_probe).await {
                         Ok(Ok(())) => {
-                            let elapsed = sample_start.elapsed().as_secs_f32();
+                            let elapsed_nanos = self.clock.monotonic_nanos().saturating_sub(sample_start_nanos);
+                            let elapsed_secs = (elapsed_nanos as f32) / 1_000_000_000.0;
                             // Latency > 10ms indicates elevated blocking queue contention; > 50ms indicates critical.
-                            (elapsed / 0.05).min(1.0)
+                            (elapsed_secs / 0.05).min(1.0)
                         }
                         _ => 1.0, // Timeout or join error indicates blocking pool saturation
                     };
@@ -322,6 +340,7 @@ mod tests {
     #[tokio::test]
     async fn test_blocking_pool_load_triggers_pressure() {
         let monitor = SystemPressureMonitor::new(Duration::from_millis(20));
+        let _clock = monitor.clock.clone();
         let mut rx = monitor.pressure_rx.clone();
         let cancellation = CancellationToken::new();
         let cancel_token = cancellation.clone();
@@ -340,8 +359,8 @@ mod tests {
 
         // Wait for SystemPressureMonitor to detect blocking queue delay/saturation
         let mut reacted = false;
-        let start = std::time::Instant::now();
-        while start.elapsed() < Duration::from_secs(2) {
+        let start_nanos = _clock.monotonic_nanos();
+        while _clock.monotonic_nanos().saturating_sub(start_nanos) < 2_000_000_000 {
             if rx.changed().await.is_ok() {
                 let p = rx.borrow().clone();
                 if p.blocking_util > BLOCKING_UTIL_ELEVATED
