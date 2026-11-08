@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-11
 // ZWECK: Integration tests for Candle real forward-pass GGUF LLM and Bert embedding inference.
 // INVARIANTEN: Ignored by default unless binary model fixtures are present; executable with real-inference-tests flag / --include-ignored.
 
@@ -7,8 +5,6 @@
 //!
 //! # Zweck
 //! Standardmäßig ignoriert (`#[ignore]`), wird manuell ausgeführt, wenn echte Binärmodelle vorliegen.
-
-// ANCHOR[contextra-infer-candle:TEST-REAL-INFERENCE]
 use contextra_infer_candle::{CandleEmbedClient, CandleLlmClient, CandleQuantization};
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};
 use std::path::Path;

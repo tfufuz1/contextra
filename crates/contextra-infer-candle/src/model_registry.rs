@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-09T15:45:22Z (SESSION: 6cae458a)
 // ZWECK: Model fingerprinting and CandleQuantization definitions.
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
@@ -78,6 +76,37 @@ pub fn compute_fingerprint(
             hasher.update(slice);
         }
     }
+
+    let quant_str = quantization.to_string();
+    hasher.update(quant_str.as_bytes());
+
+    let result = hasher.finalize();
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&result);
+
+    let model_id = model_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    Ok(ModelFingerprint {
+        hash,
+        model_id,
+        quantization: quant_str,
+    })
+}
+
+
+/// Computes a unique fingerprint for a model file accessed via the `Vfs` port trait.
+pub fn compute_fingerprint_from_vfs(
+    vfs: &dyn contextra_ports::Vfs,
+    model_path: &Path,
+    quantization: &CandleQuantization,
+) -> Result<ModelFingerprint, ContextraError> {
+    let bytes = vfs.read(model_path)?;
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
 
     let quant_str = quantization.to_string();
     hasher.update(quant_str.as_bytes());

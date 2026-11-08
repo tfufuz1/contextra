@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z
 // ZWECK: Quantized Llama GGUF model execution wrapper.
 
 use crate::inference::config::GenerationConfig;

@@ -1,5 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-09-11T16:00:00Z
 // ZWECK: Property-based tests for numerical normalization, finite outputs, and empty/whitespace input edge cases.
 // INVARIANTEN: No NaN or Inf in output vectors (is_finite true); no panics on arbitrary string lengths or empty inputs; proptest with 50 cases.
 
@@ -8,8 +6,6 @@
 //! # Zweck
 //! Prüft, dass erzeugte Einbettungen für beliebige Eingabelängen endliche Floats ohne NaN/Inf liefern
 //! und leere Eingaben wohldefinierte Vektoren erzeugen.
-
-// ANCHOR[contextra-infer-candle:PROPTEST-EMBEDDING-NORMALIZATION]
 use candle_core::Device;
 use contextra_infer_candle::embedding::{CandleEmbedInner, DefaultCandleEmbedModel};
 use contextra_infer_candle::model_registry::ModelFingerprint;
