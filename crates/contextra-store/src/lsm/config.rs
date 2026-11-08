@@ -104,7 +104,7 @@ impl DurabilityMode {
 // SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 /// Configuration for the LSM storage engine.
 pub struct LsmConfig {
@@ -130,6 +130,56 @@ pub struct LsmConfig {
     /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
     /// Default is 1,000,000 keys.
     pub ssi_max_tracked_keys: usize,
+    /// Injected clock port for deterministic execution timing (P28).
+    #[serde(skip, default = "default_clock")]
+    pub clock: std::sync::Arc<dyn contextra_ports::Clock>,
+    /// Injected source for cryptographic key and salt material (P28).
+    #[serde(skip, default = "default_key_source")]
+    pub key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
+}
+
+fn default_clock() -> std::sync::Arc<dyn contextra_ports::Clock> {
+    std::sync::Arc::new(contextra_ports::SystemClock::new())
+}
+
+fn default_key_source() -> std::sync::Arc<dyn crate::key_source::KeyMaterialSource> {
+    std::sync::Arc::new(crate::key_source::OsKeyMaterialSource)
+}
+
+impl std::fmt::Debug for LsmConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LsmConfig")
+            .field("path", &self.path)
+            .field("memtable_size_limit", &self.memtable_size_limit)
+            .field("max_ram_mb", &self.max_ram_mb)
+            .field("tx_timeout", &self.tx_timeout)
+            .field("compaction", &self.compaction)
+            .field("encryption_passphrase", &self.encryption_passphrase)
+            .field("group_commit_window_micros", &self.group_commit_window_micros)
+            .field("block_cache_shards", &self.block_cache_shards)
+            .field("durability_mode", &self.durability_mode)
+            .field("ssi_max_tracked_keys", &self.ssi_max_tracked_keys)
+            .field("clock", &"Arc<dyn Clock>")
+            .field("key_source", &self.key_source)
+            .finish()
+    }
+}
+
+impl LsmConfig {
+    /// Attaches an injected clock port fluently to `LsmConfig`.
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn contextra_ports::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Attaches an injected key material source fluently to `LsmConfig` (for deterministic testing).
+    pub fn with_key_source(
+        mut self,
+        key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
+    ) -> Self {
+        self.key_source = key_source;
+        self
+    }
 }
 
 impl Default for LsmConfig {
@@ -145,6 +195,8 @@ impl Default for LsmConfig {
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
+            clock: default_clock(),
+            key_source: default_key_source(),
         }
     }
 }

@@ -35,6 +35,8 @@
 pub mod compaction;
 pub mod engine;
 pub mod fsync;
+pub mod key_source;
+pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
@@ -52,6 +54,8 @@ pub mod tenant_codec;
 pub(crate) mod util;
 pub mod wal;
 
+#[cfg(not(loom))]
+pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
 #[cfg(not(loom))]
 pub use compaction::{
     adaptive::{

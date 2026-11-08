@@ -26,3 +26,9 @@ path = "crates/contextra-mcp/src/sandbox.rs"
 pattern = "rand::thread_rng"
 reason = "ADR-098 allows rand::thread_rng() for sandbox key generation"
 adr = "ADR-098"
+
+[[allow]]
+path = "crates/contextra-store/src/wal/flusher.rs"
+pattern = "tokio::time::Instant"
+reason = "P28 / B11: Group-Commit-Deadline im Flusher darf bei tokio::time bleiben, weil start_paused / pause Determinismus in Tests liefert"
+adr = "ADR-098"
