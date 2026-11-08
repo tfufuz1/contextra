@@ -32,7 +32,7 @@ Für `contextra-simd` gelten im Rahmen der Transformation zum modularen Baukaste
 
 ### 2.2 Abhängigkeitsmatrix & Schnittstellen
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types`
+- **Interne Abhängigkeiten:** keine (SPEC v4.0 B1, Stand WP-1)
 - **Verbotene Abhängigkeiten:** Höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
 - **Konsumierte / Implementierte Ports:** Spezifiziert in `AGENTS.md` und `docs/SPEC.md`.
 

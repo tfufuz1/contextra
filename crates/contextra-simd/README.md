@@ -11,7 +11,7 @@ Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.
 - **Ring:** Ring 0 (Unsafe-Insel 1 von 3, `#![deny(unsafe_code)]` ausgenommen)
 - **Klasse:** Kern `[K]`
 - **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)
+- **Interne Abhängigkeiten:** keine (SPEC v4.0 B1). `DistanceMetric` und `Error` sind crate-eigen.
 - **Features:** Minimal, standardmäßig keine Schwergewichte. Additive ISA-Nutzung über Runtime-Feature-Detection.
 
 ## Garantien & Invarianten
@@ -25,7 +25,7 @@ Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.
 ```rust
 use contextra_simd::{compute_distance, validate_vector};
 use contextra_simd::dispatch::{Dispatcher, SimdTarget};
-use contextra_types::DistanceMetric;
+use contextra_simd::DistanceMetric;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let a = [1.0f32, 2.0, 3.0, 4.0];

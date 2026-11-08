@@ -14,7 +14,7 @@
 //! mit einem einzigen CPU-Befehl auszuführen.
 //!
 //! **Verbindung im System:**
-//! - **Abhängigkeiten (normal):** `contextra-types` (für `ContextraError` und `DistanceMetric`), `bytemuck`, `thiserror`, `tracing`.
+//! - **Abhängigkeiten (normal):** `contextra-types` (für `Error` und `DistanceMetric`), `bytemuck`, `thiserror`, `tracing`.
 //! - **Wird eingebunden von:** `contextra-vector` (Ring 1) zur Beschleunigung von Ähnlichkeitssuchen in Vektorindizes
 //!   (z. B. HNSW = Hierarchical Navigable Small World).
 //!
@@ -26,6 +26,9 @@
 #![allow(unsafe_code)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
+
+mod error;
+mod metric;
 
 // ANCHOR[contextra-simd:CORE-MOD-DISPATCH]
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
@@ -65,11 +68,11 @@ pub use kernels::scalar::{
 /// # Ablauf von `validate_vector`:
 /// 1. Iteration über alle Elemente der `f32`-Slice.
 /// 2. Prüfung mittels `v.is_finite()`.
-/// 3. Abbruch mit Fehler (`ContextraError::invalid_input`), falls mindestens ein Wert ungültig ist.
+/// 3. Abbruch mit Fehler (`Error::invalid_input`), falls mindestens ein Wert ungültig ist.
 /// 4. Rückgabe von `Ok(())`, wenn alle Werte endlich sind.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn ein Wert `f32::NAN`, `f32::INFINITY` oder `f32::NEG_INFINITY` ist.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn ein Wert `f32::NAN`, `f32::INFINITY` oder `f32::NEG_INFINITY` ist.
 ///
 /// # Nebenwirkungen:
 /// Keine (reine Speicherprüfung im RAM).
@@ -103,9 +106,9 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
 /// 3. An [`compute_distance_trusted`] delegieren.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn Vektor `a` oder `b` NaN/Unendlich enthält.
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn die Vektorlängen ungleich sind.
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn eine unbekannte oder nicht unterstützte Metrik übergeben wurde.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn Vektor `a` oder `b` NaN/Unendlich enthält.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn die Vektorlängen ungleich sind.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn eine unbekannte oder nicht unterstützte Metrik übergeben wurde.
 ///
 /// # Nebenwirkungen:
 /// Keine.
@@ -143,7 +146,7 @@ pub fn compute_distance(
 /// 3. Längenabgleich und Ausführung im gewählten Hardware-Pfad.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, falls Längen abweichen oder eine nicht unterstützte Metrik gefordert wird.
+/// - Gibt `Err(Error::InvalidInput)` zurück, falls Längen abweichen oder eine nicht unterstützte Metrik gefordert wird.
 ///
 /// # Nebenwirkungen:
 /// Keine.
@@ -172,9 +175,9 @@ pub fn compute_distance_trusted(
 /// 3. Konvertierung/Reinterpretation der Bytes als `f32` im Ziel-Kernel.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn die Byte-Länge kein Vielfaches von 4 (`sizeof(f32)`) ist
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn die Byte-Länge kein Vielfaches von 4 (`sizeof(f32)`) ist
 ///   oder die Dimensionen nicht übereinstimmen.
-/// - Gibt `Err(ContextraError::InvalidInput)` bei unbekannter Metrik zurück.
+/// - Gibt `Err(Error::InvalidInput)` bei unbekannter Metrik zurück.
 ///
 /// # Nebenwirkungen:
 /// Keine.

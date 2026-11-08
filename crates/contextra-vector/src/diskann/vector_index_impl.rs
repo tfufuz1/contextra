@@ -7,7 +7,7 @@
 use super::format::compute_adaptive_flush_threshold;
 use super::types::DiskAnnIndex;
 use contextra_ports::{VectorIndex, VectorIndexStats};
-use contextra_simd::validate_vector;
+use crate::distance::validate_vector;
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId};
 use std::sync::atomic::Ordering;
 

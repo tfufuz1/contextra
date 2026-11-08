@@ -10,6 +10,7 @@
     deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
 )]
 
+pub mod backend;
 pub mod crypto_local;
 pub mod error;
 pub mod gate;
