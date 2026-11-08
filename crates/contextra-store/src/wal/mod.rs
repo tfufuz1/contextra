@@ -802,6 +802,11 @@ impl Wal {
     }
 
     #[cfg(any(test, feature = "test-hooks"))]
+    pub fn poison_for_test(&self) {
+        self.poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn allow_legacy_fallback_for_test(&self) -> bool {
         self.allow_legacy_integrity_key_fallback
             .load(std::sync::atomic::Ordering::Relaxed)
