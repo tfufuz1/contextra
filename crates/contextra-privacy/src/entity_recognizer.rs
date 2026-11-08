@@ -195,7 +195,7 @@ struct Normalizer {
     chars: Vec<char>,
     /// Maps character index in `chars` to start byte offset in raw text
     char_start_bytes: Vec<usize>,
-    /// Maps character index in `chars` to end byte offset in raw text
+    /// Maps character index in `chars` to end byte offset in raw text (inclusive of trailing ignored characters)
     char_end_bytes: Vec<usize>,
 }
 
@@ -211,6 +211,10 @@ impl Normalizer {
 
             // Strip zero-width & non-printing control characters
             if is_zero_width_or_control(c) {
+                // Extend the end_byte boundary of the previous valid character so that trailing combining marks/zero-widths are included in the span
+                if let Some(last_end) = char_end_bytes.last_mut() {
+                    *last_end = end_byte;
+                }
                 continue;
             }
 
@@ -253,24 +257,25 @@ impl Normalizer {
 }
 
 // ANCHOR[contextra-privacy:ER-016]
-// Prüft auf unsichtbare Steuerzeichen und Zero-Width-Zeichen zur Verhinderung von Obfuskation.
+// Prüft auf unsichtbare Steuerzeichen, Zero-Width-Zeichen und diakritische Markierungen (Zalgo) zur Verhinderung von Obfuskation.
 fn is_zero_width_or_control(c: char) -> bool {
     matches!(
         c,
-        '\u{200B}' // Zero Width Space
-        | '\u{200C}' // Zero Width Non-Joiner
-        | '\u{200D}' // Zero Width Joiner
-        | '\u{2060}' // Word Joiner
+        '\u{200B}'..='\u{200F}' // Zero Width Space, ZWNJ, ZWJ, LRM, RLM
+        | '\u{202A}'..='\u{202E}' // Bidi embedding & override controls
+        | '\u{2060}'..='\u{2064}' // Word Joiner, Invisible operators
+        | '\u{2066}'..='\u{2069}' // Bidi isolate controls
         | '\u{FEFF}' // Zero Width No-Break Space / BOM
         | '\u{00AD}' // Soft Hyphen
-        | '\u{200E}' // Left-to-Right Mark
-        | '\u{200F}' // Right-to-Left Mark
-        | '\u{202A}'..='\u{202E}' // Bidi embedding & override controls
+        | '\u{0300}'..='\u{036F}' // Combining Diacritical Marks (Zalgo striping)
+        | '\u{1DC0}'..='\u{1DFF}' // Combining Diacritical Marks Supplement
+        | '\u{20D0}'..='\u{20FF}' // Combining Diacritical Marks for Symbols
+        | '\u{FE00}'..='\u{FE0F}' // Variation Selectors
     )
 }
 
 // ANCHOR[contextra-privacy:ER-017]
-// Normalisiert kyrillische und lateinische Homoglyphen auf ihre kanonischen ASCII-Entsprechungen.
+// Normalisiert kyrillische, griechische und lateinische Homoglyphen sowie Fullwidth- und Mathe-Zeichen auf ASCII.
 fn fold_homoglyph(c: char) -> char {
     match c {
         // Cyrillic lookalikes
@@ -284,11 +289,54 @@ fn fold_homoglyph(c: char) -> char {
         'с' | 'С' => 'c',
         'т' | 'Т' => 'T',
         'х' | 'Х' => 'x',
+        'і' | 'І' => 'i',
+        'ј' | 'Ј' => 'j',
+        'ѕ' | 'Ѕ' => 's',
+        'у' | 'У' => 'y',
+        // Greek lookalikes
+        'Α' | 'α' => 'a',
+        'Β' => 'B',
+        'Ε' | 'ε' => 'e',
+        'Η' | 'η' => 'H',
+        'Ι' | 'ι' => 'i',
+        'Κ' | 'κ' => 'K',
+        'Μ' => 'M',
+        'Ν' => 'N',
+        'Ο' | 'ο' => 'o',
+        'Ρ' | 'ρ' => 'p',
+        'Τ' | 'τ' => 'T',
+        'Χ' | 'χ' => 'x',
+        'Υ' => 'Y',
+        'Ζ' => 'Z',
+        // Fullwidth Latin letters
+        'Ａ'..='Ｚ' => {
+            let offset = c as u32 - 'Ａ' as u32;
+            char::from_u32('A' as u32 + offset).unwrap_or(c)
+        }
+        'ａ'..='ｚ' => {
+            let offset = c as u32 - 'ａ' as u32;
+            char::from_u32('a' as u32 + offset).unwrap_or(c)
+        }
         // Fullwidth digits
         '０'..='９' => {
             let offset = c as u32 - '０' as u32;
-            let ascii_code = '0' as u32 + offset;
-            char::from_u32(ascii_code).unwrap_or(c)
+            char::from_u32('0' as u32 + offset).unwrap_or(c)
+        }
+        // Mathematical Alphanumeric Symbols (Bold / Monospace / Double-struck common subsets)
+        '\u{1D400}'..='\u{1D419}' => {
+            // Mathematical Bold Capital
+            let offset = c as u32 - 0x1D400;
+            char::from_u32('A' as u32 + offset).unwrap_or(c)
+        }
+        '\u{1D41A}'..='\u{1D433}' => {
+            // Mathematical Bold Small
+            let offset = c as u32 - 0x1D41A;
+            char::from_u32('a' as u32 + offset).unwrap_or(c)
+        }
+        '\u{1D7CE}'..='\u{1D7D7}' => {
+            // Mathematical Bold Digits
+            let offset = c as u32 - 0x1D7CE;
+            char::from_u32('0' as u32 + offset).unwrap_or(c)
         }
         _ => c,
     }

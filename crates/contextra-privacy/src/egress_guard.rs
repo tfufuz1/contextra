@@ -102,13 +102,13 @@ impl EgressGuard {
     }
 
     // ANCHOR[contextra-privacy:EG-012]
-    /// Prüft einen an einen Mandanten gebundenen Payload ([`contextra_types::TenantScoped`]) mit Mandantenisolationsprüfung.
+    /// Prüft einen an einen Mandanten gebundenen Payload ([`TenantScoped`]) mit Mandantenisolationsprüfung.
     ///
     /// Liefert `Block(BlockReason::PolicyDenied(...))` bei Mandantenkonflikten.
     pub async fn check_scoped(
         &self,
-        payload: contextra_types::TenantScoped<&str>,
-        expected_tenant_id: &contextra_types::TenantId,
+        payload: crate::types::TenantScoped<&str>,
+        expected_tenant_id: &crate::types::TenantId,
     ) -> EgressClassification {
         match payload.into_inner_checked(expected_tenant_id) {
             Ok(unpacked) => self.check(unpacked).await,
@@ -218,7 +218,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_scoped_tenant_isolation() {
-        use contextra_types::{TenantId, TenantScoped};
+        use crate::types::{TenantId, TenantScoped};
 
         let engine = Arc::new(MockSearchEngine {
             results: Ok(vec![]),
@@ -348,7 +348,7 @@ mod tests {
         nanos: u64,
     }
 
-    impl contextra_ports::Clock for MockClock {
+    impl crate::types::Clock for MockClock {
         fn now_unix_nanos(&self) -> u64 {
             self.nanos
         }

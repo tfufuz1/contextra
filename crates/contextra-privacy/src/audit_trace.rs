@@ -14,7 +14,7 @@
 //! - Zero-Panic: Fehlerbedingungen oder ungültige Längen führen nicht zum Absturz.
 
 use crate::egress_vault::{BlockReason, BoxFuture, EgressClassification, EgressClassifier};
-use contextra_ports::Clock;
+use crate::types::Clock;
 
 // ANCHOR[contextra-privacy:AT-001]
 /// Extrahiert eine stabile, nicht-leere Regel-Kennung aus einer [`EgressClassification`].

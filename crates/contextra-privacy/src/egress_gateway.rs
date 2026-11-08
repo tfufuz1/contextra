@@ -29,8 +29,7 @@ use crate::egress_vault::{
 };
 use crate::entity_recognizer::RuleBasedEntityRecognizer;
 use crate::error::EgressError;
-use contextra_ports::{Clock, SystemClock};
-use contextra_types::{TenantId, TenantScoped};
+use crate::types::{Clock, SystemClock, TenantId, TenantScoped};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -374,11 +373,40 @@ impl CloudResponseRehydrator {
     }
 }
 
+// ANCHOR[contextra-privacy:EGW-021]
+/// Evaluates whether PII vault data requires isolated retention mode for an affected document (neutral API).
+pub fn pii_vault_requires_isolated_retention(is_pii_match: bool, is_memory_only: bool) -> bool {
+    is_pii_match && !is_memory_only
+}
+
 /// Evaluates whether PII vault data forces CryptoShred mode for an affected document (INV-COLLECTION-PROFILE-3).
 // ANCHOR[contextra-privacy:EGW-009]
 /// Entscheidet anhand von PII-Match und Speichermodus, ob kryptografisches Schreddern erzwungen wird.
+///
+/// Hinweis: Veralteter Bezeichner; bitte zukünftig `pii_vault_requires_isolated_retention` verwenden.
+#[deprecated(note = "Neutralisierte API: verwende pii_vault_requires_isolated_retention")]
 pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -> bool {
-    is_pii_match && !is_memory_only
+    pii_vault_requires_isolated_retention(is_pii_match, is_memory_only)
+}
+
+// ANCHOR[contextra-privacy:EGW-022]
+/// Resolves the effective retention mode given PII status and storage configuration (neutral API).
+pub fn resolve_effective_retention_mode<D, K>(
+    is_pii_match: bool,
+    durability_mode: D,
+    preset_mode: K,
+    isolated_mode: K,
+) -> K
+where
+    D: std::fmt::Debug,
+    K: Copy,
+{
+    let is_memory_only = format!("{:?}", durability_mode).contains("MemoryOnly");
+    if pii_vault_requires_isolated_retention(is_pii_match, is_memory_only) {
+        isolated_mode
+    } else {
+        preset_mode
+    }
 }
 
 /// Read-only check for PII Vault coupling (Spec B.1.8 / INV-COLLECTION-PROFILE-3):
@@ -386,6 +414,9 @@ pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -
 /// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
 // ANCHOR[contextra-privacy:EGW-010]
 /// Bestimmt den effektiven Löschmodus (Shredding vs. Tombstone) unter Berücksichtigung von PII-Vorgaben.
+///
+/// Hinweis: Veralteter Bezeichner; bitte zukünftig `resolve_effective_retention_mode` verwenden.
+#[deprecated(note = "Neutralisierte API: verwende resolve_effective_retention_mode")]
 pub fn resolve_effective_kv_delete_mode<D, K>(
     is_pii_match: bool,
     durability_mode: D,
@@ -396,12 +427,12 @@ where
     D: std::fmt::Debug,
     K: Copy,
 {
-    let is_memory_only = format!("{:?}", durability_mode).contains("MemoryOnly");
-    if pii_vault_forces_crypto_shred(is_pii_match, is_memory_only) {
-        crypto_shred_mode
-    } else {
-        preset_kv_delete_mode
-    }
+    resolve_effective_retention_mode(
+        is_pii_match,
+        durability_mode,
+        preset_kv_delete_mode,
+        crypto_shred_mode,
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

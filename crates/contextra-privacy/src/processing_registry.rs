@@ -21,7 +21,7 @@
 
 use crate::egress_guard::{TextSearchEngine, TextSearchResult};
 use crate::egress_vault::BoxFuture;
-use contextra_types::TenantId;
+use crate::types::{Clock, TenantId};
 use serde::{Deserialize, Serialize};
 
 // ANCHOR[contextra-privacy:PR-001]
@@ -106,11 +106,7 @@ impl ProcessingRegistry {
     // ANCHOR[contextra-privacy:PR-007]
     /// Fügt einen Datensatz dem Verzeichnis hinzu (append-only) und belegt den Erstellungs-Zeitstempel
     /// über die injizierte Uhr.
-    pub fn append_record(
-        &mut self,
-        mut record: ProcessingActivityRecord,
-        clock: &dyn contextra_ports::Clock,
-    ) {
+    pub fn append_record(&mut self, mut record: ProcessingActivityRecord, clock: &dyn Clock) {
         let nanos = clock.now_unix_nanos();
         record.created_at_unix_secs = nanos / 1_000_000_000;
         if record.version == 0 {

@@ -4,7 +4,12 @@
 // INVARIANTEN: Egress Gateway enforces PII vault surrogate rehydration and volume rate limits fail-closed.
 // NICHT-OFFENSICHTLICH: Uses independent oracle (R4) validating surrogate vault roundtrip and sliding-window limits.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::disallowed_types,
+    deprecated
+)]
 
 use contextra_privacy::bulk_exfiltration_detector::{BulkExfiltrationDetector, SessionId};
 use contextra_privacy::egress_gateway::{

@@ -14,13 +14,46 @@
 //! - **Thread-Sicherheit**: Nebenläufiger, lock-armer Zugriff über `scc::HashMap` mit feingranularen Mutexen pro Sitzung.
 //! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port aus `contextra-ports` (INV-EGRESS-AUDIT-1, Regel 3).
 
-use contextra_ports::{Clock, SystemClock};
+use crate::types::{Clock, SystemClock};
 use parking_lot::Mutex;
-use scc::HashMap;
+use scc::HashMap; // ALLOW-DETERMINISM: Thread-safe map with explicit Blake3BuildHasher
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::hash::{BuildHasher, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
+
+/// Deterministischer, P28-konformer Hasher auf Basis von BLAKE3.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DeterministicBlake3Hasher {
+    state: u64,
+}
+
+impl Hasher for DeterministicBlake3Hasher {
+    fn finish(&self) -> u64 {
+        self.state
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let hash = blake3::hash(bytes);
+        let hash_bytes = hash.as_bytes();
+        let mut chunk = [0u8; 8];
+        chunk.copy_from_slice(&hash_bytes[0..8]);
+        self.state = self.state.rotate_left(13) ^ u64::from_le_bytes(chunk);
+    }
+}
+
+/// Deterministischer BuildHasher für sessions in `BulkExfiltrationDetector`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DeterministicBuildHasher;
+
+impl BuildHasher for DeterministicBuildHasher {
+    type Hasher = DeterministicBlake3Hasher;
+
+    fn build_hasher(&self) -> Self::Hasher {
+        DeterministicBlake3Hasher::default()
+    }
+}
 
 // ANCHOR[contextra-privacy:BED-001]
 /// Eindeutige Sitzungs-Kennung (SessionId) zur Gruppierung von Egress-Rate-Limiting-Buckets.
@@ -129,7 +162,7 @@ pub struct BulkExfiltrationDetector {
     /// Dauer des gleitenden Zeitfensters.
     pub window: Duration,
     clock: Arc<dyn Clock>,
-    sessions: HashMap<SessionId, Arc<Mutex<SlidingWindowCounter>>>,
+    sessions: HashMap<SessionId, Arc<Mutex<SlidingWindowCounter>>, DeterministicBuildHasher>,
 }
 
 impl std::fmt::Debug for BulkExfiltrationDetector {
@@ -168,7 +201,7 @@ impl BulkExfiltrationDetector {
             max_bytes_per_window,
             window,
             clock,
-            sessions: HashMap::new(),
+            sessions: HashMap::with_hasher(DeterministicBuildHasher),
         }
     }
 
@@ -235,8 +268,38 @@ impl BulkExfiltrationDetector {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+
+    struct TestManualClock {
+        nanos: AtomicU64,
+    }
+
+    impl TestManualClock {
+        fn new(initial_nanos: u64) -> Self {
+            Self {
+                nanos: AtomicU64::new(initial_nanos),
+            }
+        }
+
+        #[allow(clippy::cast_possible_truncation)]
+        fn advance(&self, duration: Duration) {
+            self.nanos.fetch_add(
+                u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX),
+                Ordering::SeqCst,
+            );
+        }
+    }
+
+    impl Clock for TestManualClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.nanos.load(Ordering::SeqCst)
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.nanos.load(Ordering::SeqCst)
+        }
+    }
 
     // ANCHOR[contextra-privacy:TEST-BED-001]
     // Prüft, dass eine einzelne Anfrage unterhalb des Limits erlaubt wird.
@@ -275,7 +338,7 @@ mod tests {
     // Prüft, dass das abgelaufene Zeitfenster das verbrauchte Datenvolumen wieder freigibt.
     #[test]
     fn test_sliding_window_expiry_resets_volume() {
-        let clock = Arc::new(ManualClock::new(100_000_000));
+        let clock = Arc::new(TestManualClock::new(100_000_000));
         let detector =
             BulkExfiltrationDetector::with_clock(1000, Duration::from_secs(10), clock.clone());
         let session = SessionId::from("session_1");

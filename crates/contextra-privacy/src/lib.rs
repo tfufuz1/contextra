@@ -35,6 +35,7 @@ pub mod entity_recognizer;
 pub mod error;
 pub mod guarded_payload;
 pub mod processing_registry;
+pub mod types;
 
 // ANCHOR[contextra-privacy:LIB-001]
 // Re-Exports für bequemen Zugriff auf die Kernfunktionalitäten
@@ -49,9 +50,10 @@ pub use context_edit_audit::{
 #[allow(deprecated)]
 pub use egress_gateway::{
     handle_cloud_query, handle_cloud_query_with_bulk_detector, handle_cloud_query_with_guard,
-    process_cloud_response, CloudQueryRequest, CloudQueryResponse, CloudResponseRehydrator,
-    DefaultEgressClassifier, EgressGateway, EgressGatewayBuilder, EgressGuardCheck,
-    InjectionDetector, MAX_SEARCH_QUERY_BYTES,
+    pii_vault_forces_crypto_shred, pii_vault_requires_isolated_retention, process_cloud_response,
+    resolve_effective_kv_delete_mode, resolve_effective_retention_mode, CloudQueryRequest,
+    CloudQueryResponse, CloudResponseRehydrator, DefaultEgressClassifier, EgressGateway,
+    EgressGatewayBuilder, EgressGuardCheck, InjectionDetector, MAX_SEARCH_QUERY_BYTES,
 };
 pub use egress_guard::{
     EgressGuard, TextSearchEngine, TextSearchResult, DEFAULT_EGRESS_GUARD_MIN_BYTES,
@@ -71,4 +73,7 @@ pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use processing_registry::{
     generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistry,
     ProcessingRegistryExport, ProcessorRole,
+};
+pub use types::{
+    Clock, EgressDecision, EgressPolicy, SystemClock, TenantId, TenantScopeViolation, TenantScoped,
 };

@@ -1,0 +1,4 @@
+[crates.contextra-privacy]
+klasse = "A"
+may_depend_on = []          # Autarker Baustein der Klasse A (keine internen Normal-Abhängigkeiten)
+transitional = ["ports-compat"] # Vorübergehende Anbindung für contextra-mcp, Entfernung in Welle 6
