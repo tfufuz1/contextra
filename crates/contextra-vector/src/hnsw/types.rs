@@ -8,6 +8,7 @@ use parking_lot::{Mutex, RwLock};
 use super::arena::HnswArena;
 use super::config::HnswConfig;
 use super::sq8_bias::Sq8Bias;
+use crate::distance::{DistanceKernel, ScalarKernel};
 
 /// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
@@ -84,10 +85,14 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
     }
 }
 
-/// The HNSW (Hierarchical Navigable Small World) vector index.
-pub struct HnswIndex {
+/// Generic HNSW (Hierarchical Navigable Small World) vector index parameterized by distance kernel.
+pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
+    pub(super) _kernel: std::marker::PhantomData<K>,
 }
+
+/// The default HNSW vector index using the scalar reference distance kernel.
+pub type HnswIndex = GenericHnswIndex<ScalarKernel>;
 
 #[repr(align(64))]
 pub struct HnswHotCore {
@@ -183,6 +188,7 @@ pub struct HnswColdCore {
     pub compute_pool: crate::compute_pool::ComputePool,
     pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
     pub metrics_sink: RwLock<std::sync::Arc<dyn contextra_ports::MetricsSink>>,
+    pub kernel: std::sync::Arc<dyn DistanceKernel>,
     pub last_rebuild_instant: Mutex<Option<std::time::Instant>>,
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
@@ -209,11 +215,29 @@ pub enum RebuildStatus {
     Pending,
 }
 
-impl HnswIndex {
+impl<K: DistanceKernel> Clone for GenericHnswIndex<K> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: std::sync::Arc::clone(&self.inner),
+            _kernel: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<K: DistanceKernel> GenericHnswIndex<K> {
     /// Creates a new HNSW index with an explicit random number generator for deterministic testing or custom seeding.
     pub fn try_new_with_rng(
         config: HnswConfig,
         rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    ) -> Result<HnswIndex> {
+        HnswIndex::try_new_with_rng_and_kernel(config, rng, std::sync::Arc::new(ScalarKernel))
+    }
+
+    /// Creates a new HNSW index with explicit RNG and distance kernel.
+    pub fn try_new_with_rng_and_kernel(
+        config: HnswConfig,
+        rng: std::sync::Arc<dyn contextra_ports::Rng>,
+        kernel: std::sync::Arc<dyn DistanceKernel>,
     ) -> Result<Self> {
         config.validate()?;
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
@@ -222,6 +246,7 @@ impl HnswIndex {
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
         Ok(Self {
+            _kernel: std::marker::PhantomData,
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
@@ -256,6 +281,7 @@ impl HnswIndex {
                     metrics_sink: RwLock::new(std::sync::Arc::new(
                         contextra_ports::NoopMetricsSink,
                     )),
+                    kernel,
                     last_rebuild_instant: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
@@ -278,9 +304,18 @@ impl HnswIndex {
     /// Creates a new HNSW index, validating configuration upfront.
     ///
     /// Uses an internal, non-cryptographic, reproducible default RNG seeded with `DEFAULT_LAYER_SEED`.
-    pub fn try_new(config: HnswConfig) -> Result<Self> {
+    pub fn try_new(config: HnswConfig) -> Result<HnswIndex> {
         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
+    }
+
+    /// Creates a new HNSW index with a custom distance kernel.
+    pub fn try_new_with_kernel(
+        config: HnswConfig,
+        kernel: std::sync::Arc<dyn DistanceKernel>,
+    ) -> Result<Self> {
+        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        Self::try_new_with_rng_and_kernel(config, rng, kernel)
     }
 
     /// Creates a new HNSW index.
@@ -297,6 +332,7 @@ impl HnswIndex {
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
         Self {
+            _kernel: std::marker::PhantomData,
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
@@ -331,6 +367,7 @@ impl HnswIndex {
                     metrics_sink: RwLock::new(std::sync::Arc::new(
                         contextra_ports::NoopMetricsSink,
                     )),
+                    kernel: std::sync::Arc::new(ScalarKernel),
                     last_rebuild_instant: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]

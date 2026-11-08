@@ -8,7 +8,6 @@ use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
 use super::sq8_bias::Sq8Bias;
 use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
-use crate::distance::compute_distance_trusted;
 
 static LAST_REBUILD_MAP: parking_lot::Mutex<Option<ahash::AHashMap<usize, u64>>> =
     parking_lot::Mutex::new(None);
@@ -104,7 +103,9 @@ impl HnswIndexCore {
     ) -> Result<f32> {
         match data {
             VectorData::F32(v) => {
-                compute_distance_trusted(query_exact, v, self.cold.config.distance_metric)
+                self.cold
+                    .kernel
+                    .distance_trusted(self.cold.config.distance_metric, query_exact, v)
             }
             VectorData::U8(v) => {
                 let guard;
@@ -150,10 +151,10 @@ impl HnswIndexCore {
                 q.asymmetric_dist(query_exact, vector_bytes, self.cold.config.distance_metric)
             }
         } else {
-            crate::distance::compute_distance_f32_bytes_trusted(
+            self.cold.kernel.distance_f32_bytes_trusted(
+                self.cold.config.distance_metric,
                 query_exact,
                 vector_bytes,
-                self.cold.config.distance_metric,
             )
         }
     }
@@ -161,7 +162,9 @@ impl HnswIndexCore {
     fn compute_symmetric_distance(&self, data_a: &VectorData, data_b: &VectorData) -> Result<f32> {
         match (data_a, data_b) {
             (VectorData::F32(a), VectorData::F32(b)) => {
-                compute_distance_trusted(a, b, self.cold.config.distance_metric)
+                self.cold
+                    .kernel
+                    .distance_trusted(self.cold.config.distance_metric, a, b)
             }
             (VectorData::U8(a), VectorData::U8(b)) => {
                 let guard = self.cold.quantizer.read();

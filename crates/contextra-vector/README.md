@@ -13,7 +13,7 @@ Der Baustein kann isoliert in beliebigen Rust-Systemen als eigenständige Vektor
 - **Ring:** Ring 1 (Vektorindexierung)
 - **Status:** 🟢 Autarker Baustein (Kopplungen entkoppelt, keine Abhängigkeit zu `contextra-crypto`)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-simd`, `contextra-mvcc`, `contextra-sys`.
+- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-sys`.
 
 ## Features
 - `default`: Minimale Standardkonfiguration für HNSW und SQ8.

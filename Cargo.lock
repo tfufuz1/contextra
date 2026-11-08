@@ -1408,7 +1408,6 @@ dependencies = [
  "blake3",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-simd",
  "contextra-sys",
  "contextra-types",
  "criterion",
