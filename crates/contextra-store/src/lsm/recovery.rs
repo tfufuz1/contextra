@@ -4,12 +4,14 @@
 
 use super::*;
 use crate::compaction::{CompactionEngine, MergeOperator};
+use crate::io_seam::RealFs;
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::Vfs;
 use contextra_ports::{ResourceBudget, ResourceTracker};
 use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -160,16 +162,21 @@ impl LsmStorage {
             )));
         }
 
-        tokio::fs::create_dir_all(&config.path)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to create dir: {}", e)))?;
+        let vfs: Arc<dyn Vfs> = config
+            .vfs
+            .clone()
+            .map(|s| s.vfs().clone())
+            .unwrap_or_else(|| Arc::new(RealFs));
 
-        crate::util::fsync_parent_dir(&config.path).await?;
+        vfs.create_dir_all(&config.path)?;
+        if let Some(parent) = config.path.parent() {
+            vfs.sync_dir(parent)?;
+        }
 
         let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
 
         let salt_path = config.path.join("SALT");
-        let salt = match tokio::fs::read(&salt_path).await {
+        let salt = match vfs.read(&salt_path) {
             Ok(buf) => {
                 if buf.len() != 32 {
                     return Err(ContextraError::Storage(format!(
@@ -179,7 +186,7 @@ impl LsmStorage {
                 }
                 buf
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Err(ContextraError::NotFound(_)) => {
                 if !directory_is_pristine(&config.path).await? {
                     return Err(ContextraError::Storage(
                         "SALT file missing in non-pristine database directory".into(),
@@ -467,10 +474,11 @@ impl LsmStorage {
 
         let mut sstables = Vec::new();
         for path in sst_files {
-            let reader = SstableReader::open_with_key_manager(
+            let reader = SstableReader::open_with_vfs(
                 path,
                 Arc::clone(&block_cache),
                 key_manager.clone(),
+                Arc::clone(&vfs),
             )
             .await?;
 
@@ -548,7 +556,8 @@ impl LsmStorage {
             Arc::clone(&resource_tracker),
             Some(Arc::clone(&manifest)),
         )
-        .with_pressure_rx(pressure_rx.clone());
+        .with_pressure_rx(pressure_rx.clone())
+        .with_vfs(Arc::clone(&vfs));
 
         if let Some(mo) = merge_operator {
             compaction_engine_builder = compaction_engine_builder.with_merge_operator(mo);

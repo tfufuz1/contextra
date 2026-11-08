@@ -65,7 +65,7 @@ impl WalScanner {
                     }
                 }
             }
-            let _ = tokio::fs::remove_file(&canary_path).await;
+            let _ = self.storage.vfs().remove_file(&canary_path);
         });
     }
 }
@@ -85,13 +85,12 @@ impl LayerScanner for WalScanner {
             let data_dir = self.storage.data_path();
             let mut wal_files = Vec::new();
 
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
-                    let name = path.file_name().unwrap_or_default().to_string_lossy();
-                    let is_wal = (name.starts_with("wal-") && name.ends_with(".log"))
-                        || name == "wal.log"
-                        || name.ends_with(".wal");
+            if let Ok(dir_entries) = self.storage.vfs().list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
+                    let is_wal = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
+                        || name_str == "wal.log"
+                        || name_str.ends_with(".wal");
                     if is_wal {
                         wal_files.push(path);
                     }

@@ -95,7 +95,7 @@ impl SstableScanner {
                     }
                 }
             }
-            let _ = tokio::fs::remove_file(&canary_path).await;
+            let _ = self.storage.vfs().remove_file(&canary_path);
         });
     }
 }
@@ -148,16 +148,21 @@ impl LayerScanner for SstableScanner {
 
             // 2. Inventar-Diff: Suche nach Altdateien (.sst), die nicht im Manifest/Store stehen
             let data_dir = self.storage.data_path();
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
+            if let Ok(dir_entries) = self.storage.vfs().list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
                     if path.extension().and_then(|s| s.to_str()) == Some("sst")
                         && !active_paths.contains(&path)
                     {
                         // Orphan SSTable gefunden
                         let block_cache = self.storage.block_cache();
-                        if let Ok(orphan_reader) =
-                            SstableReader::open_with_key_manager(&path, block_cache, None).await
+                        if let Ok(orphan_reader) = SstableReader::open_with_vfs(
+                            &path,
+                            block_cache,
+                            None,
+                            self.storage.vfs().clone(),
+                        )
+                        .await
                         {
                             if let Ok(entries) = orphan_reader.iter().await {
                                 for (key, _val, seq_no) in entries {
