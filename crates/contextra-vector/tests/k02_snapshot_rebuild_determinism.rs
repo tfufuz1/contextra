@@ -149,7 +149,7 @@ async fn run_snapshot_rebuild_determinism_for_seed(seed: u64) {
     });
 
     // Trigger rebuild
-    index.rebuild().await.expect("rebuild must succeed");
+    index.rebuild().expect("rebuild must succeed");
 
     // Wait for concurrent task to finish
     let concurrent_runs = concurrent_search_task

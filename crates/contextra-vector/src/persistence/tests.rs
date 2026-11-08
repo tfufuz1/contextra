@@ -70,7 +70,7 @@ async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
         .insert(tx, DocId::new(1), &[1.0, 2.0, 3.0, 4.0])
         .await?;
     index.commit(tx).await?;
-    index.save(&path).await?;
+    index.save(&path)?;
 
     let mmap_index = MmapIndex::open(&path)?;
 
@@ -114,10 +114,10 @@ async fn test_mmap_open_async() -> contextra_types::Result<()> {
     }
     index.commit(tx).await?;
 
-    index.save(&path).await?;
+    index.save(&path)?;
 
     let mmap_index = HnswIndex::try_new(config)?;
-    mmap_index.load_mmap(&path).await?;
+    mmap_index.load_mmap(&path)?;
 
     let query = vec![50.1, 100.2, 150.3, 200.4];
     let search_results = mmap_index.search(&query, 5).await?;
@@ -252,7 +252,7 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
         ..Default::default()
     };
     let index = HnswIndex::try_new(config)?;
-    index.load_mmap(&path).await?;
+    index.load_mmap(&path)?;
 
     let q = index
         .quantizer()
@@ -287,10 +287,10 @@ async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<(
     }
     index.commit(tx).await?;
 
-    index.save(&path).await?;
+    index.save(&path)?;
 
     let loaded_index = HnswIndex::try_new(config)?;
-    loaded_index.load_mmap(&path).await?;
+    loaded_index.load_mmap(&path)?;
 
     let q = loaded_index
         .quantizer()

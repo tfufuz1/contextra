@@ -3,8 +3,8 @@
 // INVARIANTEN: INV-DELETION-2: After Ok(..) of remove_with_graph_repair(doc_id), no neighborhood pointer points to doc_id.
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
-use ahash::AHashSet;
 use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
+use std::collections::BTreeSet;
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
@@ -154,7 +154,7 @@ impl GhostFreeVectorIndex for HnswIndex {
                             .collect();
 
                         // Collect 2nd-order candidates from remaining neighbors' connections
-                        let mut candidate_set: AHashSet<u32> = AHashSet::new();
+                        let mut candidate_set: BTreeSet<u32> = BTreeSet::new();
                         for &rem in &remaining {
                             if rem != target_idx as u32 && rem != neighbor_u32 {
                                 candidate_set.insert(rem);
@@ -291,7 +291,7 @@ impl HnswIndex {
         let m = self.inner.cold.config.m;
 
         let total_nodes = mmap_node_count + nodes_read.len();
-        let mut visited = AHashSet::new();
+        let mut visited = BTreeSet::new();
         let mut ghost_pointers = 0usize;
         let mut inspected_nodes = 0usize;
 
