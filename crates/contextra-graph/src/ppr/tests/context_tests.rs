@@ -191,8 +191,8 @@ async fn test_ppr_pathological_max_iterations_ceiling() {
 // ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-004]
 #[tokio::test]
 async fn test_ppr_ignores_deleted_entities() {
+    use crate::test_doubles::InMemoryStorageEngine;
     use contextra_ports::StorageEngine;
-    use contextra_testkit::InMemoryStorageEngine;
     use std::sync::Arc;
 
     let storage = Arc::new(InMemoryStorageEngine::new());
@@ -260,8 +260,8 @@ async fn test_ppr_ignores_deleted_entities() {
 // ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-005]
 #[tokio::test]
 async fn test_ppr_phantom_node_no_rank_mass() {
+    use crate::test_doubles::InMemoryStorageEngine;
     use contextra_ports::StorageEngine;
-    use contextra_testkit::InMemoryStorageEngine;
     use std::sync::Arc;
 
     let storage = Arc::new(InMemoryStorageEngine::new());
@@ -360,8 +360,8 @@ fn test_deleted_view_methods() {
 // ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-007]
 #[tokio::test]
 async fn test_deleted_view_tombstone_filtering_all_entry_points() {
+    use crate::test_doubles::InMemoryStorageEngine;
     use contextra_ports::StorageEngine;
-    use contextra_testkit::InMemoryStorageEngine;
     use std::sync::Arc;
 
     let storage = Arc::new(InMemoryStorageEngine::new());

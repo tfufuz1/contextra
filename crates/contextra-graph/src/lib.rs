@@ -54,6 +54,7 @@ pub mod ppr_stream;
 pub mod provenance;
 pub mod provider;
 pub mod session_dag;
+pub mod test_doubles;
 pub mod tl_hfd;
 
 #[cfg(feature = "apprh-diffusion")]

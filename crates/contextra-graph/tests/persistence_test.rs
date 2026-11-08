@@ -3,9 +3,9 @@
 //! # Zweck
 //! Prüft Serialisierung, Deserialisierung und Integritätsvalidierung nach Wiederanlauf.
 
+use contextra_graph::test_doubles::InMemoryStorageEngine;
 use contextra_graph::CsrGraph;
 use contextra_ports::{GraphIndex, StorageEngine};
-use contextra_testkit::InMemoryStorageEngine;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
