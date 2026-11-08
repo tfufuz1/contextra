@@ -803,7 +803,8 @@ impl Wal {
 
     #[cfg(any(test, feature = "test-hooks"))]
     pub fn poison_for_test(&self) {
-        self.poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.poisoned
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[cfg(any(test, feature = "test-hooks"))]

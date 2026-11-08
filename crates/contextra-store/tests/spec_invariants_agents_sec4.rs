@@ -148,7 +148,9 @@ async fn test_inv_flush_before_visible_ordering() -> Result<()> {
     let storage = LsmStorage::new(config).await?;
 
     let tx = TxId::new(10);
-    storage.put(tx, b"flush_vis_key", b"flush_vis_value").await?;
+    storage
+        .put(tx, b"flush_vis_key", b"flush_vis_value")
+        .await?;
     storage.commit(tx).await?;
 
     // Trigger flush explicitly
