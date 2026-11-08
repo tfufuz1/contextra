@@ -1,10 +1,10 @@
 //! Mandatory field validation tests for GDPR Article 30 requirements.
 
+use contextra_audit_export::TenantId;
 use contextra_audit_export::{
     testkit::InMemoryProcessingRegisterSource, AuditExportError, ProcessingRegisterEntry,
     ProcessingRegisterSource, RetentionPeriod, ThirdCountryTransfer,
 };
-use contextra_types::TenantId;
 
 fn valid_sample_entry() -> Result<ProcessingRegisterEntry, Box<dyn std::error::Error>> {
     let tenant_id = TenantId::try_new(1)?;

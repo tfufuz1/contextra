@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 //! Campaign J-27 Compliance Test Suite — GDPR Art. 30 Verarbeitungsverzeichnis & BSI Mapping
 
+use contextra_audit_export::TenantId;
 use contextra_audit_export::{
     bsi_mapping_table, render_bsi_mapping_markdown, render_register_json, render_register_markdown,
     testkit::InMemoryProcessingRegisterSource, ProcessingRegisterEntry, ProcessingRegisterSource,
 };
-use contextra_types::TenantId;
 
 // ── H10: Art. 30 DSGVO Processing Register, Canary & BSI Mapping ─────────────
 

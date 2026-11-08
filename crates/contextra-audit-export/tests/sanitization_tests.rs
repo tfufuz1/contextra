@@ -1,10 +1,10 @@
 //! Sanitization and Markdown injection prevention test suite.
 
+use contextra_audit_export::TenantId;
 use contextra_audit_export::{
     markdown_template::sanitize_markdown_cell, render_register_markdown,
     testkit::InMemoryProcessingRegisterSource, ProcessingRegisterSource,
 };
-use contextra_types::TenantId;
 
 #[test]
 fn test_sanitize_pipes() {

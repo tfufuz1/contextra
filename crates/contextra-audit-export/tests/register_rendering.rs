@@ -1,8 +1,8 @@
+use contextra_audit_export::TenantId;
 use contextra_audit_export::{
     render_register_json, render_register_markdown, testkit::InMemoryProcessingRegisterSource,
     ProcessingRegisterEntry, ProcessingRegisterSource,
 };
-use contextra_types::TenantId;
 
 #[test]
 fn test_json_rendering_roundtrip() -> Result<(), Box<dyn std::error::Error>> {

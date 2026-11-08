@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub struct BsiMappingEntry {
     /// Name of the cryptographic primitive (e.g. "Ed25519").
     pub primitive_name: String,
-    /// Code location path within the workspace (e.g. "crates/contextra-crypto/src/deletion_proof.rs").
+    /// Code location path within the workspace (e.g. "crates/contextra-crypto/src/signature.rs").
     pub code_location: String,
     /// BSI TR-02102 and BSI IT-Grundschutz reference identifier (e.g. "BSI TR-02102-1 / CON.6").
     pub bsi_reference: String,
@@ -38,9 +38,9 @@ pub fn bsi_mapping_table() -> Vec<BsiMappingEntry> {
     vec![
         BsiMappingEntry {
             primitive_name: "Ed25519".to_string(),
-            code_location: "crates/contextra-crypto/src/deletion_proof/mod.rs".to_string(),
+            code_location: "crates/contextra-crypto/src/ed25519_proof.rs".to_string(),
             bsi_reference: "BSI TR-02102-1 / BSI IT-Grundschutz CON.6 (Löschen und Vernichten)".to_string(),
-            note: "Digitale Signatur für Löschnachweise (DeletionProof v4). BSI TR-02102-1 §1.5/§3.2 bewertet Ed25519 (Curve25519) als empfohlenes Asymmetrisches Signaturverfahren mit 128-Bit Sicherheit; unterstützt BSI IT-Grundschutz CON.6 Löschen und Vernichten. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
+            note: "Digitale Signatur für kryptographische Nachweise und Prüfberichte. BSI TR-02102-1 §1.5/§3.2 bewertet Ed25519 (Curve25519) als empfohlenes Asymmetrisches Signaturverfahren mit 128-Bit Sicherheit; unterstützt BSI IT-Grundschutz CON.6 Löschen und Vernichten. Stand: März 2024, zu prüfen gegen aktuelle BSI-Veröffentlichung (keine Konformitätsbehauptung).".to_string(),
         },
         BsiMappingEntry {
             primitive_name: "HMAC-SHA256".to_string(),

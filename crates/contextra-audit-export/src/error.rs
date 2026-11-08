@@ -4,6 +4,7 @@ use thiserror::Error;
 
 /// Error type returned by operations in `contextra-audit-export`.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum AuditExportError {
     /// Failure during JSON serialization or formatting.
     #[error("Serialization error: {0}")]
@@ -23,4 +24,8 @@ pub enum AuditExportError {
     /// Requested tenant identifier is invalid or missing: {0}.
     #[error("Requested tenant identifier is invalid or missing: {0}")]
     InvalidTenant(String),
+
+    /// Failure during CSV formatting or output generation.
+    #[error("CSV export formatting error: {0}")]
+    CsvExport(String),
 }
