@@ -22,7 +22,8 @@
 //!    (SimdPathOverride), um gezielt einzelne Pfade zu isolieren.
 
 use crate::kernels::*;
-use crate::Error;
+use crate::error::SimdError;
+use crate::error::Result;
 
 // ANCHOR[contextra-simd:DISP-TARGET-ENUM]
 /// Explicit hardware target configuration for the SIMD dispatcher.
@@ -106,12 +107,9 @@ impl Dispatcher {
 
     /// Computes cosine distance ($1.0 - \text{cosine\_similarity}$) between two `f32` vectors.
     #[inline]
-    pub fn cosine_distance(&self, a: &[f32], b: &[f32]) -> Result<f32, Error> {
+    pub fn cosine_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b.len(),
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
         }
 
         match self.target {
@@ -156,7 +154,7 @@ impl Dispatcher {
 
                 Ok(scalar::cosine_distance_scalar(a, b))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -164,12 +162,9 @@ impl Dispatcher {
 
     /// Computes Euclidean distance ($\|a - b\|_2$) between two `f32` vectors.
     #[inline]
-    pub fn euclidean_distance(&self, a: &[f32], b: &[f32]) -> Result<f32, Error> {
+    pub fn euclidean_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b.len(),
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
         }
 
         match self.target {
@@ -214,7 +209,7 @@ impl Dispatcher {
 
                 Ok(scalar::euclidean_distance_scalar(a, b))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -222,12 +217,9 @@ impl Dispatcher {
 
     /// Computes dot product distance (negated dot product $-a \cdot b$) between two `f32` vectors.
     #[inline]
-    pub fn dot_product_distance(&self, a: &[f32], b: &[f32]) -> Result<f32, Error> {
+    pub fn dot_product_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b.len(),
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
         }
 
         match self.target {
@@ -272,7 +264,7 @@ impl Dispatcher {
 
                 Ok(scalar::dot_product_scalar(a, b))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -284,12 +276,9 @@ impl Dispatcher {
         &self,
         a: &[f32],
         b_bytes: &[u8],
-    ) -> Result<f32, Error> {
+    ) -> Result<f32> {
         if b_bytes.len() < a.len() * 4 {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b_bytes.len() / 4,
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b_bytes.len() / 4 });
         }
 
         match self.target {
@@ -321,7 +310,7 @@ impl Dispatcher {
 
                 Ok(scalar::cosine_distance_f32_bytes_scalar(a, b_bytes))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -333,12 +322,9 @@ impl Dispatcher {
         &self,
         a: &[f32],
         b_bytes: &[u8],
-    ) -> Result<f32, Error> {
+    ) -> Result<f32> {
         if b_bytes.len() < a.len() * 4 {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b_bytes.len() / 4,
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b_bytes.len() / 4 });
         }
 
         match self.target {
@@ -372,7 +358,7 @@ impl Dispatcher {
 
                 Ok(scalar::euclidean_distance_f32_bytes_scalar(a, b_bytes))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -384,12 +370,9 @@ impl Dispatcher {
         &self,
         a: &[f32],
         b_bytes: &[u8],
-    ) -> Result<f32, Error> {
+    ) -> Result<f32> {
         if b_bytes.len() < a.len() * 4 {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b_bytes.len() / 4,
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b_bytes.len() / 4 });
         }
 
         match self.target {
@@ -421,7 +404,7 @@ impl Dispatcher {
 
                 Ok(scalar::dot_product_f32_bytes_scalar(a, b_bytes))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -429,12 +412,9 @@ impl Dispatcher {
 
     /// Computes integer dot product between two `u8` byte slices.
     #[inline]
-    pub fn dot_product_u8(&self, a: &[u8], b: &[u8]) -> Result<u32, Error> {
+    pub fn dot_product_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b.len(),
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
         }
 
         match self.target {
@@ -471,7 +451,7 @@ impl Dispatcher {
 
                 Ok(scalar::dot_product_u8_scalar(a, b))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -479,12 +459,9 @@ impl Dispatcher {
 
     /// Computes squared Euclidean distance ($\|a - b\|_2^2$) between two `u8` byte slices.
     #[inline]
-    pub fn euclidean_distance_sq_u8(&self, a: &[u8], b: &[u8]) -> Result<u32, Error> {
+    pub fn euclidean_distance_sq_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b.len(),
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
         }
 
         match self.target {
@@ -516,7 +493,7 @@ impl Dispatcher {
 
                 Ok(scalar::euclidean_distance_sq_u8_scalar(a, b))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -528,12 +505,9 @@ impl Dispatcher {
         &self,
         a: &[u8],
         b: &[u8],
-    ) -> Result<CosineSimilarityPartsU8, Error> {
+    ) -> Result<CosineSimilarityPartsU8> {
         if a.len() != b.len() {
-            return Err(Error::EmbeddingDimensionMismatch {
-                expected: a.len(),
-                got: b.len(),
-            });
+            return Err(SimdError::DimensionMismatch { left: a.len(), right: b.len() });
         }
 
         match self.target {
@@ -570,7 +544,7 @@ impl Dispatcher {
 
                 Ok(scalar::cosine_similarity_parts_u8_scalar(a, b))
             }
-            _ => Err(Error::invalid_input(
+            _ => Err(SimdError::InvalidInput(
                 "Requested SIMD target is not supported on this host CPU",
             )),
         }
@@ -590,8 +564,8 @@ impl Dispatcher {
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -601,7 +575,7 @@ impl Dispatcher {
 ///
 /// Requires runtime detection of `avx512f` or `avx2`+`fma` on `x86_64`, or `neon` on `aarch64`.
 #[inline]
-pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
+pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).cosine_distance(a, b);
@@ -621,8 +595,8 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -632,7 +606,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
 ///
 /// Requires runtime detection of `avx512f` or `avx2`+`fma` on `x86_64`, or `neon` on `aarch64`.
 #[inline]
-pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
+pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).euclidean_distance(a, b);
@@ -652,8 +626,8 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -663,7 +637,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
 ///
 /// Requires runtime detection of `avx512f` or `avx2`+`fma` on `x86_64`, or `neon` on `aarch64`.
 #[inline]
-pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
+pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).dot_product_distance(a, b);
@@ -683,8 +657,8 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -694,7 +668,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, Error> {
 ///
 /// Requires runtime detection of `avx512f` or `avx2`+`fma` on `x86_64`.
 #[inline]
-pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Error> {
+pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).cosine_distance_f32_bytes(a, b_bytes);
@@ -714,8 +688,8 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Error
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -725,7 +699,7 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Error
 ///
 /// Requires runtime detection of `avx512f` or `avx2`+`fma` on `x86_64`.
 #[inline]
-pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Error> {
+pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).euclidean_distance_f32_bytes(a, b_bytes);
@@ -745,8 +719,8 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Er
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -756,7 +730,7 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Er
 ///
 /// Requires runtime detection of `avx512f` or `avx2`+`fma` on `x86_64`.
 #[inline]
-pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Error> {
+pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).dot_product_distance_f32_bytes(a, b_bytes);
@@ -776,8 +750,8 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -787,7 +761,7 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 ///
 /// Requires runtime detection of `avx512f`+`avx512bw`+`avx512vnni` or `avx2` on `x86_64`.
 #[inline]
-pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, Error> {
+pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).dot_product_u8(a, b);
@@ -807,8 +781,8 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -818,7 +792,7 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, Error> {
 ///
 /// Requires runtime detection of `avx512f`+`avx512bw` or `avx2` on `x86_64`.
 #[inline]
-pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, Error> {
+pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).euclidean_distance_sq_u8(a, b);
@@ -838,8 +812,8 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, Error> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
-/// Returns [`Error::InvalidInput`] if a test path override specifies an unsupported CPU feature.
+/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
 ///
@@ -852,7 +826,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, Error> {
 pub fn cosine_similarity_parts_u8(
     a: &[u8],
     b: &[u8],
-) -> Result<CosineSimilarityPartsU8, Error> {
+) -> Result<CosineSimilarityPartsU8> {
     #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         return Dispatcher::new(forced).cosine_similarity_parts_u8(a, b);
@@ -863,7 +837,7 @@ pub fn cosine_similarity_parts_u8(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::DistanceMetric;
+    use crate::metric::DistanceMetric;
 
     struct OverrideGuard;
 
@@ -895,7 +869,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_scalar_path_cosine() -> Result<(), Error> {
+    fn test_forced_scalar_path_cosine() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -908,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_scalar_path_euclidean() -> Result<(), Error> {
+    fn test_forced_scalar_path_euclidean() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -921,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_scalar_path_dot_product() -> Result<(), Error> {
+    fn test_forced_scalar_path_dot_product() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -934,7 +908,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_scalar_path_f32_bytes() -> Result<(), Error> {
+    fn test_forced_scalar_path_f32_bytes() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -953,7 +927,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_scalar_path_u8_metrics() -> Result<(), Error> {
+    fn test_forced_scalar_path_u8_metrics() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -971,7 +945,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_scalar_path_high_level_facades() -> Result<(), Error> {
+    fn test_forced_scalar_path_high_level_facades() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -1003,13 +977,13 @@ mod tests {
             let b = [2.0f32, 3.0, 4.0, 5.0];
 
             let res = cosine_distance(&a, &b);
-            assert!(matches!(res, Err(Error::InvalidInput(_))));
+            assert!(matches!(res, Err(SimdError::InvalidInput(_))));
 
             let euc_res = euclidean_distance(&a, &b);
-            assert!(matches!(euc_res, Err(Error::InvalidInput(_))));
+            assert!(matches!(euc_res, Err(SimdError::InvalidInput(_))));
 
             let dot_res = dot_product_distance(&a, &b);
-            assert!(matches!(dot_res, Err(Error::InvalidInput(_))));
+            assert!(matches!(dot_res, Err(SimdError::InvalidInput(_))));
         }
 
         #[cfg(target_arch = "aarch64")]
@@ -1021,12 +995,12 @@ mod tests {
             let b = [2.0f32, 3.0, 4.0, 5.0];
 
             let res = cosine_distance(&a, &b);
-            assert!(matches!(res, Err(Error::InvalidInput(_))));
+            assert!(matches!(res, Err(SimdError::InvalidInput(_))));
         }
     }
 
     #[test]
-    fn test_bitwise_reproducibility_fixed_path() -> Result<(), Error> {
+    fn test_bitwise_reproducibility_fixed_path() -> Result<()> {
         let _guard = OverrideGuard::new();
         set_dispatch_override(Some(SimdPathOverride::Scalar));
 
@@ -1050,7 +1024,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_avx2_if_available() -> Result<(), Error> {
+    fn test_forced_avx2_if_available() -> Result<()> {
         let _guard = OverrideGuard::new();
 
         #[cfg(target_arch = "x86_64")]
@@ -1072,7 +1046,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_avx512_if_available() -> Result<(), Error> {
+    fn test_forced_avx512_if_available() -> Result<()> {
         let _guard = OverrideGuard::new();
 
         #[cfg(target_arch = "x86_64")]
@@ -1094,7 +1068,7 @@ mod tests {
     }
 
     #[test]
-    fn test_forced_neon_if_available() -> Result<(), Error> {
+    fn test_forced_neon_if_available() -> Result<()> {
         let _guard = OverrideGuard::new();
 
         #[cfg(target_arch = "aarch64")]
@@ -1116,7 +1090,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dispatch_override_toggle_cycle() -> Result<(), Error> {
+    fn test_dispatch_override_toggle_cycle() -> Result<()> {
         let _guard = OverrideGuard::new();
 
         let a = [1.0f32, 2.0, 3.0, 4.0];

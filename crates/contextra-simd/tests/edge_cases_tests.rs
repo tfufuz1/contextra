@@ -31,7 +31,7 @@ use contextra_simd::kernels::scalar::{
 use contextra_simd::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted, validate_vector,
 };
-use contextra_simd::{DistanceMetric, Error};
+use contextra_simd::{DistanceMetric, SimdError};
 
 #[test]
 // ANCHOR[contextra-simd:TEST-EDGE-NAN-DETECTION]
@@ -39,7 +39,7 @@ use contextra_simd::{DistanceMetric, Error};
 fn test_nan_detection_in_vector() {
     let nan_vec = vec![1.0f32, 2.0, f32::NAN, 4.0];
     let res = validate_vector(&nan_vec);
-    assert!(matches!(res, Err(Error::InvalidInput(_))));
+    assert!(matches!(res, Err(SimdError::InvalidInput(_))));
 }
 
 #[test]
@@ -49,13 +49,13 @@ fn test_infinity_detection_in_vector() {
     let inf_vec = vec![1.0f32, f32::INFINITY, 3.0];
     assert!(matches!(
         validate_vector(&inf_vec),
-        Err(Error::InvalidInput(_))
+        Err(SimdError::InvalidInput(_))
     ));
 
     let neg_inf_vec = vec![1.0f32, f32::NEG_INFINITY, 3.0];
     assert!(matches!(
         validate_vector(&neg_inf_vec),
-        Err(Error::InvalidInput(_))
+        Err(SimdError::InvalidInput(_))
     ));
 }
 
@@ -243,70 +243,52 @@ fn test_dimension_mismatch_error() {
 
     assert!(matches!(
         cosine_distance(&a, &b),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 10
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 10
+         })
     ));
     assert!(matches!(
         euclidean_distance(&a, &b),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 10
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 10
+         })
     ));
     assert!(matches!(
         dot_product_distance(&a, &b),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 10
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 10
+         })
     ));
 
     assert!(matches!(
         cosine_distance_f32_bytes(&a, &b_bytes),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 4
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 4
+         })
     ));
     assert!(matches!(
         euclidean_distance_f32_bytes(&a, &b_bytes),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 4
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 4
+         })
     ));
     assert!(matches!(
         dot_product_distance_f32_bytes(&a, &b_bytes),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 4
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 4
+         })
     ));
 
     let u8_a = vec![1u8; 8];
     let u8_b = vec![1u8; 12];
     assert!(matches!(
         dot_product_u8(&u8_a, &u8_b),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 12
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 12
+         })
     ));
     assert!(matches!(
         euclidean_distance_sq_u8(&u8_a, &u8_b),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 12
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 12
+         })
     ));
     assert!(matches!(
         cosine_similarity_parts_u8(&u8_a, &u8_b),
-        Err(Error::EmbeddingDimensionMismatch {
-            expected: 8,
-            got: 12
-        })
+        Err(SimdError::DimensionMismatch { left: 8, right: 12
+         })
     ));
 }
 

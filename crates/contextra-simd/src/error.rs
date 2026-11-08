@@ -1,32 +1,36 @@
-//! Crate-eigener Fehlertyp von `contextra-simd` (SPEC v4.0 §2 B4).
-//!
-//! Bewusst ohne Abhängigkeit auf andere `contextra-*`-Crates. Die Konvertierung in
-//! den Storage-Fehler liegt im Adapter (z. B. `contextra-vector`).
+//! Lokale Fehlertypen für `contextra-simd` (B4-Konformität).
 
-/// Fehler der SIMD-Distanzkerne.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+use thiserror::Error;
+
+#[derive(Debug, Error, PartialEq, Clone)]
 #[non_exhaustive]
-pub enum Error {
-    /// Ungültige Eingabe (NaN/Unendlich, unbekannter Test-Override, …).
+pub enum SimdError {
     #[error("invalid input: {0}")]
-    InvalidInput(String),
+    InvalidInput(&'static str),
 
-    /// Vektoren unterschiedlicher Dimension.
-    #[error("embedding dimension mismatch: expected {expected}, got {got}")]
-    EmbeddingDimensionMismatch {
-        /// Erwartete Dimension.
-        expected: usize,
-        /// Tatsächliche Dimension.
-        got: usize,
-    },
+    #[error("dimension mismatch: left={left}, right={right}")]
+    DimensionMismatch { left: usize, right: usize },
+
+    #[error("unsupported metric")]
+    UnsupportedMetric,
 }
 
-impl Error {
-    /// Erzeugt einen [`Error::InvalidInput`].
-    pub fn invalid_input(msg: impl Into<String>) -> Self {
-        Self::InvalidInput(msg.into())
+pub type Result<T> = core::result::Result<T, SimdError>;
+
+#[cfg(feature = "types-compat")]
+impl From<SimdError> for contextra_types::ContextraError {
+    fn from(err: SimdError) -> Self {
+        match err {
+            SimdError::InvalidInput(msg) => contextra_types::ContextraError::invalid_input(msg),
+            SimdError::DimensionMismatch { left, right } => {
+                contextra_types::ContextraError::invalid_input(format!(
+                    "dimension mismatch: left={}, right={}",
+                    left, right
+                ))
+            }
+            SimdError::UnsupportedMetric => {
+                contextra_types::ContextraError::invalid_input("unsupported metric")
+            }
+        }
     }
 }
-
-/// Ergebnistyp des Crates.
-pub type Result<T> = core::result::Result<T, Error>;

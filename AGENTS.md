@@ -243,11 +243,7 @@ cargo bench -p <crate>
 
 ## 11. Diagnose- & Analysewerkzeuge (`tools/`) für Coding-Agenten
 
-Beide Werkzeugsätze liegen in `tools/` vor (Zusammenführung der Merge-Konflikte; SPEC v4.0 E-11).
-
-### 11.1 Diagnose- & Analysewerkzeuge (Batch-Orchestrierung)
-
-Für mikrofeingranulare Codebase-Analysen, Konformitätschecks und Architekturprüfungen stehen folgende Python-Diagnosewerkzeuge bereit. Alle Werkzeuge laufen ohne externe Abhängigkeiten (Standardbibliothek), speichern Berichte nachvollziehbar in `docs/diagnostics/` und unterstützen `--json`, `--crate` und `--workspace`:
+Für mikrofeingranulare Codebase-Analysen, Konformitätschecks und Architekturprüfungen stehen spezialisierte Python-Werkzeuge für Introspektion, Fehlerkartierung und automatisierte Dokumentation bereit. Alle Werkzeuge laufen ohne externe Abhängigkeiten (Standardbibliothek), speichern Berichte nachvollziehbar in `docs/diagnostics/` und unterstützen `--json`, `--crate` und `--workspace`:
 
 | Werkzeug | Primäre Prüfung | Ausgabeberichte |
 |---|---|---|
@@ -287,7 +283,7 @@ Gemeinsame Bibliothek: `tools/agent_tooling_common.py`. Alle Berichte liegen str
 | Dokument | Zweck |
 |---|---|
 | `PLAN.md` | Phasen 0–7, Gates G0–G7, Baukasten-Vertrag, Risiken |
-| `docs/SPEC.md` | Normative Spezifikation v3.0 (Invarianten §3.4, Ringe §4, Ports §5, Erasure §12) |
+| `docs/SPEC.md` | Normative Spezifikation v4.0 (Baukasten-Spezifikation) (Invarianten §3.4, Ringe §4, Ports §5, Erasure §12) |
 | `DEPRECATED_DEBT.md` | Schuldenregister DEBT-01 bis DEBT-05 |
 | `capabilities.toml` | Ring, Klasse, Reifegrad, `may_depend_on` |
 | `docs/VETOES.md`, `docs/CONSTITUTION.md` | Vetos und Verfassung |

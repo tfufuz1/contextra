@@ -1,13 +1,32 @@
-//! Distanzmetrik der SIMD-Kerne (lokal, SPEC v4.0 §3 Prinzip 1).
+//! Lokales Metrik-Enum für `contextra-simd` (B1/B3 Autarkie).
 
-/// Unterstützte Distanzmetriken.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DistanceMetric {
-    /// Kosinus-Distanz (`1.0 - cos(angle)`).
-    #[default]
     Cosine,
-    /// Euklidische (L2) Distanz.
     Euclidean,
-    /// Negiertes Skalarprodukt.
     DotProduct,
+}
+
+#[cfg(feature = "types-compat")]
+impl From<DistanceMetric> for contextra_types::DistanceMetric {
+    fn from(m: DistanceMetric) -> Self {
+        match m {
+            DistanceMetric::Cosine => contextra_types::DistanceMetric::Cosine,
+            DistanceMetric::Euclidean => contextra_types::DistanceMetric::Euclidean,
+            DistanceMetric::DotProduct => contextra_types::DistanceMetric::DotProduct,
+        }
+    }
+}
+
+#[cfg(feature = "types-compat")]
+impl From<contextra_types::DistanceMetric> for DistanceMetric {
+    fn from(m: contextra_types::DistanceMetric) -> Self {
+        match m {
+            contextra_types::DistanceMetric::Cosine => DistanceMetric::Cosine,
+            contextra_types::DistanceMetric::Euclidean => DistanceMetric::Euclidean,
+            contextra_types::DistanceMetric::DotProduct => DistanceMetric::DotProduct,
+            _ => DistanceMetric::Cosine,
+        }
+    }
 }
