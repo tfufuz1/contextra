@@ -42,14 +42,19 @@ else
   try $SUDO apt-get update -q
   try $SUDO apt-get install -y -q --no-install-recommends \
       build-essential pkg-config libssl-dev clang lld cmake \
-      strace valgrind gdb python3-venv python3-dev
+      strace valgrind gdb python3-venv python3-dev \
+      fd-find bat mold fzf
   ok "apt abgeschlossen"
 fi
+mkdir -p "$HOME/.local/bin"
+# fd und bat Symlinks in $HOME/.local/bin bereitstellen (Ubuntu benennt sie fdfind und batcat)
+command -v fdfind >/dev/null 2>&1 && ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+command -v batcat >/dev/null 2>&1 && ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
+
 # flatc-SHIM: crates/contextra-wire/build.rs ruft bei vorhandenem `flatc` IMMER neu generieren auf und
 # überschreibt die getrackte src/contextra_generated.rs. Ubuntus flatc (2.0.8) passt nicht zum
 # flatbuffers-Crate (24.12.x) → 35 Compilerfehler (E0053) + dirty Working Tree.
 # Ohne nutzbares flatc nimmt build.rs den eingecheckten Code. Daher: apt-flatc entfernen/verdecken.
-mkdir -p "$HOME/.local/bin"
 [ "$SUDO" != "__none__" ] && try $SUDO apt-get remove -y -q flatbuffers-compiler
 cat > "$HOME/.local/bin/flatc" <<'SHIM'
 #!/usr/bin/env bash
@@ -91,18 +96,25 @@ install_tool "command -v just"            just
 install_tool "cargo nextest --version"    cargo-nextest
 install_tool "cargo deny --version"       cargo-deny
 install_tool "cargo audit --version"      cargo-audit
-if [ "${CONTEXTRA_SETUP_FULL:-0}" = 1 ]; then      # Audit-/Test-Kampagnen
-  install_tool "cargo llvm-cov --version" cargo-llvm-cov
-  install_tool "cargo mutants --version"  cargo-mutants
-  # NIE 'cargo install fuzz' (veralteter Crate) – nur cargo-fuzz, mit nightly
-  cargo fuzz --version >/dev/null 2>&1 || try cargo +nightly install --locked cargo-fuzz
+install_tool "command -v delta"           git-delta
+install_tool "command -v hyperfine"       hyperfine
+install_tool "command -v eza"             eza
+install_tool "command -v sccache"         sccache
+install_tool "cargo llvm-cov --version"   cargo-llvm-cov
+install_tool "cargo mutants --version"    cargo-mutants
+install_tool "cargo fuzz --version"       cargo-fuzz
+
+# ast-grep: @ast-grep/cli via npm installieren und sauberen Symlink anlegen
+# HINWEIS: Niemals auf /usr/bin/sg verlinken, da sg unter Linux das newgrp-Kommando ist!
+if ! (ast-grep --version 2>&1 | grep -q "ast-grep"); then
+  try npm install -g @ast-grep/cli
+  NPM_BIN="$(npm bin -g 2>/dev/null || echo "$HOME/.nvm/versions/node/$(node -v 2>/dev/null)/bin")"
+  if [ -x "$NPM_BIN/ast-grep" ]; then
+    ln -sf "$NPM_BIN/ast-grep" "$HOME/.cargo/bin/ast-grep"
+    ln -sf "$NPM_BIN/ast-grep" "$HOME/.local/bin/ast-grep"
+  fi
 fi
-# ast-grep: npm ist schneller als Kompilieren; 'sg' → 'ast-grep' verlinken
-if ! command -v ast-grep >/dev/null; then
-  command -v sg >/dev/null && try ln -sf "$(command -v sg)" "$HOME/.cargo/bin/ast-grep" \
-    || try npm install -g @ast-grep/cli
-fi
-command -v ast-grep >/dev/null && ok "ast-grep" || warn "ast-grep fehlt (optional)"
+(ast-grep --version 2>&1 | grep -q "ast-grep") && ok "ast-grep" || warn "ast-grep fehlt (optional)"
 
 # ── 4. Python-Umgebung (contextra-py / maturin) ──────────────────────────────
 step "[4/7] Python-venv"
@@ -121,6 +133,7 @@ export CARGO_TERM_COLOR=never
 export CARGO_INCREMENTAL=0
 export CARGO_NET_RETRY=5
 export RUST_BACKTRACE=1
+export RUSTC_WRAPPER="sccache"
 export CONTEXTRA_EMBEDDING_PROVIDER=mock   # kein Modell-Download in der VM
 export PATH="\$HOME/.local/bin:$VENV/bin:\$HOME/.cargo/bin:\$PATH"
 # <<< contextra-env <<<
@@ -151,12 +164,17 @@ else warn "xtask env-attest (noch) nicht registriert"; fi
 [ -f .agents/jules/setup/refresh-context.sh ] && bash .agents/jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
 
 # ── Working-Tree zurücksetzen (Jules verwirft sonst die Verifikation: "Working tree is dirty") ──
-if [ -n "$(git status --porcelain)" ]; then
-  warn "Working Tree nach Setup dirty:"; git status --short | head -10
-  git reset --hard HEAD -q && git clean -fdq        # ohne -x: target/ und Caches bleiben
+# Nur zurücksetzen, wenn nicht im Entwicklungsmodus (CONTEXTRA_SETUP_NO_RESET=1)
+if [ "${CONTEXTRA_SETUP_NO_RESET:-0}" != 1 ]; then
+  if [ -n "$(git status --porcelain)" ]; then
+    warn "Working Tree nach Setup dirty:"; git status --short | head -10
+    git reset --hard HEAD -q && git clean -fdq        # ohne -x: target/ und Caches bleiben
+  fi
+  git reset --hard HEAD 2>&1 | tail -1                # gibt "HEAD is now at …" aus
+  git status --porcelain | grep -q . && { echo "❌ Working Tree weiterhin dirty"; FAILS=$((FAILS+1)); } || ok "Working Tree sauber"
+else
+  ok "Working Tree Reset übersprungen (CONTEXTRA_SETUP_NO_RESET=1)"
 fi
-git reset --hard HEAD 2>&1 | tail -1                # gibt "HEAD is now at …" aus
-git status --porcelain | grep -q . && { echo "❌ Working Tree weiterhin dirty"; FAILS=$((FAILS+1)); } || ok "Working Tree sauber"
 
 echo; echo "============================================================"
 [ "$FAILS" = 0 ] && echo "  ✅ Contextra Jules Environment bereit" || echo "  ❌ $FAILS Pflichtschritt(e) fehlgeschlagen"
