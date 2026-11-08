@@ -27,70 +27,70 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 26,
+        "line": 29,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 62,
+        "line": 65,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 99,
+        "line": 102,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 139,
+        "line": 142,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 22,
+        "line": 23,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 42,
+        "line": 43,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 77,
+        "line": 78,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 115,
+        "line": 116,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 158,
+        "line": 159,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 201,
+        "line": 202,
         "kind": "system_time_now",
         "code": "std::time::SystemTime::now()",
         "recommendation": "contextra_ports::Clock::now_wall_clock()"
@@ -1431,6 +1431,13 @@
     "crate": "contextra-erasure",
     "findings_prod": [
       {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 546,
+        "kind": "random_hashset",
+        "code": "let mut seen_layers = std::collections::HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
         "file": "/app/crates/contextra-erasure/src/saga/core.rs",
         "line": 41,
         "kind": "random_hashmap",
@@ -1585,10 +1592,10 @@
       "system_time_now": 0,
       "thread_rng": 0,
       "random_hashmap": 10,
-      "random_hashset": 0,
+      "random_hashset": 1,
       "env_var": 0
     },
-    "total_prod_issues": 10
+    "total_prod_issues": 11
   },
   {
     "crate": "contextra-graph",
@@ -1840,42 +1847,42 @@
       },
       {
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 91,
+        "line": 146,
         "kind": "random_hashmap",
-        "code": "pub fn compute_pagerank<G: GraphProvider>(graph: &G, damping: f32, max_iter: usize, tol: f32) -> HashMap<EntityId, f32> ",
+        "code": ") -> HashMap<EntityId, f32> {",
         "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
       },
       {
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 94,
+        "line": 150,
         "kind": "random_hashmap",
-        "code": "if n == 0 { return HashMap::new(); }",
+        "code": "return HashMap::new();",
         "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
       },
       {
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 95,
+        "line": 152,
         "kind": "random_hashmap",
-        "code": "let node_to_idx: HashMap<EntityId, usize> = nodes.iter().enumerate().map(|(idx, &id)| (id, idx)).collect();",
+        "code": "let node_to_idx: HashMap<EntityId, usize> = nodes",
         "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
       },
       {
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 133,
+        "line": 215,
         "kind": "random_hashmap",
-        "code": "let node_to_idx: HashMap<EntityId, usize> = nodes.iter().enumerate().map(|(i, &id)| (id, i)).collect();",
+        "code": "let node_to_idx: HashMap<EntityId, usize> =",
         "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
       },
       {
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 153,
+        "line": 242,
         "kind": "random_hashmap",
-        "code": "let mut comm_degs: HashMap<u64, f32> = communities.iter().enumerate().map(|(i, &c)| (c, degs[i])).collect();",
+        "code": "let mut comm_degs: HashMap<u64, f32> = communities",
         "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
       },
       {
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 160,
+        "line": 255,
         "kind": "random_hashmap",
         "code": "let mut weights: HashMap<u64, f32> = HashMap::new();",
         "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
@@ -2253,14 +2260,14 @@
       },
       {
         "file": "/app/crates/contextra-graph/src/csr/path_graph.rs",
-        "line": 62,
+        "line": 66,
         "kind": "random_hashset",
         "code": "let mut seen = std::collections::HashSet::new();",
         "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
       },
       {
         "file": "/app/crates/contextra-graph/src/csr/path_graph.rs",
-        "line": 110,
+        "line": 114,
         "kind": "random_hashset",
         "code": "let mut seen = std::collections::HashSet::new();",
         "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
@@ -4321,7 +4328,7 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 220,
+        "line": 219,
         "kind": "instant_now",
         "code": "let t0 = Instant::now();",
         "recommendation": "contextra_ports::Clock::now_monotonic()"

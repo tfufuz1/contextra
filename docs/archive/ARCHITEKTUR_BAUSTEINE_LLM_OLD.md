@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Architektur & Transformationsplan: Contextra als modulare Baustein-Bibliothek für Rust-LLM-Lösungen
 
 > **Status:** Strategisches Architektur- und Migrationskonzept

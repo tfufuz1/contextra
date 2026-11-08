@@ -8,7 +8,7 @@
 
 | Crate | Prod unwrap | Prod expect | Prod panic | Prod todo | Prod assert | Test Findings |
 |---|---|---|---|---|---|---|
-| `contextra` | 0 | 0 | 0 | 0 | 0 | 276 |
+| `contextra` | 0 | 0 | 0 | 0 | 0 | 270 |
 | `contextra-adapt` | 0 | 0 | 0 | 0 | 0 | 430 |
 | `contextra-agent` | 2 | 19 | 0 | 0 | 38 | 921 |
 | `contextra-audit-export` | 0 | 0 | 0 | 0 | 0 | 86 |
@@ -20,7 +20,7 @@
 | `contextra-db` | 0 | 0 | 0 | 0 | 1 | 1669 |
 | `contextra-durable-fs` | 0 | 0 | 0 | 0 | 0 | 117 |
 | `contextra-engine` | 111 | 1 | 6 | 0 | 66 | 1455 |
-| `contextra-erasure` | 0 | 0 | 0 | 0 | 0 | 569 |
+| `contextra-erasure` | 0 | 0 | 0 | 0 | 0 | 834 |
 | `contextra-graph` | 30 | 0 | 0 | 0 | 13 | 2472 |
 | `contextra-infer-candle` | 20 | 2 | 0 | 0 | 22 | 449 |
 | `contextra-infer-ollama` | 11 | 0 | 0 | 0 | 9 | 468 |
@@ -42,7 +42,7 @@
 | `contextra-testkit` | 0 | 0 | 1 | 0 | 0 | 288 |
 | `contextra-text` | 0 | 0 | 0 | 0 | 0 | 653 |
 | `contextra-types` | 0 | 0 | 0 | 0 | 2 | 977 |
-| `contextra-vector` | 1 | 9 | 0 | 0 | 6 | 1607 |
+| `contextra-vector` | 1 | 9 | 0 | 0 | 6 | 1585 |
 | `contextra-wire` | 16 | 0 | 0 | 0 | 1 | 221 |
 
 ## Detaillierte Produktiv-Fundstellen
@@ -583,19 +583,19 @@
 ### `contextra-wire`
 
 - `/app/crates/contextra-wire/build.rs:46` [assert]: `assert!(status.success(), "flatc failed to generate code");`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:143` [unwrap]: `unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:338` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:572` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:586` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:961` [unwrap]: `unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1083` [unwrap]: `unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1211` [unwrap]: `unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1224` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1399` [unwrap]: `unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1412` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1443` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1457` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1471` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1485` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1499` [unwrap]: `.unwrap()`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1513` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:142` [unwrap]: `unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:336` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:569` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:583` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:956` [unwrap]: `unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1077` [unwrap]: `unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1204` [unwrap]: `unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1217` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1391` [unwrap]: `unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1404` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1435` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1449` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1463` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1477` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1491` [unwrap]: `.unwrap()`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1505` [unwrap]: `.unwrap()`

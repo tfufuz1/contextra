@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Contextra Modularisierungs- & Entkopplungs-Audit
 
 > **Datum:** 2026-11-06 16:39:11 | **Analysierte Crates:** 36 | **Gesamtumfang:** 181,918 LOC

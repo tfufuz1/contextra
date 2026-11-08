@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ARCHIVIERT: Nicht normativ / Einmal-Migrationsskript / Legacy-Helfer per SPEC v4.0 WP-0
+
 """
 generate_migration_edges.py - Generates docs/spec/MIGRATION-EDGES.md inventory v2.
 

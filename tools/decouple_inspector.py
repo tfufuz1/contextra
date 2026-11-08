@@ -395,31 +395,29 @@ def evaluate_crate_decoupling(inv: CrateInventory) -> Dict[str, Any]:
             high_coupling_deps.append((dep, len(syms)))
             findings.append(f"Starke direkte Kopplung an '{dep}' ({len(syms)} importierte Symbole).")
             recommendations.append(
-                f"Abhängigkeit von '{dep}' über Traits in 'contextra-ports' entkoppeln "
-                f"oder als generische Typ-Parameter injizieren."
+                f"Abhängigkeit von '{dep}' auflösen: Für Klasse A direkte Abhängigkeiten eliminieren (lokale Typen/Fehler, kein 'contextra-ports'). Für Klasse B/C generische Abstraktionen oder State-Passing nutzen."
             )
 
     if inv.missing_port_abstractions:
         findings.append(
-            f"{len(inv.missing_port_abstractions)} Stellen mit direkten Importen aus konkreten Speicherkernen "
-            f"(fehlende Port-/Trait-Abstraktion)."
+            f"{len(inv.missing_port_abstractions)} Stellen mit direkten Importen aus konkreten Speicherkernen."
         )
         recommendations.append(
-            f"Direkte Importe aus konkreten Speicher-Crates durch Ports in 'contextra-ports' ersetzen."
+            f"Direkte Kernel-Importe für Klasse A vollständig eliminieren (autark); für Klasse C via Backends-Trait bündeln."
         )
 
     if inv.erasure_leaks:
         findings.append(
             f"{len(inv.erasure_leaks)} Referenzen auf DSGVO/Löschkette/Nachweise gefunden. "
-            f"Diese gehören ausschließlich in 'contextra-erasure'."
+            f"Diese gehören in 'contextra-erasure' oder 'contextra-erasure-adapters' (SPEC v4.0 §6.3 / E-04)."
         )
         recommendations.append(
-            f"DSGVO-/Löschlogik aus {inv.name} extrahieren und in 'contextra-erasure' modularisieren."
+            f"Löschrelikte aus {inv.name} entfernen und in 'contextra-erasure-adapters' bzw. 'contextra-erasure' modularisieren; Indizes bieten nur neutrale Maintenance-Methoden."
         )
 
     if inv.dead_code_candidates:
-        findings.append(f"{len(inv.dead_code_candidates)} ungenutzte private Symbole/Dead-Code-Kandidaten identifiziert.")
-        recommendations.append("Dead Code bereinigen oder Funktionen sauber verdrahten/exportieren.")
+        findings.append(f"{len(inv.dead_code_candidates)} nicht verdrahtete private Symbole/Inventar-Kandidaten identifiziert.")
+        recommendations.append("Inventarisieren vor Verschiebung (E-06/E-07): Kein Algorithmus wird gelöscht; hinter Feature 'experimental' sichern oder verdrahten.")
 
     score = 100
     score -= min(40, len(inv.dependencies_prod) * 6)

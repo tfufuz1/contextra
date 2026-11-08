@@ -7,7 +7,7 @@
 
 | Crate | Status | Rohe FS-Aufrufe (Prod) | Fsync Aufrufe | Swallowed Syncs (`let _ =`) |
 |---|---|---|---|---|
-| `contextra` | **ABWEICHUNG** | 6 | 0 | 0 |
+| `contextra` | **ABWEICHUNG** | 8 | 0 | 0 |
 | `contextra-adapt` | SAUBER | 0 | 0 | 0 |
 | `contextra-agent` | SAUBER | 0 | 0 | 0 |
 | `contextra-audit-export` | SAUBER | 0 | 0 | 0 |
@@ -48,12 +48,14 @@
 
 ### `contextra`
 
-- `/app/crates/contextra/src/lib.rs:187` [std_fs]: `let _ = std::fs::remove_dir_all(&base_tmp);`
-- `/app/crates/contextra/src/lib.rs:205` [std_fs]: `let _ = std::fs::remove_dir_all(&base_tmp);`
-- `/app/crates/contextra/src/builder.rs:516` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
-- `/app/crates/contextra/src/builder.rs:527` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
-- `/app/crates/contextra/src/builder.rs:537` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
-- `/app/crates/contextra/src/builder.rs:546` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
+- `/app/crates/contextra/examples/embedded_facade.rs:15` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_dir);`
+- `/app/crates/contextra/examples/embedded_facade.rs:47` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_dir);`
+- `/app/crates/contextra/src/lib.rs:183` [std_fs]: `let _ = std::fs::remove_dir_all(&base_tmp);`
+- `/app/crates/contextra/src/lib.rs:201` [std_fs]: `let _ = std::fs::remove_dir_all(&base_tmp);`
+- `/app/crates/contextra/src/builder.rs:518` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
+- `/app/crates/contextra/src/builder.rs:529` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
+- `/app/crates/contextra/src/builder.rs:539` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
+- `/app/crates/contextra/src/builder.rs:548` [std_fs]: `let _ = std::fs::remove_dir_all(&tmp_path);`
 ### `contextra-checkpoint`
 
 - `/app/crates/contextra-checkpoint/src/hardlink_cloner.rs:62` [tokio_fs]: `use tokio::fs;`

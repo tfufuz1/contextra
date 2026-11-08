@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Architektur-Kritik & Transformationsplan: Contextra als modulare Baustein-Bibliothek für Rust-LLM-Lösungen
 
 > **Rolle:** Senior Rust Software-Architekt & Systems Engineer

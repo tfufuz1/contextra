@@ -2,13 +2,13 @@
 
 > Gilt für das gesamte Repository `tfufuz1/contextra`. Jede `crates/*/AGENTS.md` ergänzt diese Datei um crate-spezifische Verträge und **wiederholt sie nicht** (DRY). Bei Widerspruch gilt: Crate-Datei vor Root-Datei, `docs/SPEC.md` §0.6 vor beiden.
 >
-> **Stand:** 2026-11-07, Basis `2127d457e`. Alle Ist-Angaben stammen aus statischer Lektüre (`Cargo.toml`, `capabilities.toml`, Quellbäume, `grep`). **Nichts davon wurde kompiliert.** Zahlen sind Heuristiken (Evidenzstufe E1, SPEC §1.4) und vor Verwendung als Beleg mit dem genannten Befehl neu zu messen.
+> **Stand:** 2026-11-08, Basis `88fdcc7ade05`. Maßgeblich ist `docs/SPEC.md` v4.0. Ist-Angaben basieren auf `cargo metadata`, `capabilities.toml` und Quellcode-Analysen. Zahlen sind anhand der aktuellen Werkzeuge und Befehle belegt (Evidenz vor Behauptung).
 
 ## 1. Rolle & Auftrag
 
 Du agierst als **Principal Rust Engineer**: Systemprogrammierung, Durability, Concurrency, RAG-Speicherkerne. Du verantwortest architektonische Integrität, Speichersicherheit und deterministische Performance eines Multi-Crate-Ökosystems.
 
-**Auftrag:** Das historisch gewachsene, verdrahtete System wird zu einem **orthogonalen Baukasten** umgebaut (`PLAN.md`, Phasen 0–7). Jeder Crate ist
+**Auftrag:** Das historisch gewachsene, verdrahtete System wird zu einem **orthogonalen Baukasten** umgebaut (gemäß `docs/SPEC.md` v4.0 und dem Prompt-Katalog `docs/prompts/ENTKOPPLUNGS_PROMPTS_v4.md`). Jeder Crate ist
 
 - **isoliert** nutzbar, ohne weiche Abhängigkeit oder Querverdrahtung,
 - **portabel**: ohne Modifikation und ohne Setup-Ritual in ein Fremdprojekt importierbar,
@@ -22,8 +22,8 @@ Du agierst als **Principal Rust Engineer**: Systemprogrammierung, Durability, Co
 | Frage | Maßgebliche Quelle |
 |---|---|
 | Was ist **jetzt** im Code? | der Code selbst (`cargo metadata`, `cargo tree`, Quellen). Berichte und Skriptausgaben sind Hypothesen (INV-EVIDENCE-1). |
-| Ring, Klasse, Reifegrad, `may_depend_on` | `capabilities.toml` (einzige Quelle, INV-DOC-SINGLE-SOURCE-1). **Lücke:** `contextra-durable-fs` fehlt dort (D6). |
-| Wohin soll der Umbau? | `PLAN.md` (Phasen, Gates G0–G7, Baukasten-Vertrag M1–M11) und `docs/SPEC.md` v3.0 §12 sowie §2.6 |
+| Ring, Klasse, Reifegrad, `may_depend_on` | `capabilities.toml` (einzige Quelle, INV-DOC-SINGLE-SOURCE-1; enthält alle 35 Crates inkl. `contextra-durable-fs`). |
+| Wohin soll der Umbau? | `docs/SPEC.md` v4.0 (Klassen A/B/C/T, Gates G1–G10, E-01 bis E-12) sowie `docs/prompts/ENTKOPPLUNGS_PROMPTS_v4.md` |
 | Normative Regeln, Invarianten, Vetos | `docs/SPEC.md` §3 (INV-*), `docs/VETOES.md`, `docs/CONSTITUTION.md` |
 | Technische Schulden | `DEPRECATED_DEBT.md` (DEBT-01 bis DEBT-05) |
 | Gates | `governance/gates.toml`, `.github/workflows/` |
@@ -77,7 +77,7 @@ Spalten: **Soll** = Ring laut `PLAN.md` §4 / SPEC §4. **cap.** = Ring in `capa
 | `sys` | 0 | 0 | **ja** | Insel (`#![allow(unsafe_code)]`, 20 `unsafe`-Treffer), `#![deny(unsafe_op_in_unsafe_fn)]`; Win32-Modul `acl_win32.rs` |
 | `simd` | 0 | 0 | **ja** | Insel (`#![allow(unsafe_code)]`, ~230 `unsafe`-Treffer in `kernels/`); Miri- und Referenztest-Abdeckung je Kernel belegen |
 | `wire` | 0 | 0 | **ja** | Insel (`#![deny(unsafe_code)]` mit lokalen Ausnahmen); generierter Code (`generated.rs`, `contextra_generated.rs`); 16 `unwrap/expect`-Treffer laut Heuristik trotz `deny(clippy::unwrap_used)` prüfen |
-| `durable-fs` | 0 | **fehlt** | nein | nicht in `capabilities.toml` (D6); hängt nur von `sys`, **nicht** von `ports` (Vfs-Implementierung offen, WP 2.1) |
+| `durable-fs` | 0 | 0 (A) | nein | in `capabilities.toml` (Klasse A); hängt von `sys`, `types`, `ports` (Soll: autark mit lokalem `Vfs`) |
 | `mvcc` | 0 | 0 | nein | autark; Dev-Kante auf `testkit` |
 | `crypto` | 0 | 0 | nein | **88 `DeletionProof`- und 31 `kv_shredding`/`revocation_log`-Treffer** (Phase 3.1 offen) |
 | `rank` | 0 | 0 | nein | enthält `calibration/`, `dibud/`, `drift.rs` neben `fusion/` |
@@ -90,7 +90,7 @@ Spalten: **Soll** = Ring laut `PLAN.md` §4 / SPEC §4. **cap.** = Ring in `capa
 | `kvcache` | 1 | 1 | nein | 6 `kv_shredding`-Treffer |
 | `infer-onnx` / `-candle` / `-ollama` | 2 | 2 | nein | `candle` hängt an `crypto` (Ziel: nur `ports`, `types`, `rank`) |
 | `sandbox` | 2 | 2 | nein | keine Contextra-Abhängigkeit; `wasmtime` nur hinter Feature halten |
-| `engine` | 3 | 3 | nein | 14 interne Deps; kein `Backends`-Trait; `contextra_impl/erasure.rs` (618 Zeilen); `pub use` von `crypto::deletion_proof` und `store::lsm::DurabilityMode` |
+| `engine` | 3 | 3 (C) | nein | 14 interne Deps; `Backends`-Trait existiert in `crates/contextra-engine/src/backends.rs`; `contextra_impl/erasure.rs` (618 Zeilen); `pub use` von `crypto::deletion_proof` und `store::lsm::DurabilityMode` |
 | `erasure` | 3 | 3 | nein | **kein Konsument im Workspace**; Dep nur `crypto`, `ports`, `types` (Soll) |
 | `db` | 3 | 3 | nein | zieht `sys` (Ziel: nur `engine`, `ports`, `types`); 10 Dev-Kanten |
 | `cognition` | 3 | 3 | nein | zusätzliche Kante auf `graph` |
@@ -233,9 +233,9 @@ cargo bench -p <crate>
 | K1 | **Vfs sync vs. async.** `PLAN.md` §5.2 zeigt `#[async_trait] trait Vfs`. Code (`ports/src/vfs.rs`) ist synchron, und PLAN M8 / SPEC P26 verlangen synchrone Ring-0-Kerne. | `Vfs` bleibt **synchron**. Async gehört in die Schale (`spawn_blocking`). Snippet im PLAN ist veraltet. |
 | K2 | **Signaturen von `Purger`/`LayerScanner`.** PLAN §5.3 / SPEC §12.2: `purge_scope(&KeyScope)`, `scan_for_residual`. SPEC §5.3: `ErasureScope`, `DeletionLayer`. Code: `purge(ctx, &ScanTarget) -> PurgeStats`, `scan_units(&mut ScanSession, ctx)`, `WitnessLayer`. | **Code ist bindend.** Konsolidierung per ADR in WP 2.2. Keine vierte Variante erfinden. |
 | K3 | **Doppelte Löschtypen.** `LayerWitness` ist in `ports` zweimal definiert (`erasure.rs:183`, `scanner/witness.rs:17`); `EraseTarget` und `LayerId` stehen sowohl in `types/src/erasure.rs` als auch in `ports/src/erasure.rs`. Verstößt gegen A2 und INV-WITNESS-MINT-1. `types/src/erasure.rs` (516 Zeilen: `EraseRequest`, `EraseReceipt`, `ErasureStatus`, `RetentionAttestation` …) liegt zudem im Fundament, obwohl die Domäne nach `erasure` gehört. | Neue Nutzung nur von `ports::scanner::*`; Vereinigung und Verlagerung per ADR in WP 2.2/3.9. |
-| K4 | **SPEC-Altregeln vs. v3.0.** SPEC §0.2 Nr. 11, A2, Kantenregel 5 und §4.3 (`crypto/proof/`) verlangen Löschtypen in `crypto`; §2.6, §12 und `PLAN.md` Phase 3 verlangen sie in `contextra-erasure`. Auch `INV-DELETION-WIRE-1`, G1–G7 (§2.4) und `forget` in `engine` (§4.3) beschreiben noch den Monolithen. | **v3.0-Entscheidung gilt** (PLAN, §2.6, §12). SPEC-Bereinigung in Phase 7; bis dahin Neucode nach §5. |
+| K4 | **Löschlogik-Zentralisierung.** Gemäß SPEC v4.0 §6 liegt Löschlogik zentral in `contextra-erasure` und wird über `contextra-erasure-adapters` angebunden. Indizes bieten nur `insert/remove/search` + `Maintain::compact()` (E-04). | **SPEC v4.0 gilt.** Löschcode wandert nach `erasure` / `erasure-adapters`. |
 | K5 | **Archiv-Liste vs. Workspace.** SPEC §0.5/§2.3/Anhang B archivieren `graph`, `cognition`, `router`, `agent`, `adapt`, `kvcache`, `infer-onnx`, `infer-ollama`. `Cargo.toml` führt sie als aktive Mitglieder, `PLAN.md` §4 als Bausteine. | **Workspace und PLAN gelten.** Behandle sie als aktive Bausteine (Klasse laut `capabilities.toml`). |
-| K6 | **Versionslabel.** SPEC-Kopf sagt „3.0“, `capabilities.toml` sagt `spec = "v4"`, `.agents/claude/CLAUDE.md` sagt „4.0“. | „3.0“ ist die Referenz dieser Dateien. Label in WP 7 vereinheitlichen. |
+| K6 | **Normative Spezifikation v4.0.** Normative Spezifikation ist `docs/SPEC.md` v4.0; Vorgänger v3.0 ist nach `docs/archive/` archiviert. | Maßgeblich ist ausnahmslos SPEC v4.0. |
 | K7 | **Veraltete Verweise.** `.agents/claude/CLAUDE.md`, `.agents/jules/*`, `.agents/rules/*` verweisen auf frühere AGENTS-Abschnitte (§2a, §4) und auf `cargo xtask`. | **Diese Datei ist maßgeblich.** Die Verweise in `.agents/` sind in WP 7 anzupassen. |
 | K8 | **Leaks in öffentlichen APIs (M3).** `engine` re-exportiert `crypto::deletion_proof::*` und `store::lsm::DurabilityMode`; `db` re-exportiert `checkpoint`. | Keine neuen Re-Exports. Abbau in WP 3.5/5.3. |
 | K9 | **Werkzeug-Crates.** SPEC §4.2 nennt `testkit`, `xtask`, `xtask-heavy`, `bench`. Im Repository existieren `testkit` und `benchmarks/contextra-bench`; `xtask*` fehlen. | `testkit` und `contextra-bench` gelten als Werkzeug und sind nie Abhängigkeit des Kerns. `xtask` siehe §8. |

@@ -43,28 +43,28 @@
         "name": "with_embedding_backend",
         "kind": "fn",
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 227,
+        "line": 228,
         "decl": "pub fn with_embedding_backend(mut self, backend: EmbeddingBackend) -> Self {"
       },
       {
         "name": "with_license_gate",
         "kind": "fn",
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 253,
+        "line": 254,
         "decl": "pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {"
       },
       {
         "name": "with_signed_license",
         "kind": "fn",
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 264,
+        "line": 266,
         "decl": "pub fn with_signed_license("
       },
       {
         "name": "with_performance_profile",
         "kind": "fn",
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 294,
+        "line": 297,
         "decl": "pub fn with_performance_profile("
       },
       {
@@ -574,7 +574,7 @@
         "name": "write_atomic",
         "kind": "fn",
         "file": "/app/crates/contextra-durable-fs/src/vfs.rs",
-        "line": 64,
+        "line": 66,
         "decl": "fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {"
       },
       {
@@ -812,8 +812,8 @@
   },
   {
     "crate": "contextra-erasure",
-    "total_declarations": 653,
-    "dead_code_candidates_count": 66,
+    "total_declarations": 697,
+    "dead_code_candidates_count": 68,
     "candidates": [
       {
         "name": "finalize_erasure",
@@ -828,6 +828,20 @@
         "file": "/app/crates/contextra-erasure/src/restore.rs",
         "line": 26,
         "decl": "pub fn is_replay(&self, seq: Seq) -> bool {"
+      },
+      {
+        "name": "verifying_key_bytes",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 138,
+        "decl": "pub fn verifying_key_bytes(&self) -> [u8; 32] {"
+      },
+      {
+        "name": "create_v3_with_audit_position",
+        "kind": "fn",
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 807,
+        "decl": "pub fn create_v3_with_audit_position("
       },
       {
         "name": "open_durable",
@@ -1316,7 +1330,7 @@
         "name": "add_hyperedge",
         "kind": "fn",
         "file": "/app/crates/contextra-graph/src/provider.rs",
-        "line": 68,
+        "line": 100,
         "decl": "pub fn add_hyperedge(&mut self, hyperedge: HyperEdge) {"
       },
       {
@@ -2422,9 +2436,16 @@
   },
   {
     "crate": "contextra-rank",
-    "total_declarations": 173,
-    "dead_code_candidates_count": 13,
+    "total_declarations": 184,
+    "dead_code_candidates_count": 14,
     "candidates": [
+      {
+        "name": "ZERO",
+        "kind": "const",
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 26,
+        "decl": "pub const ZERO: Self = ConfigFingerprint([0u8; 32]);"
+      },
       {
         "name": "set_baseline",
         "kind": "fn",
@@ -2562,7 +2583,7 @@
         "name": "set_community",
         "kind": "fn",
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
-        "line": 94,
+        "line": 92,
         "decl": "pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {"
       }
     ]
@@ -2590,7 +2611,7 @@
   },
   {
     "crate": "contextra-simd",
-    "total_declarations": 42,
+    "total_declarations": 44,
     "dead_code_candidates_count": 0,
     "candidates": []
   },
@@ -3267,7 +3288,7 @@
   },
   {
     "crate": "contextra-vector",
-    "total_declarations": 326,
+    "total_declarations": 333,
     "dead_code_candidates_count": 8,
     "candidates": [
       {
