@@ -1,3 +1,4 @@
+#![cfg(all(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
 //! # Deterministische Eigenschafts- und Konvergenztests für Regler
 //!
 //! Überprüft Konvergenzeigenschaften, Schrittantworten und Invarianten aller
@@ -15,11 +16,11 @@ use contextra_adapt::pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, MAX_SCALING_FACTOR, MIN_SCALING_FACTOR,
 };
 use contextra_adapt::shadow_mode::{ShadowDiscrepancy, ShadowSink};
+use contextra_adapt::Clock;
 use contextra_adapt::{
     AdaptiveDecayController, AntiWindupController, BanditProfileState, CatoniDriftDetector,
     DecayControllerConfig, DecaySignalInputs, DriftDetector, DriftPolicyBridge, PidController,
 };
-use contextra_ports::Clock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

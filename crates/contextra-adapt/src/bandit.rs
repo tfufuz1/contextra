@@ -58,6 +58,7 @@ pub enum BanditError {
     },
 }
 
+#[cfg(feature = "types-compat")]
 impl From<BanditError> for contextra_types::ContextraError {
     fn from(err: BanditError) -> Self {
         match err {
@@ -163,14 +164,20 @@ pub struct SketchMatrix {
 impl SketchMatrix {
     /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
     // ANCHOR[contextra-adapt:BANDIT-SKETCH-SEED-001]
-    pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
+    pub fn derive_seed_u64(tenant_id: u64, base_seed: u64) -> u64 {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"contextra_sketched_bandit_seed_v1");
-        hasher.update(&tenant_id.as_u64().to_le_bytes());
+        hasher.update(&tenant_id.to_le_bytes());
         hasher.update(&base_seed.to_le_bytes());
         let hash = hasher.finalize();
         let bytes: [u8; 8] = hash.as_bytes()[0..8].try_into().unwrap_or([0u8; 8]);
         u64::from_le_bytes(bytes)
+    }
+
+    /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash ab.
+    #[cfg(feature = "types-compat")]
+    pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
+        Self::derive_seed_u64(tenant_id.as_u64(), base_seed)
     }
 
     /// SplitMix64-PRNG aus `seed`, Rademacher-Einträge ±1/√k.
@@ -187,12 +194,12 @@ impl SketchMatrix {
         }
 
         let scale = 1.0f32 / (projected_dim as f32).sqrt();
-        let rng = contextra_ports::SeededRng::new(seed);
+        let mut rng = crate::rng::SeededRng::new(seed);
         let total_elements = projected_dim * original_dim;
         let mut data = Vec::with_capacity(total_elements);
 
         for _ in 0..total_elements {
-            let bit = (contextra_ports::Rng::next_u64(&rng) & 1) == 0;
+            let bit = (crate::rng::Rng::next_u64(&mut rng) & 1) == 0;
             data.push(if bit { scale } else { -scale });
         }
 

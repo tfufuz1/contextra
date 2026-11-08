@@ -190,3 +190,36 @@ fn no_steady_state_error() {
         STEADY_STATE_TOLERANCE_FRACTION
     );
 }
+
+// ============================================================================
+// PROPERTY-TESTS FÜR NUMERISCHE STABILITÄT (B9, B11, MISSION 12)
+// ============================================================================
+
+proptest::proptest! {
+    #[test]
+    fn prop_pid_controller_arbitrary_inputs_no_panic(
+        target_lat in -1000.0f32..10000.0f32,
+        k_min in 1usize..200usize,
+        k_max in 200usize..1000usize,
+        initial_pool in 10usize..500usize,
+        observed in -10000.0f32..50000.0f32,
+        dt_ms in 1u64..10000u64,
+    ) {
+        let mut pid = PidController::new(target_lat, k_min, k_max, Some(initial_pool));
+        let dt = std::time::Duration::from_millis(dt_ms);
+        let res = pid.update(dt, observed);
+        proptest::prop_assert!(res >= 50); // Hard floor k_min
+        proptest::prop_assert!(res <= k_max.max(50));
+    }
+
+    #[test]
+    fn prop_pid_controller_nan_and_inf_resilience(
+        observed in proptest::num::f32::ANY,
+    ) {
+        let mut pid = PidController::new(100.0, 50, 500, Some(100));
+        let dt = std::time::Duration::from_millis(50);
+        let pool = pid.update(dt, observed);
+        proptest::prop_assert!(pool >= 50);
+        proptest::prop_assert!(pool <= 500);
+    }
+}

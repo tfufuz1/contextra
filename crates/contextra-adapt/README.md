@@ -1,60 +1,63 @@
 # contextra-adapt
 
-Autarker Ring-0-Baustein für Regelungstechnik, Online-Lernen und Drift-Erkennung in eingebetteten Systemen und RAG-Speicherkernen.
+Autarker mathematischer Kontroll- und Adaptionsbaustein (Klasse A) für adaptive Regelung, Bandits, Drift-Erkennung und Feedback-Schleifen.
 
-## Rolle & Architektur
+## Zweck & Baukasten-Profil
+
 `contextra-adapt` regelt Laufzeitparameter (wie Latenzbudgets, Candidate-Pool-Sizing und Routing-Gewichte) deterministisch ohne eigene Hintergrund-Threads oder I/O.
+Es erfüllt alle Kriterien der **Klasse A** gemäß Contextra Baukasten-Spezifikation (SPEC v4.0):
+- **B1 / B2:** Autarker Standalone-Build ohne interne Abhängigkeiten (`contextra-*`).
+- **B3 / B4:** API in Standardtypen (`&[f32]`, `u64`, `Duration`) und eigenem Fehlertyp `AdaptError`.
+- **B8 / B11:** Eigenständig dokumentiert mit Unit- und Criterion-Benchmarks, strikter Determinismus (P28).
+- **B9 / B10:** Zero-Panic in Produktion (`#![forbid(unsafe_code)]`).
 
-- **Ring:** Ring 0 (Regelung & Adaption)
-- **Normativität:** Rand `[R]`
-- **Sicherheit & Unsafe:** `#![forbid(unsafe_code)]` strikt durchgesetzt.
-- **Zero-Panic-Regel:** Kein `unwrap()`, `expect()` oder `panic!` in Produktivpfaden.
-- **Fehlerbehandlung:** Alle Schnittstellen liefern typisierte Ergebnisse (`Result<T, BanditError>`, `Result<T, FcTsError>`).
-- **Determinismus (P28):** Reiner Seeded-Zufall via `ports::Rng`, Zeitmessung über `ports::Clock` bzw. übergebene `Duration`.
+## Schnelleinstieg & Export
 
-## Baukasten-Module
-- **`control`** (`pid`, `pid_latency_controller`, `homeostat`, `lyapunov`):
-  Anti-Windup PID-Regler für SLA-Einhaltung, Homeostase und Lyapunov-Stabilitätsanalyse.
-- **`bandit_algorithms`** (`bandit`, `flow_thompson`, `rie_greedy`):
-  LinUCB (Sherman-Morrison Matrix-Update & Sketched Projection), Flow-Corrected Thompson Sampling, RIE-Greedy.
-- **`policy`** (`offpolicy`, `shadow_mode`):
-  Inverse Propensity Scoring (IPS) für unverzerrte Offline-Evaluation und Schatten-Ausführung.
-- **`drift_detection`** (`drift`):
-  O(1) robuste Mittelwertschätzung via Catoni-M-Estimator und Ensemble-Drift-Wächter.
-- **`decay`** (`decay_controller`):
-  Adaptives Abklingen von Relevanz-Scores über Zeit und Zugriffsmuster (ohne Datenlöschung).
+Der Baustein kann über das Export-Tool für die Verwendung in externen Projekten extrahiert werden:
 
-## Abhängigkeiten
-- **Interne Abhängigkeiten:** `contextra-types`, `contextra-ports`.
-- **Externe Abhängigkeiten:** `blake3`, `serde`, `serde_json`, `thiserror`, `tracing`.
-
-## Features
-- `default`: `["bandit-routing", "flow-corrected-thompson"]`
-- `bandit-routing`: Aktiviert LinUCB-Bandit-Routinen.
-- `flow-corrected-thompson`: Aktiviert Flow-Corrected Thompson Sampling (`flow_thompson`).
-- `sketched-bandit`: Aktiviert dimensionsreduzierte Sketched-Projection-Bandits.
-- `rie-greedy-personalization`: Aktiviert RIE-Greedy-Profiloptimierung.
+```bash
+python3 tools/export_crate.py contextra-adapt --out /tmp/contextra-adapt
+```
 
 ## Minimalbeispiel (Autark)
+
 ```rust
-use std::time::Duration;
 use contextra_adapt::pid::PidController;
-use contextra_adapt::bandit::{BanditProfileState, BanditImplementation};
+use contextra_adapt::bandit::{BanditImplementation, BanditProfileState};
+use std::time::Duration;
 
-// 1. PID-Regler mit Anti-Windup
-let mut pid = PidController::new(25.0, 50, 500, Some(100));
-let new_pool = pid.update(Duration::from_millis(100), 40.0);
-assert!(new_pool <= 100);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. PID Latency-Controller initialisieren
+    let mut pid = PidController::new(100.0, 50, 500, Some(100));
+    let dt = Duration::from_millis(50);
+    let next_pool = pid.update(dt, 120.0);
+    assert!(next_pool >= 50);
 
-// 2. LinUCB-Bandit mit Sherman-Morrison-Update
-let mut bandit = BanditProfileState::cold_start(4, 0.2);
-bandit.implementation = BanditImplementation::ShermanMorrison;
-let x = vec![0.5, 0.1, 0.8, 0.2];
-let score = bandit.score(&x, 0.05, false).expect("valid score");
-bandit.update(&x, 1.0, 0.05, false).expect("valid update");
+    // 2. LinUCB Bandit für Profile-Routing initialisieren
+    let dim = 16;
+    let mut bandit = BanditProfileState::cold_start(dim, 0.5);
+    bandit.implementation = BanditImplementation::ShermanMorrison;
+
+    let x = vec![0.1f32; dim];
+    let score = bandit.score(&x, 0.05, false)?;
+    println!("Bandit score: {score}");
+
+    bandit.update(&x, 1.0, 0.05, false)?;
+
+    Ok(())
+}
 ```
 
-Ein vollständiges, ausführbares Beispiel befindet sich unter:
-```bash
-cargo run -p contextra-adapt --example adapt_standalone
-```
+## Features
+
+- `bandit-routing`: LinUCB Contextual Bandits mit Sherman-Morrison und Sketched Projection.
+- `flow-corrected-thompson`: Flow-Corrected Thompson Sampling (FC-TS) mit Drift-Kompensation.
+- `rie-greedy-personalization`: Regularization-Induced Exploration Greedy Mechanism.
+- `types-compat`: Transitionale Anbindung an `contextra-types` (Deprecation in Welle 6).
+- `ports-compat`: Transitionale Anbindung an `contextra-ports` (Deprecation in Welle 6).
+
+## Nicht-Ziele
+
+- Keine eigene Hintergrund-Thread-Verwaltung oder asynchrone Laufzeitbindung.
+- Keine Speicherung oder Datenbank-Persistenz (rein in-memory / parameterbasiert).
+- Keine direkte Ausführung von Vektorsuchen oder Modellen.
