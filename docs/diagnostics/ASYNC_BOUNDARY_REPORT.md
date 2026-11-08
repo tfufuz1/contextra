@@ -7,7 +7,7 @@
 
 | Crate | Sync Mandat (M8) | async fn | .await | tokio:: | block_on | Lock across Await |
 |---|---|---|---|---|---|---|
-| `contextra` | Nein | 13 | 24 | 4 | 0 | 0 |
+| `contextra` | Nein | 14 | 28 | 5 | 0 | 0 |
 | `contextra-adapt` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
 | `contextra-agent` | Nein | 37 | 127 | 21 | 0 | 0 |
 | `contextra-audit-export` | Nein | 0 | 0 | 0 | 0 | 0 |
@@ -561,9 +561,9 @@
 - `/app/crates/contextra-db/examples/db_standalone.rs:10` [tokio_import]: `#[tokio::main]`
 - `/app/crates/contextra-db/examples/db_standalone.rs:11` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
 - `/app/crates/contextra-db/examples/db_standalone.rs:20` [await_expr]: `let db = Contextra::open_with_config(tmp_dir.path(), config).await?;`
-- `/app/crates/contextra-db/examples/db_standalone.rs:28` [await_expr]: `.await?;`
-- `/app/crates/contextra-db/examples/db_standalone.rs:30` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await?;`
-- `/app/crates/contextra-db/examples/db_standalone.rs:36` [await_expr]: `db.close().await?;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:31` [await_expr]: `.await?;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:33` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await?;`
+- `/app/crates/contextra-db/examples/db_standalone.rs:39` [await_expr]: `db.close().await?;`
 - `/app/crates/contextra-db/src/multistep.rs:143` [async_fn]: `pub async fn search(`
 - `/app/crates/contextra-db/src/multistep.rs:151` [await_expr]: `.await`
 - `/app/crates/contextra-db/src/multistep.rs:174` [async_fn]: `pub async fn search_with_embedder(`

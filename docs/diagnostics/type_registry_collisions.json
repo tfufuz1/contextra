@@ -1,7 +1,7 @@
 {
-  "total_types": 1723,
-  "unique_names": 1529,
-  "collision_count": 133,
+  "total_types": 1751,
+  "unique_names": 1532,
+  "collision_count": 155,
   "collisions": {
     "Meta": {
       "crates": [
@@ -1208,7 +1208,7 @@
           "kind": "struct",
           "is_pub": true,
           "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-          "line": 914,
+          "line": 909,
           "declaration": "pub struct RoleId<'a> {",
           "crate": "contextra-wire"
         }
@@ -1234,7 +1234,7 @@
           "kind": "struct",
           "is_pub": true,
           "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-          "line": 1160,
+          "line": 1153,
           "declaration": "pub struct RoleBinding<'a> {",
           "crate": "contextra-wire"
         }
@@ -1260,7 +1260,7 @@
           "kind": "struct",
           "is_pub": true,
           "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-          "line": 1036,
+          "line": 1030,
           "declaration": "pub struct HyperEdgeId<'a> {",
           "crate": "contextra-wire"
         }
@@ -1575,6 +1575,452 @@
           "line": 1166,
           "declaration": "pub trait ErasureObserver: Send + Sync + 'static {",
           "crate": "contextra-erasure"
+        }
+      ]
+    },
+    "DistanceMetric": {
+      "crates": [
+        "contextra-simd",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "DistanceMetric",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-simd/src/metric.rs",
+          "line": 5,
+          "declaration": "pub enum DistanceMetric {",
+          "crate": "contextra-simd"
+        },
+        {
+          "name": "DistanceMetric",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/domain/document.rs",
+          "line": 20,
+          "declaration": "pub enum DistanceMetric {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "Result": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-mcp",
+        "contextra-rank",
+        "contextra-simd",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "Result",
+          "kind": "type_alias",
+          "is_pub": true,
+          "file": "/app/crates/contextra-simd/src/error.rs",
+          "line": 18,
+          "declaration": "pub type Result<T> = core::result::Result<T, SimdError>;",
+          "crate": "contextra-simd"
+        },
+        {
+          "name": "Result",
+          "kind": "type_alias",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/error.rs",
+          "line": 18,
+          "declaration": "pub type Result<T> = core::result::Result<T, RankError>;",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "Result",
+          "kind": "type_alias",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/error.rs",
+          "line": 16,
+          "declaration": "pub type Result<T> = std::result::Result<T, CryptoError>;",
+          "crate": "contextra-crypto"
+        },
+        {
+          "name": "Result",
+          "kind": "type_alias",
+          "is_pub": false,
+          "file": "/app/crates/contextra-mcp/src/sandbox.rs",
+          "line": 12,
+          "declaration": "type Result<T> = std::result::Result<T, ContextraError>;",
+          "crate": "contextra-mcp"
+        },
+        {
+          "name": "Result",
+          "kind": "type_alias",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/error.rs",
+          "line": 115,
+          "declaration": "pub type Result<T> = std::result::Result<T, ContextraError>;",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "LayerWitnessExt": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "LayerWitnessExt",
+          "kind": "trait",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 35,
+          "declaration": "pub trait LayerWitnessExt {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "LayerWitnessExt",
+          "kind": "trait",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 19,
+          "declaration": "pub trait LayerWitnessExt {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "GraphRepairAttestation": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "GraphRepairAttestation",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 92,
+          "declaration": "pub struct GraphRepairAttestation {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "GraphRepairAttestation",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 76,
+          "declaration": "pub struct GraphRepairAttestation {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "DeletionProofKeyPair": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "DeletionProofKeyPair",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 120,
+          "declaration": "pub struct DeletionProofKeyPair {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "DeletionProofKeyPair",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/ed25519_proof.rs",
+          "line": 47,
+          "declaration": "pub struct DeletionProofKeyPair {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "CustodyLevel": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "CustodyLevel",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 150,
+          "declaration": "pub enum CustodyLevel {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "CustodyLevel",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 97,
+          "declaration": "pub enum CustodyLevel {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "SigningKeyHandle": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "SigningKeyHandle",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 161,
+          "declaration": "pub enum SigningKeyHandle<'a> {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "SigningKeyHandle",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 108,
+          "declaration": "pub enum SigningKeyHandle<'a> {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "VerificationKey": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "VerificationKey",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 188,
+          "declaration": "pub enum VerificationKey<'a> {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "VerificationKey",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 135,
+          "declaration": "pub enum VerificationKey<'a> {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "LayerCleanupProof": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "LayerCleanupProof",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 224,
+          "declaration": "pub struct LayerCleanupProof {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "LayerCleanupProof",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 168,
+          "declaration": "pub struct LayerCleanupProof {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "DeletionLayer": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "DeletionLayer",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 295,
+          "declaration": "pub enum DeletionLayer {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "DeletionLayer",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 190,
+          "declaration": "pub enum DeletionLayer {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "UncoveredLayer": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "UncoveredLayer",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 319,
+          "declaration": "pub struct UncoveredLayer {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "UncoveredLayer",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 214,
+          "declaration": "pub struct UncoveredLayer {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "ScanTechniqueSerde": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "ScanTechniqueSerde",
+          "kind": "enum",
+          "is_pub": false,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 331,
+          "declaration": "enum ScanTechniqueSerde {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "ScanTechniqueSerde",
+          "kind": "enum",
+          "is_pub": false,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 226,
+          "declaration": "enum ScanTechniqueSerde {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "LayerWitnessMeasurement": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "LayerWitnessMeasurement",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 373,
+          "declaration": "pub struct LayerWitnessMeasurement {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "LayerWitnessMeasurement",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 268,
+          "declaration": "pub struct LayerWitnessMeasurement {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "ExcludedScope": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "ExcludedScope",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 391,
+          "declaration": "pub enum ExcludedScope {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "ExcludedScope",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 286,
+          "declaration": "pub enum ExcludedScope {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "DeletionScope": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "DeletionScope",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 400,
+          "declaration": "pub enum DeletionScope {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "DeletionScope",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 295,
+          "declaration": "pub enum DeletionScope {",
+          "crate": "contextra-crypto"
+        }
+      ]
+    },
+    "DeletionProof": {
+      "crates": [
+        "contextra-crypto",
+        "contextra-erasure"
+      ],
+      "occurrences": [
+        {
+          "name": "DeletionProof",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+          "line": 425,
+          "declaration": "pub struct DeletionProof {",
+          "crate": "contextra-erasure"
+        },
+        {
+          "name": "DeletionProof",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+          "line": 321,
+          "declaration": "pub struct DeletionProof {",
+          "crate": "contextra-crypto"
         }
       ]
     },
@@ -2559,6 +3005,197 @@
         }
       ]
     },
+    "DocId": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "DocId",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 8,
+          "declaration": "pub struct DocId(pub u64);",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "DocId",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
+          "line": 173,
+          "declaration": "pub struct DocId(pub u64);",
+          "crate": "contextra-types"
+        },
+        {
+          "name": "DocId",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
+          "line": 180,
+          "declaration": "pub struct DocId(pub u128);",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "ConfigFingerprint": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "ConfigFingerprint",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 23,
+          "declaration": "pub struct ConfigFingerprint(pub [u8; 32]);",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "ConfigFingerprint",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+          "line": 507,
+          "declaration": "pub struct ConfigFingerprint {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "FusionStrategy": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "FusionStrategy",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 30,
+          "declaration": "pub enum FusionStrategy {",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "FusionStrategy",
+          "kind": "enum",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/saos.rs",
+          "line": 30,
+          "declaration": "pub enum FusionStrategy {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "ContextChunk": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "ContextChunk",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 43,
+          "declaration": "pub struct ContextChunk {",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "ContextChunk",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/saos.rs",
+          "line": 230,
+          "declaration": "pub struct ContextChunk {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "MemoryLink": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "MemoryLink",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 51,
+          "declaration": "pub struct MemoryLink {",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "MemoryLink",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+          "line": 109,
+          "declaration": "pub struct MemoryLink {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "SignalFusionStrategies": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "SignalFusionStrategies",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 57,
+          "declaration": "pub struct SignalFusionStrategies {",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "SignalFusionStrategies",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/saos.rs",
+          "line": 43,
+          "declaration": "pub struct SignalFusionStrategies {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
+    "FusionWeights": {
+      "crates": [
+        "contextra-rank",
+        "contextra-types"
+      ],
+      "occurrences": [
+        {
+          "name": "FusionWeights",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-rank/src/local_types.rs",
+          "line": 62,
+          "declaration": "pub struct FusionWeights {",
+          "crate": "contextra-rank"
+        },
+        {
+          "name": "FusionWeights",
+          "kind": "struct",
+          "is_pub": true,
+          "file": "/app/crates/contextra-types/src/types/saos.rs",
+          "line": 152,
+          "declaration": "pub struct FusionWeights {",
+          "crate": "contextra-types"
+        }
+      ]
+    },
     "DriftDetector": {
       "crates": [
         "contextra-adapt",
@@ -2820,42 +3457,6 @@
           "line": 42,
           "declaration": "struct LineInfo<'a> {",
           "crate": "contextra-engine"
-        }
-      ]
-    },
-    "Result": {
-      "crates": [
-        "contextra-crypto",
-        "contextra-mcp",
-        "contextra-types"
-      ],
-      "occurrences": [
-        {
-          "name": "Result",
-          "kind": "type_alias",
-          "is_pub": true,
-          "file": "/app/crates/contextra-crypto/src/error.rs",
-          "line": 16,
-          "declaration": "pub type Result<T> = std::result::Result<T, CryptoError>;",
-          "crate": "contextra-crypto"
-        },
-        {
-          "name": "Result",
-          "kind": "type_alias",
-          "is_pub": false,
-          "file": "/app/crates/contextra-mcp/src/sandbox.rs",
-          "line": 12,
-          "declaration": "type Result<T> = std::result::Result<T, ContextraError>;",
-          "crate": "contextra-mcp"
-        },
-        {
-          "name": "Result",
-          "kind": "type_alias",
-          "is_pub": true,
-          "file": "/app/crates/contextra-types/src/error.rs",
-          "line": 115,
-          "declaration": "pub type Result<T> = std::result::Result<T, ContextraError>;",
-          "crate": "contextra-types"
         }
       ]
     },
@@ -3320,7 +3921,7 @@
           "kind": "struct",
           "is_pub": false,
           "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-          "line": 19,
+          "line": 18,
           "declaration": "struct SimpleRng {",
           "crate": "contextra-router"
         },
@@ -3346,7 +3947,7 @@
           "kind": "struct",
           "is_pub": true,
           "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-          "line": 52,
+          "line": 51,
           "declaration": "pub struct Embedding<'a> {",
           "crate": "contextra-wire"
         },
@@ -3372,7 +3973,7 @@
           "kind": "struct",
           "is_pub": true,
           "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-          "line": 257,
+          "line": 255,
           "declaration": "pub struct ScoredDocument<'a> {",
           "crate": "contextra-wire"
         },
@@ -3398,7 +3999,7 @@
           "kind": "struct",
           "is_pub": true,
           "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-          "line": 1312,
+          "line": 1304,
           "declaration": "pub struct HyperEdge<'a> {",
           "crate": "contextra-wire"
         },
@@ -3806,14 +4407,14 @@
   },
   "crate_types": {
     "contextra-ports": 150,
-    "contextra-simd": 6,
-    "contextra-erasure": 183,
+    "contextra-simd": 9,
+    "contextra-erasure": 197,
     "contextra-db": 19,
     "contextra-py": 8,
     "contextra-store": 111,
     "contextra-sandbox": 16,
     "contextra-infer-candle": 37,
-    "contextra-rank": 37,
+    "contextra-rank": 47,
     "contextra-durable-fs": 19,
     "contextra-ingest": 116,
     "contextra-avv-generator": 4,
@@ -3836,7 +4437,7 @@
     "contextra-adapt": 49,
     "contextra-text": 44,
     "contextra-agent": 45,
-    "contextra-vector": 66,
+    "contextra-vector": 67,
     "contextra-engine": 101,
     "contextra-types": 96,
     "contextra-cognition": 50
@@ -4799,7 +5400,7 @@
         "kind": "struct",
         "is_pub": true,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 914,
+        "line": 909,
         "declaration": "pub struct RoleId<'a> {",
         "crate": "contextra-wire"
       }
@@ -4819,7 +5420,7 @@
         "kind": "struct",
         "is_pub": true,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1160,
+        "line": 1153,
         "declaration": "pub struct RoleBinding<'a> {",
         "crate": "contextra-wire"
       }
@@ -4839,7 +5440,7 @@
         "kind": "struct",
         "is_pub": true,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1036,
+        "line": 1030,
         "declaration": "pub struct HyperEdgeId<'a> {",
         "crate": "contextra-wire"
       }
@@ -5084,6 +5685,73 @@
         "crate": "contextra-erasure"
       }
     ],
+    "DistanceMetric": [
+      {
+        "name": "DistanceMetric",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-simd/src/metric.rs",
+        "line": 5,
+        "declaration": "pub enum DistanceMetric {",
+        "crate": "contextra-simd"
+      },
+      {
+        "name": "DistanceMetric",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/domain/document.rs",
+        "line": 20,
+        "declaration": "pub enum DistanceMetric {",
+        "crate": "contextra-types"
+      }
+    ],
+    "Result": [
+      {
+        "name": "Result",
+        "kind": "type_alias",
+        "is_pub": true,
+        "file": "/app/crates/contextra-simd/src/error.rs",
+        "line": 18,
+        "declaration": "pub type Result<T> = core::result::Result<T, SimdError>;",
+        "crate": "contextra-simd"
+      },
+      {
+        "name": "Result",
+        "kind": "type_alias",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/error.rs",
+        "line": 18,
+        "declaration": "pub type Result<T> = core::result::Result<T, RankError>;",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "Result",
+        "kind": "type_alias",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/error.rs",
+        "line": 16,
+        "declaration": "pub type Result<T> = std::result::Result<T, CryptoError>;",
+        "crate": "contextra-crypto"
+      },
+      {
+        "name": "Result",
+        "kind": "type_alias",
+        "is_pub": false,
+        "file": "/app/crates/contextra-mcp/src/sandbox.rs",
+        "line": 12,
+        "declaration": "type Result<T> = std::result::Result<T, ContextraError>;",
+        "crate": "contextra-mcp"
+      },
+      {
+        "name": "Result",
+        "kind": "type_alias",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/error.rs",
+        "line": 115,
+        "declaration": "pub type Result<T> = std::result::Result<T, ContextraError>;",
+        "crate": "contextra-types"
+      }
+    ],
     "InMemoryLedger": [
       {
         "name": "InMemoryLedger",
@@ -5102,6 +5770,286 @@
         "line": 12,
         "declaration": "pub struct InMemoryLedger {",
         "crate": "contextra-erasure"
+      }
+    ],
+    "LayerWitnessExt": [
+      {
+        "name": "LayerWitnessExt",
+        "kind": "trait",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 35,
+        "declaration": "pub trait LayerWitnessExt {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "LayerWitnessExt",
+        "kind": "trait",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 19,
+        "declaration": "pub trait LayerWitnessExt {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "GraphRepairAttestation": [
+      {
+        "name": "GraphRepairAttestation",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 92,
+        "declaration": "pub struct GraphRepairAttestation {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "GraphRepairAttestation",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 76,
+        "declaration": "pub struct GraphRepairAttestation {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "DeletionProofKeyPair": [
+      {
+        "name": "DeletionProofKeyPair",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 120,
+        "declaration": "pub struct DeletionProofKeyPair {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "DeletionProofKeyPair",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/ed25519_proof.rs",
+        "line": 47,
+        "declaration": "pub struct DeletionProofKeyPair {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "CustodyLevel": [
+      {
+        "name": "CustodyLevel",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 150,
+        "declaration": "pub enum CustodyLevel {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "CustodyLevel",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 97,
+        "declaration": "pub enum CustodyLevel {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "SigningKeyHandle": [
+      {
+        "name": "SigningKeyHandle",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 161,
+        "declaration": "pub enum SigningKeyHandle<'a> {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "SigningKeyHandle",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 108,
+        "declaration": "pub enum SigningKeyHandle<'a> {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "VerificationKey": [
+      {
+        "name": "VerificationKey",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 188,
+        "declaration": "pub enum VerificationKey<'a> {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "VerificationKey",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 135,
+        "declaration": "pub enum VerificationKey<'a> {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "LayerCleanupProof": [
+      {
+        "name": "LayerCleanupProof",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 224,
+        "declaration": "pub struct LayerCleanupProof {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "LayerCleanupProof",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 168,
+        "declaration": "pub struct LayerCleanupProof {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "DeletionLayer": [
+      {
+        "name": "DeletionLayer",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 295,
+        "declaration": "pub enum DeletionLayer {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "DeletionLayer",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 190,
+        "declaration": "pub enum DeletionLayer {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "UncoveredLayer": [
+      {
+        "name": "UncoveredLayer",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 319,
+        "declaration": "pub struct UncoveredLayer {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "UncoveredLayer",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 214,
+        "declaration": "pub struct UncoveredLayer {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "ScanTechniqueSerde": [
+      {
+        "name": "ScanTechniqueSerde",
+        "kind": "enum",
+        "is_pub": false,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 331,
+        "declaration": "enum ScanTechniqueSerde {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "ScanTechniqueSerde",
+        "kind": "enum",
+        "is_pub": false,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 226,
+        "declaration": "enum ScanTechniqueSerde {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "LayerWitnessMeasurement": [
+      {
+        "name": "LayerWitnessMeasurement",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 373,
+        "declaration": "pub struct LayerWitnessMeasurement {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "LayerWitnessMeasurement",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 268,
+        "declaration": "pub struct LayerWitnessMeasurement {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "ExcludedScope": [
+      {
+        "name": "ExcludedScope",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 391,
+        "declaration": "pub enum ExcludedScope {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "ExcludedScope",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 286,
+        "declaration": "pub enum ExcludedScope {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "DeletionScope": [
+      {
+        "name": "DeletionScope",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 400,
+        "declaration": "pub enum DeletionScope {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "DeletionScope",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 295,
+        "declaration": "pub enum DeletionScope {",
+        "crate": "contextra-crypto"
+      }
+    ],
+    "DeletionProof": [
+      {
+        "name": "DeletionProof",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 425,
+        "declaration": "pub struct DeletionProof {",
+        "crate": "contextra-erasure"
+      },
+      {
+        "name": "DeletionProof",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-crypto/src/deletion_proof/types.rs",
+        "line": 321,
+        "declaration": "pub struct DeletionProof {",
+        "crate": "contextra-crypto"
       }
     ],
     "ErasureId": [
@@ -5902,6 +6850,155 @@
         "crate": "contextra-infer-candle"
       }
     ],
+    "DocId": [
+      {
+        "name": "DocId",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 8,
+        "declaration": "pub struct DocId(pub u64);",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "DocId",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
+        "line": 173,
+        "declaration": "pub struct DocId(pub u64);",
+        "crate": "contextra-types"
+      },
+      {
+        "name": "DocId",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
+        "line": 180,
+        "declaration": "pub struct DocId(pub u128);",
+        "crate": "contextra-types"
+      }
+    ],
+    "ConfigFingerprint": [
+      {
+        "name": "ConfigFingerprint",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 23,
+        "declaration": "pub struct ConfigFingerprint(pub [u8; 32]);",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "ConfigFingerprint",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 507,
+        "declaration": "pub struct ConfigFingerprint {",
+        "crate": "contextra-types"
+      }
+    ],
+    "FusionStrategy": [
+      {
+        "name": "FusionStrategy",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 30,
+        "declaration": "pub enum FusionStrategy {",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "FusionStrategy",
+        "kind": "enum",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 30,
+        "declaration": "pub enum FusionStrategy {",
+        "crate": "contextra-types"
+      }
+    ],
+    "ContextChunk": [
+      {
+        "name": "ContextChunk",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 43,
+        "declaration": "pub struct ContextChunk {",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "ContextChunk",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 230,
+        "declaration": "pub struct ContextChunk {",
+        "crate": "contextra-types"
+      }
+    ],
+    "MemoryLink": [
+      {
+        "name": "MemoryLink",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 51,
+        "declaration": "pub struct MemoryLink {",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "MemoryLink",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/domain/misc.rs",
+        "line": 109,
+        "declaration": "pub struct MemoryLink {",
+        "crate": "contextra-types"
+      }
+    ],
+    "SignalFusionStrategies": [
+      {
+        "name": "SignalFusionStrategies",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 57,
+        "declaration": "pub struct SignalFusionStrategies {",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "SignalFusionStrategies",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 43,
+        "declaration": "pub struct SignalFusionStrategies {",
+        "crate": "contextra-types"
+      }
+    ],
+    "FusionWeights": [
+      {
+        "name": "FusionWeights",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-rank/src/local_types.rs",
+        "line": 62,
+        "declaration": "pub struct FusionWeights {",
+        "crate": "contextra-rank"
+      },
+      {
+        "name": "FusionWeights",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-types/src/types/saos.rs",
+        "line": 152,
+        "declaration": "pub struct FusionWeights {",
+        "crate": "contextra-types"
+      }
+    ],
     "DriftDetector": [
       {
         "name": "DriftDetector",
@@ -6147,35 +7244,6 @@
         "line": 42,
         "declaration": "struct LineInfo<'a> {",
         "crate": "contextra-engine"
-      }
-    ],
-    "Result": [
-      {
-        "name": "Result",
-        "kind": "type_alias",
-        "is_pub": true,
-        "file": "/app/crates/contextra-crypto/src/error.rs",
-        "line": 16,
-        "declaration": "pub type Result<T> = std::result::Result<T, CryptoError>;",
-        "crate": "contextra-crypto"
-      },
-      {
-        "name": "Result",
-        "kind": "type_alias",
-        "is_pub": false,
-        "file": "/app/crates/contextra-mcp/src/sandbox.rs",
-        "line": 12,
-        "declaration": "type Result<T> = std::result::Result<T, ContextraError>;",
-        "crate": "contextra-mcp"
-      },
-      {
-        "name": "Result",
-        "kind": "type_alias",
-        "is_pub": true,
-        "file": "/app/crates/contextra-types/src/error.rs",
-        "line": 115,
-        "declaration": "pub type Result<T> = std::result::Result<T, ContextraError>;",
-        "crate": "contextra-types"
       }
     ],
     "SpillHandler": [
@@ -6552,7 +7620,7 @@
         "kind": "struct",
         "is_pub": false,
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 19,
+        "line": 18,
         "declaration": "struct SimpleRng {",
         "crate": "contextra-router"
       },
@@ -6572,7 +7640,7 @@
         "kind": "struct",
         "is_pub": true,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 52,
+        "line": 51,
         "declaration": "pub struct Embedding<'a> {",
         "crate": "contextra-wire"
       },
@@ -6592,7 +7660,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 57,
+        "line": 56,
         "declaration": "type Inner = Embedding<'a>;",
         "crate": "contextra-wire"
       },
@@ -6601,7 +7669,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 262,
+        "line": 260,
         "declaration": "type Inner = ScoredDocument<'a>;",
         "crate": "contextra-wire"
       },
@@ -6610,7 +7678,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 500,
+        "line": 497,
         "declaration": "type Inner = SearchResponse<'a>;",
         "crate": "contextra-wire"
       },
@@ -6619,7 +7687,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 710,
+        "line": 706,
         "declaration": "type Inner = VectorIndexUpdate<'a>;",
         "crate": "contextra-wire"
       },
@@ -6628,7 +7696,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 919,
+        "line": 914,
         "declaration": "type Inner = RoleId<'a>;",
         "crate": "contextra-wire"
       },
@@ -6637,7 +7705,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1041,
+        "line": 1035,
         "declaration": "type Inner = HyperEdgeId<'a>;",
         "crate": "contextra-wire"
       },
@@ -6646,7 +7714,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1165,
+        "line": 1158,
         "declaration": "type Inner = RoleBinding<'a>;",
         "crate": "contextra-wire"
       },
@@ -6655,7 +7723,7 @@
         "kind": "type_alias",
         "is_pub": false,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1317,
+        "line": 1309,
         "declaration": "type Inner = HyperEdge<'a>;",
         "crate": "contextra-wire"
       }
@@ -6666,7 +7734,7 @@
         "kind": "struct",
         "is_pub": true,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 257,
+        "line": 255,
         "declaration": "pub struct ScoredDocument<'a> {",
         "crate": "contextra-wire"
       },
@@ -6686,7 +7754,7 @@
         "kind": "struct",
         "is_pub": true,
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1312,
+        "line": 1304,
         "declaration": "pub struct HyperEdge<'a> {",
         "crate": "contextra-wire"
       },
@@ -7049,6 +8117,26 @@
         "crate": "contextra-vector"
       }
     ],
+    "HnswPurger": [
+      {
+        "name": "HnswPurger",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-vector/src/hnsw/purge.rs",
+        "line": 21,
+        "declaration": "pub struct HnswPurger {",
+        "crate": "contextra-vector"
+      },
+      {
+        "name": "HnswPurger",
+        "kind": "struct",
+        "is_pub": true,
+        "file": "/app/crates/contextra-vector/src/hnsw/purger.rs",
+        "line": 16,
+        "declaration": "pub struct HnswPurger {",
+        "crate": "contextra-vector"
+      }
+    ],
     "TestClock": [
       {
         "name": "TestClock",
@@ -7206,26 +8294,6 @@
         "file": "/app/crates/contextra-types/src/erasure.rs",
         "line": 312,
         "declaration": "pub enum ScanMethod {",
-        "crate": "contextra-types"
-      }
-    ],
-    "DocId": [
-      {
-        "name": "DocId",
-        "kind": "struct",
-        "is_pub": true,
-        "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
-        "line": 173,
-        "declaration": "pub struct DocId(pub u64);",
-        "crate": "contextra-types"
-      },
-      {
-        "name": "DocId",
-        "kind": "struct",
-        "is_pub": true,
-        "file": "/app/crates/contextra-types/src/types/domain/ids.rs",
-        "line": 180,
-        "declaration": "pub struct DocId(pub u128);",
         "crate": "contextra-types"
       }
     ],

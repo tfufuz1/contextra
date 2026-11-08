@@ -8,151 +8,151 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 191,
+        "line": 187,
         "kind": "assert",
         "code": "assert_eq!(db1.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 199,
+        "line": 195,
         "kind": "assert",
         "code": "assert_eq!(db2.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 203,
+        "line": 199,
         "kind": "assert",
         "code": "assert_eq!(db3.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 438,
+        "line": 440,
         "kind": "assert",
         "code": "assert_eq!(builder.config.dimension, 768);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 439,
+        "line": 441,
         "kind": "assert",
         "code": "assert_eq!(builder.storage_path, PathBuf::from(\"./contextra_data\"));"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 440,
+        "line": 442,
         "kind": "assert",
         "code": "assert!(builder.embedder.is_none());"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 441,
+        "line": 443,
         "kind": "assert",
         "code": "assert!(!builder.is_encrypted());"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 455,
+        "line": 457,
         "kind": "assert",
         "code": "assert_eq!(builder.config.dimension, 128);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 456,
+        "line": 458,
         "kind": "assert",
         "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra/src/builder.rs",
-        "line": 460,
-        "kind": "assert",
-        "code": "assert_eq!(builder.config.max_elements, 50000);"
-      },
-      {
-        "file": "/app/crates/contextra/src/builder.rs",
-        "line": 461,
-        "kind": "assert",
-        "code": "assert_eq!(builder.config.distance_metric, DistanceMetric::Euclidean);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
         "line": 462,
         "kind": "assert",
-        "code": "assert!(builder.is_encrypted());"
+        "code": "assert_eq!(builder.config.max_elements, 50000);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
         "line": 463,
         "kind": "assert",
-        "code": "assert!(!builder.config.consolidation_enabled);"
+        "code": "assert_eq!(builder.config.distance_metric, DistanceMetric::Euclidean);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
         "line": 464,
         "kind": "assert",
+        "code": "assert!(builder.is_encrypted());"
+      },
+      {
+        "file": "/app/crates/contextra/src/builder.rs",
+        "line": 465,
+        "kind": "assert",
+        "code": "assert!(!builder.config.consolidation_enabled);"
+      },
+      {
+        "file": "/app/crates/contextra/src/builder.rs",
+        "line": 466,
+        "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 477,
+        "line": 479,
         "kind": "assert",
         "code": "assert!(!debug_mode_output.contains(secret_str));"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 478,
+        "line": 480,
         "kind": "assert",
         "code": "assert!(debug_mode_output.contains(\"[REDACTED]\"));"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 482,
+        "line": 484,
         "kind": "assert",
         "code": "assert!(!debug_builder_output.contains(secret_str));"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 483,
+        "line": 485,
         "kind": "assert",
         "code": "assert!(debug_builder_output.contains(\"[REDACTED]\"));"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 494,
+        "line": 496,
         "kind": "assert",
         "code": "assert!(res.is_err());"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 496,
+        "line": 498,
         "kind": "assert",
         "code": "assert!(msg.contains(\"cannot be empty\"));"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 498,
+        "line": 500,
         "kind": "panic",
         "code": "panic!(\"Expected InvalidInput error for empty passphrase\");"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 507,
+        "line": 509,
         "kind": "assert",
         "code": "assert!(res_ws.is_err());"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 522,
+        "line": 524,
         "kind": "assert",
         "code": "assert!(!builder.is_encrypted());"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 525,
+        "line": 527,
         "kind": "assert",
         "code": "assert_eq!(db.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 545,
+        "line": 547,
         "kind": "assert",
         "code": "assert_eq!(db.len().await?, 0);"
       },
@@ -404,97 +404,97 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 39,
+        "line": 42,
         "kind": "assert",
         "code": "assert!(res.is_err());"
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 40,
-        "kind": "unwrap",
-        "code": "let err = res.err().unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
         "line": 43,
-        "kind": "assert",
-        "code": "assert!("
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 49,
-        "kind": "panic",
-        "code": "_ => panic!(\"Expected PolicyViolation error, got: {:?}\", err),"
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 76,
-        "kind": "assert",
-        "code": "assert!(res.is_err());"
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 77,
         "kind": "unwrap",
         "code": "let err = res.err().unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 80,
+        "line": 46,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 86,
+        "line": 52,
         "kind": "panic",
         "code": "_ => panic!(\"Expected PolicyViolation error, got: {:?}\", err),"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 111,
+        "line": 79,
+        "kind": "assert",
+        "code": "assert!(res.is_err());"
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
+        "line": 80,
+        "kind": "unwrap",
+        "code": "let err = res.err().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
+        "line": 83,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 116,
-        "kind": "unwrap",
-        "code": "let db = res.unwrap();"
+        "line": 89,
+        "kind": "panic",
+        "code": "_ => panic!(\"Expected PolicyViolation error, got: {:?}\", err),"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 117,
-        "kind": "unwrap",
-        "code": "assert_eq!(db.len().await.unwrap(), 0);"
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 117,
-        "kind": "assert",
-        "code": "assert_eq!(db.len().await.unwrap(), 0);"
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 153,
+        "line": 114,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 158,
+        "line": 119,
         "kind": "unwrap",
         "code": "let db = res.unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 159,
+        "line": 120,
         "kind": "unwrap",
         "code": "assert_eq!(db.len().await.unwrap(), 0);"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 159,
+        "line": 120,
+        "kind": "assert",
+        "code": "assert_eq!(db.len().await.unwrap(), 0);"
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
+        "line": 156,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
+        "line": 161,
+        "kind": "unwrap",
+        "code": "let db = res.unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
+        "line": 162,
+        "kind": "unwrap",
+        "code": "assert_eq!(db.len().await.unwrap(), 0);"
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
+        "line": 162,
         "kind": "assert",
         "code": "assert_eq!(db.len().await.unwrap(), 0);"
       },
@@ -841,42 +841,6 @@
         "code": "unreachable!()"
       },
       {
-        "file": "/app/crates/contextra/tests/review_stub_proof.rs",
-        "line": 24,
-        "kind": "unwrap",
-        "code": "let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));"
-      },
-      {
-        "file": "/app/crates/contextra/tests/review_stub_proof.rs",
-        "line": 44,
-        "kind": "assert",
-        "code": "assert!("
-      },
-      {
-        "file": "/app/crates/contextra/tests/review_stub_proof.rs",
-        "line": 55,
-        "kind": "unwrap",
-        "code": "let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));"
-      },
-      {
-        "file": "/app/crates/contextra/tests/review_stub_proof.rs",
-        "line": 74,
-        "kind": "expect",
-        "code": ".expect(\"issue succeeds\");"
-      },
-      {
-        "file": "/app/crates/contextra/tests/review_stub_proof.rs",
-        "line": 77,
-        "kind": "assert",
-        "code": "assert!("
-      },
-      {
-        "file": "/app/crates/contextra/tests/review_stub_proof.rs",
-        "line": 78,
-        "kind": "unwrap",
-        "code": "!proof.verify(wrong_key.as_slice()).unwrap(),"
-      },
-      {
         "file": "/app/crates/contextra/tests/deployment_tier_presets_valid.rs",
         "line": 25,
         "kind": "assert",
@@ -1058,115 +1022,115 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 29,
+        "line": 30,
         "kind": "unwrap",
         "code": "let db = contextra::open(&tmp_path).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 30,
+        "line": 31,
         "kind": "assert",
         "code": "assert!(!db.config().deletion_proof_active);"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 55,
+        "line": 56,
         "kind": "assert",
         "code": "assert!(res.is_err());"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 56,
+        "line": 57,
         "kind": "unwrap",
         "code": "let err = res.err().unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 59,
+        "line": 60,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 64,
+        "line": 65,
         "kind": "panic",
         "code": "_ => panic!(\"Expected PolicyViolation error, got: {:?}\", err),"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 96,
+        "line": 97,
         "kind": "expect",
         "code": ".expect(\"Build should succeed with valid signed license\");"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 98,
+        "line": 99,
         "kind": "assert",
         "code": "assert!(db.config().deletion_proof_active);"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 99,
+        "line": 100,
         "kind": "assert",
         "code": "assert_eq!(db.config().durability_mode, DurabilityMode::Full);"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 100,
+        "line": 101,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 136,
+        "line": 137,
         "kind": "assert",
         "code": "assert!(res.is_err());"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 137,
+        "line": 138,
         "kind": "unwrap",
         "code": "let err = res.err().unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 140,
+        "line": 141,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 145,
+        "line": 146,
         "kind": "panic",
         "code": "_ => panic!(\"Expected PolicyViolation error, got: {:?}\", err),"
-      },
-      {
-        "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 179,
-        "kind": "assert",
-        "code": "assert!(res.is_err());"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
         "line": 180,
+        "kind": "assert",
+        "code": "assert!(res.is_err());"
+      },
+      {
+        "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
+        "line": 181,
         "kind": "unwrap",
         "code": "let err = res.err().unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 183,
+        "line": 184,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 188,
+        "line": 189,
         "kind": "panic",
         "code": "_ => panic!(\"Expected PolicyViolation error, got: {:?}\", err),"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 227,
+        "line": 228,
         "kind": "assert",
         "code": "assert!(res.is_err());"
       },
@@ -1671,7 +1635,7 @@
       "prod_unimplemented": 0,
       "prod_unreachable": 0,
       "prod_assert": 0,
-      "test_panics": 276
+      "test_panics": 270
     }
   },
   {
@@ -11799,55 +11763,55 @@
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
-        "line": 765,
+        "line": 766,
         "kind": "expect",
-        "code": "reg.persist_sync().expect(\"persist_sync via VFS must succeed\");"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
-        "line": 770,
-        "kind": "assert",
-        "code": "assert_eq!(orphans.len(), 1);"
+        "code": ".expect(\"persist_sync via VFS must succeed\");"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
         "line": 771,
         "kind": "assert",
-        "code": "assert_eq!(orphans[0].seq_no, 777);"
+        "code": "assert_eq!(orphans.len(), 1);"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
-        "line": 777,
-        "kind": "expect",
-        "code": "let dir1 = tempfile::tempdir().expect(\"tempdir 1\");"
+        "line": 772,
+        "kind": "assert",
+        "code": "assert_eq!(orphans[0].seq_no, 777);"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
         "line": 778,
         "kind": "expect",
-        "code": "let dir2 = tempfile::tempdir().expect(\"tempdir 2\");"
+        "code": "let dir1 = tempfile::tempdir().expect(\"tempdir 1\");"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
-        "line": 797,
-        "kind": "assert",
-        "code": "assert_eq!(reg1.get_orphan_pins().len(), 1);"
+        "line": 779,
+        "kind": "expect",
+        "code": "let dir2 = tempfile::tempdir().expect(\"tempdir 2\");"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
         "line": 798,
         "kind": "assert",
+        "code": "assert_eq!(reg1.get_orphan_pins().len(), 1);"
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
+        "line": 799,
+        "kind": "assert",
         "code": "assert_eq!(reg1.get_orphaned_checkpoints().len(), 0);"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
-        "line": 800,
+        "line": 801,
         "kind": "assert",
         "code": "assert_eq!(reg2.get_orphan_pins().len(), 0);"
       },
       {
         "file": "/app/crates/contextra-checkpoint/src/orphan.rs",
-        "line": 801,
+        "line": 802,
         "kind": "assert",
         "code": "assert_eq!(reg2.get_orphaned_checkpoints().len(), 1);"
       },
@@ -14373,117 +14337,117 @@
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 167,
-        "kind": "unwrap",
-        "code": "fault_storage.put(tx1, b\"doc1\", b\"content_v1\").await.unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 168,
-        "kind": "unwrap",
-        "code": "fault_storage.commit(tx1).await.unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 172,
+        "line": 165,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 193,
-        "kind": "assert",
-        "code": "assert!(cp_res.is_err(), \"Crash mode {crash_mode} must cause create_checkpoint to fail\");"
+        "line": 166,
+        "kind": "unwrap",
+        "code": "fault_storage.commit(tx1).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 194,
+        "line": 170,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 191,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
         "line": 195,
-        "kind": "unwrap",
-        "code": "store.get_checkpoint(\"chk_systematic\").await.unwrap().is_none(),"
+        "kind": "assert",
+        "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
         "line": 199,
+        "kind": "unwrap",
+        "code": ".unwrap()"
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 204,
         "kind": "assert",
         "code": "assert!(cp_res.is_ok(), \"Clean run must succeed\");"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 200,
+        "line": 208,
         "kind": "unwrap",
-        "code": "let meta = store.get_checkpoint(\"chk_systematic\").await.unwrap().expect(\"Checkpoint must exist\");"
+        "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 200,
+        "line": 209,
         "kind": "expect",
-        "code": "let meta = store.get_checkpoint(\"chk_systematic\").await.unwrap().expect(\"Checkpoint must exist\");"
+        "code": ".expect(\"Checkpoint must exist\");"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 201,
+        "line": 210,
         "kind": "assert",
         "code": "assert_eq!(meta.name, \"chk_systematic\");"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 202,
+        "line": 211,
         "kind": "assert",
         "code": "assert_eq!(meta.seq_no, 1);"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 214,
-        "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 220,
-        "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
         "line": 223,
         "kind": "unwrap",
-        "code": "assert!(store.get_checkpoint(\"chk_to_drop\").await.unwrap().is_some());"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 223,
-        "kind": "assert",
-        "code": "assert!(store.get_checkpoint(\"chk_to_drop\").await.unwrap().is_some());"
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
         "line": 229,
-        "kind": "assert",
-        "code": "assert!(drop_res.is_err(), \"Drop with failing storage delete must return error\");"
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 234,
-        "kind": "assert",
-        "code": "assert!(retry_drop.is_ok(), \"Retry of drop_checkpoint must succeed cleanly\");"
+        "line": 232,
+        "kind": "unwrap",
+        "code": "assert!(store.get_checkpoint(\"chk_to_drop\").await.unwrap().is_some());"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 236,
+        "line": 232,
+        "kind": "assert",
+        "code": "assert!(store.get_checkpoint(\"chk_to_drop\").await.unwrap().is_some());"
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 238,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 246,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 251,
         "kind": "unwrap",
         "code": "let check = store.get_checkpoint(\"chk_to_drop\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 237,
+        "line": 252,
         "kind": "assert",
-        "code": "assert!(check.is_none(), \"Checkpoint must be removed after successful drop\");"
+        "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_clock_determinism.rs",
@@ -38998,67 +38962,67 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 21,
+        "line": 23,
         "kind": "assert",
         "code": "assert!(!handle.is_poisoned());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 22,
+        "line": 24,
         "kind": "assert",
         "code": "assert!(handle.get_ref().is_some());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 27,
+        "line": 29,
         "kind": "assert",
         "code": "assert!(handle.is_poisoned());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 28,
+        "line": 30,
         "kind": "assert",
         "code": "assert!(handle.get_ref().is_none());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 31,
+        "line": 33,
         "kind": "assert",
         "code": "assert!(err.is_err());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 55,
+        "line": 57,
         "kind": "assert",
         "code": "assert_eq!(read_back, new_data.as_bytes());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 72,
+        "line": 74,
         "kind": "assert",
         "code": "assert_eq!(class, FsClass::CloudSync);"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 75,
+        "line": 77,
         "kind": "assert",
         "code": "assert!(lock_res.is_err());"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 79,
+        "line": 81,
         "kind": "assert",
         "code": "assert!(err_msg.contains(\"cloud_sync\"));"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 80,
+        "line": 82,
         "kind": "assert",
         "code": "assert!(!err_msg.contains(\"OneDrive_Mock_\"));"
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 84,
+        "line": 86,
         "kind": "assert",
         "code": "assert_eq!(lock_mem.mode(), LockMode::MemoryOnly);"
       },
@@ -49531,10 +49495,1600 @@
   {
     "crate": "contextra-erasure",
     "path": "/app/crates/contextra-erasure",
-    "total_files": 84,
-    "prod_files": 61,
+    "total_files": 85,
+    "prod_files": 62,
     "findings_prod": [],
     "findings_test": [
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1286,
+        "kind": "unwrap",
+        "code": "let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1300,
+        "kind": "assert",
+        "code": "assert!(res_empty.is_err(), \"empty witnesses MUST return Err\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1317,
+        "kind": "assert",
+        "code": "assert!(res_no_excluded.is_err(), \"empty excluded MUST return Err\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1335,
+        "kind": "assert",
+        "code": "assert!(res1.is_err(), \"remaining > 0 MUST return Err\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1353,
+        "kind": "assert",
+        "code": "assert!(res2.is_err(), \"NotMeasured MUST return Err\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1369,
+        "kind": "assert",
+        "code": "assert!(res_missing.is_err(), \"missing mandatory SsTableAllLevels MUST return Err\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1387,
+        "kind": "assert",
+        "code": "assert!(res_dup.is_err(), \"duplicate layer MUST return Err\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1405,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1410,
+        "kind": "unwrap",
+        "code": "let proof = res3.unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1411,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature_version, 5);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1412,
+        "kind": "assert",
+        "code": "assert_eq!(proof.covered_layers.len(), 4);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1413,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(hmac_key.as_slice()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1413,
+        "kind": "assert",
+        "code": "assert!(proof.verify(hmac_key.as_slice()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1424,
+        "kind": "unwrap",
+        "code": "let ctx = RequestContext::new(TenantId::try_new(42).unwrap(), TxId(500));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1446,
+        "kind": "expect",
+        "code": ".expect(\"V5 issue must succeed\");"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1448,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature_version, 5);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1449,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1449,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1450,
+        "kind": "assert",
+        "code": "assert!(proof.verify_external(&keypair.verifying_key).is_ok());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1453,
+        "kind": "unwrap",
+        "code": "let json = serde_json::to_string_pretty(&proof).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1454,
+        "kind": "assert",
+        "code": "assert!(json.contains(r#\"\"signature_version\": 5\"#));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1455,
+        "kind": "assert",
+        "code": "assert!(json.contains(r#\"\"custody\": \"Sovereign\"\"#));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1456,
+        "kind": "unwrap",
+        "code": "let de_proof: DeletionProof = serde_json::from_str(&json).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1457,
+        "kind": "assert",
+        "code": "assert_eq!(de_proof, proof);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1462,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_sig.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1462,
+        "kind": "assert",
+        "code": "assert!(!tampered_sig.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1463,
+        "kind": "assert",
+        "code": "assert!(tampered_sig.verify_external(&keypair.verifying_key).is_err());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1468,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_digest.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1468,
+        "kind": "assert",
+        "code": "assert!(!tampered_digest.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1469,
+        "kind": "assert",
+        "code": "assert!(tampered_digest.verify_external(&keypair.verifying_key).is_err());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1480,
+        "kind": "assert",
+        "code": "assert_ne!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1494,
+        "kind": "assert",
+        "code": "assert_eq!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1505,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1512,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1519,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1521,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature_version, 3);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1522,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature.len(), 64);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1523,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1523,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1532,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1544,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1546,
+        "kind": "unwrap",
+        "code": "assert!(!proof.verify(&keypair2.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1546,
+        "kind": "assert",
+        "code": "assert!(!proof.verify(&keypair2.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1553,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1565,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1568,
+        "kind": "unwrap",
+        "code": "assert!(!proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1568,
+        "kind": "assert",
+        "code": "assert!(!proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1576,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1583,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1591,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1593,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1593,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1599,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1601,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1601,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1606,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1606,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1611,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1611,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1616,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1616,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1621,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1621,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1626,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1626,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1633,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1645,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1649,
+        "kind": "assert",
+        "code": "assert!(res.is_err());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1652,
+        "kind": "assert",
+        "code": "assert!(msg.contains(\"HMAC key provided for Ed25519 signature_version 3 proof\"));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1654,
+        "kind": "panic",
+        "code": "_ => panic!(\"Expected ContextraError::Internal\"),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1662,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1671,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1676,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1677,
+        "kind": "assert",
+        "code": "assert_eq!(proof_v2.signature_version, 2);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1678,
+        "kind": "unwrap",
+        "code": "assert!(proof_v2.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1678,
+        "kind": "assert",
+        "code": "assert!(proof_v2.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1681,
+        "kind": "unwrap",
+        "code": "let scope_bytes = bincode::serialize(&scope).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1686,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1705,
+        "kind": "assert",
+        "code": "assert_eq!(v1_proof.signature_version, 1);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1706,
+        "kind": "unwrap",
+        "code": "assert!(v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1706,
+        "kind": "assert",
+        "code": "assert!(v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1713,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1726,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1738,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1740,
+        "kind": "assert",
+        "code": "assert_ne!(proof_ab_c.deleted_keys_hash, proof_a_bc.deleted_keys_hash);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1745,
+        "kind": "unwrap",
+        "code": "let tenant = TenantId::try_new(1).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1756,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1757,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1762,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1764,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1764,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1770,
+        "kind": "assert",
+        "code": "assert!(res.is_err());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1773,
+        "kind": "assert",
+        "code": "assert!(msg.contains(\"INV-DELETION-1 violation\"));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1774,
+        "kind": "assert",
+        "code": "assert!(msg.contains(\"found 3 remaining live entries\"));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1776,
+        "kind": "panic",
+        "code": "_ => panic!(\"Expected ContextraError::Internal\"),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1783,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1786,
+        "kind": "unwrap",
+        "code": "DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1789,
+        "kind": "unwrap",
+        "code": "assert!(!proof.verify(&wrong_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1789,
+        "kind": "assert",
+        "code": "assert!(!proof.verify(&wrong_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1795,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1802,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1807,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1812,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_tx.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1812,
+        "kind": "assert",
+        "code": "assert!(!tampered_tx.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1817,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_hash.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1817,
+        "kind": "assert",
+        "code": "assert!(!tampered_hash.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1822,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(2).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1824,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_scope.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1824,
+        "kind": "assert",
+        "code": "assert!(!tampered_scope.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1827,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1827,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1838,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(2).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1846,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1849,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(2).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1857,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1859,
+        "kind": "assert",
+        "code": "assert_eq!(proof_a.deleted_keys_hash, proof_b.deleted_keys_hash);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1865,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1878,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1880,
+        "kind": "unwrap",
+        "code": "let json = proof.export_for_audit().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1881,
+        "kind": "assert",
+        "code": "assert!(json.contains(\"LlmParameterMemory\"));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1882,
+        "kind": "assert",
+        "code": "assert!(json.contains(\"ConsolidatedAndDistilled\"));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1887,
+        "kind": "unwrap",
+        "code": "let t1 = TenantId::try_new(10).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1893,
+        "kind": "unwrap",
+        "code": "DeletionProof::create(doc_scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1894,
+        "kind": "assert",
+        "code": "assert_eq!(p1.tenant_id(), t1);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1896,
+        "kind": "unwrap",
+        "code": "let t2 = TenantId::try_new(20).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1902,
+        "kind": "unwrap",
+        "code": "DeletionProof::create(col_scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1903,
+        "kind": "assert",
+        "code": "assert_eq!(p2.tenant_id(), t2);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1905,
+        "kind": "unwrap",
+        "code": "let t3 = TenantId::try_new(30).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1908,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1909,
+        "kind": "assert",
+        "code": "assert_eq!(p3.tenant_id(), t3);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1915,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(100).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1919,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1921,
+        "kind": "unwrap",
+        "code": ".unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1922,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1933,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1935,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1935,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1936,
+        "kind": "assert",
+        "code": "assert_eq!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1949,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1956,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1961,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1963,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature_version, 2);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1964,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1964,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1971,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_layers.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1971,
+        "kind": "assert",
+        "code": "assert!(!tampered_layers.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1977,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1984,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1992,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1994,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature_version, 2);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1995,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 1995,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2000,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_scopes.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2000,
+        "kind": "assert",
+        "code": "assert!(!tampered_scopes.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2006,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2018,
+        "kind": "unwrap",
+        "code": "let scope_bytes = bincode::serialize(&scope).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2023,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2044,
+        "kind": "unwrap",
+        "code": "assert!(v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2044,
+        "kind": "assert",
+        "code": "assert!(v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2051,
+        "kind": "unwrap",
+        "code": "+ &serde_json::to_string(&deleted_keys_hash).unwrap()"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2055,
+        "kind": "unwrap",
+        "code": "+ &serde_json::to_string(&v1_signature).unwrap()"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2061,
+        "kind": "unwrap",
+        "code": "let deserialized: DeletionProof = serde_json::from_str(&json_missing_version).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2062,
+        "kind": "assert",
+        "code": "assert_eq!(deserialized.signature_version, 1);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2063,
+        "kind": "unwrap",
+        "code": "assert!(deserialized.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2063,
+        "kind": "assert",
+        "code": "assert!(deserialized.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2069,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2080,
+        "kind": "unwrap",
+        "code": "let scope_bytes = bincode::serialize(&scope).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2085,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2105,
+        "kind": "unwrap",
+        "code": "let json = v1_proof.export_for_audit().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2106,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2110,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2121,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2128,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2133,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2135,
+        "kind": "assert",
+        "code": "assert_eq!(proof.signature_version, 2);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2136,
+        "kind": "unwrap",
+        "code": "let json = proof.export_for_audit().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2137,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2149,
+        "kind": "unwrap",
+        "code": "let receipt = compute_wal_delete_receipt(&prev_hmac, delete_event, integrity_key).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2152,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2153,
+        "kind": "unwrap",
+        "code": "verify_wal_delete_receipt(&receipt, &prev_hmac, delete_event, integrity_key).unwrap()"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2158,
+        "kind": "unwrap",
+        "code": "assert!(!verify_wal_delete_receipt(&receipt, &prev_hmac, delete_event, wrong_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2158,
+        "kind": "assert",
+        "code": "assert!(!verify_wal_delete_receipt(&receipt, &prev_hmac, delete_event, wrong_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2161,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2163,
+        "kind": "unwrap",
+        "code": ".unwrap()"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2171,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2177,
+        "kind": "unwrap",
+        "code": "let receipt = compute_wal_delete_receipt(&prev_hmac, delete_event, integrity_key).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2184,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2190,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2192,
+        "kind": "assert",
+        "code": "assert_eq!(proof.wal_chain_receipt, Some(receipt));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2193,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2193,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2198,
+        "kind": "unwrap",
+        "code": "assert!(!tampered_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2198,
+        "kind": "assert",
+        "code": "assert!(!tampered_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2205,
+        "kind": "assert",
+        "code": "assert!(proof_ok.is_ok());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2206,
+        "kind": "unwrap",
+        "code": "assert_eq!(proof_ok.unwrap().layer(), &DeletionLayer::HnswIndex);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2206,
+        "kind": "assert",
+        "code": "assert_eq!(proof_ok.unwrap().layer(), &DeletionLayer::HnswIndex);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2211,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2219,
+        "kind": "assert",
+        "code": "assert!(matches!(proof_err, Err(ContextraError::Internal(ref msg)) if msg == \"db error\"));"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2227,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2234,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2241,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2244,
+        "kind": "assert",
+        "code": "assert!(proof.verify_external(&keypair.verifying_key).is_ok());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2248,
+        "kind": "assert",
+        "code": "assert!(proof.verify_external(&wrong_keypair.verifying_key).is_err());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2254,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2265,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2268,
+        "kind": "assert",
+        "code": "assert!(proof.verify_external(&keypair.verifying_key).is_err());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2274,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2277,
+        "kind": "unwrap",
+        "code": "DeletionProof::create(scope, vec![], TxId(1), vec![], vec![], &test_key()).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2284,
+        "kind": "assert",
+        "code": "assert_eq!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2291,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2299,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2306,
+        "kind": "assert",
+        "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2319,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2323,
+        "kind": "unwrap",
+        "code": "let scope_bytes = bincode::serialize(&scope).unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2328,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2347,
+        "kind": "unwrap",
+        "code": "assert!(v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2347,
+        "kind": "assert",
+        "code": "assert!(v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2349,
+        "kind": "unwrap",
+        "code": "assert!(!v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2349,
+        "kind": "assert",
+        "code": "assert!(!v1_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2357,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2362,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2363,
+        "kind": "unwrap",
+        "code": "assert!(v2_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2363,
+        "kind": "assert",
+        "code": "assert!(v2_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2365,
+        "kind": "unwrap",
+        "code": "assert!(!v2_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2365,
+        "kind": "assert",
+        "code": "assert!(!v2_proof.verify(&test_key()).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2374,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2381,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2382,
+        "kind": "unwrap",
+        "code": "assert!(v3_proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2382,
+        "kind": "assert",
+        "code": "assert!(v3_proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2383,
+        "kind": "assert",
+        "code": "assert!(v3_proof.verify_external(&keypair.verifying_key).is_ok());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2386,
+        "kind": "unwrap",
+        "code": "assert!(!v3_proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2386,
+        "kind": "assert",
+        "code": "assert!(!v3_proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2387,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2398,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2405,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2412,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2414,
+        "kind": "assert",
+        "code": "assert!(proof.verify_external(&keypair.verifying_key).is_ok());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2422,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2434,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2435,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2442,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2444,
+        "kind": "unwrap",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2444,
+        "kind": "assert",
+        "code": "assert!(proof.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2445,
+        "kind": "assert",
+        "code": "assert!(proof.verify_external(&keypair.verifying_key).is_ok());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2451,
+        "kind": "unwrap",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2451,
+        "kind": "assert",
+        "code": "assert!(!tampered.verify(&keypair.verifying_key).unwrap());"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2452,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2463,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2470,
+        "kind": "unwrap",
+        "code": "LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2478,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2483,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2491,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2500,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2502,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2510,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2518,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2526,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2534,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2541,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2549,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2559,
+        "kind": "unwrap",
+        "code": "tenant_id: TenantId::try_new(1).unwrap(),"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2571,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2572,
+        "kind": "assert",
+        "code": "assert_eq!(proof_v2.signature_version, 2);"
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2573,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-erasure/src/deletion_proof.rs",
+        "line": 2581,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
       {
         "file": "/app/crates/contextra-erasure/benches/bm_erase.rs",
         "line": 29,
@@ -52958,7 +54512,7 @@
       "prod_unimplemented": 0,
       "prod_unreachable": 0,
       "prod_assert": 0,
-      "test_panics": 569
+      "test_panics": 834
     }
   },
   {
@@ -80501,19 +82055,19 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra-kvcache/examples/standalone_prefix_cache.rs",
-        "line": 45,
+        "line": 41,
         "kind": "assert",
         "code": "assert_eq!(store.get_tenant_segment_len(tenant_beta), 0);"
       },
       {
         "file": "/app/crates/contextra-kvcache/examples/standalone_prefix_cache.rs",
-        "line": 46,
+        "line": 42,
         "kind": "assert",
         "code": "assert!(store.get_segment_bytes(tenant_beta, 1).is_none());"
       },
       {
         "file": "/app/crates/contextra-kvcache/examples/standalone_prefix_cache.rs",
-        "line": 51,
+        "line": 47,
         "kind": "assert",
         "code": "assert_eq!(retrieved.as_deref(), Some(seg1_data.as_slice()));"
       },
@@ -98706,8 +100260,8 @@
   {
     "crate": "contextra-rank",
     "path": "/app/crates/contextra-rank",
-    "total_files": 38,
-    "prod_files": 21,
+    "total_files": 40,
+    "prod_files": 23,
     "findings_prod": [],
     "findings_test": [
       {
@@ -101150,31 +102704,31 @@
       },
       {
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 162,
+        "line": 161,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 239,
+        "line": 238,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 262,
+        "line": 261,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 271,
+        "line": 270,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-router/src/bandit_regret_tests.rs",
-        "line": 318,
+        "line": 317,
         "kind": "assert",
         "code": "assert!("
       },
@@ -101222,7 +102776,7 @@
       },
       {
         "file": "/app/crates/contextra-router/benches/router_bench.rs",
-        "line": 133,
+        "line": 139,
         "kind": "unwrap",
         "code": "let rt = Runtime::new().unwrap();"
       },
@@ -101486,361 +103040,361 @@
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 260,
+        "line": 282,
         "kind": "assert",
         "code": "assert_eq!(decision1.profile.name, decision2.profile.name);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 261,
+        "line": 283,
         "kind": "assert",
         "code": "assert_eq!(decision1.decision_id.inner(), decision2.decision_id.inner());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 306,
+        "line": 328,
         "kind": "assert",
         "code": "assert!(first_record);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 315,
+        "line": 337,
         "kind": "assert",
         "code": "assert!(!second_record);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 323,
+        "line": 345,
         "kind": "assert",
         "code": "assert_eq!(window_after_first, window_after_second);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 324,
+        "line": 346,
         "kind": "assert",
         "code": "assert_eq!(sel_before, 1);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 339,
+        "line": 361,
         "kind": "assert",
         "code": "assert_eq!(s1, s2);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 342,
+        "line": 364,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 397,
+        "line": 419,
         "kind": "assert",
         "code": "assert_eq!(decision.profile.name, profile_cheap.name);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 398,
+        "line": 420,
         "kind": "assert",
         "code": "assert!(decision.confidence.is_some());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 399,
+        "line": 421,
         "kind": "unwrap",
         "code": "assert!(!decision.confidence.as_ref().unwrap().calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 399,
+        "line": 421,
         "kind": "assert",
         "code": "assert!(!decision.confidence.as_ref().unwrap().calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 410,
+        "line": 432,
         "kind": "assert",
         "code": "assert!(profile_invalid_endpoint.validate().is_err());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 432,
+        "line": 454,
         "kind": "assert",
         "code": "assert!(result.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 434,
+        "line": 456,
         "kind": "assert",
         "code": "ContextraError::Internal(msg) => assert!(msg.contains(\"Fehler bei MCP-Dispatch\")),"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 435,
+        "line": 457,
         "kind": "panic",
         "code": "other => panic!(\"Expected ContextraError::Internal, got: {other:?}\"),"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 471,
+        "line": 493,
         "kind": "assert",
         "code": "assert_eq!(dec1.decision_id.inner(), 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 476,
+        "line": 498,
         "kind": "assert",
         "code": "assert_eq!(dec2.decision_id.inner(), 5000);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 479,
+        "line": 501,
         "kind": "assert",
         "code": "assert_eq!(dec3.decision_id.inner(), 5001);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 517,
+        "line": 539,
         "kind": "assert",
         "code": "assert_eq!(router.pending_decision_count(), 1);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 519,
+        "line": 541,
         "kind": "assert",
         "code": "assert!(router.record_outcome(dec1.decision_id, RoutingOutcome::Success));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 520,
+        "line": 542,
         "kind": "assert",
         "code": "assert_eq!(router.pending_decision_count(), 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 533,
+        "line": 555,
         "kind": "assert",
         "code": "assert!(cal.update(0.9));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 534,
+        "line": 556,
         "kind": "assert",
         "code": "assert!(cal.quantile_threshold > initial_q);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 537,
+        "line": 559,
         "kind": "assert",
         "code": "assert!(cal.update(0.1));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 538,
+        "line": 560,
         "kind": "assert",
         "code": "assert!(cal.quantile_threshold < raised_q);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 555,
+        "line": 577,
         "kind": "assert",
         "code": "assert_eq!(state.times_selected, 5);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 558,
+        "line": 580,
         "kind": "assert",
         "code": "assert_eq!(state.times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 559,
+        "line": 581,
         "kind": "assert",
         "code": "assert_eq!(state.conformal.window_total, 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 586,
+        "line": 608,
         "kind": "assert",
         "code": "assert_eq!(router.overall_drift_status(), \"unbekannt\");"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 606,
+        "line": 628,
         "kind": "assert",
         "code": "assert_eq!(router.overall_drift_status(), \"stabil\");"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 646,
+        "line": 668,
         "kind": "assert",
         "code": "assert!(router.record_outcome(dec.decision_id, RoutingOutcome::Success));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 659,
+        "line": 681,
         "kind": "assert",
         "code": "assert_eq!(stats.len(), 2);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 660,
+        "line": 682,
         "kind": "assert",
         "code": "assert_eq!(stats[\"keep-me\"].times_selected, 1);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 661,
+        "line": 683,
         "kind": "assert",
         "code": "assert!(!stats.contains_key(\"drop-me\"));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 662,
+        "line": 684,
         "kind": "assert",
         "code": "assert_eq!(stats[\"add-me\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 701,
+        "line": 723,
         "kind": "assert",
         "code": "assert!(res.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 702,
+        "line": 724,
         "kind": "assert",
         "code": "assert_eq!(router.profiles().len(), 1);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 703,
+        "line": 725,
         "kind": "assert",
         "code": "assert_eq!(router.profiles()[0].name, \"valid-slm\");"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 742,
+        "line": 764,
         "kind": "expect",
         "code": "let metrics = decision.confidence.expect(\"confidence metrics present\");"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 744,
+        "line": 766,
         "kind": "assert",
         "code": "assert!(!metrics.calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 745,
+        "line": 767,
         "kind": "assert",
         "code": "assert!(metrics.score_lower.is_none());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 746,
+        "line": 768,
         "kind": "assert",
         "code": "assert!(metrics.score_upper.is_none());"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 758,
+        "line": 780,
         "kind": "assert",
         "code": "assert_eq!(prev, 100);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 762,
+        "line": 784,
         "kind": "assert",
         "code": "assert_eq!(curr, expected);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 763,
+        "line": 785,
         "kind": "assert",
         "code": "assert!(curr > prev);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 773,
+        "line": 795,
         "kind": "assert",
         "code": "assert_eq!(RoutingOutcome::Success.non_conformity_score(), 0.0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 774,
+        "line": 796,
         "kind": "assert",
         "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 781,
-        "kind": "assert",
-        "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 799,
-        "kind": "assert",
-        "code": "assert_eq!(default_cost_profile.estimated_cost(), 4096.0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
         "line": 803,
         "kind": "assert",
+        "code": "assert_eq!("
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 821,
+        "kind": "assert",
+        "code": "assert_eq!(default_cost_profile.estimated_cost(), 4096.0);"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 825,
+        "kind": "assert",
         "code": "assert_eq!(custom_cost_profile.estimated_cost(), 12.5);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 830,
+        "line": 852,
         "kind": "assert",
         "code": "assert!(router.record_outcome(dec1.decision_id, RoutingOutcome::Success));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 832,
+        "line": 854,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p1\"].times_selected, 1);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 836,
+        "line": 858,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p1\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 837,
+        "line": 859,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p2\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 849,
+        "line": 871,
         "kind": "assert",
         "code": "assert_eq!(QuantizationLevel::default(), QuantizationLevel::Unknown);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 850,
+        "line": 872,
         "kind": "assert",
         "code": "assert_ne!(QuantizationLevel::F16, QuantizationLevel::Q8_0);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 851,
+        "line": 873,
         "kind": "assert",
         "code": "assert_ne!(QuantizationLevel::Q8_0, QuantizationLevel::Q4_K_M);"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 873,
+        "line": 895,
         "kind": "assert",
         "code": "assert!(router.set_lyapunov_baseline(\"p1\", &baseline));"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 874,
+        "line": 896,
         "kind": "assert",
         "code": "assert!(!router.set_lyapunov_baseline(\"nonexistent\", &baseline));"
       },
@@ -102596,631 +104150,631 @@
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 77,
+        "line": 76,
         "kind": "assert",
         "code": "assert!(!max_score.is_nan(), \"max_score must not be NaN\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 81,
+        "line": 80,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 89,
+        "line": 88,
         "kind": "assert",
         "code": "assert_eq!(selected_idx, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 138,
+        "line": 137,
         "kind": "assert",
         "code": "assert!(result.is_err(), \"Expected error when all chunks are NaN\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 142,
+        "line": 141,
         "kind": "assert",
         "code": "assert!(msg.contains(\"NaN/Inf\"));"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 144,
+        "line": 143,
         "kind": "panic",
         "code": "other => panic!(\"Expected NotFound error, got {:?}\", other),"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 152,
+        "line": 151,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 217,
+        "line": 216,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 239,
+        "line": 238,
         "kind": "assert",
         "code": "assert!(valid.is_ok());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 249,
+        "line": 248,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 255,
+        "line": 254,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 267,
+        "line": 266,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 303,
+        "line": 302,
         "kind": "unwrap",
         "code": "let serialized = serde_json::to_string(&p1).unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 304,
+        "line": 303,
         "kind": "unwrap",
         "code": "let p2: SlmProfile = serde_json::from_str(&serialized).unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 355,
+        "line": 354,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 366,
+        "line": 365,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 377,
+        "line": 376,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 418,
+        "line": 417,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 423,
+        "line": 422,
         "kind": "unwrap",
         "code": "let rt = tokio::runtime::Runtime::new().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 425,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 426,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 427,
-        "kind": "unwrap",
         "code": "let collection = rt.block_on(db.collection(\"default\")).unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 448,
+        "line": 447,
         "kind": "expect",
         "code": ".expect(\"Cascade selection succeeds\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 450,
+        "line": 449,
         "kind": "assert",
         "code": "assert_eq!(selected.name, \"mid-slm\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 451,
+        "line": 450,
         "kind": "assert",
         "code": "assert_eq!(idx, 0); // profile_mid was at original index 0"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 452,
+        "line": 451,
         "kind": "assert",
         "code": "assert!(!metrics.calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 487,
+        "line": 486,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 492,
+        "line": 491,
         "kind": "unwrap",
         "code": "let rt = tokio::runtime::Runtime::new().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 495,
+        "line": 494,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 496,
+        "line": 495,
         "kind": "unwrap",
         "code": "let collection = rt.block_on(db.collection(\"default\")).unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 516,
+        "line": 515,
         "kind": "expect",
         "code": ".expect(\"Cascade fallthrough succeeds\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 518,
+        "line": 517,
         "kind": "assert",
         "code": "assert_eq!(selected.name, \"low-slm\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 519,
+        "line": 518,
         "kind": "assert",
         "code": "assert_eq!(idx, 2);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 520,
+        "line": 519,
         "kind": "assert",
         "code": "assert!(!metrics.calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 529,
+        "line": 528,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 535,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 536,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 537,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 548,
+        "line": 547,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 551,
+        "line": 550,
         "kind": "unwrap",
         "code": "let tx = db.allocate_tx().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 554,
+        "line": 553,
         "kind": "unwrap",
         "code": ".put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap())"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 555,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 556,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 557,
-        "kind": "unwrap",
         "code": "db.inner_storage().commit(tx).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 577,
+        "line": 576,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 591,
+        "line": 590,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 603,
+        "line": 602,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 609,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 610,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 611,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 621,
+        "line": 620,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 640,
+        "line": 639,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 645,
+        "line": 644,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 652,
+        "line": 651,
         "kind": "assert",
         "code": "assert_ne!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 672,
+        "line": 671,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 673,
+        "line": 672,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 674,
+        "line": 673,
         "kind": "unwrap",
         "code": "!decision_after_shift.confidence.as_ref().unwrap().calibrated,"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 679,
+        "line": 678,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 689,
+        "line": 688,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 694,
+        "line": 693,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 706,
+        "line": 705,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 712,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 713,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 714,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 724,
+        "line": 723,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 742,
+        "line": 741,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 746,
+        "line": 745,
         "kind": "assert",
         "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 766,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 767,
-        "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 768,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 769,
+        "line": 768,
         "kind": "unwrap",
         "code": "!decision_after_shift.confidence.as_ref().unwrap().calibrated,"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 772,
+        "line": 771,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 784,
+        "line": 783,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 790,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 791,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 792,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 802,
+        "line": 801,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 820,
+        "line": 819,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 824,
+        "line": 823,
         "kind": "assert",
         "code": "assert!("
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 844,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 845,
-        "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 846,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 847,
+        "line": 846,
         "kind": "unwrap",
         "code": "!decision_after_shift.confidence.as_ref().unwrap().calibrated,"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 850,
+        "line": 849,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 860,
+        "line": 859,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 866,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 867,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 868,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 878,
+        "line": 877,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 896,
+        "line": 895,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 901,
+        "line": 900,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 911,
+        "line": 910,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 918,
+        "line": 917,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 919,
+        "line": 918,
         "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 930,
+        "line": 929,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 933,
+        "line": 932,
         "kind": "unwrap",
         "code": "let tx = db.allocate_tx().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 936,
+        "line": 935,
         "kind": "unwrap",
         "code": ".put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap())"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 938,
+        "line": 937,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 939,
+        "line": 938,
         "kind": "unwrap",
         "code": "db.inner_storage().commit(tx).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 961,
+        "line": 960,
+        "kind": "unwrap",
+        "code": ".unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
+        "line": 966,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
         "line": 967,
-        "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 968,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 982,
+        "line": 981,
         "kind": "assert",
         "code": "assert_eq!(cal.alpha, 0.05);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 983,
+        "line": 982,
         "kind": "assert",
         "code": "assert_eq!(cal.gamma, 0.01);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 984,
+        "line": 983,
         "kind": "assert",
         "code": "assert_eq!(cal.quantile_threshold, 0.5);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 985,
+        "line": 984,
         "kind": "assert",
         "code": "assert_eq!(cal.empirical_error_rate(), 0.0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 988,
+        "line": 987,
         "kind": "assert",
         "code": "assert_eq!(cal.window_total, 1);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 989,
+        "line": 988,
         "kind": "assert",
         "code": "assert_eq!(cal.window_errors, 1);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 992,
+        "line": 991,
         "kind": "assert",
         "code": "assert_eq!(cal.window_total, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 993,
+        "line": 992,
         "kind": "assert",
         "code": "assert_eq!(cal.window_errors, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 994,
+        "line": 993,
         "kind": "assert",
         "code": "assert_eq!(cal.empirical_error_rate(), 0.0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 1003,
+        "line": 1002,
         "kind": "assert",
         "code": "assert_eq!(default_st.times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 1004,
+        "line": 1003,
         "kind": "assert",
         "code": "assert_eq!(default_st.average_confidence(), 1.0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 1009,
+        "line": 1008,
         "kind": "assert",
         "code": "assert_eq!(st.average_confidence(), 1.5);"
       },
@@ -103844,475 +105398,475 @@
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 19,
+        "line": 18,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap(); // unwrap"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
+        "line": 25,
+        "kind": "unwrap",
+        "code": ".unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
         "line": 26,
         "kind": "unwrap",
-        "code": ".unwrap(); // unwrap"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 27,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 50,
+        "line": 49,
         "kind": "assert",
         "code": "assert!(matches!(res_try_new, Err(ContextraError::InvalidInput(_))));"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 54,
+        "line": 53,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 76,
+        "line": 75,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 95,
+        "line": 94,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 113,
+        "line": 112,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 122,
+        "line": 121,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 129,
+        "line": 128,
         "kind": "unwrap",
         "code": ".unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 130,
+        "line": 129,
         "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 140,
+        "line": 139,
         "kind": "unwrap",
         "code": ".unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 152,
+        "line": 151,
         "kind": "assert",
         "code": "assert!(matches!(res, Err(ContextraError::NotFound(_))));"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 194,
+        "line": 193,
         "kind": "assert",
         "code": "assert!(res.is_ok());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 202,
+        "line": 201,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
+        "line": 208,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
         "line": 209,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 210,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 221,
+        "line": 220,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 224,
+        "line": 223,
         "kind": "unwrap",
         "code": "let tx = db.allocate_tx().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 227,
+        "line": 226,
         "kind": "unwrap",
         "code": ".put(tx, &comm_key, &serde_json::to_vec(&100u64).unwrap())"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 229,
+        "line": 228,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 230,
+        "line": 229,
         "kind": "unwrap",
         "code": "db.inner_storage().commit(tx).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 258,
+        "line": 257,
         "kind": "unwrap",
         "code": "let res = h.await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 259,
+        "line": 258,
         "kind": "assert",
         "code": "assert!(res.is_ok(), \"route() failed in parallel task: {:?}\", res);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 266,
+        "line": 265,
         "kind": "assert",
         "code": "assert_eq!(st.times_selected, 100);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 267,
+        "line": 266,
         "kind": "assert",
         "code": "assert_eq!(st.conformal.window_total, 100);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 272,
+        "line": 271,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 285,
+        "line": 284,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
+        "line": 291,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
         "line": 292,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 293,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 301,
+        "line": 300,
         "kind": "assert",
         "code": "assert_eq!(cal[\"p1\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 317,
+        "line": 316,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p1\"].times_selected, 10);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 318,
+        "line": 317,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p2\"].times_selected, 20);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 321,
+        "line": 320,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p1\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 322,
+        "line": 321,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p2\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 329,
+        "line": 328,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
+      },
+      {
+        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
+        "line": 335,
+        "kind": "unwrap",
+        "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
         "line": 336,
         "kind": "unwrap",
-        "code": ".unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 337,
-        "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 343,
+        "line": 342,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 348,
+        "line": 347,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 357,
+        "line": 356,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 367,
+        "line": 366,
         "kind": "unwrap",
         "code": "std::fs::write(&cal_path, serde_json::to_vec(&initial_map).unwrap()).unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 375,
+        "line": 374,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 376,
+        "line": 375,
         "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 380,
+        "line": 379,
         "kind": "assert",
         "code": "assert_eq!(stats[\"p1\"].times_selected, 42);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 383,
+        "line": 382,
         "kind": "assert",
         "code": "assert_eq!(count, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 431,
+        "line": 430,
         "kind": "expect",
         "code": "let decision = last_decision.expect(\"decision present\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 432,
+        "line": 431,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 436,
+        "line": 435,
         "kind": "unwrap",
         "code": "let status = decision.drift_status.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 437,
+        "line": 436,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 468,
+        "line": 467,
         "kind": "assert",
         "code": "assert!(try_new_res.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 480,
+        "line": 479,
         "kind": "assert",
         "code": "assert!(try_update_res.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 507,
+        "line": 506,
         "kind": "assert",
         "code": "assert!(router.drift_status(\"nonexistent\").is_none());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 508,
+        "line": 507,
         "kind": "assert",
         "code": "assert!(!router.set_lyapunov_baseline(\"nonexistent\", &[0.1, 0.2]));"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 509,
+        "line": 508,
         "kind": "assert",
         "code": "assert!(router.set_lyapunov_baseline(\"p1\", &[0.1, 0.2]));"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 511,
+        "line": 510,
         "kind": "assert",
         "code": "assert_eq!(router.pending_decision_count(), 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 514,
+        "line": 513,
         "kind": "assert",
         "code": "assert_eq!(router.calibration_stats()[\"p1\"].times_selected, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 559,
+        "line": 558,
         "kind": "assert",
         "code": "assert!(err_empty_chunks.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 573,
+        "line": 572,
         "kind": "assert",
         "code": "assert!(err_nan_chunks.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 587,
+        "line": 586,
         "kind": "assert",
         "code": "assert!(err_empty_profiles.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 592,
+        "line": 591,
         "kind": "assert",
         "code": "assert!(err_no_comm.is_err());"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 606,
+        "line": 605,
         "kind": "assert",
         "code": "assert_eq!(fallback_p.name, \"p2\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 607,
+        "line": 606,
         "kind": "assert",
         "code": "assert_eq!(fallback_idx, 1);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 608,
+        "line": 607,
         "kind": "assert",
         "code": "assert!(!metrics.calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 643,
+        "line": 642,
         "kind": "assert",
         "code": "assert_eq!(router.profiles().len(), 1);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 659,
+        "line": 658,
         "kind": "assert",
         "code": "assert!(router.pending_decision_count() > crate::router::MAX_PENDING_DECISIONS);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 662,
+        "line": 661,
         "kind": "assert",
         "code": "assert!(router.pending_decision_count() <= crate::router::MAX_PENDING_DECISIONS);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 670,
+        "line": 669,
         "kind": "assert",
         "code": "assert!(router.record_outcome(dec_id, crate::RoutingOutcome::Success));"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 697,
+        "line": 696,
         "kind": "assert",
         "code": "assert_eq!(idx, 0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 698,
+        "line": 697,
         "kind": "assert",
         "code": "assert_eq!(prof.name, \"p_zero\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 699,
+        "line": 698,
         "kind": "assert",
         "code": "assert_eq!(metrics.selection_margin, 1.0);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 708,
+        "line": 707,
         "kind": "unwrap",
         "code": "let dir = tempfile::tempdir().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 715,
+        "line": 714,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 716,
+        "line": 715,
         "kind": "unwrap",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 726,
+        "line": 725,
         "kind": "unwrap",
         "code": ".unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 765,
+        "line": 764,
         "kind": "expect",
         "code": ".expect(\"routing during warmup succeeds\");"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 767,
+        "line": 766,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 771,
+        "line": 770,
         "kind": "unwrap",
         "code": "assert!(!decision.confidence.as_ref().unwrap().calibrated);"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 771,
+        "line": 770,
         "kind": "assert",
         "code": "assert!(!decision.confidence.as_ref().unwrap().calibrated);"
       },
@@ -105305,181 +106859,199 @@
   {
     "crate": "contextra-simd",
     "path": "/app/crates/contextra-simd",
-    "total_files": 14,
-    "prod_files": 7,
+    "total_files": 16,
+    "prod_files": 9,
     "findings_prod": [],
     "findings_test": [
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 886,
+        "line": 860,
         "kind": "assert",
         "code": "assert_eq!(get_dispatch_override(), None);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 888,
+        "line": 862,
         "kind": "assert",
         "code": "assert_eq!(get_dispatch_override(), Some(SimdPathOverride::Scalar));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 891,
+        "line": 865,
         "kind": "assert",
         "code": "assert_eq!(get_dispatch_override(), Some(SimdPathOverride::Avx2));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 894,
+        "line": 868,
         "kind": "assert",
         "code": "assert_eq!(get_dispatch_override(), None);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 906,
+        "line": 880,
         "kind": "assert",
         "code": "assert!((0.0..=2.0).contains(&res));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 919,
+        "line": 893,
         "kind": "assert",
         "code": "assert_eq!(res, 5.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 932,
+        "line": 906,
         "kind": "assert",
         "code": "assert_eq!(res, -32.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 949,
+        "line": 923,
         "kind": "assert",
         "code": "assert!(cos >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 950,
+        "line": 924,
         "kind": "assert",
         "code": "assert!(euc >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 951,
+        "line": 925,
         "kind": "assert",
         "code": "assert_eq!(dot, -40.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 967,
+        "line": 941,
         "kind": "assert",
         "code": "assert_eq!(dot, 10 * 5 + 20 * 15 + 30 * 25 + 40 * 35);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 968,
+        "line": 942,
         "kind": "assert",
         "code": "assert_eq!(euc_sq, 25 + 25 + 25 + 25);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 969,
+        "line": 943,
         "kind": "assert",
         "code": "assert_eq!(parts.dot, dot);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 987,
+        "line": 961,
         "kind": "assert",
         "code": "assert!(cos >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 988,
+        "line": 962,
         "kind": "assert",
         "code": "assert!(euc >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 989,
+        "line": 963,
         "kind": "assert",
         "code": "assert_eq!(dot_bytes, -40.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1006,
+        "line": 980,
         "kind": "assert",
-        "code": "assert!(matches!(res, Err(ContextraError::InvalidInput(_))));"
+        "code": "assert!(matches!(res, Err(SimdError::InvalidInput(_))));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1009,
+        "line": 983,
         "kind": "assert",
-        "code": "assert!(matches!(euc_res, Err(ContextraError::InvalidInput(_))));"
+        "code": "assert!(matches!(euc_res, Err(SimdError::InvalidInput(_))));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1012,
+        "line": 986,
         "kind": "assert",
-        "code": "assert!(matches!(dot_res, Err(ContextraError::InvalidInput(_))));"
+        "code": "assert!(matches!(dot_res, Err(SimdError::InvalidInput(_))));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1024,
+        "line": 998,
         "kind": "assert",
-        "code": "assert!(matches!(res, Err(ContextraError::InvalidInput(_))));"
+        "code": "assert!(matches!(res, Err(SimdError::InvalidInput(_))));"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1045,
+        "line": 1019,
         "kind": "assert",
         "code": "assert_eq!(initial_cos.to_bits(), cos.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1046,
+        "line": 1020,
         "kind": "assert",
         "code": "assert_eq!(initial_euc.to_bits(), euc.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1047,
+        "line": 1021,
         "kind": "assert",
         "code": "assert_eq!(initial_dot.to_bits(), dot.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1067,
+        "line": 1041,
         "kind": "assert",
         "code": "assert!(cos >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1068,
+        "line": 1042,
         "kind": "assert",
         "code": "assert!(euc >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1069,
+        "line": 1043,
         "kind": "assert",
         "code": "assert!(dot <= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1089,
+        "line": 1063,
         "kind": "assert",
         "code": "assert!(cos >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1090,
+        "line": 1064,
         "kind": "assert",
         "code": "assert!(euc >= 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1091,
+        "line": 1065,
+        "kind": "assert",
+        "code": "assert!(dot <= 0.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/src/dispatch.rs",
+        "line": 1085,
+        "kind": "assert",
+        "code": "assert!(cos >= 0.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/src/dispatch.rs",
+        "line": 1086,
+        "kind": "assert",
+        "code": "assert!(euc >= 0.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/src/dispatch.rs",
+        "line": 1087,
         "kind": "assert",
         "code": "assert!(dot <= 0.0);"
       },
@@ -105487,29 +107059,11 @@
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
         "line": 1111,
         "kind": "assert",
-        "code": "assert!(cos >= 0.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1112,
-        "kind": "assert",
-        "code": "assert!(euc >= 0.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1113,
-        "kind": "assert",
-        "code": "assert!(dot <= 0.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1137,
-        "kind": "assert",
         "code": "assert_eq!(default_val.to_bits(), reverted_val.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
-        "line": 1138,
+        "line": 1112,
         "kind": "assert",
         "code": "assert!((scalar_val - default_val).abs() < 1e-4);"
       },
@@ -106129,7 +107683,7 @@
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
         "line": 42,
         "kind": "assert",
-        "code": "assert!(matches!(res, Err(ContextraError::InvalidInput(_))));"
+        "code": "assert!(matches!(res, Err(SimdError::InvalidInput(_))));"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
@@ -106445,325 +107999,325 @@
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 251,
+        "line": 249,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 258,
+        "line": 254,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 266,
+        "line": 260,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 273,
+        "line": 265,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 280,
+        "line": 270,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 290,
+        "line": 278,
         "kind": "assert",
         "code": "assert!(matches!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 297,
+        "line": 283,
         "kind": "assert",
         "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
+        "line": 288,
+        "kind": "assert",
+        "code": "assert!(matches!("
+      },
+      {
+        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
+        "line": 302,
+        "kind": "unwrap",
+        "code": "assert_eq!(cosine_distance(&empty_f32, &empty_f32).unwrap(), 1.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
+        "line": 302,
+        "kind": "assert",
+        "code": "assert_eq!(cosine_distance(&empty_f32, &empty_f32).unwrap(), 1.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
+        "line": 303,
+        "kind": "unwrap",
+        "code": "assert_eq!(euclidean_distance(&empty_f32, &empty_f32).unwrap(), 0.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
+        "line": 303,
+        "kind": "assert",
+        "code": "assert_eq!(euclidean_distance(&empty_f32, &empty_f32).unwrap(), 0.0);"
+      },
+      {
+        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
+        "line": 304,
+        "kind": "unwrap",
+        "code": "assert_eq!(dot_product_distance(&empty_f32, &empty_f32).unwrap(), -0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
         "line": 304,
         "kind": "assert",
-        "code": "assert!(matches!("
-      },
-      {
-        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 320,
-        "kind": "unwrap",
-        "code": "assert_eq!(cosine_distance(&empty_f32, &empty_f32).unwrap(), 1.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 320,
-        "kind": "assert",
-        "code": "assert_eq!(cosine_distance(&empty_f32, &empty_f32).unwrap(), 1.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 321,
-        "kind": "unwrap",
-        "code": "assert_eq!(euclidean_distance(&empty_f32, &empty_f32).unwrap(), 0.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 321,
-        "kind": "assert",
-        "code": "assert_eq!(euclidean_distance(&empty_f32, &empty_f32).unwrap(), 0.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 322,
-        "kind": "unwrap",
         "code": "assert_eq!(dot_product_distance(&empty_f32, &empty_f32).unwrap(), -0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 322,
-        "kind": "assert",
-        "code": "assert_eq!(dot_product_distance(&empty_f32, &empty_f32).unwrap(), -0.0);"
-      },
-      {
-        "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 324,
+        "line": 306,
         "kind": "unwrap",
         "code": "assert_eq!(dot_product_u8(&empty_u8, &empty_u8).unwrap(), 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 324,
+        "line": 306,
         "kind": "assert",
         "code": "assert_eq!(dot_product_u8(&empty_u8, &empty_u8).unwrap(), 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 325,
+        "line": 307,
         "kind": "unwrap",
         "code": "assert_eq!(euclidean_distance_sq_u8(&empty_u8, &empty_u8).unwrap(), 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 325,
+        "line": 307,
         "kind": "assert",
         "code": "assert_eq!(euclidean_distance_sq_u8(&empty_u8, &empty_u8).unwrap(), 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 326,
+        "line": 308,
         "kind": "unwrap",
         "code": "let parts = cosine_similarity_parts_u8(&empty_u8, &empty_u8).unwrap();"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 327,
+        "line": 309,
         "kind": "assert",
         "code": "assert_eq!(parts.dot, 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 328,
+        "line": 310,
         "kind": "assert",
         "code": "assert_eq!(parts.norm_a_sq, 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 329,
+        "line": 311,
         "kind": "assert",
         "code": "assert_eq!(parts.norm_b_sq, 0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 339,
+        "line": 321,
         "kind": "unwrap",
         "code": "assert_eq!(cosine_distance(&a, &b).unwrap(), 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 339,
+        "line": 321,
         "kind": "assert",
         "code": "assert_eq!(cosine_distance(&a, &b).unwrap(), 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 340,
+        "line": 322,
         "kind": "unwrap",
         "code": "assert_eq!(euclidean_distance(&a, &b).unwrap(), 2.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 340,
+        "line": 322,
         "kind": "assert",
         "code": "assert_eq!(euclidean_distance(&a, &b).unwrap(), 2.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 341,
+        "line": 323,
         "kind": "unwrap",
         "code": "assert_eq!(dot_product_distance(&a, &b).unwrap(), -8.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 341,
+        "line": 323,
         "kind": "assert",
         "code": "assert_eq!(dot_product_distance(&a, &b).unwrap(), -8.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 350,
+        "line": 332,
         "kind": "assert",
         "code": "assert_eq!(zero_vec, vec![0.0f32; 10]);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 354,
+        "line": 336,
         "kind": "assert",
         "code": "assert_eq!(single, vec![1.0f32]);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 358,
+        "line": 340,
         "kind": "assert",
         "code": "assert_eq!(neg_single, vec![-1.0f32]);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 362,
+        "line": 344,
         "kind": "assert",
         "code": "assert!((v[0] - 0.6).abs() < 1e-6);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 363,
+        "line": 345,
         "kind": "assert",
         "code": "assert!((v[1] - 0.8).abs() < 1e-6);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 376,
+        "line": 358,
         "kind": "unwrap",
         "code": "let dot = dot_product_u8(&a, &b).unwrap();"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 378,
+        "line": 360,
         "kind": "assert",
         "code": "assert_eq!(dot, expected);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 380,
+        "line": 362,
         "kind": "unwrap",
         "code": "let parts = cosine_similarity_parts_u8(&a, &b).unwrap();"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 381,
+        "line": 363,
         "kind": "assert",
         "code": "assert_eq!(parts.dot, expected);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 382,
+        "line": 364,
         "kind": "assert",
         "code": "assert_eq!(parts.norm_a_sq, expected);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 383,
+        "line": 365,
         "kind": "assert",
         "code": "assert_eq!(parts.norm_b_sq, expected);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 396,
+        "line": 378,
         "kind": "assert",
         "code": "assert_eq!(c1.to_bits(), c2.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 400,
+        "line": 382,
         "kind": "assert",
         "code": "assert_eq!(e1.to_bits(), e2.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 404,
+        "line": 386,
         "kind": "assert",
         "code": "assert_eq!(d1.to_bits(), d2.to_bits());"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 417,
+        "line": 399,
         "kind": "assert",
         "code": "assert_eq!(parts_u8, parts_u8_copy);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 418,
+        "line": 400,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 429,
+        "line": 411,
         "kind": "assert",
         "code": "assert_eq!(parts_f32_u8, parts_f32_u8_copy);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 430,
+        "line": 412,
         "kind": "assert",
         "code": "assert_eq!("
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 442,
+        "line": 424,
         "kind": "assert",
         "code": "assert_eq!(cosine_distance_scalar(&empty_f32, &empty_f32), 1.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 443,
+        "line": 425,
         "kind": "assert",
         "code": "assert_eq!(euclidean_distance_scalar(&empty_f32, &empty_f32), 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 444,
+        "line": 426,
         "kind": "assert",
         "code": "assert_eq!(dot_product_scalar(&empty_f32, &empty_f32), -0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 448,
+        "line": 430,
         "kind": "assert",
         "code": "assert_eq!(cosine_distance_scalar(&single_a, &single_b), 0.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 449,
+        "line": 431,
         "kind": "assert",
         "code": "assert_eq!(euclidean_distance_scalar(&single_a, &single_b), 1.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 450,
+        "line": 432,
         "kind": "assert",
         "code": "assert_eq!(dot_product_scalar(&single_a, &single_b), -12.0);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 454,
+        "line": 436,
         "kind": "assert",
         "code": "assert_eq!(dot_product_u8_scalar(&single_u8_a, &single_u8_b), 50);"
       },
       {
         "file": "/app/crates/contextra-simd/tests/edge_cases_tests.rs",
-        "line": 455,
+        "line": 437,
         "kind": "assert",
         "code": "assert_eq!("
       },
@@ -150068,8 +151622,8 @@
   {
     "crate": "contextra-vector",
     "path": "/app/crates/contextra-vector",
-    "total_files": 109,
-    "prod_files": 47,
+    "total_files": 110,
+    "prod_files": 48,
     "findings_prod": [
       {
         "file": "/app/crates/contextra-vector/src/diskann/build.rs",
@@ -150237,225 +151791,93 @@
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 44,
+        "line": 65,
         "kind": "unwrap",
         "code": "let dist_trusted = compute_distance_trusted(&query, &target, metric).unwrap();"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 46,
+        "line": 67,
         "kind": "unwrap",
         "code": "compute_distance_f32_bytes_trusted(&query, &target_bytes, metric).unwrap();"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 49,
+        "line": 70,
         "kind": "assert",
         "code": "assert!("
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 63,
+        "line": 84,
         "kind": "expect",
         "code": "let cos = compute_distance(&v1, &v2, DistanceMetric::Cosine).expect(\"cosine\");"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 64,
+        "line": 85,
         "kind": "assert",
         "code": "assert!((cos - 1.0).abs() < 1e-5);"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 66,
+        "line": 87,
         "kind": "expect",
         "code": "let euc = compute_distance(&v1, &v2, DistanceMetric::Euclidean).expect(\"euclidean\");"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 67,
+        "line": 88,
         "kind": "assert",
         "code": "assert!((euc - 2.0_f32.sqrt()).abs() < 1e-5);"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 69,
+        "line": 90,
         "kind": "expect",
         "code": "let dot = compute_distance(&v1, &v2, DistanceMetric::DotProduct).expect(\"dot\");"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 70,
+        "line": 91,
         "kind": "assert",
         "code": "assert_eq!(dot, 0.0);"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 79,
+        "line": 100,
         "kind": "expect",
         "code": "let d = compute_distance(&a, &b, DistanceMetric::DotProduct).expect(\"test\");"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 81,
+        "line": 102,
         "kind": "assert",
         "code": "assert!((dot_scalar - dot_simd).abs() < 1e-3);"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 84,
+        "line": 105,
         "kind": "expect",
         "code": "let euc_simd = compute_distance(&a, &b, DistanceMetric::Euclidean).expect(\"test\");"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 85,
+        "line": 106,
         "kind": "assert",
         "code": "assert!((euc_scalar - euc_simd).abs() < 1e-3);"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 88,
+        "line": 109,
         "kind": "expect",
         "code": "let cos_simd = compute_distance(&a, &b, DistanceMetric::Cosine).expect(\"test\");"
       },
       {
         "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 89,
-        "kind": "assert",
-        "code": "assert!((cos_scalar - cos_simd).abs() < 1e-3);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 101,
-        "kind": "unwrap",
-        "code": "let dot_dispatch = dot_product_u8(&a, &b).unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 102,
-        "kind": "assert",
-        "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 109,
-        "kind": "unwrap",
-        "code": "let euc_sq_dispatch = euclidean_distance_sq_u8(&a, &b).unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
         "line": 110,
         "kind": "assert",
-        "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 117,
-        "kind": "unwrap",
-        "code": "let parts_dispatch = cosine_similarity_parts_u8(&a, &b).unwrap();"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 118,
-        "kind": "assert",
-        "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 122,
-        "kind": "assert",
-        "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 126,
-        "kind": "assert",
-        "code": "assert_eq!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 137,
-        "kind": "assert",
-        "code": "assert!(dot_product_u8(&a, &b).is_err());"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 138,
-        "kind": "assert",
-        "code": "assert!(euclidean_distance_sq_u8(&a, &b).is_err());"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 139,
-        "kind": "assert",
-        "code": "assert!(cosine_similarity_parts_u8(&a, &b).is_err());"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 157,
-        "kind": "assert",
-        "code": "assert!((dist_sq - expected).abs() < 1e-5);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 164,
-        "kind": "assert",
-        "code": "assert!((dot - expected_dot).abs() < 1e-5);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 172,
-        "kind": "assert",
-        "code": "assert!(matches!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 188,
-        "kind": "assert",
-        "code": "assert!(matches!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 204,
-        "kind": "assert",
-        "code": "assert!(matches!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 220,
-        "kind": "assert",
-        "code": "assert!(matches!("
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 235,
-        "kind": "assert",
-        "code": "assert_eq!(zero_vec, vec![0.0, 0.0, 0.0]);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 239,
-        "kind": "assert",
-        "code": "assert_eq!(single_vec, vec![1.0]);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 243,
-        "kind": "assert",
-        "code": "assert!((vec_34[0] - 0.6).abs() < 1e-6);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 244,
-        "kind": "assert",
-        "code": "assert!((vec_34[1] - 0.8).abs() < 1e-6);"
-      },
-      {
-        "file": "/app/crates/contextra-vector/src/distance.rs",
-        "line": 247,
-        "kind": "assert",
-        "code": "assert!((norm_sq - 1.0).abs() < 1e-6);"
+        "code": "assert!((cos_scalar - cos_simd).abs() < 1e-3);"
       },
       {
         "file": "/app/crates/contextra-vector/src/compute_pool.rs",
@@ -159820,7 +161242,7 @@
       "prod_unimplemented": 0,
       "prod_unreachable": 0,
       "prod_assert": 6,
-      "test_panics": 1607
+      "test_panics": 1585
     }
   },
   {
@@ -159837,97 +161259,97 @@
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 143,
+        "line": 142,
         "kind": "unwrap",
         "code": "unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 338,
+        "line": 336,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 572,
+        "line": 569,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 586,
+        "line": 583,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 961,
+        "line": 956,
         "kind": "unwrap",
         "code": "unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1083,
+        "line": 1077,
         "kind": "unwrap",
         "code": "unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1211,
+        "line": 1204,
         "kind": "unwrap",
         "code": "unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1224,
+        "line": 1217,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1399,
+        "line": 1391,
         "kind": "unwrap",
         "code": "unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1412,
+        "line": 1404,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1443,
+        "line": 1435,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1457,
+        "line": 1449,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1471,
+        "line": 1463,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1485,
+        "line": 1477,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1499,
+        "line": 1491,
         "kind": "unwrap",
         "code": ".unwrap()"
       },
       {
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
-        "line": 1513,
+        "line": 1505,
         "kind": "unwrap",
         "code": ".unwrap()"
       }

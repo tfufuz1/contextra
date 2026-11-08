@@ -1,8 +1,8 @@
 # Typen-Register & Kollisions-Audit (K3 / A2)
 
 > Generiert durch `tools/type_registry_sync.py`.
-> Einzigartige Typnamen: 1529 | Gesamte Definitionen: 1723
-> Erkannte typografische Crate-Übergreifende Kollisionen: **133**
+> Einzigartige Typnamen: 1532 | Gesamte Definitionen: 1751
+> Erkannte typografische Crate-Übergreifende Kollisionen: **155**
 
 ## Crate Typen-Statistik
 
@@ -19,7 +19,7 @@
 | `contextra-db` | 19 |
 | `contextra-durable-fs` | 19 |
 | `contextra-engine` | 101 |
-| `contextra-erasure` | 183 |
+| `contextra-erasure` | 197 |
 | `contextra-graph` | 116 |
 | `contextra-infer-candle` | 37 |
 | `contextra-infer-ollama` | 38 |
@@ -32,16 +32,16 @@
 | `contextra-ports` | 150 |
 | `contextra-privacy` | 51 |
 | `contextra-py` | 8 |
-| `contextra-rank` | 37 |
+| `contextra-rank` | 47 |
 | `contextra-router` | 26 |
 | `contextra-sandbox` | 16 |
-| `contextra-simd` | 6 |
+| `contextra-simd` | 9 |
 | `contextra-store` | 111 |
 | `contextra-sys` | 9 |
 | `contextra-testkit` | 27 |
 | `contextra-text` | 44 |
 | `contextra-types` | 96 |
-| `contextra-vector` | 66 |
+| `contextra-vector` | 67 |
 | `contextra-wire` | 49 |
 
 ## Kollisionen über Crate-Grenzen (Identische Typnamen)
@@ -60,14 +60,23 @@
 | `CompactionPermit` | `contextra-erasure`, `contextra-ports` | 2 |
 | `CompactionStrategy` | `contextra-cognition`, `contextra-store` | 2 |
 | `Confidence` | `contextra-infer-ollama`, `contextra-ingest` | 2 |
+| `ConfigFingerprint` | `contextra-rank`, `contextra-types` | 2 |
 | `ConformalCalibrator` | `contextra-rank`, `contextra-router` | 2 |
 | `ConsolidationNodesGuard` | `contextra-cognition`, `contextra-graph` | 2 |
+| `ContextChunk` | `contextra-rank`, `contextra-types` | 2 |
 | `ContextEditAuditRecord` | `contextra-agent`, `contextra-privacy` | 2 |
 | `ControlEvidence` | `contextra-erasure`, `contextra-types` | 2 |
+| `CustodyLevel` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `DecayControllerConfig` | `contextra-adapt`, `contextra-engine` | 2 |
 | `DecaySignalInputs` | `contextra-adapt`, `contextra-engine` | 2 |
 | `Dek` | `contextra-crypto`, `contextra-erasure` | 2 |
+| `DeletionLayer` | `contextra-crypto`, `contextra-erasure` | 2 |
+| `DeletionProof` | `contextra-crypto`, `contextra-erasure` | 2 |
+| `DeletionProofKeyPair` | `contextra-crypto`, `contextra-erasure` | 2 |
+| `DeletionScope` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `DirLock` | `contextra-durable-fs`, `contextra-store` | 2 |
+| `DistanceMetric` | `contextra-simd`, `contextra-types` | 2 |
+| `DocId` | `contextra-rank`, `contextra-types` | 3 |
 | `DriftDetector` | `contextra-adapt`, `contextra-rank` | 2 |
 | `DurabilityConfigError` | `contextra`, `contextra-store` | 2 |
 | `DurabilityMode` | `contextra`, `contextra-store` | 2 |
@@ -89,13 +98,17 @@
 | `Error` | `contextra-crypto`, `contextra-engine`, `contextra-rank`, `contextra-types` | 4 |
 | `EvictionCommand` | `contextra-crypto`, `contextra-kvcache` | 2 |
 | `EvictionWorker` | `contextra-crypto`, `contextra-kvcache` | 2 |
+| `ExcludedScope` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `FileId` | `contextra-erasure`, `contextra-ports`, `contextra-types` | 3 |
 | `FileKey` | `contextra-erasure`, `contextra-ports` | 2 |
 | `FileKeyring` | `contextra-erasure`, `contextra-ports` | 2 |
 | `FileKind` | `contextra-erasure`, `contextra-ports` | 2 |
 | `FixedTestClock` | `contextra-mcp`, `contextra-privacy`, `contextra-rank` | 3 |
+| `FusionStrategy` | `contextra-rank`, `contextra-types` | 2 |
+| `FusionWeights` | `contextra-rank`, `contextra-types` | 2 |
 | `FuzzInput` | `contextra-graph`, `contextra-mcp`, `contextra-store` | 4 |
 | `GateDecision` | `contextra-erasure`, `contextra-ports` | 2 |
+| `GraphRepairAttestation` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `HeapItem` | `contextra-graph`, `contextra-store` | 2 |
 | `HybridQueryBuilder` | `contextra-engine`, `contextra-types` | 2 |
 | `HyperEdge` | `contextra-graph`, `contextra-wire` | 2 |
@@ -108,14 +121,18 @@
 | `KvDeleteMode` | `contextra`, `contextra-store` | 2 |
 | `KvSegment` | `contextra-crypto`, `contextra-kvcache` | 2 |
 | `LatencyBudgetGuard` | `contextra-adapt`, `contextra-db` | 2 |
+| `LayerCleanupProof` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `LayerId` | `contextra-erasure`, `contextra-ports`, `contextra-types` | 3 |
 | `LayerScope` | `contextra-erasure`, `contextra-ports` | 2 |
 | `LayerWitness` | `contextra-erasure`, `contextra-ports`, `contextra-types` | 4 |
+| `LayerWitnessExt` | `contextra-crypto`, `contextra-erasure` | 2 |
+| `LayerWitnessMeasurement` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `LedgerEntry` | `contextra-erasure`, `contextra-ports` | 3 |
 | `LedgerSink` | `contextra-erasure`, `contextra-ports` | 2 |
 | `LineInfo` | `contextra-engine`, `contextra-ingest` | 2 |
 | `LoomMetadata` | `contextra-checkpoint`, `contextra-store` | 2 |
 | `MeasureClass` | `contextra-erasure`, `contextra-types` | 2 |
+| `MemoryLink` | `contextra-rank`, `contextra-types` | 2 |
 | `Meta` | `contextra-checkpoint`, `contextra-ports` | 2 |
 | `MockEmbedder` | `contextra-kvcache`, `contextra-mcp`, `contextra-testkit` | 5 |
 | `MockLlmGenerator` | `contextra-cognition`, `contextra-engine`, `contextra-mcp` | 4 |
@@ -141,11 +158,12 @@
 | `RerankPidController` | `contextra-adapt`, `contextra-db` | 2 |
 | `Residue` | `contextra-erasure`, `contextra-types` | 2 |
 | `ResourceBudget` | `contextra-ingest`, `contextra-types` | 2 |
-| `Result` | `contextra-crypto`, `contextra-mcp`, `contextra-types` | 3 |
+| `Result` | `contextra-crypto`, `contextra-mcp`, `contextra-rank`, `contextra-simd`, `contextra-types` | 5 |
 | `RetentionAttestation` | `contextra-erasure`, `contextra-types` | 2 |
 | `RetentionCode` | `contextra-erasure`, `contextra-types` | 2 |
 | `RoleBinding` | `contextra-ports`, `contextra-wire` | 2 |
 | `RoleId` | `contextra-ports`, `contextra-wire` | 2 |
+| `ScanTechniqueSerde` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `Scanner` | `contextra-erasure`, `contextra-ports`, `contextra-types` | 3 |
 | `ScoredDocument` | `contextra-types`, `contextra-wire` | 2 |
 | `ScrubOutcome` | `contextra-durable-fs`, `contextra-erasure` | 2 |
@@ -156,8 +174,10 @@
 | `ShadowSink` | `contextra-adapt`, `contextra-graph` | 2 |
 | `Shard` | `contextra-crypto`, `contextra-kvcache` | 2 |
 | `Signal` | `contextra-rank`, `contextra-types` | 2 |
+| `SignalFusionStrategies` | `contextra-rank`, `contextra-types` | 2 |
 | `SignerError` | `contextra-erasure`, `contextra-ports` | 2 |
 | `SignerId` | `contextra-erasure`, `contextra-ports` | 2 |
+| `SigningKeyHandle` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `SimpleRng` | `contextra-graph`, `contextra-router` | 2 |
 | `SpillHandler` | `contextra-crypto`, `contextra-kvcache` | 2 |
 | `SplitMix64` | `contextra-adapt`, `contextra-cognition` | 2 |
@@ -175,8 +195,10 @@
 | `Timing` | `contextra-erasure`, `contextra-types` | 2 |
 | `TlHfdParams` | `contextra-graph`, `contextra-types` | 2 |
 | `Unarmed` | `contextra-erasure`, `contextra-types` | 2 |
+| `UncoveredLayer` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `UnitKey` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `Value` | `contextra-ingest`, `contextra-ports` | 4 |
+| `VerificationKey` | `contextra-crypto`, `contextra-erasure` | 2 |
 | `VerifiedVia` | `contextra-erasure`, `contextra-ports` | 4 |
 | `VfsFile` | `contextra-erasure`, `contextra-ports` | 2 |
 | `VfsOpenOptions` | `contextra-erasure`, `contextra-ports` | 2 |
@@ -233,6 +255,10 @@
 
 - `contextra-ingest`: `/app/crates/contextra-ingest/src/detect/mod.rs:26` -> `pub enum Confidence`
 - `contextra-infer-ollama`: `/app/crates/contextra-infer-ollama/src/importance.rs:94` -> `pub enum Confidence`
+### `ConfigFingerprint`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:23` -> `pub struct ConfigFingerprint`
+- `contextra-types`: `/app/crates/contextra-types/src/types/domain/misc.rs:507` -> `pub struct ConfigFingerprint`
 ### `ConformalCalibrator`
 
 - `contextra-rank`: `/app/crates/contextra-rank/src/calibration/conformal.rs:40` -> `pub trait ConformalCalibrator`
@@ -241,6 +267,10 @@
 
 - `contextra-graph`: `/app/crates/contextra-graph/src/hyperedge.rs:312` -> `pub struct ConsolidationNodesGuard`
 - `contextra-cognition`: `/app/crates/contextra-cognition/src/consolidation_locks.rs:45` -> `pub struct ConsolidationNodesGuard`
+### `ContextChunk`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:43` -> `pub struct ContextChunk`
+- `contextra-types`: `/app/crates/contextra-types/src/types/saos.rs:230` -> `pub struct ContextChunk`
 ### `ContextEditAuditRecord`
 
 - `contextra-privacy`: `/app/crates/contextra-privacy/src/context_edit_audit.rs:69` -> `pub struct ContextEditAuditRecord`
@@ -249,6 +279,10 @@
 
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/types_local.rs:728` -> `pub struct ControlEvidence`
 - `contextra-types`: `/app/crates/contextra-types/src/erasure.rs:442` -> `pub struct ControlEvidence`
+### `CustodyLevel`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:150` -> `pub enum CustodyLevel`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:97` -> `pub enum CustodyLevel`
 ### `DecayControllerConfig`
 
 - `contextra-adapt`: `/app/crates/contextra-adapt/src/decay_controller.rs:46` -> `pub struct DecayControllerConfig`
@@ -261,10 +295,35 @@
 
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/crypto_local.rs:39` -> `pub struct Dek`
 - `contextra-crypto`: `/app/crates/contextra-crypto/src/dek.rs:16` -> `pub struct Dek`
+### `DeletionLayer`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:295` -> `pub enum DeletionLayer`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:190` -> `pub enum DeletionLayer`
+### `DeletionProof`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:425` -> `pub struct DeletionProof`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:321` -> `pub struct DeletionProof`
+### `DeletionProofKeyPair`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:120` -> `pub struct DeletionProofKeyPair`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/ed25519_proof.rs:47` -> `pub struct DeletionProofKeyPair`
+### `DeletionScope`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:400` -> `pub enum DeletionScope`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:295` -> `pub enum DeletionScope`
 ### `DirLock`
 
 - `contextra-store`: `/app/crates/contextra-store/src/util.rs:24` -> `pub struct DirLock`
 - `contextra-durable-fs`: `/app/crates/contextra-durable-fs/src/lib.rs:323` -> `pub struct DirLock`
+### `DistanceMetric`
+
+- `contextra-simd`: `/app/crates/contextra-simd/src/metric.rs:5` -> `pub enum DistanceMetric`
+- `contextra-types`: `/app/crates/contextra-types/src/types/domain/document.rs:20` -> `pub enum DistanceMetric`
+### `DocId`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:8` -> `pub struct DocId`
+- `contextra-types`: `/app/crates/contextra-types/src/types/domain/ids.rs:173` -> `pub struct DocId`
+- `contextra-types`: `/app/crates/contextra-types/src/types/domain/ids.rs:180` -> `pub struct DocId`
 ### `DriftDetector`
 
 - `contextra-rank`: `/app/crates/contextra-rank/src/drift.rs:61` -> `pub struct DriftDetector`
@@ -279,7 +338,7 @@
 - `contextra`: `/app/crates/contextra/src/performance_profile.rs:37` -> `pub enum DurabilityMode`
 ### `Embedding`
 
-- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:52` -> `pub struct Embedding`
+- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:51` -> `pub struct Embedding`
 - `contextra-types`: `/app/crates/contextra-types/src/types/domain/document.rs:174` -> `pub struct Embedding`
 ### `EncryptedSegmentPayload`
 
@@ -352,6 +411,10 @@
 
 - `contextra-crypto`: `/app/crates/contextra-crypto/src/kv_segment/eviction_worker.rs:40` -> `pub struct EvictionWorker`
 - `contextra-kvcache`: `/app/crates/contextra-kvcache/src/eviction_worker.rs:85` -> `pub struct EvictionWorker`
+### `ExcludedScope`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:391` -> `pub enum ExcludedScope`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:286` -> `pub enum ExcludedScope`
 ### `FileId`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/keys.rs:12` -> `pub struct FileId`
@@ -374,6 +437,14 @@
 - `contextra-rank`: `/app/crates/contextra-rank/src/calibration/isotonic.rs:332` -> `struct FixedTestClock`
 - `contextra-privacy`: `/app/crates/contextra-privacy/src/context_edit_audit.rs:281` -> `struct FixedTestClock`
 - `contextra-mcp`: `/app/crates/contextra-mcp/src/prompt_injection/tests.rs:353` -> `struct FixedTestClock`
+### `FusionStrategy`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:30` -> `pub enum FusionStrategy`
+- `contextra-types`: `/app/crates/contextra-types/src/types/saos.rs:30` -> `pub enum FusionStrategy`
+### `FusionWeights`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:62` -> `pub struct FusionWeights`
+- `contextra-types`: `/app/crates/contextra-types/src/types/saos.rs:152` -> `pub struct FusionWeights`
 ### `FuzzInput`
 
 - `contextra-store`: `/app/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:42` -> `enum FuzzInput`
@@ -384,6 +455,10 @@
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/gate.rs:104` -> `pub enum GateDecision`
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/types_local.rs:205` -> `pub enum GateDecision`
+### `GraphRepairAttestation`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:92` -> `pub struct GraphRepairAttestation`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:76` -> `pub struct GraphRepairAttestation`
 ### `HeapItem`
 
 - `contextra-store`: `/app/crates/contextra-store/src/compaction/engine.rs:455` -> `struct HeapItem`
@@ -394,12 +469,12 @@
 - `contextra-types`: `/app/crates/contextra-types/src/types/saos.rs:491` -> `pub struct HybridQueryBuilder`
 ### `HyperEdge`
 
-- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:1312` -> `pub struct HyperEdge`
+- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:1304` -> `pub struct HyperEdge`
 - `contextra-graph`: `/app/crates/contextra-graph/src/hyperedge.rs:44` -> `pub struct HyperEdge`
 ### `HyperEdgeId`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/graph.rs:63` -> `pub struct HyperEdgeId`
-- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:1036` -> `pub struct HyperEdgeId`
+- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:1030` -> `pub struct HyperEdgeId`
 ### `InMemoryStorageEngine`
 
 - `contextra-store`: `/app/crates/contextra-store/src/engine/memory_only.rs:32` -> `pub struct InMemoryStorageEngine`
@@ -433,6 +508,10 @@
 
 - `contextra-db`: `/app/crates/contextra-db/src/pid_latency_controller.rs:88` -> `pub struct LatencyBudgetGuard`
 - `contextra-adapt`: `/app/crates/contextra-adapt/src/pid_latency_controller.rs:151` -> `pub struct LatencyBudgetGuard`
+### `LayerCleanupProof`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:224` -> `pub struct LayerCleanupProof`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:168` -> `pub struct LayerCleanupProof`
 ### `LayerId`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/erasure.rs:13` -> `pub struct LayerId`
@@ -448,6 +527,14 @@
 - `contextra-ports`: `/app/crates/contextra-ports/src/scanner/witness.rs:17` -> `pub struct LayerWitness`
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/types_local.rs:944` -> `pub struct LayerWitness`
 - `contextra-types`: `/app/crates/contextra-types/src/erasure.rs:555` -> `pub struct LayerWitness`
+### `LayerWitnessExt`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:35` -> `pub trait LayerWitnessExt`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:19` -> `pub trait LayerWitnessExt`
+### `LayerWitnessMeasurement`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:373` -> `pub struct LayerWitnessMeasurement`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:268` -> `pub struct LayerWitnessMeasurement`
 ### `LedgerEntry`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/ledger.rs:59` -> `pub struct LedgerEntry`
@@ -469,6 +556,10 @@
 
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/types_local.rs:709` -> `pub enum MeasureClass`
 - `contextra-types`: `/app/crates/contextra-types/src/erasure.rs:297` -> `pub enum MeasureClass`
+### `MemoryLink`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:51` -> `pub struct MemoryLink`
+- `contextra-types`: `/app/crates/contextra-types/src/types/domain/misc.rs:109` -> `pub struct MemoryLink`
 ### `Meta`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/checkpoint.rs:28` -> `type_alias Meta`
@@ -582,6 +673,8 @@
 - `contextra-types`: `/app/crates/contextra-types/src/types/budget.rs:341` -> `pub struct ResourceBudget`
 ### `Result`
 
+- `contextra-simd`: `/app/crates/contextra-simd/src/error.rs:18` -> `pub type_alias Result`
+- `contextra-rank`: `/app/crates/contextra-rank/src/error.rs:18` -> `pub type_alias Result`
 - `contextra-crypto`: `/app/crates/contextra-crypto/src/error.rs:16` -> `pub type_alias Result`
 - `contextra-mcp`: `/app/crates/contextra-mcp/src/sandbox.rs:12` -> `type_alias Result`
 - `contextra-types`: `/app/crates/contextra-types/src/error.rs:115` -> `pub type_alias Result`
@@ -596,11 +689,15 @@
 ### `RoleBinding`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/graph.rs:44` -> `pub struct RoleBinding`
-- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:1160` -> `pub struct RoleBinding`
+- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:1153` -> `pub struct RoleBinding`
 ### `RoleId`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/graph.rs:14` -> `pub struct RoleId`
-- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:914` -> `pub struct RoleId`
+- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:909` -> `pub struct RoleId`
+### `ScanTechniqueSerde`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:331` -> `enum ScanTechniqueSerde`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:226` -> `enum ScanTechniqueSerde`
 ### `Scanner`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/erasure.rs:156` -> `pub struct Scanner`
@@ -608,7 +705,7 @@
 - `contextra-types`: `/app/crates/contextra-types/src/erasure.rs:481` -> `pub struct Scanner`
 ### `ScoredDocument`
 
-- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:257` -> `pub struct ScoredDocument`
+- `contextra-wire`: `/app/crates/contextra-wire/src/contextra_generated.rs:255` -> `pub struct ScoredDocument`
 - `contextra-types`: `/app/crates/contextra-types/src/types/domain/document.rs:221` -> `pub struct ScoredDocument`
 ### `ScrubOutcome`
 
@@ -643,6 +740,10 @@
 
 - `contextra-rank`: `/app/crates/contextra-rank/src/fusion/types.rs:171` -> `pub enum Signal`
 - `contextra-types`: `/app/crates/contextra-types/src/types/saos.rs:319` -> `pub enum Signal`
+### `SignalFusionStrategies`
+
+- `contextra-rank`: `/app/crates/contextra-rank/src/local_types.rs:57` -> `pub struct SignalFusionStrategies`
+- `contextra-types`: `/app/crates/contextra-types/src/types/saos.rs:43` -> `pub struct SignalFusionStrategies`
 ### `SignerError`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/report_signer.rs:30` -> `pub enum SignerError`
@@ -651,9 +752,13 @@
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/report_signer.rs:15` -> `pub type_alias SignerId`
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/types_local.rs:1058` -> `pub type_alias SignerId`
+### `SigningKeyHandle`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:161` -> `pub enum SigningKeyHandle`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:108` -> `pub enum SigningKeyHandle`
 ### `SimpleRng`
 
-- `contextra-router`: `/app/crates/contextra-router/src/bandit_regret_tests.rs:19` -> `struct SimpleRng`
+- `contextra-router`: `/app/crates/contextra-router/src/bandit_regret_tests.rs:18` -> `struct SimpleRng`
 - `contextra-graph`: `/app/crates/contextra-graph/src/community.rs:151` -> `struct SimpleRng`
 ### `SpillHandler`
 
@@ -724,6 +829,10 @@
 
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/types_local.rs:720` -> `pub struct Unarmed`
 - `contextra-types`: `/app/crates/contextra-types/src/erasure.rs:427` -> `pub struct Unarmed`
+### `UncoveredLayer`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:319` -> `pub struct UncoveredLayer`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:214` -> `pub struct UncoveredLayer`
 ### `UnitKey`
 
 - `contextra-erasure`: `/app/crates/contextra-erasure/src/crypto_local.rs:43` -> `pub struct UnitKey`
@@ -734,6 +843,10 @@
 - `contextra-ports`: `/app/crates/contextra-ports/src/conformance.rs:193` -> `type_alias Value`
 - `contextra-ingest`: `/app/crates/contextra-ingest/src/formats/structured/json.rs:44` -> `type_alias Value`
 - `contextra-ingest`: `/app/crates/contextra-ingest/src/formats/structured/json.rs:55` -> `type_alias Value`
+### `VerificationKey`
+
+- `contextra-erasure`: `/app/crates/contextra-erasure/src/deletion_proof.rs:188` -> `pub enum VerificationKey`
+- `contextra-crypto`: `/app/crates/contextra-crypto/src/deletion_proof/types.rs:135` -> `pub enum VerificationKey`
 ### `VerifiedVia`
 
 - `contextra-ports`: `/app/crates/contextra-ports/src/vfs.rs:30` -> `pub enum VerifiedVia`

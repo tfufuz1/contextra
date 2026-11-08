@@ -2,13 +2,29 @@
   {
     "crate": "contextra",
     "is_permitted_fs": false,
-    "raw_fs_prod_count": 6,
+    "raw_fs_prod_count": 8,
     "swallowed_sync_count": 0,
     "total_fsync_calls": 0,
     "findings_prod": [
       {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 15,
+        "category": "raw_fs_usage",
+        "kind": "std_fs",
+        "code": "let _ = std::fs::remove_dir_all(&tmp_dir);",
+        "is_swallowed": false
+      },
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 47,
+        "category": "raw_fs_usage",
+        "kind": "std_fs",
+        "code": "let _ = std::fs::remove_dir_all(&tmp_dir);",
+        "is_swallowed": false
+      },
+      {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 187,
+        "line": 183,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&base_tmp);",
@@ -16,7 +32,7 @@
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 205,
+        "line": 201,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&base_tmp);",
@@ -24,7 +40,7 @@
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 516,
+        "line": 518,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -32,7 +48,7 @@
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 527,
+        "line": 529,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -40,7 +56,7 @@
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 537,
+        "line": 539,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -48,7 +64,7 @@
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 546,
+        "line": 548,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -58,7 +74,7 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 31,
+        "line": 34,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -66,7 +82,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 52,
+        "line": 55,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -74,7 +90,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 67,
+        "line": 70,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -82,7 +98,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 89,
+        "line": 92,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -90,7 +106,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 104,
+        "line": 107,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -98,7 +114,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 119,
+        "line": 122,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -106,7 +122,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 144,
+        "line": 147,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -114,7 +130,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 161,
+        "line": 164,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -130,7 +146,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 27,
+        "line": 28,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -138,7 +154,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 32,
+        "line": 33,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -146,7 +162,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 47,
+        "line": 48,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -154,7 +170,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 67,
+        "line": 68,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -162,7 +178,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 82,
+        "line": 83,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -170,7 +186,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 105,
+        "line": 106,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -178,7 +194,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 120,
+        "line": 121,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -186,7 +202,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 148,
+        "line": 149,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -194,7 +210,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 163,
+        "line": 164,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -202,7 +218,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 191,
+        "line": 192,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -210,7 +226,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 206,
+        "line": 207,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -218,7 +234,7 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 229,
+        "line": 230,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(&tmp_path);",
@@ -764,7 +780,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/src/vfs.rs",
-        "line": 55,
+        "line": 57,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "std::fs::read(path).map_err(|e| {",
@@ -830,7 +846,7 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 6,
+        "line": 8,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "use std::fs::File;",
@@ -838,7 +854,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 18,
+        "line": 20,
         "category": "raw_fs_usage",
         "kind": "std_file",
         "code": "let file = File::create(&file_path)?;",
@@ -846,7 +862,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 33,
+        "line": 35,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_file(file_path);",
@@ -854,7 +870,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 54,
+        "line": 56,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let read_back = std::fs::read(&file_path)?;",
@@ -862,7 +878,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 58,
+        "line": 60,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_file(file_path);",
@@ -870,7 +886,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 69,
+        "line": 71,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "std::fs::create_dir_all(&cloud_dir)?;",
@@ -878,7 +894,7 @@
       },
       {
         "file": "/app/crates/contextra-durable-fs/tests/durability_tests.rs",
-        "line": 87,
+        "line": 89,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "let _ = std::fs::remove_dir_all(parent);",
@@ -1846,7 +1862,7 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 367,
+        "line": 366,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "std::fs::write(&cal_path, serde_json::to_vec(&initial_map).unwrap()).unwrap();",
@@ -1854,7 +1870,7 @@
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 629,
+        "line": 628,
         "category": "raw_fs_usage",
         "kind": "std_fs",
         "code": "std::fs::write(&corrupt_file, b\"invalid json content\")?;",

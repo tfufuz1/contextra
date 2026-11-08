@@ -19,7 +19,7 @@
 | `contextra-db` | 51 | **4** |
 | `contextra-durable-fs` | 90 | **12** |
 | `contextra-engine` | 436 | **22** |
-| `contextra-erasure` | 653 | **66** |
+| `contextra-erasure` | 697 | **68** |
 | `contextra-graph` | 510 | **11** |
 | `contextra-infer-candle` | 170 | **8** |
 | `contextra-infer-ollama` | 110 | **3** |
@@ -32,16 +32,16 @@
 | `contextra-ports` | 447 | **33** |
 | `contextra-privacy` | 167 | **10** |
 | `contextra-py` | 72 | **1** |
-| `contextra-rank` | 173 | **13** |
+| `contextra-rank` | 184 | **14** |
 | `contextra-router` | 121 | **6** |
 | `contextra-sandbox` | 44 | **2** |
-| `contextra-simd` | 42 | **0** |
+| `contextra-simd` | 44 | **0** |
 | `contextra-store` | 531 | **32** |
 | `contextra-sys` | 44 | **0** |
 | `contextra-testkit` | 98 | **9** |
 | `contextra-text` | 233 | **7** |
 | `contextra-types` | 260 | **43** |
-| `contextra-vector` | 326 | **8** |
+| `contextra-vector` | 333 | **8** |
 | `contextra-wire` | 168 | **1** |
 
 ## Dead Code Kandidaten (Auszug)
@@ -53,10 +53,10 @@
 - `/app/crates/contextra/src/query_rewriter.rs:78` [fn `with_max_snippet_chars`]: `pub fn with_max_snippet_chars(mut self, n: usize) -> Self {`
 - `/app/crates/contextra/src/collection_profile.rs:123` [fn `validate_with_license`]: `pub fn validate_with_license(`
 - `/app/crates/contextra/src/boot.rs:17` [enum `BootPhase`]: `pub enum BootPhase {`
-- `/app/crates/contextra/src/builder.rs:227` [fn `with_embedding_backend`]: `pub fn with_embedding_backend(mut self, backend: EmbeddingBackend) -> Self {`
-- `/app/crates/contextra/src/builder.rs:253` [fn `with_license_gate`]: `pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {`
-- `/app/crates/contextra/src/builder.rs:264` [fn `with_signed_license`]: `pub fn with_signed_license(`
-- `/app/crates/contextra/src/builder.rs:294` [fn `with_performance_profile`]: `pub fn with_performance_profile(`
+- `/app/crates/contextra/src/builder.rs:228` [fn `with_embedding_backend`]: `pub fn with_embedding_backend(mut self, backend: EmbeddingBackend) -> Self {`
+- `/app/crates/contextra/src/builder.rs:254` [fn `with_license_gate`]: `pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {`
+- `/app/crates/contextra/src/builder.rs:266` [fn `with_signed_license`]: `pub fn with_signed_license(`
+- `/app/crates/contextra/src/builder.rs:297` [fn `with_performance_profile`]: `pub fn with_performance_profile(`
 - `/app/crates/contextra/src/agent_memory.rs:175` [fn `new_arc`]: `pub fn new_arc(engine: Arc<Contextra>) -> Self {`
 ### `contextra-adapt`
 
@@ -134,7 +134,7 @@
 ### `contextra-durable-fs`
 
 - `/app/crates/contextra-durable-fs/src/health.rs:109` [fn `allows_writes`]: `pub fn allows_writes(self) -> bool {`
-- `/app/crates/contextra-durable-fs/src/vfs.rs:64` [fn `write_atomic`]: `fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {`
+- `/app/crates/contextra-durable-fs/src/vfs.rs:66` [fn `write_atomic`]: `fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {`
 - `/app/crates/contextra-durable-fs/src/vfs.rs:111` [fn `list_dir`]: `fn list_dir(&self, path: &Path) -> Result<Vec<String>> {`
 - `/app/crates/contextra-durable-fs/src/vfs.rs:176` [fn `read_verified`]: `fn read_verified(&self, offset: u64, len: usize) -> std::io::Result<(Vec<u8>, VerifiedVia)> {`
 - `/app/crates/contextra-durable-fs/src/journal.rs:91` [fn `health_state`]: `pub fn health_state(&self) -> HealthState {`
@@ -172,6 +172,8 @@
 
 - `/app/crates/contextra-erasure/src/ledger.rs:67` [fn `finalize_erasure`]: `pub fn finalize_erasure(`
 - `/app/crates/contextra-erasure/src/restore.rs:26` [fn `is_replay`]: `pub fn is_replay(&self, seq: Seq) -> bool {`
+- `/app/crates/contextra-erasure/src/deletion_proof.rs:138` [fn `verifying_key_bytes`]: `pub fn verifying_key_bytes(&self) -> [u8; 32] {`
+- `/app/crates/contextra-erasure/src/deletion_proof.rs:807` [fn `create_v3_with_audit_position`]: `pub fn create_v3_with_audit_position(`
 - `/app/crates/contextra-erasure/src/journal.rs:37` [fn `open_durable`]: `pub fn open_durable(`
 - `/app/crates/contextra-erasure/src/vault.rs:68` [fn `new_in_memory_with_key`]: `pub fn new_in_memory_with_key(total_capacity: usize, mac_key: [u8; 32]) -> Self {`
 - `/app/crates/contextra-erasure/src/vault.rs:114` [fn `create_dir`]: `pub fn create_dir(`
@@ -188,16 +190,14 @@
 - `/app/crates/contextra-erasure/src/restricted.rs:143` [fn `create_entry`]: `pub fn create_entry(`
 - `/app/crates/contextra-erasure/src/restricted.rs:175` [fn `is_lifted`]: `pub fn is_lifted(&self) -> bool {`
 - `/app/crates/contextra-erasure/src/restricted.rs:185` [fn `lift`]: `pub fn lift(&mut self, _reason: &str) -> Result<(), ErasureError> {`
-- `/app/crates/contextra-erasure/src/restricted.rs:199` [fn `supersede_by_erasure`]: `pub fn supersede_by_erasure(&mut self) -> Result<(), ErasureError> {`
-- `/app/crates/contextra-erasure/src/replace.rs:88` [fn `advance_to_r2_intent`]: `pub fn advance_to_r2_intent(&mut self) -> Result<(), ErasureError> {`
-- ... und 46 weitere Kandidaten.
+- ... und 48 weitere Kandidaten.
 ### `contextra-graph`
 
 - `/app/crates/contextra-graph/src/arc_slice.rs:81` [fn `as_arc`]: `pub fn as_arc(&self) -> &Arc<[T]> {`
 - `/app/crates/contextra-graph/src/ppr_stream.rs:50` [fn `with_batch_size`]: `pub fn with_batch_size(mut self, n: usize) -> Self {`
 - `/app/crates/contextra-graph/src/ppr_stream.rs:57` [fn `with_exclude_seeds`]: `pub fn with_exclude_seeds(mut self, exclude: bool) -> Self {`
 - `/app/crates/contextra-graph/src/ppr_stream.rs:120` [fn `is_exhausted`]: `pub fn is_exhausted(&self) -> bool {`
-- `/app/crates/contextra-graph/src/provider.rs:68` [fn `add_hyperedge`]: `pub fn add_hyperedge(&mut self, hyperedge: HyperEdge) {`
+- `/app/crates/contextra-graph/src/provider.rs:100` [fn `add_hyperedge`]: `pub fn add_hyperedge(&mut self, hyperedge: HyperEdge) {`
 - `/app/crates/contextra-graph/src/cascade.rs:22` [const `DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT`]: `pub const DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT: usize = MAX_HYPEREDGE_CASCADE_FANOUT;`
 - `/app/crates/contextra-graph/src/hyperedge.rs:248` [fn `slice_participants`]: `pub fn slice_participants(`
 - `/app/crates/contextra-graph/src/apprh/selector.rs:92` [fn `with_default_monitor`]: `pub fn with_default_monitor(config: ApprhSelectorConfig) -> Result<Self, ApprhError> {`
@@ -344,6 +344,7 @@
 - `/app/crates/contextra-py/src/lib.rs:141` [const `VERSION`]: `pub const VERSION: &str = "0.1.0";`
 ### `contextra-rank`
 
+- `/app/crates/contextra-rank/src/local_types.rs:26` [const `ZERO`]: `pub const ZERO: Self = ConfigFingerprint([0u8; 32]);`
 - `/app/crates/contextra-rank/src/drift.rs:90` [fn `set_baseline`]: `pub fn set_baseline(&mut self, baseline: f32) {`
 - `/app/crates/contextra-rank/src/drift.rs:97` [fn `observe`]: `pub fn observe(&mut self, score: f32) -> DriftStatus {`
 - `/app/crates/contextra-rank/src/drift.rs:136` [fn `overall_drift_status`]: `pub fn overall_drift_status(&self) -> &'static str {`
@@ -364,7 +365,7 @@
 - `/app/crates/contextra-router/src/router/lifecycle.rs:123` [fn `with_initial_decision_id`]: `pub fn with_initial_decision_id(mut self, start: u64) -> Self {`
 - `/app/crates/contextra-router/src/router/lifecycle.rs:132` [fn `with_routing_strategy`]: `pub fn with_routing_strategy(`
 - `/app/crates/contextra-router/src/tests/fixtures.rs:29` [fn `advance`]: `pub fn advance(&self, duration: std::time::Duration) {`
-- `/app/crates/contextra-router/src/tests/fixtures.rs:94` [fn `set_community`]: `pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {`
+- `/app/crates/contextra-router/src/tests/fixtures.rs:92` [fn `set_community`]: `pub fn set_community(&self, entity_id: EntityId, comm_id: u64) {`
 ### `contextra-sandbox`
 
 - `/app/crates/contextra-sandbox/src/capabilities.rs:68` [fn `pure_merge_operator`]: `pub fn pure_merge_operator() -> Self {`

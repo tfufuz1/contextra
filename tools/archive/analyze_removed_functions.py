@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ARCHIVIERT: Nicht normativ / Einmal-Migrationsskript / Legacy-Helfer per SPEC v4.0 WP-0
+
 """
 analyze_removed_functions.py — Identifies removed/abandoned functions from history and builds cherry-pick catalog.
 

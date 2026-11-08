@@ -357,8 +357,13 @@
   },
   {
     "crate": "contextra-rank",
-    "error_enums_count": 1,
+    "error_enums_count": 2,
     "error_enums": [
+      {
+        "name": "RankError",
+        "file": "/app/crates/contextra-rank/src/error.rs",
+        "line": 7
+      },
       {
         "name": "ConformalError",
         "file": "/app/crates/contextra-rank/src/calibration/conformal.rs",
@@ -406,8 +411,14 @@
   },
   {
     "crate": "contextra-simd",
-    "error_enums_count": 0,
-    "error_enums": [],
+    "error_enums_count": 1,
+    "error_enums": [
+      {
+        "name": "SimdError",
+        "file": "/app/crates/contextra-simd/src/error.rs",
+        "line": 7
+      }
+    ],
     "suspicious_messages_count": 0,
     "suspicious_messages": []
   },

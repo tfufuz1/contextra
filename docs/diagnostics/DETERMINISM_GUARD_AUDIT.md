@@ -19,7 +19,7 @@
 | `contextra-db` | 4 | 0 | 0 | 1 | 0 | **5** |
 | `contextra-durable-fs` | 0 | 0 | 0 | 0 | 0 | **0** |
 | `contextra-engine` | 1 | 1 | 0 | 20 | 0 | **22** |
-| `contextra-erasure` | 0 | 0 | 0 | 10 | 0 | **10** |
+| `contextra-erasure` | 0 | 0 | 0 | 11 | 0 | **11** |
 | `contextra-graph` | 0 | 0 | 0 | 151 | 0 | **151** |
 | `contextra-infer-candle` | 1 | 0 | 0 | 3 | 0 | **4** |
 | `contextra-infer-ollama` | 1 | 0 | 0 | 0 | 0 | **1** |
@@ -142,8 +142,10 @@
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
 - `/app/crates/contextra-engine/src/collection/search/hybrid/mod.rs:351` [random_hashset]: `let mut visited = std::collections::HashSet::new();`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
-### `contextra-erasure` (10 Fundstellen)
+### `contextra-erasure` (11 Fundstellen)
 
+- `/app/crates/contextra-erasure/src/deletion_proof.rs:546` [random_hashset]: `let mut seen_layers = std::collections::HashSet::new();`
+  - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
 - `/app/crates/contextra-erasure/src/saga/core.rs:41` [random_hashmap]: `use std::collections::HashMap;`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
 - `/app/crates/contextra-erasure/src/saga/core.rs:92` [random_hashmap]: `pub layer_priorities: HashMap<[u8; 16], PurgePriority>,`
@@ -236,17 +238,17 @@
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
 - `/app/crates/contextra-graph/src/ppr_stream.rs:145` [random_hashset]: `let seed_set: HashSet<EntityId> = self.seeds.iter().copied().collect();`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/provider.rs:91` [random_hashmap]: `pub fn compute_pagerank<G: GraphProvider>(graph: &G, damping: f32, max_iter: usize, tol: f32) -> HashMap<EntityId, f32> `
+- `/app/crates/contextra-graph/src/provider.rs:146` [random_hashmap]: `) -> HashMap<EntityId, f32> {`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/provider.rs:94` [random_hashmap]: `if n == 0 { return HashMap::new(); }`
+- `/app/crates/contextra-graph/src/provider.rs:150` [random_hashmap]: `return HashMap::new();`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/provider.rs:95` [random_hashmap]: `let node_to_idx: HashMap<EntityId, usize> = nodes.iter().enumerate().map(|(idx, &id)| (id, idx)).collect();`
+- `/app/crates/contextra-graph/src/provider.rs:152` [random_hashmap]: `let node_to_idx: HashMap<EntityId, usize> = nodes`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/provider.rs:133` [random_hashmap]: `let node_to_idx: HashMap<EntityId, usize> = nodes.iter().enumerate().map(|(i, &id)| (id, i)).collect();`
+- `/app/crates/contextra-graph/src/provider.rs:215` [random_hashmap]: `let node_to_idx: HashMap<EntityId, usize> =`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/provider.rs:153` [random_hashmap]: `let mut comm_degs: HashMap<u64, f32> = communities.iter().enumerate().map(|(i, &c)| (c, degs[i])).collect();`
+- `/app/crates/contextra-graph/src/provider.rs:242` [random_hashmap]: `let mut comm_degs: HashMap<u64, f32> = communities`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/provider.rs:160` [random_hashmap]: `let mut weights: HashMap<u64, f32> = HashMap::new();`
+- `/app/crates/contextra-graph/src/provider.rs:255` [random_hashmap]: `let mut weights: HashMap<u64, f32> = HashMap::new();`
   - **Empfehlung:** `BTreeMap oder HashMap mit festem BuildHasher`
 - `/app/crates/contextra-graph/src/cascade.rs:194` [random_hashset]: `let node_set: std::collections::HashSet<_> = closure_nodes.iter().copied().collect();`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
@@ -354,9 +356,9 @@
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
 - `/app/crates/contextra-graph/src/csr/graph_persist.rs:81` [random_hashset]: `let mut deleted_entity_ids = HashSet::new();`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/csr/path_graph.rs:62` [random_hashset]: `let mut seen = std::collections::HashSet::new();`
+- `/app/crates/contextra-graph/src/csr/path_graph.rs:66` [random_hashset]: `let mut seen = std::collections::HashSet::new();`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
-- `/app/crates/contextra-graph/src/csr/path_graph.rs:110` [random_hashset]: `let mut seen = std::collections::HashSet::new();`
+- `/app/crates/contextra-graph/src/csr/path_graph.rs:114` [random_hashset]: `let mut seen = std::collections::HashSet::new();`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`
 - `/app/crates/contextra-graph/src/csr/graph_write/tombstone.rs:9` [random_hashset]: `use std::collections::HashSet;`
   - **Empfehlung:** `BTreeSet oder HashSet mit festem BuildHasher`

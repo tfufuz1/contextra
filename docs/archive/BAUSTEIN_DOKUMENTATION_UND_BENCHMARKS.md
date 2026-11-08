@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Baustein-Dokumentation & Benchmark-Profile
 
 **Geltungsbereich:** Zentrale, autarke Bausteine des Contextra-Baukastens

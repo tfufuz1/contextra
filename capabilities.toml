@@ -5,6 +5,11 @@
 schema = "2"
 spec = "v4"
 
+# Schema-Erweiterung SPEC v4.0 (§8.1 Gate G1):
+# - klasse: "A" (isolierte Bausteine), "B" (Storage-Bundle), "C" (Anwendungsschicht), "T" (Testwerkzeuge)
+# - may_depend_on: Liste erlaubter interner Abhängigkeiten (Klasse A Soll: leer)
+# - transitional: Temporär erlaubte Übergangskanten mit Verfallsdatum Welle 6 (erzeugt Warnung in Gate G1)
+
 [crates.contextra]
 klasse = 'C'
 ring = 'Ring 4'

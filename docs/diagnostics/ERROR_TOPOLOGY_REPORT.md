@@ -32,10 +32,10 @@
 | `contextra-ports` | 6 | 0 |
 | `contextra-privacy` | 3 | **2** |
 | `contextra-py` | 0 | 0 |
-| `contextra-rank` | 1 | 0 |
+| `contextra-rank` | 2 | 0 |
 | `contextra-router` | 2 | 0 |
 | `contextra-sandbox` | 2 | 0 |
-| `contextra-simd` | 0 | 0 |
+| `contextra-simd` | 1 | 0 |
 | `contextra-store` | 2 | 0 |
 | `contextra-sys` | 0 | 0 |
 | `contextra-testkit` | 0 | 0 |

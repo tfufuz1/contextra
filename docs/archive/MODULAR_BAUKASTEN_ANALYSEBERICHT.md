@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Umfassender Analysebericht: Transformation in eine modulare Baustein-Bibliothek
 
 **Dokument-ID:** ARCH-ANALYSE-2026-11
