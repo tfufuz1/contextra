@@ -7,7 +7,7 @@
 
 | Crate | Unit-Tests | Proptests | Loom Checks | FaultVfs | Benchmarks | Empfehlungen |
 |---|---|---|---|---|---|---|
-| `contextra` | 65 | 0 | 0 | 0 | 0 | Property-Tests mit proptest ergänzen; Criterion-Benchmarks für Hot Paths anlegen |
+| `contextra` | 63 | 0 | 0 | 0 | 0 | Property-Tests mit proptest ergänzen; Criterion-Benchmarks für Hot Paths anlegen |
 | `contextra-adapt` | 141 | 1 | 0 | 0 | 0 | Criterion-Benchmarks für Hot Paths anlegen |
 | `contextra-agent` | 121 | 0 | 0 | 0 | 0 | Property-Tests mit proptest ergänzen; Criterion-Benchmarks für Hot Paths anlegen |
 | `contextra-audit-export` | 32 | 0 | 0 | 0 | 0 | Property-Tests mit proptest ergänzen; Criterion-Benchmarks für Hot Paths anlegen |
@@ -19,7 +19,7 @@
 | `contextra-db` | 186 | 3 | 0 | 0 | 1 | Vollständig aufgestellt |
 | `contextra-durable-fs` | 37 | 0 | 0 | 0 | 0 | Property-Tests mit proptest ergänzen; Kritischer Concurrency-Crate: Loom-Tests erforderlich; Criterion-Benchmarks für Hot Paths anlegen |
 | `contextra-engine` | 260 | 3 | 7 | 0 | 0 | Criterion-Benchmarks für Hot Paths anlegen |
-| `contextra-erasure` | 94 | 0 | 5 | 0 | 0 | Vollständig aufgestellt |
+| `contextra-erasure` | 128 | 0 | 5 | 0 | 0 | Vollständig aufgestellt |
 | `contextra-graph` | 399 | 6 | 0 | 3 | 10 | Vollständig aufgestellt |
 | `contextra-infer-candle` | 119 | 2 | 0 | 0 | 10 | Vollständig aufgestellt |
 | `contextra-infer-ollama` | 117 | 2 | 0 | 0 | 0 | Criterion-Benchmarks für Hot Paths anlegen |
@@ -41,7 +41,7 @@
 | `contextra-testkit` | 62 | 0 | 0 | 22 | 0 | Property-Tests mit proptest ergänzen; Criterion-Benchmarks für Hot Paths anlegen |
 | `contextra-text` | 206 | 5 | 0 | 0 | 1 | Vollständig aufgestellt |
 | `contextra-types` | 186 | 6 | 0 | 0 | 0 | Criterion-Benchmarks für Hot Paths anlegen |
-| `contextra-vector` | 264 | 3 | 4 | 0 | 45 | Chaos-Tests mit FaultVfs zur Crash-Validierung anlegen |
+| `contextra-vector` | 256 | 3 | 4 | 0 | 45 | Chaos-Tests mit FaultVfs zur Crash-Validierung anlegen |
 | `contextra-wire` | 108 | 0 | 0 | 0 | 0 | Property-Tests mit proptest ergänzen; Criterion-Benchmarks für Hot Paths anlegen |
 
 ## Handlungsempfehlungen für Coding-Agenten

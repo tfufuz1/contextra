@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Crate-Kopplungsbericht
 
 - Erzeugt: 2026-11-06 16:30

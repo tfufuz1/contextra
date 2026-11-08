@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Abschlussbericht: Transformation des Repositories zur privaten Baustein-Bibliothek
 
 **Dokument-ID:** ARCH-ABSCHLUSS-2026-11

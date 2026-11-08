@@ -270,253 +270,253 @@
         "file": "/app/crates/contextra-simd/src/dispatch.rs",
         "items": [
           {
-            "line": 124,
+            "line": 122,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::cosine_distance_avx2(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 129,
+            "line": 127,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::cosine_distance_avx512(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 134,
+            "line": 132,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { neon::cosine_distance_neon(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 141,
+            "line": 139,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 145,
+            "line": 143,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 153,
+            "line": 151,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { neon::cosine_distance_neon(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 182,
+            "line": 177,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::euclidean_distance_avx2(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 187,
+            "line": 182,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::euclidean_distance_avx512(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 192,
+            "line": 187,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { neon::euclidean_distance_neon(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 199,
+            "line": 194,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 203,
+            "line": 198,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 211,
+            "line": 206,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { neon::euclidean_distance_neon(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 240,
+            "line": 232,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::dot_product_avx2(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 245,
+            "line": 237,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::dot_product_avx512(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 250,
+            "line": 242,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { neon::dot_product_neon(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 257,
+            "line": 249,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::dot_product_avx512(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 261,
+            "line": 253,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::dot_product_avx2(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 269,
+            "line": 261,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { neon::dot_product_neon(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 302,
+            "line": 291,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) })",
             "has_safety_comment": true
           },
           {
-            "line": 307,
+            "line": 296,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) })",
             "has_safety_comment": true
           },
           {
-            "line": 314,
+            "line": 303,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });",
             "has_safety_comment": true
           },
           {
-            "line": 318,
+            "line": 307,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });",
             "has_safety_comment": true
           },
           {
-            "line": 351,
+            "line": 337,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) })",
             "has_safety_comment": true
           },
           {
-            "line": 356,
+            "line": 342,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) })",
             "has_safety_comment": true
           },
           {
-            "line": 363,
+            "line": 349,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 369,
+            "line": 355,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });",
             "has_safety_comment": true
           },
           {
-            "line": 402,
+            "line": 385,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) })",
             "has_safety_comment": true
           },
           {
-            "line": 407,
+            "line": 390,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) })",
             "has_safety_comment": true
           },
           {
-            "line": 414,
+            "line": 397,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });",
             "has_safety_comment": true
           },
           {
-            "line": 418,
+            "line": 401,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });",
             "has_safety_comment": true
           },
           {
-            "line": 445,
+            "line": 425,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::dot_product_u8_avx2(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 454,
+            "line": 434,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 464,
+            "line": 444,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 468,
+            "line": 448,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 495,
+            "line": 472,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 502,
+            "line": 479,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 509,
+            "line": 486,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 513,
+            "line": 490,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 544,
+            "line": 518,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 553,
+            "line": 527,
             "kind": "unsafe_block",
             "code": "Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) })",
             "has_safety_comment": true
           },
           {
-            "line": 563,
+            "line": 537,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });",
             "has_safety_comment": true
           },
           {
-            "line": 567,
+            "line": 541,
             "kind": "unsafe_block",
             "code": "return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });",
             "has_safety_comment": true
@@ -2219,271 +2219,271 @@
         "file": "/app/crates/contextra-wire/src/contextra_generated.rs",
         "items": [
           {
-            "line": 60,
+            "line": 59,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 82,
+            "line": 81,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 111,
+            "line": 110,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 127,
+            "line": 126,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 143,
+            "line": 142,
             "kind": "unsafe_block",
             "code": "unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }",
             "has_safety_comment": true
           },
           {
-            "line": 265,
+            "line": 263,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 290,
+            "line": 288,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 322,
+            "line": 320,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 335,
+            "line": 333,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 349,
+            "line": 347,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 364,
+            "line": 362,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 503,
+            "line": 500,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 525,
+            "line": 522,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 555,
+            "line": 552,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 569,
+            "line": 566,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 583,
+            "line": 580,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 713,
+            "line": 709,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 735,
+            "line": 731,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 766,
+            "line": 762,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 779,
+            "line": 775,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 794,
+            "line": 790,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 922,
+            "line": 917,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 938,
+            "line": 933,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 961,
+            "line": 956,
             "kind": "unsafe_block",
             "code": "unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }",
             "has_safety_comment": true
           },
           {
-            "line": 1044,
+            "line": 1038,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 1060,
+            "line": 1054,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 1083,
+            "line": 1077,
             "kind": "unsafe_block",
             "code": "unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }",
             "has_safety_comment": true
           },
           {
-            "line": 1168,
+            "line": 1161,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 1187,
+            "line": 1180,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 1211,
+            "line": 1204,
             "kind": "unsafe_block",
             "code": "unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }",
             "has_safety_comment": true
           },
           {
-            "line": 1221,
+            "line": 1214,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1320,
+            "line": 1312,
             "kind": "unsafe_fn",
             "code": "unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {",
             "has_safety_comment": true
           },
           {
-            "line": 1363,
+            "line": 1355,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {",
             "has_safety_comment": true
           },
           {
-            "line": 1399,
+            "line": 1391,
             "kind": "unsafe_block",
             "code": "unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }",
             "has_safety_comment": true
           },
           {
-            "line": 1409,
+            "line": 1401,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1426,
+            "line": 1418,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1440,
+            "line": 1432,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1454,
+            "line": 1446,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1468,
+            "line": 1460,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1482,
+            "line": 1474,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1496,
+            "line": 1488,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1510,
+            "line": 1502,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1524,
+            "line": 1516,
             "kind": "unsafe_block",
             "code": "unsafe {",
             "has_safety_comment": true
           },
           {
-            "line": 1791,
+            "line": 1783,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {",
             "has_safety_comment": true
           },
           {
-            "line": 1801,
+            "line": 1793,
             "kind": "unsafe_fn",
             "code": "pub unsafe fn size_prefixed_root_as_search_response_unchecked(",
             "has_safety_comment": true

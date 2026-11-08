@@ -3,13 +3,49 @@
     "crate": "contextra",
     "is_sync_mandated": false,
     "summary_prod": {
-      "async_fn": 13,
-      "await_expr": 24,
-      "tokio_import": 4,
+      "async_fn": 14,
+      "await_expr": 28,
+      "tokio_import": 5,
       "block_on": 0,
       "lock_across_await": 0
     },
     "findings_prod": [
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 12,
+        "kind": "tokio_import",
+        "code": "#[tokio::main]"
+      },
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 13,
+        "kind": "async_fn",
+        "code": "async fn main() -> Result<(), Box<dyn std::error::Error>> {"
+      },
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 24,
+        "kind": "await_expr",
+        "code": ".await?;"
+      },
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 26,
+        "kind": "await_expr",
+        "code": "println!(\"Datenbank initialisiert. Dokumentenanzahl: {}\", db.len().await?);"
+      },
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 36,
+        "kind": "await_expr",
+        "code": ".await?;"
+      },
+      {
+        "file": "/app/crates/contextra/examples/embedded_facade.rs",
+        "line": 40,
+        "kind": "await_expr",
+        "code": "let recalled = memory.recall(\"Systemprogrammiersprache\", 5).await?;"
+      },
       {
         "file": "/app/crates/contextra/src/query_rewriter.rs",
         "line": 84,
@@ -30,163 +66,163 @@
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 134,
+        "line": 130,
         "kind": "async_fn",
         "code": "pub async fn open(path: impl AsRef<std::path::Path>) -> Result<Contextra, ContextraError> {"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 135,
+        "line": 131,
         "kind": "await_expr",
         "code": "builder(768).with_storage_path(path.as_ref()).build().await"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 166,
+        "line": 162,
         "kind": "async_fn",
         "code": "pub async fn open_with_config("
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 174,
+        "line": 170,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 183,
+        "line": 179,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 184,
+        "line": 180,
         "kind": "async_fn",
         "code": "async fn test_facade_open_and_builder_entrypoints() -> Result<(), Box<dyn std::error::Error>> {"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 190,
+        "line": 186,
         "kind": "await_expr",
         "code": "let db1 = open(&db1_path).await?;"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 191,
+        "line": 187,
         "kind": "await_expr",
         "code": "assert_eq!(db1.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 198,
+        "line": 194,
         "kind": "await_expr",
         "code": "let db2 = open_with_config(&db2_path, config).await?;"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 199,
+        "line": 195,
         "kind": "await_expr",
         "code": "assert_eq!(db2.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 202,
+        "line": 198,
         "kind": "await_expr",
         "code": "let db3 = builder(32).with_storage_path(&db3_path).build().await?;"
       },
       {
         "file": "/app/crates/contextra/src/lib.rs",
-        "line": 203,
+        "line": 199,
         "kind": "await_expr",
         "code": "assert_eq!(db3.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 337,
+        "line": 340,
         "kind": "async_fn",
         "code": "pub async fn build(self) -> Result<Contextra, ContextraError> {"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 411,
+        "line": 414,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 414,
+        "line": 417,
         "kind": "await_expr",
         "code": "Ok(instance.with_embedder(embedder).await)"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 488,
+        "line": 490,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 489,
+        "line": 491,
         "kind": "async_fn",
         "code": "async fn test_empty_passphrase_rejected() {"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 493,
+        "line": 495,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 506,
+        "line": 508,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 512,
+        "line": 514,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 513,
+        "line": 515,
         "kind": "async_fn",
         "code": "async fn test_explicit_unencrypted_mode() -> Result<(), Box<dyn std::error::Error>> {"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 524,
+        "line": 526,
         "kind": "await_expr",
         "code": "let db = builder.build().await?;"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 525,
+        "line": 527,
         "kind": "await_expr",
         "code": "assert_eq!(db.len().await?, 0);"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 533,
+        "line": 535,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 534,
+        "line": 536,
         "kind": "async_fn",
         "code": "async fn test_builder_build_roundtrip() -> Result<(), Box<dyn std::error::Error>> {"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 543,
+        "line": 545,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra/src/builder.rs",
-        "line": 545,
+        "line": 547,
         "kind": "await_expr",
         "code": "assert_eq!(db.len().await?, 0);"
       },
@@ -392,85 +428,85 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 21,
+        "line": 24,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 22,
+        "line": 25,
         "kind": "async_fn",
         "code": "async fn test_compliance_profile_without_gate_fails() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 37,
+        "line": 40,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 57,
+        "line": 60,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 58,
+        "line": 61,
         "kind": "async_fn",
         "code": "async fn test_compliance_profile_with_explicit_open_fast_gate_fails() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 74,
+        "line": 77,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 94,
+        "line": 97,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 95,
+        "line": 98,
         "kind": "async_fn",
         "code": "async fn test_builder_without_performance_profile_succeeds() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 109,
+        "line": 112,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 117,
+        "line": 120,
         "kind": "await_expr",
         "code": "assert_eq!(db.len().await.unwrap(), 0);"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 134,
+        "line": 137,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 135,
+        "line": 138,
         "kind": "async_fn",
         "code": "async fn test_compliance_profile_with_allow_all_gate_succeeds() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 151,
+        "line": 154,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_enforcement.rs",
-        "line": 159,
+        "line": 162,
         "kind": "await_expr",
         "code": "assert_eq!(db.len().await.unwrap(), 0);"
       },
@@ -1286,109 +1322,109 @@
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 17,
+        "line": 18,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 18,
+        "line": 19,
         "kind": "async_fn",
         "code": "async fn open_without_gate_never_grants_sovereign() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 29,
+        "line": 30,
         "kind": "await_expr",
         "code": "let db = contextra::open(&tmp_path).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 37,
+        "line": 38,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 38,
+        "line": 39,
         "kind": "async_fn",
         "code": "async fn compliance_profile_without_signed_license_returns_error() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 53,
+        "line": 54,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 72,
+        "line": 73,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 73,
+        "line": 74,
         "kind": "async_fn",
         "code": "async fn compliance_profile_with_valid_signed_license_activates_deletion_proof() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 95,
+        "line": 96,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 110,
+        "line": 111,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 111,
+        "line": 112,
         "kind": "async_fn",
         "code": "async fn expired_signature_rejected() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 134,
+        "line": 135,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 153,
+        "line": 154,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 154,
+        "line": 155,
         "kind": "async_fn",
         "code": "async fn tampered_signature_rejected() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 177,
+        "line": 178,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 196,
+        "line": 197,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 197,
+        "line": 198,
         "kind": "async_fn",
         "code": "async fn explicit_conflicting_user_value_to_profile_returns_policy_violation() {"
       },
       {
         "file": "/app/crates/contextra/tests/license_gate_always_enforced.rs",
-        "line": 225,
+        "line": 226,
         "kind": "await_expr",
         "code": ".await;"
       },
@@ -9382,127 +9418,127 @@
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 73,
+        "line": 68,
         "kind": "await_expr",
         "code": "self.inner.put(tx_id, key, value).await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 84,
+        "line": 79,
         "kind": "await_expr",
         "code": "self.inner.delete(tx_id, key).await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 95,
+        "line": 90,
         "kind": "await_expr",
         "code": "self.inner.commit(tx_id).await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 102,
+        "line": 97,
         "kind": "await_expr",
         "code": "self.inner.rollback(tx_id).await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 133,
+        "line": 128,
         "kind": "await_expr",
         "code": "self.inner.pin_checkpoint(seq_no).await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 159,
+        "line": 154,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 160,
+        "line": 155,
         "kind": "async_fn",
         "code": "async fn systematic_crash_at_every_checkpoint_io_point() {"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 167,
+        "line": 164,
         "kind": "await_expr",
-        "code": "fault_storage.put(tx1, b\"doc1\", b\"content_v1\").await.unwrap();"
+        "code": ".await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 168,
+        "line": 166,
         "kind": "await_expr",
         "code": "fault_storage.commit(tx1).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 171,
+        "line": 169,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 190,
+        "line": 188,
         "kind": "await_expr",
         "code": ".await;"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 195,
+        "line": 198,
         "kind": "await_expr",
-        "code": "store.get_checkpoint(\"chk_systematic\").await.unwrap().is_none(),"
+        "code": ".await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 200,
+        "line": 207,
         "kind": "await_expr",
-        "code": "let meta = store.get_checkpoint(\"chk_systematic\").await.unwrap().expect(\"Checkpoint must exist\");"
+        "code": ".await"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 208,
+        "line": 217,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 209,
+        "line": 218,
         "kind": "async_fn",
         "code": "async fn crash_during_checkpoint_deletion_leaves_clean_state() {"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 213,
+        "line": 222,
         "kind": "await_expr",
         "code": ".await"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 219,
-        "kind": "await_expr",
-        "code": ".await"
-      },
-      {
-        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 223,
-        "kind": "await_expr",
-        "code": "assert!(store.get_checkpoint(\"chk_to_drop\").await.unwrap().is_some());"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
         "line": 228,
         "kind": "await_expr",
+        "code": ".await"
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 232,
+        "kind": "await_expr",
+        "code": "assert!(store.get_checkpoint(\"chk_to_drop\").await.unwrap().is_some());"
+      },
+      {
+        "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+        "line": 237,
+        "kind": "await_expr",
         "code": "let drop_res = store.drop_checkpoint(\"chk_to_drop\").await;"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 233,
+        "line": 245,
         "kind": "await_expr",
         "code": "let retry_drop = store.drop_checkpoint(\"chk_to_drop\").await;"
       },
       {
         "file": "/app/crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
-        "line": 236,
+        "line": 251,
         "kind": "await_expr",
         "code": "let check = store.get_checkpoint(\"chk_to_drop\").await.unwrap();"
       },
@@ -13948,19 +13984,19 @@
       },
       {
         "file": "/app/crates/contextra-db/examples/db_standalone.rs",
-        "line": 28,
+        "line": 31,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-db/examples/db_standalone.rs",
-        "line": 30,
+        "line": 33,
         "kind": "await_expr",
         "code": "let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await?;"
       },
       {
         "file": "/app/crates/contextra-db/examples/db_standalone.rs",
-        "line": 36,
+        "line": 39,
         "kind": "await_expr",
         "code": "db.close().await?;"
       },
@@ -59531,451 +59567,451 @@
     "findings_test": [
       {
         "file": "/app/crates/contextra-router/benches/router_bench.rs",
-        "line": 15,
+        "line": 20,
         "kind": "tokio_import",
         "code": "use tokio::runtime::Runtime;"
       },
       {
         "file": "/app/crates/contextra-router/benches/router_bench.rs",
-        "line": 169,
+        "line": 175,
         "kind": "await_expr",
         "code": "let _res = router.route(&query_vec, query_text).await;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 73,
+        "line": 72,
         "kind": "async_fn",
-        "code": "async fn insert(&self, key: &str, vector: &[f32], metadata: Option<serde_json::Value>) -> Result<()> {"
+        "code": "async fn insert("
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 190,
+        "line": 210,
         "kind": "async_fn",
         "code": "async fn open_with_config(_path: &std::path::Path, _cfg: ContextraConfig) -> Result<Self> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 193,
+        "line": 215,
         "kind": "async_fn",
         "code": "async fn collection(&self, _name: &str) -> Result<MockCollection> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 211,
+        "line": 233,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 212,
+        "line": 234,
         "kind": "async_fn",
         "code": "async fn test_fixed_seed_routing_reproducibility() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 218,
+        "line": 240,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 219,
+        "line": 241,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 226,
+        "line": 248,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 255,
+        "line": 277,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 258,
+        "line": 280,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 268,
+        "line": 290,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 269,
+        "line": 291,
         "kind": "async_fn",
         "code": "async fn test_record_outcome_idempotency() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 275,
+        "line": 297,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 276,
+        "line": 298,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 283,
+        "line": 305,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 297,
+        "line": 319,
         "kind": "await_expr",
         "code": "let decision = router.route(&[1.0, 0.0, 0.0, 0.0], \"test query\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 351,
+        "line": 373,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 352,
+        "line": 374,
         "kind": "async_fn",
         "code": "async fn test_cold_start_fallback_default_route() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 358,
+        "line": 380,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 359,
+        "line": 381,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 366,
+        "line": 388,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 396,
+        "line": 418,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 406,
+        "line": 428,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 407,
+        "line": 429,
         "kind": "async_fn",
         "code": "async fn test_transport_error_propagation_typed() {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 431,
+        "line": 453,
         "kind": "await_expr",
         "code": "let result = contextra_router::dispatch_to_slm(&decision).await;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 442,
+        "line": 464,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 443,
+        "line": 465,
         "kind": "async_fn",
         "code": "async fn test_restart_resumption_with_initial_decision_id() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 449,
+        "line": 471,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 450,
+        "line": 472,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 457,
+        "line": 479,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 470,
+        "line": 492,
         "kind": "await_expr",
         "code": "let dec1 = router1.route(&[1.0, 0.0, 0.0, 0.0], \"query 1\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 475,
+        "line": 497,
         "kind": "await_expr",
         "code": "let dec2 = router2.route(&[1.0, 0.0, 0.0, 0.0], \"query 2\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 478,
+        "line": 500,
         "kind": "await_expr",
         "code": "let dec3 = router2.route(&[1.0, 0.0, 0.0, 0.0], \"query 3\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 487,
+        "line": 509,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 488,
+        "line": 510,
         "kind": "async_fn",
         "code": "async fn test_clock_based_ttl_eviction_public_api() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 494,
+        "line": 516,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 495,
+        "line": 517,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 502,
+        "line": 524,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 516,
+        "line": 538,
         "kind": "await_expr",
         "code": "let dec1 = router.route(&[1.0, 0.0, 0.0, 0.0], \"q1\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 565,
+        "line": 587,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 566,
+        "line": 588,
         "kind": "async_fn",
         "code": "async fn test_lyapunov_drift_status_summary_unconfigured() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 572,
+        "line": 594,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 573,
+        "line": 595,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 593,
+        "line": 615,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 594,
+        "line": 616,
         "kind": "async_fn",
         "code": "async fn test_lyapunov_drift_status_summary_empty() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 600,
+        "line": 622,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 601,
+        "line": 623,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 613,
+        "line": 635,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 614,
+        "line": 636,
         "kind": "async_fn",
         "code": "async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 620,
+        "line": 642,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 621,
+        "line": 643,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 624,
+        "line": 646,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 645,
+        "line": 667,
         "kind": "await_expr",
         "code": "let dec = router.route(&[1.0, 0.0, 0.0, 0.0], \"test\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 670,
+        "line": 692,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 671,
+        "line": 693,
         "kind": "async_fn",
         "code": "async fn test_router_engine_try_update_profiles_validation_error() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 677,
+        "line": 699,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 678,
+        "line": 700,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 711,
+        "line": 733,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 712,
+        "line": 734,
         "kind": "async_fn",
         "code": "async fn test_confidence_metrics_warmup_period() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 718,
+        "line": 740,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 719,
-        "kind": "await_expr",
-        "code": "let collection = db.collection(\"default\").await?;"
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 726,
-        "kind": "await_expr",
-        "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
         "line": 741,
         "kind": "await_expr",
-        "code": "let decision = router.route(&[1.0, 0.0, 0.0, 0.0], \"warmup query\").await?;"
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 809,
-        "kind": "tokio_import",
-        "code": "#[tokio::test]"
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 810,
-        "kind": "async_fn",
-        "code": "async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {"
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 816,
-        "kind": "await_expr",
-        "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
-      },
-      {
-        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 817,
-        "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 820,
+        "line": 748,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 829,
+        "line": 763,
         "kind": "await_expr",
-        "code": "let dec1 = router.route(&[1.0, 0.0, 0.0, 0.0], \"test\").await?;"
+        "code": "let decision = router.route(&[1.0, 0.0, 0.0, 0.0], \"warmup query\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 857,
+        "line": 831,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 858,
+        "line": 832,
         "kind": "async_fn",
-        "code": "async fn test_set_lyapunov_baseline_existing_and_nonexisting() -> Result<()> {"
+        "code": "async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 864,
+        "line": 838,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
-        "line": 865,
+        "line": 839,
+        "kind": "await_expr",
+        "code": "let collection = db.collection(\"default\").await?;"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 842,
+        "kind": "await_expr",
+        "code": ".await?;"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 851,
+        "kind": "await_expr",
+        "code": "let dec1 = router.route(&[1.0, 0.0, 0.0, 0.0], \"test\").await?;"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 879,
+        "kind": "tokio_import",
+        "code": "#[tokio::test]"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 880,
+        "kind": "async_fn",
+        "code": "async fn test_set_lyapunov_baseline_existing_and_nonexisting() -> Result<()> {"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 886,
+        "kind": "await_expr",
+        "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
+      },
+      {
+        "file": "/app/crates/contextra-router/tests/router_audit_and_isolation_tests.rs",
+        "line": 887,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
@@ -60265,35 +60301,35 @@
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
         "line": 74,
         "kind": "async_fn",
-        "code": "pub async fn insert("
+        "code": "pub async fn insert(&self, key: &str, vector: &[f32], metadata: Option<Value>) -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
-        "line": 98,
+        "line": 96,
         "kind": "async_fn",
         "code": "pub async fn relate(&self, _key_a: &str, _key_b: &str, _relation: &str) -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
-        "line": 240,
+        "line": 246,
         "kind": "async_fn",
         "code": "pub async fn put(&self, _tx: TxId, key: &[u8], val: &[u8]) -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
-        "line": 257,
+        "line": 266,
         "kind": "async_fn",
         "code": "pub async fn commit(&self, _tx: TxId) -> Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
-        "line": 278,
+        "line": 290,
         "kind": "async_fn",
         "code": "pub async fn open_with_config("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/fixtures.rs",
-        "line": 287,
+        "line": 299,
         "kind": "async_fn",
         "code": "pub async fn collection(&self, _name: &str) -> Result<Arc<TestCollection>> {"
       },
@@ -60527,307 +60563,307 @@
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 423,
+        "line": 422,
         "kind": "tokio_import",
         "code": "let rt = tokio::runtime::Runtime::new().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 425,
+        "line": 424,
         "kind": "block_on",
         "code": ".block_on(Contextra::open_with_config(dir.path(), config))"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 427,
+        "line": 426,
         "kind": "block_on",
         "code": "let collection = rt.block_on(db.collection(\"default\")).unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 492,
+        "line": 491,
         "kind": "tokio_import",
         "code": "let rt = tokio::runtime::Runtime::new().unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 494,
+        "line": 493,
         "kind": "block_on",
         "code": ".block_on(Contextra::open_with_config(dir.path(), config))"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 496,
+        "line": 495,
         "kind": "block_on",
         "code": "let collection = rt.block_on(db.collection(\"default\")).unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 525,
+        "line": 524,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 526,
+        "line": 525,
         "kind": "async_fn",
         "code": "async fn test_calibrated_threshold_convergence() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 535,
+        "line": 534,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 537,
+        "line": 536,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 547,
+        "line": 546,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 555,
+        "line": 554,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 557,
+        "line": 556,
         "kind": "await_expr",
         "code": "db.inner_storage().commit(tx).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 576,
+        "line": 575,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 599,
+        "line": 598,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 600,
+        "line": 599,
         "kind": "async_fn",
         "code": "async fn test_calibration_invalidation_on_temperature_change() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 609,
+        "line": 608,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 611,
+        "line": 610,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 620,
+        "line": 619,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 639,
+        "line": 638,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 671,
+        "line": 670,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 688,
+        "line": 687,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 702,
+        "line": 701,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 703,
+        "line": 702,
         "kind": "async_fn",
         "code": "async fn test_calibration_invalidation_on_prompt_template_hash_change() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 712,
+        "line": 711,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 714,
+        "line": 713,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 723,
+        "line": 722,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 741,
+        "line": 740,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 766,
+        "line": 765,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 780,
+        "line": 779,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 781,
+        "line": 780,
         "kind": "async_fn",
         "code": "async fn test_calibration_invalidation_on_quantization_change() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 790,
+        "line": 789,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 792,
+        "line": 791,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 801,
+        "line": 800,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 819,
+        "line": 818,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 844,
+        "line": 843,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 858,
+        "line": 857,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 859,
+        "line": 858,
         "kind": "async_fn",
         "code": "async fn test_calibration_failsafe_on_unknown_quantization() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 866,
+        "line": 865,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 868,
+        "line": 867,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 877,
+        "line": 876,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 895,
+        "line": 894,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 909,
+        "line": 908,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 910,
+        "line": 909,
         "kind": "async_fn",
         "code": "async fn test_cascade_determinism() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 917,
+        "line": 916,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 919,
+        "line": 918,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 929,
+        "line": 928,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 937,
+        "line": 936,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 939,
+        "line": 938,
         "kind": "await_expr",
         "code": "db.inner_storage().commit(tx).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 960,
+        "line": 959,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/misc_tests/part1.rs",
-        "line": 966,
+        "line": 965,
         "kind": "await_expr",
         "code": ".await"
       },
@@ -61313,427 +61349,427 @@
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 17,
+        "line": 16,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 18,
+        "line": 17,
         "kind": "async_fn",
         "code": "async fn test_router_engine_try_new_and_try_update_profiles_validation_error() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 25,
+        "line": 24,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 27,
+        "line": 26,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 120,
+        "line": 119,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 121,
+        "line": 120,
         "kind": "async_fn",
         "code": "async fn test_route_with_missing_community_or_corrupt_result() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 128,
+        "line": 127,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 130,
+        "line": 129,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap(); // unwrap"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 139,
+        "line": 138,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 151,
+        "line": 150,
         "kind": "await_expr",
         "code": "let res = router.route(&[1.0, 0.0, 0.0, 0.0], \"sample text\").await;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 157,
+        "line": 156,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 158,
+        "line": 157,
         "kind": "async_fn",
         "code": "async fn test_route_invalid_search_result_skips_chunk() -> Result<(), Box<dyn std::error::Error>> {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 164,
+        "line": 163,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 165,
+        "line": 164,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 175,
+        "line": 174,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 181,
+        "line": 180,
         "kind": "await_expr",
         "code": "db.inner_storage().put(tx, &comm_key, &comm_val).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 182,
+        "line": 181,
         "kind": "await_expr",
         "code": "db.inner_storage().commit(tx).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 193,
+        "line": 192,
         "kind": "await_expr",
         "code": "let res = router.route(&[1.0, 0.0, 0.0, 0.0], \"valid content\").await;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 200,
+        "line": 199,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 201,
+        "line": 200,
         "kind": "async_fn",
         "code": "async fn test_parallel_route_conformal_calibration_monotonic_convergence() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 208,
+        "line": 207,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 210,
+        "line": 209,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 220,
+        "line": 219,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 228,
+        "line": 227,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 230,
+        "line": 229,
         "kind": "await_expr",
         "code": "db.inner_storage().commit(tx).await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 250,
+        "line": 249,
         "kind": "tokio_import",
         "code": "handles.push(tokio::spawn(async move {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 251,
+        "line": 250,
         "kind": "await_expr",
         "code": "let decision = r.route(&vec_c, \"parallel convergence content\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 258,
+        "line": 257,
         "kind": "await_expr",
         "code": "let res = h.await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 283,
+        "line": 282,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 284,
+        "line": 283,
         "kind": "async_fn",
         "code": "async fn test_router_engine_reset_all_calibration() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 291,
+        "line": 290,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 293,
+        "line": 292,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 327,
+        "line": 326,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 328,
+        "line": 327,
         "kind": "async_fn",
         "code": "async fn test_route_non_finite_query_embedding_err() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 335,
+        "line": 334,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 337,
+        "line": 336,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 342,
+        "line": 341,
         "kind": "await_expr",
         "code": "let res_nan = router.route(&[f32::NAN, 0.0, 0.0, 0.0], \"query\").await;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 347,
+        "line": 346,
         "kind": "await_expr",
         "code": "let res_inf = router.route(&[f32::INFINITY, 0.0, 0.0, 0.0], \"query\").await;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 355,
+        "line": 354,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 356,
+        "line": 355,
         "kind": "async_fn",
         "code": "async fn test_router_engine_persisted_calibration_loading() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 374,
+        "line": 373,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 376,
+        "line": 375,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 388,
+        "line": 387,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 389,
+        "line": 388,
         "kind": "async_fn",
         "code": "async fn test_route_populates_drift_status_after_sufficient_data("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 396,
+        "line": 395,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 397,
+        "line": 396,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 406,
+        "line": 405,
         "kind": "await_expr",
         "code": ".await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 427,
+        "line": 426,
         "kind": "await_expr",
         "code": "let decision = router.route(&vec_data, \"lyapunov test content\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 452,
+        "line": 451,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 453,
+        "line": 452,
         "kind": "async_fn",
         "code": "async fn test_router_engine_try_new_and_try_update_profiles_error_paths("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 460,
+        "line": 459,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 461,
+        "line": 460,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 487,
+        "line": 486,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 488,
+        "line": 487,
         "kind": "async_fn",
         "code": "async fn test_router_engine_drift_status_and_baseline_helpers("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 495,
+        "line": 494,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 496,
+        "line": 495,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 521,
+        "line": 520,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 522,
+        "line": 521,
         "kind": "async_fn",
         "code": "async fn test_select_profile_cascade_error_branches_and_fallback("
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 533,
+        "line": 532,
         "kind": "await_expr",
         "code": "let db = Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 534,
+        "line": 533,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 615,
+        "line": 614,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 616,
+        "line": 615,
         "kind": "async_fn",
         "code": "async fn test_router_engine_additional_coverage_paths() -> contextra_types::Result<()> {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 624,
+        "line": 623,
         "kind": "await_expr",
         "code": "let db = crate::tests::tests::Contextra::open_with_config(dir.path(), config).await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 625,
+        "line": 624,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await?;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 661,
+        "line": 660,
         "kind": "await_expr",
         "code": "let _ = router.route(&[f32::NAN], \"query\").await;"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 706,
+        "line": 705,
         "kind": "tokio_import",
         "code": "#[tokio::test]"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 707,
+        "line": 706,
         "kind": "async_fn",
         "code": "async fn test_router_uses_cheapest_profile_during_warmup() {"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 714,
+        "line": 713,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 716,
+        "line": 715,
         "kind": "await_expr",
         "code": "let collection = db.collection(\"default\").await.unwrap();"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 725,
+        "line": 724,
         "kind": "await_expr",
         "code": ".await"
       },
       {
         "file": "/app/crates/contextra-router/src/tests/routing_tests/engine_part2.rs",
-        "line": 764,
+        "line": 763,
         "kind": "await_expr",
         "code": ".await"
       },

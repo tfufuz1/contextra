@@ -5,7 +5,7 @@ audit_modular_building_blocks.py — Workspace-weiter Entkopplungs- und Baukaste
 Generiert eine detaillierte architektonische Bestandsaufnahme für das gesamte Contextra-Projekt,
 prüft alle Crates auf Modularität, direkte Verdrahtungen, Schnittstellenabstraktion,
 Dead-Code-Kandidaten und verstreute Löschketten/DSGVO-Artefakte und schreibt einen
-aussagekräftigen Bericht nach docs/MODULAR_DECOUPLING_AUDIT.md.
+aussagekräftigen Bericht nach docs/generated/modular_decoupling_audit.md.
 """
 
 from __future__ import annotations
@@ -34,9 +34,8 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
 
     total_crates = len(evaluations)
     total_loc = sum(e["loc"] for e in evaluations)
-    avg_score = sum(e["score"] for e in evaluations) / max(1, total_crates)
     autarkic = [e for e in evaluations if e["dependencies_count"] == 0]
-    high_priority = [e for e in evaluations if e["score"] < 60]
+    high_priority = [e for e in evaluations if e["dependencies_count"] > 0 or e["erasure_leaks_count"] > 0]
     total_erasure_leaks = sum(e["erasure_leaks_count"] for e in evaluations)
     total_dead_code = sum(e.get("dead_code_count", 0) for e in evaluations)
     total_missing_ports = sum(e.get("missing_ports_count", 0) for e in evaluations)
@@ -62,16 +61,15 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
 
     md.append("## 2. Gesamtübersicht des Baukastensystems")
     md.append("")
-    md.append(f"- **Durchschnittlicher Modularitäts-Score:** {avg_score:.1f} / 100")
     md.append(f"- **Vollkommen autarke Bausteine:** {len(autarkic)} Crates")
-    md.append(f"- **Dringender Entkopplungsbedarf (Score < 60):** {len(high_priority)} Crates")
+    md.append(f"- **Entkopplungs- / Bereinigungsbedarf:** {len(high_priority)} Crates")
     md.append(f"- **Verstreute Löschketten-/DSGVO-Relikte außerhalb `contextra-erasure`:** {total_erasure_leaks} Fundstellen")
     md.append(f"- **Identifizierte Dead-Code-Kandidaten (ungenutzte interne Definitionen):** {total_dead_code} Stellen")
     md.append(f"- **Fehlende Port-Abstraktionen (direkte Kernel-Importe):** {total_missing_ports} Stellen")
     md.append("")
 
-    md.append("| Crate | Modularitäts-Score | Status | LOC | Dateien | Interne Deps | Schnittstellen (T/S/E) | Pub/Gesamt Fns | Dead Code | DSGVO/Lösch-Relikte |")
-    md.append("|---|---:|---|---:|---:|---:|---:|---:|---:|---:|")
+    md.append("| Crate | Status | LOC | Dateien | Interne Deps | Schnittstellen (T/S/E) | Pub/Gesamt Fns | Dead Code | DSGVO/Lösch-Relikte |")
+    md.append("|---|---|---:|---:|---:|---:|---:|---:|---:|")
     for e in sorted(evaluations, key=lambda x: (x["score"], -x["loc"])):
         md.append(
             f"| `{e['crate']}` | **{e['score']}/100** | {e['status']} | {e['loc']:,} | {e['files']} | "
@@ -131,7 +129,7 @@ def generate_markdown_report(evaluations: list[dict], out_path: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit-Runner für Baukastensystem und Modularisierung.")
     parser.add_argument("--root", default=".", help="Workspace-Root")
-    parser.add_argument("--out", default="docs/MODULAR_DECOUPLING_AUDIT.md", help="Ausgabepfad für Markdown-Report")
+    parser.add_argument("--out", default="docs/generated/modular_decoupling_audit.md", help="Ausgabepfad für Markdown-Report")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()

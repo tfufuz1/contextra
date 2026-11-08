@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Zielarchitektur & Modul-Katalog: Contextra Baukastensystem
 
 **Dokument-ID:** ARCH-ZIEL-2026-11

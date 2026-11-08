@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Strategischer Architektur- & Transformationsplan: Contextra Baukastensystem
 
 > **Rolle:** Senior Rust Architekt & Principal Engineer

@@ -1,3 +1,5 @@
+> Nicht normativ, widerlegt durch SPEC v4.0 §1
+
 # Architektur & Transformationsplan: Modulare Baustein-Bibliothek für Rust-LLM- & Enterprise-Systeme
 
 > **Dokumentenstatus:** Umfassendes Architektur-, Analyse- und Migrationskonzept

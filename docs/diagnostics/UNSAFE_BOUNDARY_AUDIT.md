@@ -55,48 +55,48 @@
 - `/app/crates/contextra-graph/tests/ppr_alloc_test.rs:37` [unsafe_block] (OK): `unsafe { System.dealloc(ptr, layout) }; // SAFETY: Forward ptr and layout to System allocator.`
 ### `contextra-simd`
 
-- `/app/crates/contextra-simd/src/dispatch.rs:124` [unsafe_block] (OK): `Ok(unsafe { avx2::cosine_distance_avx2(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:129` [unsafe_block] (OK): `Ok(unsafe { avx512::cosine_distance_avx512(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:134` [unsafe_block] (OK): `return Ok(unsafe { neon::cosine_distance_neon(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:141` [unsafe_block] (OK): `return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:145` [unsafe_block] (OK): `return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:153` [unsafe_block] (OK): `return Ok(unsafe { neon::cosine_distance_neon(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:182` [unsafe_block] (OK): `Ok(unsafe { avx2::euclidean_distance_avx2(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:187` [unsafe_block] (OK): `Ok(unsafe { avx512::euclidean_distance_avx512(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:192` [unsafe_block] (OK): `return Ok(unsafe { neon::euclidean_distance_neon(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:199` [unsafe_block] (OK): `return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:203` [unsafe_block] (OK): `return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:211` [unsafe_block] (OK): `return Ok(unsafe { neon::euclidean_distance_neon(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:240` [unsafe_block] (OK): `Ok(unsafe { avx2::dot_product_avx2(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:245` [unsafe_block] (OK): `Ok(unsafe { avx512::dot_product_avx512(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:250` [unsafe_block] (OK): `return Ok(unsafe { neon::dot_product_neon(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:257` [unsafe_block] (OK): `return Ok(unsafe { avx512::dot_product_avx512(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:261` [unsafe_block] (OK): `return Ok(unsafe { avx2::dot_product_avx2(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:269` [unsafe_block] (OK): `return Ok(unsafe { neon::dot_product_neon(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:302` [unsafe_block] (OK): `Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:307` [unsafe_block] (OK): `Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:314` [unsafe_block] (OK): `return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:318` [unsafe_block] (OK): `return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:351` [unsafe_block] (OK): `Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:356` [unsafe_block] (OK): `Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:363` [unsafe_block] (OK): `return Ok(unsafe {`
-- `/app/crates/contextra-simd/src/dispatch.rs:369` [unsafe_block] (OK): `return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:402` [unsafe_block] (OK): `Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:407` [unsafe_block] (OK): `Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:414` [unsafe_block] (OK): `return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:418` [unsafe_block] (OK): `return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:445` [unsafe_block] (OK): `Ok(unsafe { avx2::dot_product_u8_avx2(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:454` [unsafe_block] (OK): `Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:464` [unsafe_block] (OK): `return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:468` [unsafe_block] (OK): `return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:495` [unsafe_block] (OK): `Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:502` [unsafe_block] (OK): `Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:509` [unsafe_block] (OK): `return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:513` [unsafe_block] (OK): `return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:544` [unsafe_block] (OK): `Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:553` [unsafe_block] (OK): `Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) })`
-- `/app/crates/contextra-simd/src/dispatch.rs:563` [unsafe_block] (OK): `return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });`
-- `/app/crates/contextra-simd/src/dispatch.rs:567` [unsafe_block] (OK): `return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:122` [unsafe_block] (OK): `Ok(unsafe { avx2::cosine_distance_avx2(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:127` [unsafe_block] (OK): `Ok(unsafe { avx512::cosine_distance_avx512(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:132` [unsafe_block] (OK): `return Ok(unsafe { neon::cosine_distance_neon(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:139` [unsafe_block] (OK): `return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:143` [unsafe_block] (OK): `return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:151` [unsafe_block] (OK): `return Ok(unsafe { neon::cosine_distance_neon(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:177` [unsafe_block] (OK): `Ok(unsafe { avx2::euclidean_distance_avx2(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:182` [unsafe_block] (OK): `Ok(unsafe { avx512::euclidean_distance_avx512(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:187` [unsafe_block] (OK): `return Ok(unsafe { neon::euclidean_distance_neon(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:194` [unsafe_block] (OK): `return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:198` [unsafe_block] (OK): `return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:206` [unsafe_block] (OK): `return Ok(unsafe { neon::euclidean_distance_neon(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:232` [unsafe_block] (OK): `Ok(unsafe { avx2::dot_product_avx2(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:237` [unsafe_block] (OK): `Ok(unsafe { avx512::dot_product_avx512(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:242` [unsafe_block] (OK): `return Ok(unsafe { neon::dot_product_neon(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:249` [unsafe_block] (OK): `return Ok(unsafe { avx512::dot_product_avx512(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:253` [unsafe_block] (OK): `return Ok(unsafe { avx2::dot_product_avx2(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:261` [unsafe_block] (OK): `return Ok(unsafe { neon::dot_product_neon(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:291` [unsafe_block] (OK): `Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:296` [unsafe_block] (OK): `Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:303` [unsafe_block] (OK): `return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:307` [unsafe_block] (OK): `return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:337` [unsafe_block] (OK): `Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:342` [unsafe_block] (OK): `Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:349` [unsafe_block] (OK): `return Ok(unsafe {`
+- `/app/crates/contextra-simd/src/dispatch.rs:355` [unsafe_block] (OK): `return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:385` [unsafe_block] (OK): `Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:390` [unsafe_block] (OK): `Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:397` [unsafe_block] (OK): `return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:401` [unsafe_block] (OK): `return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:425` [unsafe_block] (OK): `Ok(unsafe { avx2::dot_product_u8_avx2(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:434` [unsafe_block] (OK): `Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:444` [unsafe_block] (OK): `return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:448` [unsafe_block] (OK): `return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:472` [unsafe_block] (OK): `Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:479` [unsafe_block] (OK): `Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:486` [unsafe_block] (OK): `return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:490` [unsafe_block] (OK): `return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:518` [unsafe_block] (OK): `Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:527` [unsafe_block] (OK): `Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) })`
+- `/app/crates/contextra-simd/src/dispatch.rs:537` [unsafe_block] (OK): `return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });`
+- `/app/crates/contextra-simd/src/dispatch.rs:541` [unsafe_block] (OK): `return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });`
 - `/app/crates/contextra-simd/src/kernels/neon.rs:16` [unsafe_fn] (**KEIN SAFETY KOMMENTAR**): `//! - Alle Kernel sind `unsafe fn`, da der Aufrufer sicherstellen muss, dass die NEON-Erweiterung`
 - `/app/crates/contextra-simd/src/kernels/neon.rs:33` [unsafe_fn] (**KEIN SAFETY KOMMENTAR**): `pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {`
 - `/app/crates/contextra-simd/src/kernels/neon.rs:38` [unsafe_block] (OK): `let mut dot_v = unsafe { vdupq_n_f32(0.0) };`
@@ -343,50 +343,50 @@
 - `/app/crates/contextra-wire/build.rs:168` [unsafe_block] (**KEIN SAFETY KOMMENTAR**): `let expected1 = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()";`
 - `/app/crates/contextra-wire/build.rs:173` [unsafe_block] (**KEIN SAFETY KOMMENTAR**): `let expected2 = "    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }";`
 - `/app/crates/contextra-wire/build.rs:176` [unsafe_block] (**KEIN SAFETY KOMMENTAR**): `let input3 = "    unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap()}";`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:60` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:82` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:111` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:127` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:143` [unsafe_block] (OK): `unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:265` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:290` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:322` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:335` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:349` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:364` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:503` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:525` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:555` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:569` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:583` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:713` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:735` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:766` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:779` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:794` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:922` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:938` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:961` [unsafe_block] (OK): `unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1044` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1060` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1083` [unsafe_block] (OK): `unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1168` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1187` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1211` [unsafe_block] (OK): `unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1221` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1320` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1363` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1399` [unsafe_block] (OK): `unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1409` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1426` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1440` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1454` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1468` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1482` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1496` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1510` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1524` [unsafe_block] (OK): `unsafe {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1791` [unsafe_fn] (OK): `pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {`
-- `/app/crates/contextra-wire/src/contextra_generated.rs:1801` [unsafe_fn] (OK): `pub unsafe fn size_prefixed_root_as_search_response_unchecked(`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:59` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:81` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:110` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:126` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:142` [unsafe_block] (OK): `unsafe { self._tab.get::<i8>(Embedding::VT_METRIC, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:263` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:288` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:320` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:333` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:347` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:362` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:500` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:522` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:552` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:566` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:580` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:709` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:731` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:762` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:775` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:790` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:917` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:933` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:956` [unsafe_block] (OK): `unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1038` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1054` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1077` [unsafe_block] (OK): `unsafe { self._tab.get::<u64>(HyperEdgeId::VT_ID, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1161` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1180` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1204` [unsafe_block] (OK): `unsafe { self._tab.get::<u32>(RoleBinding::VT_ROLE, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1214` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1312` [unsafe_fn] (OK): `unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1355` [unsafe_fn] (OK): `pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1391` [unsafe_block] (OK): `unsafe { self._tab.get::<u64>(HyperEdge::VT_ID, Some(0)).unwrap() }`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1401` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1418` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1432` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1446` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1460` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1474` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1488` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1502` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1516` [unsafe_block] (OK): `unsafe {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1783` [unsafe_fn] (OK): `pub unsafe fn root_as_search_response_unchecked(buf: &[u8]) -> SearchResponse {`
+- `/app/crates/contextra-wire/src/contextra_generated.rs:1793` [unsafe_fn] (OK): `pub unsafe fn size_prefixed_root_as_search_response_unchecked(`
 - `/app/crates/contextra-wire/tests/schema_drift.rs:191` [unsafe_block] (**KEIN SAFETY KOMMENTAR**): `if prefix.trim_end().ends_with("unsafe {") || prefix.contains("unsafe") {`
 - `/app/crates/contextra-wire/tests/schema_drift.rs:216` [unsafe_block] (**KEIN SAFETY KOMMENTAR**): `result.push_str("unsafe { ");`

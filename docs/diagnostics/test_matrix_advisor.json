@@ -1,7 +1,7 @@
 [
   {
     "crate": "contextra",
-    "unit_tests": 65,
+    "unit_tests": 63,
     "proptests": 0,
     "loom_checks": 0,
     "fault_vfs_tests": 0,
@@ -158,7 +158,7 @@
   },
   {
     "crate": "contextra-erasure",
-    "unit_tests": 94,
+    "unit_tests": 128,
     "proptests": 0,
     "loom_checks": 5,
     "fault_vfs_tests": 0,
@@ -433,7 +433,7 @@
   },
   {
     "crate": "contextra-vector",
-    "unit_tests": 264,
+    "unit_tests": 256,
     "proptests": 3,
     "loom_checks": 4,
     "fault_vfs_tests": 0,
