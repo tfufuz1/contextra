@@ -4,7 +4,7 @@
 
 use contextra_simd::dispatch::{Dispatcher, SimdTarget};
 use contextra_simd::{compute_distance, validate_vector};
-use contextra_types::DistanceMetric;
+use contextra_simd::DistanceMetric;
 
 fn main() {
     println!("=== contextra-simd standalone building block example ===");

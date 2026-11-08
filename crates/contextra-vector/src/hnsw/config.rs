@@ -62,7 +62,7 @@ impl Default for HnswConfig {
 
 /// Validates that a vector is non-empty and contains no NaN or Infinite values.
 pub(super) fn validate_vector(vec: &[f32]) -> Result<()> {
-    contextra_simd::validate_vector(vec)
+    crate::distance::validate_vector(vec)
 }
 
 impl HnswConfig {

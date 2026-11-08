@@ -5,10 +5,10 @@
 use contextra_simd::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted, validate_vector,
 };
-use contextra_types::{ContextraError, DistanceMetric};
+use contextra_simd::{DistanceMetric, SimdError};
 
 #[test]
-fn test_building_block_safe_api_and_validation() -> Result<(), ContextraError> {
+fn test_building_block_safe_api_and_validation() -> Result<(), SimdError> {
     let a = [1.0f32, 0.0, 0.0];
     let b = [0.0f32, 1.0, 0.0];
 
@@ -31,7 +31,7 @@ fn test_building_block_safe_api_and_validation() -> Result<(), ContextraError> {
 }
 
 #[test]
-fn test_building_block_injectable_dispatcher_contract() -> Result<(), ContextraError> {
+fn test_building_block_injectable_dispatcher_contract() -> Result<(), SimdError> {
     use contextra_simd::dispatch::{Dispatcher, SimdTarget};
 
     let auto_disp = Dispatcher::auto();
@@ -70,7 +70,7 @@ fn test_building_block_injectable_dispatcher_contract() -> Result<(), ContextraE
 }
 
 #[test]
-fn test_building_block_byte_slice_and_trusted_fast_path() -> Result<(), ContextraError> {
+fn test_building_block_byte_slice_and_trusted_fast_path() -> Result<(), SimdError> {
     let a = [1.0f32, 2.0, 3.0, 4.0];
     let b = [2.0f32, 3.0, 4.0, 5.0];
     let b_bytes: Vec<u8> = b.iter().flat_map(|x| x.to_le_bytes()).collect();

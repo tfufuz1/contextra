@@ -6,6 +6,7 @@ schema = "2"
 spec = "v4"
 
 [crates.contextra]
+klasse = 'C'
 ring = 'Ring 4'
 maturity = 'stable'
 description = 'Haupt-Library Facade für Endanwender'
@@ -18,6 +19,7 @@ spec = ['A2', 'A3', 'A4', '0', '2', '3', '4', '5', '6', '7', '8', '9', '12', '13
 test = "cargo test -p contextra --locked"
 
 [crates.contextra-adapt]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'beta'
 description = 'Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller)'
@@ -30,6 +32,7 @@ spec = ['A2', 'A4', '0', '3', '4', '17', '21']
 test = "cargo test -p contextra-adapt --locked"
 
 [crates.contextra-agent]
+klasse = 'C'
 ring = 'Ring 3'
 maturity = 'beta'
 description = 'Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline'
@@ -42,6 +45,7 @@ spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-agent --locked"
 
 [crates.contextra-audit-export]
+klasse = 'A'
 ring = 'Extension'
 maturity = 'experimental'
 description = 'Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export'
@@ -54,6 +58,7 @@ spec = ['16']
 test = "cargo test -p contextra-audit-export --locked"
 
 [crates.contextra-avv-generator]
+klasse = 'A'
 ring = 'Extension'
 maturity = 'experimental'
 description = 'AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO'
@@ -66,6 +71,7 @@ spec = ['2', '15']
 test = "cargo test -p contextra-avv-generator --locked"
 
 [crates.contextra-checkpoint]
+klasse = 'B'
 ring = 'Ring 1'
 maturity = 'stable'
 description = 'Persistent Checkpoint Engine und Blake3 Manifest-Verifikation'
@@ -78,6 +84,7 @@ spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-checkpoint --locked"
 
 [crates.contextra-cognition]
+klasse = 'C'
 ring = 'Ring 3'
 maturity = 'experimental'
 description = 'Konsolidierungs- und Background Sleep Passes'
@@ -91,6 +98,7 @@ test = "cargo test -p contextra-cognition --locked"
 
 
 [crates.contextra-durable-fs]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'beta'
 description = 'Durable filesystem operations, RealFs POSIX implementation and synchronous disk flushing'
@@ -103,6 +111,7 @@ spec = ['0', '4', '7']
 test = "cargo test -p contextra-durable-fs --locked"
 
 [crates.contextra-crypto]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'beta'
 description = 'Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC'
@@ -115,6 +124,7 @@ spec = ['A2', '0', '4', '9', '13']
 test = "cargo test -p contextra-crypto --locked"
 
 [crates.contextra-db]
+klasse = 'C'
 ring = 'Ring 3'
 maturity = 'beta'
 description = 'Contextra Main Database Abstraction, Hybrid Search & Collections'
@@ -127,6 +137,7 @@ spec = ['A2', 'A3', '0', '2', '3', '4', '13', '15', '20']
 test = "cargo test -p contextra-db --locked"
 
 [crates.contextra-engine]
+klasse = 'C'
 ring = 'Ring 3'
 maturity = 'beta'
 description = 'Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02)'
@@ -139,6 +150,7 @@ spec = ['A2', 'A3', '0', '4', '20']
 test = "cargo test -p contextra-engine --locked"
 
 [crates.contextra-graph]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'CSR Graph-Engine, Path Graphing und GraphRAG Community Detection'
@@ -151,6 +163,7 @@ spec = ['A2', 'A3', 'A4', '0', '4', '6', '13', '15', '17', '21', 'B', 'D']
 test = "cargo test -p contextra-graph --locked"
 
 [crates.contextra-infer-candle]
+klasse = 'A'
 ring = 'Ring 2'
 maturity = 'stable'
 description = 'Candle LLM Inference Client und KV-Bridge Adapter'
@@ -163,6 +176,7 @@ spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-infer-candle --locked"
 
 [crates.contextra-infer-ollama]
+klasse = 'A'
 ring = 'Ring 2'
 maturity = 'beta'
 description = 'Ollama External Provider Client und Embeddings Integration'
@@ -175,6 +189,7 @@ spec = ['0', '4', '9']
 test = "cargo test -p contextra-infer-ollama --locked"
 
 [crates.contextra-infer-onnx]
+klasse = 'A'
 ring = 'Ring 2'
 maturity = 'experimental'
 description = 'ONNX Embeddings und Cross-Encoder Reranking Execution Provider'
@@ -187,6 +202,7 @@ spec = ['A3', '0', '4', '9']
 test = "cargo test -p contextra-infer-onnx --locked"
 
 [crates.contextra-kvcache]
+klasse = 'A'
 ring = 'Ring 1'
 maturity = 'beta'
 description = 'Stufenmodell KV-Cache Storage & Offloading'
@@ -199,6 +215,7 @@ spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-kvcache --locked"
 
 [crates.contextra-ingest]
+klasse = 'A'
 ring = 'Ring 4'
 maturity = 'experimental'
 description = 'Dokumentformat-Extraktoren und strukturbewusstes Chunking (Adapter außerhalb des Kerns, SPEC C-10.3)'
@@ -211,6 +228,7 @@ spec = ['0', '4', '10', '11']
 test = "cargo test -p contextra-ingest --locked"
 
 [crates.contextra-license]
+klasse = 'A'
 ring = 'Ring 4'
 maturity = 'experimental'
 description = 'Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe'
@@ -223,6 +241,7 @@ spec = ['14', '15']
 test = "cargo test -p contextra-license --locked"
 
 [crates.contextra-mcp]
+klasse = 'C'
 ring = 'Ring 4'
 maturity = 'beta'
 description = 'Model Context Protocol Server & Cloud Egress Gateway'
@@ -235,6 +254,7 @@ spec = ['A2', '0', '2', '4', '13']
 test = "cargo test -p contextra-mcp --locked"
 
 [crates.contextra-mvcc]
+klasse = 'B'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'Multi-Version Concurrency Control und Isolation-Mechanismen'
@@ -247,6 +267,7 @@ spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-mvcc --locked"
 
 [crates.contextra-ports]
+klasse = 'B'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung'
@@ -259,6 +280,7 @@ spec = ['A2', '0', '3', '4', '9', '20']
 test = "cargo test -p contextra-ports --locked"
 
 [crates.contextra-privacy]
+klasse = 'A'
 ring = 'Ring 3'
 maturity = 'stable'
 description = 'Egress Filtering, Anonymisierung und Privacy Compliance Rules'
@@ -271,6 +293,7 @@ spec = ['A2', 'A3', '0', '4']
 test = "cargo test -p contextra-privacy --locked"
 
 [crates.contextra-py]
+klasse = 'C'
 ring = 'Ring 4'
 maturity = 'stable'
 description = 'PyO3 Python Bindings'
@@ -283,6 +306,7 @@ spec = ['A2', '0', '4', '9', '17', '18', '19', '20']
 test = "cargo test -p contextra-py --locked"
 
 [crates.contextra-rank]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers)'
@@ -295,6 +319,7 @@ spec = ['A2', 'A3', 'A4', '0', '4', '7', '17', '21', 'D']
 test = "cargo test -p contextra-rank --locked"
 
 [crates.contextra-router]
+klasse = 'C'
 ring = 'Ring 3'
 maturity = 'stable'
 description = 'Lyapunov Drift Control und Multi-Candidate Search Routing Engine'
@@ -307,6 +332,7 @@ spec = ['A2', '0', '4', '8', '13', '15', 'B']
 test = "cargo test -p contextra-router --locked"
 
 [crates.contextra-sandbox]
+klasse = 'A'
 ring = 'Ring 2'
 maturity = 'stable'
 description = 'WASM Execution Boundary und Isolations-Sandbox'
@@ -319,6 +345,7 @@ spec = ['A2', '0', '4']
 test = "cargo test -p contextra-sandbox --locked"
 
 [crates.contextra-simd]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'beta'
 description = 'SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen'
@@ -331,6 +358,7 @@ spec = ['A2', '0', '4', '8', '20', 'B']
 test = "cargo test -p contextra-simd --locked"
 
 [crates.contextra-store]
+klasse = 'B'
 ring = 'Ring 1'
 maturity = 'beta'
 description = 'LSM-Tree Storage Engine, WAL Durability und Compaction Engine'
@@ -343,6 +371,7 @@ spec = ['A2', '0', '4', '5', '9', '13', '15', '20', 'B']
 test = "cargo test -p contextra-store --locked"
 
 [crates.contextra-sys]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'Systemnahe Bindings, Low-Level I/O und Memory-Mapping'
@@ -355,6 +384,7 @@ spec = ['A2', 'A3', '0', '4', '20']
 test = "cargo test -p contextra-sys --locked"
 
 [crates.contextra-testkit]
+klasse = 'T'
 ring = 'Tooling'
 maturity = 'stable'
 description = 'Test Fixtures, Mock Engines und Chaos Matrix Harness'
@@ -367,6 +397,7 @@ spec = ['0', '3', '4', '20']
 test = "cargo test -p contextra-testkit --locked"
 
 [crates.contextra-text]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'beta'
 description = 'Volltextsuche und Inverted-Index (BM25 Engine)'
@@ -379,6 +410,7 @@ spec = ['A2', 'A3', 'A4', '0', '4', '16', '17', '18', '21', 'D']
 test = "cargo test -p contextra-text --locked"
 
 [crates.contextra-types]
+klasse = 'B'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)'
@@ -391,6 +423,7 @@ spec = ['A2', '0', '3', '4', '20', 'D']
 test = "cargo test -p contextra-types --locked"
 
 [crates.contextra-vector]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'beta'
 description = 'Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung)'
@@ -404,6 +437,7 @@ spec = ['A2', 'A3', 'A4', '0', '4', '16', '17', '18', '20', '21', 'D']
 test = "cargo test -p contextra-vector --locked"
 
 [crates.contextra-wire]
+klasse = 'A'
 ring = 'Ring 0'
 maturity = 'stable'
 description = 'FlatBuffers Wire-Protokolle und Serialisierungs-Formate'
@@ -416,6 +450,7 @@ spec = ['A2', '0', '4', '20']
 test = "cargo test -p contextra-wire --locked"
 
 [crates.contextra-erasure]
+klasse = 'A'
 ring = 'Ring 3'
 maturity = 'beta'
 description = 'Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.'
