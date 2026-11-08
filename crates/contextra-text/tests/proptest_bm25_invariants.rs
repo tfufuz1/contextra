@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Property-based tests for BM25 score invariants and tombstone isolation.
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};

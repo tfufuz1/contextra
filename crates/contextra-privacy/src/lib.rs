@@ -66,9 +66,9 @@ pub use egress_vault::{
     EgressVaultError, EntityRecognizer, PolicyCategory, SurrogateVault, MAX_CLASSIFY_PAYLOAD_BYTES,
 };
 pub use entity_recognizer::{
-    Gazetteer, PatternRecognizer, RuleBasedEntityRecognizer, DEFAULT_MAX_INPUT_LENGTH,
+    EntityMatch, Gazetteer, PatternRecognizer, RuleBasedEntityRecognizer, DEFAULT_MAX_INPUT_LENGTH,
 };
-pub use error::EgressError;
+pub use error::{EgressError, Error, Result};
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use processing_registry::{
     generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistry,
