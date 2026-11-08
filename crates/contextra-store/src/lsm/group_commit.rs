@@ -24,15 +24,15 @@ pub(super) async fn execute_group_commit_append(
                 .await;
             if append_res.is_err() {
                 if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
-                    tracing::error!(
+                    crate::log::error!(
                         "Failed to truncate WAL after failed group append_batch: {trunc_err}"
                     );
                 }
                 if wal.is_poisoned() {
                     match wal.recover_from_poison().await {
-                        Ok(()) => tracing::info!("WAL successfully recovered from poison state"),
+                        Ok(()) => crate::log::info!("WAL successfully recovered from poison state"),
                         Err(rec_err) => {
-                            tracing::error!("Failed to recover WAL from poison state: {rec_err}")
+                            crate::log::error!("Failed to recover WAL from poison state: {rec_err}")
                         }
                     }
                 }

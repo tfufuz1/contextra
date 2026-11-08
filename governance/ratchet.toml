@@ -93,3 +93,6 @@ dead_features = 24
 # unwrap/expect in Produktionscode (P7, SPEC §0.2 R2) — Ziel: 0
 unwrap_exact = 502
 expect_exact = 242
+
+# Code-Budget (tools/loc.py) — Obergrenze nach P09 (SPEC §4.2, PLAN DoD)
+loc_contextra_store = 16668

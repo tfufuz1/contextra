@@ -10,7 +10,7 @@ pub trait MergeOperator: Send + Sync {
     /// # Fail-Safe Requirement
     /// Implementations running untrusted guest code (e.g. WASM via `contextra-sandbox`) MUST
     /// implement fail-safe handling: if execution fails (e.g. fuel exhaustion or trap),
-    /// the caller or operator must swallow the error for that single entry, log a `tracing::warn!`,
+    /// the caller or operator must swallow the error for that single entry, log a `crate::log::warn!`,
     /// and retain both original versions in the compacted SSTable without aborting the overall compaction.
     fn merge(&self, existing_val: &[u8], new_val: &[u8]) -> Result<Vec<u8>>;
 }

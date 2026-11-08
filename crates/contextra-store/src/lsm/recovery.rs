@@ -107,7 +107,7 @@ pub(crate) async fn write_salt_atomically(
     if write_res.is_err() {
         if let Err(e) = tokio::fs::remove_file(&tmp_path).await {
             if e.kind() != std::io::ErrorKind::NotFound {
-                tracing::warn!("Failed to remove temporary SALT file {:?}: {}", tmp_path, e);
+                crate::log::warn!("Failed to remove temporary SALT file {:?}: {}", tmp_path, e);
             }
         }
     }
@@ -221,7 +221,7 @@ impl LsmStorage {
                             max_wal_id = Some(max_wal_id.unwrap_or(id).max(id));
                         }
                         Err(_) => {
-                            tracing::warn!(
+                            crate::log::warn!(
                                 path = ?entry.path(),
                                 seq_component = seq_component,
                                 "WAL filename sequence component overflows u64; ignoring from max_wal_id calculation"
@@ -336,7 +336,7 @@ impl LsmStorage {
 
             let orphan_ops: usize = pending_tx_map.values().map(|v| v.len()).sum();
             if orphan_ops > 0 {
-                tracing::warn!(
+                crate::log::warn!(
                     orphan_ops = orphan_ops,
                     wal_path = ?wal_path,
                     "Discarded uncommitted orphan transaction operations from WAL segment"
@@ -380,7 +380,7 @@ impl LsmStorage {
         let resource_tracker = Arc::new(ResourceTracker::new(budget_config));
         if replayed_size > 0 {
             if let Err(e) = resource_tracker.consume_memory(replayed_size) {
-                tracing::warn!(
+                crate::log::warn!(
                     replayed_bytes = replayed_size,
                     "Memory budget tracking nach WAL-Replay fehlgeschlagen: {e}. \
                      Budget-Accounting unpräzise bis zum nächsten Flush."
@@ -405,7 +405,7 @@ impl LsmStorage {
                 let hex_part = &file_name[9..file_name.len() - 7];
                 if hex_part.len() == 16 {
                     if let Ok(target_tx) = u64::from_str_radix(hex_part, 16) {
-                        tracing::error!(
+                        crate::log::error!(
                             target_tx = target_tx,
                             intent_path = ?path,
                             "Unfinished rollback intent file detected during LsmStorage startup! Recovery required."
@@ -433,9 +433,9 @@ impl LsmStorage {
                 || file_name.starts_with("SALT.tmp.")
                 || file_name.starts_with("MANIFEST.new.")
             {
-                tracing::warn!("Removing leftover un-renamed temp file: {:?}", path);
+                crate::log::warn!("Removing leftover un-renamed temp file: {:?}", path);
                 if let Err(e) = tokio::fs::remove_file(&path).await {
-                    tracing::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
+                    crate::log::warn!("Failed to remove leftover temp file {:?}: {}", path, e);
                 }
             } else if path.extension().is_some_and(|ext| ext == "sst") {
                 if let Some(ref valid_set) = valid_manifest_sstables {
@@ -446,12 +446,12 @@ impl LsmStorage {
                         .as_ref()
                         .is_some_and(|dead_set| dead_set.contains(path_key))
                     {
-                        tracing::info!("Removing dead SSTable file proven by MANIFEST: {:?}", path);
+                        crate::log::info!("Removing dead SSTable file proven by MANIFEST: {:?}", path);
                         if let Err(e) = tokio::fs::remove_file(&path).await {
-                            tracing::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
+                            crate::log::warn!("Failed to remove dead SSTable {:?}: {}", path, e);
                         }
                     } else {
-                        tracing::warn!(
+                        crate::log::warn!(
                             "Unmanifested or orphaned SSTable file found in data directory (skipping): {:?}",
                             path
                         );
@@ -619,7 +619,7 @@ impl LsmStorage {
         };
 
         if replayed_size > 0 && !wal_files.is_empty() {
-            tracing::info!(
+            crate::log::info!(
                 replayed_bytes = replayed_size,
                 "Forcing startup flush to persist replayed WAL entries before old WAL cleanup"
             );
@@ -636,13 +636,13 @@ impl LsmStorage {
             for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
                 if old_wal_path != &active_wal_path {
                     if let Err(e) = tokio::fs::remove_file(old_wal_path).await {
-                        tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
+                        crate::log::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
                     } else {
-                        tracing::info!("Removed old replayed WAL file: {:?}", old_wal_path);
+                        crate::log::info!("Removed old replayed WAL file: {:?}", old_wal_path);
                         let uuid_sidecar =
                             PathBuf::from(format!("{}.uuid", old_wal_path.display()));
                         if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
-                            tracing::debug!(
+                            crate::log::debug!(
                                 "Could not remove WAL UUID sidecar {:?}: {} (non-critical)",
                                 uuid_sidecar,
                                 e
@@ -654,7 +654,7 @@ impl LsmStorage {
         }
 
         for target_tx in pending_rollbacks {
-            tracing::info!(
+            crate::log::info!(
                 target_tx = target_tx,
                 "Executing pending rollback recovery for TxId({})",
                 target_tx
@@ -670,7 +670,7 @@ impl LsmStorage {
                         storage.config.path
                     ))
                 })?;
-            tracing::info!(
+            crate::log::info!(
                 target_tx = target_tx,
                 "Successfully completed pending rollback recovery for TxId({})",
                 target_tx
@@ -837,11 +837,11 @@ impl LsmStorage {
 
         let mut manifest_batch = Vec::new();
         for path in sst_to_remove {
-            tracing::info!("Removing SSTable during rollback: {:?}", path);
+            crate::log::info!("Removing SSTable during rollback: {:?}", path);
             manifest_batch.push(crate::manifest::ManifestEntry::Remove { path: path.clone() });
             if let Err(e) = tokio::fs::remove_file(&path).await {
                 if e.kind() != std::io::ErrorKind::NotFound {
-                    tracing::error!(
+                    crate::log::error!(
                         path = ?path,
                         "Orphaned SSTable konnte nicht entfernt werden: {e}. Manuelles Cleanup nötig."
                     );
@@ -854,12 +854,12 @@ impl LsmStorage {
         });
 
         if let Err(e) = self.manifest.append_batch(&manifest_batch).await {
-            tracing::warn!("Failed to write Manifest batch during rollback: {}", e);
+            crate::log::warn!("Failed to write Manifest batch during rollback: {}", e);
         }
 
         if let Err(e) = tokio::fs::remove_file(&intent_path).await {
             if e.kind() != std::io::ErrorKind::NotFound {
-                tracing::warn!(
+                crate::log::warn!(
                     "Could not remove rollback intent file {:?}: {} \
                      (non-fatal — recovery will re-run on next startup)",
                     intent_path,
@@ -877,7 +877,7 @@ impl LsmStorage {
             locks.retain(|_, v| v.inner() <= target_tx.inner());
         }
 
-        tracing::info!(
+        crate::log::info!(
             "Rollback to TX {} successful. Max seq: {}, WAL offset: {}",
             target_tx.inner(),
             max_seq,

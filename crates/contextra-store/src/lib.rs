@@ -1,3 +1,7 @@
+#![deny(dead_code)]
+#![forbid(unsafe_code)]
+#![allow(unexpected_cfgs)]
+
 //! # contextra-store (Ring 1)
 //!
 //! Die Crate `contextra-store` implementiert das persistente LSM-Tree-Speichertriebwerk
@@ -27,8 +31,6 @@
 //!   `contextra-py` und der uebergeordneten Facade `contextra`.
 //! - **Ausgehende Abhaengigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
 //!   `contextra-sys`, `contextra-mvcc`.
-
-#![deny(dead_code)]
 //! `Contextra` Store — LSM-Tree based storage engine.
 //!
 //! Provides persistent key-value storage with WAL, `MemTable`,
@@ -41,14 +43,12 @@
 // REVIEW-PASS[1/2] Systematischer Tiefen-Audit von contextra-store (PRÜFER-KONTEXT: FRESH) (TS: 2026-09-13T01:33:57Z) (SESSION: 60ca322c)
 // MODUL-HIERARCHIE: lsm.rs orchestriert, memtable/wal/sstable sind Bausteine.
 
-#![forbid(unsafe_code)]
-#![allow(unexpected_cfgs)]
-
 #[cfg(not(loom))]
 pub mod compaction;
 pub mod engine;
 pub mod fsync;
 pub mod kv;
+pub(crate) mod log;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]

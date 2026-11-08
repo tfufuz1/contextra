@@ -16,7 +16,6 @@ use std::sync::atomic::AtomicU64;
 static COMPACTION_SST_COUNTER: AtomicU64 = AtomicU64::new(1);
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing;
 
 // ANCHOR[contextra-store:COMP-ENG-001]
 /// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
@@ -185,7 +184,7 @@ impl CompactionEngine {
 
         input_ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
-        tracing::info!(
+        crate::log::info!(
             "Compaction triggered: merging {} SSTables",
             input_ssts.len()
         );
@@ -196,7 +195,7 @@ impl CompactionEngine {
             if estimated_peak > limit_bytes {
                 let used_mb = estimated_peak.div_ceil(1024 * 1024);
                 let limit_mb = limit_bytes.div_ceil(1024 * 1024);
-                tracing::warn!(
+                crate::log::warn!(
                     "Compaction aborted: estimated peak memory {} bytes ({}MB) exceeds max_peak_memory_bytes limit {} bytes ({}MB)",
                     estimated_peak,
                     used_mb,
@@ -255,12 +254,12 @@ impl CompactionEngine {
             };
 
             if !is_contiguous {
-                tracing::warn!(
+                crate::log::warn!(
                     "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
                      (concurrent flush or rollback detected)"
                 );
                 if let Err(e) = tokio::fs::remove_file(&output_path).await {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "Failed to clean up aborted compaction output {:?}: {}",
                         output_path,
                         e
@@ -310,12 +309,12 @@ impl CompactionEngine {
         // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
             if let Err(e) = tokio::fs::remove_file(path).await {
-                tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
+                crate::log::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
             let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
             if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {
                 if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
-                    tracing::debug!(
+                    crate::log::debug!(
                         "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
                         uuid_sidecar,
                         e
@@ -324,7 +323,7 @@ impl CompactionEngine {
             }
         }
 
-        tracing::info!(
+        crate::log::info!(
             "Compaction complete: merged {} SSTables into {:?}",
             input_ssts.len(),
             output_path
@@ -347,7 +346,7 @@ impl CompactionEngine {
                 )
                 .await
             {
-                tracing::warn!("Periodic MANIFEST rollover failed after compaction: {e}");
+                crate::log::warn!("Periodic MANIFEST rollover failed after compaction: {e}");
             }
         }
 
@@ -432,7 +431,7 @@ impl CompactionEngine {
         if merge_res.is_err() {
             if let Err(e) = tokio::fs::remove_file(output_path).await {
                 if e.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
                         output_path,
                         e
@@ -469,16 +468,6 @@ impl CompactionEngine {
         }
 
         impl Eq for HeapItem {}
-
-        #[allow(dead_code)]
-        fn _check_partial_cmp(a: &HeapItem, b: &HeapItem) -> Option<std::cmp::Ordering> {
-            a.partial_cmp(b)
-        }
-        // ANCHOR: partial_cmp comparator
-        #[allow(unused)]
-        fn _verify_partial_cmp(a: &HeapItem, b: &HeapItem) {
-            let _ = a.partial_cmp(b);
-        }
 
         impl PartialOrd for HeapItem {
             fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -548,10 +537,10 @@ impl CompactionEngine {
                 if let Some(ref pressure_rx) = self.pressure_rx {
                     let level = pressure_rx.borrow().pressure_level;
                     if level == crate::system_pressure::PressureLevel::Critical {
-                        tracing::warn!("Compaction merge delayed due to Critical system pressure.");
+                        crate::log::warn!("Compaction merge delayed due to Critical system pressure.");
                         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                     } else if level == crate::system_pressure::PressureLevel::Elevated {
-                        tracing::debug!("Compaction merge active under Elevated system pressure.");
+                        crate::log::debug!("Compaction merge active under Elevated system pressure.");
                     }
                 }
 
@@ -565,7 +554,7 @@ impl CompactionEngine {
                                 self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
                             let used_mb = limit_bytes.div_ceil(1024 * 1024);
                             let limit_mb = limit_bytes.div_ceil(1024 * 1024);
-                            tracing::error!(
+                            crate::log::error!(
                                 "Compaction aborted: backpressure wait timeout exceeded ({:?}) while memory budget exhausted",
                                 self.config.max_backpressure_wait
                             );
@@ -581,7 +570,7 @@ impl CompactionEngine {
                                 ));
                             }
                         }
-                        tracing::warn!("Compaction engine paused due to memory budget exhaustion.");
+                        crate::log::warn!("Compaction engine paused due to memory budget exhaustion.");
                         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                     }
                     // Yield after blocking to give other tasks a fair chance
@@ -693,7 +682,7 @@ impl CompactionEngine {
                                     merged = true;
                                 }
                                 Err(err) => {
-                                    tracing::warn!(
+                                    crate::log::warn!(
                                         "Merge operator error for key {:?}: {}, retaining both versions (fail-safe)",
                                         item.key,
                                         err
@@ -806,7 +795,7 @@ impl CompactionEngine {
         loop {
             // Check for shutdown signal
             if shutdown.is_cancelled() {
-                tracing::info!("Compaction engine received shutdown signal");
+                crate::log::info!("Compaction engine received shutdown signal");
                 break;
             }
 
@@ -815,10 +804,10 @@ impl CompactionEngine {
                 _ = tokio::time::sleep(self.config.check_interval) => {
                     match self.maybe_compact_with_cancel(&sstables, &data_path, Some(&shutdown)).await {
                         Ok(true) => {
-                            tracing::debug!("Background compaction cycle completed successfully");
+                            crate::log::debug!("Background compaction cycle completed successfully");
                         }
                         Ok(false) => {
-                            tracing::trace!("No compaction needed");
+                            crate::log::trace!("No compaction needed");
                             if let Some(ref manifest) = self.manifest {
                                 let current_live_entries: Vec<crate::manifest::ManifestEntry> = {
                                     let ssts = sstables.read().await;
@@ -836,17 +825,17 @@ impl CompactionEngine {
                                     )
                                     .await
                                 {
-                                    tracing::warn!("Periodic MANIFEST rollover check failed: {e}");
+                                    crate::log::warn!("Periodic MANIFEST rollover check failed: {e}");
                                 }
                             }
                         }
                         Err(e) => {
-                            tracing::error!("Background compaction failed: {}", e);
+                            crate::log::error!("Background compaction failed: {}", e);
                         }
                     }
                 }
                 _ = shutdown.cancelled() => {
-                    tracing::info!("Compaction engine shutting down via signal");
+                    crate::log::info!("Compaction engine shutting down via signal");
                     break;
                 }
             }

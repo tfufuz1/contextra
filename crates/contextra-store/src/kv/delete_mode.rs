@@ -8,12 +8,14 @@
 // INVARIANTEN:
 // - INV-KV-DELETE-1: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 /// Mode specifying KV segment deletion behavior.
 ///
 /// INVARIANTE `INV-KV-DELETE-1`: Bereinigungsnachweis auf Key-Value-Seite ist ausschließlich für `CryptoShred`-Segmente möglich, niemals für `TombstoneOnly`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[non_exhaustive]
 pub enum KvDeleteMode {
     TombstoneOnly,
@@ -35,6 +37,7 @@ mod tests {
         assert_eq!(KvDeleteMode::default(), KvDeleteMode::CryptoShred);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_kv_delete_mode_serde_roundtrip() {
         let mode = KvDeleteMode::CryptoShred;

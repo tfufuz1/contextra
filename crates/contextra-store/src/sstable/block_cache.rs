@@ -222,13 +222,6 @@ impl BlockCacheBackend for LruBlockCacheBackend {
 #[derive(Clone)]
 struct BlockWeighter;
 
-#[allow(dead_code)]
-#[allow(dead_code)]
-fn _weight_ref() {
-    let weight = 0;
-    let _ = weight;
-}
-
 #[cfg(feature = "block-cache-v2")]
 impl quick_cache::Weighter<(u64, u64), Bytes> for BlockWeighter {
     fn weight(&self, _key: &(u64, u64), value: &Bytes) -> u64 {

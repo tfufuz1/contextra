@@ -56,7 +56,7 @@ impl Manifest {
             return Ok(false);
         }
 
-        tracing::info!(
+        crate::log::info!(
             manifest_size = metadata.len(),
             threshold_bytes = threshold_bytes,
             "MANIFEST size threshold exceeded; initiating atomic rollover"
@@ -168,7 +168,7 @@ impl Manifest {
         .await;
 
         if let Err(ref e) = rollover_res {
-            tracing::error!(
+            crate::log::error!(
                 path = ?self.path,
                 tmp_path = ?tmp_path,
                 error = %e,
@@ -176,7 +176,7 @@ impl Manifest {
             );
             if let Err(clean_err) = tokio::fs::remove_file(&tmp_path).await {
                 if clean_err.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!(
+                    crate::log::warn!(
                         tmp_path = ?tmp_path,
                         error = %clean_err,
                         "Failed to remove temporary MANIFEST file after failed rollover"
@@ -186,7 +186,7 @@ impl Manifest {
             rollover_res?;
         }
 
-        tracing::info!(
+        crate::log::info!(
             path = ?self.path,
             live_entries_count = live_entries.len(),
             "MANIFEST rollover completed successfully"

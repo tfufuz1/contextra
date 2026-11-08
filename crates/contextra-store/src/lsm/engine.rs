@@ -21,7 +21,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Health status of the storage engine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StorageHealth {
     Healthy,
     FlushFailing,
@@ -462,7 +463,7 @@ impl LsmStorage {
 
                     if wal.was_legacy_rekeyed() {
                         let timestamp_nanos = clock.now_unix_nanos();
-                        tracing::info!(
+                        crate::log::info!(
                             wal_path = %file_path.display(),
                             timestamp_nanos = timestamp_nanos,
                             "Legacy WAL key migration executed for segment"

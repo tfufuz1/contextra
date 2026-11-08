@@ -48,7 +48,7 @@ impl DirLock {
                         "Dateisperre auf diesem Dateisystem nicht unterstützt: {e}"
                     )))
                 } else {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "Dateisperre auf diesem Dateisystem nicht unterstützt ({}); fahre ohne Sperre fort: {e}",
                         lock_path.display()
                     );

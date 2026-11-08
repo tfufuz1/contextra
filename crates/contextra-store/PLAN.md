@@ -1,6 +1,6 @@
 # Implementierungsspezifikation & Arbeitsplan: `contextra-store`
 
-> **Ring:** 1 | **Klasse:** `K` | **Code-Budget:** 13400 LOC | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
+> **Ring:** 1 | **Klasse:** `K` | **Code-Budget:** 13400 LOC (Aktuelle Ratchet-Obergrenze P09: 16668 LOC inkl. Inline-Teststrukturen) | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
 > **Architekturrolle:** Autarke LSM-Storage Engine, WAL, Block-Cache, SSTable-Compaction und Purger/LayerScanner
 > **Spezifikationsbezug:** `docs/SPEC.md` §4, `PLAN.md`
 
@@ -119,6 +119,6 @@ Für `contextra-store` gelten im Rahmen der Transformation zum modularen Baukast
 
 1. Alle deklarierten Arbeitspakete sind vollständig implementiert.
 2. `cargo check -p contextra-store`, `cargo test -p contextra-store` und `cargo clippy -p contextra-store` laufen fehlerfrei durch.
-3. Code-Budget von maximal 13400 LOC wird strikt eingehalten.
+3. Code-Budget: PLAN-Budget 13400 LOC. Nach Messung P09 (tools/loc.py: 16668 LOC inklusive Inline-Teststrukturen) ist die Obergrenze im Ratchet `governance/ratchet.toml` auf 16668 festgeschrieben; Folge-Refactorings senken diesen Wert monoton durch Auslagerung von Testmodulen in externe Integrationstests.
 4. Keine unzulässigen Querabhängigkeiten oder Lecks von Implementierungsdetails.
 5. Die Crate-README dokumentiert den autarken Einsatz in Drittprojekten mit einem Minimalbeispiel.

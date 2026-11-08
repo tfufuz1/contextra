@@ -43,7 +43,7 @@ impl Wal {
             }
             _ => {
                 if pos >= file_size {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "WAL truncation at tail (offset {}), partial entry: {}",
                         chunk_start_pos,
                         e
@@ -116,7 +116,7 @@ impl Wal {
         match self.replay_mmap().await {
             Ok(res) => Ok(res),
             Err(e) => {
-                tracing::warn!(
+                crate::log::warn!(
                     "WAL mmap replay failed for {:?} ({}), falling back to stream reader",
                     self.path,
                     e
@@ -163,7 +163,8 @@ impl Wal {
         self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
     }
 
-    #[allow(dead_code, clippy::type_complexity)]
+    #[cfg(test)]
+    #[allow(clippy::type_complexity)]
     pub(crate) fn parse_mmap_slice(
         &self,
         mmap: &[u8],
@@ -194,7 +195,7 @@ impl Wal {
 
     /// Scans the WAL using read-only memory mapping (`memmap2`) for zero-copy entry parsing.
     ///
-    /// If mmap mapping or slice scanning encounters any error, it logs a warning (`tracing::warn!`)
+    /// If mmap mapping or slice scanning encounters any error, it logs a warning (`crate::log::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
     pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
     where
@@ -238,7 +239,7 @@ impl Wal {
                 Ok(version)
             }
             Err(e) => {
-                tracing::warn!(
+                crate::log::warn!(
                     error = ?e,
                     "scan_entries_mmap: HMAC/integrity verify error during mmap scan, falling back to stream"
                 );
@@ -288,7 +289,7 @@ impl Wal {
                     }
                 };
                 if legacy_res.is_ok() {
-                    tracing::warn!(
+                    crate::log::warn!(
                         target: "contextra_store::wal::legacy_fallback",
                         wal_path = %self.path.display(),
                         event = "legacy_integrity_key_fallback_used",
@@ -356,7 +357,7 @@ impl Wal {
             }
 
             if pos + 4 > slice_len {
-                tracing::warn!(
+                crate::log::warn!(
                     "WAL tail corruption (partial length header) at offset {}",
                     pos
                 );
@@ -366,7 +367,7 @@ impl Wal {
             let len_bytes_slice = match slice.get(pos as usize..pos as usize + 4) {
                 Some(s) => s,
                 None => {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "WAL tail corruption (out of bounds length) at offset {}",
                         pos
                     );
@@ -395,7 +396,7 @@ impl Wal {
                             ),
                         ));
                     }
-                    tracing::warn!("WAL tail corruption (huge len) at offset {}", pos);
+                    crate::log::warn!("WAL tail corruption (huge len) at offset {}", pos);
                     break;
                 }
                 return Err(ContextraError::wal_corruption(
@@ -414,14 +415,14 @@ impl Wal {
                         ),
                     ));
                 }
-                tracing::warn!("WAL tail corruption (partial entry) at offset {}", pos);
+                crate::log::warn!("WAL tail corruption (partial entry) at offset {}", pos);
                 break;
             }
 
             let entry_data_raw = match slice.get(pos as usize + 4..pos as usize + 4 + len) {
                 Some(data) => data,
                 None => {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "WAL tail corruption (entry slice out of bounds) at offset {}",
                         pos
                     );
@@ -443,7 +444,7 @@ impl Wal {
                     };
                     if entry_data_raw.len() < 12 {
                         if pos >= file_size {
-                            tracing::warn!(
+                            crate::log::warn!(
                                 "WAL truncated during read at offset {}",
                                 chunk_start_pos
                             );
@@ -475,7 +476,7 @@ impl Wal {
                         Err(e) => {
                             if pos >= file_size {
                                 // Policy: An AEAD decryption failure at physical tail can be caused by zero-filled/truncated write.
-                                tracing::error!(
+                                crate::log::error!(
                                     "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                     chunk_start_pos,
                                     e
@@ -607,7 +608,7 @@ impl Wal {
                                     )));
                                 } else {
                                     if pos >= file_size {
-                                        tracing::error!(
+                                        crate::log::error!(
                                             "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                             chunk_start_pos,
                                             e

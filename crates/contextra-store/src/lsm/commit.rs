@@ -68,7 +68,7 @@ impl LsmStorage {
     #[inline]
     pub(super) fn advance_visibility(&self, tx_id: TxId) {
         if tx_id.inner() == 0 {
-            tracing::debug!(
+            crate::log::debug!(
                 "LsmStorage::commit tx=0 called — ignoring visibility update to prevent blackout"
             );
             return;
@@ -116,7 +116,7 @@ impl LsmStorage {
             if let Err(e) = self.budget.consume_memory(entry_size as u64) {
                 self.budget_tracking_drift_bytes
                     .fetch_add(entry_size as u64, std::sync::atomic::Ordering::Relaxed);
-                tracing::warn!(
+                crate::log::warn!(
                     drift_bytes = entry_size,
                     total_drift_bytes = self
                         .budget_tracking_drift_bytes

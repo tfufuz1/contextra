@@ -91,7 +91,7 @@ where
         let mut len_buf = [0u8; 4];
         if let Err(e) = reader.read_exact(&mut len_buf).await {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                tracing::warn!(
+                crate::log::warn!(
                     "WAL tail corruption (partial entry length) at offset {}",
                     pos
                 );
@@ -113,7 +113,7 @@ where
                         ),
                     ));
                 }
-                tracing::warn!("WAL tail corruption (huge len) at offset {}", pos);
+                crate::log::warn!("WAL tail corruption (huge len) at offset {}", pos);
                 break;
             }
             return Err(ContextraError::wal_corruption(
@@ -132,14 +132,14 @@ where
                     ),
                 ));
             }
-            tracing::warn!("WAL tail corruption (partial entry) at offset {}", pos);
+            crate::log::warn!("WAL tail corruption (partial entry) at offset {}", pos);
             break;
         }
 
         let mut entry_data_raw = vec![0u8; len];
         if let Err(e) = reader.read_exact(&mut entry_data_raw).await {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                tracing::warn!(
+                crate::log::warn!(
                     "WAL tail corruption (truncated entry payload) at offset {}",
                     pos
                 );
@@ -155,7 +155,7 @@ where
             if let (Some(km), WalVersion::V2 | WalVersion::V3) = (key_manager, version) {
                 if entry_data_raw.len() < 12 {
                     if pos >= file_size {
-                        tracing::warn!("WAL truncated during read at offset {}", chunk_start_pos);
+                        crate::log::warn!("WAL truncated during read at offset {}", chunk_start_pos);
                         break;
                     }
                     return Err(ContextraError::Storage(
@@ -181,7 +181,7 @@ where
                     Err(e) => {
                         if pos >= file_size {
                             // Policy: An AEAD decryption failure at physical tail can be caused by zero-filled/truncated write.
-                            tracing::error!(
+                            crate::log::error!(
                                 "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                 chunk_start_pos,
                                 e
@@ -287,7 +287,7 @@ where
                                     }
                                 };
                             if legacy_res.is_ok() {
-                                tracing::warn!(
+                                crate::log::warn!(
                                     target: "contextra_store::wal::legacy_fallback",
                                     wal_path = %path.display(),
                                     event = "legacy_integrity_key_fallback_used",
@@ -351,7 +351,7 @@ where
                                 )));
                             } else {
                                 if pos >= file_size {
-                                    tracing::error!(
+                                    crate::log::error!(
                                         "WAL truncation at tail (offset {}), AEAD decryption failed: {}. Tolerated as incomplete tail write.",
                                         chunk_start_pos,
                                         e
@@ -436,7 +436,7 @@ where
                             }
                         };
                         if legacy_res.is_ok() {
-                            tracing::warn!(
+                            crate::log::warn!(
                                 target: "contextra_store::wal::legacy_fallback",
                                 wal_path = %path.display(),
                                 event = "legacy_integrity_key_fallback_used",

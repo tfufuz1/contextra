@@ -387,7 +387,7 @@ impl ObserverRegistry {
                     worker
                         .circuit_breaker_open_until_nanos
                         .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                    tracing::warn!(
+                    crate::log::warn!(
                         tx_id = ctx.tx_id.inner(),
                         "WalObserver queue full; dropped event and tripped circuit breaker"
                     );
@@ -402,7 +402,7 @@ impl ObserverRegistry {
                             worker
                                 .circuit_breaker_open_until_nanos
                                 .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                            tracing::warn!(
+                            crate::log::warn!(
                                 elapsed_us = elapsed_nanos / 1_000,
                                 max_allowed_us = max_latency_nanos / 1_000,
                                 tx_id = ctx.tx_id.inner(),
@@ -420,7 +420,7 @@ impl ObserverRegistry {
                         worker
                             .circuit_breaker_open_until_nanos
                             .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                        tracing::error!(
+                        crate::log::error!(
                             tx_id = ctx.tx_id.inner(),
                             "WalObserver panicked during on_commit execution; deregistering observer"
                         );
@@ -432,7 +432,7 @@ impl ObserverRegistry {
                         worker
                             .circuit_breaker_open_until_nanos
                             .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                        tracing::warn!(
+                        crate::log::warn!(
                             max_allowed_us = max_latency_nanos / 1_000,
                             tx_id = ctx.tx_id.inner(),
                             "WalObserver timed out on commit path; tripped circuit breaker and continuing"

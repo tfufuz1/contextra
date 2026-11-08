@@ -205,7 +205,7 @@ impl SystemPressureMonitor {
                     }
 
                     if pressure.pressure_level != last_level {
-                        tracing::info!(
+                        crate::log::info!(
                             previous_level = ?last_level,
                             new_level = ?pressure.pressure_level,
                             wal_depth = pressure.wal_queue_depth,

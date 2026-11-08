@@ -207,7 +207,7 @@ impl Manifest {
             match reader.read_exact(&mut len_bytes).await {
                 Ok(_) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "MANIFEST tail truncation detected (incomplete length header) at offset {}",
                         pos
                     );
@@ -261,7 +261,7 @@ impl Manifest {
                 }
 
                 if is_valid_tail_truncation_candidate(len, &partial_raw) {
-                    tracing::warn!(
+                    crate::log::warn!(
                         "MANIFEST tail truncation detected (incomplete payload) at offset {}",
                         entry_pos
                     );

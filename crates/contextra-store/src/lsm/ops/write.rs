@@ -419,17 +419,17 @@ async fn single_commit_path(
             let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
             if append_res.is_err() {
                 if let Err(trunc_err) = wal.truncate(start_offset, prev_hmac).await {
-                    tracing::error!(
+                    crate::log::error!(
                         "Failed to truncate WAL after failed single append_batch: {trunc_err}"
                     );
                 }
                 if wal.is_poisoned() {
                     match wal.recover_from_poison().await {
                         Ok(()) => {
-                            tracing::info!("WAL successfully recovered from poison state")
+                            crate::log::info!("WAL successfully recovered from poison state")
                         }
                         Err(rec_err) => {
-                            tracing::error!("Failed to recover WAL from poison state: {rec_err}")
+                            crate::log::error!("Failed to recover WAL from poison state: {rec_err}")
                         }
                     }
                 }
@@ -693,7 +693,7 @@ async fn leader_commit_path(
     let pending_queue = match queue_guard.take() {
         Some(q) => q,
         None => {
-            tracing::error!("Group commit leader: pending_commit_queue unexpectedly missing.");
+            crate::log::error!("Group commit leader: pending_commit_queue unexpectedly missing.");
             return Err(ContextraError::Internal(
                 "Group commit queue invariant violated".into(),
             ));
@@ -814,7 +814,7 @@ async fn leader_commit_path(
 
     for r in pending_queue.requests {
         if r.sender.send(Ok(())).is_err() {
-            tracing::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver before group commit notification");
+            crate::log::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver before group commit notification");
         }
     }
 

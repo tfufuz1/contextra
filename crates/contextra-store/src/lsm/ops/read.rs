@@ -68,7 +68,7 @@ pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes
     validate_key(key)?;
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     let res = storage.get_at_seq(key, snapshot_seq).await?;
-    tracing::debug!(
+    crate::log::debug!(
         "LsmStorage::get key={:?} seq={} found={}",
         String::from_utf8_lossy(key),
         snapshot_seq,
@@ -93,7 +93,7 @@ pub(super) async fn get_at_seq(
             state.immutable_memtables.clone(),
         )
     };
-    tracing::debug!(
+    crate::log::debug!(
         "LsmStorage::get_at_seq key={:?} seq={} snapshot_tx={}",
         String::from_utf8_lossy(key),
         seq_no,
@@ -128,7 +128,7 @@ pub(super) async fn get_at_seq(
             continue;
         }
         if let Some((val, seq, tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {
-            tracing::debug!(
+            crate::log::debug!(
                 "LsmStorage::get_at_seq SSTable check: seq={} target_seq={} tx={} snapshot_tx={}",
                 seq & !TOMBSTONE_BIT,
                 seq_no,
@@ -136,10 +136,10 @@ pub(super) async fn get_at_seq(
                 snapshot_tx
             );
             if (seq & TOMBSTONE_BIT) != 0 {
-                tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
+                crate::log::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
                 return Ok(None);
             }
-            tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
+            crate::log::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
             return Ok(Some(val));
         }
     }

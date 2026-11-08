@@ -195,13 +195,13 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                     }
 
                     if let Err(e) = tokio::fs::remove_file(&wal_path).await {
-                        tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
+                        crate::log::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
                     } else {
                         let uuid_sidecar =
                             std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
                         if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
                             if e.kind() != std::io::ErrorKind::NotFound {
-                                tracing::debug!(
+                                crate::log::debug!(
                                     "Could not delete sidecar {:?}: {}",
                                     uuid_sidecar,
                                     e
@@ -231,7 +231,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             seq_val.prune_through(prune_bound);
         }
 
-        tracing::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
+        crate::log::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
         Ok(())
     }
     .await;
@@ -239,14 +239,14 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
     if let Err(ref e) = phase3_res {
         if sst_path.exists() {
             if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {
-                tracing::warn!(
+                crate::log::warn!(
                     path = ?sst_path,
                     "Failed to remove partial SSTable after flush failure: {rm_err}"
                 );
             }
         }
 
-        tracing::warn!(
+        crate::log::warn!(
             "Flush Phase 3 failed; old memtable retained in immutable list for continued read availability. WAL on disk is intact. Error: {e}"
         );
     }

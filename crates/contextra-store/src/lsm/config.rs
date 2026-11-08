@@ -3,11 +3,13 @@
 //! Konfiguriert Schwellenwerte fuer MemTable-Groesse, Flush-Intervalle und WAL-Pfade.
 
 use crate::compaction::CompactionConfig;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[non_exhaustive]
 pub enum DurabilityMode {
     Full,
@@ -72,8 +74,9 @@ impl DurabilityMode {
 // SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 /// Configuration for the LSM storage engine.
 pub struct LsmConfig {
     /// Path to the data directory.

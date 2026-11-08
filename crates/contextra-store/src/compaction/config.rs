@@ -37,12 +37,14 @@
 // HOTSPOTS:    compact_sstables(), merge_sorted_iters()
 // SIEHE AUCH:  crates/contextra-store/AGENTS.md
 
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Configuration for the compaction engine.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 pub struct CompactionConfig {
     /// Minimum number of SSTables in a size tier to trigger compaction.
     pub min_sstables_per_tier: usize,

@@ -41,7 +41,7 @@ static LEGACY_KEY_WARN_ONCE: std::sync::Once = std::sync::Once::new();
 #[cfg(feature = "legacy-wal-key")]
 pub(crate) fn warn_legacy_key_use_once(context_msg: &str) {
     LEGACY_KEY_WARN_ONCE.call_once(|| {
-        tracing::warn!(
+        crate::log::warn!(
             target: "contextra_store::wal::legacy_key",
             event = "legacy_integrity_key_accessed",
             context = %context_msg,

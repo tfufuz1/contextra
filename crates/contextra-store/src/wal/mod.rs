@@ -23,7 +23,6 @@ pub(crate) mod fs {
 }
 
 #[cfg(loom)]
-#[allow(dead_code)]
 pub(crate) mod fs {
     use std::path::Path;
 
@@ -32,7 +31,7 @@ pub(crate) mod fs {
         std::fs::read(path)
     }
     // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(
         path: P,
         contents: C,
@@ -256,24 +255,6 @@ pub(crate) mod fs {
         }
     }
 
-    #[cfg(loom)]
-    #[allow(dead_code)]
-    fn _loom_trait_methods_used() {
-        let poll_read = ();
-        let poll_write = ();
-        let poll_flush = ();
-        let poll_shutdown = ();
-        let start_seek = ();
-        let poll_complete = ();
-        let _ = (
-            poll_read,
-            poll_write,
-            poll_flush,
-            poll_shutdown,
-            start_seek,
-            poll_complete,
-        );
-    }
     impl tokio::io::AsyncSeek for LoomFile {
         fn start_seek(
             mut self: std::pin::Pin<&mut Self>,
@@ -420,7 +401,7 @@ impl Wal {
     ) -> Result<bool> {
         let path_ref = path.as_ref();
         if Self::has_migration_marker(path_ref).await {
-            tracing::info!(
+            crate::log::info!(
                 wal_path = %path_ref.display(),
                 "WAL segment already has migration marker; no legacy migration needed."
             );
@@ -464,7 +445,7 @@ impl Wal {
     ) -> Result<Self> {
         let path_ref = path.as_ref();
         if Self::has_migration_marker(path_ref).await {
-            tracing::info!(
+            crate::log::info!(
                 "WAL {:?} already has migration marker; opening via standard secure path.",
                 path_ref
             );
@@ -523,7 +504,7 @@ impl Wal {
         self.legacy_key_used
             .store(false, std::sync::atomic::Ordering::SeqCst);
 
-        tracing::info!(
+        crate::log::info!(
             "WAL segment {:?} successfully rekeyed from legacy static key to secure key.",
             self.path
         );
@@ -703,7 +684,7 @@ impl Wal {
         if metadata.len() > 0 {
             let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;
             if version < config.min_wal_version || version != WalVersion::V3 {
-                tracing::info!(
+                crate::log::info!(
                     "WAL {:?} format detected at {:?}. Will be rewritten as V3 after successful replay.",
                     version,
                     wal.path
@@ -766,7 +747,7 @@ impl Wal {
 
                 if verified_end < metadata.len() {
                     let discarded_bytes = metadata.len() - verified_end;
-                    tracing::warn!(
+                    crate::log::warn!(
                         wal_path = %wal.path.display(),
                         discarded_bytes,
                         verified_end,
@@ -934,7 +915,7 @@ impl Wal {
                 queue_capacity: DEFAULT_WAL_QUEUE_CAPACITY,
             },
         ) {
-            tracing::error!("Failed to enable flusher in loom: {e}");
+            crate::log::error!("Failed to enable flusher in loom: {e}");
         }
         wal
     }

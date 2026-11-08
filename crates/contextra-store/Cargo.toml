@@ -13,7 +13,10 @@ description = "LSM-Tree storage engine for Contextra"
 ring = "1"
 
 [features]
-default = []
+default = ["std", "tracing", "serde"]
+std = []
+tracing = ["dep:tracing"]
+serde = ["dep:serde"]
 test-hooks = []
 memory-only-storage = []
 fault-injection = []
@@ -33,15 +36,13 @@ bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
 parking_lot = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 tokio = { workspace = true }
-memmap2 = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 rand = { workspace = true }
 lru = "0.16.3"
-
 
 uuid = { version = "1", features = ["v4"] }
 tokio-util = { version = "0.7.18", features = ["rt"] }
