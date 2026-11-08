@@ -14,7 +14,7 @@
 //! mit einem einzigen CPU-Befehl auszuführen.
 //!
 //! **Verbindung im System:**
-//! - **Abhängigkeiten (normal):** `contextra-types` (für `ContextraError` und `DistanceMetric`), `bytemuck`, `thiserror`, `tracing`.
+//! - **Abhängigkeiten (normal):** `contextra-types` (für `Error` und `DistanceMetric`), `bytemuck`, `thiserror`, `tracing`.
 //! - **Wird eingebunden von:** `contextra-vector` (Ring 1) zur Beschleunigung von Ähnlichkeitssuchen in Vektorindizes
 //!   (z. B. HNSW = Hierarchical Navigable Small World).
 //!
@@ -26,6 +26,9 @@
 #![allow(unsafe_code)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
+
+mod error;
+mod metric;
 
 // ANCHOR[contextra-simd:CORE-MOD-DISPATCH]
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
@@ -49,7 +52,8 @@ pub use kernels::scalar::{
     normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
 };
 
-use contextra_types::{ContextraError, DistanceMetric};
+pub use error::{Error, Result};
+pub use metric::DistanceMetric;
 
 // ANCHOR[contextra-simd:CORE-VALIDATE-VEC]
 /// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
@@ -60,11 +64,11 @@ use contextra_types::{ContextraError, DistanceMetric};
 /// # Ablauf von `validate_vector`:
 /// 1. Iteration über alle Elemente der `f32`-Slice.
 /// 2. Prüfung mittels `v.is_finite()`.
-/// 3. Abbruch mit Fehler (`ContextraError::invalid_input`), falls mindestens ein Wert ungültig ist.
+/// 3. Abbruch mit Fehler (`Error::invalid_input`), falls mindestens ein Wert ungültig ist.
 /// 4. Rückgabe von `Ok(())`, wenn alle Werte endlich sind.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn ein Wert `f32::NAN`, `f32::INFINITY` oder `f32::NEG_INFINITY` ist.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn ein Wert `f32::NAN`, `f32::INFINITY` oder `f32::NEG_INFINITY` ist.
 ///
 /// # Nebenwirkungen:
 /// Keine (reine Speicherprüfung im RAM).
@@ -80,9 +84,9 @@ use contextra_types::{ContextraError, DistanceMetric};
 /// assert!(validate_vector(&invalid).is_err());
 /// ```
 #[inline]
-pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
+pub fn validate_vector(vec: &[f32]) -> Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
-        return Err(ContextraError::invalid_input(
+        return Err(Error::invalid_input(
             "NaN or Infinity detected in vector",
         ));
     }
@@ -100,9 +104,9 @@ pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
 /// 3. An [`compute_distance_trusted`] delegieren.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn Vektor `a` oder `b` NaN/Unendlich enthält.
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn die Vektorlängen ungleich sind.
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn eine unbekannte oder nicht unterstützte Metrik übergeben wurde.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn Vektor `a` oder `b` NaN/Unendlich enthält.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn die Vektorlängen ungleich sind.
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn eine unbekannte oder nicht unterstützte Metrik übergeben wurde.
 ///
 /// # Nebenwirkungen:
 /// Keine.
@@ -110,19 +114,19 @@ pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
 /// # Beispiel:
 /// ```
 /// use contextra_simd::compute_distance;
-/// use contextra_types::DistanceMetric;
+/// use contextra_simd::DistanceMetric;
 ///
 /// let a = [1.0, 0.0, 0.0];
 /// let b = [0.0, 1.0, 0.0];
 /// let dist = compute_distance(&a, &b, DistanceMetric::Cosine)?;
-/// # Ok::<(), contextra_types::ContextraError>(())
+/// # Ok::<(), contextra_simd::Error>(())
 /// ```
 #[inline]
 pub fn compute_distance(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_types::Result<f32> {
+) -> Result<f32> {
     validate_vector(a)?;
     validate_vector(b)?;
     compute_distance_trusted(a, b, metric)
@@ -140,7 +144,7 @@ pub fn compute_distance(
 /// 3. Längenabgleich und Ausführung im gewählten Hardware-Pfad.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, falls Längen abweichen oder eine nicht unterstützte Metrik gefordert wird.
+/// - Gibt `Err(Error::InvalidInput)` zurück, falls Längen abweichen oder eine nicht unterstützte Metrik gefordert wird.
 ///
 /// # Nebenwirkungen:
 /// Keine.
@@ -149,12 +153,12 @@ pub fn compute_distance_trusted(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_types::Result<f32> {
+) -> Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance(a, b),
         DistanceMetric::Euclidean => euclidean_distance(a, b),
         DistanceMetric::DotProduct => dot_product_distance(a, b),
-        _ => Err(ContextraError::invalid_input("Unsupported distance metric")),
+        _ => Err(Error::invalid_input("Unsupported distance metric")),
     }
 }
 
@@ -170,9 +174,9 @@ pub fn compute_distance_trusted(
 /// 3. Konvertierung/Reinterpretation der Bytes als `f32` im Ziel-Kernel.
 ///
 /// # Fehlerfälle:
-/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn die Byte-Länge kein Vielfaches von 4 (`sizeof(f32)`) ist
+/// - Gibt `Err(Error::InvalidInput)` zurück, wenn die Byte-Länge kein Vielfaches von 4 (`sizeof(f32)`) ist
 ///   oder die Dimensionen nicht übereinstimmen.
-/// - Gibt `Err(ContextraError::InvalidInput)` bei unbekannter Metrik zurück.
+/// - Gibt `Err(Error::InvalidInput)` bei unbekannter Metrik zurück.
 ///
 /// # Nebenwirkungen:
 /// Keine.
@@ -181,11 +185,11 @@ pub fn compute_distance_f32_bytes_trusted(
     a: &[f32],
     b_bytes: &[u8],
     metric: DistanceMetric,
-) -> contextra_types::Result<f32> {
+) -> Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance_f32_bytes(a, b_bytes),
         DistanceMetric::Euclidean => euclidean_distance_f32_bytes(a, b_bytes),
         DistanceMetric::DotProduct => dot_product_distance_f32_bytes(a, b_bytes),
-        _ => Err(ContextraError::invalid_input("Unsupported distance metric")),
+        _ => Err(Error::invalid_input("Unsupported distance metric")),
     }
 }

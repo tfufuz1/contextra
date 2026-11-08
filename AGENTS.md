@@ -241,8 +241,11 @@ cargo bench -p <crate>
 | K9 | **Werkzeug-Crates.** SPEC §4.2 nennt `testkit`, `xtask`, `xtask-heavy`, `bench`. Im Repository existieren `testkit` und `benchmarks/contextra-bench`; `xtask*` fehlen. | `testkit` und `contextra-bench` gelten als Werkzeug und sind nie Abhängigkeit des Kerns. `xtask` siehe §8. |
 | K10 | **`governance/security_ports.toml` zeigt auf nicht existierende Pfade** (`contextra_ports::kms::*`, `::purger::Purger`, `::log::DurableLog`, `::journal::ErasureJournal`, `contextra_store::vfs::StdVfs`). `StorageRead`/`StorageWrite` (verlangt von `.agents/rules/async-io.md`) existieren nicht. | Pfade nie aus diesen Dateien übernehmen; am Code prüfen. Korrektur in WP 2.2/7. |
 
-<<<<<<< HEAD
 ## 11. Diagnose- & Analysewerkzeuge (`tools/`) für Coding-Agenten
+
+Beide Werkzeugsätze liegen in `tools/` vor (Zusammenführung der Merge-Konflikte; SPEC v4.0 E-11).
+
+### 11.1 Diagnose- & Analysewerkzeuge (Batch-Orchestrierung)
 
 Für mikrofeingranulare Codebase-Analysen, Konformitätschecks und Architekturprüfungen stehen folgende Python-Diagnosewerkzeuge bereit. Alle Werkzeuge laufen ohne externe Abhängigkeiten (Standardbibliothek), speichern Berichte nachvollziehbar in `docs/diagnostics/` und unterstützen `--json`, `--crate` und `--workspace`:
 
@@ -259,8 +262,7 @@ Für mikrofeingranulare Codebase-Analysen, Konformitätschecks und Architekturpr
 | `python3 tools/error_topology_mapper.py` | Fehler-Topologie (INV-LOG-1 / HR-4): Kartiert Fehlertypen und verhindert Datenleaks in Fehlermeldungen | `ERROR_TOPOLOGY_REPORT.md`, `.json` |
 | `python3 tools/test_matrix_advisor.py` | Test-Pyramide (§8): Prüft Abdeckung (Unit, Proptest, Loom, FaultVfs, Benchmarks) und gibt Ratschläge | `TEST_MATRIX_ADVISOR.md`, `.json` |
 | `python3 tools/orchestrate_diagnostics.py` | Master-Orchestrierung: Führt alle 10 Werkzeuge aus und erzeugt Gesamtreport | `DIAGNOSTIC_SUMMARY.md` |
-=======
-## 11. Analyse- & Diagnose-Werkzeuge für Agenten (`tools/`)
+### 11.2 Analyse- & Diagnose-Werkzeuge (Einzelwerkzeuge, Micro-Probes)
 
 Für Coding-Agenten und Entwickler stehen spezialisierte Python-Werkzeuge für mikrofeingranulare Code-Introspektion, Architekturprüfungen, Fehlerkartierung und automatisierte Dokumentation zur Verfügung. Alle Werkzeuge exportieren ihre Befunde automatisch nach `docs/diagnostics/<name>.{md,json}` (oder via `--output-dir`), unterstützen `--crate <name>`, `--json` für Pipelines und bieten maschinenlesbare Schnittstellen.
 
@@ -279,7 +281,6 @@ Für Coding-Agenten und Entwickler stehen spezialisierte Python-Werkzeuge für m
 | `tools/agentic_context_pack.py` | Context-Engineering & Prompt-Packager: Bündelt minimale, hochdichte Modulinformationen & Regeln für LLM-Agenten | `python3 tools/agentic_context_pack.py -c <crate>` |
 
 Gemeinsame Bibliothek: `tools/agent_tooling_common.py`. Alle Berichte liegen strukturiert in `docs/diagnostics/`.
->>>>>>> d19a1ae08 (Add micro-granular diagnostic tools for coding agents)
 
 ## 12. Referenzen
 

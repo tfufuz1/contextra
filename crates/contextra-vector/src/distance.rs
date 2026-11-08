@@ -5,17 +5,86 @@
 
 //! # Distance Computation Module
 //!
-//! This module re-exports distance metric computations and vector validation from `contextra_simd`.
+//! Adapter zu `contextra_simd` (SPEC v4.0 E-03): `contextra-simd` kennt weder
+//! `contextra-types` noch deren Fehler- und Metrik-Typen. Die Konvertierung von
+//! `DistanceMetric` und `Error` geschieht ausschließlich hier.
+
+use contextra_types::{ContextraError, DistanceMetric, Result};
 
 pub use contextra_simd::kernels::scalar::{
     cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,
 };
 pub use contextra_simd::{
-    compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted,
-    cosine_distance, cosine_similarity_parts_u8, dot_product_distance, dot_product_f32_u8,
-    dot_product_u8, euclidean_distance, euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8,
-    normalize_inplace, validate_vector,
+    cosine_similarity_parts_u8, dot_product_f32_u8, dot_product_u8, euclidean_distance_sq_f32_u8,
+    euclidean_distance_sq_u8, normalize_inplace,
 };
+
+/// Fail-closed: unbekannte Metriken (`#[non_exhaustive]`) werden abgelehnt, nicht umgedeutet.
+fn to_simd_metric(metric: DistanceMetric) -> Result<contextra_simd::DistanceMetric> {
+    match metric {
+        DistanceMetric::Cosine => Ok(contextra_simd::DistanceMetric::Cosine),
+        DistanceMetric::Euclidean => Ok(contextra_simd::DistanceMetric::Euclidean),
+        DistanceMetric::DotProduct => Ok(contextra_simd::DistanceMetric::DotProduct),
+        _ => Err(ContextraError::invalid_input("unsupported distance metric")),
+    }
+}
+
+fn from_simd_error(err: contextra_simd::Error) -> ContextraError {
+    match err {
+        contextra_simd::Error::EmbeddingDimensionMismatch { expected, got } => {
+            ContextraError::EmbeddingDimensionMismatch { expected, got }
+        }
+        contextra_simd::Error::InvalidInput(msg) => ContextraError::InvalidInput(msg),
+        other => ContextraError::invalid_input(other.to_string()),
+    }
+}
+
+fn adapt<T>(res: contextra_simd::Result<T>) -> Result<T> {
+    res.map_err(from_simd_error)
+}
+
+/// Prüft einen Vektor auf endliche Werte (Delegation an `contextra_simd`).
+pub fn validate_vector(vec: &[f32]) -> Result<()> {
+    adapt(contextra_simd::validate_vector(vec))
+}
+
+/// Distanz zwischen zwei `f32`-Vektoren (validiert).
+pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
+    adapt(contextra_simd::compute_distance(a, b, to_simd_metric(metric)?))
+}
+
+/// Distanz zwischen zwei `f32`-Vektoren ohne Validierung.
+pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
+    adapt(contextra_simd::compute_distance_trusted(a, b, to_simd_metric(metric)?))
+}
+
+/// Distanz `f32`-Query gegen rohe `f32`-Bytes (validiert).
+pub fn compute_distance_f32_bytes_trusted(
+    a: &[f32],
+    b_bytes: &[u8],
+    metric: DistanceMetric,
+) -> Result<f32> {
+    adapt(contextra_simd::compute_distance_f32_bytes_trusted(
+        a,
+        b_bytes,
+        to_simd_metric(metric)?,
+    ))
+}
+
+/// Kosinus-Distanz (Delegation).
+pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32> {
+    adapt(contextra_simd::cosine_distance(a, b))
+}
+
+/// Euklidische Distanz (Delegation).
+pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
+    adapt(contextra_simd::euclidean_distance(a, b))
+}
+
+/// Skalarprodukt-Distanz (Delegation).
+pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32> {
+    adapt(contextra_simd::dot_product_distance(a, b))
+}
 
 #[cfg(test)]
 mod tests {
