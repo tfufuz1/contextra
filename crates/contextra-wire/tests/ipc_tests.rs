@@ -1281,3 +1281,85 @@ fn test_shared_buffer_concurrency() {
         t.join().expect("Thread panicked");
     }
 }
+
+// ANCHOR[contextra-wire:TST-065]
+/// SPEC: INV-WIRE-BOUNDS-1
+/// Proptest / Property-Test: Beliebige mutierte oder feindliche Payloads dürfen
+/// niemals zu Panics führen und niemals außerhalb von Puffergrenzen lesen.
+#[test]
+fn test_inv_wire_bounds_1_property_safety() {
+    use proptest::test_runner::TestRunner;
+
+    let mut runner = TestRunner::default();
+    runner
+        .run(
+            &proptest::collection::vec(proptest::prelude::any::<u8>(), 0..2048),
+            |bytes| {
+                let config = FlatBufferConfig::default();
+                // Unverified buffer darf bei beliebigen Bytes nie paniken
+                let _ = verify_and_parse_search_response(&bytes, &config);
+                let _ = verify_and_parse_embedding(&bytes, &config);
+                let _ = verify_and_parse_scored_document(&bytes, &config);
+                let _ = verify_and_parse_vector_index_update(&bytes, &config);
+                let _ = verify_and_parse_role_id(&bytes, &config);
+                let _ = verify_and_parse_hyper_edge_id(&bytes, &config);
+                let _ = verify_and_parse_role_binding(&bytes, &config);
+                let _ = verify_and_parse_hyper_edge(&bytes, &config);
+
+                // Typestate transition test on random bytes
+                let raw_bytes = bytes::Bytes::copy_from_slice(&bytes);
+                let unverified = WireBuffer::new(raw_bytes);
+                let _ = unverified.verify::<Embedding>(&config);
+
+                // JSON-RPC darf bei beliebigen Bytes nie paniken
+                let rpc_config = JsonRpcConfig::default();
+                let _ = parse_jsonrpc_payload_with_config(&bytes, &rpc_config);
+
+                Ok(())
+            },
+        )
+        .expect("proptest fuzz bounds safety check");
+}
+
+// ANCHOR[contextra-wire:TST-066]
+/// SPEC: INV-WIRE-BOUNDS-1
+/// Proptest / Roundtrip Property: Beliebige serialisierte SearchResponses müssen nach
+/// Verifikation und Rekonstruktion exakt dem Original entsprechen (Roundtrip-Invariante).
+#[test]
+fn test_inv_wire_bounds_1_roundtrip_property() {
+    use proptest::test_runner::TestRunner;
+
+    let mut runner = TestRunner::default();
+    runner
+        .run(&(0u32..100_000, 0u32..50), |(total_hits, took_ms)| {
+            let mut builder = flatbuffers::FlatBufferBuilder::new();
+            let response_args = SearchResponseArgs {
+                total_hits,
+                processing_time_ms: took_ms as f32,
+                results: None,
+            };
+            let resp_offset = SearchResponse::create(&mut builder, &response_args);
+            builder.finish(resp_offset, None);
+            let encoded = builder.finished_data();
+
+            let config = FlatBufferConfig::default();
+            let parsed = verify_and_parse_search_response(encoded, &config)
+                .expect("Valid serialized SearchResponse must verify");
+
+            assert_eq!(parsed.total_hits(), total_hits);
+            assert_eq!(parsed.processing_time_ms(), took_ms as f32);
+            assert!(parsed.results().is_none());
+
+            // WireBuffer typestate roundtrip
+            let buf = WireBuffer::new(bytes::Bytes::copy_from_slice(encoded));
+            let verified = buf
+                .verify::<SearchResponse>(&config)
+                .expect("WireBuffer verification must succeed");
+            let root = verified.root().expect("Root extraction must succeed");
+            assert_eq!(root.total_hits(), total_hits);
+            assert_eq!(root.processing_time_ms(), took_ms as f32);
+
+            Ok(())
+        })
+        .expect("proptest roundtrip property check");
+}
