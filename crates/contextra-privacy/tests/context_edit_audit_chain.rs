@@ -6,14 +6,18 @@
 //              Verifizierung liefert exakt den ersten fehlerhaften Index bei Manipulation.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing
+)]
 
-use contextra_ports::Clock;
 use contextra_privacy::context_edit_audit::{
     build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
     ContextEditInput, ContextEditKind,
 };
-use contextra_types::TenantId;
+use contextra_privacy::{Clock, TenantId};
 
 struct MockSequenceClock {
     timestamps: std::sync::atomic::AtomicU64,

@@ -1,5 +1,11 @@
 //! H-Reihe Kampagnentests für Egress-Shield, DLP-Evasion, Type-State-Safety und Audit-Determinismus.
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::disallowed_types,
+    deprecated
+)]
 //! Campaign J-27 Privacy Test Suite — Egress-Firewall, DLP Vault & Compliance Invariants
 
 use contextra_privacy::audit_trace::compute_audit_trace;
@@ -18,7 +24,7 @@ use contextra_privacy::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier, EgressVault,
 };
 use contextra_privacy::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
-use contextra_types::{TenantId, TenantScoped};
+use contextra_privacy::{TenantId, TenantScoped};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -440,7 +446,7 @@ struct FixedClock {
     nanos: u64,
 }
 
-impl contextra_ports::Clock for FixedClock {
+impl contextra_privacy::Clock for FixedClock {
     fn now_unix_nanos(&self) -> u64 {
         self.nanos
     }

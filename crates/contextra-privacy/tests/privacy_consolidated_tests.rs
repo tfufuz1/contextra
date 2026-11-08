@@ -2,6 +2,7 @@
 //! Consolidated tests for `contextra-privacy` resolving TenantId duplicates,
 //! verifying processing registry serialization, tenant separation, data subject searches,
 //! and audit-chain manipulation detection with `ManualClock`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
 use contextra_privacy::context_edit_audit::{
     build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
@@ -12,8 +13,38 @@ use contextra_privacy::processing_registry::{
     generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistryExport,
     ProcessorRole,
 };
-use contextra_testkit::ManualClock;
-use contextra_types::TenantId;
+use contextra_privacy::TenantId;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
+
+pub struct ManualClock {
+    nanos: AtomicU64,
+}
+
+impl ManualClock {
+    pub fn new(initial_nanos: u64) -> Self {
+        Self {
+            nanos: AtomicU64::new(initial_nanos),
+        }
+    }
+
+    pub fn advance(&self, duration: Duration) {
+        self.nanos.fetch_add(
+            u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
+    }
+}
+
+impl contextra_privacy::Clock for ManualClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::SeqCst)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::SeqCst)
+    }
+}
 
 fn make_sample_record(tenant_u64: u64, name: &str, purpose: &str) -> ProcessingActivityRecord {
     ProcessingActivityRecord {
@@ -42,7 +73,7 @@ fn make_sample_record(tenant_u64: u64, name: &str, purpose: &str) -> ProcessingA
 // Prüft: Prüft JSON-Serialisierung und Deserialisierung des Verarbeitungsverzeichnisses.
 fn test_01_registry_json_serde_roundtrip() {
     let rec = make_sample_record(101, "Kundendatenbank", "Vertragsabwicklung");
-    let export = generate_registry(&[rec.clone()]);
+    let export = generate_registry(std::slice::from_ref(&rec));
 
     let json_str = serde_json::to_string(&export).expect("serialization to json");
     let deser: ProcessingRegistryExport =

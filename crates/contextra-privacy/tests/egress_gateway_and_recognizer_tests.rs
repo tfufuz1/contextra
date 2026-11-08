@@ -9,7 +9,6 @@
 // FILE-CONTEXT
 // ZWECK: Uferloser Test-Suite (>= 40 Tests) für RuleBasedEntityRecognizer, Gateway Pipeline Enforcements, Checksums und Zero PII Leakage.
 
-use contextra_ports::Clock;
 use contextra_privacy::bulk_exfiltration_detector::{BulkExfiltrationDetector, SessionId};
 use contextra_privacy::egress_gateway::{
     CloudQueryRequest, DefaultEgressGuard, EgressGateway, EgressGuardCheck,
@@ -18,7 +17,8 @@ use contextra_privacy::egress_vault::{
     BlockReason, BoxFuture, EgressClassification, EgressClassifier, SurrogateVault,
 };
 use contextra_privacy::entity_recognizer::{Gazetteer, RuleBasedEntityRecognizer};
-use contextra_types::{TenantId, TenantScoped};
+use contextra_privacy::Clock;
+use contextra_privacy::{TenantId, TenantScoped};
 use std::sync::Arc;
 
 // ============================================================================

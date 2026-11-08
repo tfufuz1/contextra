@@ -12,25 +12,34 @@ description = "Cloud Egress Security, DLP & Exfiltration Protection for Contextr
 [package.metadata.contextra]
 ring = "3"
 
+[features]
+default = ["ports-compat"]
+# Transitionales Compat-Feature bis Welle 6 für Workspace-Konsumenten (z. B. contextra-mcp)
+ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
+types-compat = ["ports-compat"]
+
 [dependencies]
 # Y.6.2, Clock-Injektion für P28-konforme Hash-Trace-Erzeugung
-contextra-ports = { workspace = true }
-contextra-types = { workspace = true }
+contextra-ports = { workspace = true, optional = true }
+contextra-types = { workspace = true, optional = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
+serde = { version = "1", features = ["derive"] }
 serde_json = { workspace = true }
-rand = { workspace = true }
+rand = "0.8"
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
-parking_lot = { workspace = true }
-tokio = { workspace = true }
+parking_lot = "0.12"
+tokio = { version = "1", features = ["rt", "time", "sync"] }
 scc = "2"
-blake3 = { workspace = true }
-regex = { workspace = true }
+blake3 = "1"
+regex = "1"
 
 [dev-dependencies]
-bincode = { workspace = true }
-contextra-crypto = { workspace = true, features = ["test-utils"] }
-contextra-testkit = { workspace = true }
-tempfile = { workspace = true }
-tokio = { workspace = true, features = ["full", "test-util"] }
+bincode = "1.3"
+criterion = { version = "0.5", features = ["async_tokio"] }
+tempfile = "3"
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[[bench]]
+name = "bench_privacy"
+harness = false
