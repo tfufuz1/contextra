@@ -98,6 +98,9 @@ pub struct LsmConfig {
     /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
     /// Default is 1,000,000 keys.
     pub ssi_max_tracked_keys: usize,
+    /// Optional Vfs instance for file operations.
+    #[serde(skip)]
+    pub vfs: Option<crate::io_seam::StoreIo>,
 }
 
 impl Default for LsmConfig {
@@ -113,6 +116,7 @@ impl Default for LsmConfig {
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
+            vfs: None,
         }
     }
 }
