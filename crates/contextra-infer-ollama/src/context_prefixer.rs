@@ -14,8 +14,8 @@
 //! Mit Cross-Encoder Reranking: 67% Reduktion.
 
 use crate::client::xml_escape;
+use crate::error::{OllamaError, Result};
 use crate::OllamaClient;
-use contextra_types::ContextraError;
 
 /// Konfiguration für Kontext-Präfix-Generierung.
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ impl Default for ContextPrefixConfig {
 ///
 /// # Verwendung
 /// ```no_run
-/// # async fn example() -> Result<(), contextra_types::ContextraError> {
+/// # async fn example() -> Result<(), contextra_infer_ollama::OllamaError> {
 /// use contextra_infer_ollama::{OllamaClient, ContextPrefixEngine, ContextPrefixConfig};
 /// let client = OllamaClient::new("http://localhost:11434");
 /// let engine = ContextPrefixEngine::new(client, ContextPrefixConfig::default());
@@ -72,20 +72,20 @@ impl ContextPrefixEngine {
     /// "Describe this chunk in context of the full document (1-2 sentences)."
     ///
     /// # Fehler
-    /// - `ContextraError::Storage` / `ContextraError::Io` wenn Ollama nicht erreichbar
-    /// - `ContextraError::InvalidInput` wenn document oder chunk leer
+    /// - `OllamaError::Storage` / `OllamaError::Io` wenn Ollama nicht erreichbar
+    /// - `OllamaError::InvalidInput` wenn document oder chunk leer
     pub async fn generate_prefix(
         &self,
         full_document: &str,
         chunk_content: &str,
-    ) -> Result<String, ContextraError> {
+    ) -> Result<String> {
         if full_document.trim().is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(OllamaError::InvalidInput(
                 "full_document must not be empty".into(),
             ));
         }
         if chunk_content.trim().is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(OllamaError::InvalidInput(
                 "chunk_content must not be empty".into(),
             ));
         }
@@ -125,7 +125,7 @@ impl ContextPrefixEngine {
         &self,
         full_document: &str,
         chunks: &[&str],
-    ) -> Vec<Result<String, ContextraError>> {
+    ) -> Vec<Result<String>> {
         if let Err(e) = crate::client::validate_batch_size(chunks.len()) {
             return vec![Err(e)];
         }

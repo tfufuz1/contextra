@@ -1,5 +1,5 @@
 use super::config::{MAX_BATCH_SIZE, MAX_TEXT_BYTES};
-use contextra_types::{ContextraError, Result};
+use crate::error::{OllamaError, Result};
 
 /// Escapes XML special characters in string inputs to prevent tag injection.
 pub fn xml_escape(input: &str) -> String {
@@ -28,7 +28,7 @@ pub fn build_rag_prompt(system_context: &str, rag_context: &str, user_query: &st
 /// Validates that input text length does not exceed `MAX_TEXT_BYTES`.
 pub fn validate_text_length(text: &str, field_name: &str) -> Result<()> {
     if text.len() > MAX_TEXT_BYTES {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(OllamaError::InvalidInput(format!(
             "Input field '{field_name}' size ({} bytes) exceeds maximum allowed limit of {MAX_TEXT_BYTES} bytes",
             text.len()
         )));
@@ -39,7 +39,7 @@ pub fn validate_text_length(text: &str, field_name: &str) -> Result<()> {
 /// Validates that batch size does not exceed `MAX_BATCH_SIZE`.
 pub fn validate_batch_size(count: usize) -> Result<()> {
     if count > MAX_BATCH_SIZE {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(OllamaError::InvalidInput(format!(
             "Batch size ({count}) exceeds maximum allowed limit of {MAX_BATCH_SIZE}"
         )));
     }
@@ -49,12 +49,12 @@ pub fn validate_batch_size(count: usize) -> Result<()> {
 /// Validates that model name does not contain invalid path traversal or whitespace control characters.
 pub fn validate_model_name(name: &str) -> Result<()> {
     if name.is_empty() {
-        return Err(ContextraError::InvalidInput(
+        return Err(OllamaError::InvalidInput(
             "Model name cannot be empty".into(),
         ));
     }
     if name.contains('/') || name.contains('\n') || name.contains('\r') {
-        return Err(ContextraError::PolicyViolation(format!(
+        return Err(OllamaError::InvalidInput(format!(
             "Model name '{name}' contains invalid characters"
         )));
     }
