@@ -48,6 +48,7 @@
 pub mod compaction;
 pub mod engine;
 pub mod fsync;
+pub mod key_source;
 pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
@@ -71,6 +72,8 @@ pub mod wal;
 // Tracking-Issue: WP-4.1 (Out-of-Core mmap SSTable-Zugriff; siehe docs/PLAN.md)
 // INVARIANTE: LSM-Kern bleibt blind gegenüber Indexstrukturen.
 
+#[cfg(not(loom))]
+pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
 #[cfg(not(loom))]
 pub use compaction::{
     adaptive::{

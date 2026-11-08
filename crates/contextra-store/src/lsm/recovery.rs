@@ -25,14 +25,19 @@ pub(crate) fn next_temp_file_counter() -> u64 {
     TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Helper to generate a 32-byte cryptographic salt.
-///
-/// P28-Ausnahme: kryptografisches Salt-Material (Spezifikation v17 Teil 3.1 & Governance-Regel 5).
-pub(crate) fn generate_crypto_salt() -> [u8; 32] {
+/// Helper to generate a 32-byte cryptographic salt using the provided [`KeyMaterialSource`].
+pub(crate) fn generate_crypto_salt_with_source(
+    key_source: &dyn crate::key_source::KeyMaterialSource,
+) -> Result<[u8; 32]> {
     let mut buf = [0u8; 32];
-    use rand::Rng;
-    rand::thread_rng().fill(&mut buf);
-    buf
+    key_source.fill_key_bytes(&mut buf)?;
+    Ok(buf)
+}
+
+/// Helper to generate a 32-byte cryptographic salt with default OS-CSPRNG.
+pub(crate) fn generate_crypto_salt() -> [u8; 32] {
+    let source = crate::key_source::OsKeyMaterialSource;
+    generate_crypto_salt_with_source(&source).expect("OS CSPRNG entropy failed during salt generation")
 }
 
 pub(crate) async fn write_salt_atomically(
@@ -185,7 +190,7 @@ impl LsmStorage {
                         "SALT file missing in non-pristine database directory".into(),
                     ));
                 }
-                let buf = generate_crypto_salt();
+                let buf = generate_crypto_salt_with_source(config.key_source.as_ref())?;
                 write_salt_atomically(&salt_path, &buf).await?;
                 buf.to_vec()
             }
@@ -517,8 +522,9 @@ impl LsmStorage {
         let wal_queue_depth = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let wal_queue_depth_clone = Arc::clone(&wal_queue_depth);
 
-        let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new(
+        let pressure_monitor = crate::system_pressure::SystemPressureMonitor::new_with_clock(
             std::time::Duration::from_millis(100),
+            Arc::clone(&config.clock),
         );
         let pressure_rx = pressure_monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
@@ -548,6 +554,7 @@ impl LsmStorage {
             Arc::clone(&resource_tracker),
             Some(Arc::clone(&manifest)),
         )
+        .with_clock(Arc::clone(&config.clock))
         .with_pressure_rx(pressure_rx.clone());
 
         if let Some(mo) = merge_operator {
@@ -578,6 +585,7 @@ impl LsmStorage {
                 .with_metrics_sink(Arc::clone(&metrics_sink_container)),
         );
 
+        let clock_arc = Arc::clone(&config.clock);
         let storage = Self {
             config,
             key_manager,
@@ -611,7 +619,7 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),
+            clock: parking_lot::RwLock::new(clock_arc),
             ssi_validator: Arc::clone(&default_ssi_val)
                 as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
             sequence_log_ssi_validator: Some(default_ssi_val),
