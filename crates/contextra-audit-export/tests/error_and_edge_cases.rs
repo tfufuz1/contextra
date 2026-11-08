@@ -1,10 +1,10 @@
 //! Error formatting and edge cases test suite.
 
+use contextra_audit_export::TenantId;
 use contextra_audit_export::{
     render_register_json, render_register_markdown, testkit::InMemoryProcessingRegisterSource,
     AuditExportError, ControllerContact, ProcessingRegisterSource,
 };
-use contextra_types::TenantId;
 
 #[test]
 fn test_error_display_formatting() {

@@ -1,24 +1,123 @@
 //! `contextra-audit-export` — GDPR Article 30 Processing Register export generator.
 //!
-//! # Architecture Role (Ring 0)
-//! This crate provides an external interface for generating automated processing registers
-//! (Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO) based on egress gateway logs
-//! and cryptographic deletion proofs.
+//! # Architecture Role (Building Block, Class A)
+//! This crate provides an independent, autarkic export tool for generating processing registers
+//! (Verzeichnis von Verarbeitungstätigkeiten nach Art. 30 DSGVO) based on neutral audit records.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod bsi_mapping;
+pub mod csv_template;
 pub mod error;
 pub mod markdown_template;
 pub mod testkit;
 
 pub use bsi_mapping::{bsi_mapping_table, render_bsi_mapping_markdown, BsiMappingEntry};
+pub use csv_template::render_register_csv;
 pub use error::AuditExportError;
 pub use markdown_template::render_register_markdown;
 
-use contextra_types::TenantId;
+use core::fmt;
 use serde::{Deserialize, Serialize};
+
+/// Canonical local tenant identifier for data isolation in compliance audit exports.
+///
+/// Implements standard traits and conversions to standard primitive types (`u64`).
+/// When compiled with feature `types-compat`, transparent conversions to/from
+/// `contextra_types::TenantId` are provided.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[repr(transparent)]
+pub struct TenantId(pub u64);
+
+impl TenantId {
+    /// Reserved identifier for system-internal contexts.
+    pub const SYSTEM: Self = Self(0);
+
+    /// Constructs a valid user `TenantId`.
+    ///
+    /// # Errors
+    /// Returns [`AuditExportError::InvalidTenant`] if `id == 0`, as tenant ID 0 is strictly
+    /// reserved for system context.
+    pub fn try_new(id: u64) -> Result<Self, AuditExportError> {
+        if id == 0 {
+            Err(AuditExportError::InvalidTenant(
+                "TenantId(0) is reserved for system context".to_string(),
+            ))
+        } else {
+            Ok(Self(id))
+        }
+    }
+
+    /// Constructs a `TenantId` without validation.
+    #[inline]
+    pub const fn from_raw(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Returns the underlying 64-bit integer value.
+    #[inline]
+    pub const fn as_u64(self) -> u64 {
+        self.0
+    }
+
+    /// Returns the underlying 64-bit integer value.
+    #[inline]
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+
+    /// Checks if this tenant is the reserved system tenant (ID 0).
+    #[inline]
+    pub const fn is_system(self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl Default for TenantId {
+    #[inline]
+    fn default() -> Self {
+        Self::SYSTEM
+    }
+}
+
+impl fmt::Display for TenantId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TenantId({})", self.0)
+    }
+}
+
+impl From<TenantId> for u64 {
+    #[inline]
+    fn from(t: TenantId) -> Self {
+        t.0
+    }
+}
+
+impl TryFrom<u64> for TenantId {
+    type Error = AuditExportError;
+
+    #[inline]
+    fn try_from(id: u64) -> Result<Self, Self::Error> {
+        Self::try_new(id)
+    }
+}
+
+#[cfg(feature = "types-compat")]
+impl From<contextra_types::TenantId> for TenantId {
+    #[inline]
+    fn from(t: contextra_types::TenantId) -> Self {
+        Self(t.as_u64())
+    }
+}
+
+#[cfg(feature = "types-compat")]
+impl From<TenantId> for contextra_types::TenantId {
+    #[inline]
+    fn from(t: TenantId) -> Self {
+        contextra_types::TenantId(t.0)
+    }
+}
 
 /// Contact details for the data controller, representative, and data protection officer (Art. 30 Abs. 1 lit. a DSGVO).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,7 +230,7 @@ pub struct DeletionProofSummary {
 /// A record entry in the GDPR Article 30 processing register.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingRegisterEntry {
-    /// Associated tenant identifier (`contextra_types::TenantId`).
+    /// Associated tenant identifier ([`TenantId`]).
     pub tenant_id: TenantId,
     /// Contact details of data controller, representative, and DSB (Art. 30 Abs. 1 lit. a).
     pub controller_contact: ControllerContact,
@@ -248,6 +347,15 @@ pub trait ProcessingRegisterSource {
         &self,
         tenant_id: TenantId,
     ) -> Result<Vec<ProcessingRegisterEntry>, AuditExportError>;
+}
+
+/// Neutral record source trait for streaming audit records (B1, B3).
+pub trait RecordSource {
+    /// Record item type.
+    type Record;
+
+    /// Collects records into a vector.
+    fn collect_records(&self) -> Result<Vec<Self::Record>, AuditExportError>;
 }
 
 /// Renders a list of processing register entries as a formatted JSON string.

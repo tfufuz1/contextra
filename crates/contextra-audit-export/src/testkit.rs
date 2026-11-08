@@ -2,9 +2,9 @@
 
 use crate::{
     AuditExportError, ControllerContact, DeletionProofSummary, EgressEventSummary,
-    ProcessingRegisterEntry, ProcessingRegisterSource, RetentionPeriod, ThirdCountryTransfer,
+    ProcessingRegisterEntry, ProcessingRegisterSource, RetentionPeriod, TenantId,
+    ThirdCountryTransfer,
 };
-use contextra_types::TenantId;
 
 /// In-memory implementation of [`ProcessingRegisterSource`] for testing purposes.
 #[derive(Debug, Default, Clone)]

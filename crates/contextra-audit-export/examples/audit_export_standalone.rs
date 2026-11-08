@@ -4,9 +4,8 @@
 
 use contextra_audit_export::{
     bsi_mapping_table, render_bsi_mapping_markdown, render_register_json, render_register_markdown,
-    testkit::InMemoryProcessingRegisterSource, ProcessingRegisterSource,
+    testkit::InMemoryProcessingRegisterSource, ProcessingRegisterSource, TenantId,
 };
-use contextra_types::TenantId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tenant_id = TenantId::try_new(1001)?;
