@@ -5,8 +5,8 @@
 //! MK3: Schlüsselabwesenheit – Slot der höchsten Ebene genullt, DEK-Ableitung scheitert.
 
 use crate::error::ErasureError;
+use crate::types_local::Vfs;
 use crate::types_local::{LayerId, MeasureClass};
-use contextra_ports::vfs::Vfs;
 use std::path::{Path, PathBuf};
 
 /// Art der Leseverifikation gemäß SPEC D-113.

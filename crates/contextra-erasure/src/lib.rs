@@ -12,6 +12,7 @@
 
 pub mod backend;
 pub mod crypto_local;
+pub mod deletion_proof;
 pub mod error;
 pub mod gate;
 pub mod io;
@@ -30,3 +31,8 @@ pub mod supersede;
 pub mod test_mocks;
 pub mod types_local;
 pub mod vault;
+
+pub mod ed25519_proof;
+pub mod kv_shredding;
+pub mod orchestrator;
+pub mod revocation_log;

@@ -5,9 +5,9 @@
 use contextra_erasure::measure::field::{scan_mk1_structures, scan_mk2_raw, scan_mk3_keys};
 use contextra_erasure::measure::positive_control::run_positive_control;
 use contextra_erasure::measure::witness::{arm_scanner, finish_scan};
+use contextra_erasure::types_local::Vfs;
 use contextra_erasure::types_local::{LayerId, MeasureClass, Scanner, Unarmed};
 use contextra_erasure::types_local::{VfsFile, VfsOpenOptions};
-use contextra_ports::vfs::Vfs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -88,44 +88,53 @@ impl MemoryVfsFile {
 }
 
 impl Vfs for MemoryVfs {
-    fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
+    fn read(&self, path: &Path) -> Result<Vec<u8>, contextra_erasure::error::ErasureError> {
         let files = self.files.lock().unwrap();
-        files
-            .get(path)
-            .cloned()
-            .ok_or_else(|| contextra_types::ContextraError::NotFound(path.display().to_string()))
+        files.get(path).cloned().ok_or_else(|| {
+            contextra_erasure::error::ErasureError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                path.display().to_string(),
+            ))
+        })
     }
 
-    fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_ports::Result<()> {
+    fn write_atomic(
+        &self,
+        path: &Path,
+        data: &[u8],
+    ) -> Result<(), contextra_erasure::error::ErasureError> {
         let mut files = self.files.lock().unwrap();
         files.insert(path.to_path_buf(), data.to_vec());
         Ok(())
     }
 
-    fn create_dir_all(&self, _path: &Path) -> contextra_ports::Result<()> {
+    fn create_dir_all(&self, _path: &Path) -> Result<(), contextra_erasure::error::ErasureError> {
         Ok(())
     }
 
-    fn remove_file(&self, path: &Path) -> contextra_ports::Result<()> {
+    fn remove_file(&self, path: &Path) -> Result<(), contextra_erasure::error::ErasureError> {
         let mut files = self.files.lock().unwrap();
         files.remove(path);
         Ok(())
     }
 
-    fn exists(&self, path: &Path) -> contextra_ports::Result<bool> {
+    fn exists(&self, path: &Path) -> Result<bool, contextra_erasure::error::ErasureError> {
         let files = self.files.lock().unwrap();
         Ok(files.contains_key(path))
     }
 
-    fn len(&self, path: &Path) -> contextra_ports::Result<u64> {
+    fn len(&self, path: &Path) -> Result<u64, contextra_erasure::error::ErasureError> {
         let files = self.files.lock().unwrap();
-        let content = files
-            .get(path)
-            .ok_or_else(|| contextra_types::ContextraError::NotFound(path.display().to_string()))?;
+        let content = files.get(path).ok_or_else(|| {
+            contextra_erasure::error::ErasureError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                path.display().to_string(),
+            ))
+        })?;
         Ok(content.len() as u64)
     }
 
-    fn list_dir(&self, path: &Path) -> contextra_ports::Result<Vec<String>> {
+    fn list_dir(&self, path: &Path) -> Result<Vec<String>, contextra_erasure::error::ErasureError> {
         let files = self.files.lock().unwrap();
         let mut names = Vec::new();
         for k in files.keys() {
@@ -141,7 +150,7 @@ impl Vfs for MemoryVfs {
         Ok(names)
     }
 
-    fn sync_dir(&self, _path: &Path) -> contextra_ports::Result<()> {
+    fn sync_dir(&self, _path: &Path) -> Result<(), contextra_erasure::error::ErasureError> {
         Ok(())
     }
 }

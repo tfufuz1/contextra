@@ -11,7 +11,7 @@ use crate::types_local::{Envelope, RecordSealer, SealCtx};
 use crate::types_local::{KeyBuf, KeyRange};
 use crate::vault::slot::SlotType;
 use crate::vault::FileVault;
-use contextra_ports::BoxFuture;
+use futures_util::future::BoxFuture;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;

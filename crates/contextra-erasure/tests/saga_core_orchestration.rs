@@ -18,7 +18,9 @@ use contextra_erasure::saga::machine::{EraseSaga, SagaState};
 use contextra_erasure::saga::seams::{
     SagaGate, SagaJournal, SagaLedger, SagaMeasure, SagaReport, SagaVault, SnapshotRevoker,
 };
+use contextra_erasure::types_local::Clock;
 use contextra_erasure::types_local::GateDecision;
+use contextra_erasure::types_local::IdGen;
 use contextra_erasure::types_local::OperatorRef;
 use contextra_erasure::types_local::{
     Armed, EraseTarget, ErasureLayer, KeyCoverage, LayerId, LayerScope, LayerWitness, PurgeCx,
@@ -33,9 +35,7 @@ use contextra_erasure::types_local::{
 };
 use contextra_erasure::types_local::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError};
 use contextra_erasure::types_local::{ErasureId, Timestamp};
-use contextra_ports::clock::Clock;
-use contextra_ports::id_gen::IdGen;
-use contextra_ports::BoxFuture;
+use futures_util::future::BoxFuture;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};

@@ -2,8 +2,8 @@
 
 use crate::backend::{ErasureTarget, StorageBackend};
 use crate::error::ErasureError;
-use contextra_ports::erasure::{LayerId, PurgeCx, PurgeOutcome};
-use contextra_ports::BoxFuture;
+use crate::types_local::{LayerId, PurgeCx, PurgeOutcome};
+use futures_util::future::BoxFuture;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
