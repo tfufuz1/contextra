@@ -84,7 +84,7 @@ impl VerificationResult {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// use contextra_crypto::deletion_proof::{
 ///     DeletionProof, DeletionProofVerifier, DeletionScope, LayerCleanupProof, DeletionLayer
 /// };

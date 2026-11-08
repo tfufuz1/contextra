@@ -1,15 +1,17 @@
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:54:39Z (SESSION: ed7b7b38)
 // ZWECK: LLM-basierte Wichtigkeits-Bewertung (ImportanceScore 0.0-1.0) für Memory Chunks
-// INVARIANTEN: Parst Floats via OnceLock-Regex; Escaped Input vor Prompt-Bau; Returnt `ContextraError::Internal` bei Parse-Fehler
+// INVARIANTEN: Parst Floats via OnceLock-Regex; Escaped Input vor Prompt-Bau; Returnt `OllamaError::Internal` bei Parse-Fehler
 // NICHT-OFFENSICHTLICH: Regex parst erste valide 0.0-1.0 Float-Zahl aus LLM Few-Shot Antwort
 // HOTSPOTS: score_importance
 
 //! LLM-based Memory Importance scoring using Ollama generate_text.
 
-use crate::client::xml_escape;
+use crate::error::{OllamaError, Result};
+#[cfg(feature = "http")]
+use crate::xml_escape::xml_escape;
+#[cfg(feature = "http")]
 use crate::OllamaClient;
-use contextra_types::{ContextraError, ImportanceScore, Result};
 use parking_lot::Mutex;
 use regex::Regex;
 use std::sync::{Arc, OnceLock};
@@ -34,6 +36,7 @@ pub trait ImportanceCalibrator: Send + Sync {
 /// # Performance
 /// Spawns one tokio task per chunk up to `max_concurrent` (default: 8).
 /// Uses `futures::stream::buffer_unordered` to limit concurrency without blocking.
+#[cfg(feature = "http")]
 pub async fn score_importance_batch(
     client: &Arc<OllamaClient>,
     chunks: &[&str],
@@ -61,10 +64,7 @@ pub async fn score_importance_batch(
                         .unwrap_or_else(|e| {
                             tracing::warn!(chunk_index = i, error = %e,
                                 "score_importance_batch: chunk failed, using default");
-                            ImportanceAssessment::new(
-                                ImportanceScore::default(),
-                                Confidence::Unparseable,
-                            )
+                            ImportanceAssessment::new(0.5, Confidence::Unparseable)
                         }),
                 )
             }
@@ -74,10 +74,7 @@ pub async fn score_importance_batch(
         .await
         .into_iter()
         .fold(
-            vec![
-                ImportanceAssessment::new(ImportanceScore::default(), Confidence::Unparseable,);
-                chunks.len()
-            ],
+            vec![ImportanceAssessment::new(0.5, Confidence::Unparseable,); chunks.len()],
             |mut acc, (i, assessment)| {
                 if let Some(slot) = acc.get_mut(i) {
                     *slot = assessment;
@@ -102,7 +99,7 @@ pub enum Confidence {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ImportanceAssessment {
     /// The normalized importance score (0.0 to 1.0).
-    pub score: ImportanceScore,
+    pub score: f32,
     /// Confidence indicator describing whether the score was parsed or defaulted.
     pub confidence: Confidence,
     /// Model ID used to generate this score (prevents provenance loss across model changes).
@@ -116,7 +113,7 @@ pub struct ImportanceAssessment {
 
 impl ImportanceAssessment {
     /// Creates a new `ImportanceAssessment` with default empty model ID and no calibration.
-    pub fn new(score: ImportanceScore, confidence: Confidence) -> Self {
+    pub fn new(score: f32, confidence: Confidence) -> Self {
         Self {
             score,
             confidence,
@@ -127,7 +124,7 @@ impl ImportanceAssessment {
 
     /// Creates a new `ImportanceAssessment` with model provenance and optional calibrated confidence.
     pub fn with_provenance(
-        score: ImportanceScore,
+        score: f32,
         confidence: Confidence,
         model_id: impl Into<String>,
         calibrated_confidence: Option<f32>,
@@ -142,7 +139,7 @@ impl ImportanceAssessment {
 
     /// Helper returning the raw `f32` importance score value.
     pub fn value(&self) -> f32 {
-        self.score.value()
+        self.score
     }
 
     /// Returns `true` if the score was parsed successfully from the LLM output.
@@ -156,11 +153,11 @@ fn get_score_regex() -> Result<&'static Regex> {
         return Ok(re);
     }
     let re = Regex::new(r"(?:0(?:\.\d+)?|1(?:\.0+)?|\.\d+)")
-        .map_err(|e| ContextraError::Internal(format!("Regex compilation failed: {e}")))?;
+        .map_err(|e| OllamaError::Internal(format!("Regex compilation failed: {e}")))?;
     let _ = SCORE_REGEX.set(re);
     SCORE_REGEX
         .get()
-        .ok_or_else(|| ContextraError::Internal("SCORE_REGEX set failed".into()))
+        .ok_or_else(|| OllamaError::Internal("SCORE_REGEX set failed".into()))
 }
 
 /// Evaluates the importance of a text chunk using a local Ollama LLM model.
@@ -169,9 +166,10 @@ fn get_score_regex() -> Result<&'static Regex> {
 /// a score output between 0.0 and 1.0.
 ///
 /// # Errors
-/// - Returns `ContextraError::InvalidInput` if `chunk_text` is empty.
-/// - Returns `ContextraError::Storage` / `ContextraError::Io` on network or Ollama API errors.
+/// - Returns `OllamaError::InvalidInput` if `chunk_text` is empty.
+/// - Returns `OllamaError::Storage` / `OllamaError::Io` on network or Ollama API errors.
 // AI-TAG[ML-SCORING][MAJOR] RESOLVED: Score importance enriches output with model_id provenance and optional calibrated_confidence via IsotonicCalibrator. Post-hoc outcome feedback interface record_importance_outcome added (ID: AGT-OLLAMA-14c0c140) (TS: 2026-09-07T06:00:00Z) (SESSION: jules)
+#[cfg(feature = "http")]
 pub async fn score_importance(
     client: &OllamaClient,
     chunk_text: &str,
@@ -183,13 +181,14 @@ pub async fn score_importance(
 ///
 /// Populates `model_id` provenance from `client.config().model` and enriches
 /// `calibrated_confidence` when the calibrator has completed warmup.
+#[cfg(feature = "http")]
 pub async fn score_importance_with_calibrator(
     client: &OllamaClient,
     chunk_text: &str,
     calibrator: Option<&Arc<Mutex<dyn ImportanceCalibrator>>>,
 ) -> Result<ImportanceAssessment> {
     if chunk_text.trim().is_empty() {
-        return Err(ContextraError::InvalidInput(
+        return Err(OllamaError::InvalidInput(
             "chunk_text must not be empty".into(),
         ));
     }
@@ -252,14 +251,14 @@ pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessme
             raw_response = %truncated,
             "SCORE_REGEX compilation failed, returning default ImportanceScore(0.5) with Confidence::Unparseable"
         );
-        return ImportanceAssessment::new(ImportanceScore::default(), Confidence::Unparseable);
+        return ImportanceAssessment::new(0.5, Confidence::Unparseable);
     };
 
     let trimmed = raw_response.trim();
     if let Some(m) = re.find(trimmed) {
         let matched = m.as_str();
         if let Ok(parsed) = matched.parse::<f32>() {
-            return ImportanceAssessment::new(ImportanceScore::new(parsed), Confidence::Parsed);
+            return ImportanceAssessment::new(parsed, Confidence::Parsed);
         }
     }
 
@@ -268,7 +267,7 @@ pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessme
         raw_response = %truncated,
         "Failed to parse ImportanceScore float from LLM response, returning default ImportanceScore(0.5) with Confidence::Unparseable"
     );
-    ImportanceAssessment::new(ImportanceScore::default(), Confidence::Unparseable)
+    ImportanceAssessment::new(0.5, Confidence::Unparseable)
 }
 
 #[cfg(test)]
@@ -277,6 +276,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_batch_empty_returns_empty() {
         let client = Arc::new(OllamaClient::new("http://localhost:11434"));
         let res = score_importance_batch(&client, &[], None, 8).await;
@@ -284,6 +284,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_batch_preserves_order() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -340,6 +341,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_batch_single_error_doesnt_kill_batch() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -385,13 +387,15 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_empty_text_error() {
         let client = OllamaClient::new("http://localhost:11434");
         let res = score_importance(&client, "   ").await;
-        assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
+        assert!(matches!(res, Err(OllamaError::InvalidInput(_))));
     }
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_mock_success() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -428,6 +432,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_mock_invalid_response_error() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -530,6 +535,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http")]
     async fn test_score_importance_with_calibrator_provenance_and_warmup() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap

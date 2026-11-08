@@ -9,10 +9,9 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
-use contextra_ports::{Clock, Rng, SeededRng, SystemClock};
-use contextra_types::{ContextraError, Result};
-use futures_util::StreamExt;
-use serde::Deserialize;
+use crate::error::{OllamaError, Result};
+use crate::traits::{Clock, Rng, SeededRng, SystemClock};
+use futures::StreamExt;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,7 +19,7 @@ use std::time::Duration;
 pub async fn read_response_bytes(response: reqwest::Response, max_bytes: usize) -> Result<Vec<u8>> {
     if let Some(len) = response.content_length() {
         if usize::try_from(len).unwrap_or(usize::MAX) > max_bytes {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(OllamaError::InvalidInput(format!(
                 "Response size limit exceeded: content length {len} bytes exceeds maximum allowed limit of {max_bytes} bytes"
             )));
         }
@@ -30,16 +29,16 @@ pub async fn read_response_bytes(response: reqwest::Response, max_bytes: usize) 
     while let Some(chunk_res) = stream.next().await {
         let chunk = chunk_res.map_err(|e| {
             if e.is_timeout() {
-                ContextraError::Io(std::io::Error::new(
+                OllamaError::Io(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
                     format!("Network stream read timed out: {e}"),
                 ))
             } else {
-                ContextraError::Storage(format!("Network stream read error: {e}"))
+                OllamaError::Storage(format!("Network stream read error: {e}"))
             }
         })?;
         if body.len() + chunk.len() > max_bytes {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(OllamaError::InvalidInput(format!(
                 "Response size limit exceeded: cumulative stream body exceeded maximum allowed limit of {max_bytes} bytes"
             )));
         }
@@ -51,9 +50,8 @@ pub async fn read_response_bytes(response: reqwest::Response, max_bytes: usize) 
 /// Helper to read HTTP response text while strictly enforcing `max_bytes` limit.
 pub async fn read_response_text(response: reqwest::Response, max_bytes: usize) -> Result<String> {
     let bytes = read_response_bytes(response, max_bytes).await?;
-    String::from_utf8(bytes).map_err(|e| {
-        ContextraError::Serialization(format!("Response body is not valid UTF-8: {e}"))
-    })
+    String::from_utf8(bytes)
+        .map_err(|e| OllamaError::Serialization(format!("Response body is not valid UTF-8: {e}")))
 }
 
 /// Private helper to calculate retry jitter bounded to 0..100 ms using the injected RNG port.
@@ -164,7 +162,7 @@ impl OllamaClient {
             .pool_max_idle_per_host(8)
             .build()
             .map_err(|e| {
-                ContextraError::Io(std::io::Error::other(format!(
+                OllamaError::Io(std::io::Error::other(format!(
                     "HTTP client construction failed: {e}"
                 )))
             })?;
@@ -208,7 +206,7 @@ impl OllamaClient {
     /// Pre-request policy and circuit breaker validation.
     fn prepare_request(&self) -> Result<()> {
         if let Some(ref build_err) = self.client_build_error {
-            return Err(ContextraError::Io(std::io::Error::other(format!(
+            return Err(OllamaError::Io(std::io::Error::other(format!(
                 "Client construction failed: {build_err}"
             ))));
         }
@@ -217,7 +215,7 @@ impl OllamaClient {
             .check_endpoint(self.base_url(), self.audit_sink.as_ref())?;
         self.circuit_breaker
             .check(self.clock.as_ref())
-            .map_err(|msg| ContextraError::Io(std::io::Error::other(msg)))?;
+            .map_err(|msg| OllamaError::Io(std::io::Error::other(msg)))?;
         Ok(())
     }
 
@@ -260,7 +258,7 @@ impl OllamaClient {
                 "Ollama health check at {} returned unsuccessful status",
                 self.base_url()
             );
-            return Err(ContextraError::Storage(format!(
+            return Err(OllamaError::Storage(format!(
                 "Ollama health check at {} returned HTTP status {}",
                 self.base_url(),
                 status
@@ -364,25 +362,22 @@ impl OllamaClient {
 
             if status == reqwest::StatusCode::NOT_FOUND || body.to_lowercase().contains("not found")
             {
-                return Err(ContextraError::NotFound(format!(
+                return Err(OllamaError::NotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
             if status == reqwest::StatusCode::BAD_REQUEST {
-                return Err(ContextraError::InvalidInput("Batch embed HTTP 400".into()));
+                return Err(OllamaError::InvalidInput("Batch embed HTTP 400".into()));
             }
-            return Err(ContextraError::Internal(format!(
-                "Batch embed HTTP {status}"
-            )));
+            return Err(OllamaError::Internal(format!("Batch embed HTTP {status}")));
         }
 
         let bytes = read_response_bytes(response, self.config.max_response_bytes).await?;
-        let parsed: BatchEmbedResponse = serde_json::from_slice(&bytes).map_err(|e| {
-            ContextraError::Internal(format!("Batch embed response parse error: {e}"))
-        })?;
+        let parsed: BatchEmbedResponse = serde_json::from_slice(&bytes)
+            .map_err(|e| OllamaError::Internal(format!("Batch embed response parse error: {e}")))?;
 
         if parsed.embeddings.len() != texts.len() {
-            return Err(ContextraError::Internal(format!(
+            return Err(OllamaError::Internal(format!(
                 "Batch embed response count mismatch: expected {}, got {}",
                 texts.len(),
                 parsed.embeddings.len()
@@ -401,7 +396,7 @@ impl OllamaClient {
             Ok(r) => r,
             Err(e) => {
                 self.circuit_breaker.record_failure(self.clock.as_ref());
-                return Err(ContextraError::Internal(format!(
+                return Err(OllamaError::Internal(format!(
                     "Ollama not reachable at {}: {e}",
                     self.base_url()
                 )));
@@ -413,23 +408,23 @@ impl OllamaClient {
             if status.is_server_error() {
                 self.circuit_breaker.record_failure(self.clock.as_ref());
             }
-            return Err(ContextraError::Storage(format!(
+            return Err(OllamaError::Storage(format!(
                 "Ollama list_models HTTP {status}"
             )));
         }
 
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct TagsResponse {
             models: Vec<ModelTagInfo>,
         }
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         struct ModelTagInfo {
             name: String,
         }
 
         let bytes = read_response_bytes(response, self.config.max_response_bytes).await?;
         let tags: TagsResponse = serde_json::from_slice(&bytes)
-            .map_err(|e| ContextraError::Internal(format!("Invalid Ollama tags response: {e}")))?;
+            .map_err(|e| OllamaError::Internal(format!("Invalid Ollama tags response: {e}")))?;
 
         self.circuit_breaker.record_success();
         Ok(tags.models.into_iter().map(|m| m.name).collect())
@@ -484,7 +479,7 @@ impl OllamaClient {
 
         match last_err {
             Some(e) => Err(e),
-            None => Err(ContextraError::Storage(
+            None => Err(OllamaError::Storage(
                 "generate_text retries exhausted with no error captured".into(),
             )),
         }
@@ -505,7 +500,7 @@ impl OllamaClient {
         validate_model_name(model)?;
         validate_text_length(prompt, "prompt")?;
         if prompt.trim().is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(OllamaError::InvalidInput(
                 "generate_text_stream: prompt is empty".into(),
             ));
         }
@@ -541,16 +536,16 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(ContextraError::NotFound(format!(
+                return Err(OllamaError::NotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
             if status == reqwest::StatusCode::BAD_REQUEST {
-                return Err(ContextraError::InvalidInput(
+                return Err(OllamaError::InvalidInput(
                     "Ollama generate_text_stream HTTP 400".into(),
                 ));
             }
-            return Err(ContextraError::Internal(format!(
+            return Err(OllamaError::Internal(format!(
                 "Ollama generate_text_stream failed: HTTP {status}"
             )));
         }
@@ -563,11 +558,11 @@ impl OllamaClient {
 
         'outer: while let Some(chunk_result) = stream.next().await {
             let bytes = chunk_result
-                .map_err(|e| ContextraError::Storage(format!("Stream interrupted: {e}")))?;
+                .map_err(|e| OllamaError::Storage(format!("Stream interrupted: {e}")))?;
 
             total_bytes += bytes.len();
             if total_bytes > max_bytes {
-                return Err(ContextraError::InvalidInput(format!(
+                return Err(OllamaError::InvalidInput(format!(
                     "Response size limit exceeded in stream: cumulative size exceeds {max_bytes} bytes"
                 )));
             }
@@ -606,7 +601,7 @@ impl OllamaClient {
                                 chunk.done
                             }
                             Err(e) => {
-                                return Err(ContextraError::Serialization(format!(
+                                return Err(OllamaError::Serialization(format!(
                                     "Failed to parse streaming JSON chunk: {e}"
                                 )));
                             }
@@ -653,7 +648,7 @@ impl OllamaClient {
                     }
                 }
                 Err(e) => {
-                    return Err(ContextraError::Serialization(format!(
+                    return Err(OllamaError::Serialization(format!(
                         "Failed to parse streaming JSON chunk: {e}"
                     )));
                 }
@@ -670,7 +665,7 @@ impl OllamaClient {
         validate_model_name(model)?;
         validate_text_length(prompt, "prompt")?;
         if prompt.trim().is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(OllamaError::InvalidInput(
                 "generate_text: prompt is empty".into(),
             ));
         }
@@ -706,23 +701,23 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(ContextraError::NotFound(format!(
+                return Err(OllamaError::NotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
             if status == reqwest::StatusCode::BAD_REQUEST {
-                return Err(ContextraError::InvalidInput(
+                return Err(OllamaError::InvalidInput(
                     "Ollama generate_text HTTP 400".into(),
                 ));
             }
-            return Err(ContextraError::Internal(format!(
+            return Err(OllamaError::Internal(format!(
                 "Ollama generate_text failed: HTTP {status}"
             )));
         }
 
         let bytes = read_response_bytes(response, self.config.max_response_bytes).await?;
         let body: serde_json::Value = serde_json::from_slice(&bytes)
-            .map_err(|e| ContextraError::Internal(format!("JSON parse error: {e}")))?;
+            .map_err(|e| OllamaError::Internal(format!("JSON parse error: {e}")))?;
 
         let text = body
             .get("message")
@@ -730,7 +725,7 @@ impl OllamaClient {
             .and_then(|c| c.as_str())
             .map(|s| s.trim().to_string())
             .ok_or_else(|| {
-                ContextraError::Internal("Ollama response missing message.content".into())
+                OllamaError::Internal("Ollama response missing message.content".into())
             })?;
 
         self.circuit_breaker.record_success();
@@ -768,7 +763,7 @@ impl OllamaClient {
 
         match last_err {
             Some(e) => Err(e),
-            None => Err(ContextraError::Storage(
+            None => Err(OllamaError::Storage(
                 "generate retries exhausted with no error captured".into(),
             )),
         }
@@ -810,34 +805,33 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(ContextraError::NotFound(format!(
+                return Err(OllamaError::NotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
             if status == reqwest::StatusCode::BAD_REQUEST {
-                return Err(ContextraError::InvalidInput(
+                return Err(OllamaError::InvalidInput(
                     "Ollama generate request failed: HTTP 400".into(),
                 ));
             }
-            return Err(ContextraError::Internal(format!(
+            return Err(OllamaError::Internal(format!(
                 "Ollama generate request failed: HTTP {status}"
             )));
         }
 
         let bytes = read_response_bytes(response, self.config.max_response_bytes).await?;
-        let parsed: GenerateResponse = serde_json::from_slice(&bytes).map_err(|e| {
-            ContextraError::Internal(format!("Invalid Ollama generate response: {e}"))
-        })?;
+        let parsed: GenerateResponse = serde_json::from_slice(&bytes)
+            .map_err(|e| OllamaError::Internal(format!("Invalid Ollama generate response: {e}")))?;
 
         self.circuit_breaker.record_success();
         Ok(parsed.response)
     }
 
-    /// Ensures that the specified model exists; returns `ContextraError::NotFound` with helpful instruction if missing.
+    /// Ensures that the specified model exists; returns `OllamaError::NotFound` with helpful instruction if missing.
     pub async fn ensure_model_available(&self, model: &str) -> Result<()> {
         validate_model_name(model)?;
         if !self.is_model_available(model).await {
-            return Err(ContextraError::NotFound(format!(
+            return Err(OllamaError::NotFound(format!(
                 "Ollama model '{model}' not found. Run: ollama pull {model}"
             )));
         }
@@ -877,7 +871,7 @@ impl OllamaClient {
 
         match last_err {
             Some(e) => Err(e),
-            None => Err(ContextraError::Storage(
+            None => Err(OllamaError::Storage(
                 "Embed retries exhausted with no error captured".into(),
             )),
         }
@@ -918,23 +912,23 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(ContextraError::NotFound(format!(
+                return Err(OllamaError::NotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
             if status == reqwest::StatusCode::BAD_REQUEST {
-                return Err(ContextraError::InvalidInput(
+                return Err(OllamaError::InvalidInput(
                     "Ollama embedding request failed: HTTP 400".into(),
                 ));
             }
-            return Err(ContextraError::Internal(format!(
+            return Err(OllamaError::Internal(format!(
                 "Ollama embedding request failed: HTTP {status}"
             )));
         }
 
         let bytes = read_response_bytes(response, self.config.max_response_bytes).await?;
         let parsed: EmbedResponse = serde_json::from_slice(&bytes).map_err(|e| {
-            ContextraError::Internal(format!("Invalid Ollama embedding response: {e}"))
+            OllamaError::Internal(format!("Invalid Ollama embedding response: {e}"))
         })?;
 
         self.circuit_breaker.record_success();
@@ -999,16 +993,16 @@ impl OllamaClient {
             if lower.contains("model") && lower.contains("not found")
                 || status == reqwest::StatusCode::NOT_FOUND
             {
-                return Err(ContextraError::NotFound(format!(
+                return Err(OllamaError::NotFound(format!(
                     "Ollama model '{model}' not found. Run: ollama pull {model}"
                 )));
             }
             if status == reqwest::StatusCode::BAD_REQUEST {
-                return Err(ContextraError::InvalidInput(
+                return Err(OllamaError::InvalidInput(
                     "Ollama chat_with_rag_streaming HTTP 400".into(),
                 ));
             }
-            return Err(ContextraError::Internal(format!(
+            return Err(OllamaError::Internal(format!(
                 "Ollama chat request failed: HTTP {status}"
             )));
         }
@@ -1021,11 +1015,11 @@ impl OllamaClient {
 
         'outer: while let Some(chunk_result) = stream.next().await {
             let bytes = chunk_result
-                .map_err(|e| ContextraError::Storage(format!("Stream interrupted: {e}")))?;
+                .map_err(|e| OllamaError::Storage(format!("Stream interrupted: {e}")))?;
 
             total_bytes += bytes.len();
             if total_bytes > max_bytes {
-                return Err(ContextraError::InvalidInput(format!(
+                return Err(OllamaError::InvalidInput(format!(
                     "Response size limit exceeded in stream: cumulative size exceeds {max_bytes} bytes"
                 )));
             }
@@ -1060,7 +1054,7 @@ impl OllamaClient {
                                 chunk.done
                             }
                             Err(e) => {
-                                return Err(ContextraError::Serialization(format!(
+                                return Err(OllamaError::Serialization(format!(
                                     "Failed to parse streaming JSON chunk: {e}"
                                 )));
                             }
@@ -1105,7 +1099,7 @@ impl OllamaClient {
                     }
                 }
                 Err(e) => {
-                    return Err(ContextraError::Serialization(format!(
+                    return Err(OllamaError::Serialization(format!(
                         "Failed to parse streaming JSON chunk: {e}"
                     )));
                 }
@@ -1131,7 +1125,7 @@ pub(crate) struct ParsedPrompt {
 #[cfg(test)]
 pub(crate) fn parse_prompt_template(
     prompt: &str,
-) -> std::result::Result<ParsedPrompt, ContextraError> {
+) -> std::result::Result<ParsedPrompt, OllamaError> {
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
 
@@ -1162,7 +1156,7 @@ pub(crate) fn parse_prompt_template(
                         text_buf.push_str(&name);
                         text_buf.push('>');
                     } else {
-                        return Err(ContextraError::Internal(format!(
+                        return Err(OllamaError::Internal(format!(
                             "parse_prompt_template: nested tag '{}' inside '{}' is not allowed",
                             name, current_tag
                         )));
@@ -1174,7 +1168,7 @@ pub(crate) fn parse_prompt_template(
                 let name = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 if depth == 2 {
                     let unescaped = quick_xml::escape::unescape(&text_buf).map_err(|e| {
-                        ContextraError::Internal(format!(
+                        OllamaError::Internal(format!(
                             "parse_prompt_template: unescape failed: {}",
                             e
                         ))
@@ -1191,7 +1185,7 @@ pub(crate) fn parse_prompt_template(
             Ok(Event::Text(e)) => {
                 if depth >= 2 {
                     let text = reader.decoder().decode(e.as_ref()).map_err(|e| {
-                        ContextraError::Internal(format!(
+                        OllamaError::Internal(format!(
                             "parse_prompt_template: decode text failed: {}",
                             e
                         ))
@@ -1202,7 +1196,7 @@ pub(crate) fn parse_prompt_template(
             Ok(Event::GeneralRef(e)) => {
                 if depth == 2 {
                     let text = reader.decoder().decode(e.as_ref()).map_err(|e| {
-                        ContextraError::Internal(format!(
+                        OllamaError::Internal(format!(
                             "parse_prompt_template: decode ref failed: {}",
                             e
                         ))
@@ -1214,7 +1208,7 @@ pub(crate) fn parse_prompt_template(
             }
             Ok(_) => {}
             Err(e) => {
-                return Err(ContextraError::Internal(format!(
+                return Err(OllamaError::Internal(format!(
                     "parse_prompt_template: XML parse error at offset {}: {}",
                     reader.buffer_position(),
                     e
@@ -1225,7 +1219,7 @@ pub(crate) fn parse_prompt_template(
     }
 
     if child_tags != ["system", "instructions", "context", "user_query"] {
-        return Err(ContextraError::Internal(format!(
+        return Err(OllamaError::Internal(format!(
             "parse_prompt_template: expected tags [system, instructions, context, user_query], got {:?}",
             child_tags
         )));

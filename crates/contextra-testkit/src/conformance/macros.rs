@@ -16,7 +16,32 @@
 macro_rules! assert_conformance {
     ($res:expr) => {
         if let Err(failure) = $res {
-            panic!("{}", failure);
+            #[allow(clippy::panic)]
+            {
+                ::std::panic::panic_any(failure.to_string());
+            }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::conformance::failure::ConformanceFailure;
+
+    #[test]
+    fn test_assert_conformance_macro_success() {
+        let ok_res: Result<(), ConformanceFailure> = Ok(());
+        assert_conformance!(ok_res);
+    }
+
+    #[test]
+    #[should_panic(expected = "synthetic test failure")]
+    fn test_assert_conformance_macro_failure() {
+        let err_res: Result<(), ConformanceFailure> = Err(ConformanceFailure::new(
+            "TestSuite",
+            "test_case",
+            "synthetic test failure",
+        ));
+        assert_conformance!(err_res);
+    }
 }

@@ -45,13 +45,33 @@ pub mod anti_tamper;
 pub mod audit_chain;
 pub mod crypto;
 pub mod dek;
+#[cfg(feature = "legacy-erasure")]
+#[deprecated(
+    since = "0.1.0",
+    note = "Lösch- und Attestationslogik migriert nach contextra-erasure (SPEC §6.2)"
+)]
 pub mod deletion_proof;
+#[cfg(feature = "legacy-erasure")]
+#[deprecated(
+    since = "0.1.0",
+    note = "Ed25519 Proof Typen migrieren nach contextra-erasure (SPEC §6.2)"
+)]
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
+#[cfg(feature = "legacy-erasure")]
+#[deprecated(
+    since = "0.1.0",
+    note = "KV-Shredding Logik migriert nach contextra-erasure (SPEC §6.2)"
+)]
 pub mod kv_shredding;
+#[cfg(feature = "legacy-erasure")]
+#[deprecated(
+    since = "0.1.0",
+    note = "RevocationLog migriert nach contextra-erasure (SPEC §6.2)"
+)]
 pub mod revocation_log;
 pub mod secret;
 pub mod wal_completeness;
@@ -68,14 +88,20 @@ pub use audit_chain::{
 };
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
+#[cfg(feature = "legacy-erasure")]
+#[allow(deprecated)]
 pub use deletion_proof::{
     CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
     LayerCleanupProof, SigningKeyHandle,
 };
+#[cfg(feature = "legacy-erasure")]
+#[allow(deprecated)]
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-pub use kv_cipher::{EncryptedKvLayer, KvCipher, KvSegmentCipher, ModelFingerprint};
+#[cfg(feature = "legacy-erasure")]
+pub use kv_cipher::KvSegmentCipher;
+pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
 pub use kv_segment::{
     delete_mode::KvDeleteMode,
     eviction_worker::{emergency_wipe, EvictionWorker},
@@ -84,7 +110,11 @@ pub use kv_segment::{
     store::TenantIsolatedKvStore,
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
+#[cfg(feature = "legacy-erasure")]
+#[allow(deprecated)]
 pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
+#[cfg(feature = "legacy-erasure")]
+#[allow(deprecated)]
 pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
 pub use wal_completeness::verify_wal_chain_completeness;
 #[cfg(feature = "cloud-egress-guard")]
