@@ -14,11 +14,11 @@
 //!
 //! Verifiziert die strikte Trennung von Checkpoints über verschiedene Mandanten-Namespaces hinweg.
 
+use contextra_checkpoint::SnapshotPinner;
 use contextra_checkpoint::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
     StateCheckpoint,
 };
-use contextra_checkpoint::SnapshotPinner;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;

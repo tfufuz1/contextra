@@ -70,7 +70,7 @@ pub mod advanced {
     };
 
     pub use contextra_engine as engine;
-pub use contextra_engine::DurabilityMode;
+    pub use contextra_engine::DurabilityMode;
 
     pub use contextra_engine::{
         background_workers, chunker, export, filter, import, temporal_filter, transaction,

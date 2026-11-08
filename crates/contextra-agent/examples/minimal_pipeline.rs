@@ -73,6 +73,9 @@ fn main() -> Result<()> {
         goal_condition: None,
     })?;
 
-    println!("StateGraph successfully initialized with {} nodes.", graph.nodes.len());
+    println!(
+        "StateGraph successfully initialized with {} nodes.",
+        graph.nodes.len()
+    );
     Ok(())
 }

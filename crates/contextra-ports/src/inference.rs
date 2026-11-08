@@ -2,8 +2,8 @@
 
 pub use crate::attention::{AttentionExporter, RequestId};
 pub use crate::embedding::{
-    ContextSegment, EmbeddingError, EmbeddingProvider, LlmTextGenerator,
-    LlmTextGeneratorStreaming, TextEmbeddingEngine,
+    ContextSegment, EmbeddingError, EmbeddingProvider, LlmTextGenerator, LlmTextGeneratorStreaming,
+    TextEmbeddingEngine,
 };
 pub use crate::query_rewriter::QueryRewriter;
 pub use crate::reranker::Reranker;

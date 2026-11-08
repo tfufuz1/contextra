@@ -7,10 +7,10 @@
 //! unter allen Umständen erzwungen werden und nicht durch Standardwerte umgangen werden können.
 
 use contextra::builder::ContextraBuilder;
+use contextra::performance_profile::DurabilityMode;
 use contextra::performance_profile::{PerformanceProfile, VectorDeleteMode};
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::FeatureRing;
-use contextra::performance_profile::DurabilityMode;
 use contextra_types::error::ContextraError;
 
 // ANCHOR[contextra:TEST-LGA-001]

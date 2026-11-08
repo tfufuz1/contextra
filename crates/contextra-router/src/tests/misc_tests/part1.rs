@@ -17,7 +17,6 @@
 use super::super::fixtures::*;
 use crate::{RoutingOutcome, SlmProfile};
 
-
 use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
 use std::sync::Arc;

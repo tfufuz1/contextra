@@ -29,7 +29,9 @@ use std::os::unix::fs::FileExt;
 #[cfg(windows)]
 use std::os::windows::fs::FileExt;
 
-pub use contextra_ports::{Vfs as PortsVfs, VfsFile as PortsVfsFile, VfsOpenOptions as PortsVfsOpenOptions};
+pub use contextra_ports::{
+    Vfs as PortsVfs, VfsFile as PortsVfsFile, VfsOpenOptions as PortsVfsOpenOptions,
+};
 
 // ANCHOR[contextra-durable-fs:REAL-FS-001]
 /// Standard-Implementierung von [`contextra_ports::Vfs`], die direkt mit dem Host-Betriebssystem interagiert.
@@ -97,15 +99,13 @@ impl Vfs for RealFs {
     }
 
     fn len(&self, path: &Path) -> Result<u64> {
-        fs::metadata(path)
-            .map(|m| m.len())
-            .map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    ContextraError::NotFound(path.display().to_string())
-                } else {
-                    ContextraError::Io(e)
-                }
-            })
+        fs::metadata(path).map(|m| m.len()).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
     }
 
     fn list_dir(&self, path: &Path) -> Result<Vec<String>> {

@@ -1,0 +1,108 @@
+{
+  "tool_name": "error_topology_mapper.py",
+  "title": "Error Topology & Conversion Architecture Report",
+  "description": "Maps strongly-typed error definitions (thiserror), variants, error codes, and cross-boundary error conversion implementations (impl From<E>).",
+  "timestamp": "2026-11-07T23:01:33.302943+00:00",
+  "metrics": {
+    "total_error_enums": 2,
+    "total_error_variants": 73,
+    "total_conversions_from": 10
+  },
+  "findings_count": 12,
+  "findings": [
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 38,
+      "kind": "ERROR_ENUM",
+      "name": "HnswDeletionError",
+      "variant_count": 4,
+      "description": "Error enum `HnswDeletionError` with 4 variants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 129,
+      "kind": "ERROR_ENUM",
+      "name": "ContextraError",
+      "variant_count": 69,
+      "description": "Error enum `ContextraError` with 69 variants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 81,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for StepId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 499,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<std::array::TryFromSliceError> for ContextraError"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 75,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<ContextraError> for ContextraErrorDto"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error_dto.rs",
+      "line": 81,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for ContextraErrorDto"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 62,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<FusionStrategy> for SignalFusionStrategies"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 152,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for CollectionId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 277,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for DocId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 284,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u128> for DocId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 366,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<u64> for EntityId"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/ids.rs",
+      "line": 401,
+      "kind": "ERROR_CONVERSION",
+      "description": "impl From<String> for EntityId"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Erfasste Error-Klassen",
+      "content": "| Crate | Error-Typ | Zeile | Varianten | Datei |\n|---|---|---|---|---|\n| `contextra-types` | `HnswDeletionError` | 38 | 4 | `crates/contextra-types/src/error.rs` |\n| `contextra-types` | `ContextraError` | 129 | 69 | `crates/contextra-types/src/error.rs` |"
+    }
+  ]
+}
