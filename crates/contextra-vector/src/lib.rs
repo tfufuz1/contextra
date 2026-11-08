@@ -46,6 +46,7 @@ pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SI
 pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
+#[cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock))]
 #[allow(deprecated)]
 pub use hnsw::{
     hnsw_purger, hnsw_scanner, HnswConfig, HnswIndex, HnswPurger, HnswScanner, RebuildStatus,
