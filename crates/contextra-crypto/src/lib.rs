@@ -103,7 +103,9 @@ pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use kv_cipher::KvSegmentCipher;
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
 pub use kv_segment::{
+    delete_mode::KvDeleteMode,
     eviction_worker::{emergency_wipe, EvictionWorker},
+    manager::{KvSegmentConfig, KvSegmentManager, KvSegmentPayload},
     segment::KvSegment,
     store::TenantIsolatedKvStore,
     CURRENT_KV_KEY_DERIVATION_VERSION,

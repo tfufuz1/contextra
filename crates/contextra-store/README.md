@@ -66,9 +66,10 @@ Im Baukastensystem von Contextra (SPEC §2, §5) ist `contextra-store` nicht als
   - `legacy-wal-key`: Abwärtskompatibilitätsunterstützung für ältere WAL-Integritätsschlüssel.
   - `fault-injection`, `test-hooks`: Test- und Chaos-Engineering-Schalter.
 
-## Minimalbeispiel
-
-Dieses Beispiel demonstriert die grundlegende Nutzung von `LsmStorage`. Es entspricht dem lauffähigen Beispiel `examples/store_standalone.rs`:
+## Garantien
+- **ACID / Durability:** Atomare Commits über Write-Ahead-Logging mit synchronen Gruppen-Flushes.
+- **Speichersicherheit:** Striktes `#![forbid(unsafe_code)]` im gesamten Produktionscode.
+- **Neutralität:** Datenhaltung und physische Bereinigung ohne Rechts- oder Berichtsbegrifflichkeiten (SPEC §6.1, E-04). Die Port-Namen in `scanner/` (`Purger`, `LayerScanner`, `WitnessLayer`) verbleiben bis zur Bereitstellung von `contextra-erasure-adapters` hier und bilden die einzige dokumentierte Ausnahme.
 
 ```rust,no_run
 use contextra_ports::StorageEngine;
