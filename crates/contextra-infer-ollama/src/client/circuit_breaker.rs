@@ -1,4 +1,4 @@
-use contextra_ports::Clock;
+use crate::error::LocalClock;
 use parking_lot::Mutex;
 use std::time::Duration;
 
@@ -30,7 +30,7 @@ impl CircuitBreaker {
 
     /// Checks if the circuit breaker allows a request.
     /// Returns `Ok(())` if closed/half-open, or `Err(msg)` if open.
-    pub fn check(&self, clock: &dyn Clock) -> Result<(), String> {
+    pub fn check(&self, clock: &dyn LocalClock) -> Result<(), String> {
         let mut state = self.state.lock();
         if state.open_until_nanos > 0 {
             let now = clock.monotonic_nanos();
@@ -56,7 +56,7 @@ impl CircuitBreaker {
     }
 
     /// Records a failed request (transient/network/5xx).
-    pub fn record_failure(&self, clock: &dyn Clock) {
+    pub fn record_failure(&self, clock: &dyn LocalClock) {
         let mut state = self.state.lock();
         state.consecutive_failures += 1;
         if state.consecutive_failures >= self.failure_threshold {
