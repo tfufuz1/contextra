@@ -10,9 +10,8 @@
 
 use contextra_avv_generator::{
     default_technical_measures, render_avv_markdown, render_avv_markdown_with_date, AvvContext,
-    AvvError, TechnicalMeasure,
+    AvvError, TechnicalMeasure, TenantId,
 };
-use contextra_types::TenantId;
 
 // ANCHOR[contextra-avv-generator:TEST-CTX-001]
 fn sample_context() -> AvvContext {
