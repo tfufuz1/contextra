@@ -243,52 +243,43 @@ fn test_dimension_mismatch_error() {
 
     assert!(matches!(
         cosine_distance(&a, &b),
-        Err(SimdError::DimensionMismatch { left: 8, right: 10
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 10 })
     ));
     assert!(matches!(
         euclidean_distance(&a, &b),
-        Err(SimdError::DimensionMismatch { left: 8, right: 10
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 10 })
     ));
     assert!(matches!(
         dot_product_distance(&a, &b),
-        Err(SimdError::DimensionMismatch { left: 8, right: 10
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 10 })
     ));
 
     assert!(matches!(
         cosine_distance_f32_bytes(&a, &b_bytes),
-        Err(SimdError::DimensionMismatch { left: 8, right: 4
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 4 })
     ));
     assert!(matches!(
         euclidean_distance_f32_bytes(&a, &b_bytes),
-        Err(SimdError::DimensionMismatch { left: 8, right: 4
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 4 })
     ));
     assert!(matches!(
         dot_product_distance_f32_bytes(&a, &b_bytes),
-        Err(SimdError::DimensionMismatch { left: 8, right: 4
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 4 })
     ));
 
     let u8_a = vec![1u8; 8];
     let u8_b = vec![1u8; 12];
     assert!(matches!(
         dot_product_u8(&u8_a, &u8_b),
-        Err(SimdError::DimensionMismatch { left: 8, right: 12
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 12 })
     ));
     assert!(matches!(
         euclidean_distance_sq_u8(&u8_a, &u8_b),
-        Err(SimdError::DimensionMismatch { left: 8, right: 12
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 12 })
     ));
     assert!(matches!(
         cosine_similarity_parts_u8(&u8_a, &u8_b),
-        Err(SimdError::DimensionMismatch { left: 8, right: 12
-         })
+        Err(SimdError::DimensionMismatch { left: 8, right: 12 })
     ));
 }
 
