@@ -5,15 +5,11 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// FILE-CONTEXT
-// STAND: 2026-09-15T14:45:00Z (SESSION: 527bbb50)
 // ZWECK: Stress, fault-injection, and multi-threading concurrency tests for contextra-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (fingerprint reset), PID anti-windup & k_min floor >= 50.
 
 use contextra_rank::{IsotonicCalibrator, PlattScaler};
 use proptest::prelude::*;
-
-// ANCHOR[contextra-rank:CAL-TEST-004]
 #[test]
 fn test_isotonic_fifo_eviction_and_force_rebuild() {
     let max_obs = 20;

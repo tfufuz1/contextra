@@ -9,7 +9,6 @@ use ahash::AHashMap;
 
 /// Fluent builder for constructing `ProvenanceRecord` instances.
 #[derive(Debug, Clone, PartialEq)]
-// ANCHOR[contextra-rank:PROV-001]
 /// Fluent-Builder zum deterministischen Erstellen von `ProvenanceRecord`-Strukturen.
 pub struct ProvenanceBuilder {
     vector_distance: Option<f32>,
@@ -111,7 +110,6 @@ impl ProvenanceBuilder {
     }
 
     /// Builds the resulting `ProvenanceRecord`.
-    // ANCHOR[contextra-rank:PROV-002]
     /// Schließt die Konstruktion ab und berechnet die RRF-Beiträge je Signal.
     pub fn build(self) -> ProvenanceRecord {
         build_provenance(&self)

@@ -19,8 +19,6 @@ fn make_search_result(id: &str, score: f32, community_id: Option<u64>) -> Search
         provenance: None,
     }
 }
-
-// ANCHOR[contextra-rank:GLOB-TEST-001]
 #[test]
 fn test_global_fusion_community_aware_rrf() {
     let config = GlobalFusionConfig {
