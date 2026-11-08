@@ -9,7 +9,7 @@
 
 use contextra_rank::dibud::{fuse_exact_prefix, DiBudFusionState, FusionBudget};
 use contextra_rank::fusion::{weighted_reciprocal_rank_fusion, SearchResult};
-use contextra_types::DocId;
+use contextra_rank::DocId;
 
 struct SimpleLcg {
     state: u64,

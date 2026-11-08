@@ -5,8 +5,9 @@
 //! Enthält grundlegende Datenstrukturen für Retrieval-Ergebnisse, aggregierte Fusionsergebnisse,
 //! Herkunftsnachweise (Provenance) und Fehlerrichtlinien bei Signalausfällen.
 
+use crate::local_types::DocId;
+pub use crate::local_types::SignalFailurePolicy;
 use ahash::AHashMap;
-use contextra_types::{ContextChunk, ContextraError, DocId, MemoryLink};
 use serde::{Deserialize, Serialize};
 
 pub fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
@@ -14,6 +15,7 @@ pub fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
 }
 
 // ADR-098 (Token-Schätzung für ContextChunk: f64 -> usize Konvertierung)
+#[cfg(feature = "types-compat")]
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(super) fn estimate_tokens(text: &str) -> usize {
     if text.is_empty() {
@@ -30,12 +32,16 @@ pub(super) fn estimate_tokens(text: &str) -> usize {
 }
 
 // ANCHOR[contextra-rank:TYPE-001]
-impl TryFrom<SearchResult> for ContextChunk {
-    type Error = ContextraError;
+#[cfg(feature = "types-compat")]
+impl TryFrom<SearchResult> for contextra_types::ContextChunk {
+    type Error = contextra_types::ContextraError;
 
     fn try_from(r: SearchResult) -> std::result::Result<Self, Self::Error> {
-        let doc_id = DocId::from_key(&r.id).map_err(|e| {
-            ContextraError::InvalidInput(format!("SearchResult-ID '{}' ungültig: {e}", r.id))
+        let doc_id = contextra_types::DocId::from_key(&r.id).map_err(|e| {
+            contextra_types::ContextraError::InvalidInput(format!(
+                "SearchResult-ID '{}' ungültig: {e}",
+                r.id
+            ))
         })?;
         let content = r
             .metadata
@@ -45,13 +51,13 @@ impl TryFrom<SearchResult> for ContextChunk {
             .unwrap_or("")
             .to_string();
         let token_count = estimate_tokens(&content);
-        let links: Vec<MemoryLink> = r
+        let links: Vec<contextra_types::MemoryLink> = r
             .metadata
             .as_ref()
             .and_then(|m| m.get("links"))
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default();
-        Ok(ContextChunk {
+        Ok(contextra_types::ContextChunk {
             doc_id,
             content,
             relevance: r.score,
@@ -107,7 +113,7 @@ pub struct ProvenanceRecord {
 
 impl ProvenanceRecord {
     /// Constructs a `ProvenanceRecord` synthesized from source document IDs.
-    pub fn synthesized_from(source_doc_ids: &[contextra_types::DocId]) -> Self {
+    pub fn synthesized_from(source_doc_ids: &[DocId]) -> Self {
         let mut signal_ranks = AHashMap::new();
         for (idx, id) in source_doc_ids.iter().enumerate() {
             let rank_u32 = u32::try_from(idx.saturating_add(1)).unwrap_or(u32::MAX);
@@ -118,6 +124,13 @@ impl ProvenanceRecord {
             signal_ranks,
             ..Default::default()
         }
+    }
+
+    #[cfg(feature = "types-compat")]
+    /// Synthesized from contextra_types::DocId.
+    pub fn synthesized_from_types(source_doc_ids: &[contextra_types::DocId]) -> Self {
+        let local_ids: Vec<DocId> = source_doc_ids.iter().map(|&id| DocId(id.0)).collect();
+        Self::synthesized_from(&local_ids)
     }
 }
 
@@ -186,11 +199,6 @@ impl std::fmt::Display for Signal {
         }
     }
 }
-
-/// Policy governing multi-signal retrieval error handling semantics.
-// ANCHOR[contextra-rank:TYPE-007]
-/// Richtlinie für den Umgang mit Signalfehlern während der Fusionsberechnung.
-pub use contextra_types::OnSignalFailure as SignalFailurePolicy;
 
 /// Execution report for search query execution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

@@ -14,7 +14,7 @@ mod tests {
     use contextra_rank::fusion::{
         reciprocal_rank_fusion, BoundedTopK, ProvenanceBuilder, SearchResult,
     };
-    use contextra_types::ConfigFingerprint;
+    use contextra_rank::ConfigFingerprint;
 
     // ANCHOR[contextra-rank:RNK-TEST-001]
     #[test]

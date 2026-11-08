@@ -13,8 +13,8 @@ use super::signal::{
 };
 use super::topk::{BoundedTopK, TopKCandidate};
 use super::types::{ProvenanceRecord, SearchResult, SignalContribution};
+pub use crate::local_types::FusionStrategy;
 use ahash::AHashMap;
-pub use contextra_types::FusionStrategy;
 
 /// Bounded smooth influence function $g(x) = \frac{x}{1 + |x|}$.
 ///
@@ -635,7 +635,7 @@ fn compute_doc_weighted_score(
 struct HybridAccumulatorContext<'a> {
     result_sets: &'a [(String, Vec<SearchResult>, f32)],
     effective_strategies: &'a AHashMap<String, FusionStrategy>,
-    strategies: &'a contextra_types::SignalFusionStrategies,
+    strategies: &'a crate::local_types::SignalFusionStrategies,
     k_rrf: f32,
 }
 
@@ -713,7 +713,7 @@ fn accumulate_hybrid_strategy_scores<'a>(
 
 fn evaluate_effective_signal_strategies(
     active_sets: &[&(String, Vec<SearchResult>, f32)],
-    strategies: &contextra_types::SignalFusionStrategies,
+    strategies: &crate::local_types::SignalFusionStrategies,
 ) -> AHashMap<String, FusionStrategy> {
     let mut effective_strategies = AHashMap::new();
     let total_active_signals = active_sets.len();
@@ -780,7 +780,7 @@ pub fn fuse_search_results_with_signal_strategies(
     priority: MetadataMergePriority,
     include_provenance: bool,
     resonance_config: Option<&ResonanceConfig>,
-    strategies: contextra_types::SignalFusionStrategies,
+    strategies: crate::local_types::SignalFusionStrategies,
 ) -> Vec<SearchResult> {
     if max_results == 0 {
         return Vec::new();

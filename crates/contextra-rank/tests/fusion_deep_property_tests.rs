@@ -7,7 +7,7 @@ use contextra_rank::fusion::{
     MetadataMergePriority, ProvenanceBuilder, ResonanceConfig, SearchResult,
     SignalCalibrationContext,
 };
-use contextra_types::{FusionStrategy, SignalFusionStrategies};
+use contextra_rank::{FusionStrategy, SignalFusionStrategies};
 use proptest::prelude::*;
 
 fn make_doc_with_community(id: &str, score: f32, community_id: u64) -> SearchResult {

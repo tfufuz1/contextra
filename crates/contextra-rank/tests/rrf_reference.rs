@@ -7,7 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use ahash::AHashMap;
 use contextra_rank::fusion::{reciprocal_rank_fusion, SearchResult};
-use contextra_types::DocId;
+use contextra_rank::DocId;
 
 /// Helper function adapting RRF interface to accept lists of `DocId` and `k`.
 fn rrf_fusion(result_lists: &[Vec<DocId>], k: usize) -> AHashMap<DocId, f32> {

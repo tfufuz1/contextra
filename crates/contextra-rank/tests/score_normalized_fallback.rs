@@ -8,7 +8,7 @@
 use contextra_rank::fusion::{
     fuse_search_results_with_strategy, MetadataMergePriority, SearchResult,
 };
-use contextra_types::FusionStrategy;
+use contextra_rank::FusionStrategy;
 
 fn make_doc(id: &str, score: f32) -> SearchResult {
     SearchResult {

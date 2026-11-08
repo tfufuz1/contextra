@@ -5,7 +5,8 @@
 //! Definiert Budget-Spezifikationen, Kanal-Identifikatoren und Ergebnisstrukturen
 //! für die budgetierte Streaming-Rangfusion.
 
-use contextra_types::{ContextraError, DocId};
+use crate::error::RankError;
+use crate::local_types::DocId;
 use serde::{Deserialize, Serialize};
 
 /// Identifies the channels managed by DiBud fusion budget.
@@ -77,26 +78,26 @@ impl FusionBudget {
     ///
     /// Ensures all weights are finite and non-negative, and minimum accesses/certified lengths
     /// are at least 1.
-    pub fn validate(&self) -> Result<(), ContextraError> {
+    pub fn validate(&self) -> Result<(), RankError> {
         if self.max_total_accesses == 0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(RankError::InvalidInput(
                 "FusionBudget max_total_accesses must be at least 1".to_string(),
             ));
         }
         if self.min_certified_results == 0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(RankError::InvalidInput(
                 "FusionBudget min_certified_results must be at least 1".to_string(),
             ));
         }
         for (idx, &w) in self.channel_weights.iter().enumerate() {
             if !w.is_finite() || w < 0.0 {
-                return Err(ContextraError::InvalidInput(format!(
+                return Err(RankError::InvalidInput(format!(
                     "FusionBudget channel_weights[{idx}] must be a finite non-negative float, got {w}"
                 )));
             }
         }
         if !self.edge_reinforcement_weight.is_finite() || self.edge_reinforcement_weight < 0.0 {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(RankError::InvalidInput(format!(
                 "FusionBudget edge_reinforcement_weight must be a finite non-negative float, got {}",
                 self.edge_reinforcement_weight
             )));
@@ -104,7 +105,7 @@ impl FusionBudget {
         if !self.edge_reinforcement_upper_bound.is_finite()
             || self.edge_reinforcement_upper_bound < 0.0
         {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(RankError::InvalidInput(format!(
                 "FusionBudget edge_reinforcement_upper_bound must be a finite non-negative float, got {}",
                 self.edge_reinforcement_upper_bound
             )));

@@ -33,16 +33,24 @@
 // ANCHOR[contextra-rank:MOD-001]
 pub mod calibration;
 pub mod drift;
+pub mod error;
 pub mod explain;
 pub mod fusion;
+pub mod local_types;
 pub mod metrics;
+
+pub use error::{RankError, Result};
+pub use local_types::{
+    ConfigFingerprint, DocId, FusionStrategy, FusionWeights, SignalFailurePolicy,
+    SignalFusionStrategies, MAX_SEARCH_K,
+};
 
 #[cfg(feature = "dibud")]
 pub mod dibud;
 
 pub use calibration::{
-    AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
-    PlattScaler,
+    AdaptiveConformalCalibrator, Clock, ConformalCalibrator, ConformalError, IsotonicCalibrator,
+    PlattScaler, SystemClock,
 };
 #[cfg(feature = "dibud")]
 pub use dibud::{

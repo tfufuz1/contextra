@@ -5,7 +5,7 @@
 //! Bietet quantilbasierte Online-Schwellenwertschätzung mit mathematischen
 //! Finite-Sample-Abdeckungsgarantien (Coverage Guarantees).
 
-use contextra_types::ConfigFingerprint;
+use crate::local_types::ConfigFingerprint;
 use thiserror::Error;
 
 /// Error type for conformal calibration and threshold updates.
@@ -173,7 +173,8 @@ impl AdaptiveConformalCalibrator {
     }
 
     /// Resets state if ConfigFingerprint changes (P8 Compliance).
-    pub fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint) {
+    pub fn invalidate_on_config_change(&mut self, new_fingerprint: impl Into<ConfigFingerprint>) {
+        let new_fingerprint = new_fingerprint.into();
         if self.fingerprint.as_ref() != Some(&new_fingerprint) {
             tracing::warn!(
                 old_fp = ?self.fingerprint,

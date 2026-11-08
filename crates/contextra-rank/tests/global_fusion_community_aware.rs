@@ -5,8 +5,8 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use contextra_rank::RankError;
 use contextra_rank::{GlobalFusionConfig, GlobalFusionStrategy, SearchResult};
-use contextra_types::ContextraError;
 use serde_json::json;
 
 fn make_search_result(id: &str, score: f32, community_id: Option<u64>) -> SearchResult {
@@ -128,11 +128,11 @@ fn test_global_fusion_empty_community_index_degrades_gracefully() {
         .expect_err("should return InvalidInput error");
 
     match err {
-        ContextraError::InvalidInput(msg) => {
+        RankError::InvalidInput(msg) => {
             assert!(
                 msg.contains("Community index is empty") || msg.contains("contextra_consolidate")
             );
         }
-        other => panic!("expected ContextraError::InvalidInput, got {other:?}"),
+        other => panic!("expected RankError::InvalidInput, got {other:?}"),
     }
 }

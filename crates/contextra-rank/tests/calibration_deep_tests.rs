@@ -10,8 +10,8 @@
 // ZWECK: Deep integration, proptest, and adversarial test suite for contextra-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (invalidation resets observations/weights), P8 compliance.
 
+use contextra_rank::ConfigFingerprint;
 use contextra_rank::{IsotonicCalibrator, PlattScaler};
-use contextra_types::ConfigFingerprint;
 use proptest::prelude::*;
 
 // ============================================================================

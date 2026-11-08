@@ -188,6 +188,17 @@ pub fn score_normalized_fusion_with_options(
 // ANCHOR[contextra-rank:NORM-002]
 /// Konvertiert relative Signalgewichte in Normalisierungsfaktoren.
 pub fn weights_to_signal_factors(
+    weights: Option<&crate::local_types::FusionWeights>,
+) -> (f32, f32, f32) {
+    match weights {
+        Some(w) => (w.vector, w.text, w.graph),
+        None => (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0),
+    }
+}
+
+#[cfg(feature = "types-compat")]
+/// Converts optional contextra_types::FusionWeights.
+pub fn weights_to_signal_factors_types_compat(
     weights: Option<&contextra_types::FusionWeights>,
 ) -> (f32, f32, f32) {
     match weights {

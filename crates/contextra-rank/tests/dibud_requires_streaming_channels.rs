@@ -14,7 +14,7 @@ use std::sync::Arc;
 use contextra_rank::dibud::{
     fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, FusionBudget,
 };
-use contextra_types::{ContextraError, DocId};
+use contextra_rank::{DocId, RankError};
 
 fn block_on<F: Future>(fut: F) -> F::Output {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -121,7 +121,7 @@ fn test_dibud_std_async_driver_minimal_executor() {
                 res
             }
         };
-        async move { Ok::<Option<DocId>, ContextraError>(item) }
+        async move { Ok::<Option<DocId>, RankError>(item) }
     };
 
     let budget = FusionBudget {
