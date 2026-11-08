@@ -15,6 +15,9 @@ pub mod config;
 pub mod fallback;
 pub mod meta;
 pub mod stubs;
+pub mod types;
+
+pub use types::{ContextChunk, ContextChunkLink, DocId};
 
 pub mod email {
     pub use crate::chunking::stubs::EmailChunker;

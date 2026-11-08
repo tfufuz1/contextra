@@ -9,7 +9,12 @@
 // INVARIANTEN: Zero-Dependency CFB-Writer via cfb-Crate, deterministische Test-Bytes.
 // STAND: TS:2026-10-31T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
 
 use cfb::CompoundFile;
 use std::io::{Cursor, Write};

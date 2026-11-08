@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-web")]
 //! Integrationstest-Suite: `web_golden_tests.rs`
 //!
 //! # Zweck & Testabdeckung

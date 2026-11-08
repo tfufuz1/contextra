@@ -120,7 +120,7 @@ fn ends_with_abbreviation(text: &str) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::get_first)]
 mod tests {
     use super::*;
 
@@ -129,7 +129,7 @@ mod tests {
         let text = "Das ist z. B. ein Test. Dr. Müller geht nach Hause. Er kommt bzw. bleibt hier.";
         let result = split_sentences(text, 0);
         assert_eq!(result.len(), 3);
-        assert_eq!(result.get(0).unwrap().text, "Das ist z. B. ein Test. ");
+        assert_eq!(result.first().unwrap().text, "Das ist z. B. ein Test. ");
         assert_eq!(result.get(1).unwrap().text, "Dr. Müller geht nach Hause. ");
         assert_eq!(result.get(2).unwrap().text, "Er kommt bzw. bleibt hier.");
     }
@@ -140,8 +140,10 @@ mod tests {
         let result = split_sentences(text, 10);
         assert_eq!(result.len(), 2);
         assert_eq!(
-            text.get(result.get(0).unwrap().span.start - 10..result.get(0).unwrap().span.end - 10)
-                .unwrap(),
+            text.get(
+                result.first().unwrap().span.start - 10..result.first().unwrap().span.end - 10
+            )
+            .unwrap(),
             "Erster Satz. "
         );
         assert_eq!(

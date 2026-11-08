@@ -14,7 +14,7 @@ fuzz_target!(|data: &[u8]| {
         filename: Some("fuzz_pipeline_input.bin"),
         mime: None,
         format_override: None,
-        doc_id: contextra_types::DocId::new(1),
+        doc_id: contextra_ingest::chunking::types::DocId::new(1),
     };
     let cfg = contextra_ingest::pipeline::IngestConfig::default();
     let _ = contextra_ingest::pipeline::ingest(&req, &cfg, &registry);

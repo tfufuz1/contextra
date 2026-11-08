@@ -10,17 +10,19 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: Open Packaging Convention (OPC) Beziehungsdaten (.rels) & Pfad-Auflösung (P00B).
+// ZWECK: Open Packaging Convention (OPC) Beziehungsdaten (.rels), Pfad-Auflösung & OpcPackage (P00B/P04).
 // INVARIANTEN: Zero-Panic, Determinismus durch BTreeMap, sichere Pfad-Normierung.
-// STAND: TS:2026-10-31T00:00:00Z
+// STAND: TS:2026-11-08T00:00:00Z
 
 use crate::error::IngestError;
 use crate::extractor::ResourceBudget;
-use crate::safe::xml::parse_xml;
+use crate::safe::archive::SafeArchive;
+use crate::safe::xml::{parse_xml, SafeXmlReader};
+use quick_xml::events::Event;
 use std::collections::BTreeMap;
 
 /// Eine einzelne OPC-Beziehung (<Relationship Id="..." Type="..." Target="..." />).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OpcRelationship {
     pub id: String,
     pub rel_type: String,
@@ -49,7 +51,7 @@ impl OpcRels {
                         id: id.to_string(),
                         rel_type: rel_type.to_string(),
                         target: target.to_string(),
-                        target_mode: child.attr("TargetMode").map(|s| s.to_string()),
+                        target_mode: child.attr("TargetMode").map(ToString::to_string),
                     };
                     rels_by_id.insert(id.to_string(), rel);
                 }
@@ -59,47 +61,176 @@ impl OpcRels {
         Ok(Self { rels_by_id })
     }
 
-    /// Sucht ein Ziel (`Target`) anhand seiner Beziehungs-ID (`rId1` etc.).
-    pub fn get_target(&self, id: &str) -> Option<&str> {
+    /// Sucht das Ziel einer Beziehung über deren ID.
+    pub fn target_for_id(&self, id: &str) -> Option<&str> {
         self.rels_by_id.get(id).map(|r| r.target.as_str())
     }
 
-    /// Sucht alle Zielpfade, deren Beziehungs-Typ das angegebene Suffix enthält.
-    pub fn find_targets_by_type_suffix(&self, type_suffix: &str) -> Vec<&str> {
-        let mut result = Vec::new();
+    /// Alias für `target_for_id` zur Rückwärtskompatibilität.
+    pub fn get_target(&self, id: &str) -> Option<&str> {
+        self.target_for_id(id)
+    }
+
+    /// Sucht das erste Ziel eines bestimmten Beziehungstyps.
+    pub fn target_for_type(&self, rel_type: &str) -> Option<&str> {
         for rel in self.rels_by_id.values() {
-            if rel.rel_type.ends_with(type_suffix) {
-                result.push(rel.target.as_str());
+            if rel.rel_type == rel_type || rel.rel_type.ends_with(rel_type) {
+                return Some(&rel.target);
             }
         }
-        result
+        None
+    }
+
+    /// Findet alle Targets, deren Typ auf ein bestimmtes Suffix endet.
+    pub fn find_targets_by_type_suffix(&self, suffix: &str) -> Vec<&str> {
+        let mut targets = Vec::new();
+        for rel in self.rels_by_id.values() {
+            if rel.rel_type.ends_with(suffix) {
+                targets.push(rel.target.as_str());
+            }
+        }
+        targets
     }
 }
 
-/// Löst einen relativen OPC-Zielpfad basierend auf dem Pfad des Ursprungsdokuments auf.
-pub fn resolve_opc_target(base_file_path: &str, target: &str) -> String {
-    let target_clean = target.replace('\\', "/");
-    if target_clean.starts_with('/') {
-        return target_clean.trim_start_matches('/').to_string();
+/// Helper for OPC package navigation.
+#[derive(Debug)]
+pub struct OpcPackage<'a> {
+    archive: SafeArchive<'a>,
+}
+
+impl<'a> OpcPackage<'a> {
+    /// Opens an OPC package from bytes.
+    pub fn open(bytes: &'a [u8], budget: &ResourceBudget) -> Result<Self, IngestError> {
+        let archive = SafeArchive::new(bytes, budget)?;
+        Ok(Self { archive })
     }
 
-    let mut parts: Vec<&str> = Vec::new();
-    if let Some((dir, _)) = base_file_path.rsplit_once('/') {
-        for seg in dir.split('/') {
-            if !seg.is_empty() && seg != "." {
-                parts.push(seg);
+    /// Checks if a part exists in the package.
+    pub fn has_part(&mut self, path: &str) -> bool {
+        self.archive.has_entry(path)
+    }
+
+    /// Reads raw bytes for a part path.
+    pub fn read_part(
+        &mut self,
+        path: &str,
+        budget: &ResourceBudget,
+    ) -> Result<Vec<u8>, IngestError> {
+        self.archive.read_entry(path, budget)
+    }
+
+    /// Parses relationships XML at `rels_path` (e.g., `_rels/.rels` or `word/_rels/document.xml.rels`).
+    pub fn parse_relationships(
+        &mut self,
+        rels_path: &str,
+        max_xml_depth: u32,
+        budget: &ResourceBudget,
+    ) -> Result<Vec<OpcRelationship>, IngestError> {
+        if !self.has_part(rels_path) {
+            return Ok(Vec::new());
+        }
+
+        let bytes = self.read_part(rels_path, budget)?;
+        let mut reader = SafeXmlReader::new(&bytes, max_xml_depth);
+        let mut rels = Vec::new();
+
+        loop {
+            match reader.next_event(budget)? {
+                Event::Start(ref e) | Event::Empty(ref e) => {
+                    if e.local_name().as_ref() == b"Relationship" {
+                        let mut id = String::new();
+                        let mut rel_type = String::new();
+                        let mut target = String::new();
+                        let mut target_mode = None;
+
+                        for attr in e.attributes().flatten() {
+                            let val = match String::from_utf8(attr.value.to_vec()) {
+                                Ok(v) => v,
+                                Err(_) => continue,
+                            };
+                            match attr.key.local_name().as_ref() {
+                                b"Id" => id = val,
+                                b"Type" => rel_type = val,
+                                b"Target" => target = val,
+                                b"TargetMode" => target_mode = Some(val),
+                                _ => {}
+                            }
+                        }
+
+                        if !rel_type.is_empty() && !target.is_empty() {
+                            rels.push(OpcRelationship {
+                                id,
+                                rel_type,
+                                target,
+                                target_mode,
+                            });
+                        }
+                    }
+                }
+                Event::Eof => break,
+                _ => {}
             }
         }
+
+        Ok(rels)
     }
 
-    for seg in target_clean.split('/') {
-        if seg.is_empty() || seg == "." {
-            continue;
+    /// Finds main document part path from `_rels/.rels`. Defaults to `word/document.xml`.
+    pub fn main_document_part(
+        &mut self,
+        max_xml_depth: u32,
+        budget: &ResourceBudget,
+    ) -> Result<String, IngestError> {
+        let rels = self.parse_relationships("_rels/.rels", max_xml_depth, budget)?;
+        for rel in rels {
+            if rel.rel_type.ends_with("/officeDocument") {
+                let target = rel.target.trim_start_matches('/');
+                return Ok(target.to_string());
+            }
         }
-        if seg == ".." {
-            let _ = parts.pop();
+
+        if self.has_part("word/document.xml") {
+            Ok("word/document.xml".to_string())
         } else {
-            parts.push(seg);
+            Err(IngestError::Corrupt {
+                format: None,
+                detail: "Hauptdokument-Part (document.xml) nicht gefunden".into(),
+            })
+        }
+    }
+
+    /// Resolves target path for a relationship relative to a base part directory.
+    pub fn resolve_target(base_part_path: &str, target: &str) -> String {
+        resolve_opc_target(base_part_path, target)
+    }
+}
+
+/// Löst ein relatives OPC-Target bezüglich eines Basispfads deterministisch auf.
+pub fn resolve_opc_target(base_part_path: &str, target: &str) -> String {
+    if target.starts_with('/') {
+        return target.trim_start_matches('/').to_string();
+    }
+
+    let mut parts: Vec<&str> = base_part_path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    // Dateiname des Basispfads entfernen
+    if !parts.is_empty() {
+        parts.pop();
+    }
+
+    for segment in target.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                let _ = parts.pop();
+            }
+            seg => {
+                parts.push(seg);
+            }
         }
     }
 

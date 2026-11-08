@@ -110,11 +110,13 @@ fn split_mbox_messages(input: &[u8]) -> Vec<Vec<u8>> {
     let mut i = 0;
 
     while i < len {
-        if is_start_of_line && blank_line_preceding && starts_with_from(input, i) {
-            if !current.is_empty() {
-                messages.push(current);
-                current = Vec::new();
-            }
+        if is_start_of_line
+            && blank_line_preceding
+            && starts_with_from(input, i)
+            && !current.is_empty()
+        {
+            messages.push(current);
+            current = Vec::new();
         }
 
         if let Some(&b) = input.get(i) {

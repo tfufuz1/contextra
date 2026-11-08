@@ -213,6 +213,7 @@ pub fn analyze_headers_footers(page_lines: &[Vec<String>]) -> HeaderFooterAnalys
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-ole")]
 //! Integrationstest-Suite: `ole_tests.rs`
 //!
 //! # Zweck & Testabdeckung
@@ -9,7 +10,13 @@
 // INVARIANTEN: Zero-Panic, deterministische Extraktion, Limit- und Fehlerprüfungen.
 // STAND: TS:2026-10-31T00:00:00Z
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
 
 mod ole_support;
 

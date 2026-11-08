@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-structured")]
 //! Integrationstest-Suite: `structured_abuse_tests.rs`
 //!
 //! # Zweck & Testabdeckung

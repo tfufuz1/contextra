@@ -1,3 +1,4 @@
+#![cfg(feature = "fmt-odf")]
 //! Integrationstest-Suite: `odf_tests.rs`
 //!
 //! # Zweck & Testabdeckung
