@@ -210,6 +210,10 @@ pub enum ContextraError {
     },
 
     /// HNSW graph degradation warning threshold reached.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Indexspezifische Fehler gehören in das Crate contextra-vector"
+    )]
     #[error("HNSW graph connectivity degraded: {deleted_ratio:.1}% deleted nodes")]
     HnswConnectivityDegraded {
         /// Ratio of deleted tombstone nodes in graph.
@@ -356,6 +360,10 @@ pub enum ContextraError {
     PinBudgetExceeded(String),
 
     /// HNSW graph repair failure.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Indexspezifische Fehler gehören in das Crate contextra-vector"
+    )]
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(#[from] HnswDeletionError),
 
