@@ -13,8 +13,9 @@
 //! 3. Kryptografische Mandantentrennung (`crates/contextra-types/src/tenant_scope.rs`)
 //! 4. Verschlüsselter KV-Cache (`crates/contextra-crypto/src/crypto.rs`)
 
-use contextra_avv_generator::{default_technical_measures, render_avv_markdown, AvvContext};
-use contextra_types::TenantId;
+use contextra_avv_generator::{
+    default_technical_measures, render_avv_markdown, AvvContext, TenantId,
+};
 
 // ── H11: Art. 28 DSGVO AVV Generator Technical Completeness ─────────────────────
 

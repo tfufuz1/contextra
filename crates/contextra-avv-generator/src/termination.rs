@@ -23,7 +23,7 @@ use std::fmt::Write;
 // ANCHOR[contextra-avv-generator:TERM-001]
 /// Rendert Abschnitt 8: „Löschung von Daten und SLA“.
 ///
-/// Schreibt die Löschklausel unter Einbindung der Mandanten-ID ([`contextra_types::TenantId`])
+/// Schreibt die Löschklausel unter Einbindung der Mandanten-ID ([`crate::TenantId`])
 /// und des konfigurierten Lösch-SLAs in Tagen in den Zielpuffer.
 ///
 /// # Parameter

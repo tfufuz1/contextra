@@ -14,12 +14,10 @@
 //! # Einbindung & Abhängigkeiten
 //! - **Ring-Einstufung:** Ring 4 (Erweiterung / `[E]`).
 //! - **Abhängigkeiten (normal):**
-//!   - `contextra-types`: Stellt fundamentale Domänentypen wie [`TenantId`] bereit.
-//!   - `serde`: Serialisierung und Deserialisierung des Kontexts [`AvvContext`].
 //!   - `thiserror`: Strukturierte Fehlerbehandlung über [`AvvError`].
+//!   - `serde` (optional): Serialisierung und Deserialisierung des Kontexts [`AvvContext`].
 //! - **Wird eingebunden von:**
-//!   - `contextra-privacy`: Re-exportiert den Generator (historisch / Migrationspfad).
-//!   - `contextra`: Haupt-Crate (optional via Feature-Flag `avv-generator`).
+//!   - Keine Workspace-Kanten; autarker Klasse-A-Baustein.
 //!
 //! # Sicherheit & Garantien
 //! Gemäß `#![forbid(unsafe_code)]` enthält diese Crate keinerlei `unsafe`-Blöcke.
@@ -37,8 +35,64 @@ pub mod termination;
 
 pub use error::{AvvError, AvvGeneratorError};
 
-use contextra_types::TenantId;
+use core::fmt;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+// ANCHOR[contextra-avv-generator:ID-TENANT]
+/// Mandanten-Identifikator im Rahmen der AVV-Generierung.
+///
+/// Autarker 64-Bit-Ganzzahl-Typ zur Identifikation des Mandanten im Vertragskontext.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[repr(transparent)]
+pub struct TenantId(pub u64);
+
+impl TenantId {
+    /// SYSTEM-Mandant (Standardwert `0`).
+    pub const SYSTEM: Self = Self(0);
+
+    /// Erstellt eine neue [`TenantId`].
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Sicherer Konstruktor. Schlägt fehl, falls `id == 0`.
+    pub fn try_new(id: u64) -> Result<Self, AvvError> {
+        if id == 0 {
+            Err(AvvError::InvalidContext(
+                "TenantId(0) ist für TenantId::SYSTEM reserviert".to_string(),
+            ))
+        } else {
+            Ok(Self(id))
+        }
+    }
+
+    /// Liefert den rohen `u64`-Wert.
+    #[inline]
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+
+    /// Liefert den rohen `u64`-Wert als primitive Ganzzahl.
+    #[inline]
+    pub const fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for TenantId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TenantId({})", self.0)
+    }
+}
+
+impl From<u64> for TenantId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
 
 // ANCHOR[contextra-avv-generator:CTX-001]
 /// Kontext- und Konfigurationsparameter zur Generierung einer AVV-Vorlage gemäß Art. 28 DSGVO.
@@ -49,8 +103,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Beispiel
 /// ```rust
-/// use contextra_avv_generator::{AvvContext, default_technical_measures, render_avv_markdown};
-/// use contextra_types::TenantId;
+/// use contextra_avv_generator::{AvvContext, TenantId, default_technical_measures, render_avv_markdown};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let ctx = AvvContext::new(
@@ -67,7 +120,8 @@ use serde::{Deserialize, Serialize};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AvvContext {
     /// Name oder Bezeichnung des Verantwortlichen (Auftraggebers, z. B. Kanzlei, Praxis, Unternehmen).
     pub controller_name: String,
@@ -82,13 +136,13 @@ pub struct AvvContext {
     /// Vereinbarte Frist (SLA = Service Level Agreement) für die Löschung in Tagen nach Vertragsende (1..=365).
     pub deletion_sla_days: u32,
     /// Optionales explizites Vertragsdatum (z. B. "2026-10-29"). Bei `None` wird ein Standardtext verwendet.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub contract_date: Option<String>,
     /// Kennzeichnung, ob Unterauftragsverarbeiter grundsätzlich gestattet sind.
     ///
     /// NOTE: Wenn `Some(true)` gesetzt ist, aber `subprocessors` leer ist,
     /// schlägt [`validate`](Self::validate) mit [`AvvError::MissingSubprocessors`] fehl.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub subprocessors_allowed: Option<bool>,
 }
 
@@ -230,7 +284,8 @@ impl AvvContext {
 ///
 /// TOMs beschreiben die Sicherheitsmechanismen, die zum Schutz der Vertraulichkeit,
 /// Integrität, Verfügbarkeit und Belastbarkeit der Systeme implementiert wurden.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TechnicalMeasure {
     /// Bezeichnung der Sicherheitsmaßnahme (z. B. "Kryptografischer Löschbeweis (Ed25519)").
     pub name: String,
