@@ -37,6 +37,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod contract;
 pub mod error;
 pub mod memory_index;
 pub mod traits;
