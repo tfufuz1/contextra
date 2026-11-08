@@ -1,12 +1,13 @@
+#![cfg(feature = "flow-corrected-thompson")]
 //! Property-Tests und Unit-Tests für Off-Policy-Kompatibilität und Bandit-Default-Flip-Gate (§B.3.2).
 
 use contextra_adapt::{
     BanditDefaultFlipGate, BanditShadowReport, DefaultBanditFlipGate, DiagonalApproximationBandit,
-    FcTsSamplingDistribution, OffPolicyCompatibility, OffPolicyError,
+    FcTsSamplingDistribution, OffPolicyCompatibility, OffPolicyError, RetrievalStrategy,
     MAX_CUMULATIVE_REGRET_THRESHOLD, MIN_BANDIT_SHADOW_SAMPLES,
 };
-use contextra_types::{ContextraError, RetrievalStrategy};
 use proptest::prelude::*;
+use std::collections::BTreeMap;
 
 const STRATEGIES: [RetrievalStrategy; 4] = [
     RetrievalStrategy::Vector,
@@ -27,8 +28,8 @@ proptest! {
         ref_props in proptest::array::uniform4(0.0f32..=1.0f32),
         fcts_probs in proptest::array::uniform4(0.0f32..=1.0f32),
     ) {
-        let mut ref_map = std::collections::HashMap::new();
-        let mut fcts_map = std::collections::HashMap::new();
+        let mut ref_map = BTreeMap::new();
+        let mut fcts_map = BTreeMap::new();
 
         for (i, &strat) in STRATEGIES.iter().enumerate() {
             ref_map.insert(strat, ref_props[i]);
@@ -77,8 +78,11 @@ proptest! {
     }
 }
 
+#[cfg(feature = "types-compat")]
 #[test]
 fn test_off_policy_error_conversion_to_contextra_error() {
+    use contextra_types::ContextraError;
+
     let err = OffPolicyError::ZeroPropensityViolation(RetrievalStrategy::Graph);
     let contextra_err: ContextraError = err.clone().into();
 

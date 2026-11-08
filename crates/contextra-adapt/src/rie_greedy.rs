@@ -26,6 +26,7 @@ pub enum RieGreedyError {
     InvalidConfig(String),
 }
 
+#[cfg(feature = "types-compat")]
 impl From<RieGreedyError> for contextra_types::ContextraError {
     fn from(err: RieGreedyError) -> Self {
         match err {

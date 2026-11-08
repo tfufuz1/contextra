@@ -1,3 +1,4 @@
+#![allow(clippy::manual_range_contains, clippy::indexing_slicing)]
 //! # Anti-Windup-Verifikation für den PID-Regler
 //!
 //! Überprüft, dass bei Aktuatorsättigung die Integrator-Akkumulation eingefroren wird,

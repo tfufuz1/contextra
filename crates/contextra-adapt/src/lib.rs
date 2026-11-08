@@ -8,6 +8,29 @@
     clippy::cast_sign_loss,
     clippy::disallowed_types
 )]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::manual_range_contains,
+        clippy::same_item_push
+    )
+)]
+
+// --- Lokale Grundabstraktionen (B3, B4, B11) ---
+
+pub mod clock;
+pub mod error;
+pub mod rng;
+pub mod strategy;
+
+pub use clock::{Clock, SystemClock};
+pub use error::{AdaptError, Result};
+pub use rng::{Rng, SeededRng};
+pub use strategy::RetrievalStrategy;
 
 // --- Baukasten-Zielmodule ---
 

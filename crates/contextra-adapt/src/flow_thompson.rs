@@ -43,6 +43,7 @@ pub enum FcTsError {
     InvalidConfig(String),
 }
 
+#[cfg(feature = "types-compat")]
 impl From<FcTsError> for contextra_types::ContextraError {
     fn from(err: FcTsError) -> Self {
         match err {
@@ -657,13 +658,13 @@ fn solve_conjugate_gradient(ztz: &[f32], zte: &[f32], d: usize) -> Vec<f32> {
 // ANCHOR[contextra-adapt:FCTS-DIAG-BANDIT-001]
 pub struct DiagonalApproximationBandit {
     /// Propensities P(a | x) pro RetrievalStrategy.
-    pub propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+    pub propensities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
 }
 
 impl DiagonalApproximationBandit {
     /// Erstellt eine neue `DiagonalApproximationBandit`-Referenzpolitik mit der gegebenen Propensitätsmap.
     pub fn new(
-        propensities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+        propensities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
     ) -> Self {
         Self { propensities }
     }
@@ -672,7 +673,7 @@ impl DiagonalApproximationBandit {
     ///
     /// ```
     /// use contextra_adapt::flow_thompson::DiagonalApproximationBandit;
-    /// use contextra_types::RetrievalStrategy;
+    /// use contextra_adapt::strategy::RetrievalStrategy;
     ///
     /// let bandit = DiagonalApproximationBandit::from_pairs([
     ///     (RetrievalStrategy::Vector, 0.7),
@@ -681,15 +682,24 @@ impl DiagonalApproximationBandit {
     /// assert_eq!(bandit.propensity(RetrievalStrategy::Vector), 0.7);
     /// ```
     pub fn from_pairs(
-        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+        pairs: impl IntoIterator<Item = (crate::strategy::RetrievalStrategy, f32)>,
     ) -> Self {
         Self {
             propensities: pairs.into_iter().collect(),
         }
     }
+    /// Erstellt eine `DiagonalApproximationBandit`-Instanz aus `contextra_types::RetrievalStrategy`-Paaren.
+    #[cfg(feature = "types-compat")]
+    pub fn from_compat_pairs(
+        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+    ) -> Self {
+        Self {
+            propensities: pairs.into_iter().map(|(s, p)| (s.into(), p)).collect(),
+        }
+    }
 
     /// Liefert die Propensity P(a | x) für eine gegebene RetrievalStrategy.
-    pub fn propensity(&self, strategy: contextra_types::RetrievalStrategy) -> f32 {
+    pub fn propensity(&self, strategy: crate::strategy::RetrievalStrategy) -> f32 {
         self.propensities.get(&strategy).copied().unwrap_or(0.0)
     }
 }
@@ -713,9 +723,10 @@ pub trait OffPolicyCompatibility {
 pub enum OffPolicyError {
     /// Ein Arm hat Propensity 0 unter der Referenzpolicy, aber eine positive FC-TS-Sampling-Wahrscheinlichkeit.
     #[error("arm {0:?} has zero propensity under reference policy but positive FC-TS sampling probability — IPS weight would diverge")]
-    ZeroPropensityViolation(contextra_types::RetrievalStrategy),
+    ZeroPropensityViolation(crate::strategy::RetrievalStrategy),
 }
 
+#[cfg(feature = "types-compat")]
 impl From<OffPolicyError> for contextra_types::ContextraError {
     fn from(err: OffPolicyError) -> Self {
         contextra_types::ContextraError::InvalidInput(err.to_string())
@@ -727,13 +738,13 @@ impl From<OffPolicyError> for contextra_types::ContextraError {
 // ANCHOR[contextra-adapt:FCTS-DISTRIBUTION-001]
 pub struct FcTsSamplingDistribution {
     /// Mapping von RetrievalStrategy zu FC-TS-Sampling-Wahrscheinlichkeit P_FCTS(a | x).
-    pub probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+    pub probabilities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
 }
 
 impl FcTsSamplingDistribution {
     /// Erstellt eine neue `FcTsSamplingDistribution`-Instanz mit der gegebenen Wahrscheinlichkeitsmap.
     pub fn new(
-        probabilities: std::collections::HashMap<contextra_types::RetrievalStrategy, f32>,
+        probabilities: std::collections::BTreeMap<crate::strategy::RetrievalStrategy, f32>,
     ) -> Self {
         Self { probabilities }
     }
@@ -742,7 +753,7 @@ impl FcTsSamplingDistribution {
     ///
     /// ```
     /// use contextra_adapt::flow_thompson::FcTsSamplingDistribution;
-    /// use contextra_types::RetrievalStrategy;
+    /// use contextra_adapt::strategy::RetrievalStrategy;
     ///
     /// let dist = FcTsSamplingDistribution::from_pairs([
     ///     (RetrievalStrategy::Hybrid, 0.8),
@@ -751,15 +762,24 @@ impl FcTsSamplingDistribution {
     /// assert_eq!(dist.probability(RetrievalStrategy::Hybrid), 0.8);
     /// ```
     pub fn from_pairs(
-        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+        pairs: impl IntoIterator<Item = (crate::strategy::RetrievalStrategy, f32)>,
     ) -> Self {
         Self {
             probabilities: pairs.into_iter().collect(),
         }
     }
+    /// Erstellt eine `FcTsSamplingDistribution`-Instanz aus `contextra_types::RetrievalStrategy`-Paaren.
+    #[cfg(feature = "types-compat")]
+    pub fn from_compat_pairs(
+        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
+    ) -> Self {
+        Self {
+            probabilities: pairs.into_iter().map(|(s, p)| (s.into(), p)).collect(),
+        }
+    }
 
     /// Liefert die FC-TS-Sampling-Wahrscheinlichkeit für eine gegebene RetrievalStrategy.
-    pub fn probability(&self, strategy: contextra_types::RetrievalStrategy) -> f32 {
+    pub fn probability(&self, strategy: crate::strategy::RetrievalStrategy) -> f32 {
         self.probabilities.get(&strategy).copied().unwrap_or(0.0)
     }
 }
@@ -853,17 +873,17 @@ impl OffPolicyCompatibility for FcTsArmSet {
         reference_policy: &DiagonalApproximationBandit,
     ) -> Result<(), OffPolicyError> {
         let default_strategies = [
-            contextra_types::RetrievalStrategy::Vector,
-            contextra_types::RetrievalStrategy::Text,
-            contextra_types::RetrievalStrategy::Graph,
-            contextra_types::RetrievalStrategy::Hybrid,
+            crate::strategy::RetrievalStrategy::Vector,
+            crate::strategy::RetrievalStrategy::Text,
+            crate::strategy::RetrievalStrategy::Graph,
+            crate::strategy::RetrievalStrategy::Hybrid,
         ];
 
         for (idx, _arm) in self.arms.iter().enumerate() {
             let strategy = default_strategies
                 .get(idx)
                 .copied()
-                .unwrap_or(contextra_types::RetrievalStrategy::Vector);
+                .unwrap_or(crate::strategy::RetrievalStrategy::Vector);
             let ref_p = reference_policy.propensity(strategy);
             if ref_p <= 0.0 {
                 return Err(OffPolicyError::ZeroPropensityViolation(strategy));

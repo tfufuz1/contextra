@@ -6,7 +6,7 @@
 
 //! PID Latency Controller & Latency Budget Guard.
 
-use contextra_ports::{Clock, SystemClock};
+use crate::clock::{Clock, SystemClock};
 use std::sync::Arc;
 
 /// Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).

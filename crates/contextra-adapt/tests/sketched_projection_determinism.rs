@@ -1,3 +1,4 @@
+#![cfg(feature = "sketched-bandit")]
 //! # Determinismus- und Mandantenisolationstests für Sketched-Projection
 //!
 //! Prüft die exakte Wiederholbarkeit der Projektionsmatrizen und die Trennung über TenantIds.
