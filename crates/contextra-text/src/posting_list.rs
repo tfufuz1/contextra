@@ -18,6 +18,11 @@
 //! Block-Max-Zusammenfassungen (à 64 Einträge) zur Beschleunigung des WAND-Algorithmus.
 //! Aktualisierungen erfolgen über RCU (Read-Copy-Update) für sperrenfreie Lesezugriffe.
 
+#[cfg(not(feature = "types-compat"))]
+use crate::error::TextError as ContextraError;
+#[cfg(not(feature = "types-compat"))]
+use crate::types::DocId;
+#[cfg(feature = "types-compat")]
 use contextra_types::{ContextraError, DocId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -70,7 +75,7 @@ impl Posting {
     #[inline]
     pub fn new(doc_id: DocId, tf: u32, doc_len: u32) -> Self {
         Self {
-            doc_id: doc_id.inner(),
+            doc_id: doc_id.inner() as _,
             tf,
             doc_len,
         }
@@ -78,7 +83,7 @@ impl Posting {
 
     #[inline]
     pub fn doc_id(&self) -> DocId {
-        DocId::new(self.doc_id)
+        DocId::new(self.doc_id as _)
     }
 }
 
@@ -190,7 +195,7 @@ impl PostingList {
     /// Entfernt ein Posting per Copy-On-Write (RCU).
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
-        if let Ok(idx) = new_postings.binary_search_by_key(&doc_id.inner(), |p| p.doc_id) {
+        if let Ok(idx) = new_postings.binary_search_by_key(&(doc_id.inner() as _), |p| p.doc_id) {
             new_postings.remove(idx);
         }
         let blocks = compute_blocks(&new_postings);
