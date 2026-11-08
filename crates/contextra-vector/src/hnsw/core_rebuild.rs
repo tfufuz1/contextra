@@ -970,6 +970,112 @@ impl HnswIndexCore {
     }
 }
 
+impl HnswIndex {
+    /// Führt Graphtraversierung durch zur Überprüfung von `INV-VEC-CONNECTIVITY-1`.
+    ///
+    /// Verifiziert, dass jeder lebende Knoten im Index vom Einstiegspunkt über
+    /// Graphkanten erreichbar ist.
+    pub fn verify_full_connectivity(&self) -> bool {
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_node_count = mmap_guard
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        let total = mmap_node_count + nodes.len();
+
+        let mut alive_nodes = ahash::AHashSet::new();
+        for i in 0..total {
+            if !deleted.contains(i as u64) {
+                alive_nodes.insert(i as u32);
+            }
+        }
+
+        if alive_nodes.is_empty() {
+            return true;
+        }
+
+        let ep = match self.inner.hot.get_entry_point() {
+            Some(e) => e as u32,
+            None => return false,
+        };
+
+        if !alive_nodes.contains(&ep) {
+            return false;
+        }
+
+        let m = self.inner.cold.config.m;
+        let mut visited = ahash::AHashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+
+        visited.insert(ep);
+        queue.push_back(ep);
+
+        while let Some(curr) = queue.pop_front() {
+            let curr_idx = curr as usize;
+            let max_layer = if curr_idx < mmap_node_count {
+                if let Some(mmap) = mmap_guard.as_ref() {
+                    mmap.get_node_record(curr_idx)
+                        .map(|r| r.max_layer as usize)
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            } else {
+                let ram_idx = curr_idx - mmap_node_count;
+                nodes.get(ram_idx).map(|n| n.max_layer).unwrap_or(0)
+            };
+
+            for layer in 0..=max_layer {
+                let conns = if curr_idx < mmap_node_count {
+                    if let Some(mmap) = mmap_guard.as_ref() {
+                        if let Ok(rec) = mmap.get_node_record(curr_idx) {
+                            mmap.get_connections(&rec, layer).unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    let ram_idx = curr_idx - mmap_node_count;
+                    self.inner
+                        .hot
+                        .arena
+                        .get_ram_node_connections(ram_idx, layer, m)
+                };
+
+                for &neighbor in &conns {
+                    if alive_nodes.contains(&neighbor) && visited.insert(neighbor) {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        alive_nodes.is_subset(&visited)
+    }
+}
+
+impl crate::types::Maintain for HnswIndex {
+    fn compact(&self) -> crate::error::Result<()> {
+        self.inner
+            .rebuild_sync()
+            .map_err(|e| crate::error::VectorError::Index(e.to_string()))?;
+        if !self.verify_full_connectivity() {
+            return Err(crate::error::VectorError::ConnectivityDegraded {
+                deleted_ratio: self.deleted_ratio(),
+            });
+        }
+        Ok(())
+    }
+
+    fn is_rebuild_required(&self) -> bool {
+        self.is_rebuild_required()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -27,6 +27,7 @@
     clippy::wrong_self_convention
 )]
 
+pub mod contract;
 pub mod error;
 pub mod types;
 
