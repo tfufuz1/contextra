@@ -1,21 +1,21 @@
-//! Autarkes Anwendungsbeispiel für `contextra-text` (M10).
+//! Autarkes Anwendungsbeispiel für `contextra-text` (Klasse A).
 //!
-//! Dieses Beispiel demonstriert die isolierte Nutzung der Komponenten von `contextra-text`:
+//! Dieses Beispiel demonstriert die vollständig isolierte Nutzung von `contextra-text`:
 //! 1. Text-Normalisierung und deutsche morphologische Komposita-Zerlegung.
 //! 2. Mathematische Relevanzberechnung mit Standard-BM25.
-//! 3. Posting-Listen-Erzeugung und dynamisches Pruning mit BoundedTopK.
+//! 3. Thread-sicherer In-Memory Volltextindex mit Snapshot-Isolation (`Index<DocKey, str>` & `Maintain`).
 
 use contextra_text::bm25::BM25;
+use contextra_text::contract::DocKey;
+use contextra_text::memory_index::MemoryTextIndex;
 use contextra_text::morphology::{
     normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer,
 };
-use contextra_text::posting_list::{Posting, PostingList};
 use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
-use contextra_text::wand::BoundedTopK;
-use contextra_types::DocId;
+use contextra_text::traits::{Index, Maintain};
 
 fn main() {
-    println!("=== Contextra-Text Autarkes Baukasten-Beispiel (M10) ===\n");
+    println!("=== Contextra-Text Autarkes Baukasten-Beispiel (Klasse A) ===\n");
 
     // 1. Textanalyse & deutsche Morphologie
     let splitter = GermanCompoundSplitter::default();
@@ -47,33 +47,33 @@ fn main() {
     println!("   Parameter: tf={tf}, doc_len={doc_len}, avg_doc_len={avg_doc_len}, df={df}, N={total_docs}");
     println!("   Errechneter BM25-Score: {score:.4}\n");
 
-    // 3. Posting-Listen & Block-Info
-    let mut postings = Vec::new();
-    postings.push(Posting::new(DocId::new(1), 2, 40));
-    postings.push(Posting::new(DocId::new(2), 5, 60));
-    postings.push(Posting::new(DocId::new(3), 1, 35));
+    // 3. Thread-sicherer In-Memory Volltextindex (Snapshot-Isolation)
+    let mut index = MemoryTextIndex::new();
+    let doc1 = DocKey::from(1u64);
+    let doc2 = DocKey::from(2u64);
 
-    let posting_list = PostingList::new(postings);
-    println!("4. Posting-Liste:");
-    println!("   Anzahl Postings: {}", posting_list.len());
-    if let Some(first_block) = posting_list.blocks().first() {
+    Index::<DocKey, str>::insert(&mut index, doc1, b"Donaudampfschifffahrt und Volltextsuche")
+        .unwrap();
+    Index::<DocKey, str>::insert(&mut index, doc2, b"Volltextsuche in Rust mit BM25").unwrap();
+
+    let hits = Index::<DocKey, str>::search(&index, "Volltextsuche", 10).unwrap();
+    println!("4. In-Memory Volltextsuche Treffer: {}", hits.len());
+    for (i, hit) in hits.iter().enumerate() {
         println!(
-            "   Block-Info: Max TF = {}, Min Doc Len = {}\n",
-            first_block.max_tf, first_block.min_doc_len
+            "   Rang {}: DocId={:?}, Score={:.4}",
+            i + 1,
+            hit.doc_id,
+            hit.score
         );
     }
 
-    // 4. BoundedTopK Min-Heap Pruning
-    let mut top_k = BoundedTopK::new(2);
-    top_k.push(DocId::new(1), 1.25);
-    top_k.push(DocId::new(2), 3.80);
-    top_k.push(DocId::new(3), 2.10);
+    // Löschung und Kompaktierung
+    Index::<DocKey, str>::remove(&mut index, &doc1).unwrap();
+    let stats = Maintain::compact(&mut index).unwrap();
+    println!(
+        "5. Index-Kompaktierung: {} Dokumente bereinigt, {} aktiv.\n",
+        stats.purged_docs, stats.active_docs
+    );
 
-    let ranked = top_k.into_sorted_vec();
-    println!("5. BoundedTopK Ergebnisse (k=2):");
-    for (rank, (doc_id, s)) in ranked.iter().enumerate() {
-        println!("   Rang {}: DocId={:?}, Score={:.2}", rank + 1, doc_id, s);
-    }
-
-    println!("\nBaukasten contextra-text erfolgreich autark ausgeführt!");
+    println!("Baukasten contextra-text erfolgreich autark ausgeführt!");
 }

@@ -37,10 +37,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod contract;
 pub mod error;
 pub mod memory_index;
 pub mod traits;
 pub mod types;
+
+pub use contract::{Clock, DocKey, Epoch, Error as ContractError, Result as ContractResult, Rng};
 
 pub use error::{Result as LocalResult, TextError};
 pub use memory_index::{CompactStats, MemoryTextIndex};
