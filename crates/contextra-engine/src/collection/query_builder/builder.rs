@@ -298,7 +298,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self.include_provenance = query.include_provenance;
         self.rerank_pool_multiplier = query.rerank_pool_multiplier;
         self.rerank_pool_max = query.rerank_pool_max;
-        self.on_signal_failure = query.on_signal_failure;
+        self.on_signal_failure = query.on_signal_failure.into();
         self.k = Some(query.k);
         self
     }

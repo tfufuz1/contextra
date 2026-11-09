@@ -136,7 +136,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             rerank_pool_multiplier: self.rerank_pool_multiplier,
             rerank_pool_max: Some(effective_pool_max),
             has_reranker: self.reranker.is_some(),
-            on_signal_failure: self.on_signal_failure,
+            on_signal_failure: self.on_signal_failure.into(),
             k,
         }
     }

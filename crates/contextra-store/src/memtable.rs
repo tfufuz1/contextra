@@ -45,6 +45,7 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
+// Compile-time Invariante: TOMBSTONE_BIT muss exakt Bit 63 sein für atomare Bitmaskierung.
 const _: () = assert!(TOMBSTONE_BIT == 1u64 << 63);
 
 /// Helper function to check if a sequence number has TOMBSTONE_BIT set.

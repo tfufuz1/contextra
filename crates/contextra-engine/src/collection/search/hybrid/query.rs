@@ -289,7 +289,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         match vector_res {
             Ok(res) => Ok(res),
             Err(err) => {
-                if query.on_signal_failure == SignalFailurePolicy::Fail {
+                if query.on_signal_failure == SignalFailurePolicy::Fail.into() {
                     Err(err)
                 } else {
                     report.degraded_signals.push(Signal::Vector);
@@ -384,7 +384,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         match text_res {
             Ok(res) => Ok(res),
             Err(err) => {
-                if query.on_signal_failure == SignalFailurePolicy::Fail {
+                if query.on_signal_failure == SignalFailurePolicy::Fail.into() {
                     Err(err)
                 } else {
                     report.degraded_signals.push(Signal::Text);
@@ -485,7 +485,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let graph_results = match graph_res {
             Ok(res) => res,
             Err(err) => {
-                if query.on_signal_failure == SignalFailurePolicy::Fail {
+                if query.on_signal_failure == SignalFailurePolicy::Fail.into() {
                     return Err(err);
                 }
                 report.degraded_signals.push(Signal::Graph);
