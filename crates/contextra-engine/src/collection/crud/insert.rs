@@ -24,17 +24,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         mut metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         let embedding = {
-            let embedder = {
-                let guard = self.embedder.read();
-                guard
-                    .as_ref()
-                    .ok_or_else(|| {
-                        contextra_types::ContextraError::Internal(
-                            "No embedder configured for this collection".into(),
-                        )
-                    })?
-                    .clone()
-            };
+            let embedder = self.embedder().ok_or_else(|| {
+                contextra_types::ContextraError::Internal(
+                    "No embedder configured for this collection".into(),
+                )
+            })?;
             embedder.embed(text).await?
         };
 
@@ -72,17 +66,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         mut metadata: Option<serde_json::Value>,
     ) -> Result<()> {
         let embedding = {
-            let embedder = {
-                let guard = self.embedder.read();
-                guard
-                    .as_ref()
-                    .ok_or_else(|| {
-                        contextra_types::ContextraError::Internal(
-                            "No embedder configured for this collection".into(),
-                        )
-                    })?
-                    .clone()
-            };
+            let embedder = self.embedder().ok_or_else(|| {
+                contextra_types::ContextraError::Internal(
+                    "No embedder configured for this collection".into(),
+                )
+            })?;
             embedder.embed(text).await?
         };
 
