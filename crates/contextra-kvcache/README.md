@@ -1,43 +1,44 @@
 # contextra-kvcache
 
-> **Ring 1** · Klasse `[K]` (Kern) · Reifegrad `beta` · Unsafe: **nein** (`#![forbid(unsafe_code)]`) · Rolle: Verschlüsselter, mandantenisolierter KV-Prefix-Cache für LLM-Zustände (Radix-Baum, Attention-Eviction, KIVI-Quantisierung).
+> Klasse `A` (Stand-alone Baukasten) · Unsafe: **nein** (`#![forbid(unsafe_code)]`) · Rolle: Verschlüsselter, mandantenisolierter KV-Prefix-Cache für LLM-Inferenzzustände (Radix-Baum, Attention-Eviction, KIVI-Quantisierung).
 
-`contextra-kvcache` ist ein eigenständiger, modularer Baukasten für modernes Key-Value-Cache-Management bei LLM-Inferenz und RAG-Workloads. Er beschleunigt Prefill-Phasen durch deterministisches Teilen von Prompt-Präfixen und bietet Tenant-Isolierung sowie verschlüsseltes Tiering.
+`contextra-kvcache` ist ein eigenständiger, hochperformanter Baukasten für Key-Value-Cache-Management bei LLM-Inferenz und Agentic RAG Workloads. Er beschleunigt Prefill-Phasen durch deterministisches Teilen von Prompt-Präfixen und bietet vollständige Mandanten-Isolierung, neutrale Segment-Schlüsselzerstörung sowie optionales verschlüsseltes Tiering.
 
-## 1. Baukasten-Profil & Entkopplung
+## 1. Zweck und Baukasten-Prinzip (Klasse A)
 
-- **Keine juristische Löschkettenlogik:** Bereinigung erfolgt als neutrale In-Memory-Freigabe, Verdrängung (Eviction) oder Zeroization.
-- **Fail-Closed Verschlüsselung:** Segment-Verschlüsselung mit deterministischer AAD-Bindung (Segment-ID, Tenant, ModelFingerprint) und Schlüsselableitungs-Versionsprüfung.
-- **Zero Shared Mutable State:** Saubere Sharding- und Lock-Hierarchie ohne globale Singletons.
+- **Vollständig autark:** Keine zwingenden internen Abhängigkeiten. Baut und testet mit `--no-default-features` komplett isoliert.
+- **Copy-Paste-Readiness:** Kann via `python3 tools/export_crate.py contextra-kvcache` als eigenständige Library exportiert werden.
+- **Keine juristische Löschkettenlogik (SPEC §6):** Bereinigung erfolgt ausschließlich als neutrale Invalidation, Verdrängung (Eviction) oder kryptografische Schlüsselzerstörung (`SegmentKey::destroy()`). Löschbeweise und DSGVO-Orchestrierung liegen in `contextra-erasure-adapters`.
+- **Eigene Trait-Schnittstelle:** Segmentverschlüsselung ist über den lokalen Trait `SegmentCipher` abstrahiert (inklusive `PlaintextSegmentCipher`).
 
 ## 2. Abhängigkeiten
 
-Gemäß `capabilities.toml` und Ring-1-Vorgaben hängt `contextra-kvcache` ausschließlich an:
-- `contextra-types` (Ring 0)
-- `contextra-ports` (Ring 0)
-- `contextra-crypto` (Ring 0)
+### Externe Crates
+- `thiserror`, `tracing`, `parking_lot`, `tokio` (minimal), `serde`, `bitvec`, `half`, `criterion` (dev-dep).
 
-Keine Abhängigkeiten zu höheren Ringen oder Inferenz-Frameworks (`candle`, `onnx`, `ollama`).
+### Übergangs-Features (Transitional / Compat)
+- `ports-compat`: Optionale Konvertierung zu `contextra-types` und Implementierung von Ports aus `contextra-ports`.
+- `crypto-compat`: Optionale Anbindung an `contextra-crypto` für `SegmentCipher`.
 
 ## 3. Features
 
-- `default = []`: Minimaler Default-Footprint.
-- `kv-encryption`: Aktiviert erweiterte kryptografische Bindung via `contextra-crypto`.
-- `content-addressed-kv-cache`: Inhaltsadressierte KV-Blöcke.
+- `default = ["std", "ports-compat", "crypto-compat"]`
+- `kv-encryption`: Aktiviert kryptografische Bindung und Segmentverschlüsselung.
+- `content-addressed-kv-cache`: Inhaltsadressierte KV-Blöcke über Hash-Präfixe.
 - `kivi-quantization` / `kvcache-kivi-quant`: 2-Bit/4-Bit KIVI-Quantisierung für KV-Tensoren.
-- `kvcache-attention-eviction`: Attention-basierte Verdrängungspolicies.
+- `kvcache-attention-eviction`: Attention-basierte Verdrängungspolicies (Sieve, LRU).
 
 ## 4. Garantien & Invarianten
 
-1. **Mandantentrennung (VETO-F10):** Jede Operation wird strikt über `TenantId` isoliert. Cross-Tenant Cache-Sharing ist unmöglich.
-2. **Speichersicherheit:** `#![forbid(unsafe_code)]` im gesamten Crate.
-3. **Zero-Panic:** Keine unwrap/expect/panic! im Produktivcode.
-4. **Fail-Closed:** Mismatches bei AAD, Schlüsselversionen oder fehlerhafte Entschlüsselung führen deterministisch zu Fehlern.
+1. **Mandantentrennung (INV-KV-1):** Jede Operation wird strikt über `TenantId` isoliert. Kein mandantenübergreifendes Sharing.
+2. **Krypto-Invalidierung (INV-KV-2):** `SegmentKey::destroy()` überschreibt das Schlüsselmaterial sicher (`zeroize`).
+3. **Zero-Panic (INV-KV-3):** Kein `unwrap()` / `expect()` im Produktivcode; alle Fehler sind als `KvCacheError` typisiert.
+4. **Speichersicherheit:** `#![forbid(unsafe_code)]` garantiert vollständige Speichersicherheit.
 
-## 5. Einbettungsbeispiel
+## 5. Minimalbeispiel
 
 ```rust
-use contextra_kvcache::{KvCacheConfig, KvCacheServiceBuilder, KvSegment, TenantIsolatedKvStore};
+use contextra_kvcache::{KvSegment, PrefixRadixTree, TenantIsolatedKvStore};
 use contextra_types::TenantId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,5 +56,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
-
-Ein ausführliches Standalone-Beispiel findet sich unter `examples/standalone_prefix_cache.rs`.
