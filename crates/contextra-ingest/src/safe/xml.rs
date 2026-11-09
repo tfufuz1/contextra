@@ -216,7 +216,33 @@ pub fn parse_xml(bytes: &[u8], budget: &ResourceBudget) -> Result<XmlElement, In
         };
 
         match event {
+            Event::DocType(dt) => {
+                let dt_bytes: &[u8] = dt.as_ref();
+                if dt_bytes
+                    .windows(6)
+                    .any(|w| w.eq_ignore_ascii_case(b"ENTITY"))
+                    || dt_bytes
+                        .windows(6)
+                        .any(|w| w.eq_ignore_ascii_case(b"SYSTEM"))
+                    || dt_bytes
+                        .windows(6)
+                        .any(|w| w.eq_ignore_ascii_case(b"PUBLIC"))
+                {
+                    return Err(IngestError::Corrupt {
+                        format: None,
+                        detail: "XXE-Sicherheitsverstoß: Externe DTDs/Entitäten sind verboten"
+                            .into(),
+                    });
+                }
+            }
             Event::Start(e) => {
+                if stack.len() >= budget.limits.max_xml_depth as usize {
+                    return Err(IngestError::LimitExceeded {
+                        kind: LimitKind::XmlDepth,
+                        limit: u64::from(budget.limits.max_xml_depth),
+                        observed: stack.len() as u64 + 1,
+                    });
+                }
                 let name = match String::from_utf8(e.name().as_ref().to_vec()) {
                     Ok(n) => n,
                     Err(_) => {
