@@ -11,9 +11,9 @@
 
 use crate::client::xml_escape;
 use crate::error::LocalQueryRewriteOutput;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::error::Result;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::OllamaClient;
 #[cfg(feature = "ports-compat")]
 use contextra_ports::{BoxFuture, QueryRewriter};
@@ -50,16 +50,16 @@ impl Default for OllamaQueryRewriterConfig {
 
 /// LLM-basierter Multi-Signal Query Rewriter über Ollama.
 pub struct OllamaQueryRewriter {
-    #[cfg(feature = "http")]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
+    #[cfg(feature = "client")]
     client: OllamaClient,
     config: OllamaQueryRewriterConfig,
 }
 
 impl OllamaQueryRewriter {
     /// Erstellt einen neuen `OllamaQueryRewriter` mit dem angegebenen Client und der Konfiguration.
-    #[cfg(feature = "http")]
-    pub fn new(#[cfg(feature = "http")]
+    #[cfg(feature = "client")]
+    pub fn new(#[cfg(feature = "client")]
     client: OllamaClient, config: OllamaQueryRewriterConfig) -> Self {
         Self { client, config }
     }
@@ -70,8 +70,8 @@ impl OllamaQueryRewriter {
     }
 
     /// Rewrites a query using plain text context snippets.
-    #[cfg(feature = "http")]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
+    #[cfg(feature = "client")]
     pub async fn rewrite(
         &self,
         original_query: &str,
@@ -106,7 +106,7 @@ impl OllamaQueryRewriter {
     }
 
     /// Rewrites a query structured according to contextra-ports QueryRewriter contract.
-    #[cfg(all(feature = "http", feature = "ports-compat"))]
+    #[cfg(all(feature = "client", feature = "ports-compat"))]
     pub fn rewrite_structured<'a>(
         &'a self,
         original_query: &'a str,
@@ -116,7 +116,7 @@ impl OllamaQueryRewriter {
     }
 }
 
-#[cfg(all(feature = "http", feature = "ports-compat"))]
+#[cfg(all(feature = "client", feature = "ports-compat"))]
 impl QueryRewriter for OllamaQueryRewriter {
     fn rewrite_structured<'a>(
         &'a self,
