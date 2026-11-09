@@ -121,3 +121,90 @@ impl<T: EgressClassifier + ?Sized> EgressClassifierTrace for T {
         })
     }
 }
+
+/// Neutraler Senken-Trait für die Weiterleitung von Audit-Ereignissen.
+pub trait EventSink: Send + Sync {
+    /// Zeichnet ein neutrales Ereignis auf.
+    fn record(&self, event: &AuditEvent);
+}
+
+/// No-Op Senke für autonome Umgebungen.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoOpEventSink;
+
+impl EventSink for NoOpEventSink {
+    #[inline]
+    fn record(&self, _event: &AuditEvent) {}
+}
+
+/// In-Memory Senke für Test- und Beobachtungszwecke.
+#[derive(Debug, Default)]
+pub struct InMemoryEventSink {
+    events: std::sync::RwLock<Vec<AuditEvent>>,
+}
+
+impl InMemoryEventSink {
+    /// Erstellt eine neue leere `InMemoryEventSink`.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            events: std::sync::RwLock::new(Vec::new()),
+        }
+    }
+
+    /// Gibt eine Kopie aller bisher aufgezeichneten Ereignisse zurück.
+    #[must_use]
+    pub fn events(&self) -> Vec<AuditEvent> {
+        self.events.read().map(|g| g.clone()).unwrap_or_default()
+    }
+
+    /// Leert den internen Ereignisspeicher.
+    pub fn clear(&self) {
+        if let Ok(mut g) = self.events.write() {
+            g.clear();
+        }
+    }
+}
+
+impl EventSink for InMemoryEventSink {
+    fn record(&self, event: &AuditEvent) {
+        if let Ok(mut g) = self.events.write() {
+            g.push(event.clone());
+        }
+    }
+}
+
+/// Neutrales Audit-Ereignis.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct AuditEvent {
+    /// Zeitstempel in Nanosekunden (monoton oder Unix-Epoche von Clock injiziert).
+    pub timestamp_nanos: u64,
+    /// Kategorie des Ereignisses (z. B. "egress_blocked", "egress_allowed", "vault_access").
+    pub category: String,
+    /// Eindeutige Regel- oder Richtlinien-Kennung.
+    pub rule_id: Option<String>,
+    /// Neutraler Statuscode oder Ergebnisbeschreibung.
+    pub outcome: String,
+    /// Anzahl verarbeiteter Bytes.
+    pub bytes_processed: usize,
+}
+
+impl AuditEvent {
+    /// Erzeugt ein neues Audit-Ereignis ohne vertrauliche Nutzlast-Inhalte.
+    #[must_use]
+    pub fn new(
+        timestamp_nanos: u64,
+        category: impl Into<String>,
+        rule_id: Option<String>,
+        outcome: impl Into<String>,
+        bytes_processed: usize,
+    ) -> Self {
+        Self {
+            timestamp_nanos,
+            category: category.into(),
+            rule_id,
+            outcome: outcome.into(),
+            bytes_processed,
+        }
+    }
+}

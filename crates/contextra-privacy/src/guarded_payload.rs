@@ -8,15 +8,44 @@
 //!
 //! # Ring-Zugehörigkeit
 //! Ring 3 (Domain-Typen).
+//!
+//! # Typ-Test (compile_fail)
+//! ```compile_fail
+//! // Direkte externe Feld-Konstruktion ist verboten:
+//! use contextra_privacy::guarded_payload::{GuardedPayload, Sanitized};
+//! let _p = GuardedPayload { inner: "geheim".to_string(), session_id: "s1".to_string(), _state: std::marker::PhantomData };
+//! ```
+//!
+//! ```compile_fail
+//! // Mutierender Zugriff ist verboten:
+//! use contextra_privacy::guarded_payload::{GuardedPayload, Sanitized};
+//! fn tamper(p: &mut GuardedPayload<Sanitized>) {
+//!     p.clear(); // Fehler: kein DerefMut
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! // Unsanitized kann nicht an Sanitized-Empfänger übergeben werden:
+//! use contextra_privacy::guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
+//! fn send_to_cloud(_p: GuardedPayload<Sanitized>) {}
+//! fn run() {
+//!     let raw = GuardedPayload::<Unsanitized>::new("raw".into(), "s1".into());
+//!     send_to_cloud(raw); // Typfehler
+//! }
+//! ```
 
+use std::fmt;
 use std::marker::PhantomData;
+use std::ops::Deref;
 
 // ANCHOR[contextra-privacy:GP-001]
 /// Marker-Typ: Payload hat noch nicht alle Egress-Guard-Layer durchlaufen und gilt als unbereinigt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Unsanitized;
 
 // ANCHOR[contextra-privacy:GP-002]
 /// Marker-Typ: Payload hat alle 5 Egress-Guard-Layer erfolgreich durchlaufen und ist bereinigt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Sanitized;
 
 // ANCHOR[contextra-privacy:GP-003]
@@ -29,29 +58,43 @@ pub struct Sanitized;
 /// # Invariante (§12.3)
 /// `dispatch_to_cloud()` akzeptiert ausschließlich `GuardedPayload<Sanitized>`.
 /// Diese Invariante ist nicht durch Laufzeit-Checks, sondern durch das Typsystem erzwungen.
-#[derive(Debug)]
-pub struct GuardedPayload<S> {
+#[derive(Clone, PartialEq, Eq)]
+pub struct GuardedPayload<S = Sanitized> {
     pub(crate) inner: String,
     pub(crate) session_id: String,
-    _state: PhantomData<S>,
+    pub(crate) _state: PhantomData<S>,
 }
 
 impl<S> GuardedPayload<S> {
     // ANCHOR[contextra-privacy:GP-004]
     /// Gibt eine Referenz auf die zugeordnete Sitzungs-ID (`session_id`) zurück.
+    #[must_use]
     pub fn session_id(&self) -> &str {
         &self.session_id
+    }
+
+    /// Gibt eine Referenz auf den Textinhalt zurück.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+
+    /// Gibt die Bytelänge des Textinhalts zurück.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Gibt zurück, ob die Nutzlast leer ist.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 
 impl GuardedPayload<Unsanitized> {
     // ANCHOR[contextra-privacy:GP-005]
     /// Erstellt einen neuen unsanitizierten Payload (Eingang aus MCP-Client oder interner Engine).
-    ///
-    /// # Ablauf
-    /// 1. Übernimmt den rohen Eingabestring `raw`.
-    /// 2. Verknüpft die übergebene `session_id`.
-    /// 3. Initialisiert den `PhantomData`-Marker mit Zustand `Unsanitized`.
     pub fn new(raw: String, session_id: String) -> Self {
         Self {
             inner: raw,
@@ -64,13 +107,7 @@ impl GuardedPayload<Unsanitized> {
 impl GuardedPayload<Sanitized> {
     // ANCHOR[contextra-privacy:GP-006]
     /// Konstruiert einen bereinigten Payload nach erfolgreicher Bereinigung.
-    ///
-    /// # Ablauf
-    /// Nur von `egress_gateway.rs` nach erfolgreichem Durchlauf aller Egress-Filter aufzurufen.
-    /// 1. Kapselt den bereinigten String `sanitized`.
-    /// 2. Verknüpft die `session_id`.
-    /// 3. Weist den Compile-Zeit-Zustand `Sanitized` zu.
-    pub fn from_sanitized(sanitized: String, session_id: String) -> Self {
+    pub(crate) fn from_sanitized(sanitized: String, session_id: String) -> Self {
         Self {
             inner: sanitized,
             session_id,
@@ -78,13 +115,55 @@ impl GuardedPayload<Sanitized> {
         }
     }
 
-    // ANCHOR[contextra-privacy:GP-007]
     /// Extrahiert den bereinigten String aus dem Schutzbehälter für den Versand.
-    ///
-    /// # Ablauf
-    /// Konsumiert die Instanz und gibt das interne `String`-Objekt frei.
+    #[must_use]
     pub fn into_inner(self) -> String {
         self.inner
+    }
+
+    #[cfg(any(test, feature = "test-doubles"))]
+    #[doc(hidden)]
+    pub fn from_sanitized_for_test(sanitized: String, session_id: String) -> Self {
+        Self::from_sanitized(sanitized, session_id)
+    }
+}
+
+impl<S> Deref for GuardedPayload<S> {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<S> AsRef<str> for GuardedPayload<S> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        &self.inner
+    }
+}
+
+impl<S> AsRef<[u8]> for GuardedPayload<S> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.inner.as_bytes()
+    }
+}
+
+impl<S> fmt::Debug for GuardedPayload<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GuardedPayload")
+            .field("session_id", &self.session_id)
+            .field("bytes_len", &self.inner.len())
+            .field("is_empty", &self.inner.is_empty())
+            .finish()
+    }
+}
+
+impl<S> fmt::Display for GuardedPayload<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.inner)
     }
 }
 
@@ -93,7 +172,6 @@ mod tests {
     use super::*;
 
     // ANCHOR[contextra-privacy:TEST-GP-001]
-    // Prüft, dass die Type-States Unsanitized und Sanitized getrennt konstruierbar sind und Werte korrekt halten.
     #[test]
     fn test_guarded_payload_type_states_are_distinct() {
         let raw = GuardedPayload::<Unsanitized>::new("test".into(), "s1".into());

@@ -990,3 +990,49 @@ mod tests {
         );
     }
 }
+
+/// Trait für kryptografisches Sealing (Verschlüsseln und Entschlüsseln) von Vault-Einträgen.
+pub trait Sealer: Send + Sync {
+    /// Versiegelt Klartextdaten in einen Ciphertext.
+    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>, crate::error::EgressError>;
+    /// Entsiegelt Ciphertext in Klartextdaten.
+    fn unseal(&self, ciphertext: &[u8]) -> Result<Vec<u8>, crate::error::EgressError>;
+}
+
+/// No-Op bzw. Passthrough Sealer für Testumgebungen.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PassthroughSealer;
+
+impl Sealer for PassthroughSealer {
+    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>, crate::error::EgressError> {
+        Ok(plaintext.to_vec())
+    }
+
+    fn unseal(&self, ciphertext: &[u8]) -> Result<Vec<u8>, crate::error::EgressError> {
+        Ok(ciphertext.to_vec())
+    }
+}
+
+/// Masking Sealer (XOR mit statischem Mask-Byte für isolierte Tests ohne Krypto-Bibliothek).
+#[derive(Debug, Clone)]
+pub struct MaskingSealer {
+    mask: u8,
+}
+
+impl MaskingSealer {
+    /// Erstellt einen neuen `MaskingSealer` mit dem angegebenen Maskierungs-Byte.
+    #[must_use]
+    pub fn new(mask: u8) -> Self {
+        Self { mask }
+    }
+}
+
+impl Sealer for MaskingSealer {
+    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>, crate::error::EgressError> {
+        Ok(plaintext.iter().map(|b| b ^ self.mask).collect())
+    }
+
+    fn unseal(&self, ciphertext: &[u8]) -> Result<Vec<u8>, crate::error::EgressError> {
+        Ok(ciphertext.iter().map(|b| b ^ self.mask).collect())
+    }
+}

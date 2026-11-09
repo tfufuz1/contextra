@@ -850,3 +850,22 @@ mod tests {
         }
     }
 }
+
+use crate::guarded_payload::Sanitized;
+
+/// Trait für die eigentliche Übertragung der Nutzlast (I/O liegt beim Aufrufer).
+pub trait Sender: Send + Sync {
+    /// Überträgt eine typisierte, geprüfte Nutzlast an das Ziel.
+    fn send(&self, destination: &str, payload: &crate::guarded_payload::GuardedPayload<Sanitized>) -> Result<(), EgressError>;
+}
+
+/// No-Op Sender für isolierte Tests und Gateways ohne Netzwerkadapter.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct NoOpSender;
+
+impl Sender for NoOpSender {
+    #[inline]
+    fn send(&self, _destination: &str, _payload: &crate::guarded_payload::GuardedPayload<Sanitized>) -> Result<(), EgressError> {
+        Ok(())
+    }
+}
