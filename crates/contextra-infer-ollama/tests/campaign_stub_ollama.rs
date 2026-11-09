@@ -1,4 +1,4 @@
-#![cfg(feature = "http")]
+#![cfg(feature = "client")]
 // campaign_stub_ollama.rs — Campaign stub tests for contextra-infer-ollama (J-19)
 // Oracle source: Local HTTP mock server simulating Ollama API edge cases.
 
