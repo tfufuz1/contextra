@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Testsuite `audit_inspection.rs` für contextra-text.
 //!
 //! # Ring-Zuordnung

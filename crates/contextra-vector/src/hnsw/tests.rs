@@ -275,7 +275,7 @@ async fn test_hnsw_rebuild_metrics_duration() {
         .expect("insert");
     index.commit(tx).await.expect("commit");
 
-    index.rebuild().await.expect("rebuild must succeed");
+    index.rebuild().expect("rebuild must succeed");
 
     let hists = sink.histograms.lock();
     assert!(
@@ -307,9 +307,11 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
         .build()
         .expect("valid config");
 
+    let clock = std::sync::Arc::new(crate::hnsw::MonotonicCounterClock::default());
     let index = HnswIndex::try_new(config)
         .expect("valid index")
-        .with_metrics_sink(sink.clone());
+        .with_metrics_sink(sink.clone())
+        .with_clock(clock.clone());
 
     let tx1 = TxId::new(1);
     index
@@ -336,16 +338,16 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
     );
 
     // First rebuild attempt -> succeeds
-    index.rebuild().await.expect("first rebuild must succeed");
+    index.rebuild().expect("first rebuild must succeed");
 
     // Second rapid rebuild attempt -> suppressed by backoff cooldown
-    let res2 = index.rebuild().await;
+    let res2 = index.rebuild();
     assert!(res2.is_err(), "rapid rebuild must fail due to backoff");
     let err_msg2 = format!("{}", res2.unwrap_err());
     assert!(err_msg2.contains("Rebuild rate limited by backoff cooldown"));
 
     // Third rapid rebuild attempt -> suppressed and triggers alert threshold alarm
-    let res3 = index.rebuild().await;
+    let res3 = index.rebuild();
     assert!(
         res3.is_err(),
         "subsequent rapid rebuild must fail due to backoff"
@@ -367,12 +369,11 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 
     drop(cnts);
 
-    // Wait for exponential backoff cooldown to expire
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+    // Advance clock past exponential backoff cooldown (200ms base * 2 = 400ms)
+    clock.advance_nanos(1_000_000_000);
 
     // Rebuild after cooldown expires -> succeeds
     index
         .rebuild()
-        .await
         .expect("rebuild after cooldown must succeed");
 }
