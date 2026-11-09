@@ -165,7 +165,7 @@ fn test_unsupported_op_type_v2_rejected() {
 fn test_nonce_counter_exhaustion_protection() {
     let km = KeyManager::try_new("exhaustion-secret-passphrase", b"salt-1234").expect("km init");
     let (ciphertext, nonce) = km.encrypt_auto_nonce(b"test-payload").expect("encrypt");
-    assert_eq!(ciphertext.is_empty(), false);
+    assert!(!ciphertext.is_empty());
     assert_eq!(nonce.len(), 12);
 }
 

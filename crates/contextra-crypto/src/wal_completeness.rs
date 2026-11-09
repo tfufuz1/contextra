@@ -12,7 +12,7 @@
 
 #![forbid(unsafe_code)]
 
-//! Modul zur Verifikation der WAL-Ketten-Vollständigkeit.
+//!   Modul zur Verifikation der WAL-Ketten-Vollständigkeit.
 //!
 //! Schützt gegen unbemerkte WAL-Truncation-Angriffe und partielle Log-Dateitrunkierungen.
 

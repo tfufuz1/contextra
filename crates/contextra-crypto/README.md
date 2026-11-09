@@ -1,52 +1,53 @@
 # contextra-crypto
 
-Kryptographische Vaults, Zeroize, Egress-Verschlüsselung, Audit-Ketten und kryptographische Attestationen.
+Autarker Rust-Baustein für symmetrische und asymmetrische kryptographische Primitive, AEAD, KDF, Schlüsselverwaltung und Integritätsketten.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §20, `capabilities.toml`).
+Normativitätsklasse: **Klasse A** (Baukasten-Baustein, Ring 0).
 
-## Rolle in einem Satz
-`contextra-crypto` stellt I/O-freie kryptographische Primitiven, Schlüsselverwaltung, Zeroization, Audit-Chains und kryptographische Attestationssignaturen bereit.
+## Rolle & Zweck
+`contextra-crypto` stellt auditierbare, I/O-freie kryptographische Primitiven, Schlüsselverwaltung mit `ZeroizeOnDrop`, und Anti-Tamper Integritätsketten für LLM-/RAG-Software bereit.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Kryptographie & Kernprimitiven, I/O-frei im Kern)
-- **Klasse:** Klasse A (Baukasten-Baustein)
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_depend_on`):** Soll: `[]`; transitional: `contextra-types`, `contextra-ports` (SPEC v4.0 §5)
-- **Lints:** `#![forbid(unsafe_code)]`, Zero-Panic in Produktionscode
+## Sicherheitsmodell
+- **Bedrohungsmodell:** Schutz von Daten-at-Rest und In-Memory-Schlüsseln vor unbefugtem Auslesen, Kaltstart-Angriffen (Memory Dumps), Nonce-Misuse-Angriffen, Replay/Tampering in Logs und Timing-Seitenkanalangriffen.
+- **Nicht-Ziele:** Keine juristischen Löschnachweise oder DSGVO-Sagas (diese gehören nach `contextra-erasure`). Keine Authentifizierungs-Token-Infrastruktur oder Netzwerk-Protokollierung.
 
-## Baukasten-Profil & Garantien (Klasse A)
-- **Copy-Paste-Readiness:** Exportierbar und autark nutzbar via `python3 tools/export_crate.py contextra-crypto`.
-- **Keine Eigenbauten (EP12):** Ausschließlich erprobte Standardprimitive (`aes-gcm-siv`, `argon2`, `hkdf`, `hmac`, `ed25519-dalek`, `blake3`, `sha2`).
-- **Härtung & Konstantzeit:** Konstantzeit-Vergleiche (`subtle`), kein Klartext-Schlüssel-Leak in Debug/Logs, Zeroize-on-Drop auf allen Schlüsselspeichern.
-- **Entkopplung der Löschlogik (D-E1):** Löschketten- und juristische DSGVO-Nachweise verbleiben exklusiv in `contextra-erasure`. Historische Re-Exports in `crypto` sind hinter dem Feature `legacy-erasure` gebunden und als `#[deprecated]` markiert.
+## Garantien & Invarianten
+- **Keine Eigenbauten:** Ausschließlich geprüfte RustCrypto-Crates (`aes-gcm-siv`, `argon2`, `hkdf`, `hmac`, `sha2`, `blake3`).
+- **`INV-CRYPTO-ZEROIZE-1`:** Alle Schlüsselstrukturen (`SecretKey`, `UnitKey`, `Dek`, `VolatileEncryptionKey`) werden beim Verlassen des Gültigkeitsbereichs (`Drop`) deterministisch im RAM genullt.
+- **`INV-CRYPTO-CONSTANT-TIME-1`:** Alle Vergleiche von MACs, Tags und Schlüsselbytes erfolgen in konstanter Zeit mittels `subtle::ConstantTimeEq`.
+- **Zero-Panic:** 0 Panics (`unwrap`, `expect`, etc.) im Produktionscode.
 
-## Einbettungsbeispiel (Autarker Einsatz)
+## Copy-Paste-Anleitung & Autarker Export
+`contextra-crypto` besitzt keine internen Workspace-Abhängigkeiten und kann direkt exportiert werden:
+```bash
+python3 tools/export_crate.py contextra-crypto --out /tmp/export-contextra-crypto
+```
+
+## Minimalbeispiel
 
 ```rust
-use contextra_crypto::{KeyManager, KdfHeader, KdfParams, derive_key_argon2id, WalHmac};
+use contextra_crypto::aead::{open_record, seal_record_with_nonce};
+use contextra_crypto::dek::Dek;
+use contextra_crypto::secret::SecretKey;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let passphrase = "safe-secure-passphrase";
-    let salt = vec![0x42u8; 16];
+    // 1. Schlüsselcontainer mit Zeroize-on-Drop
+    let secret = SecretKey::new([0x42u8; 32]);
+    let dek = Dek::new(secret);
 
-    // 1. Sichere KDF mit Argon2id
-    let header = KdfHeader::new(KdfParams::default(), salt)?;
-    let _key = derive_key_argon2id(passphrase, &header)?;
+    // 2. Authentifizierte AEAD-Verschlüsselung (RFC 8452)
+    let doc_tag = [0xAAu8; 16];
+    let key_bytes = b"sample_record_key";
+    let plaintext = b"Sensibler Kontext für RAG-Pipeline";
+    let nonce = [0x01u8; 12];
 
-    // 2. Schlüsselmanager & Nonce-sichere AEAD (AES-256-GCM-SIV)
-    let km = KeyManager::try_new(passphrase, b"salt-123")?;
-    let (ciphertext, nonce) = km.encrypt_auto_nonce(b"Vertrauliche Daten")?;
-    let plaintext = km.decrypt_auto_nonce(&ciphertext, &nonce)?;
-    assert_eq!(plaintext, b"Vertrauliche Daten");
+    let envelope = seal_record_with_nonce(&dek, doc_tag, key_bytes, plaintext, nonce);
 
-    // 3. Dateispezifischer Teilschlüssel (HKDF-Expand)
-    let file_km = km.derive_file_key(b"segment_001.sst")?;
-    let (file_ct, file_nonce) = file_km.encrypt_auto_nonce(b"SSTable Block")?;
-    let file_pt = file_km.decrypt_auto_nonce(&file_ct, &file_nonce)?;
-    assert_eq!(file_pt, b"SSTable Block");
+    // 3. Entschlüsselung mit AAD-Authentifizierung
+    let decrypted = open_record(&dek, key_bytes, &envelope)?;
+    assert_eq!(decrypted.as_slice(), plaintext);
 
+    println!("Erfolgreich verschlüsselt und entschlüsselt.");
     Ok(())
 }
 ```
-
-Ein ausführbares Minimalbeispiel befindet sich unter `examples/crypto_standalone.rs` und kann direkt mit `cargo run -p contextra-crypto --example crypto_standalone` gestartet werden.

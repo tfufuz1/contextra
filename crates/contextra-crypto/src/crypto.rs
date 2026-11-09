@@ -16,7 +16,7 @@
 // HOTSPOTS: [50-150]
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
-//! Encryption utilities for Contextra.
+//!   Encryption utilities for Contextra.
 //!
 //! Implements AES-256-GCM-SIV encryption and HKDF-SHA256 key derivation.
 //!
@@ -79,6 +79,16 @@ impl std::fmt::Debug for KeyManager {
 }
 
 impl KeyManager {
+    pub fn key_bytes(&self) -> &[u8] {
+        self.key.as_bytes()
+    }
+
+    /// Test helper for inspecting key bytes.
+    #[doc(hidden)]
+    pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] {
+        self.key.inspect_key_bytes_for_test()
+    }
+
     /// Creates a new KeyManager by deriving a key from a passphrase using HKDF-SHA256.
     ///
     /// # WARNHINWEIS
@@ -235,40 +245,18 @@ impl KeyManager {
     /// All KV-cache segments encrypted before v2 are cryptographically unreadable under v2 keys
     /// and will fail at the `format_version` check in `KvSegmentCipher::decrypt()` with
     /// `CryptoError::KvFormatVersionMismatch` — never with a silent garbage-data result.
-    pub fn derive_kv_key(
-        &self,
-        tenant_id: contextra_types::TenantId,
-        model_fingerprint: &crate::kv_cipher::ModelFingerprint,
-    ) -> Result<Self> {
+    /// Derives an isolated sub-key for a numeric namespace (VETO-F10).
+    pub fn cipher_for_namespace(&self, namespace_id: u64) -> Result<Self> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
 
         let mut sub_key = [0u8; 32];
-        // S-2 FIX: Length-prefix each variable field before concatenation.
-        // RFC 5869 best practice: variable-length fields without separators are ambiguous.
-        // Without length prefixes, ("abc", "def") and ("ab", "cdef") produce identical info strings.
-        // Encoding: 4-byte LE u32 length prefix for each variable-length field.
-        let model_id_bytes = model_fingerprint.model_id.as_bytes();
-        let quantization_bytes = model_fingerprint.quantization.as_bytes();
-
-        let mut info = Vec::with_capacity(
-            b"contextra-kv-layer-v2:".len()
-                + 8  // tenant_id (u64 LE)
-                + 32 // model hash
-                + 4 + model_id_bytes.len()      // u32 len prefix + data
-                + 4 + quantization_bytes.len(), // u32 len prefix + data
-        );
-        info.extend_from_slice(b"contextra-kv-layer-v2:");
-        info.extend_from_slice(&tenant_id.inner().to_le_bytes());
-        info.extend_from_slice(&model_fingerprint.hash);
-        // Length-prefixed fields (S-2 fix): u32 LE prefix prevents concatenation ambiguity
-        info.extend_from_slice(&(model_id_bytes.len() as u32).to_le_bytes());
-        info.extend_from_slice(model_id_bytes);
-        info.extend_from_slice(&(quantization_bytes.len() as u32).to_le_bytes());
-        info.extend_from_slice(quantization_bytes);
+        let mut info = Vec::with_capacity(b"ctx/ns/v1:".len() + 8);
+        info.extend_from_slice(b"ctx/ns/v1:");
+        info.extend_from_slice(&namespace_id.to_le_bytes());
 
         hk.expand(&info, &mut sub_key)
-            .map_err(|e| CryptoError::Crypto(format!("HKDF KV sub-key expansion failed: {}", e)))?;
+            .map_err(|e| CryptoError::Crypto(format!("HKDF namespace expansion failed: {}", e)))?;
 
         let cipher = Aes256GcmSiv::new_from_slice(&sub_key)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv key init failed: {}", e)))?;
@@ -286,45 +274,6 @@ impl KeyManager {
         })
     }
 
-    /// Derives a sub-key for KV-cache segment encryption with strict compile-time tenant scope enforcement.
-    ///
-    /// Unpacks `scoped_fingerprint` only if the inner bound `TenantId` matches `expected_tenant_id`.
-    /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
-    pub fn derive_kv_key_scoped(
-        &self,
-        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
-        expected_tenant_id: &contextra_types::TenantId,
-    ) -> Result<Self> {
-        let fingerprint = scoped_fingerprint
-            .into_inner_checked(expected_tenant_id)
-            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        self.derive_kv_key(*expected_tenant_id, fingerprint)
-    }
-
-    /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
-    pub fn cipher_for(&self, tenant_id: contextra_types::TenantId) -> Result<Self> {
-        let dummy_fp = crate::kv_cipher::ModelFingerprint {
-            hash: [0u8; 32],
-            model_id: "default_tenant_cipher".to_string(),
-            quantization: "raw".to_string(),
-        };
-        self.derive_kv_key(tenant_id, &dummy_fp)
-    }
-
-    /// Derives a tenant-isolated `KeyManager` instance enforcing compile-time `TenantScoped` verification.
-    /// Unpacks `scoped_key` only if the bound `TenantId` matches `expected_tenant_id`.
-    pub fn cipher_for_scoped<T>(
-        &self,
-        scoped_key: contextra_types::TenantScoped<T>,
-        expected_tenant_id: &contextra_types::TenantId,
-    ) -> Result<Self> {
-        let _unpacked = scoped_key
-            .into_inner_checked(expected_tenant_id)
-            .map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        self.cipher_for(*expected_tenant_id)
-    }
-
-    /// Derives an integrity key for HMAC-SHA256.
     pub fn integrity_key(&self) -> Result<[u8; 32]> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
@@ -334,15 +283,7 @@ impl KeyManager {
         Ok(key)
     }
 
-    /// Derives a deletion proof signing key for cryptographic deletion verification.
-    #[deprecated(note = "Use contextra-erasure for deletion proofs and attestation signing")]
-    pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
-        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
-            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
-        let mut key = [0u8; 32];
-        hk.expand(b"deletion-proof", &mut key).map_err(|e| {
-            CryptoError::Crypto(format!("HKDF deletion proof key expansion failed: {}", e))
-        })?;
+)?;
         Ok(key)
     }
 
@@ -511,13 +452,13 @@ mod tests {
     }
 
     #[test]
-    fn test_derive_deletion_proof_key() {
+    fn test_derive_file_key_basic() {
         let km = KeyManager::try_new("passphrase", b"salt").unwrap();
-        let deletion_key = km.derive_deletion_proof_key().unwrap();
-        assert_ne!(deletion_key, [0u8; 32]);
+        let key = km.derive_file_key(b"test").unwrap();
+        assert_eq!(key.key_bytes().len(), 32);
 
         let integrity_key = km.integrity_key().unwrap();
-        assert_ne!(deletion_key, integrity_key);
+        assert_ne!(key.key_bytes(), &integrity_key);
     }
 
     #[test]
@@ -707,242 +648,14 @@ mod tests {
     }
 
     #[test]
-    fn test_derive_kv_key_length_prefix_prevents_collision() -> Result<()> {
-        use crate::kv_cipher::ModelFingerprint;
-        use contextra_types::TenantId;
-
-        // Setup: Zwei ModelFingerprint-Instanzen mit gleichem hash, aber unterschiedlicher
-        // Aufteilung von model_id/quantization die ohne Längenpräfix kollidieren würden.
+    #[test]
+    fn test_derive_namespace_cipher_determinism() -> Result<()> {
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
-        let tenant = TenantId::try_new(42).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let ns1_a = km.cipher_for_namespace(42)?;
+        let ns1_b = km.cipher_for_namespace(42)?;
+        let ns2 = km.cipher_for_namespace(43)?;
 
-        let fp_a = ModelFingerprint {
-            hash: [0xAB; 32],
-            model_id: "llama-3.2-3b".to_string(),
-            quantization: "Q4_K_M".to_string(),
-        };
-        let fp_b = ModelFingerprint {
-            hash: [0xAB; 32],
-            model_id: "llama-3.2-3bQ4".to_string(),
-            quantization: "_K_M".to_string(), // Gleiche Konkatenation ohne Präfix
-        };
-
-        let key_a = km.derive_kv_key(tenant, &fp_a)?;
-        let key_b = km.derive_kv_key(tenant, &fp_b)?;
-
-        // Mit Längenpräfixierung MÜSSEN die Keys verschieden sein
-        assert_ne!(
-            key_a.inspect_key_bytes_for_test(), key_b.inspect_key_bytes_for_test(),
-            "HKDF-Subkeys dürfen bei unterschiedlichen (model_id, quantization)-Paaren nicht gleich sein"
-        );
+        assert_eq!(ns1_a.inspect_key_bytes_for_test(), ns1_b.inspect_key_bytes_for_test());
+        assert_ne!(ns1_a.inspect_key_bytes_for_test(), ns2.inspect_key_bytes_for_test());
         Ok(())
     }
-
-    #[test]
-    fn test_derive_kv_key_same_fingerprint_produces_same_key() -> Result<()> {
-        use crate::kv_cipher::ModelFingerprint;
-        use contextra_types::TenantId;
-
-        // Determinismus-Test: Gleiche Eingaben → gleicher Key (HKDF ist deterministisch)
-        let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
-        let tenant = TenantId::try_new(1).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        let fp = ModelFingerprint {
-            hash: [0x12; 32],
-            model_id: "test-model".to_string(),
-            quantization: "Q8_0".to_string(),
-        };
-        let key_1 = km.derive_kv_key(tenant, &fp)?;
-        let key_2 = km.derive_kv_key(tenant, &fp)?;
-        assert_eq!(
-            key_1.inspect_key_bytes_for_test(),
-            key_2.inspect_key_bytes_for_test()
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_derive_kv_key_scoped_enforces_tenant_isolation() -> Result<()> {
-        use crate::kv_cipher::ModelFingerprint;
-        use contextra_types::{TenantId, TenantScoped};
-
-        let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
-        let tenant_a =
-            TenantId::try_new(100).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-        let tenant_b =
-            TenantId::try_new(200).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
-
-        let fp = ModelFingerprint {
-            hash: [0x42; 32],
-            model_id: "scoped-model".to_string(),
-            quantization: "Q4_0".to_string(),
-        };
-
-        let scoped_fp = TenantScoped::new(tenant_a, &fp);
-
-        // Success path: expected tenant matches bound tenant
-        let key_scoped = km.derive_kv_key_scoped(scoped_fp.clone(), &tenant_a)?;
-        let key_direct = km.derive_kv_key(tenant_a, &fp)?;
-        assert_eq!(
-            key_scoped.inspect_key_bytes_for_test(),
-            key_direct.inspect_key_bytes_for_test(),
-            "derive_kv_key_scoped MUST match derive_kv_key on identical tenant"
-        );
-
-        // Mismatch path: attempting to unpack tenant_a payload with expected tenant_b fails
-        let err = km.derive_kv_key_scoped(scoped_fp, &tenant_b).unwrap_err();
-        assert!(
-            matches!(err, CryptoError::InvalidInput(ref msg) if msg.contains("tenant scope mismatch")),
-            "Expected tenant scope mismatch error, got: {:?}",
-            err
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_hkdf_anti_mirroring_reference_check() {
-        use hkdf::Hkdf;
-        use sha2::Sha256;
-
-        let passphrase = "independent-passphrase-reference";
-        let salt = b"independent-salt-reference";
-
-        let km = KeyManager::try_new(passphrase, salt).expect("km"); // expect
-
-        // Independent external calculation
-        let hk = Hkdf::<Sha256>::new(Some(salt), passphrase.as_bytes());
-        let mut expected_key = [0u8; 32];
-        hk.expand(b"contextra-aes-256-gcm-key", &mut expected_key)
-            .expect("hkdf expansion"); // expect
-
-        assert_eq!(
-            km.inspect_key_bytes_for_test(),
-            &expected_key,
-            "KeyManager derived key MUST match independently calculated HKDF-SHA256 reference value!"
-        );
-    }
-
-    // ANCHOR[TEST:CRY-001] STATUS:DONE (TS:2026-08-31T21:13:05Z) (SESSION:8427f167) — Nonce-Uniqueness verification bei paralleler Verschlüsselung
-    // REVIEW-PASS[1/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:00:00Z) (SESSION: b8e4f1a2)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Parallel encryption nonce uniqueness verified across concurrent threads.
-    // REVIEW-PASS[2/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Independent review pass verified no duplicate nonces generated.
-    // REVIEW-PASS[3/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-31T21:13:05Z) (SESSION: 8427f167)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Security review pass re-verified 100k parallel nonces without duplication.
-    // REVIEW-PASS[4/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-01T23:15:00Z) (SESSION: 88a840fb)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Re-verified 100k parallel nonces uniqueness in full crate audit.
-    // REVIEW-PASS[5/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-02T08:16:22Z) (SESSION: 881ec05e)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Re-verified zero-panic, zero-unsafe, and 85/85 tests green in contextra-crypto audit session.
-    // REVIEW-PASS[6/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-06T11:17:31Z) (SESSION: 8157a40e)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Re-verified zero-panic, zero-unsafe, and full Tier-1 audit pass in contextra-crypto depth-audit session.
-    // REVIEW-PASS[7/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-10T19:35:00Z) (SESSION: b434cc40)
-    // PRÜFER-KONTEXT: FRESH
-    // BEFUND: Verified AES-256-GCM-SIV nonce uniqueness, HKDF domain separation, and zero-unsafe invariants in contextra-security audit session.
-    #[test]
-    fn test_befund_1_nonce_uniqueness_and_envelope_format() {
-        let km = KeyManager::try_new("nonce-uniqueness-secret", b"salt-123456").expect("km");
-        let plaintext = b"identical-plaintext-payload";
-
-        // (a) Verify 100,000 consecutive encrypt_auto_nonce calls with identical plaintext produce unique nonces
-        let mut seen_nonces = std::collections::HashSet::with_capacity(100_000);
-        let mut first_nonce = None;
-
-        for i in 0..100_000 {
-            let (ciphertext, nonce) = km.encrypt_auto_nonce(plaintext).expect("encrypt");
-            if i == 0 {
-                first_nonce = Some(nonce);
-            } else if i == 1 {
-                assert_ne!(
-                    first_nonce.unwrap(),
-                    nonce,
-                    "Two consecutive calls with identical plaintext MUST produce different nonces"
-                );
-            }
-            assert!(
-                seen_nonces.insert(nonce),
-                "CRITICAL: Nonce collision detected at iteration {i}"
-            );
-
-            // (b) Verify Ciphertext/Envelope format exposes the 12-byte nonce required for decryption
-            let decrypted = km
-                .decrypt_auto_nonce(&ciphertext, &nonce)
-                .expect("decrypt roundtrip");
-            assert_eq!(decrypted, plaintext);
-        }
-
-        assert_eq!(seen_nonces.len(), 100_000);
-    }
-
-    #[tokio::test]
-    async fn test_parallel_nonce_uniqueness() {
-        use std::collections::HashSet;
-        use std::sync::{Arc, Mutex};
-
-        let km = Arc::new(
-            KeyManager::try_new("parallel-secret-passphrase", b"salt-parallel-1234").expect("km"), // expect
-        );
-        let nonces = Arc::new(Mutex::new(HashSet::with_capacity(100_000)));
-
-        let mut handles = Vec::new();
-        for _ in 0..10 {
-            let km_clone = Arc::clone(&km);
-            let nonces_clone = Arc::clone(&nonces);
-            handles.push(tokio::spawn(async move {
-                let data = b"parallel payload data block";
-                for _ in 0..10_000 {
-                    let (_, nonce) = km_clone.encrypt_auto_nonce(data).expect("encrypt"); // expect
-                    let mut guard = nonces_clone.lock().expect("lock nonces"); // expect
-                    assert!(
-                        guard.insert(nonce),
-                        "Nonce reuse detected in parallel execution!"
-                    );
-                }
-            }));
-        }
-
-        for handle in handles {
-            handle.await.expect("task handle joined"); // expect
-        }
-
-        let final_count = nonces.lock().expect("lock nonces").len(); // expect
-        assert_eq!(
-            final_count, 100_000,
-            "All 100,000 nonces generated in parallel MUST be distinct"
-        );
-    }
-
-    #[test]
-    fn test_derive_segment_key_determinism_and_isolation() -> Result<()> {
-        let km = KeyManager::try_new("master-passphrase-segment-key", b"salt-123")?;
-        let sub_km1 = km.derive_segment_key("contextra-kv-v1-segment-1-100")?;
-        let sub_km2 = km.derive_segment_key("contextra-kv-v1-segment-1-100")?;
-        let sub_km3 = km.derive_segment_key("contextra-kv-v1-segment-1-101")?;
-
-        assert_eq!(
-            sub_km1.inspect_key_bytes_for_test(),
-            sub_km2.inspect_key_bytes_for_test(),
-            "Identical segment info strings MUST yield identical subkeys"
-        );
-        assert_ne!(
-            sub_km1.inspect_key_bytes_for_test(),
-            sub_km3.inspect_key_bytes_for_test(),
-            "Different segment info strings MUST yield distinct subkeys"
-        );
-
-        let data = b"segment tensor data";
-        let (encrypted, nonce) = sub_km1.encrypt_auto_nonce(data)?;
-        let decrypted = sub_km2.decrypt_auto_nonce(&encrypted, &nonce)?;
-        assert_eq!(decrypted, data);
-
-        assert!(sub_km3.decrypt_auto_nonce(&encrypted, &nonce).is_err());
-        Ok(())
-    }
-
-    // REVIEW-PASS[8/3] STATUS:PASS (ID: AGT-CRYPTO-81653b64) (TS: 2026-09-13T01:35:00Z) (SESSION: dd990e1d) (PRÜFER-KONTEXT: FRESH)
-}

@@ -52,7 +52,8 @@ impl VolatileEncryptionKey {
 
     /// Test-only method to inspect key bytes.
     /// Used to verify zeroing in integration tests.
-    #[cfg(any(test, feature = "test-utils"))]
+    /// Test helper for inspecting key bytes.
+    #[doc(hidden)]
     pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] {
         &self.key_bytes
     }
@@ -68,6 +69,26 @@ impl std::fmt::Debug for VolatileEncryptionKey {
 
 // AI-TAG[SECURITY][MINOR][RESOLVED] ConstantTimeEq used in PartialEq equality (ID: AGT-CRYPTO-dd984bc2) (TS: 2026-09-03T19:31:53Z) (SESSION: a413a598)
 // RESOLVED: Replaced manual XOR loop with subtle::ConstantTimeEq for provably constant-time slice comparison.
+
+impl subtle::ConstantTimeEq for VolatileEncryptionKey {
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        self.key_bytes
+            .as_slice()
+            .ct_eq(other.key_bytes.as_slice())
+    }
+}
+
+/// Computes a BLAKE3 keyed MAC or hash in constant time comparison wrapper.
+pub fn compute_keyed_mac(key: &[u8; 32], data: &[u8]) -> [u8; 32] {
+    blake3::keyed_hash(key, data).into()
+}
+
+/// Verifies a BLAKE3 keyed MAC in constant time (`INV-CRYPTO-CONSTANT-TIME-1`).
+pub fn verify_keyed_mac(key: &[u8; 32], data: &[u8], expected_tag: &[u8; 32]) -> bool {
+    let computed = compute_keyed_mac(key, data);
+    computed.ct_eq(expected_tag).into()
+}
+
 impl PartialEq for VolatileEncryptionKey {
     fn eq(&self, other: &Self) -> bool {
         self.key_bytes

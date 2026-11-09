@@ -16,7 +16,7 @@
 // HOTSPOTS: [35-180]
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
-//! Encryption at Rest layer for LSM/WAL components (WP-3.2)
+//!   Encryption at Rest layer for LSM/WAL components (WP-3.2)
 //!
 //! Secures blocks of data transparently via ChaCha20Poly1305 / AES-GCM-SIV.
 
@@ -487,7 +487,7 @@ impl IntegrityVerifier {
     #[deprecated(
         note = "Nur für Legacy-Replay von WalVersion::V2-Bestandsdateien. Nicht für neue WAL-Segmente verwenden — siehe Doc-Kommentar. Audit-Referenz: F2."
     )]
-    /// Verifiziert und aktualisiert die HMAC-Kette im V2-Format (Rückwärtskompatibilität).
+    ///   Verifiziert und aktualisiert die HMAC-Kette im V2-Format (Rückwärtskompatibilität).
     pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         if entry.op_type > 2 {
             return Err(CryptoError::wal_corruption(

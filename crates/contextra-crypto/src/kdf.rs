@@ -90,7 +90,6 @@ impl KdfParams {
     }
 
     /// Erstellt `KdfParams` mit kleineren Kostenparametern ausschließlich für Testzwecke.
-    #[cfg(any(test, feature = "test-utils"))]
     pub fn new_for_test(m_cost_kib: u32, t_cost: u32, p_cost: u32) -> Self {
         Self {
             m_cost_kib,
