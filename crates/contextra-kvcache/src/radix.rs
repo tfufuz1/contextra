@@ -1020,7 +1020,11 @@ impl NamespaceRadixTree {
     }
 
     /// Fügt eine Token-Sequenz ein.
-    pub fn insert(&mut self, tokens: &[u32], segment_id: u64) -> Result<SharedSegmentRef, ContextraError> {
+    pub fn insert(
+        &mut self,
+        tokens: &[u32],
+        segment_id: u64,
+    ) -> Result<SharedSegmentRef, ContextraError> {
         if tokens.is_empty() {
             return Err(ContextraError::InvalidInput(
                 "Cannot insert empty token sequence".to_string(),
@@ -1037,7 +1041,12 @@ impl NamespaceRadixTree {
             }
         };
 
-        Self::insert_internal(&mut self.children, tokens, shared_ref.clone(), &mut self.total_entries);
+        Self::insert_internal(
+            &mut self.children,
+            tokens,
+            shared_ref.clone(),
+            &mut self.total_entries,
+        );
         Ok(shared_ref)
     }
 
@@ -1092,7 +1101,11 @@ impl NamespaceRadixTree {
     }
 
     /// Sucht das längste übereinstimmende Präfix im Namespace.
-    pub fn find_longest_prefix(&self, tokens: &[u32], policy: KvReusePolicy) -> Option<PrefixMatch> {
+    pub fn find_longest_prefix(
+        &self,
+        tokens: &[u32],
+        policy: KvReusePolicy,
+    ) -> Option<PrefixMatch> {
         if tokens.is_empty() || matches!(policy, KvReusePolicy::Never) {
             return None;
         }

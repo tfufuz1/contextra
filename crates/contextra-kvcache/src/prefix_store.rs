@@ -501,7 +501,9 @@ impl NamespacePrefixStore {
         let mut partitions = self.partitions.write();
         let partition = partitions.get_mut(&namespace)?;
 
-        let pm = partition.tree.find_longest_prefix(tokens, self.reuse_policy)?;
+        let pm = partition
+            .tree
+            .find_longest_prefix(tokens, self.reuse_policy)?;
         let group = partition.groups.get_mut(&pm.block_id)?;
 
         group.tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
@@ -520,7 +522,10 @@ impl NamespacePrefixStore {
             None => return Ok(false),
         };
 
-        if let Some(pm) = partition.tree.find_longest_prefix(tokens, KvReusePolicy::Always) {
+        if let Some(pm) = partition
+            .tree
+            .find_longest_prefix(tokens, KvReusePolicy::Always)
+        {
             if pm.matched_len == tokens.len() {
                 if let Some(group) = partition.groups.get_mut(&pm.block_id) {
                     group.pinned = true;
@@ -539,7 +544,10 @@ impl NamespacePrefixStore {
             None => return Ok(false),
         };
 
-        if let Some(pm) = partition.tree.find_longest_prefix(tokens, KvReusePolicy::Always) {
+        if let Some(pm) = partition
+            .tree
+            .find_longest_prefix(tokens, KvReusePolicy::Always)
+        {
             if pm.matched_len == tokens.len() {
                 if let Some(group) = partition.groups.get_mut(&pm.block_id) {
                     group.pinned = false;
@@ -558,17 +566,24 @@ impl NamespacePrefixStore {
         blocks: Vec<KvBlock>,
     ) -> Result<(), ContextraError> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput("Tokens cannot be empty".to_string()));
+            return Err(ContextraError::InvalidInput(
+                "Tokens cannot be empty".to_string(),
+            ));
         }
         if blocks.is_empty() {
-            return Err(ContextraError::InvalidInput("Blocks cannot be empty".to_string()));
+            return Err(ContextraError::InvalidInput(
+                "Blocks cannot be empty".to_string(),
+            ));
         }
 
         let group_bytes: usize = blocks.iter().map(|b| b.data.len()).sum();
         if group_bytes > self.byte_budget_per_namespace {
             return Err(ContextraError::limit_exceeded(
                 self.byte_budget_per_namespace,
-                format!("Block group size ({} bytes) exceeds byte budget", group_bytes),
+                format!(
+                    "Block group size ({} bytes) exceeds byte budget",
+                    group_bytes
+                ),
             ));
         }
 
@@ -655,12 +670,18 @@ impl NamespacePrefixStore {
     /// Gibt die Gesamtzahl gespeicherter Block-Gruppen im Namespace zurück.
     pub fn entry_count(&self, namespace: u64) -> usize {
         let partitions = self.partitions.read();
-        partitions.get(&namespace).map(|p| p.groups.len()).unwrap_or(0)
+        partitions
+            .get(&namespace)
+            .map(|p| p.groups.len())
+            .unwrap_or(0)
     }
 
     /// Gibt die gesamten allokierten Bytes im Namespace zurück.
     pub fn total_bytes(&self, namespace: u64) -> usize {
         let partitions = self.partitions.read();
-        partitions.get(&namespace).map(|p| p.total_bytes).unwrap_or(0)
+        partitions
+            .get(&namespace)
+            .map(|p| p.total_bytes)
+            .unwrap_or(0)
     }
 }
