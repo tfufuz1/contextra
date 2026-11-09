@@ -42,5 +42,6 @@ pub use types::{
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
+pub use vector_index_impl::{HnswCompactStats, Index, Maintain};
 
 pub use staging::{VectorStagingOp, VectorTxBuffer};
