@@ -1,4 +1,4 @@
-#![cfg(all(feature = "http", feature = "ports-compat"))]
+#![cfg(all(feature = "client", feature = "ports-compat"))]
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_infer_ollama::query_rewriter::{OllamaQueryRewriter, OllamaQueryRewriterConfig};

@@ -5,35 +5,35 @@
 // NICHT-OFFENSICHTLICH: Client-Fehler 4xx (400, 404) niemals retrien; Automatischer Fallback auf sequentielles Embedding falls /api/embed fehlt
 // HOTSPOTS: embed, try_embed_batch, generate_text, chat_with_rag_streaming
 
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 mod circuit_breaker;
 pub mod config;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 mod core;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 mod errors;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub mod policy;
-#[cfg(all(feature = "http", feature = "ports-compat"))]
+#[cfg(all(feature = "client", feature = "ports-compat"))]
 mod trait_impls;
 pub mod validation;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 mod wire;
 
-#[cfg(all(test, feature = "http"))]
+#[cfg(all(test, feature = "client"))]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests;
 
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub use circuit_breaker::CircuitBreaker;
 pub use config::*;
-#[cfg(all(test, feature = "http"))]
+#[cfg(all(test, feature = "client"))]
 #[allow(unused_imports)]
 pub(crate) use core::{parse_prompt_template, retry_jitter, ParsedPrompt};
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub use core::{read_response_bytes, read_response_text, OllamaClient};
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub use errors::*;
-#[cfg(feature = "http")]
-pub use policy::*;
+#[cfg(feature = "client")]
+pub use policy::{EgressAuditSink, EndpointPolicy, NoopEgressAuditSink, PayloadGate, PermissivePayloadGate};
 pub use validation::*;
