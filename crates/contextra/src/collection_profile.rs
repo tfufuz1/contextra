@@ -29,6 +29,7 @@
 //!   stets valide sein (`validate().is_ok()`).
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
+#[allow(deprecated)]
 use contextra_ports::license::LicenseGate;
 pub use contextra_types::types::domain::AutoExtractionMode;
 use serde::{Deserialize, Serialize};
@@ -118,15 +119,15 @@ impl CollectionProfile {
     // ANCHOR[contextra:PRF-007]
     /// Validiert das Profil zusätzlich gegen ein Lizenzgate.
     ///
-    /// Stellt sicher, dass das Profil intern konsistent ist und der geforderte Feature-Ring
-    /// durch die Lizenz abgedeckt ist.
+    /// # Veraltet
+    /// Die Lizenzprüfung wurde entfernt. Diese Methode ist ein No-op bezüglich des Lizenzgates
+    /// und validiert lediglich die Profilkonsistenz.
+    #[deprecated(note = "license gating was removed; no-op")]
     pub fn validate_with_license(
         &self,
-        gate: &dyn LicenseGate,
+        _gate: &dyn LicenseGate,
     ) -> Result<(), CollectionProfileError> {
         self.validate()?;
-        let resolved = self.performance.resolve();
-        resolved.enforce_license(gate)?;
         Ok(())
     }
 }

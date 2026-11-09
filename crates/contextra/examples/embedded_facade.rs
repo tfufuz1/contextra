@@ -14,7 +14,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tmp_dir = std::env::temp_dir().join(format!("contextra_example_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
-    println!("Contextra-Fassade: Initialisiere Datenbank am Pfad {:?}", tmp_dir);
+    println!(
+        "Contextra-Fassade: Initialisiere Datenbank am Pfad {:?}",
+        tmp_dir
+    );
 
     // 1. Initialisierung über den Fluent Builder
     let db = ContextraBuilder::new(4)
@@ -23,7 +26,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    println!("Datenbank initialisiert. Dokumentenanzahl: {}", db.len().await?);
+    println!(
+        "Datenbank initialisiert. Dokumentenanzahl: {}",
+        db.len().await?
+    );
 
     // 2. Verwendung der agentenzentrierten Fassade AgentMemory
     let memory = AgentMemory::new(db);

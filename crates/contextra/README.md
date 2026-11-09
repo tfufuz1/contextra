@@ -12,8 +12,7 @@ Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; SPEC §4.4, §4.5, `capa
 - **Minimale Abhängigkeiten:** Keine unbedingten Bindungen an Inferenz-Backends oder Lizenzmodule.
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` und Zero-Panic-Doktrin im Produktionscode.
 - **Optionale Features:**
-  - `embedded` (Standard): Minimaler lokaler Betrieb ohne Inferenz und ohne Lizenzprüfung.
-  - `license`: Kryptografische Signaturprüfung und Lizenzautorisierung (`SignedLicenseGate`).
+  - `embedded` (Standard): Minimaler lokaler Betrieb ohne Inferenz.
   - `candle`: Lokale Inferenz via `contextra-infer-candle`.
 
 ## Baukasten-Nutzung
@@ -22,17 +21,22 @@ Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; SPEC §4.4, §4.5, `capa
 use contextra::builder::ContextraBuilder;
 use contextra_types::DistanceMetric;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let db = ContextraBuilder::new(384)
-        .with_storage_path("./contextra_data")
-        .with_distance_metric(DistanceMetric::Cosine)
-        .build()
-        .await?;
+# async fn doc_example() -> Result<(), Box<dyn std::error::Error>> {
+let tmp_dir = tempfile::tempdir()?;
+let db = ContextraBuilder::new(384)
+    .with_storage_path(tmp_dir.path())
+    .with_distance_metric(DistanceMetric::Cosine)
+    .build()
+    .await?;
 
-    println!("Datenbank initialisiert, Dokumente: {}", db.len().await?);
-    Ok(())
-}
+let coll = db.collection("demo").await?;
+coll.insert("doc1", &[0.1; 384], None).await?;
+let found = coll.get("doc1").await?;
+assert!(found.is_some());
+coll.delete("doc1").await?;
+assert!(coll.get("doc1").await?.is_none());
+# Ok(())
+# }
 ```
 
 ## Agent Memory
