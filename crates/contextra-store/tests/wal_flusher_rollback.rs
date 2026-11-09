@@ -37,10 +37,21 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
     let res = wal.append_batch(batch2).await;
     assert!(res.is_err(), "Partial append write must fail");
 
-    // After flusher rollback, poisoned MUST be false and file size MUST equal size_before
+    // Handle is poisoned with TornWrite (SPEC §3.5, §12.1, INV-FSYNC-1)
+    assert!(
+        wal.is_poisoned(),
+        "WAL handle must be poisoned after partial write failure"
+    );
+    assert_eq!(
+        wal.poison_cause(),
+        Some(contextra_store::wal::PoisonCause::TornWrite)
+    );
+
+    // Recover handle via recover_from_poison
+    wal.recover_from_poison().await?;
     assert!(
         !wal.is_poisoned(),
-        "WAL handle must NOT be poisoned after successful flusher rollback"
+        "WAL handle must NOT be poisoned after successful recover_from_poison"
     );
 
     let meta_after = tokio::fs::metadata(&wal_path).await?;
