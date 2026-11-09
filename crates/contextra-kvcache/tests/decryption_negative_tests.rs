@@ -84,7 +84,7 @@ fn test_decrypt_bit_flip_fails() {
     let seg_id = 42;
     let plaintext = b"sensitive_llm_kv_cache_tensor_data";
 
-    let _segment = KvSegment::new_encrypted(&cipher, tenant, seg_id, fp.clone(), None, plaintext)
+    let segment = KvSegment::new_encrypted(&cipher, tenant, seg_id, fp.clone(), None, plaintext)
         .expect("encryption must succeed");
 
     let layer = cipher
