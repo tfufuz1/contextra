@@ -1,105 +1,95 @@
-//! Neutrale Wartungs- und Inspektions-Schnittstelle für den Graph-Baustein (SPEC §4.3 / Klasse A).
+//! Neutrale Wartungs- und Bereinigungs-Implementierung für den Graph-Baustein (`contextra-ports::scanner::Purger`).
 //!
 //! # Zweck
-//! Stellt neutrale `remove`- und `compact`-Methoden sowie bei aktiviertem Feature `inspect`
-//! lesende Diagnose- und Prüfsichten bereit.
+//! Ermöglicht die physische Bereinigung von Graph-Kanten und Knoten für ein gegebenes `ScanTarget`.
 //!
-//! Port-spezifische Adapter wurden gemäß Architektur-Entscheidung D-E1 / E-05
-//! in das Handoff-Verzeichnis für Adapter in Klasse C (`contextra-erasure-adapters`) ausgelagert.
+//! # Baukasten-Hinweis (D-E1)
+//! Löschschnittstellen und Löschtypen werden gemäß Architektur-Entscheidung D-E1 künftig
+//! in `contextra-erasure-spi` geführt. Bis dahin bleibt diese Implementierung übergangsweise
+//! als deprecated markiert erhalten, um die Abwärtskompatibilität des Workspace zu wahren.
+
+#![allow(deprecated)]
 
 use std::sync::Arc;
 
-use crate::csr::CsrGraph;
-use crate::error::Result;
-use crate::types::{DocId, TxId};
-use crate::Maintain;
+use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
+use contextra_types::{DocId, RequestContext, Result, TxId};
 
-/// Neutraler Graph-Maintainer für physische Kantenbereinigungen und Kompaktierung.
-#[derive(Clone)]
-pub struct GraphMaintainer {
+use crate::csr::CsrGraph;
+
+/// Purger-Implementierung für [`CsrGraph`].
+#[deprecated(
+    note = "Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden"
+)]
+pub struct GraphPurger {
     graph: Arc<CsrGraph>,
 }
 
-impl GraphMaintainer {
-    /// Erzeugt eine neue Instanz von [`GraphMaintainer`].
+impl GraphPurger {
+    /// Erzeugt einen neuen [`GraphPurger`].
     pub fn new(graph: Arc<CsrGraph>) -> Self {
         Self { graph }
     }
+}
 
-    /// Entfernt alle Kanten und Registrierungen eines Dokuments physisch aus dem Graph.
-    pub fn remove_document_edges(&self, doc: DocId) -> Result<u64> {
-        let edge_ids = self.graph.edges_for_doc(doc);
-        if edge_ids.is_empty() {
-            return Ok(0);
+/// Erzeugt einen `Arc<dyn Purger>` für einen gegebenen [`CsrGraph`].
+#[deprecated(
+    note = "Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden"
+)]
+pub fn graph_purger(graph: Arc<CsrGraph>) -> Arc<dyn Purger> {
+    Arc::new(GraphPurger::new(graph))
+}
+
+impl Purger for GraphPurger {
+    fn purge(&self, _ctx: &RequestContext, target: &ScanTarget) -> Result<PurgeStats> {
+        let mut total_purged = 0u64;
+        let mut bytes_freed = 0u64;
+
+        // Versuche target_id als DocId zu parsen
+        let doc_id = target
+            .target_id
+            .parse::<u64>()
+            .map(DocId::new)
+            .or_else(|_| DocId::from_key(&target.target_id));
+
+        if let Ok(doc) = doc_id {
+            let edge_ids = self.graph.edges_for_doc(doc);
+            if !edge_ids.is_empty() {
+                let tx = TxId::new(u64::MAX);
+                let (count, _, _) = self.graph.tombstone_edges_direct(&edge_ids, tx)?;
+                total_purged += count as u64;
+                bytes_freed += (count * std::mem::size_of::<(u32, u32, f32)>()) as u64;
+                self.graph.doc_edge_index.remove_doc(doc);
+            }
         }
-        let tx = TxId::new(u64::MAX);
-        let (count, _, _) = self
-            .graph
-            .tombstone_edges_direct(&edge_ids, tx)
-            .map_err(|e| crate::error::GraphError::Internal(format!("{e}")))?;
-        self.graph.doc_edge_index.remove_doc(doc);
-        Ok(count as u64)
-    }
 
-    /// Lesende Inspektions-Statistiken bei aktiviertem `inspect`-Feature.
-    #[cfg(feature = "inspect")]
-    pub fn inspect_stats(&self) -> GraphInspectStats {
-        GraphInspectStats {
-            entity_count: self.graph.entity_count(),
-            edge_count: self.graph.edge_count(),
-            max_hyperedge_id: self.graph.max_hyperedge_id(),
-        }
-    }
-}
-
-/// Diagnose-Statistiken für lesende Inspektionssichten.
-#[cfg(feature = "inspect")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GraphInspectStats {
-    /// Anzahl aktiver Entitäten.
-    pub entity_count: usize,
-    /// Anzahl gespeicherter Kanten.
-    pub edge_count: usize,
-    /// Höchste vergebene Hyperkanten-ID.
-    pub max_hyperedge_id: u64,
-}
-
-/// Wartungsstatistiken nach einer Kompaktierung.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct MaintenanceStats {
-    /// Anzahl freigegebener Kanten/Einträge.
-    pub freed_entries: usize,
-}
-
-impl Maintain for GraphMaintainer {
-    type Stats = MaintenanceStats;
-
-    fn compact(&mut self) -> Result<Self::Stats> {
-        // CSR-Graph verdichtet Tombstone-Kanten
-        Ok(MaintenanceStats { freed_entries: 0 })
-    }
-
-    fn vacuum(&mut self) -> Result<()> {
-        Ok(())
+        Ok(PurgeStats {
+            purged_units: total_purged,
+            bytes_freed,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Edge, Entity, EntityId};
+    use contextra_ports::GraphIndex;
+    use contextra_types::{Edge, Entity, EntityId};
 
     #[tokio::test]
-    async fn test_graph_maintainer_empty() {
+    async fn test_graph_purger_empty_target() {
         let graph = Arc::new(CsrGraph::new());
-        let maintainer = GraphMaintainer::new(graph);
-        let count = maintainer.remove_document_edges(DocId::new(999)).unwrap();
-        assert_eq!(count, 0);
+        let purger = graph_purger(graph);
+        let ctx = RequestContext::new(contextra_types::TenantId::new(0), TxId::new(0));
+        let target = ScanTarget::new("12345", [0u8; 32]);
+
+        let stats = purger.purge(&ctx, &target).expect("purge should succeed");
+        assert_eq!(stats.purged_units, 0);
+        assert_eq!(stats.bytes_freed, 0);
     }
 
     #[tokio::test]
-    async fn test_graph_maintainer_existing_edges() {
+    async fn test_graph_purger_existing_edges() {
         let graph = Arc::new(CsrGraph::new());
         let tx = TxId::new(1);
         let doc_id = DocId::new(42);
@@ -118,14 +108,18 @@ mod tests {
 
         let mut edge = Edge::new(id_a, id_b, "rel");
         edge.source_doc_id = Some(doc_id);
-        graph.add_edge(tx, edge).await.unwrap();
+        <CsrGraph as GraphIndex>::add_edge(&graph, tx, edge).await.unwrap();
         graph.commit(tx).await.unwrap();
 
         // Register in doc_edge_index
         graph.doc_edge_index.record(doc_id, (id_a, id_b));
 
-        let maintainer = GraphMaintainer::new(graph.clone());
-        let count = maintainer.remove_document_edges(doc_id).unwrap();
-        assert_eq!(count, 1);
+        let purger = graph_purger(graph.clone());
+        let ctx = RequestContext::new(contextra_types::TenantId::new(0), TxId::new(0));
+        let target = ScanTarget::new("42", [0u8; 32]);
+
+        let stats = purger.purge(&ctx, &target).expect("purge should succeed");
+        assert_eq!(stats.purged_units, 1);
+        assert!(stats.bytes_freed > 0);
     }
 }
