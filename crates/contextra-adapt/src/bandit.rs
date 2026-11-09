@@ -58,35 +58,6 @@ pub enum BanditError {
     },
 }
 
-#[cfg(feature = "types-compat")]
-impl From<BanditError> for contextra_types::ContextraError {
-    fn from(err: BanditError) -> Self {
-        match err {
-            BanditError::DimensionMismatch { expected, actual } => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
-                ))
-            }
-            BanditError::InvalidConfig(msg) => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Invalid bandit configuration: {msg}"
-                ))
-            }
-            BanditError::NonFiniteVariance(val) => {
-                contextra_types::ContextraError::Internal(format!(
-                    "Non-finite or negative variance encountered: {val}"
-                ))
-            }
-            BanditError::PrecisionMatrixDriftDetected {
-                updates_since_reset,
-                denominator,
-            } => contextra_types::ContextraError::Internal(format!(
-                "Sherman-Morrison precision matrix drift detected after {updates_since_reset} updates (denominator = {denominator})"
-            )),
-        }
-    }
-}
-
 /// 64-Byte cache-aligned Wrapper um `Vec<f32>` zur Vermeidung von False Sharing.
 ///
 /// Hinweis: Der `Vec<f32>`-Heap-Buffer selbst folgt zwar nicht zwingend der 64-Byte-Grenze des Structs
@@ -174,10 +145,9 @@ impl SketchMatrix {
         u64::from_le_bytes(bytes)
     }
 
-    /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash ab.
-    #[cfg(feature = "types-compat")]
-    pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
-        Self::derive_seed_u64(tenant_id.as_u64(), base_seed)
+    /// Leitet einen isolierten PRNG-Seed via BLAKE3-Hash ab.
+    pub fn derive_seed(namespace_id: u64, base_seed: u64) -> u64 {
+        Self::derive_seed_u64(namespace_id, base_seed)
     }
 
     /// SplitMix64-PRNG aus `seed`, Rademacher-Einträge ±1/√k.
