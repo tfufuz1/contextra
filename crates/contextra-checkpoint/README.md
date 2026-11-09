@@ -1,93 +1,51 @@
 # contextra-checkpoint
 
-Persistent Checkpoint Engine, Hardlink Cloner und Blake3 Manifest-Verifikation.
-
-Normativitätsklasse: **B (Storage Bundle)** (Ring 1, `stable`; SPEC v4.0 §5).
-
-`contextra-checkpoint` verwaltet Time-Travel Checkpoints, Snapshot-Exporte, Transaktions-Guards und Snapshots für Contextra (Ring 1).
+Persistent Checkpoint Engine, Hardlink Cloner und Blake3 Manifest-Verifikation für Contextra Storage.
 
 ## Zweck
+`contextra-checkpoint` verwaltet Time-Travel Checkpoints, konsistente Snapshot-Exporte, RAII-gesicherte Transaktions-Rollbacks und Orphan-Recovery für heterogene Storage-Engines über standardisierte Port-Schnittstellen (`StorageEngine`, `Vfs`, `Clock`, `IdGen`).
 
-Ermöglicht deterministische Wiederherstellung von Zuständen, konsistente Snapshot-Exporte und RAII-gesicherte Transaktions-Rollbacks über eine saubere Port-Schnittstelle (`StorageEngine`, `Vfs`, `Clock`, `IdGen`) ohne globalen Zustand.
+## Reifegrad
+- **Status:** Stabil / Produktionsreif (P1–P6 erfüllt)
+- **Zero-Panic-Doktrin:** Vollständig typisierte Fehler (`CheckpointError`), kein `unwrap`/`expect` im Produktionscode.
+- **Transaktions-Garantien:** Deterministische Rollbacks bei Panic/Drop über `CheckpointGuard`, Inodes-Erkennung bei Hardlink-Klonen.
 
-## Standalone Copy-Paste-Anleitung (Gate G3)
+## Interne Abhängigkeiten
+`contextra-checkpoint` hat minimale interne Abhängigkeiten und hängt ausschließlich an Typen- und Port-Definitionen:
+- `contextra-types`: Kern-Typen (`TxId`, `Seq`, `Result`, etc.)
+- `contextra-ports`: Port-Schnittstellen (`StorageEngine`, `Vfs`, `Clock`, `MetricsSink`, etc.)
+- `contextra-testkit` (nur `[dev-dependencies]`): Für Integrationstests und Mocks (`InMemoryStorageEngine`).
+- Keine Abhängigkeiten zu höheren Ringen (`graph`, `vector`, `db`, `engine`, `store`).
 
-Um diesen Baustein in einem externen Projekt autark zu nutzen:
+## Features
+- `default = []`: Reines Standard-Build ohne optionale Features.
 
-```bash
-python3 tools/export_crate.py contextra-checkpoint --out /pfad/zu/deinem/projekt/contextra-checkpoint
-```
-
-## Externe Abhängigkeiten
-
-- `blake3`: Kryptografische Prüfsummen für Manifest-Integrität.
-- `bytes`: Pufferverwaltung für I/O.
-- `parking_lot`: Schnelle, blockierungsfreie In-Memory Mutexe.
-- `serde`, `serde_json`: Serialisierung von Manifesten und Metadaten.
-- `tokio`: Asynchrone Laufzeit und I/O-Primitiven.
-- `tracing`: Strukturierte Diagnose-Logs.
-
-## Ring-Zugehörigkeit & Status
-
-- **Klasse:** Klasse B (Storage Bundle)
-- **Ring:** Ring 1 (Persistenz)
-- **Status:** 🟢 Stabil / Entkoppelt
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Nicht-Ziele (Out of Scope)
-
-- **Keine juristische Löschlogik:** Enthält keine DSGVO/GDPR-Konzepte, Saga-Orchestrierung oder Deletion-Proofs. Diese verbleiben exklusiv in `contextra-erasure`.
-- **Keine Schlüsselpersistenz:** Daten-Checkpoints enthalten niemals kryptografische Schlüsselmaterialien (Zwei-Spuren-Prinzip).
-- **Keine direkte Dateisystem-Bindung:** Alle I/O-Operationen laufen über die Ports `StorageEngine` und `Vfs`.
-
-## Abgrenzung: CheckpointGuard vs. Erasure RestoreGuard
-
-- **`contextra-checkpoint::CheckpointGuard`:**
-  - Kapselt die Transaktions-RAII-Grenze für operative Agenten-Schritte oder Transaktionen.
-  - Erzwingt explizites `commit()` oder `rollback()`.
-  - Bei unkontrolliertem Abbruch (`drop` ohne Commit/Rollback) erfolgt die Vormerkung in der instanzgebundenen `InstanceOrphanRegistry` zur sauberen Wiederanlauf-Bereinigung.
-  - Besitzt **keinerlei** Lösch- oder Nachweissemantik.
-
-- **`contextra-erasure::restore::RestoreGuard`:**
-  - Dient als Schutzbarriere gegen das unbemerkte Wiederauftauchen gelöschter Daten (Resurrection-Schutz, INV-NO-RESURRECTION-1, INV-RESTORE-HORIZON-1).
-  - Prüft den Wiederherstellungshorizont gegen den kryptografischen Erasure Ledger.
-
-## Baukasten-Eigenschaften
-
-- **Minimale Abhängigkeiten:** Hängt zur Laufzeit nur an `contextra-types` und `contextra-ports`.
-- **Keine Fremd-Dev-Kanten:** Tests laufen rein über `contextra-testkit` (`InMemoryStorageEngine`, `FaultVfs`).
-- **Injizierte Umwelt:** Zeit über `Clock`, Dateisystem über `Vfs`.
-
-## Öffentliche API-Übersicht
-
-- **Snapshot Guards:** `CheckpointGuard`, `PinGuard`
-- **Manifest & Metadaten:** `CheckpointManifest`, `CheckpointMeta`, `StateCheckpoint`
-- **Registry & Store:** `PersistentCheckpointStore`, `CheckpointRegistry`
-- **Cloner:** `CheckpointHardlinkCloner`, `DefaultHardlinkCloner`, `SnapshotPinner`
-
-## Minimalbeispiel (Benutzung auf InMemoryStorageEngine)
-
-```rust
-use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_testkit::InMemoryStorageEngine;
-use contextra_types::TxId;
-use serde_json::json;
+## Minimalbeispiel
+```rust,ignore
 use std::sync::Arc;
+use contextra_checkpoint::{PersistentCheckpointStore, StateCheckpoint, TxId};
+use contextra_ports::StorageEngine;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let storage = Arc::new(InMemoryStorageEngine::new());
-    let store = PersistentCheckpointStore::open(storage, "example_namespace").await?;
-
-    let meta = store.create_checkpoint(
-        "snapshot_1",
-        "collection_a",
-        1,
-        TxId::new(TxId::INTERNAL_BASE + 1),
-        json!({"phase": "initial"}),
-    ).await?;
-
-    println!("Created checkpoint: {}", meta.name);
+async fn run<S: StorageEngine>(storage: Arc<S>) -> Result<(), Box<dyn std::error::Error>> {
+    let store = PersistentCheckpointStore::new(storage);
+    let cp = StateCheckpoint::new(TxId::new(1), "checkpoint-1");
+    store.create_checkpoint(cp).await?;
+    let loaded = store.get_checkpoint("checkpoint-1").await?;
+    assert!(loaded.is_some());
     Ok(())
 }
 ```
+
+## Entnahme-Rezept
+Dieser Baustein kann autark in beliebige Rust-Projekte mit einer Port-kompatiblen Storage-Engine eingebunden werden:
+1. Kopiere den Ordner `crates/contextra-checkpoint` in dein Ziel-Repository.
+2. Binde die Crates `contextra-types` und `contextra-ports` ein.
+3. Ergänze die Abhängigkeit in deiner `Cargo.toml`:
+```toml
+[dependencies]
+contextra-checkpoint = { path = "../contextra-checkpoint" }
+```
+
+## Bekannte Grenzen
+- Checkpoint-Namen sind auf gültige ASCII/UTF-8 Bezeichner ohne Pfadtrennzeichen (`/`, `\`) und maximal 256 Bytes begrenzt.
+- Hardlink-Cloning setzt ein Dateisystem voraus, das Hardlinks unterstützt; bei Cross-Device-Links erfolgt ein deterministischer Fallback auf Copy.

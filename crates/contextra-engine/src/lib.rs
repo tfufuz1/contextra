@@ -14,12 +14,6 @@
 
 pub mod orchestration;
 
-#[deprecated(
-    note = "Attestation and deletion proof types belong to contextra-erasure/contextra-crypto"
-)]
-pub use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
-};
 use contextra_ports::license::LicenseGate;
 #[cfg(feature = "sandbox")]
 use contextra_ports::BoxFuture;
@@ -37,6 +31,7 @@ use serde_json::Value;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+pub mod adapters;
 pub mod backends;
 #[cfg(not(loom))]
 pub mod background_workers;
@@ -389,17 +384,15 @@ pub struct Contextra {
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
-    proof_key_provider:
-        parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,
 }
 
 pub use contextra_impl::erasure::{
-    summary_from_witness, ErasureFailure, ErasureReport, LayerSummary, ProofKeyProvider,
+    summary_from_witness, ErasureFailure, ErasureReport, LayerSummary,
     UNMEASURED_ERASURE_LAYERS,
 };
 
 #[cfg(not(loom))]
-mod contextra_impl;
+pub mod contextra_impl;
 
 pub use contextra_types::DistanceMetric;
 pub use serde_json::json;

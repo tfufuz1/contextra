@@ -44,8 +44,18 @@ pub trait CheckpointCoordinator: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Self::Meta>> + Send;
 
     /// Deletes a checkpoint by name.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::NotFound` falls der Checkpoint nicht existiert, oder I/O-Fehler.
+    /// # Crash
+    /// Atomare Manifest-/VFS-Operation; bei Crash vor Abschluss bleibt der Checkpoint erhalten.
     fn drop_named_checkpoint(&self, name: &str) -> impl Future<Output = Result<()>> + Send;
 
     /// Lists all active checkpoints.
+    ///
+    /// # Fehler
+    /// Liefert I/O- oder Deserialisierungsfehler beim Lesen der Checkpoint-Metadaten.
+    /// # Crash
+    /// Reiner Lesevorgang aus Manifest oder Verzeichnis; keine Seiteneffekte.
     fn list_named_checkpoints(&self) -> impl Future<Output = Result<Vec<Self::Meta>>> + Send;
 }

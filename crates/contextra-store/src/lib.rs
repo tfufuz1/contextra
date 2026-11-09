@@ -54,7 +54,6 @@ pub mod compaction;
 pub mod engine;
 pub mod fsync;
 pub mod key_source;
-pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
@@ -69,11 +68,11 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
-pub(crate) mod util;
+pub mod util;
 pub mod wal;
 
-#[cfg(not(loom))]
-pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
+pub use util::{RecordAuthenticator, RecordSealer, SealedEnvelope};
+
 #[cfg(not(loom))]
 pub use compaction::{
     adaptive::{
@@ -82,6 +81,8 @@ pub use compaction::{
     },
     CompactionConfig, CompactionEngine, MergeOperator, TtlMetadata,
 };
+#[cfg(not(loom))]
+pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
 #[cfg(not(loom))]
 pub use lsm::{
     CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,

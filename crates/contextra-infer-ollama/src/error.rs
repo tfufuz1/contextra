@@ -115,6 +115,7 @@ pub trait LocalClock: Send + Sync {
 
 static PROCESS_EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
 
+#[allow(clippy::disallowed_methods)]
 fn get_process_epoch() -> std::time::Instant {
     *PROCESS_EPOCH.get_or_init(std::time::Instant::now)
 }
@@ -123,6 +124,7 @@ fn get_process_epoch() -> std::time::Instant {
 #[derive(Debug, Clone, Default)]
 pub struct SystemClock;
 
+#[allow(clippy::disallowed_methods)]
 impl LocalClock for SystemClock {
     fn now(&self) -> std::time::SystemTime {
         std::time::UNIX_EPOCH + std::time::Duration::from_nanos(self.monotonic_nanos())
@@ -131,7 +133,7 @@ impl LocalClock for SystemClock {
     fn monotonic_nanos(&self) -> u64 {
         let epoch = get_process_epoch();
         let now = std::time::Instant::now();
-        now.saturating_duration_since(epoch).as_nanos() as u64
+        u64::try_from(now.saturating_duration_since(epoch).as_nanos()).unwrap_or(u64::MAX)
     }
 }
 

@@ -156,7 +156,7 @@ pub trait ReadGate: Send + Sync {
     /// Retrieves the sequence number at which the key was gated, if any (Restore-Guard, commit rejection).
     ///
     /// # Fehler
-    /// Synchron, liefert Option<Seq>.
+    /// Synchron, liefert `Option<Seq>`.
     ///
     /// # Crash
     /// Reiner RAM-Lookup; keine Mutation.
@@ -165,6 +165,11 @@ pub trait ReadGate: Send + Sync {
     /// Returns the monotonic gate epoch counter (SPEC §11.3, D-120, I-21).
     ///
     /// Incremented before key destruction to allow linearized read verification.
+    ///
+    /// # Fehler
+    /// Keine; synchroner atomarer Abruf.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
     fn gate_epoch(&self) -> u64 {
         0
     }
@@ -172,6 +177,11 @@ pub trait ReadGate: Send + Sync {
     /// Evaluates whether a 16-byte `KeyBuf` is covered by an active gate (Erased or Restricted) (SPEC I-2).
     ///
     /// Used by replay filters and commit leader phase.
+    ///
+    /// # Fehler
+    /// Keine; synchroner ram-basierter Lookup.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
     fn covers(&self, k: &KeyBuf) -> bool {
         match self.check(k) {
             GateDecision::Erased | GateDecision::Restricted => true,
@@ -180,11 +190,21 @@ pub trait ReadGate: Send + Sync {
     }
 
     /// Evaluates point gate status of a canonical 78-byte raw key (SPEC 9.1, D-123).
+    ///
+    /// # Fehler
+    /// Keine; synchroner ram-basierter Lookup.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
     fn check_raw(&self, _raw: &[u8; 78]) -> GateDecision {
         GateDecision::Open
     }
 
     /// Evaluates whether a canonical 78-byte raw key is covered by an active gate (SPEC I-2, I-21, D-123).
+    ///
+    /// # Fehler
+    /// Keine; synchroner ram-basierter Lookup.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
     fn covers_raw(&self, raw: &[u8; 78]) -> bool {
         match self.check_raw(raw) {
             GateDecision::Erased | GateDecision::Restricted => true,
@@ -193,6 +213,11 @@ pub trait ReadGate: Send + Sync {
     }
 
     /// Retrieves the sequence number at which a 78-byte raw key was gated, if any.
+    ///
+    /// # Fehler
+    /// Keine; synchroner ram-basierter Lookup.
+    /// # Crash
+    /// Reiner RAM-Zugriff ohne Mutation.
     fn gated_seq_raw(&self, _raw: &[u8; 78]) -> Option<Seq> {
         None
     }
