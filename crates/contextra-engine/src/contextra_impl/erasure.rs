@@ -1,25 +1,19 @@
 #![allow(deprecated)]
 //! # Modul: erasure.rs
 //!
-//! **Zweck:** Fail-Closed ErasureOrchestrator für gemessene Bereinigungen (DEBT-01).
+//! **Zweck:** Neutrale Speicherbereinigung und Layer-Scanning-Koordination (M7).
 //!
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
-
-// FILE-CONTEXT
-// ZWECK: Orchestrierung der fail-closed Datenbereinigung (ErasureOrchestrator, SPEC §12.7.4, DEBT-01).
-// INVARIANTEN: DeletionProof entsteht ausschließlich nach unabhängiger LayerWitness-Messung aller Schichten. Fehler nach erster Mutation ergeben Ok(ErasureReport { verified: false, proof: None, ... }).
-// NICHT-OFFENSICHTLICH: Physische Purger laufen in fixer Reihenfolge (Text -> Vector -> LSM). Scans laufen unabhängig und vertrauen Purgern nicht.
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, neutrale Wartungsoperationen ohne Löschdomänen-Kopplung.
 
 #![forbid(unsafe_code)]
 
 use crate::*;
-use contextra_crypto::deletion_proof::LayerWitnessExt;
 use contextra_ports::scanner::{
     LayerScanner, LayerWitness, ScanTarget, ScanTechnique, WitnessLayer,
 };
 use contextra_ports::SystemClock;
-use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};
+use contextra_types::{CollectionId, ContextraError, RequestContext, Result, TenantId};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -31,12 +25,6 @@ pub enum CollectionStatus {
     Active,
     /// Zur physischen Bereinigung vorgemerkt/Fehlgeschlagen.
     PendingPurge,
-}
-
-/// Injected provider interface for deletion proof signing keys.
-pub trait ProofKeyProvider: Send + Sync {
-    /// Resolves the deletion proof key for the specified tenant.
-    fn resolve_proof_key(&self, tenant_id: TenantId) -> Result<Vec<u8>>;
 }
 
 /// Summary of a single storage layer's scan result.
@@ -89,38 +77,14 @@ pub fn summary_from_witness(layer_name: String, witness: &LayerWitness) -> Layer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErasureReport {
     /// Gibt an, ob alle tatsächlich gemessenen Schichten verifizierbar ohne Restbestände bereinigt wurden.
-    ///
-    /// **Hinweis zur Verifikation (SPEC §9.4, §9.10):**
-    /// Dieser Wert bezieht sich ausschließlich auf die in `erase_document` bzw. `erase_collection`
-    /// tatsächlich gemessenen Schichten (LSM-Memtable, SSTable, WAL, TextIndex, HnswIndex).
-    /// Er enthält **keine** Aussage über derzeit ungemessene Schichten ([`UNMEASURED_ERASURE_LAYERS`]).
     pub verified: bool,
-    /// Cryptographic DeletionProof issued iff verified == true.
-    pub proof: Option<DeletionProof>,
     /// Layer-by-layer measurement summaries.
     pub layers: Vec<LayerSummary>,
     /// Detailed failure descriptor if verified == false.
     pub failure: Option<ErasureFailure>,
 }
 
-/// Default excluded scopes for Contextra deletion proofs (§20.4).
-pub const DEFAULT_EXCLUDED_SCOPES: &[ExcludedScope] = &[
-    ExcludedScope::LlmParameterMemory,
-    ExcludedScope::ConsolidatedAndDistilled,
-];
-
 impl Contextra {
-    /// Sets the [`ProofKeyProvider`] for resolving deletion proof signing keys.
-    pub fn set_proof_key_provider(&self, provider: Arc<dyn ProofKeyProvider>) {
-        *self.proof_key_provider.write() = Some(provider);
-    }
-
-    /// Ergänzt die Instanz um einen [`ProofKeyProvider`].
-    pub fn with_proof_key_provider(self, provider: Arc<dyn ProofKeyProvider>) -> Self {
-        self.set_proof_key_provider(provider);
-        self
-    }
-
     /// Erzeugt eine deterministische, kollisionsfreie [`CollectionId`] aus einem Namen.
     pub fn compute_collection_id(name: &str) -> CollectionId {
         let hash = blake3::hash(name.as_bytes());
@@ -139,19 +103,6 @@ impl Contextra {
         collection: &str,
         id: &str,
     ) -> Result<ErasureReport> {
-        // --- STUFE A: Preflight (vor jeder Mutation) ---
-        let proof_key = match self.proof_key_provider.read().as_ref() {
-            Some(provider) => provider.resolve_proof_key(tenant_id)?,
-            None => {
-                return Err(ContextraError::invalid_input(
-                    "No ProofKeyProvider registered for deletion proof key resolution",
-                ))
-            }
-        };
-        if proof_key.is_empty() {
-            return Err(ContextraError::invalid_input("Resolved proof key is empty"));
-        }
-
         // Snapshot-Check: Wenn ein aktiver Snapshot existiert, schlägt der Purge fehl. Vor Mutation abweisen!
         if self.storage.snapshot_registry.min_active_seqno() != u64::MAX {
             return Err(ContextraError::Storage(
@@ -174,7 +125,6 @@ impl Contextra {
         if let Err(e) = col.delete(id).await {
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: Vec::new(),
                 failure: Some(ErasureFailure {
                     layer: "LogicalStorage".to_string(),
@@ -227,7 +177,6 @@ impl Contextra {
                 purge_err.unwrap_or(("Unknown".to_string(), "Purge failed".to_string()));
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: Vec::new(),
                 failure: Some(ErasureFailure { layer, reason }),
             });
@@ -266,7 +215,6 @@ impl Contextra {
                 ScanTechnique::IndexIntrospection,
             ));
 
-            let mut witnesses = Vec::new();
             let mut summaries = Vec::new();
             let mut first_failure: Option<ErasureFailure> = None;
 
@@ -282,7 +230,6 @@ impl Contextra {
                                 reason: format!("Layer has {remaining} residual live entries"),
                             });
                         }
-                        witnesses.push(witness);
                     }
                     Err(e) => {
                         if first_failure.is_none() {
@@ -295,49 +242,26 @@ impl Contextra {
                 }
             }
 
-            (witnesses, summaries, first_failure)
+            (summaries, first_failure)
         })
         .await
         .map_err(|e| ContextraError::Internal(format!("Scan task panicked: {e}")))?;
 
-        let (witnesses, summaries, first_failure) = scan_result;
+        let (summaries, first_failure) = scan_result;
 
         if let Some(failure) = first_failure {
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: summaries,
                 failure: Some(failure),
             });
         }
 
-        // --- STUFE E: DeletionProof::issue ---
-        let saga = SagaRecord::new(target_hash);
-        match DeletionProof::issue(
-            &ctx,
-            &saga,
-            &witnesses,
-            DEFAULT_EXCLUDED_SCOPES,
-            contextra_crypto::deletion_proof::CustodyLevel::Local,
-            proof_key.as_slice(),
-            &clock,
-        ) {
-            Ok(proof) => Ok(ErasureReport {
-                verified: true,
-                proof: Some(proof),
-                layers: summaries,
-                failure: None,
-            }),
-            Err(e) => Ok(ErasureReport {
-                verified: false,
-                proof: None,
-                layers: summaries,
-                failure: Some(ErasureFailure {
-                    layer: "ProofIssuance".to_string(),
-                    reason: format!("DeletionProof issuance failed: {e}"),
-                }),
-            }),
-        }
+        Ok(ErasureReport {
+            verified: true,
+            layers: summaries,
+            failure: None,
+        })
     }
 
     /// Löscht eine gesamte Collection fail-closed aus allen Schichten und erzeugt einen [`ErasureReport`].
@@ -346,19 +270,6 @@ impl Contextra {
             return Err(ContextraError::invalid_input(
                 "Cannot drop default collection",
             ));
-        }
-
-        // --- STUFE A: Preflight (vor jeder Mutation) ---
-        let proof_key = match self.proof_key_provider.read().as_ref() {
-            Some(provider) => provider.resolve_proof_key(tenant_id)?,
-            None => {
-                return Err(ContextraError::invalid_input(
-                    "No ProofKeyProvider registered for deletion proof key resolution",
-                ))
-            }
-        };
-        if proof_key.is_empty() {
-            return Err(ContextraError::invalid_input("Resolved proof key is empty"));
         }
 
         if self.storage.snapshot_registry.min_active_seqno() != u64::MAX {
@@ -393,7 +304,6 @@ impl Contextra {
         {
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: Vec::new(),
                 failure: Some(ErasureFailure {
                     layer: "LogicalStorage".to_string(),
@@ -407,7 +317,6 @@ impl Contextra {
         {
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: Vec::new(),
                 failure: Some(ErasureFailure {
                     layer: "LogicalStorage".to_string(),
@@ -419,7 +328,6 @@ impl Contextra {
         if let Err(e) = tenant_storage.commit(tx_id).await {
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: Vec::new(),
                 failure: Some(ErasureFailure {
                     layer: "LogicalStorage".to_string(),
@@ -479,7 +387,6 @@ impl Contextra {
 
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: Vec::new(),
                 failure: Some(ErasureFailure { layer, reason }),
             });
@@ -518,7 +425,6 @@ impl Contextra {
                 ScanTechnique::IndexIntrospection,
             ));
 
-            let mut witnesses = Vec::new();
             let mut summaries = Vec::new();
             let mut first_failure: Option<ErasureFailure> = None;
 
@@ -534,7 +440,6 @@ impl Contextra {
                                 reason: format!("Layer has {remaining} residual live entries"),
                             });
                         }
-                        witnesses.push(witness);
                     }
                     Err(e) => {
                         if first_failure.is_none() {
@@ -547,12 +452,12 @@ impl Contextra {
                 }
             }
 
-            (witnesses, summaries, first_failure)
+            (summaries, first_failure)
         })
         .await
         .map_err(|e| ContextraError::Internal(format!("Scan task panicked: {e}")))?;
 
-        let (witnesses, summaries, first_failure) = scan_result;
+        let (summaries, first_failure) = scan_result;
 
         if let Some(failure) = first_failure {
             let pending_status_bytes =
@@ -564,43 +469,10 @@ impl Contextra {
 
             return Ok(ErasureReport {
                 verified: false,
-                proof: None,
                 layers: summaries,
                 failure: Some(failure),
             });
         }
-
-        // --- STUFE E: DeletionProof::issue ---
-        let saga = SagaRecord::new(target_hash);
-        let proof = match DeletionProof::issue(
-            &ctx,
-            &saga,
-            &witnesses,
-            DEFAULT_EXCLUDED_SCOPES,
-            contextra_crypto::deletion_proof::CustodyLevel::Local,
-            proof_key.as_slice(),
-            &clock,
-        ) {
-            Ok(p) => p,
-            Err(e) => {
-                let pending_status_bytes =
-                    serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
-                let _ = tenant_storage
-                    .put(tx_id, &col_idx_key, &pending_status_bytes)
-                    .await;
-                let _ = tenant_storage.commit(tx_id).await;
-
-                return Ok(ErasureReport {
-                    verified: false,
-                    proof: None,
-                    layers: summaries,
-                    failure: Some(ErasureFailure {
-                        layer: "ProofIssuance".to_string(),
-                        reason: format!("DeletionProof issuance failed: {e}"),
-                    }),
-                });
-            }
-        };
 
         // --- STUFE F: Erst DANACH Collection-Registry-Einträge entfernen ---
         self.collections.write().await.remove(name);
@@ -611,7 +483,6 @@ impl Contextra {
 
         Ok(ErasureReport {
             verified: true,
-            proof: Some(proof),
             layers: summaries,
             failure: None,
         })
