@@ -22,11 +22,12 @@
 
 ### Invarianten
 1. **Skalares Orakel:** Die skalare Implementierung in `kernels/scalar.rs` ist die deterministische Referenz für alle ISA-Kerne.
-2. **Determinismus (INV-RING0-DETERMINISM-1):** Reduktionen folgen einer festen Summationsordnung über Vektor-Lanes und deterministische Baumreduktion. Numerische Abweichungen zwischen SIMD- und Skalarpfad liegen strikt innerhalb IEEE-754 ULP-Toleranzen (< 1e-4).
-3. **Tail-Handling & Validierung:** Beliebige Vektorlängen werden ohne Vorbedingung `len % lane == 0` unterstützt. Ungültige Gleitkommazahlen (NaN, ±Inf) werden via `validate_vector` Fail-Closed zurückgewiesen.
-4. **AVX-512 VNNI Vorzeichen- und Wrapping-Semantik:** Bei `dot_product_u8_avx512vnni` (`_mm512_dpbusd_epi32`) und `cosine_similarity_parts_u8_avx512` werden die Operanden auf Byte-Ebene mit 32-Bit Unsigned Wrapping-Akkumulation addiert.
-5. **Zero-Panic & Design by Contract:** Öffentliche Funktionen geraten niemals in unkontrollierte Panics; Vorbedingungsverletzungen liefern typisierte `SimdError`-Fehler.
-6. **Unsafe-Insel (B10):** Jeder `unsafe`-Block ist durch einen expliziten `// SAFETY:`-Beweis mit Host-Feature- und Slice-Garantien dokumentiert.
+2. **INV-SIMD-DETERMINISM-1 (Determinismus):** Reduktionen folgen einer festen Summationsordnung über Vektor-Lanes und deterministische Baumreduktion. Numerische Abweichungen zwischen SIMD- und Skalarpfad liegen strikt innerhalb der dokumentierten Toleranz (< 1e-5 relativ, < 1e-4 absolut für hohe Dimensionen). Test: `test_inv_simd_determinism_1`.
+3. **INV-SIMD-FINITE-1 (Endlichkeit):** Ungültige Gleitkommazahlen (NaN, ±Inf) werden via `validate_vector` Fail-Closed zurückgewiesen. Es wird nie mit ungültigen Werten gerechnet. Test: `test_inv_simd_finite_1`.
+4. **INV-SIMD-ALIGN-1 (Byte-Ausrichtung):** Byte-Puffer müssen eine durch 4 teilbare Länge aufweisen. Es werden keine Alignment-Annahmen an Speicheradressen getroffen (unaligned Zero-Copy Reads). Test: `test_inv_simd_align_1`.
+5. **AVX-512 VNNI Vorzeichen- und Wrapping-Semantik:** Bei `dot_product_u8_avx512vnni` (`_mm512_dpbusd_epi32`) und `cosine_similarity_parts_u8_avx512` werden die Operanden auf Byte-Ebene mit 32-Bit Unsigned Wrapping-Akkumulation addiert.
+6. **Zero-Panic & Design by Contract:** Öffentliche Funktionen geraten niemals in unkontrollierte Panics; Vorbedingungsverletzungen liefern typisierte `SimdError`/`Error`-Fehler.
+7. **Unsafe-Insel (B10):** Jeder `unsafe`-Block ist durch einen expliziten `// SAFETY:`-Beweis mit Host-Feature- und Slice-Garantien dokumentiert.
 
 ---
 

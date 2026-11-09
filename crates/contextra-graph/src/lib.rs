@@ -34,10 +34,12 @@
 mod contract;
 #[cfg(feature = "apprh-diffusion")]
 pub mod apprh;
+pub mod contract;
 pub mod arc_slice;
 pub mod cascade;
 pub mod community;
 pub mod consistency_enforcement;
+pub mod contract;
 pub mod csr;
 #[cfg(feature = "edge-reinforcement-learning")]
 pub mod edge_reinforcement;
@@ -54,9 +56,12 @@ pub mod ppr;
 pub mod ppr_stream;
 pub mod provenance;
 pub mod provider;
+pub mod purger;
 pub mod session_dag;
+pub mod storage;
 pub mod test_doubles;
 pub mod tl_hfd;
+pub mod types;
 
 #[cfg(feature = "apprh-diffusion")]
 pub use apprh::{
@@ -78,6 +83,7 @@ pub use consistency_enforcement::{
     ConflictPattern, ConsistencyEnforcer, ContradictionDetector, EdgeAssertion, EdgeId,
     ExactPredicateConflictDetector,
 };
+pub use contract::{Clock, Error as ContractError, NodeId, Result as ContractResult, Rng, Weight};
 pub use csr::CsrGraph;
 #[cfg(feature = "edge-reinforcement-learning")]
 pub use edge_reinforcement::{
@@ -89,7 +95,7 @@ pub use edge_reinforcement_buffer::{CooccurrenceSignal, EdgeReinforcementBuffer,
 pub use entity_extraction::{
     ingest_extracted_relations, EntityExtractor, ExtractedRelation, RuleBasedEntityExtractor,
 };
-pub use error::GraphMutationError;
+pub use error::{Error, GraphError, GraphMutationError, Result};
 pub use hyperedge::{
     sort_dedup_entities, star_weight, ConsolidationNodesGuard, HyperEdge, HyperEdgeId,
     HyperEdgeView, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
@@ -112,7 +118,8 @@ pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
 pub use provider::{
-    compute_pagerank, detect_communities_on_provider, GraphProvider, InMemoryGraphProvider,
+    compute_pagerank, detect_communities_on_provider, EntityProvider, GraphProvider,
+    InMemoryGraphProvider,
 };
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
@@ -122,9 +129,40 @@ pub use tl_hfd::{
     ShadowDiscrepancyReport, TlHfdError, TlHfdFlipGate, TlHfdParams, MIN_AGREEMENT_THRESHOLD,
     MIN_SHADOW_SAMPLES,
 };
+pub use types::{DocId, Edge, Entity, RequestContext, ResourceTracker, TxId};
+
+/// Kern-Index-Schnittstelle nach SPEC §4.3 für autonome Bausteine (Klasse A).
+pub trait Index<Id, Query: ?Sized> {
+    /// Treffertyp der Suchoperation.
+    type Hit;
+
+    /// Fügt ein Element mit gegebener ID und Byte-Nutzlast in den Index ein.
+    fn insert(&mut self, id: Id, payload: &[u8]) -> Result<()>;
+
+    /// Entfernt ein Element anhand seiner ID aus dem Index.
+    ///
+    /// Gibt `true` zurück, wenn das Element vorhanden war und gelöscht wurde.
+    fn remove(&mut self, id: &Id) -> Result<bool>;
+
+    /// Führt eine Suche anhand der Query aus und liefert bis zu `limit` Treffer zurück.
+    fn search(&self, query: &Query, limit: usize) -> Result<Vec<Self::Hit>>;
+}
+
+/// Neutrale Wartungsschnittstelle nach SPEC §4.3 für autonome Bausteine (Klasse A).
+pub trait Maintain {
+    /// Statistiktyp der Kompaktierungsoperation.
+    type Stats;
+
+    /// Führt eine Kompaktierung durch und gibt Segmente bzw. gelöschte Einträge tatsächlich frei.
+    fn compact(&mut self) -> Result<Self::Stats>;
+
+    /// Bereinigt fragmentierte interne Strukturen.
+    fn vacuum(&mut self) -> Result<()>;
+}
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
 // ANCHOR[contextra-graph:SRC-LIB-001]
+#[cfg(feature = "ports-compat")]
 pub trait GraphIndexExt: contextra_ports::GraphIndex {
     /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
     fn remove_entity<'a>(

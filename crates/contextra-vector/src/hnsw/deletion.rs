@@ -5,9 +5,8 @@
 //              INV-HNSW-SLOT-1: Deleted slots are NOT reused before full index rebuild (rebuild_sync).
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
-use ahash::AHashSet;
 use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
-use zeroize::Zeroize;
+use std::collections::BTreeSet;
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex, VectorData};
@@ -157,7 +156,7 @@ impl GhostFreeVectorIndex for HnswIndex {
                             .collect();
 
                         // Collect 2nd-order candidates from remaining neighbors' connections
-                        let mut candidate_set: AHashSet<u32> = AHashSet::new();
+                        let mut candidate_set: BTreeSet<u32> = BTreeSet::new();
                         for &rem in &remaining {
                             if rem != target_idx as u32 && rem != neighbor_u32 {
                                 candidate_set.insert(rem);
@@ -335,7 +334,7 @@ impl HnswIndex {
         let m = self.inner.cold.config.m;
 
         let total_nodes = mmap_node_count + nodes_read.len();
-        let mut visited = AHashSet::new();
+        let mut visited = BTreeSet::new();
         let mut ghost_pointers = 0usize;
         let mut inspected_nodes = 0usize;
 
@@ -393,5 +392,46 @@ impl HnswIndex {
         }
 
         ghost_pointers
+    }
+}
+
+impl HnswIndex {
+    /// O(1) Tombstone-Löschung gemäß VETO-F02 und INV-VEC-ZEROIZE-1.
+    ///
+    /// Markiert den Knoten deterministisch als gelöscht, nullt den Vektorspeicher im Slot
+    /// und entfernt die ID aus der Dokumentenzuordnung.
+    /// Gibt `Ok(true)` zurück, falls das Dokument existierte, andernfalls `Ok(false)`.
+    pub fn remove(&self, doc_id: DocId) -> Result<bool> {
+        let _write_lock = self.inner.hot.write_mutex.lock();
+        let doc_map = self.inner.hot.doc_to_node.read();
+        let target_idx_opt = doc_map.get(&doc_id.inner()).copied();
+        drop(doc_map);
+
+        let Some(idx) = target_idx_opt else {
+            return Ok(false);
+        };
+
+        // INV-VEC-ZEROIZE-1: Vektorslot im Speicher mit Nullen überschreiben
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_count = mmap_guard
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        drop(mmap_guard);
+
+        if idx >= mmap_count {
+            let ram_idx = idx - mmap_count;
+            let mut nodes = self.inner.hot.nodes.write();
+            if let Some(node) = nodes.get_mut(ram_idx) {
+                use zeroize::Zeroize;
+                match &mut node.vector {
+                    super::types::VectorData::F32(v) => v.as_mut_slice().zeroize(),
+                    super::types::VectorData::U8(v) => v.as_mut_slice().zeroize(),
+                }
+            }
+        }
+
+        self.inner.do_delete(doc_id)?;
+        Ok(true)
     }
 }

@@ -39,6 +39,10 @@ pub struct KvSegmentPayload {
 
 /// Manager for KV segment encryption, decryption, and crypto-shredding.
 #[derive(Debug)]
+#[deprecated(
+    since = "0.1.0",
+    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
+)]
 pub struct KvSegmentManager {
     config: KvSegmentConfig,
     registry: Arc<KeyRegistry>,
@@ -72,14 +76,9 @@ impl KvSegmentManager {
     ) -> Result<KvSegmentPayload, CryptoError> {
         match self.config.delete_mode {
             KvDeleteMode::CryptoShred => {
-                let master_key =
-                    self.master_key
-                        .as_ref()
-                        .ok_or_else(|| {
-                            CryptoError::Crypto(
-                                "Master key is required for CryptoShred mode".to_string(),
-                            )
-                        })?;
+                let master_key = self.master_key.as_ref().ok_or_else(|| {
+                    CryptoError::Crypto("Master key is required for CryptoShred mode".to_string())
+                })?;
                 let (ciphertext, nonce) = self
                     .registry
                     .encrypt_with_group(master_key, group_id, plaintext)

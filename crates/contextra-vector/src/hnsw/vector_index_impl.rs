@@ -368,7 +368,10 @@ impl VectorIndex for HnswIndex {
     /// targeted timing execution inside the critical rebuild swap window.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         let _pin_guard = SnapshotPinGuard::new(&self.inner, seq_no);
-        let log = self.inner.cold.seq_log.read().clone();
+        let log = {
+            let guard = self.inner.cold.seq_log.read();
+            guard.clone()
+        };
         let filter_fn = move |doc_id: DocId| -> bool { log.is_visible(doc_id, seq_no) };
         self.search_filtered_internal(query, k, Some(&filter_fn), Some(seq_no))
             .await

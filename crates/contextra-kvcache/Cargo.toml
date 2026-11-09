@@ -13,13 +13,14 @@ description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory 
 ring = "1"
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-crypto = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
+contextra-crypto = { workspace = true, optional = true }
 ahash = { workspace = true }
 blake3 = { workspace = true }
 lru = "0.16.4"
 parking_lot = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 serde = { workspace = true }
@@ -28,13 +29,21 @@ bincode = { workspace = true }
 bytes = { workspace = true }
 
 [features]
-default = []
+default = ["std", "ports-compat", "crypto-compat", "kv-encryption"]
+std = []
+ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
+crypto-compat = ["dep:contextra-crypto"]
+kv-encryption = ["crypto-compat", "contextra-crypto/kv-encryption"]
 content-addressed-kv-cache = []
-kv-encryption = ["contextra-crypto/kv-encryption"]
 kvcache-attention-eviction = []
 kvcache-kivi-quant = []
 kivi-quantization = []
 
 [dev-dependencies]
+criterion = { workspace = true, features = ["async_tokio"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
+
+[[bench]]
+name = "kvcache_bench"
+harness = false

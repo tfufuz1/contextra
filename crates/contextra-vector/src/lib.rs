@@ -27,6 +27,7 @@
     clippy::wrong_self_convention
 )]
 
+pub mod contract;
 pub mod error;
 pub mod types;
 
@@ -40,6 +41,7 @@ pub mod quantize;
 pub mod acorn;
 pub mod candidate_stream;
 pub mod compute_pool;
+pub mod fixed_hasher;
 pub mod partial_rebuild;
 
 #[cfg(feature = "experimental-rabitq")]
