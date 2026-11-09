@@ -14,3 +14,11 @@
 
 3. **`Cargo.lock` Lockfile-Diskrepanz** [V]
    - Das Repository enthält auf `restructure/main` / `origin/main` nicht synchronisierte Abhängigkeiten in `Cargo.lock`, sodass Builds mit `--locked` fehlschlagen. Gemäß Regel 2 wird `Cargo.lock` vor Commits zurückgesetzt (`git checkout -- Cargo.lock`).
+
+4. **GitHub Actions CI-Blocker (Workspace-Level / Außerhalb BESITZ)** [V]
+   - **xtask Workspace-Fehlstelle:** Workflows scheitern mit `manifest path xtask/Cargo.toml does not exist` / `package(s) xtask not found in workspace` (u. a. `check-duplicate-symbols-cross-file`, `check-fbs-drift`, `check-marker-drift`, `check-commit-diff-integrity`, `check-ring-layering`).
+   - **Baukasten Verification Gates (G1-G10):** 40 pre-existing G1-Verletzungen in fremden Crates (`contextra`, `contextra-agent`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-checkpoint`, etc.).
+   - **Dependency Policy Gate (cargo deny):** Bekannte Sicherheitsadvisories in `wasmtime` (RUSTSEC-2026-0424) und `zip` (RUSTSEC-2026-0367, RUSTSEC-2026-0368, RUSTSEC-2026-0369, RUSTSEC-2026-0429) in `Cargo.lock`.
+   - **Cargo clippy / build in contextra-vector & contextra-text:** Mehrfache Duplikate (`duplicate definitions for remove`, `duplicate definitions for rebuild_sync`) und fehlende Traits/Felder (`zeroize`, `kernel`) in `contextra-vector` sowie clippy disallowed types (`std::collections::HashSet`, `HashMap`) und Slicing-Warnungen in `contextra-text`.
+   - **TSan / Mutants / Loom Gates:** Scheitern infolge der Upstream-Kompilierfehler in `contextra-crypto` und `contextra-vector`.
+   - **Regel-Konformität:** Gemäß Regel 2 (Besitzprinzip) und Regel 5 (Fremdfehler) darf P08 keine fremden Crates oder Root-Konfigurationsdateien reparieren. Diese Fehler blockieren die CI-Checks auf Workspace-Ebene vollständig.
