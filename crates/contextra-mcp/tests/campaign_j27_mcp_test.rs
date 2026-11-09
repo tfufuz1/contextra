@@ -129,7 +129,7 @@ fn test_h9_mcp_tool_registry_and_sandbox_classification() {
 
 #[test]
 fn test_h9_destructive_tools_confirm_flag_strictness() {
-    // Test helper logic for boolean confirm parameter requirement in contextra_forget / contextra_drop_collection
+    // Test helper logic for boolean confirm parameter requirement in contextra_drop_collection
     let valid_confirm = json!({
         "collection": "test_col",
         "confirm": true

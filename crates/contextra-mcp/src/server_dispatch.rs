@@ -190,15 +190,14 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_forget",
-                            "description": "Delete a document (unverified) or drop an entire collection (with verified drop receipt export).",
+                            "description": "Delete a document without verification receipt (Alias for contextra_delete).",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
-                                    "collection": { "type": "string" },
                                     "id":         { "type": "string" },
-                                    "confirm":    { "type": "boolean" }
+                                    "collection": { "type": "string", "default": "default" }
                                 },
-                                "required": ["collection", "confirm"]
+                                "required": ["id"]
                             }
                         },
                         {
@@ -238,7 +237,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_delete",
-                            "description": "Delete a single document without measured deletion proof.",
+                            "description": "Delete a single document.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -263,7 +262,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_drop_collection",
-                            "description": "Delete an entire collection and issue a verified collection-wide cryptographic drop receipt.",
+                            "description": "Delete an entire collection.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {

@@ -64,9 +64,6 @@ async fn create_mock_server() -> (Arc<McpServer>, TempDir) {
 async fn test_confirm_required_semantics_table_test() {
     let (server, _tmp) = create_mock_server().await;
 
-    // Set deletion proof key environment variable for drop_collection tests requiring proof key
-    std::env::set_var("CONTEXTRA_PROOF_KEY", "test_key_32_bytes_long_exact!!");
-
     struct TestCase {
         name: &'static str,
         tool: &'static str,
@@ -75,43 +72,6 @@ async fn test_confirm_required_semantics_table_test() {
     }
 
     let test_cases = vec![
-        // ── contextra_forget ──
-        TestCase {
-            name: "forget with confirm: true (bool) -> success",
-            tool: "contextra_forget",
-            confirm_value: Some(json!(true)),
-            should_succeed: true,
-        },
-        TestCase {
-            name: "forget with confirm: false (bool) -> rejection",
-            tool: "contextra_forget",
-            confirm_value: Some(json!(false)),
-            should_succeed: false,
-        },
-        TestCase {
-            name: "forget with confirm: \"true\" (string) -> rejection",
-            tool: "contextra_forget",
-            confirm_value: Some(json!("true")),
-            should_succeed: false,
-        },
-        TestCase {
-            name: "forget with confirm: 1 (number) -> rejection",
-            tool: "contextra_forget",
-            confirm_value: Some(json!(1)),
-            should_succeed: false,
-        },
-        TestCase {
-            name: "forget with confirm: null -> rejection",
-            tool: "contextra_forget",
-            confirm_value: Some(Value::Null),
-            should_succeed: false,
-        },
-        TestCase {
-            name: "forget with confirm parameter missing -> rejection",
-            tool: "contextra_forget",
-            confirm_value: None,
-            should_succeed: false,
-        },
         // ── contextra_drop_collection ──
         TestCase {
             name: "drop_collection with confirm: true (bool) -> success",
@@ -197,5 +157,4 @@ async fn test_confirm_required_semantics_table_test() {
         }
     }
 
-    std::env::remove_var("CONTEXTRA_PROOF_KEY");
 }

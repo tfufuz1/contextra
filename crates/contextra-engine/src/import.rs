@@ -107,6 +107,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 }
 
+/// Maximum allowable collections in an import document (bounded resource principle).
+pub const MAX_IMPORT_COLLECTIONS: usize = 10_000;
+
 impl Contextra {
     /// Importiert ein ExportDocumentV1 in die Contextra-Datenbank mit Schema-Versionsprüfung und Idempotenz.
     pub async fn import_memories(&self, doc: ExportDocumentV1) -> Result<ImportSummary> {
@@ -114,6 +117,14 @@ impl Contextra {
             return Err(contextra_types::ContextraError::invalid_input(format!(
                 "Incompatible export schema version '{}', expected '{}'",
                 doc.schema_version, SCHEMA_VERSION_V1
+            )));
+        }
+
+        if doc.collections.len() > MAX_IMPORT_COLLECTIONS {
+            return Err(contextra_types::ContextraError::invalid_input(format!(
+                "Collection count exceeds limit: {} > {}",
+                doc.collections.len(),
+                MAX_IMPORT_COLLECTIONS
             )));
         }
 
