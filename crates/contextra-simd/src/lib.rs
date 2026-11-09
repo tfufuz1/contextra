@@ -24,6 +24,7 @@
 //! 3. `lib.rs`: Bietet die sichere öffentliche Schnittstelle mit Vorab-Validierung gegen ungültige Werte (NaN/Unendlich).
 
 #![allow(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
 
@@ -43,7 +44,7 @@ pub use dispatch::{
 };
 #[cfg(test)]
 pub use dispatch::{get_dispatch_override, set_dispatch_override, SimdPathOverride};
-pub use error::{Result, SimdError};
+pub use error::{Error, Result, SimdError};
 pub use kernels::scalar::{
     cosine_distance_f32_bytes_scalar, cosine_distance_scalar, cosine_similarity_parts_f32_u8,
     cosine_similarity_parts_u8_scalar, dot_product_f32_bytes_scalar, dot_product_f32_u8,

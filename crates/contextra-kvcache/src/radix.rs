@@ -929,3 +929,265 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
     dot / (norm_a.sqrt() * norm_b.sqrt())
 }
+
+// ---------------------------------------------------------------------------
+// MISSION KV-1: INV-KV-PREFIX-1 & Namespace Partition Isolation
+// ---------------------------------------------------------------------------
+
+/// Referenzzählungs- und Segment-Tracking-Struktur für `INV-KV-PREFIX-1`.
+#[derive(Debug, Clone)]
+pub struct SharedSegmentRef {
+    /// Physische Segment-ID oder Block-ID.
+    pub segment_id: u64,
+    /// Anzahl aktiver Referenzierungen über Pfade/Knoten hinweg.
+    pub ref_count: Arc<AtomicUsize>,
+}
+
+impl SharedSegmentRef {
+    /// Erstellt eine neue geteilte Referenz mit initialem Referenzzähler 1.
+    pub fn new(segment_id: u64) -> Self {
+        Self {
+            segment_id,
+            ref_count: Arc::new(AtomicUsize::new(1)),
+        }
+    }
+
+    /// Klont die Referenz und inkrementiert den Zähler atomar.
+    pub fn retain(&self) -> Self {
+        self.ref_count.fetch_add(1, Ordering::SeqCst);
+        Self {
+            segment_id: self.segment_id,
+            ref_count: Arc::clone(&self.ref_count),
+        }
+    }
+
+    /// Gibt die aktuelle Anzahl von Referenzen zurück.
+    pub fn current_refs(&self) -> usize {
+        self.ref_count.load(Ordering::SeqCst)
+    }
+
+    /// Dekrementiert den Zähler und gibt den verbleibenden Wert zurück.
+    pub fn release(&self) -> usize {
+        let prev = self.ref_count.fetch_sub(1, Ordering::SeqCst);
+        prev.saturating_sub(1)
+    }
+}
+
+/// Knoten im partitionsisolierten Radix-Baum mit geteilten Segment-Referenzen.
+struct NamespaceRadixNode {
+    tokens: Vec<u32>,
+    segment: Option<SharedSegmentRef>,
+    children: Vec<NamespaceRadixNode>,
+}
+
+impl NamespaceRadixNode {
+    fn new(tokens: Vec<u32>, segment: Option<SharedSegmentRef>) -> Self {
+        Self {
+            tokens,
+            segment,
+            children: Vec::new(),
+        }
+    }
+
+    fn lcp_len(a: &[u32], b: &[u32]) -> usize {
+        a.iter().zip(b.iter()).take_while(|(&x, &y)| x == y).count()
+    }
+}
+
+/// Partitionsisolierter Radix-Baum über `namespace: u64`.
+pub struct NamespaceRadixTree {
+    namespace: u64,
+    children: Vec<NamespaceRadixNode>,
+    total_entries: usize,
+    segment_registry: ahash::AHashMap<Vec<u32>, SharedSegmentRef>,
+}
+
+impl NamespaceRadixTree {
+    /// Erstellt einen neuen partitionsisolierten Radix-Baum.
+    pub fn new(namespace: u64) -> Self {
+        Self {
+            namespace,
+            children: Vec::new(),
+            total_entries: 0,
+            segment_registry: ahash::AHashMap::new(),
+        }
+    }
+
+    /// Gibt den zugehörigen Namespace zurück.
+    #[inline]
+    pub fn namespace(&self) -> u64 {
+        self.namespace
+    }
+
+    /// Fügt eine Token-Sequenz ein.
+    pub fn insert(&mut self, tokens: &[u32], segment_id: u64) -> Result<SharedSegmentRef, ContextraError> {
+        if tokens.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "Cannot insert empty token sequence".to_string(),
+            ));
+        }
+
+        let key = tokens.to_vec();
+        let shared_ref = match self.segment_registry.get(&key) {
+            Some(existing) => existing.retain(),
+            None => {
+                let r = SharedSegmentRef::new(segment_id);
+                self.segment_registry.insert(key, r.clone());
+                r
+            }
+        };
+
+        Self::insert_internal(&mut self.children, tokens, shared_ref.clone(), &mut self.total_entries);
+        Ok(shared_ref)
+    }
+
+    fn insert_internal(
+        nodes: &mut Vec<NamespaceRadixNode>,
+        tokens: &[u32],
+        segment: SharedSegmentRef,
+        total_entries: &mut usize,
+    ) {
+        for node in nodes.iter_mut() {
+            let lcp = NamespaceRadixNode::lcp_len(&node.tokens, tokens);
+            if lcp == 0 {
+                continue;
+            }
+
+            if lcp == node.tokens.len() {
+                let remaining = &tokens[lcp..];
+                if remaining.is_empty() {
+                    if node.segment.is_none() {
+                        *total_entries += 1;
+                    }
+                    node.segment = Some(segment);
+                } else {
+                    Self::insert_internal(&mut node.children, remaining, segment, total_entries);
+                }
+                return;
+            }
+
+            let child_remaining = node.tokens[lcp..].to_vec();
+            let parent_tokens = node.tokens[..lcp].to_vec();
+
+            let mut old_child = NamespaceRadixNode::new(child_remaining, node.segment.take());
+            old_child.children = std::mem::take(&mut node.children);
+
+            node.tokens = parent_tokens;
+            node.children = vec![old_child];
+
+            let query_remaining = &tokens[lcp..];
+            if query_remaining.is_empty() {
+                node.segment = Some(segment);
+                *total_entries += 1;
+            } else {
+                let new_child = NamespaceRadixNode::new(query_remaining.to_vec(), Some(segment));
+                node.children.push(new_child);
+                *total_entries += 1;
+            }
+            return;
+        }
+
+        nodes.push(NamespaceRadixNode::new(tokens.to_vec(), Some(segment)));
+        *total_entries += 1;
+    }
+
+    /// Sucht das längste übereinstimmende Präfix im Namespace.
+    pub fn find_longest_prefix(&self, tokens: &[u32], policy: KvReusePolicy) -> Option<PrefixMatch> {
+        if tokens.is_empty() || matches!(policy, KvReusePolicy::Never) {
+            return None;
+        }
+
+        let mut current_nodes = &self.children;
+        let mut remaining = tokens;
+        let mut accumulated_tokens: Vec<u32> = Vec::new();
+        let mut best_match: Option<PrefixMatch> = None;
+
+        while !remaining.is_empty() {
+            let mut matched_child = None;
+            for node in current_nodes {
+                let lcp = NamespaceRadixNode::lcp_len(&node.tokens, remaining);
+                if lcp > 0 {
+                    matched_child = Some((node, lcp));
+                    break;
+                }
+            }
+
+            let (node, lcp) = match matched_child {
+                Some(p) => p,
+                None => break,
+            };
+
+            accumulated_tokens.extend_from_slice(&node.tokens[..lcp]);
+
+            if lcp == node.tokens.len() {
+                if let Some(ref seg) = node.segment {
+                    let len = accumulated_tokens.len();
+                    if policy.should_reuse(len) {
+                        best_match = Some(PrefixMatch {
+                            matched_tokens: accumulated_tokens.clone(),
+                            matched_len: len,
+                            block_id: seg.segment_id,
+                        });
+                    }
+                }
+                remaining = &remaining[lcp..];
+                current_nodes = &node.children;
+            } else {
+                break;
+            }
+        }
+
+        best_match
+    }
+
+    /// Entfernt eine Sequenz und dekrementiert die geteilte Referenz.
+    pub fn remove(&mut self, tokens: &[u32]) -> Option<u64> {
+        if tokens.is_empty() {
+            return None;
+        }
+        let seg_ref = Self::remove_internal(&mut self.children, tokens, &mut self.total_entries)?;
+        let seg_id = seg_ref.segment_id;
+        let remaining_refs = seg_ref.release();
+        if remaining_refs == 0 {
+            self.segment_registry.remove(tokens);
+        }
+        Some(seg_id)
+    }
+
+    fn remove_internal(
+        nodes: &mut [NamespaceRadixNode],
+        tokens: &[u32],
+        total_entries: &mut usize,
+    ) -> Option<SharedSegmentRef> {
+        for node in nodes.iter_mut() {
+            let lcp = NamespaceRadixNode::lcp_len(&node.tokens, tokens);
+            if lcp == node.tokens.len() {
+                let remaining = &tokens[lcp..];
+                if remaining.is_empty() {
+                    if let Some(seg) = node.segment.take() {
+                        *total_entries = total_entries.saturating_sub(1);
+                        return Some(seg);
+                    }
+                    return None;
+                }
+                return Self::remove_internal(&mut node.children, remaining, total_entries);
+            }
+        }
+        None
+    }
+
+    /// Gibt die Gesamtzahl gespeicherter Präfixe zurück.
+    pub fn len(&self) -> usize {
+        self.total_entries
+    }
+
+    /// Prüft, ob der Baum leer ist.
+    pub fn is_empty(&self) -> bool {
+        self.total_entries == 0
+    }
+
+    /// Gibt eine Referenz auf die interne Segment-Registrierung zurück.
+    pub fn segment_registry(&self) -> &ahash::AHashMap<Vec<u32>, SharedSegmentRef> {
+        &self.segment_registry
+    }
+}

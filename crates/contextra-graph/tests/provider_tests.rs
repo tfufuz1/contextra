@@ -6,8 +6,8 @@ use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::provider::{
     compute_pagerank, detect_communities_on_provider, GraphProvider, InMemoryGraphProvider,
 };
+use contextra_graph::types::EntityId;
 use contextra_graph::PathRAGEngine;
-use contextra_types::EntityId;
 
 #[test]
 fn test_in_memory_graph_provider_pagerank() {

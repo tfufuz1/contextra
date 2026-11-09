@@ -1,9 +1,10 @@
-//! Generic `GraphProvider` trait and implementations for isolated graph algorithms.
+//! Generic `GraphProvider` and `EntityProvider` traits and implementations for isolated graph algorithms.
 
+use crate::error::{GraphError, Result};
 use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding};
 use crate::path_rag::PathGraph;
-use contextra_types::{EntityId, Result};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use crate::types::EntityId;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 /// Generic Graph Provider abstraction.
@@ -41,6 +42,36 @@ pub trait GraphProvider: Send + Sync {
         self.get_hyperedge(id)
             .map(|he| he.participants.clone())
             .unwrap_or_else(|| Arc::from([]))
+    }
+}
+
+/// Generic local Entity Provider abstraction for modular LLM/inference integration without direct dependencies.
+pub trait EntityProvider: Send + Sync {
+    /// Provides entity relation suggestions or text completions based on prompt text.
+    fn generate_entities(&self, prompt: &str) -> Result<Vec<String>>;
+}
+
+/// In-memory rule-based mock implementation of `EntityProvider` (available for testing/experiments).
+#[derive(Debug, Clone, Default)]
+pub struct MockEntityProvider {
+    canned_entities: BTreeMap<String, Vec<String>>,
+}
+
+impl MockEntityProvider {
+    /// Creates a new mock provider.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registers canned responses for a prompt key.
+    pub fn register(&mut self, prompt: impl Into<String>, entities: Vec<String>) {
+        self.canned_entities.insert(prompt.into(), entities);
+    }
+}
+
+impl EntityProvider for MockEntityProvider {
+    fn generate_entities(&self, prompt: &str) -> Result<Vec<String>> {
+        Ok(self.canned_entities.get(prompt).cloned().unwrap_or_default())
     }
 }
 
@@ -143,13 +174,13 @@ pub fn compute_pagerank<G: GraphProvider>(
     damping: f32,
     max_iter: usize,
     tol: f32,
-) -> HashMap<EntityId, f32> {
+) -> BTreeMap<EntityId, f32> {
     let nodes = graph.node_ids();
     let n = nodes.len();
     if n == 0 {
-        return HashMap::new();
+        return BTreeMap::new();
     }
-    let node_to_idx: HashMap<EntityId, usize> = nodes
+    let node_to_idx: BTreeMap<EntityId, usize> = nodes
         .iter()
         .enumerate()
         .map(|(idx, &id)| (id, idx))
@@ -212,7 +243,7 @@ pub fn detect_communities_on_provider<G: GraphProvider>(
     if num_real == 0 {
         return Ok(Vec::new());
     }
-    let node_to_idx: HashMap<EntityId, usize> =
+    let node_to_idx: BTreeMap<EntityId, usize> =
         nodes.iter().enumerate().map(|(i, &id)| (id, i)).collect();
     let mut local_adj: Vec<Vec<(usize, f32)>> = vec![Vec::new(); num_real];
     let mut degs: Vec<f32> = vec![0.0; num_real];
@@ -239,7 +270,7 @@ pub fn detect_communities_on_provider<G: GraphProvider>(
             .collect());
     }
     let mut communities = local_u64_ids.clone();
-    let mut comm_degs: HashMap<u64, f32> = communities
+    let mut comm_degs: BTreeMap<u64, f32> = communities
         .iter()
         .enumerate()
         .map(|(i, &c)| (c, degs[i]))
@@ -252,7 +283,7 @@ pub fn detect_communities_on_provider<G: GraphProvider>(
                 continue;
             }
             let c_cur = communities[u];
-            let mut weights: HashMap<u64, f32> = HashMap::new();
+            let mut weights: BTreeMap<u64, f32> = BTreeMap::new();
             for &(v, w) in &local_adj[u] {
                 *weights.entry(communities[v]).or_default() += w;
             }

@@ -28,10 +28,11 @@ python3 tools/export_crate.py contextra-simd --out /tmp/my-simd-crate
 
 ## Garantien & Invarianten
 1. **Design by Contract & Safe Public API:** Sämtliche öffentlichen Methoden (`compute_distance`, `validate_vector`, `Dispatcher`) sind vollkommen sicher und frei von unkontrollierten Panics.
-2. **Determinismus & Reduktionsordnung (INV-RING0-DETERMINISM-1):** Float-Reduktionen folgen einer festen Summationsordnung über Vektor-Lanes und deterministische Baumreduktion. Numerische Abweichungen zwischen SIMD- und Skalarpfad liegen strikt innerhalb IEEE-754 ULP-Toleranzen (< 1e-4).
-3. **Tail-Handling & Validierung:** Beliebige Vektorlängen werden ohne Vorbedingung `len % lane == 0` unterstützt. Ungültige Gleitkommazahlen (NaN, ±Inf) werden via `validate_vector` Fail-Closed zurückgewiesen.
-4. **Injizierbarer Dispatcher:** Ermöglicht zustandslose, thread-sichere Konfiguration (`Dispatcher::auto()`, `Dispatcher::scalar()`, `Dispatcher::new(SimdTarget)`), ohne auf globalen veränderlichen Zustand angewiesen zu sein.
-5. **Skalares Orakel:** Differentialtests verifizieren jeden SIMD-Kernel kontinuierlich gegen die deterministische Skalar-Referenz.
+2. **INV-SIMD-DETERMINISM-1 (Determinismus):** Float-Reduktionen folgen einer festen Summationsordnung über Vektor-Lanes und deterministische Baumreduktion. Numerische Abweichungen zwischen SIMD- und Skalarpfad liegen strikt innerhalb der dokumentierten Toleranz (< 1e-5 relativ). Test: `test_inv_simd_determinism_1`.
+3. **INV-SIMD-FINITE-1 (Endlichkeit):** Ungültige Gleitkommazahlen (NaN, ±Inf) werden via `validate_vector` Fail-Closed zurückgewiesen. Es wird nie mit NaN/Inf gerechnet. Test: `test_inv_simd_finite_1`.
+4. **INV-SIMD-ALIGN-1 (Byte-Puffer-Alignment):** Byte-Puffer müssen eine ganzzahlig durch 4 teilbare Länge besitzen; es werden keine Annahmen über Speicherausrichtung getroffen. Test: `test_inv_simd_align_1`.
+5. **Injizierbarer Dispatcher:** Ermöglicht zustandslose, thread-sichere Konfiguration (`Dispatcher::auto()`, `Dispatcher::scalar()`, `Dispatcher::new(SimdTarget)`), ohne auf globalen veränderlichen Zustand angewiesen zu sein.
+6. **Skalares Orakel:** Differentialtests verifizieren jeden SIMD-Kernel kontinuierlich gegen die deterministische Skalar-Referenz.
 
 ## Minimalbeispiel
 

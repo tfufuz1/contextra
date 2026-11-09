@@ -72,8 +72,12 @@ async fn test_hnsw_topology_and_search_determinism() {
 
     // 2. Verify search results are bitwise/identical
     let query: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
-    let res1 = idx1.search(&query, 10).await.expect("idx1 search");
-    let res2 = idx2.search(&query, 10).await.expect("idx2 search");
+    let res1 = VectorIndex::search(&idx1, &query, 10)
+        .await
+        .expect("idx1 search");
+    let res2 = VectorIndex::search(&idx2, &query, 10)
+        .await
+        .expect("idx2 search");
 
     assert_eq!(res1.len(), res2.len());
     for (r1, r2) in res1.iter().zip(res2.iter()) {
@@ -199,8 +203,7 @@ async fn test_insert_and_search() {
         .expect("insert 3");
     index.commit(tx).await.expect("commit");
 
-    let results = index
-        .search(&[1.0, 0.0, 0.0, 0.0], 2)
+    let results = VectorIndex::search(&index, &[1.0, 0.0, 0.0, 0.0], 2)
         .await
         .expect("search");
     assert!(!results.is_empty());
@@ -376,4 +379,56 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
     index
         .rebuild()
         .expect("rebuild after cooldown must succeed");
+}
+
+#[test]
+fn test_hnsw_klasse_a_index_and_maintain_trait() {
+    use crate::contract::ExternalId;
+    use crate::hnsw::{Index, Maintain};
+
+    let config = HnswConfig {
+        dimension: 4,
+        max_elements: 100,
+        m: 8,
+        ef_construction: 16,
+        ef_search: 16,
+        distance_metric: DistanceMetric::Euclidean,
+        ..Default::default()
+    };
+    let mut index = HnswIndex::try_new(config).unwrap();
+
+    let id1 = ExternalId(1);
+    let id2 = ExternalId(2);
+
+    let v1 = [1.0f32, 0.0, 0.0, 0.0];
+    let v2 = [0.0f32, 1.0, 0.0, 0.0];
+
+    let mut p1 = Vec::new();
+    for &x in &v1 {
+        p1.extend_from_slice(&x.to_le_bytes());
+    }
+    let mut p2 = Vec::new();
+    for &x in &v2 {
+        p2.extend_from_slice(&x.to_le_bytes());
+    }
+
+    Index::insert(&mut index, id1, &p1).unwrap();
+    Index::insert(&mut index, id2, &p2).unwrap();
+
+    let q = [1.0f32, 0.0, 0.0, 0.0];
+    let hits = Index::search(&index, &q, 2).unwrap();
+    assert_eq!(hits.len(), 2);
+    assert_eq!(hits[0].id, id1);
+
+    // Remove
+    let removed = Index::remove(&mut index, &id1).unwrap();
+    assert!(removed);
+
+    let hits_after = Index::search(&index, &q, 2).unwrap();
+    assert_eq!(hits_after.len(), 1);
+    assert_eq!(hits_after[0].id, id2);
+
+    // Maintain compact
+    let stats = Maintain::compact(&mut index).unwrap();
+    assert_eq!(stats.purged_docs, 1);
 }
