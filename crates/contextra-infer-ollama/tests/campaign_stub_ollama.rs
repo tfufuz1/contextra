@@ -1,12 +1,3 @@
-// INVENTORY / E-07 TRACEABILITY:
-// The 7 campaign stub tests below implement edge-case fault simulation for Ollama HTTP communication:
-// 1. campaign_stub_success_200: Valid 200 JSON embedding response
-// 2. campaign_stub_server_500_error: 500 server error handling with retry exhaustion
-// 3. campaign_stub_timeout: Latency sleep exceeding request timeout
-// 4. campaign_stub_malformed_json: Broken JSON payload parsing resilience
-// 5. campaign_stub_empty_response: Empty JSON object response handling
-// 6. campaign_stub_batch_dimension_mismatch: Inconsistent batch vector dimensions
-// 7. campaign_stub_huge_response: Large payload (100k dimension) stress handling
 #![cfg(feature = "http")]
 // campaign_stub_ollama.rs — Campaign stub tests for contextra-infer-ollama (J-19)
 // Oracle source: Local HTTP mock server simulating Ollama API edge cases.

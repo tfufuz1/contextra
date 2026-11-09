@@ -42,6 +42,7 @@ pub mod quantize;
 pub mod acorn;
 pub mod candidate_stream;
 pub mod compute_pool;
+pub mod fixed_hasher;
 pub mod partial_rebuild;
 
 #[cfg(feature = "experimental-rabitq")]
@@ -51,7 +52,7 @@ pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SI
 pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
-pub use error::{Result, VectorError};
+#[cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock))]
 #[allow(deprecated)]
 pub use hnsw::{
     hnsw_purger, hnsw_scanner, HnswConfig, HnswIndex, HnswPurger, HnswScanner, RebuildStatus,

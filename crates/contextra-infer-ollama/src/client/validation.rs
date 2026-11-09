@@ -54,7 +54,7 @@ pub fn validate_model_name(name: &str) -> Result<()> {
         ));
     }
     if name.contains('/') || name.contains('\n') || name.contains('\r') {
-        return Err(OllamaError::InvalidInput(format!(
+        return Err(OllamaError::EgressViolation(format!(
             "Model name '{name}' contains invalid characters"
         )));
     }

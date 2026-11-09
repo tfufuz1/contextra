@@ -1,6 +1,6 @@
 #![cfg(feature = "ports-compat")]
 // FILE-CONTEXT
-// STAND: 2026-10-29T10:00:00Z
+// STAND: 2026-11-08
 // ZWECK: LLM-gestütztes Multi-Signal Query-Rewriting für Ollama (Text, Semantik, Graph-Anker)
 // INVARIANTEN: Prompt-Injection-Isolation via xml_escape; Resiliente JSON/Fallback-Antwortdekodierung; Zero Panic
 
@@ -10,9 +10,15 @@
 //! als Vektor-Input und (c) Anker-Entitäten für das Graph-Signal.
 
 use crate::client::xml_escape;
+use crate::error::LocalQueryRewriteOutput;
+#[cfg(feature = "http")]
+use crate::error::Result;
+#[cfg(feature = "http")]
 use crate::OllamaClient;
+#[cfg(feature = "ports-compat")]
 use contextra_ports::{BoxFuture, QueryRewriter};
-use contextra_types::{QueryRewriteOutput, Result, ScoredEntry};
+#[cfg(feature = "ports-compat")]
+use contextra_types::{QueryRewriteOutput, ScoredEntry};
 use serde::Deserialize;
 
 /// Maximum number of anchor entities to parse from LLM response.
@@ -44,13 +50,17 @@ impl Default for OllamaQueryRewriterConfig {
 
 /// LLM-basierter Multi-Signal Query Rewriter über Ollama.
 pub struct OllamaQueryRewriter {
+    #[cfg(feature = "http")]
+    #[cfg(feature = "http")]
     client: OllamaClient,
     config: OllamaQueryRewriterConfig,
 }
 
 impl OllamaQueryRewriter {
     /// Erstellt einen neuen `OllamaQueryRewriter` mit dem angegebenen Client und der Konfiguration.
-    pub fn new(client: OllamaClient, config: OllamaQueryRewriterConfig) -> Self {
+    #[cfg(feature = "http")]
+    pub fn new(#[cfg(feature = "http")]
+    client: OllamaClient, config: OllamaQueryRewriterConfig) -> Self {
         Self { client, config }
     }
 
@@ -59,53 +69,79 @@ impl OllamaQueryRewriter {
         &self.config
     }
 
+    /// Rewrites a query using plain text context snippets.
+    #[cfg(feature = "http")]
+    #[cfg(feature = "http")]
+    pub async fn rewrite(
+        &self,
+        original_query: &str,
+        context_snippets: &[&str],
+    ) -> Result<Vec<LocalQueryRewriteOutput>> {
+        let trimmed_query = original_query.trim();
+        if trimmed_query.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let bounded_query = truncate_chars(trimmed_query, self.config.max_query_chars);
+
+        let prompt = build_rewrite_prompt_from_snippets(
+            bounded_query,
+            context_snippets,
+            self.config.max_context_results,
+            self.config.max_snippet_chars,
+        );
+
+        match self.client.generate_text(&self.config.model, &prompt).await {
+            Ok(raw_response) => {
+                let output = parse_rewrite_response(&raw_response, bounded_query);
+                Ok(vec![output])
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "Ollama query rewriting call failed ({err}); falling back to original query"
+                );
+                Ok(vec![LocalQueryRewriteOutput::text_only(bounded_query)])
+            }
+        }
+    }
+
     /// Rewrites a query structured according to contextra-ports QueryRewriter contract.
+    #[cfg(all(feature = "http", feature = "ports-compat"))]
     pub fn rewrite_structured<'a>(
         &'a self,
         original_query: &'a str,
         current_results: &'a [ScoredEntry],
-    ) -> BoxFuture<'a, Result<Vec<QueryRewriteOutput>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<QueryRewriteOutput>>> {
         QueryRewriter::rewrite_structured(self, original_query, current_results)
     }
 }
 
+#[cfg(all(feature = "http", feature = "ports-compat"))]
 impl QueryRewriter for OllamaQueryRewriter {
     fn rewrite_structured<'a>(
         &'a self,
         original_query: &'a str,
         current_results: &'a [ScoredEntry],
-    ) -> BoxFuture<'a, Result<Vec<QueryRewriteOutput>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<QueryRewriteOutput>>> {
         Box::pin(async move {
-            let trimmed_query = original_query.trim();
-            if trimmed_query.is_empty() {
-                return Ok(vec![]);
-            }
+            let snippets: Vec<String> = current_results
+                .iter()
+                .take(self.config.max_context_results)
+                .map(extract_snippet)
+                .collect();
+            let snippet_refs: Vec<&str> = snippets.iter().map(|s| s.as_str()).collect();
 
-            let bounded_query = truncate_chars(trimmed_query, self.config.max_query_chars);
+            let outputs = self
+                .rewrite(original_query, &snippet_refs)
+                .await
+                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
 
-            let prompt = build_rewrite_prompt(
-                bounded_query,
-                current_results,
-                self.config.max_context_results,
-                self.config.max_snippet_chars,
-            );
-
-            match self.client.generate_text(&self.config.model, &prompt).await {
-                Ok(raw_response) => {
-                    let output = parse_rewrite_response(&raw_response, bounded_query);
-                    Ok(vec![output])
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        "Ollama query rewriting call failed ({err}); falling back to original query"
-                    );
-                    Ok(vec![QueryRewriteOutput::text_only(bounded_query)])
-                }
-            }
+            Ok(outputs.into_iter().map(Into::into).collect())
         })
     }
 }
 
+#[cfg(feature = "ports-compat")]
 fn extract_snippet(entry: &ScoredEntry) -> String {
     if let Some(meta) = &entry.metadata {
         if let Some(text) = meta
@@ -122,16 +158,16 @@ fn extract_snippet(entry: &ScoredEntry) -> String {
     String::new()
 }
 
-fn truncate_chars(s: &str, max_chars: usize) -> &str {
+pub fn truncate_chars(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
         Some((idx, _)) => s.get(..idx).unwrap_or(s),
         None => s,
     }
 }
 
-fn build_rewrite_prompt(
+pub fn build_rewrite_prompt_from_snippets(
     original_query: &str,
-    current_results: &[ScoredEntry],
+    snippets: &[&str],
     max_context_results: usize,
     max_snippet_chars: usize,
 ) -> String {
@@ -152,9 +188,8 @@ fn build_rewrite_prompt(
     prompt.push_str(&escaped_query);
     prompt.push_str("\n</query>\n\n<untrusted_context>\n");
 
-    for (i, res) in current_results.iter().take(max_context_results).enumerate() {
-        let snippet_raw = extract_snippet(res);
-        let snippet_truncated = truncate_chars(&snippet_raw, max_snippet_chars);
+    for (i, snippet_raw) in snippets.iter().take(max_context_results).enumerate() {
+        let snippet_truncated = truncate_chars(snippet_raw, max_snippet_chars);
         let snippet_escaped = xml_escape(snippet_truncated);
         prompt.push_str(&format!("[{}] {}\n", i + 1, snippet_escaped));
     }
@@ -171,10 +206,10 @@ struct RawRewriteJson {
     anchor_entities: Vec<String>,
 }
 
-fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteOutput {
+pub fn parse_rewrite_response(response: &str, original_query: &str) -> LocalQueryRewriteOutput {
     let trimmed = response.trim();
     if trimmed.is_empty() {
-        return QueryRewriteOutput::text_only(original_query);
+        return LocalQueryRewriteOutput::text_only(original_query);
     }
 
     // 1. Try stripping code fences if present
@@ -209,10 +244,10 @@ fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteO
             .collect();
 
         if text_q.is_none() && sem_q.is_none() && entities.is_empty() {
-            return QueryRewriteOutput::text_only(original_query);
+            return LocalQueryRewriteOutput::text_only(original_query);
         }
 
-        return QueryRewriteOutput::new(text_q, sem_q, entities);
+        return LocalQueryRewriteOutput::new(text_q, sem_q, entities);
     }
 
     // 3. Fallback: line-based plain text parsing if model output structured list
@@ -226,7 +261,6 @@ fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteO
             continue;
         }
 
-        // Only process lines that start with bullet points or number list markers
         let has_bullet_prefix = line.starts_with(['-', '*', '•', '+'])
             || (line.starts_with(|c: char| c.is_ascii_digit()) && line.contains(['.', ')', '-']));
 
@@ -255,10 +289,10 @@ fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteO
     }
 
     if text_q.is_none() && sem_q.is_none() && entities.is_empty() {
-        return QueryRewriteOutput::text_only(original_query);
+        return LocalQueryRewriteOutput::text_only(original_query);
     }
 
-    QueryRewriteOutput::new(text_q, sem_q, entities)
+    LocalQueryRewriteOutput::new(text_q, sem_q, entities)
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::path_rag::{PathGraph, PathRAGEngine};
-use contextra_types::EntityId;
+use contextra_graph::types::EntityId;
 use std::collections::HashMap;
 
 /// In-Memory Test-Double für den `PathGraph`-Trait.

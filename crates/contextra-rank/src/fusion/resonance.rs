@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 
 /// Configuration for Resonance Coherence Bonus.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:RES-001]
 /// Konfigurationsparameter für die Berechnung des Resonanz-Kohärenz-Bonus.
 pub struct ResonanceConfig {
     /// Exponent β for coherence bonus. Default: 0.5.
@@ -30,7 +29,6 @@ impl Default for ResonanceConfig {
 }
 
 /// Convenience API to fuse multi-signal search results.
-// ANCHOR[contextra-rank:RES-002]
 /// Komfortfunktion zur Zusammenführung mehrerer Signal-Ergebnismengen mittels gewichteter RRF.
 pub fn fuse_signals(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
@@ -40,7 +38,6 @@ pub fn fuse_signals(
 }
 
 /// Applies Resonance Coherence Bonus to fused search results.
-// ANCHOR[contextra-rank:RES-003]
 /// Wendet den Resonanz-Kohärenz-Bonus auf bereits fusionierte Suchergebnisse an.
 pub fn apply_resonance_bonus(
     results: Vec<SearchResult>,

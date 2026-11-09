@@ -6,9 +6,18 @@ name = "contextra-infer-ollama"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
+description = "Autonomous REST/HTTP adapter for Ollama inference servers (Klasse A, Ring 2)"
 
 [package.metadata.contextra]
 ring = "2"
+klasse = "A"
+
+[features]
+default = []
+types-compat = ["dep:contextra-ports", "dep:contextra-types"]
+ports-compat = ["types-compat"]
+http = ["dep:reqwest", "dep:tokio", "dep:futures", "dep:futures-util"]
 
 [features]
 default = []
@@ -19,26 +28,25 @@ ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
 [dependencies]
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-thiserror = { workspace = true }
 parking_lot = { workspace = true }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"], optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-tokio = { workspace = true, optional = true }
 tracing = { workspace = true }
+regex = "1.13"
+quick-xml = "0.41"
+thiserror = { workspace = true }
+
+# HTTP stack dependencies
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"], optional = true }
+tokio = { workspace = true, optional = true }
 futures = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
-regex = { workspace = true }
-quick-xml = "0.41"
 
 [dev-dependencies]
 proptest = "1.4"
 tracing-test = "0.2"
+criterion = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
-futures = "0.3"
-futures-util = "0.3"
-criterion = { version = "0.5", features = ["async_tokio"] }
 
 [[bench]]
 name = "ollama_bench"

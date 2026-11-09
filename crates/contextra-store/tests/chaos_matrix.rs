@@ -60,7 +60,7 @@ impl GroundTruth {
 
 /// Combined Chaos Matrix Test: Task Massacre + Memory Pressure
 #[tokio::test]
-#[ignore]
+#[ignore = "Ressourcenintensiver Chaos-Stresstest (Task Massacre + Memory Pressure). Ausfuehren mit: cargo test -p contextra-store --test chaos_matrix test_chaos_matrix_task_massacre_and_memory_pressure -- --ignored"]
 async fn test_chaos_matrix_task_massacre_and_memory_pressure() {
     let seed = resolve_and_log_seed();
     let mut rng = StdRng::seed_from_u64(seed);
@@ -137,7 +137,7 @@ async fn test_chaos_matrix_task_massacre_and_memory_pressure() {
 
 /// Combined Chaos Matrix Test: Bit-Flip Fault Injection + Crash Recovery Cycles
 #[tokio::test]
-#[ignore]
+#[ignore = "Ressourcenintensiver Chaos-Stresstest (Bitflip Infiltration + Crash Recovery). Ausfuehren mit: cargo test -p contextra-store --test chaos_matrix test_chaos_matrix_bitflip_and_crash_recovery -- --ignored"]
 async fn test_chaos_matrix_bitflip_and_crash_recovery() {
     let seed = resolve_and_log_seed();
     let mut rng = StdRng::seed_from_u64(seed);
@@ -219,7 +219,7 @@ async fn test_chaos_matrix_bitflip_and_crash_recovery() {
 
 /// Combined Chaos Matrix Test: Multi-scenario sequence (Task Massacre -> Power Cut -> Recovery)
 #[tokio::test]
-#[ignore]
+#[ignore = "Ressourcenintensiver voller Kombinatorik-Stresstest (alle Chaos-Achsen). Ausfuehren mit: cargo test -p contextra-store --test chaos_matrix test_chaos_matrix_full_combos -- --ignored"]
 async fn test_chaos_matrix_full_combos() {
     let seed = resolve_and_log_seed();
     let mut rng = StdRng::seed_from_u64(seed);

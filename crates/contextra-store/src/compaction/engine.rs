@@ -5,10 +5,12 @@
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
+use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::StorageStats;
+use contextra_ports::Vfs;
 use contextra_types::{Result, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -33,6 +35,7 @@ pub struct CompactionEngine {
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
     clock: Arc<dyn contextra_ports::Clock>,
+    pub(crate) vfs: Arc<dyn Vfs>,
 }
 
 impl CompactionEngine {
@@ -69,7 +72,14 @@ impl CompactionEngine {
             adaptive_planner,
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
+            vfs: Arc::new(RealFs),
         }
+    }
+
+    /// Configures a custom VFS implementation for compaction file operations.
+    pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
+        self.vfs = vfs;
+        self
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
@@ -223,14 +233,17 @@ impl CompactionEngine {
         .await?;
 
         // Explicit fsync of output file and parent directory
-        crate::util::fsync_parent_dir(&output_path).await?;
+        if let Some(parent) = output_path.parent() {
+            self.vfs.sync_dir(parent)?;
+        }
 
         // Open the new SSTable reader
         let new_reader = Arc::new(
-            SstableReader::open_with_key_manager(
+            SstableReader::open_with_vfs(
                 &output_path,
                 Arc::clone(&self.block_cache),
                 self.key_manager.clone(),
+                Arc::clone(&self.vfs),
             )
             .await?,
         );
@@ -259,7 +272,7 @@ impl CompactionEngine {
                     "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
                      (concurrent flush or rollback detected)"
                 );
-                if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                if let Err(e) = self.vfs.remove_file(&output_path) {
                     tracing::warn!(
                         "Failed to clean up aborted compaction output {:?}: {}",
                         output_path,
@@ -309,12 +322,12 @@ impl CompactionEngine {
 
         // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
-            if let Err(e) = tokio::fs::remove_file(path).await {
+            if let Err(e) = self.vfs.remove_file(path) {
                 tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
             let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
-            if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {
-                if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+            if matches!(self.vfs.exists(&uuid_sidecar), Ok(true)) {
+                if let Err(e) = self.vfs.remove_file(&uuid_sidecar) {
                     tracing::debug!(
                         "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
                         uuid_sidecar,
@@ -430,8 +443,8 @@ impl CompactionEngine {
             .await;
 
         if merge_res.is_err() {
-            if let Err(e) = tokio::fs::remove_file(output_path).await {
-                if e.kind() != std::io::ErrorKind::NotFound {
+            if let Err(e) = self.vfs.remove_file(output_path) {
+                if !matches!(e, contextra_ports::ContextraError::NotFound(_)) {
                     tracing::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
                         output_path,
@@ -521,8 +534,12 @@ impl CompactionEngine {
             }
         }
 
-        let mut builder =
-            SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;
+        let mut builder = SstableBuilder::create_with_vfs(
+            output_path,
+            self.key_manager.clone(),
+            Arc::clone(&self.vfs),
+        )
+        .await?;
         let mut last_key: Option<bytes::Bytes> = None;
         let mut floor_emitted = false;
         let mut processed_count = 0;
