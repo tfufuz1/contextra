@@ -149,8 +149,8 @@ async fn test_persisted_file_byte_needle() {
     index.insert(tx, needle_doc, &needle_vec).await.unwrap();
     index.commit(tx).await.unwrap();
 
-    index.save(&file_path).await.expect("Save index");
-    index.load_mmap(&file_path).await.expect("Load mmap");
+    index.save(&file_path).expect("Save index");
+    index.load_mmap(&file_path).expect("Load mmap");
 
     // Verify raw file contains needle bytes before purge
     let file_bytes_before = std::fs::read(&file_path).expect("Read saved file");
@@ -170,7 +170,7 @@ async fn test_persisted_file_byte_needle() {
     purger.purge(&ctx, &target).expect("Purge needle doc");
 
     // Re-save clean index
-    index.save(&file_path).await.expect("Re-save clean index");
+    index.save(&file_path).expect("Re-save clean index");
 
     let file_bytes_after = std::fs::read(&file_path).expect("Read re-saved file");
     let contains_doc_after = file_bytes_after

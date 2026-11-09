@@ -12,8 +12,8 @@
 use contextra_erasure::journal::appendlog::DurableJournal;
 use contextra_erasure::journal::epoch::{compute_commitment, EpochKeys};
 use contextra_erasure::journal::record::{JournalRecord, RecordCode, TargetType};
+use contextra_erasure::types_local::Vfs;
 use contextra_erasure::types_local::{VfsFile, VfsOpenOptions};
-use contextra_ports::vfs::Vfs;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -85,47 +85,79 @@ impl TrackingVfs {
 }
 
 impl Vfs for TrackingVfs {
-    fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
+    fn read(
+        &self,
+        path: &Path,
+    ) -> std::result::Result<Vec<u8>, contextra_erasure::error::ErasureError> {
         let files = self.files.read();
         files
             .get(path)
             .map(|data| data.read().clone())
-            .ok_or_else(|| contextra_ports::ContextraError::NotFound(path.display().to_string()))
+            .ok_or_else(|| {
+                contextra_erasure::error::ErasureError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    path.display().to_string(),
+                ))
+            })
     }
 
-    fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_ports::Result<()> {
+    fn write_atomic(
+        &self,
+        path: &Path,
+        data: &[u8],
+    ) -> std::result::Result<(), contextra_erasure::error::ErasureError> {
         let mut files = self.files.write();
         files.insert(path.to_path_buf(), Arc::new(RwLock::new(data.to_vec())));
         self.sync_counter.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
-    fn create_dir_all(&self, _path: &Path) -> contextra_ports::Result<()> {
+    fn create_dir_all(
+        &self,
+        _path: &Path,
+    ) -> std::result::Result<(), contextra_erasure::error::ErasureError> {
         Ok(())
     }
 
-    fn remove_file(&self, path: &Path) -> contextra_ports::Result<()> {
+    fn remove_file(
+        &self,
+        path: &Path,
+    ) -> std::result::Result<(), contextra_erasure::error::ErasureError> {
         self.files.write().remove(path);
         Ok(())
     }
 
-    fn exists(&self, path: &Path) -> contextra_ports::Result<bool> {
+    fn exists(
+        &self,
+        path: &Path,
+    ) -> std::result::Result<bool, contextra_erasure::error::ErasureError> {
         Ok(self.files.read().contains_key(path))
     }
 
-    fn len(&self, path: &Path) -> contextra_ports::Result<u64> {
+    fn len(&self, path: &Path) -> std::result::Result<u64, contextra_erasure::error::ErasureError> {
         let files = self.files.read();
         files
             .get(path)
             .map(|data| data.read().len() as u64)
-            .ok_or_else(|| contextra_ports::ContextraError::NotFound(path.display().to_string()))
+            .ok_or_else(|| {
+                contextra_erasure::error::ErasureError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    path.display().to_string(),
+                ))
+            })
     }
 
-    fn list_dir(&self, _path: &Path) -> contextra_ports::Result<Vec<String>> {
+    fn list_dir(
+        &self,
+        _path: &Path,
+    ) -> std::result::Result<Vec<String>, contextra_erasure::error::ErasureError> {
         Ok(Vec::new())
     }
 
-    fn sync_dir(&self, _path: &Path) -> contextra_ports::Result<()> {
+    fn sync_dir(
+        &self,
+        _path: &Path,
+    ) -> std::result::Result<(), contextra_erasure::error::ErasureError> {
         self.sync_counter.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }

@@ -38,33 +38,65 @@ impl From<DurabilityConfigError> for contextra_types::ContextraError {
 }
 
 impl DurabilityMode {
+    /// Validates the durability mode against required integrity guarantees and persistence constraints.
+    pub fn validate_durability(
+        self,
+        integrity_chain_required: bool,
+        require_persistence: bool,
+    ) -> Result<(), DurabilityConfigError> {
+        use DurabilityMode::*;
+        match self {
+            Full => Ok(()),
+            WalNoHmac if integrity_chain_required => {
+                Err(DurabilityConfigError::IncompatibleCombination {
+                    mode: self,
+                    feature: "integrity-chain",
+                    reason: "no HMAC integrity chain to anchor the proof or audit trail",
+                })
+            }
+            MemoryOnly if integrity_chain_required || require_persistence => {
+                Err(DurabilityConfigError::IncompatibleCombination {
+                    mode: self,
+                    feature: "persistence-required",
+                    reason: "no persistence layer exists to prove integrity or durability from",
+                })
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Legacy-Validierung gegen Feature-Flags und Feature-Ringe.
+    #[deprecated(
+        since = "0.1.0",
+        note = "use validate_durability(integrity_chain_required, require_persistence) instead (DEBT-01)"
+    )]
     pub fn validate_against_features(
         self,
         deletion_proof_active: bool,
         feature_ring: contextra_ports::license::FeatureRing,
     ) -> Result<(), DurabilityConfigError> {
-        use DurabilityMode::*;
-        match self {
-            Full => Ok(()),
-            WalNoHmac if deletion_proof_active => {
-                Err(DurabilityConfigError::IncompatibleCombination {
-                    mode: self,
-                    feature: "deletion-proof",
-                    reason: "no HMAC integrity chain to anchor the proof",
-                })
-            }
-            MemoryOnly
-                if deletion_proof_active
-                    || feature_ring == contextra_ports::license::FeatureRing::Sovereign =>
-            {
-                Err(DurabilityConfigError::IncompatibleCombination {
-                    mode: self,
-                    feature: "deletion-proof / FeatureRing::Sovereign",
-                    reason: "no persistence layer exists to prove deletion from",
-                })
-            }
-            _ => Ok(()),
-        }
+        let require_persistence =
+            feature_ring == contextra_ports::license::FeatureRing::Sovereign;
+        self.validate_durability(deletion_proof_active, require_persistence)
+            .map_err(|err| match err {
+                DurabilityConfigError::IncompatibleCombination { mode, feature, reason } => {
+                    if feature == "integrity-chain" {
+                        DurabilityConfigError::IncompatibleCombination {
+                            mode,
+                            feature: "deletion-proof",
+                            reason: "no HMAC integrity chain to anchor the proof",
+                        }
+                    } else if feature == "persistence-required" {
+                        DurabilityConfigError::IncompatibleCombination {
+                            mode,
+                            feature: "deletion-proof / FeatureRing::Sovereign",
+                            reason: "no persistence layer exists to prove deletion from",
+                        }
+                    } else {
+                        DurabilityConfigError::IncompatibleCombination { mode, feature, reason }
+                    }
+                }
+            })
     }
 }
 
@@ -72,7 +104,7 @@ impl DurabilityMode {
 // SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 /// Configuration for the LSM storage engine.
 pub struct LsmConfig {
@@ -98,6 +130,9 @@ pub struct LsmConfig {
     /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
     /// Default is 1,000,000 keys.
     pub ssi_max_tracked_keys: usize,
+    /// Optional Vfs instance for file operations.
+    #[serde(skip)]
+    pub vfs: Option<crate::io_seam::StoreIo>,
 }
 
 impl Default for LsmConfig {
@@ -113,6 +148,7 @@ impl Default for LsmConfig {
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
+            vfs: None,
         }
     }
 }

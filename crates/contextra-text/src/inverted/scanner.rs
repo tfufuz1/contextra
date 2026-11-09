@@ -40,21 +40,21 @@ impl ParsedTextTarget {
     pub fn parse(target_id: &str) -> Self {
         if let Some(rest) = target_id.strip_prefix("doc:") {
             if let Ok(id) = rest.parse::<u64>() {
-                return ParsedTextTarget::Document(DocId::from(id));
+                return ParsedTextTarget::Document(DocId::new(id as _));
             }
         }
         if let Some(rest) = target_id.strip_prefix("doc_id:") {
             if let Ok(id) = rest.parse::<u64>() {
-                return ParsedTextTarget::Document(DocId::from(id));
+                return ParsedTextTarget::Document(DocId::new(id as _));
             }
         }
         #[cfg(not(feature = "docid-128"))]
         if let Ok(id) = target_id.parse::<u64>() {
-            return ParsedTextTarget::Document(DocId::from(id));
+            return ParsedTextTarget::Document(DocId::new(id as _));
         }
         #[cfg(feature = "docid-128")]
         if let Ok(id) = target_id.parse::<u128>() {
-            return ParsedTextTarget::Document(DocId::from(id));
+            return ParsedTextTarget::Document(DocId::new(id as _));
         }
         if let Some(rest) = target_id.strip_prefix("collection:") {
             return ParsedTextTarget::Collection(rest.to_string());

@@ -14,7 +14,7 @@ use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
 use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
 use contextra_types::{RequestContext, Result};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 pub(crate) fn block_on_future<F: std::future::Future>(fut: F) -> F::Output
@@ -66,7 +66,7 @@ impl SstableScanner {
     fn run_positive_control(&self, session: &mut ScanSession) {
         block_on_future(async {
             let temp_dir = std::env::temp_dir();
-            let canary_path = temp_dir.join(format!("canary_{}.sst", uuid::Uuid::new_v4()));
+            let canary_path = temp_dir.join(format!("canary_{}_{}.sst", std::process::id(), crate::lsm::recovery::next_temp_file_counter()));
             let canary_key = b"t:canary:1:chunk:1";
             let canary_val = b"canary_val";
 
@@ -95,7 +95,7 @@ impl SstableScanner {
                     }
                 }
             }
-            let _ = tokio::fs::remove_file(&canary_path).await;
+            let _ = self.storage.vfs().remove_file(&canary_path);
         });
     }
 }
@@ -114,7 +114,7 @@ impl LayerScanner for SstableScanner {
         block_on_future(async {
             // 1. Offene / Aktive SSTables im Store erfassen
             let readers = self.storage.sstables_for_scanner().await;
-            let mut active_paths = HashSet::new();
+            let mut active_paths = BTreeSet::new();
 
             for reader in &readers {
                 active_paths.insert(reader.file_path().to_path_buf());
@@ -148,16 +148,21 @@ impl LayerScanner for SstableScanner {
 
             // 2. Inventar-Diff: Suche nach Altdateien (.sst), die nicht im Manifest/Store stehen
             let data_dir = self.storage.data_path();
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
+            if let Ok(dir_entries) = self.storage.vfs().list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
                     if path.extension().and_then(|s| s.to_str()) == Some("sst")
                         && !active_paths.contains(&path)
                     {
                         // Orphan SSTable gefunden
                         let block_cache = self.storage.block_cache();
-                        if let Ok(orphan_reader) =
-                            SstableReader::open_with_key_manager(&path, block_cache, None).await
+                        if let Ok(orphan_reader) = SstableReader::open_with_vfs(
+                            &path,
+                            block_cache,
+                            None,
+                            self.storage.vfs().clone(),
+                        )
+                        .await
                         {
                             if let Ok(entries) = orphan_reader.iter().await {
                                 for (key, _val, seq_no) in entries {

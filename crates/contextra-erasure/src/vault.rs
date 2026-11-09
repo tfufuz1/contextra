@@ -52,7 +52,7 @@ pub struct FileVault {
     shards: Vec<ShardBackend>,
     vault_id: [u8; 16],
     mac_key: [u8; 32],
-    vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
+    vfs: Option<Arc<dyn crate::types_local::Vfs>>,
     vault_dir: Option<PathBuf>,
 }
 
@@ -112,7 +112,7 @@ impl FileVault {
 
     /// Erstellt einen neuen dauerhaften Tresor mit 16 Shards in `vault_dir` über VFS (SPEC D-111, D-112).
     pub fn create_dir(
-        vfs: &Arc<dyn contextra_ports::vfs::Vfs>,
+        vfs: &Arc<dyn crate::types_local::Vfs>,
         vault_dir: &Path,
         vault_id: [u8; 16],
         mac_key: [u8; 32],
@@ -120,7 +120,7 @@ impl FileVault {
         created_seq: u64,
     ) -> Result<Self, ErasureError> {
         vfs.create_dir_all(vault_dir).map_err(|e| match e {
-            contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),
+            crate::error::ErasureError::Io(io_err) => ErasureError::Io(io_err),
             other => ErasureError::Io(std::io::Error::other(other.to_string())),
         })?;
 
@@ -145,7 +145,7 @@ impl FileVault {
         }
 
         vfs.sync_dir(vault_dir).map_err(|e| match e {
-            contextra_ports::ContextraError::Io(io_err) => ErasureError::Io(io_err),
+            crate::error::ErasureError::Io(io_err) => ErasureError::Io(io_err),
             other => ErasureError::Io(std::io::Error::other(other.to_string())),
         })?;
 
@@ -160,7 +160,7 @@ impl FileVault {
 
     /// Öffnet einen bestehenden dauerhaften Tresor über VFS nach SPEC D-111 Abs. 8 / D-112:
     pub fn open_dir(
-        vfs: &Arc<dyn contextra_ports::vfs::Vfs>,
+        vfs: &Arc<dyn crate::types_local::Vfs>,
         vault_dir: &Path,
         expected_vault_id: &[u8; 16],
         mac_key: &[u8; 32],
@@ -371,7 +371,7 @@ impl FileVault {
     }
 
     /// Vfs-Instanz (falls dauerhaft).
-    pub fn vfs(&self) -> Option<&Arc<dyn contextra_ports::vfs::Vfs>> {
+    pub fn vfs(&self) -> Option<&Arc<dyn crate::types_local::Vfs>> {
         self.vfs.as_ref()
     }
 }

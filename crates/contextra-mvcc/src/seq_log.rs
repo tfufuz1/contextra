@@ -180,6 +180,23 @@ impl SequenceLog {
         }
     }
 
+    /// Erstellt ein `SequenceLog` mit einer anpassbaren Zeitstempel-Closure (State-Passing per `Fn() -> u64`).
+    pub fn with_time_fn<F>(time_fn: F) -> Self
+    where
+        F: Fn() -> u64 + Send + Sync + 'static,
+    {
+        struct ClosureClock<F>(F);
+        impl<F: Fn() -> u64 + Send + Sync + 'static> Clock for ClosureClock<F> {
+            fn now_unix_nanos(&self) -> u64 {
+                (self.0)()
+            }
+            fn monotonic_nanos(&self) -> u64 {
+                (self.0)()
+            }
+        }
+        Self::with_clock(Arc::new(ClosureClock(time_fn)))
+    }
+
     /// Gibt eine Referenz auf den aktiven [`Clock`]-Port zurück.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock

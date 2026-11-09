@@ -47,6 +47,20 @@ impl Purger for LsmPurger {
         let mut purged_units = 0u64;
         let mut bytes_freed = 0u64;
 
+        // Dekker-Write-Fence: Purge vs Flush Koordination
+        if !self.storage.flush_purge_fence.enter_purge() {
+            return Err(ContextraError::Storage(
+                "Purge conflict: active flush in progress".to_string(),
+            ));
+        }
+        struct PurgeFenceGuard<'a>(&'a crate::lsm::fence::FlushPurgeFence);
+        impl<'a> Drop for PurgeFenceGuard<'a> {
+            fn drop(&mut self) {
+                self.0.leave_purge();
+            }
+        }
+        let _purge_fence_guard = PurgeFenceGuard(&self.storage.flush_purge_fence);
+
         block_on_future(async {
             // 2. Erzwungener Flush der Memtables in SSTables
             self.storage.flush().await?;
@@ -80,7 +94,10 @@ impl Purger for LsmPurger {
                     // Datei filtern und neu schreiben
                     let old_path = reader.file_path();
                     let new_path = old_path.with_extension("purged.sst");
-                    if let Ok(mut builder) = SstableBuilder::create(&new_path).await {
+                    if let Ok(mut builder) =
+                        SstableBuilder::create_with_vfs(&new_path, None, self.storage.vfs().clone())
+                            .await
+                    {
                         for (rk, rv, rseq) in retained {
                             let _ = builder.add(&rk, &rv, rseq, 1).await;
                         }
@@ -114,9 +131,10 @@ impl Purger for LsmPurger {
                 active_paths.insert(r.file_path().to_path_buf());
             }
 
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
+            let vfs = self.storage.vfs();
+            if let Ok(dir_entries) = vfs.list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
                     if path.extension().and_then(|s| s.to_str()) == Some("sst")
                         && !active_paths.contains(&path)
                     {
@@ -126,11 +144,10 @@ impl Purger for LsmPurger {
             }
 
             for old_path in sst_files_to_purge {
-                if let Ok(metadata) = tokio::fs::metadata(&old_path).await {
-                    let len = metadata.len();
+                if let Ok(len) = vfs.len(&old_path) {
                     let zeros = vec![0u8; len as usize];
-                    let _ = tokio::fs::write(&old_path, zeros).await;
-                    if tokio::fs::remove_file(&old_path).await.is_ok() {
+                    let _ = vfs.write_atomic(&old_path, &zeros);
+                    if vfs.remove_file(&old_path).is_ok() {
                         bytes_freed += len;
                     }
                 }
@@ -138,13 +155,12 @@ impl Purger for LsmPurger {
 
             // 4. WAL-Segmente filtern / bereinigen
             let mut wal_files = Vec::new();
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
-                    let name = path.file_name().unwrap_or_default().to_string_lossy();
-                    let is_wal = (name.starts_with("wal-") && name.ends_with(".log"))
-                        || name == "wal.log"
-                        || name.ends_with(".wal");
+            if let Ok(dir_entries) = vfs.list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
+                    let is_wal = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
+                        || name_str == "wal.log"
+                        || name_str.ends_with(".wal");
                     if is_wal {
                         wal_files.push(path);
                     }
@@ -198,11 +214,10 @@ impl Purger for LsmPurger {
 
                             if retained_wal.is_empty() {
                                 // WAL enthielt nur Target -> Nullen und Entfernen
-                                if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
-                                    let len = metadata.len();
+                                if let Ok(len) = self.storage.vfs().len(&wal_path) {
                                     let zeros = vec![0u8; len as usize];
-                                    let _ = tokio::fs::write(&wal_path, zeros).await;
-                                    let _ = tokio::fs::remove_file(&wal_path).await;
+                                    let _ = self.storage.vfs().write_atomic(&wal_path, &zeros);
+                                    let _ = self.storage.vfs().remove_file(&wal_path);
                                     bytes_freed += len;
                                 }
                             } else {
@@ -217,12 +232,11 @@ impl Purger for LsmPurger {
                                         let _ = new_wal.append_batch(batch).await;
                                     }
 
-                                    if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
-                                        let len = metadata.len();
+                                    if let Ok(len) = self.storage.vfs().len(&wal_path) {
                                         let zeros = vec![0u8; len as usize];
-                                        let _ = tokio::fs::write(&wal_path, zeros).await;
+                                        let _ = self.storage.vfs().write_atomic(&wal_path, &zeros);
                                     }
-                                    let _ = tokio::fs::rename(&tmp_wal_path, &wal_path).await;
+                                    let _ = self.storage.vfs().rename(&tmp_wal_path, &wal_path);
                                 }
                             }
                         }

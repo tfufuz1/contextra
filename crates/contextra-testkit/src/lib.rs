@@ -112,7 +112,7 @@ pub use reference_model::{RefOp, ReferenceModel};
 /// 2. Ruft die interne Port-Funktion `mint_witness_for_testkit` mit synthetischen Werten
 ///    (fixer Hash `[0xFE; 32]`, Sequenznummer `0`) auf.
 ///
-/// **Vorbedingungen:** Nur aktiv unter dem Feature-Flag `testkit`.
+/// **Vorbedingungen:** Nur aktiv unter dem Feature-Flag `erasure-conformance`.
 /// **Rückgabe:** Ein fertig initialisiertes `LayerWitness`-Objekt.
 ///
 /// # Beispiel
@@ -123,7 +123,7 @@ pub use reference_model::{RefOp, ReferenceModel};
 /// let witness = mint_witness_for_tests(WitnessLayer::Wal, 100, 0, ScanTechnique::FullScan);
 /// assert_eq!(witness.scanned_keys(), 100);
 /// ```
-#[cfg(feature = "testkit")]
+#[cfg(feature = "erasure-conformance")]
 pub fn mint_witness_for_tests(
     layer: impl Into<contextra_ports::scanner::WitnessLayer>,
     scanned: u64,

@@ -234,9 +234,10 @@ async fn test_t_fk_keyring_lifecycle_and_zeroize() {
 /// Modul für dauerhafte VFS-Tests mit Injektion
 mod durable_tests {
     use super::*;
+    use contextra_erasure::error::ErasureError as ContextraError;
+    use contextra_erasure::types_local::Vfs;
     use contextra_erasure::types_local::{VerifiedVia, VfsFile, VfsOpenOptions};
-    use contextra_ports::vfs::Vfs;
-    use contextra_ports::{ContextraError, Result};
+    pub type Result<T> = std::result::Result<T, ContextraError>;
     use parking_lot::Mutex;
     use std::collections::HashMap;
     use std::io::{Error, ErrorKind};
@@ -339,7 +340,10 @@ mod durable_tests {
             if let Some(data) = files.get(path) {
                 Ok(data.lock().clone())
             } else {
-                Err(ContextraError::NotFound(path.display().to_string()))
+                Err(ContextraError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    path.display().to_string(),
+                )))
             }
         }
 
@@ -360,7 +364,10 @@ mod durable_tests {
             if let Some(data) = files.get(path) {
                 Ok(data.lock().len() as u64)
             } else {
-                Err(ContextraError::NotFound(path.display().to_string()))
+                Err(ContextraError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    path.display().to_string(),
+                )))
             }
         }
 

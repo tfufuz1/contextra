@@ -9,16 +9,16 @@ Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §20, `cap
 
 ## Ring, Klasse & Reifegrad
 - **Ring:** Ring 0 (Kryptographie & Kernprimitiven, I/O-frei im Kern)
-- **Klasse:** Kern `[K]`
+- **Klasse:** Klasse A (Baukasten-Baustein)
 - **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_depend_on`):** `contextra-types`, `contextra-ports` (SPEC §4, §6.9, `capabilities.toml`)
+- **Erlaubte Abhängigkeiten (`may_depend_on`):** Soll: `[]`; transitional: `contextra-types`, `contextra-ports` (SPEC v4.0 §5)
 - **Lints:** `#![forbid(unsafe_code)]`, Zero-Panic in Produktionscode
 
-## Baukasten-Profil & Garantien
-- **Vollständige Isolation (M1, M2):** Baut und testet isoliert nur mit `types` und `ports` ohne Kenntnis höherer Schichten.
-- **Keine Eigenbauten (EP12):** Ausschließlich erprobte Standardprimitive (`aes-gcm-siv`, `argon2`, `hkdf`, `hmac`, `ed25519-dalek`, `blake3`).
-- **Härtung & Konstantzeit:** Konstantzeit-Vergleiche (`subtle`), kein Klartext-Schlüssel-Leak in Debug/Logs, Zeroize-on-Drop.
-- **Entkopplung der Löschlogik (D-E1):** Löschketten- und juristische DSGVO-Nachweise verbleiben exklusiv in `contextra-erasure`. Historische Re-Exports in `crypto` sind als deprecated markiert.
+## Baukasten-Profil & Garantien (Klasse A)
+- **Copy-Paste-Readiness:** Exportierbar und autark nutzbar via `python3 tools/export_crate.py contextra-crypto`.
+- **Keine Eigenbauten (EP12):** Ausschließlich erprobte Standardprimitive (`aes-gcm-siv`, `argon2`, `hkdf`, `hmac`, `ed25519-dalek`, `blake3`, `sha2`).
+- **Härtung & Konstantzeit:** Konstantzeit-Vergleiche (`subtle`), kein Klartext-Schlüssel-Leak in Debug/Logs, Zeroize-on-Drop auf allen Schlüsselspeichern.
+- **Entkopplung der Löschlogik (D-E1):** Löschketten- und juristische DSGVO-Nachweise verbleiben exklusiv in `contextra-erasure`. Historische Re-Exports in `crypto` sind hinter dem Feature `legacy-erasure` gebunden und als `#[deprecated]` markiert.
 
 ## Einbettungsbeispiel (Autarker Einsatz)
 

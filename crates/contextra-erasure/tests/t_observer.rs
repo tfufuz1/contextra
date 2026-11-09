@@ -5,7 +5,7 @@ use contextra_erasure::purge::{
     ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind,
 };
 use contextra_erasure::types_local::ErasureId;
-use contextra_ports::BoxFuture;
+use futures_util::future::BoxFuture;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

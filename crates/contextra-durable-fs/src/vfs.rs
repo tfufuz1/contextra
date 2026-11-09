@@ -1,213 +1,141 @@
-//! # Virtuelles Dateisystem (VFS - Virtual File System)
-//!
-//! Zweck: Bereitstellung einer Schnittstellenabstraktion für Dateisystemoperationen,
-//! um positionsbasiertes I/O (`read_at`, `write_at`), Dateisynchronisation (`sync_data`, `sync_all`)
-//! und Verzeichnisverwaltung testbar und mockbar zu machen.
-//!
-//! Ring-Zugehörigkeit: Ring 0 (I/O- und Speicherschnittstellen).
-//! Wird genutzt von: Index- und Speicher-Engines (z. B. HNSW-Vektorindex, Blockmanager).
-//! Wichtigste Typen:
-//! - [`RealFs`]: Standardimplementierung von [`contextra_ports::Vfs`], die Aufrufe an das reale Host-Dateisystem weiterleitet.
-//! - [`RealFsFile`]: Dateihandle-Wrapper für [`std::fs::File`] mit Implementierung von [`contextra_ports::VfsFile`].
-//!
-//! Invarianten:
-//! - Schnittstellenvertrag: Deterministische I/O-Fehlerweiterleitung ohne `panic!`.
-//! - Plattformunabhängigkeit: Verwendet auf Unix `FileExt::read_at`/`write_at` und auf Windows `FileExt::seek_read`/`seek_write`.
-
-// FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Virtual File System (VFS) Abstraktion fuer deterministische I/O-Injektion und Testbarkeit.
-// INVARIANTEN: Zero-Panic, Fail-Closed, SCHNITTSTELLENVERTRAG exakt eingehalten.
-
-use contextra_ports::{ContextraError, Result, VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
+use crate::error::{DurableFsError, Result};
+use crate::platform::{sync_file, FlushKind};
 use std::fs::{self, File, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(unix)]
-use std::os::unix::fs::FileExt;
+/// Lokaler Zähler für temporäre Dateinamen bei atomaren Schreibvorgängen.
+static ATOMIC_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[cfg(windows)]
-use std::os::windows::fs::FileExt;
+/// Synchroner Trait für virtuelle Dateisystemoperationen (Klasse A).
+pub trait Vfs: Send + Sync {
+    /// Liest den gesamten Inhalt einer Datei.
+    fn read(&self, path: &Path) -> Result<Vec<u8>>;
 
-pub use contextra_ports::{
-    Vfs as PortsVfs, VfsFile as PortsVfsFile, VfsOpenOptions as PortsVfsOpenOptions,
-};
+    /// Schreibt Daten atomar und crash-sicher in eine Datei (`INV-VFS-ATOMIC-1`).
+    fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()>;
 
-// ANCHOR[contextra-durable-fs:REAL-FS-001]
-/// Standard-Implementierung von [`contextra_ports::Vfs`], die direkt mit dem Host-Betriebssystem interagiert.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct RealFs;
+    /// Hängt Daten an eine Datei an und flusht synchron.
+    fn append(&self, path: &Path, data: &[u8]) -> Result<()>;
 
-impl Vfs for RealFs {
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
-        let mut std_opts = OpenOptions::new();
-        std_opts
-            .read(opts.read)
-            .write(opts.write)
-            .create(opts.create)
-            .create_new(opts.create_new)
-            .truncate(opts.truncate)
-            .append(opts.append);
+    /// Synchronisiert eine Datei auf stabilen Speicher.
+    fn sync_file(&self, path: &Path) -> Result<()>;
 
-        let file = std_opts.open(path).map_err(ContextraError::Io)?;
-        Ok(Box::new(RealFsFile { file }))
+    /// Synchronisiert die Metadaten eines Verzeichnisses auf stabilen Speicher.
+    fn sync_dir(&self, path: &Path) -> Result<()>;
+
+    /// Entfernt eine Datei dauerhaft und flusht das übergeordnete Verzeichnis.
+    fn remove(&self, path: &Path) -> Result<()>;
+
+    /// Benennt eine Datei atomar um und flusht das übergeordnete Verzeichnis.
+    fn rename(&self, from: &Path, to: &Path) -> Result<()>;
+
+    /// Listet alle Dateinamen in einem Verzeichnis lexikografisch sortiert auf.
+    fn list(&self, path: &Path) -> Result<Vec<String>>;
+
+    /// Prüft, ob ein Pfad existiert.
+    fn exists(&self, path: &Path) -> bool {
+        path.exists()
     }
 
+    /// Gibt die Größe einer Datei in Bytes zurück.
+    fn len(&self, path: &Path) -> Result<u64> {
+        fs::metadata(path)
+            .map(|m| m.len())
+            .map_err(|e| map_io_err(e, path))
+    }
+
+    /// Erstellt ein Verzeichnis inklusive aller Zwischenverzeichnisse.
+    fn create_dir_all(&self, path: &Path) -> Result<()> {
+        fs::create_dir_all(path).map_err(DurableFsError::Io)
+    }
+}
+
+/// Standard-Implementierung von [`Vfs`] auf Basis von `std::fs`.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct StdVfs;
+
+/// Alias für bestehende Workspace-Kompatibilität (`RealFs`).
+pub type RealFs = StdVfs;
+
+impl Vfs for StdVfs {
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
-        std::fs::read(path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                ContextraError::NotFound(path.display().to_string())
-            } else {
-                ContextraError::Io(e)
-            }
-        })
+        fs::read(path).map_err(|e| map_io_err(e, path))
     }
 
     fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
-        crate::atomic_replace(path, data).map_err(ContextraError::Io)
+        crate::atomic_replace(path, data)
     }
 
-    fn create_dir_all(&self, path: &Path) -> Result<()> {
-        fs::create_dir_all(path).map_err(ContextraError::Io)
+    fn append(&self, path: &Path, data: &[u8]) -> Result<()> {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|e| map_io_err(e, path))?;
+        file.write_all(data).map_err(DurableFsError::Io)?;
+        sync_file(&file, FlushKind::DataAndMetadata).map_err(DurableFsError::Io)
     }
 
-    fn remove_file(&self, path: &Path) -> Result<()> {
-        crate::durable_remove(path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                ContextraError::NotFound(path.display().to_string())
-            } else {
-                ContextraError::Io(e)
-            }
-        })
-    }
-
-    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
-        crate::rename_durable(from, to).map_err(ContextraError::Io)
-    }
-
-    fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
-        let entries = fs::read_dir(path).map_err(ContextraError::Io)?;
-        let mut res = Vec::new();
-        for entry in entries {
-            res.push(entry.map_err(ContextraError::Io)?.path());
-        }
-        Ok(res)
-    }
-
-    fn exists(&self, path: &Path) -> Result<bool> {
-        Ok(path.exists())
-    }
-
-    fn len(&self, path: &Path) -> Result<u64> {
-        fs::metadata(path).map(|m| m.len()).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                ContextraError::NotFound(path.display().to_string())
-            } else {
-                ContextraError::Io(e)
-            }
-        })
-    }
-
-    fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
-        let entries = fs::read_dir(path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                ContextraError::NotFound(path.display().to_string())
-            } else {
-                ContextraError::Io(e)
-            }
-        })?;
-        let mut res = Vec::new();
-        for entry in entries {
-            let entry = entry.map_err(ContextraError::Io)?;
-            if let Some(name) = entry.file_name().to_str() {
-                res.push(name.to_string());
-            }
-        }
-        res.sort();
-        Ok(res)
+    fn sync_file(&self, path: &Path) -> Result<()> {
+        let file = File::open(path).map_err(|e| map_io_err(e, path))?;
+        sync_file(&file, FlushKind::DataAndMetadata).map_err(DurableFsError::Io)
     }
 
     fn sync_dir(&self, path: &Path) -> Result<()> {
-        crate::sync_dir(path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                ContextraError::NotFound(path.display().to_string())
-            } else {
-                ContextraError::Io(e)
+        crate::sync_dir(path)
+    }
+
+    fn remove(&self, path: &Path) -> Result<()> {
+        crate::durable_remove(path)
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        crate::rename_durable(from, to)
+    }
+
+    fn list(&self, path: &Path) -> Result<Vec<String>> {
+        let entries = fs::read_dir(path).map_err(|e| map_io_err(e, path))?;
+        let mut names = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(DurableFsError::Io)?;
+            if let Some(s) = entry.file_name().to_str() {
+                names.push(s.to_string());
             }
-        })
+        }
+        names.sort();
+        Ok(names)
     }
 }
 
-// ANCHOR[contextra-durable-fs:REAL-FS-FILE-001]
-/// Implementierung von [`contextra_ports::VfsFile`] auf Basis von [`std::fs::File`].
-#[derive(Debug)]
-pub struct RealFsFile {
-    file: File,
-}
-
-impl RealFsFile {
-    /// Erzeugt ein neues [`RealFsFile`] aus einem offenen Dateihandle.
-    pub fn new(file: File) -> Self {
-        Self { file }
-    }
-
-    /// Gibt eine Referenz auf die zugrundeliegende [`File`] zurück.
-    pub fn file(&self) -> &File {
-        &self.file
+fn map_io_err(e: std::io::Error, path: &Path) -> DurableFsError {
+    if e.kind() == std::io::ErrorKind::NotFound {
+        DurableFsError::NotFound {
+            path: path.to_path_buf(),
+        }
+    } else {
+        DurableFsError::Io(e)
     }
 }
 
-impl VfsFile for RealFsFile {
-    fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        #[cfg(unix)]
-        {
-            FileExt::read_at(&self.file, buf, offset)
-        }
-        #[cfg(windows)]
-        {
-            FileExt::seek_read(&self.file, buf, offset)
-        }
-        #[cfg(not(any(unix, windows)))]
-        {
-            compile_error!("Unsupported target OS for positional VfsFile");
-        }
-    }
+/// RAII-Guard zum automatischen Löschen temporärer Zwischendateien bei Fehlern oder Panics.
+pub(crate) struct TmpFileGuard<'a>(pub &'a Path);
 
-    fn read_verified(&self, offset: u64, len: usize) -> std::io::Result<(Vec<u8>, VerifiedVia)> {
-        let mut buf = vec![0u8; len];
-        let n = self.read_at(&mut buf, offset)?;
-        buf.truncate(n);
-        Ok((buf, VerifiedVia::Cached))
+impl<'a> Drop for TmpFileGuard<'a> {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(self.0);
     }
+}
 
-    fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
-        #[cfg(unix)]
-        {
-            FileExt::write_at(&self.file, buf, offset)
-        }
-        #[cfg(windows)]
-        {
-            FileExt::seek_write(&self.file, buf, offset)
-        }
-        #[cfg(not(any(unix, windows)))]
-        {
-            compile_error!("Unsupported target OS for positional VfsFile");
-        }
-    }
-
-    fn set_len(&self, len: u64) -> std::io::Result<()> {
-        self.file.set_len(len)
-    }
-
-    fn len(&self) -> std::io::Result<u64> {
-        self.file.metadata().map(|m| m.len())
-    }
-
-    fn sync_data(&self) -> std::io::Result<()> {
-        contextra_sys::durable_flush_file(&self.file, false)
-    }
-
-    fn sync_all(&self) -> std::io::Result<()> {
-        contextra_sys::durable_flush_file(&self.file, true)
-    }
+/// Hilfsfunktion zur Erzeugung eines eindeutigen temporären Dateipfads im Zielordner.
+pub(crate) fn generate_tmp_path(target: &Path) -> Result<PathBuf> {
+    let parent = target.parent().ok_or_else(|| {
+        DurableFsError::InvalidArgument("target path has no parent directory".to_string())
+    })?;
+    let stem = target.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
+    let count = ATOMIC_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let pid = std::process::id();
+    let tmp_name = format!(".{}.tmp.{}.{}", stem, pid, count);
+    Ok(parent.join(tmp_name))
 }

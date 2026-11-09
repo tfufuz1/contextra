@@ -1,48 +1,43 @@
-# Contextra – Typ-Registry (Kern v1)
+# Contextra – Typ-Registry (Baukasten-System)
 
-<!-- doc-stamp: 2026-10-30 | Normativ: docs/SPEC.md Fassung 4.0 §16 (B7), Regel 11 -->
+<!-- doc-stamp: 2026-11-08 | Normativ: docs/SPEC.md Fassung 4.1 §2 (B3, B4), §3.1, §15 (E-02) -->
 
-**Stand:** 30.10.2026. Dieses Dokument ersetzt die frühere Matrix mit über 35 Typen. Die meisten dort genannten Typen gehören zu entfernten Crates (SPEC §5.2) und sind nicht mehr relevant. Der Vorzustand bleibt über Commit `3c1f144fa` erreichbar.
-
-**Zweck:** Regel 11 verlangt eine Typfamilie je Konzept. Hier stehen die öffentlichen Typen, die im Workspace mehrfach definiert sind, mit Zielzustand.
-
----
-
-## 1. Ermittlung
-
-Die Liste entstand aus folgendem Befehl (Ausgabe am 30.10.2026):
-
-```bash
-grep -rhoE "^\s*pub(\(crate\))? (struct|enum|trait|type) [A-Za-z0-9_]+" crates --include=*.rs \
-  | awk '{print $NF}' | sort | uniq -d
-```
-
-Nach Umsetzung von PLAN WP R1.3 muss die Ausgabe nur noch die in Abschnitt 3 als bewusst gewollt markierten Namen enthalten.
+**Stand:** 2026-11-08.
+Dieses Dokument dokumentiert die Typen-Landschaft, Prinzipien der Typentkopplung und das Monitoring von Namenskollisionen im modularen **Contextra Baukastensystem**.
 
 ---
 
-## 2. Doppeldefinitionen mit Zielzustand
+## 1. Leitprinzipien der Baukasten-Typisierung (SPEC v4.1)
 
-| Typname | Fundstellen (Ist) | Zielzustand | Maßnahme |
-|---|---|---|---|
-| `BoundedTopK` | `contextra-text/src/wand.rs`, `contextra-rank/src/fusion/topk.rs` | Eine kanonische Definition | Verschieben nach `contextra-types` oder umbenennen der Textvariante (PLAN R1.3) |
-| `HybridQueryBuilder` | `contextra-engine/src/collection/query_builder/builder.rs`, `contextra-types/src/types/saos.rs` | Nur in `contextra-engine` | `types/saos.rs` entfernen (Restmodul) |
-| `InMemoryStorageEngine` | `contextra-testkit/src/in_memory_store.rs`, `contextra-store/src/engine/memory_only.rs` | Store-Variante als einzige Implementierung, Testkit re-exportiert | PLAN R1.3 |
-| `Signal` | `contextra-types/src/types/saos.rs`, `contextra-rank/src/fusion/types.rs` | Nur in `contextra-rank` | `types/saos.rs` entfernen |
+1. **Vertikale Autarkie vor DRY (§3.1):**
+   Wiederholungen trivialer Datenstrukturen (z. B. `DistanceMetric`, `ScoredPoint`, `Token`, `SliceRange`) zwischen voneinander unabhängigen Crates sind erwünscht und normativ vorgeschrieben. DRY über Crate-Grenzen hinweg erzeugt unzulässige Kopplung.
+2. **Standardtypen in öffentlichen APIs (B3):**
+   Öffentliche APIs von Klasse-A-Bausteinen verwenden Standard-Rust-Typen (`&[f32]`, `&[u8]`, `&str`, `u64`, `usize`) oder Crate-eigene Typen.
+3. **Lokales Fehlermodell (B4):**
+   Jedes Crate definiert genau einen primären Fehlertyp (`Error`, `thiserror`, `#[non_exhaustive]`). Kein globaler Fehler-Hub.
+4. **Keine Hub-Abhängigkeit zu `types` in Klasse A (E-02):**
+   Klasse-A-Bausteine importieren weder `contextra-types` noch `contextra-ports`. Typ-Konvertierungen erfolgen in Adaptern oder in der Integrationsschicht (Klasse C).
 
 ---
 
-## 3. Bewusste Mehrfachnamen
+## 2. Kanonische Zuordnungen & Kollisionsüberwachung
 
-| Typname | Fundstellen | Begründung |
+Zur Vermeidung von Verwirrung und unbeabsichtigtem Shadowing wird die Verwendung öffentlicher Namen über Crates hinweg auditiert:
+
+| Typname | Crate(s) | Status & Vorgabe |
 |---|---|---|
-| `Result` | `contextra-types/src/error.rs`, `contextra-crypto/src/error.rs` | Typalias je Fehlerdomäne, kein Konflikt in Modulen |
-| `DocId`, `DocIdRaw` | `contextra-types/src/types/domain/ids.rs`, `contextra-text/src/posting_list.rs` | Verschiedene Konzepte: Domänen-ID und interne Postings-ID |
-| `BlockCacheShard` | `contextra-store/src/sstable/block_cache.rs` | Typalias, cfg-abhängig über Feature `block-cache-v2` (zwei Alias-Ziele, nicht zwei Definitionen) |
+| `DistanceMetric` | `contextra-simd` (kanonisch für Kernel), lokale Enums in Adaptern | Vertikal autark; keine Abhängigkeit von `simd` auf `types` |
+| `BoundedTopK` | `contextra-rank` (kanonisch für Rangfusion), `contextra-text` | Lokal getrennt gekapselt |
+| `HybridQueryBuilder` | `contextra-engine` | Exklusiv in der Integrationsschicht |
+| `InMemoryStorageEngine` | `contextra-testkit` | Exklusiv in Tooling / Testdoubles |
+| `Error` / `Result` | Jedes Crate lokal | Erlaubte und vorgeschriebene Crate-eigene Fehlerdomäne (B4) |
 
 ---
 
-## 4. Pflege
+## 3. Typ-Audits
 
-- Neue öffentliche Typen zuerst über die Suche prüfen. Existiert ein kanonischer Typ, wird er importiert.
-- Wird ein Typ dupliziert, muss der PR diesen Eintrag in Abschnitt 2 ergänzen oder die Duplikation beseitigen.
+Das Tooling prüft Typkollisionen und Schnittstellenreinheit automatisiert:
+```bash
+python3 tools/type_registry_sync.py
+```
+Ergebnisse werden in `docs/diagnostics/TYPE_REGISTRY_COLLISIONS.md` dokumentiert.

@@ -29,8 +29,6 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-
-// ANCHOR[contextra-rank:MOD-001]
 pub mod calibration;
 pub mod drift;
 pub mod error;
@@ -49,8 +47,8 @@ pub use local_types::{
 pub mod dibud;
 
 pub use calibration::{
-    AdaptiveConformalCalibrator, Clock, ConformalCalibrator, ConformalError, IsotonicCalibrator,
-    PlattScaler, SystemClock,
+    calibrate_score, AdaptiveConformalCalibrator, Calibrator, Clock, ConformalCalibrator,
+    ConformalError, IsotonicCalibrator, PlattScaler, SystemClock,
 };
 #[cfg(feature = "dibud")]
 pub use dibud::{
@@ -61,11 +59,11 @@ pub use drift::{DriftDetector, DriftStatus};
 pub use explain::{explain, ExplanationEntry, RetrievalExplanation};
 pub use fusion::{
     apply_resonance_bonus, fuse_search_results_with_strategy, g, modulate_and_renormalize_weights,
-    reciprocal_rank_fusion, score_normalized_fusion_with_options, weighted_reciprocal_rank_fusion,
-    weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
-    weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
-    GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority, ProvenanceBuilder,
-    ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext, SignalContribution,
-    SignalKind,
+    reciprocal_rank_fusion, rrf_fuse, score_normalized_fusion_with_options,
+    weighted_reciprocal_rank_fusion, weighted_reciprocal_rank_fusion_mrrf,
+    weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
+    weights_to_signal_factors, BoundedTopK, GlobalFusionConfig, GlobalFusionStrategy,
+    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, ScoredItem,
+    SearchResult, SignalCalibrationContext, SignalContribution, SignalKind,
 };
 pub use metrics::{mean_reciprocal_rank, ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank};

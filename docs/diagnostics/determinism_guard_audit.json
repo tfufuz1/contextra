@@ -1,0 +1,662 @@
+[
+  {
+    "crate": "contextra-store",
+    "findings_prod": [
+      {
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 18,
+        "kind": "random_hashmap",
+        "code": "use std::collections::HashMap;",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/engine.rs",
+        "line": 67,
+        "kind": "random_hashmap",
+        "code": "pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 251,
+        "kind": "random_hashset",
+        "code": "Option<std::collections::HashSet<std::path::PathBuf>>,",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 252,
+        "kind": "random_hashset",
+        "code": "Option<std::collections::HashSet<std::path::PathBuf>>,",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 271,
+        "kind": "random_hashmap",
+        "code": "let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 272,
+        "kind": "random_hashmap",
+        "code": "std::collections::HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 275,
+        "kind": "random_hashset",
+        "code": "let mut replayed_hmac_set = std::collections::HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 620,
+        "kind": "random_hashmap",
+        "code": "intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/recovery.rs",
+        "line": 742,
+        "kind": "random_hashset",
+        "code": "let txs_to_rollback: std::collections::HashSet<u64> = memtable",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/wal/flusher.rs",
+        "line": 242,
+        "kind": "instant_now",
+        "code": "let deadline = tokio::time::Instant::now()",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/manifest/core.rs",
+        "line": 284,
+        "kind": "random_hashmap",
+        "code": "let mut valid_map = std::collections::HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/manifest/core.rs",
+        "line": 338,
+        "kind": "random_hashset",
+        "code": ") -> std::collections::HashSet<PathBuf> {",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/manifest/core.rs",
+        "line": 340,
+        "kind": "random_hashset",
+        "code": "let valid_set: std::collections::HashSet<PathBuf> =",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/manifest/core.rs",
+        "line": 342,
+        "kind": "random_hashset",
+        "code": "let mut dead_set = std::collections::HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs",
+        "line": 8,
+        "kind": "random_hashmap",
+        "code": "use std::collections::HashMap;",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs",
+        "line": 59,
+        "kind": "random_hashmap",
+        "code": "let mut oracle: HashMap<Vec<u8>, Option<Vec<u8>>> = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/fuzz/fuzz_targets/fuzz_memtable_concurrent.rs",
+        "line": 99,
+        "kind": "instant_now",
+        "code": "let start_time = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      }
+    ],
+    "findings_test": [
+      {
+        "file": "/app/crates/contextra-store/benches/redb_comparative_bench.rs",
+        "line": 101,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/benches/redb_comparative_bench.rs",
+        "line": 136,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/benches/redb_comparative_bench.rs",
+        "line": 473,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/benches/redb_comparative_bench.rs",
+        "line": 532,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_observer_test.rs",
+        "line": 148,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/group_commit_test.rs",
+        "line": 179,
+        "kind": "instant_now",
+        "code": "let start_no_batch = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/group_commit_test.rs",
+        "line": 212,
+        "kind": "instant_now",
+        "code": "let start_batch = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/filename_uniqueness_test.rs",
+        "line": 7,
+        "kind": "random_hashset",
+        "code": "use std::collections::HashSet;",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/filename_uniqueness_test.rs",
+        "line": 14,
+        "kind": "random_hashset",
+        "code": "let mut sealed_paths = HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/filename_uniqueness_test.rs",
+        "line": 85,
+        "kind": "random_hashset",
+        "code": "let mut all_paths = HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/read_path_audit.rs",
+        "line": 222,
+        "kind": "random_hashset",
+        "code": "let mut seen_keys = std::collections::HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/observer_blocking_failopen.rs",
+        "line": 75,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/observer_blocking_failopen.rs",
+        "line": 195,
+        "kind": "instant_now",
+        "code": "let start_drop = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/recovery_salt_dirlock.rs",
+        "line": 109,
+        "kind": "env_var",
+        "code": "if std::env::var(\"TEST_SUBPROCESS_DIRLOCK_CHILD\").is_ok() {",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/recovery_salt_dirlock.rs",
+        "line": 110,
+        "kind": "env_var",
+        "code": "let path_str = std::env::var(\"TEST_SUBPROCESS_DIR_PATH\").unwrap();",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/amplification_benchmark.rs",
+        "line": 8,
+        "kind": "random_hashset",
+        "code": "use std::collections::HashSet;",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/amplification_benchmark.rs",
+        "line": 17,
+        "kind": "random_hashset",
+        "code": "tracked_files: std::sync::Mutex<HashSet<PathBuf>>,",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/amplification_benchmark.rs",
+        "line": 25,
+        "kind": "random_hashset",
+        "code": "tracked_files: std::sync::Mutex::new(HashSet::new()),",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/group_commit_stress.rs",
+        "line": 26,
+        "kind": "instant_now",
+        "code": "let start_time = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/group_commit_stress.rs",
+        "line": 100,
+        "kind": "instant_now",
+        "code": "let t0 = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/executor_starvation_test.rs",
+        "line": 39,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/executor_starvation_test.rs",
+        "line": 70,
+        "kind": "instant_now",
+        "code": "let io_start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/executor_starvation_test.rs",
+        "line": 96,
+        "kind": "instant_now",
+        "code": "let read_start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 103,
+        "kind": "env_var",
+        "code": "if std::env::var(\"CRASH_CHILD\").is_err() {",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 107,
+        "kind": "env_var",
+        "code": "let db_path_str = std::env::var(\"CRASH_DB_PATH\").expect(\"CRASH_DB_PATH environment variable\");",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 110,
+        "kind": "env_var",
+        "code": "let group_commit_micros: u64 = std::env::var(\"CRASH_GROUP_COMMIT_WINDOW_MICROS\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 115,
+        "kind": "env_var",
+        "code": "let encrypted = std::env::var(\"CRASH_ENCRYPTION\").as_deref() == Ok(\"1\");",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 180,
+        "kind": "env_var",
+        "code": "if std::env::var(\"CRASH_CHILD\").is_ok() {",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 184,
+        "kind": "env_var",
+        "code": "let num_iters: usize = std::env::var(\"CRASH_ITERS\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 189,
+        "kind": "env_var",
+        "code": "let seed: u64 = std::env::var(\"CRASH_SEED\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/crash_kill_durability.rs",
+        "line": 193,
+        "kind": "system_time_now",
+        "code": "std::time::SystemTime::now()",
+        "recommendation": "contextra_ports::Clock::now_wall_clock()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/blocking_util_pool_measurement.rs",
+        "line": 73,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_matrix.rs",
+        "line": 21,
+        "kind": "env_var",
+        "code": "let seed: u64 = std::env::var(\"CHAOS_SEED\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_power_cut.rs",
+        "line": 11,
+        "kind": "random_hashmap",
+        "code": "use std::collections::HashMap;",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_power_cut.rs",
+        "line": 84,
+        "kind": "thread_rng",
+        "code": "let mut rng = rand::thread_rng();",
+        "recommendation": "contextra_ports::RngSeed / deterministischer ChaCha20Rng"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_power_cut.rs",
+        "line": 128,
+        "kind": "random_hashmap",
+        "code": "let mut committed_entries: HashMap<u64, (String, String)> = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_power_cut.rs",
+        "line": 129,
+        "kind": "random_hashmap",
+        "code": "let mut started_entries: HashMap<u64, (String, String)> = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/proptest_model_based.rs",
+        "line": 128,
+        "kind": "env_var",
+        "code": "cases: std::env::var(\"PROPTEST_CASES\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_recovery_runtime_stall.rs",
+        "line": 26,
+        "kind": "instant_now",
+        "code": "start_time: Instant::now(),",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_recovery_runtime_stall.rs",
+        "line": 38,
+        "kind": "instant_now",
+        "code": "guard.push((count, Instant::now()));",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_observer_integration.rs",
+        "line": 229,
+        "kind": "instant_now",
+        "code": "let start2 = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/fsync_syscall_verification.rs",
+        "line": 49,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/compaction_io_rate_limit.rs",
+        "line": 38,
+        "kind": "instant_now",
+        "code": "let mut io_token_last_reset = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/compaction_io_rate_limit.rs",
+        "line": 39,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/compaction_io_rate_limit.rs",
+        "line": 53,
+        "kind": "instant_now",
+        "code": "io_token_last_reset = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/campaign_j21_hypotheses.rs",
+        "line": 401,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_hmac_chain_ordering.rs",
+        "line": 13,
+        "kind": "random_hashset",
+        "code": "use std::collections::HashSet;",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_hmac_chain_ordering.rs",
+        "line": 77,
+        "kind": "random_hashset",
+        "code": "let mut prev_hmacs = HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_hmac_chain_ordering.rs",
+        "line": 179,
+        "kind": "random_hashset",
+        "code": "let mut prev_hmacs = HashSet::new();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/compaction_overlap_scan_and_tombstone.rs",
+        "line": 107,
+        "kind": "env_var",
+        "code": "cases: std::env::var(\"PROPTEST_CASES\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/model_based_mvcc_flush.rs",
+        "line": 15,
+        "kind": "random_hashmap",
+        "code": "use std::collections::HashMap;",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/model_based_mvcc_flush.rs",
+        "line": 47,
+        "kind": "env_var",
+        "code": "cases: std::env::var(\"PROPTEST_CASES\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/model_based_mvcc_flush.rs",
+        "line": 75,
+        "kind": "random_hashmap",
+        "code": "let mut pinned_snapshots: HashMap<usize, u64> = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/observer_deadline_no_runtime_block.rs",
+        "line": 45,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 10,
+        "kind": "random_hashmap",
+        "code": "use std::collections::{HashMap, HashSet};",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 10,
+        "kind": "random_hashset",
+        "code": "use std::collections::{HashMap, HashSet};",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 36,
+        "kind": "random_hashmap",
+        "code": "let mut all_ground_truth_keys = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 53,
+        "kind": "random_hashset",
+        "code": "let confirmed_commits: Arc<Mutex<HashSet<Vec<u8>>>> = Arc::new(Mutex::new(HashSet::new()));",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 85,
+        "kind": "thread_rng",
+        "code": "let mut rng = rand::thread_rng();",
+        "recommendation": "contextra_ports::RngSeed / deterministischer ChaCha20Rng"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 89,
+        "kind": "random_hashset",
+        "code": "let aborted_task_ids: HashSet<usize> = task_indices.into_iter().take(num_aborts).collect();",
+        "recommendation": "BTreeSet oder HashSet mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/chaos_task_massacre.rs",
+        "line": 123,
+        "kind": "random_hashmap",
+        "code": "let mut pre_reopen_snapshot: HashMap<Vec<u8>, Option<bytes::Bytes>> = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_observer.rs",
+        "line": 147,
+        "kind": "instant_now",
+        "code": "let start2 = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/wal_observer_contract.rs",
+        "line": 98,
+        "kind": "instant_now",
+        "code": "let start_wait = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/metrics_sink_test.rs",
+        "line": 147,
+        "kind": "instant_now",
+        "code": "let start_time = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/campaign_stress_store.rs",
+        "line": 311,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/memtable_shard_prefix_distribution.rs",
+        "line": 5,
+        "kind": "random_hashmap",
+        "code": "use std::collections::HashMap;",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/memtable_shard_prefix_distribution.rs",
+        "line": 13,
+        "kind": "random_hashmap",
+        "code": "let mut shard_distribution: HashMap<usize, Vec<&'static str>> = HashMap::new();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/tests/campaign_prop_lsm_ops.rs",
+        "line": 232,
+        "kind": "env_var",
+        "code": "cases: std::env::var(\"PROPTEST_CASES\")",
+        "recommendation": "Explizite Konfigurations\u00fcbergabe (Config-Struct)"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/sstable/tests.rs",
+        "line": 882,
+        "kind": "instant_now",
+        "code": "let start = Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/tests/mvcc_tests.rs",
+        "line": 225,
+        "kind": "instant_now",
+        "code": "let req_start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/tests/mvcc_tests.rs",
+        "line": 484,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/tests/scan_tests.rs",
+        "line": 404,
+        "kind": "random_hashmap",
+        "code": "let map1: std::collections::HashMap<_, _> = res_seq1.into_iter().collect();",
+        "recommendation": "BTreeMap oder HashMap mit festem BuildHasher"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/lsm/tests/commit_tests.rs",
+        "line": 351,
+        "kind": "instant_now",
+        "code": "let start = std::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/compaction/tests/advanced.rs",
+        "line": 461,
+        "kind": "instant_now",
+        "code": "let start_normal = tokio::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      },
+      {
+        "file": "/app/crates/contextra-store/src/compaction/tests/advanced.rs",
+        "line": 486,
+        "kind": "instant_now",
+        "code": "let start_critical = tokio::time::Instant::now();",
+        "recommendation": "contextra_ports::Clock::now_monotonic()"
+      }
+    ],
+    "summary_prod": {
+      "instant_now": 2,
+      "system_time_now": 0,
+      "thread_rng": 0,
+      "random_hashmap": 8,
+      "random_hashset": 7,
+      "env_var": 0
+    },
+    "total_prod_issues": 17
+  }
+]
