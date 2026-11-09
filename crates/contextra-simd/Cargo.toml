@@ -18,6 +18,7 @@ default = ["std"]
 std = []
 serde = ["dep:serde"]
 types-compat = ["dep:contextra-types"]
+simd-avx512 = []
 
 [dependencies]
 thiserror = { workspace = true }
@@ -29,6 +30,7 @@ contextra-types = { workspace = true, optional = true }
 [dev-dependencies]
 proptest = "1.4"
 criterion = "0.5"
+simsimd = "6.5"
 
 [[bench]]
 name = "simd_bench"
