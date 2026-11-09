@@ -51,12 +51,17 @@ impl BloomFilter {
 
     /// Inserts a key into the filter.
     pub fn insert(&mut self, key: &[u8]) {
+        if self.num_bits == 0 {
+            return;
+        }
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
             // Double Hashing: bit_idx = (h1 + i * h2) % num_bits
             // Garantiert gleichmäßige Verteilung ohne Wiederholungen für i < num_bits
-            let bit_idx = h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize % self.num_bits;
-            self.bits[bit_idx / 64] |= 1u64 << (bit_idx % 64);
+            let bit_idx = (h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize) % self.num_bits;
+            if let Some(word) = self.bits.get_mut(bit_idx / 64) {
+                *word |= 1u64 << (bit_idx % 64);
+            }
         }
     }
 
@@ -67,9 +72,14 @@ impl BloomFilter {
         }
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
-            let bit_idx = h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize % self.num_bits;
-            if (self.bits[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
-                return false;
+            let bit_idx = (h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize) % self.num_bits;
+            match self.bits.get(bit_idx / 64) {
+                Some(word) => {
+                    if (word & (1u64 << (bit_idx % 64))) == 0 {
+                        return false;
+                    }
+                }
+                None => return false,
             }
         }
         true
