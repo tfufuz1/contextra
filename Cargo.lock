@@ -713,8 +713,6 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
- "contextra-ports",
- "contextra-types",
  "criterion",
  "proptest",
  "serde",
@@ -1310,7 +1308,6 @@ dependencies = [
  "contextra-crypto",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-store",
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
