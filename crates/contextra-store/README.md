@@ -56,10 +56,10 @@ Im Baukastensystem von Contextra (SPEC §2, §5) ist `contextra-store` nicht als
 - **Lokaler HMAC-Schlüssel:** Das Ablegen von `.wal_integrity_key` im Dateisystem schützt vor Bit-Rot, jedoch nicht vor Manipulation durch Angreifer mit Schreibrechten (SECURITY NOTE in `wal/hmac.rs`).
 
 ## Abhängigkeiten & Features
-- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-mvcc`, `contextra-crypto`.
+- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-mvcc`. (Entkoppelt von Klasse-A-Crates `contextra-crypto` und `contextra-sys` via lokale Traits `RecordSealer`/`RecordAuthenticator` und den `Vfs`-Port).
 - **Features:**
-  - `default`: Minimaler Build.
-  - `inspect`: Öffnet Schnappschuss-APIs für Scan-Adapter.
+  - `default`: Minimaler synchroner Build.
+  - `inspect`: Öffnet neutrale Inspektions-Sicht (`StoreInspector`, `ResidualInspectionReport`).
   - `block-cache-v2`: Aktiviert den optimierten Block-Cache via `quick_cache`.
   - `memory-only-storage`: Ermöglicht flüchtigen In-Memory-Betrieb ohne Festplatten-I/O.
   - `docid-128`: Unterstützt 128-Bit-Dokument-IDs.
