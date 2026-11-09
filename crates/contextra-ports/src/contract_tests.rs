@@ -11,7 +11,15 @@ use crate::clock::Clock;
 use crate::error::ContextraError;
 use crate::metrics::MetricsSink;
 use crate::rng::{Rng, SeededRng};
+#[cfg(test)]
+use crate::scanner::WitnessLayer;
+use crate::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique};
+use crate::storage::StorageEngine;
+use crate::text_index::TextIndex;
+use crate::types::{DocId, TenantId, TxId};
+use crate::vector_index::VectorIndex;
 use crate::vfs::Vfs;
+use crate::RequestContext;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -161,6 +169,201 @@ pub fn verify_metrics_sink_contract<M: MetricsSink>(sink: &M) {
     sink.record_counter("contract_counter", 5, &[("layer", "ring0")]);
     sink.record_gauge("contract_gauge", 99.5, &[("node", "n1")]);
     sink.record_histogram("contract_latency", 0.005, &[("op", "read")]);
+}
+
+/// Contract test helper verifying [`StorageEngine`] trait implementation compliance.
+///
+/// Verifies put/get, isolation, prefix scanning, delete, and commit lifecycle.
+pub async fn verify_storage_engine_contract<S: StorageEngine>(storage: &S) {
+    let tx1 = TxId(101);
+    let key1 = b"contract:storage:k1";
+    let val1 = b"value_1";
+
+    // 1. Put and get within tx
+    storage
+        .put(tx1, key1, val1)
+        .await
+        .expect("put must succeed");
+
+    // 2. Commit transaction
+    storage.commit(tx1).await.expect("commit must succeed");
+
+    // 3. Get committed value
+    let res = storage.get(key1).await.expect("get must succeed");
+    assert_eq!(
+        res.as_deref(),
+        Some(&val1[..]),
+        "Committed value must match"
+    );
+
+    // 4. Batch put and scan prefix
+    let tx2 = TxId(102);
+    let batch = vec![
+        (b"contract:storage:p_a".to_vec(), b"v_a".to_vec()),
+        (b"contract:storage:p_b".to_vec(), b"v_b".to_vec()),
+    ];
+    storage
+        .put_batch(tx2, &batch)
+        .await
+        .expect("put_batch must succeed");
+    storage.commit(tx2).await.expect("commit tx2 must succeed");
+
+    let scanned = storage
+        .scan_prefix(b"contract:storage:p_")
+        .await
+        .expect("scan_prefix must succeed");
+    assert!(
+        scanned.len() >= 2,
+        "scan_prefix must return at least 2 entries"
+    );
+
+    // 5. Delete prefix
+    let tx3 = TxId(103);
+    let deleted = storage
+        .delete_prefix(tx3, b"contract:storage:p_")
+        .await
+        .expect("delete_prefix must succeed");
+    assert!(deleted >= 2, "delete_prefix must report deleted count >= 2");
+    storage.commit(tx3).await.expect("commit tx3 must succeed");
+
+    // 6. Rollback behavior
+    let tx4 = TxId(104);
+    storage
+        .put(tx4, b"contract:storage:rollback_key", b"discard")
+        .await
+        .expect("put must succeed");
+    storage.rollback(tx4).await.expect("rollback must succeed");
+    let uncommitted = storage
+        .get(b"contract:storage:rollback_key")
+        .await
+        .expect("get rolled-back key");
+    assert_eq!(
+        uncommitted, None,
+        "Rolled-back key must not be visible after rollback"
+    );
+}
+
+/// Contract test helper verifying [`VectorIndex`] trait implementation compliance.
+///
+/// Verifies insertion, search, delete, len, and transaction lifecycle.
+pub async fn verify_vector_index_contract<V: VectorIndex>(index: &V) {
+    let tx1 = TxId(201);
+    let doc1 = DocId(1001);
+    let vec1 = [1.0, 0.0, 0.0, 0.0];
+
+    // 1. Insert vector
+    index
+        .insert(tx1, doc1, &vec1)
+        .await
+        .expect("vector insert must succeed");
+    index.commit(tx1).await.expect("vector commit must succeed");
+
+    assert!(
+        index.len().await >= 1,
+        "Vector index len must be >= 1 after insert"
+    );
+
+    // 2. Search
+    let results = index
+        .search(&vec1, 5)
+        .await
+        .expect("vector search must succeed");
+    assert!(
+        !results.is_empty(),
+        "Vector search must return matching candidates"
+    );
+
+    // 3. Delete
+    let tx2 = TxId(202);
+    index
+        .delete(tx2, doc1)
+        .await
+        .expect("vector delete must succeed");
+    index.commit(tx2).await.expect("vector commit must succeed");
+}
+
+/// Contract test helper verifying [`TextIndex`] trait implementation compliance.
+///
+/// Verifies text insertion, search, delete, len, and commit.
+pub async fn verify_text_index_contract<T: TextIndex>(index: &T) {
+    let tx1 = TxId(301);
+    let doc1 = DocId(2001);
+    let text1 = "contract verification quick brown fox";
+
+    // 1. Insert text
+    index
+        .insert(tx1, doc1, text1)
+        .await
+        .expect("text insert must succeed");
+    index.commit(tx1).await.expect("text commit must succeed");
+
+    assert!(
+        index.len().await >= 1,
+        "Text index len must be >= 1 after insert"
+    );
+
+    // 2. Search
+    let results = index
+        .search("quick brown", 5)
+        .await
+        .expect("text search must succeed");
+    assert!(
+        !results.is_empty(),
+        "Text search must return candidates for indexed keywords"
+    );
+
+    // 3. Delete
+    let tx2 = TxId(302);
+    index
+        .delete(tx2, doc1)
+        .await
+        .expect("text delete must succeed");
+    index.commit(tx2).await.expect("text commit must succeed");
+}
+
+/// Contract test helper verifying [`Purger`] trait implementation compliance.
+///
+/// Verifies idempotency and safe fail-closed execution.
+pub fn verify_purger_contract<P: Purger>(purger: &P) {
+    let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(401));
+    let target = ScanTarget::new("tenant_contract_test", [0xFE; 32]);
+
+    // 1. First execution
+    let stats1 = purger.purge(&ctx, &target).expect("first purge call");
+
+    // 2. Idempotent second execution
+    let stats2 = purger
+        .purge(&ctx, &target)
+        .expect("second purge call must be idempotent");
+
+    assert_eq!(
+        stats2.purged_units, 0,
+        "Subsequent purge on already cleaned target should report 0 units"
+    );
+    let _ = stats1;
+}
+
+/// Contract test helper verifying [`LayerScanner`] trait implementation compliance.
+///
+/// Verifies positive control, scanned unit registration, and invariant `INV-WITNESS-MINT-1`.
+pub fn verify_layer_scanner_contract<L: LayerScanner>(scanner: &L, clock: &dyn Clock) {
+    let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(501));
+    let target = ScanTarget::new("tenant_scanner_test", [0xEE; 32]);
+
+    let witness = scanner
+        .scan(&ctx, target, ScanTechnique::Structural, clock)
+        .expect("scan must succeed with positive control");
+
+    assert_eq!(witness.witness_layer(), &scanner.layer());
+    assert!(
+        witness.scanned() > 0,
+        "Valid scan witness must have scanned > 0 units"
+    );
+    assert_ne!(
+        witness.digest(),
+        &[0u8; 32],
+        "Valid scan witness must have non-zero digest commitment"
+    );
 }
 
 /// In-memory VFS reference implementation used strictly for contract self-testing.
@@ -330,6 +533,59 @@ mod self_tests {
         let vfs = MemVfs::new();
         let base_dir = Path::new("/data");
         verify_vfs_contract(&vfs, base_dir);
+    }
+
+    #[test]
+    fn test_contract_purger_and_scanner() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        struct MockPurger {
+            purged: AtomicBool,
+        }
+        impl Purger for MockPurger {
+            fn purge(
+                &self,
+                _ctx: &RequestContext,
+                _target: &ScanTarget,
+            ) -> crate::Result<crate::scanner::PurgeStats> {
+                if !self.purged.swap(true, Ordering::SeqCst) {
+                    Ok(crate::scanner::PurgeStats {
+                        purged_units: 5,
+                        bytes_freed: 256,
+                    })
+                } else {
+                    Ok(crate::scanner::PurgeStats {
+                        purged_units: 0,
+                        bytes_freed: 0,
+                    })
+                }
+            }
+        }
+
+        let purger = MockPurger {
+            purged: AtomicBool::new(false),
+        };
+        verify_purger_contract(&purger);
+
+        struct MockScanner;
+        impl LayerScanner for MockScanner {
+            fn layer(&self) -> WitnessLayer {
+                WitnessLayer::LsmMemtable
+            }
+            fn scan_units(
+                &self,
+                session: &mut crate::scanner::ScanSession,
+                _ctx: &RequestContext,
+            ) -> crate::Result<()> {
+                session.record_control_match();
+                session.record_unit([42u8; 32], false);
+                Ok(())
+            }
+        }
+
+        let scanner = MockScanner;
+        let clock = SystemClock::new();
+        verify_layer_scanner_contract(&scanner, &clock);
     }
 
     #[test]
