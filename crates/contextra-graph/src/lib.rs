@@ -31,6 +31,7 @@
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-10T19:23:40Z) (SESSION: bd6ff800)
 // PRÜFER-KONTEXT: FRESH - Verified zero-unsafe invariant, zero unhandled panics, AGT-GRAPH-001 TxId origin assertions, and 133/133 tests green.
 
+mod contract;
 #[cfg(feature = "apprh-diffusion")]
 pub mod apprh;
 pub mod contract;
