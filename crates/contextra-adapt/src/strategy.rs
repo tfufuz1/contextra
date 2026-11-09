@@ -18,33 +18,3 @@ pub enum RetrievalStrategy {
     /// Globale / Community-Retrieval Strategie.
     Global,
 }
-
-#[cfg(feature = "types-compat")]
-impl From<RetrievalStrategy> for contextra_types::RetrievalStrategy {
-    fn from(strat: RetrievalStrategy) -> Self {
-        match strat {
-            RetrievalStrategy::Vector => contextra_types::RetrievalStrategy::Vector,
-            RetrievalStrategy::Text => contextra_types::RetrievalStrategy::Text,
-            RetrievalStrategy::Graph => contextra_types::RetrievalStrategy::Graph,
-            RetrievalStrategy::Hybrid => contextra_types::RetrievalStrategy::Hybrid,
-            RetrievalStrategy::Global => contextra_types::RetrievalStrategy::Global {
-                max_community_nodes: None,
-                min_community_size: None,
-            },
-        }
-    }
-}
-
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::RetrievalStrategy> for RetrievalStrategy {
-    fn from(strat: contextra_types::RetrievalStrategy) -> Self {
-        match strat {
-            contextra_types::RetrievalStrategy::Vector => RetrievalStrategy::Vector,
-            contextra_types::RetrievalStrategy::Text => RetrievalStrategy::Text,
-            contextra_types::RetrievalStrategy::Graph => RetrievalStrategy::Graph,
-            contextra_types::RetrievalStrategy::Hybrid => RetrievalStrategy::Hybrid,
-            contextra_types::RetrievalStrategy::Global { .. } => RetrievalStrategy::Global,
-            _ => RetrievalStrategy::Vector,
-        }
-    }
-}

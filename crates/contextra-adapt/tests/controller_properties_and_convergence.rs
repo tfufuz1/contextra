@@ -1,4 +1,5 @@
 #![cfg(all(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
+#![allow(clippy::field_reassign_with_default)]
 //! # Deterministische Eigenschafts- und Konvergenztests für Regler
 //!
 //! Überprüft Konvergenzeigenschaften, Schrittantworten und Invarianten aller

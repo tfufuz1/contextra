@@ -1,5 +1,5 @@
 //! Testfall für Sherman-Morrison Langzeit-Stabilität und Präzisions-Matrix-Drift-Erkennung (§13.2).
-
+#![allow(clippy::needless_range_loop)]
 #![cfg(feature = "bandit-routing")]
 
 use contextra_adapt::{

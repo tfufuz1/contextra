@@ -78,23 +78,6 @@ proptest! {
     }
 }
 
-#[cfg(feature = "types-compat")]
-#[test]
-fn test_off_policy_error_conversion_to_contextra_error() {
-    use contextra_types::ContextraError;
-
-    let err = OffPolicyError::ZeroPropensityViolation(RetrievalStrategy::Graph);
-    let contextra_err: ContextraError = err.clone().into();
-
-    match contextra_err {
-        ContextraError::InvalidInput(msg) => {
-            assert!(msg.contains("Graph"));
-            assert!(msg.contains("zero propensity"));
-        }
-        other => panic!("Expected InvalidInput, got {:?}", other),
-    }
-}
-
 #[test]
 fn test_bandit_default_flip_gate_decision_boundaries() {
     let gate = DefaultBanditFlipGate;
