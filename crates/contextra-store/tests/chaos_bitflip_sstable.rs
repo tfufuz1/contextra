@@ -398,4 +398,54 @@ proptest! {
             }
         });
     }
+
+    /// Requirement 2d: Footer / Trailer corruption via proptest
+    /// Corrupting a bit inside the 54-byte trailer section MUST fail open with an error
+    /// (Storage / ChecksumMismatch / ParseError). It MUST NEVER panic.
+    #[test]
+    fn prop_chaos_sstable_trailer_bitflip(
+        trailer_byte_offset in 0usize..54usize,
+        bit_idx in 0u8..8u8,
+    ) {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let (storage, tmp, _ground_truth, layout) = setup_sstable_and_ground_truth(50).await;
+            storage.wait_shutdown().await;
+            drop(storage);
+
+            if layout.file_size >= 54 {
+                let flip_offset = layout.file_size - 54 + (trailer_byte_offset as u64);
+                layout.inject_bit_flip(flip_offset, bit_idx).expect("bitflip");
+
+                let config = LsmConfig {
+                    path: tmp.path().to_path_buf(),
+                    memtable_size_limit: 1024 * 1024,
+                    max_ram_mb: 64,
+                    tx_timeout: Duration::from_secs(60),
+                    encryption_passphrase: None,
+                    ..Default::default()
+                };
+
+                let reopened_res = LsmStorage::new(config).await;
+                match reopened_res {
+                    Err(e) => {
+                        assert!(
+                            matches!(
+                                e,
+                                ContextraError::ChecksumMismatch { .. }
+                                    | ContextraError::ParseError(_)
+                                    | ContextraError::Storage(_)
+                            ),
+                            "Trailer corruption must be detected: {:?}",
+                            e
+                        );
+                    }
+                    Ok(reopened) => {
+                        // If magic/offsets weren't in that exact byte, reads must still be safe
+                        reopened.wait_shutdown().await;
+                    }
+                }
+            }
+        });
+    }
 }

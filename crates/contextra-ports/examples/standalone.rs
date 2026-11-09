@@ -1,3 +1,8 @@
+#![allow(
+    clippy::disallowed_types,
+    clippy::indexing_slicing,
+    clippy::needless_question_mark
+)]
 //! Standalone example demonstrating direct usage of `contextra-ports` contracts (Contract M10).
 
 use contextra_ports::env::prelude::*;

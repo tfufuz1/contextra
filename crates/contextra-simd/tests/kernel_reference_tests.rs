@@ -229,14 +229,25 @@ fn test_unaligned_slices_all_lengths() {
                 // f32_bytes
                 let euc_b_d = dispatcher.euclidean_distance_f32_bytes(a, b_bytes).unwrap();
                 let euc_b_s = euclidean_distance_f32_bytes_scalar(a, b_bytes);
-                assert!((euc_b_d - euc_b_s).abs() <= 1e-3 * euc_b_s.abs().max(euc_b_d.abs()).max(1.0));
+                assert!(
+                    (euc_b_d - euc_b_s).abs() <= 1e-3 * euc_b_s.abs().max(euc_b_d.abs()).max(1.0)
+                );
 
                 // u8
                 let u_a = &u8_buf_a[offset..offset + len];
                 let u_b = &u8_buf_b[offset + 2..offset + 2 + len];
-                assert_eq!(dispatcher.dot_product_u8(u_a, u_b).unwrap(), dot_product_u8_scalar(u_a, u_b));
-                assert_eq!(dispatcher.euclidean_distance_sq_u8(u_a, u_b).unwrap(), euclidean_distance_sq_u8_scalar(u_a, u_b));
-                assert_eq!(dispatcher.cosine_similarity_parts_u8(u_a, u_b).unwrap(), cosine_similarity_parts_u8_scalar(u_a, u_b));
+                assert_eq!(
+                    dispatcher.dot_product_u8(u_a, u_b).unwrap(),
+                    dot_product_u8_scalar(u_a, u_b)
+                );
+                assert_eq!(
+                    dispatcher.euclidean_distance_sq_u8(u_a, u_b).unwrap(),
+                    euclidean_distance_sq_u8_scalar(u_a, u_b)
+                );
+                assert_eq!(
+                    dispatcher.cosine_similarity_parts_u8(u_a, u_b).unwrap(),
+                    cosine_similarity_parts_u8_scalar(u_a, u_b)
+                );
             }
         }
     });
@@ -246,11 +257,7 @@ fn test_unaligned_slices_all_lengths() {
 // ANCHOR[contextra-simd:TEST-PROPTEST-FIXED-SEED-F32]
 // Proptest mit festem deterministischem Seed fuer Zufallseingaben ueber variable Laengen.
 fn test_proptest_fixed_seed_f32() {
-    let fixed_seeds = [
-        [0x42; 32],
-        [0x99; 32],
-        [0xAA; 32],
-    ];
+    let fixed_seeds = [[0x42; 32], [0x99; 32], [0xAA; 32]];
 
     for seed in fixed_seeds {
         let config = Config {
@@ -258,7 +265,10 @@ fn test_proptest_fixed_seed_f32() {
             failure_persistence: Some(Box::new(FileFailurePersistence::Off)),
             ..Config::default()
         };
-        let mut runner = TestRunner::new_with_rng(config, TestRng::from_seed(proptest::test_runner::RngAlgorithm::ChaCha, &seed));
+        let mut runner = TestRunner::new_with_rng(
+            config,
+            TestRng::from_seed(proptest::test_runner::RngAlgorithm::ChaCha, &seed),
+        );
 
         let strategy = (0..=65usize).prop_flat_map(|len| {
             (
@@ -304,11 +314,7 @@ fn test_proptest_fixed_seed_f32() {
 // ANCHOR[contextra-simd:TEST-PROPTEST-FIXED-SEED-U8]
 // Proptest mit festem deterministischem Seed fuer u8-Zufallseingaben.
 fn test_proptest_fixed_seed_u8() {
-    let fixed_seeds = [
-        [0x17; 32],
-        [0x55; 32],
-        [0xFE; 32],
-    ];
+    let fixed_seeds = [[0x17; 32], [0x55; 32], [0xFE; 32]];
 
     for seed in fixed_seeds {
         let config = Config {
@@ -316,7 +322,10 @@ fn test_proptest_fixed_seed_u8() {
             failure_persistence: Some(Box::new(FileFailurePersistence::Off)),
             ..Config::default()
         };
-        let mut runner = TestRunner::new_with_rng(config, TestRng::from_seed(proptest::test_runner::RngAlgorithm::ChaCha, &seed));
+        let mut runner = TestRunner::new_with_rng(
+            config,
+            TestRng::from_seed(proptest::test_runner::RngAlgorithm::ChaCha, &seed),
+        );
 
         let strategy = (0..=65usize).prop_flat_map(|len| {
             (

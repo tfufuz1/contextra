@@ -138,6 +138,11 @@ pub struct KvPrefixHit {
 /// Dieser Trait ist durch synchrone Schnittstellen vtable-kompatibel (dyn-safe).
 pub trait KvPrefixStore: Send + Sync + 'static {
     /// Returns the longest exact matching prefix in blocks for the prompt tokens, if any.
+    ///
+    /// # Fehler
+    /// Keine; liefert `None` falls kein übereinstimmendes Präfix gefunden wurde.
+    /// # Crash
+    /// Reiner Lesevorgang aus dem Speicher oder Cache ohne persistente Mutation.
     fn lookup(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit>;
 
     /// Inserts KV blocks for a given token prefix into the store.
@@ -151,6 +156,11 @@ pub trait KvPrefixStore: Send + Sync + 'static {
 
     /// Evicts KV prefix entries for the given tenant and prefix key.
     /// Returns the number of blocks evicted.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O- oder Freigabefehlern.
+    /// # Crash
+    /// Idempotente Eviction; Teilausfall hinterlässt entweder alten oder eviktierten Zustand.
     fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64, ContextraError>;
 }
 

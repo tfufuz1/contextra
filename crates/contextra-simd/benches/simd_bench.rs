@@ -50,7 +50,8 @@ fn bench_simd_distances(c: &mut Criterion) {
             BenchmarkId::new("euclidean_f32/own_simd", dim),
             &dim,
             |b_bench, _| {
-                b_bench.iter(|| euclidean_distance(black_box(&a), black_box(&b)).expect("valid bench"))
+                b_bench
+                    .iter(|| euclidean_distance(black_box(&a), black_box(&b)).expect("valid bench"))
             },
         );
 
@@ -70,9 +71,7 @@ fn bench_simd_distances(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("euclidean_f32/scalar_autovec", dim),
             &dim,
-            |b_bench, _| {
-                b_bench.iter(|| euclidean_distance_scalar(black_box(&a), black_box(&b)))
-            },
+            |b_bench, _| b_bench.iter(|| euclidean_distance_scalar(black_box(&a), black_box(&b))),
         );
 
         // --- Cosine ---
@@ -99,9 +98,7 @@ fn bench_simd_distances(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("cosine_f32/scalar_autovec", dim),
             &dim,
-            |b_bench, _| {
-                b_bench.iter(|| cosine_distance_scalar(black_box(&a), black_box(&b)))
-            },
+            |b_bench, _| b_bench.iter(|| cosine_distance_scalar(black_box(&a), black_box(&b))),
         );
 
         // --- Dot Product ---
@@ -109,7 +106,9 @@ fn bench_simd_distances(c: &mut Criterion) {
             BenchmarkId::new("dot_product_f32/own_simd", dim),
             &dim,
             |b_bench, _| {
-                b_bench.iter(|| dot_product_distance(black_box(&a), black_box(&b)).expect("valid bench"))
+                b_bench.iter(|| {
+                    dot_product_distance(black_box(&a), black_box(&b)).expect("valid bench")
+                })
             },
         );
 
@@ -128,9 +127,7 @@ fn bench_simd_distances(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("dot_product_f32/scalar_autovec", dim),
             &dim,
-            |b_bench, _| {
-                b_bench.iter(|| dot_product_scalar(black_box(&a), black_box(&b)))
-            },
+            |b_bench, _| b_bench.iter(|| dot_product_scalar(black_box(&a), black_box(&b))),
         );
 
         // --- Zero-Copy Byte and u8 Metrics (Own Implementation) ---
@@ -139,7 +136,8 @@ fn bench_simd_distances(c: &mut Criterion) {
             &dim,
             |b_bench, _| {
                 b_bench.iter(|| {
-                    cosine_distance_f32_bytes(black_box(&a), black_box(&b_bytes)).expect("valid bench")
+                    cosine_distance_f32_bytes(black_box(&a), black_box(&b_bytes))
+                        .expect("valid bench")
                 })
             },
         );
@@ -149,7 +147,8 @@ fn bench_simd_distances(c: &mut Criterion) {
             &dim,
             |b_bench, _| {
                 b_bench.iter(|| {
-                    euclidean_distance_f32_bytes(black_box(&a), black_box(&b_bytes)).expect("valid bench")
+                    euclidean_distance_f32_bytes(black_box(&a), black_box(&b_bytes))
+                        .expect("valid bench")
                 })
             },
         );
@@ -159,7 +158,8 @@ fn bench_simd_distances(c: &mut Criterion) {
             &dim,
             |b_bench, _| {
                 b_bench.iter(|| {
-                    dot_product_distance_f32_bytes(black_box(&a), black_box(&b_bytes)).expect("valid bench")
+                    dot_product_distance_f32_bytes(black_box(&a), black_box(&b_bytes))
+                        .expect("valid bench")
                 })
             },
         );
@@ -168,7 +168,9 @@ fn bench_simd_distances(c: &mut Criterion) {
             BenchmarkId::new("dot_product_u8/own_simd", dim),
             &dim,
             |b_bench, _| {
-                b_bench.iter(|| dot_product_u8(black_box(&u8_a), black_box(&u8_b)).expect("valid bench"))
+                b_bench.iter(|| {
+                    dot_product_u8(black_box(&u8_a), black_box(&u8_b)).expect("valid bench")
+                })
             },
         );
 
@@ -177,7 +179,8 @@ fn bench_simd_distances(c: &mut Criterion) {
             &dim,
             |b_bench, _| {
                 b_bench.iter(|| {
-                    euclidean_distance_sq_u8(black_box(&u8_a), black_box(&u8_b)).expect("valid bench")
+                    euclidean_distance_sq_u8(black_box(&u8_a), black_box(&u8_b))
+                        .expect("valid bench")
                 })
             },
         );
