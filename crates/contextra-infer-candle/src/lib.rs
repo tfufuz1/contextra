@@ -1,30 +1,35 @@
 #![deny(dead_code)]
 // FILE-CONTEXT
-// STAND: 2026-09-16T16:13:00Z (SESSION: afafdd44)
+// STAND: 2026-11-09T00:00:00Z
 // ZWECK: Crate root for contextra-infer-candle native GGUF inference backend.
-// INVARIANTEN: Zero unsafe code in crate; re-exports core inference types and gasp validator.
+// INVARIANTEN: Zero unsafe code in crate; pure-Rust fallback without candle; fail-closed.
 
-//! `contextra-infer-candle`: Native Candle GGUF ML Inferenz-Backend für Contextra.
+//! `contextra-infer-candle`: Native Candle GGUF ML Inferenz-Baustein für Contextra (Klasse A).
 //!
-//! # Architektur-Strategie
-//!
-//! **Strategie B** (mistral.rs-artiger Ansatz):
-//! Dieses Crate bietet eine schnell deploybare, native Inferenz-Engine hinter den bestehenden
-//! Traits (`LlmTextGenerator`, `EmbeddingProvider`, `TextEmbeddingEngine`).
-//! Es kapselt Modell-Laden und Tensor-Inferenz ohne direkten Attention-Level- oder
-//! RoPE-Shift-Zugriff auf KV-Cache-Ebene.
-//!
-//! *Hinweis*: **Strategie A** (expliziter RoPE-Shift- und KV-Cache-Bridge-Zugriff für mandantenisolierte
-//! Cache-Projektionen) ist ein separates, zukünftiges Vorhaben und NICHT Gegenstand dieser Erstfassung.
+//! # Architektur
+//! - **Pure Rust Standard**: Ohne aktiviertes Feature `candle` baut dieser Crate autark
+//!   mit lokalen Traits (`Embedder`, `TextGenerator`) und Fake-Backends.
+//! - **GGUF-Laden**: Robuster, defensiver GGUF-Header- und Metadaten-Parser mit SHA-256 Validierung.
+//! - **Optionale Hardwarebeschleunigung**: Unterstützt CUDA und Metal via Feature-Flags.
 
 #![forbid(unsafe_code)]
 
-// REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
+pub mod error;
+pub mod fake;
+pub mod gguf_loader;
+pub mod traits;
+
+pub use error::{Error, Result};
+pub use fake::{FakeEmbedder, FakeTextGenerator};
+pub use gguf_loader::{
+    parse_gguf_metadata, parse_gguf_metadata_with_checksum, GgufMetadata, MAX_GGUF_METADATA_KVS,
+    MAX_GGUF_STRING_LEN, MAX_GGUF_TENSORS,
+};
+pub use traits::{Embedder, GenerationConfig, KvStateSink, KvStateSource, TextGenerator};
 
 pub mod attention_exporter;
 pub mod embedding;
 pub mod embedding_provider;
-pub mod gguf_loader;
 pub mod inference;
 pub mod model_registry;
 
