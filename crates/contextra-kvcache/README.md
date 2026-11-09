@@ -1,41 +1,30 @@
 # contextra-kvcache
 
-> Klasse `A` (Stand-alone Baukasten) · Unsafe: **nein** (`#![forbid(unsafe_code)]`) · Rolle: Verschlüsselter, mandantenisolierter KV-Prefix-Cache für LLM-Inferenzzustände (Radix-Baum, Attention-Eviction, KIVI-Quantisierung).
+## Zweck
+Prefix-Cache-Verwaltung für KV-Segmente; keine Anbindung an eine konkrete Inferenz-Runtime im Repo.
+`contextra-kvcache` stellt deterministische Datenstrukturen (Radix-Baum, Segment-Store, LRU-/Attention-Eviction, KIVI-Quantisierung) zur Verwaltung und Wiederverwendung von Key-Value-Cache-Segmenten bei Prefill- und Decode-Workflows bereit.
 
-`contextra-kvcache` ist ein eigenständiger, hochperformanter Baukasten für Key-Value-Cache-Management bei LLM-Inferenz und Agentic RAG Workloads. Er beschleunigt Prefill-Phasen durch deterministisches Teilen von Prompt-Präfixen und bietet vollständige Mandanten-Isolierung, neutrale Segment-Schlüsselzerstörung sowie optionales verschlüsseltes Tiering.
+## Reifegrad
+`beta` (Eigenständiger Baustein für KV-Prefix-Management; als `frozen`-Kandidat für Workspace-Default-Members gemeldet, da die Entflechtung von `crypto-compat` upstream in Vorbereitung ist).
 
-## 1. Zweck und Baukasten-Prinzip (Klasse A)
+## Interne Abhängigkeiten
+- `contextra-types` (optional über Feature `ports-compat`)
+- `contextra-ports` (optional über Feature `ports-compat`)
+- `contextra-crypto` (optional über Feature `crypto-compat` / `kv-encryption`)
 
-- **Vollständig autark:** Keine zwingenden internen Abhängigkeiten. Baut und testet mit `--no-default-features` komplett isoliert.
-- **Copy-Paste-Readiness:** Kann via `python3 tools/export_crate.py contextra-kvcache` als eigenständige Library exportiert werden.
-- **Keine juristische Löschkettenlogik (SPEC §6):** Bereinigung erfolgt ausschließlich als neutrale Invalidation, Verdrängung (Eviction) oder kryptografische Schlüsselzerstörung (`SegmentKey::destroy()`). Löschbeweise und DSGVO-Orchestrierung liegen in `contextra-erasure-adapters`.
-- **Eigene Trait-Schnittstelle:** Segmentverschlüsselung ist über den lokalen Trait `SegmentCipher` abstrahiert (inklusive `PlaintextSegmentCipher`).
+Hinweis: Es bestehen keine Abhängigkeiten oder Importpfade zu Inferenz-Runtimes (`contextra-infer-*`) im Repository [V].
 
-## 2. Abhängigkeiten
-
-### Externe Crates
-- `thiserror`, `tracing`, `parking_lot`, `tokio` (minimal), `serde`, `bitvec`, `half`, `criterion` (dev-dep).
-
-### Übergangs-Features (Transitional / Compat)
-- `ports-compat`: Optionale Konvertierung zu `contextra-types` und Implementierung von Ports aus `contextra-ports`.
-- `crypto-compat`: Optionale Anbindung an `contextra-crypto` für `SegmentCipher`.
-
-## 3. Features
-
-- `default = ["std", "ports-compat", "crypto-compat"]`
-- `kv-encryption`: Aktiviert kryptografische Bindung und Segmentverschlüsselung.
+## Features
+- `default = ["std", "ports-compat", "crypto-compat", "kv-encryption"]`
+- `std`: Standardbibliotheksunterstützung.
+- `ports-compat`: Anbindung an `contextra-ports` und `contextra-types`.
+- `crypto-compat`: Optionale Anbindung an `contextra-crypto` für Segmentverschlüsselung.
+- `kv-encryption`: Kryptografisches Sealing und Segmentverschlüsselung.
 - `content-addressed-kv-cache`: Inhaltsadressierte KV-Blöcke über Hash-Präfixe.
-- `kivi-quantization` / `kvcache-kivi-quant`: 2-Bit/4-Bit KIVI-Quantisierung für KV-Tensoren.
-- `kvcache-attention-eviction`: Attention-basierte Verdrängungspolicies (Sieve, LRU).
+- `kvcache-attention-eviction`: Attention-basierte Verdrängungsstrategien.
+- `kivi-quantization` / `kvcache-kivi-quant`: KIVI-Quantisierung für KV-Tensoren.
 
-## 4. Garantien & Invarianten
-
-1. **Mandantentrennung (INV-KV-1):** Jede Operation wird strikt über `TenantId` isoliert. Kein mandantenübergreifendes Sharing.
-2. **Krypto-Invalidierung (INV-KV-2):** `SegmentKey::destroy()` überschreibt das Schlüsselmaterial sicher (`zeroize`).
-3. **Zero-Panic (INV-KV-3):** Kein `unwrap()` / `expect()` im Produktivcode; alle Fehler sind als `KvCacheError` typisiert.
-4. **Speichersicherheit:** `#![forbid(unsafe_code)]` garantiert vollständige Speichersicherheit.
-
-## 5. Minimalbeispiel
+## Minimalbeispiel
 
 ```rust
 use contextra_kvcache::{KvSegment, PrefixRadixTree, TenantIsolatedKvStore};
@@ -56,3 +45,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Entnahme-Rezept
+Zur Verwendung als eigenständiger Baustein in externen Projekten:
+1. Verzeichnis `crates/contextra-kvcache` kopieren.
+2. Crate-Abhängigkeiten `contextra-types`, `contextra-ports` und `contextra-crypto` durch eigene Typdefinitionen ersetzen oder über die Features konfigurieren.
+3. `Cargo.toml` anpassen und Features wie gewünscht aktivieren.
+
+## Bekannte Grenzen
+- **Keine Inferenz-Runtime:** Enthält keine Anbindung an LLM-Laufzeitumgebungen wie Candle, ONNX Runtime oder Ollama.
+- **Kopplung an Krypto-Schicht:** Die Segment-Verschlüsselung stützt sich in den Standard-Features auf `contextra-crypto`.
+- **Async Runtime:** Benötigt für asynchrone Speicher-Adapter (`StorageEngineKvBridge`) eine Tokio-Runtime-Umgebung.

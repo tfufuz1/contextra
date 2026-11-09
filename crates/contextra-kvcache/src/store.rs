@@ -1298,23 +1298,23 @@ mod tests {
         let clock = SystemClock::new();
 
         // 1. Initialer Scan auf leerem Store: Positivkontrolle besteht, Restmenge ist 0
-        let witness = scanner
+        let scan_result = scanner
             .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
             .expect("Scanner must succeed on empty store");
-        assert_eq!(witness.witness_layer(), &WitnessLayer::KvCacheSegments);
-        assert_eq!(witness.scanned(), 1); // Positivkontrolle registriert
-        assert_eq!(witness.remaining(), 0);
+        assert_eq!(scan_result.witness_layer(), &WitnessLayer::KvCacheSegments);
+        assert_eq!(scan_result.scanned(), 1); // Positivkontrolle registriert
+        assert_eq!(scan_result.remaining(), 0);
 
         // 2. Segmente einfügen
         store.insert_segment(tenant, KvSegment::new(tenant, 10, vec![1, 2, 3, 4]));
         store.insert_segment(tenant, KvSegment::new(tenant, 20, vec![5, 6, 7, 8, 9]));
 
         // 3. Scan mit Restmenge (2 Einheiten)
-        let witness_with_data = scanner
+        let scan_with_data = scanner
             .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
             .expect("Scanner must succeed with data");
-        assert_eq!(witness_with_data.remaining(), 2);
-        assert_eq!(witness_with_data.scanned(), 3); // 1 Canary + 2 Segmente
+        assert_eq!(scan_with_data.remaining(), 2);
+        assert_eq!(scan_with_data.scanned(), 3); // 1 Canary + 2 Segmente
 
         // 4. Pruning ausführen
         let purge_stats = pruner.purge(&ctx, &target).expect("Pruner must succeed");
@@ -1323,9 +1323,9 @@ mod tests {
         assert_eq!(store.get_tenant_segment_len(tenant), 0);
 
         // 5. Verifikation nach Bereinigung: Restmenge wieder 0
-        let witness_after = scanner
+        let scan_after = scanner
             .scan(&ctx, target, ScanTechnique::Structural, &clock)
             .expect("Scanner must succeed after purge");
-        assert_eq!(witness_after.remaining(), 0);
+        assert_eq!(scan_after.remaining(), 0);
     }
 }

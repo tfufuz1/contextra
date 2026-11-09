@@ -20,6 +20,11 @@ pub trait SegmentSynthesizer: Send + Sync {
         segment_texts: &'a [&'a str],
     ) -> BoxFuture<'a, Result<String>>;
     /// Gibt die Modell-ID des Synthesizers zurück.
+    ///
+    /// # Fehler
+    /// Keine; statische Identifikator-Abfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Mutation.
     fn model_id(&self) -> &str;
 }
 
@@ -68,32 +73,77 @@ pub trait TextIndex: Send + Sync + 'static {
     }
 
     /// Inserts or updates a document in the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O-, Tokenisierungs- oder Speicherfehlern.
+    /// # Crash
+    /// Transaktional gepuffert bis zum Commit; vor Commit kein persistenter Schaden.
     fn insert(&self, tx: TxId, id: DocId, text: &str) -> impl Future<Output = Result<()>> + Send;
 
     /// Deletes a document from the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Transaktions- oder I/O-Fehlern.
+    /// # Crash
+    /// Transaktional isoliert; bei Crash vor Commit bleibt der Vorzustand erhalten.
     fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
 
     /// Commits a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei WAL-, Flush- oder Fsync-Fehlern.
+    /// # Crash
+    /// WAL-first; Commit ist nach erfolgreichem Fsync dauerhaft wiederherstellbar.
     fn commit(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Transaktionsverwaltungsproblemen.
+    /// # Crash
+    /// Verwirft uncommittete Schreibpuffer im RAM; Zustand bleibt konsistent.
     fn rollback(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back the entire index state to a specific transaction ID.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` falls der Zielzustand nicht auffindbar oder korrupt ist.
+    /// # Crash
+    /// Atomarer Rollback; bei Unterbrechung stellt Recovery den sauberen Zustand her.
     fn rollback_to_tx(&self, tx_id: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Returns the last transaction ID processed by the index.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei Lesefehlern des Manifests/Indexheaders.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn last_tx_id(&self) -> impl Future<Output = Result<TxId>> + Send;
 
     /// Returns the number of documents in the index.
+    ///
+    /// # Fehler
+    /// Keine; garantiert panikfrei.
+    /// # Crash
+    /// Reiner Statusabruf aus Header oder RAM-Zustand.
     fn len(&self) -> impl Future<Output = usize> + Send;
 
     /// Returns true if the index is empty.
+    ///
+    /// # Fehler
+    /// Keine; delegiert panikfrei an `len`.
+    /// # Crash
+    /// Reiner Statusabruf ohne Seiteneffekte.
     fn is_empty(&self) -> impl Future<Output = bool> + Send {
         async { self.len().await == 0 }
     }
 
     /// Returns index statistics.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` falls Statistiken nicht aggregiert werden können.
+    /// # Crash
+    /// Reiner Lesevorgang ohne Zustandsänderung.
     fn stats(&self) -> impl Future<Output = Result<TextIndexStats>> + Send;
 }
 
