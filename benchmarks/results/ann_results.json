@@ -1,4 +1,6 @@
 {
+  "_status": "historical",
+  "_historical_note": "Historischer Lauf (Stand vor Reduktion, E12 / WP-110)",
   "dataset_name": "synthetic-1k-128d",
   "n_vectors": 1000,
   "dimension": 128,

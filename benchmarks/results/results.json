@@ -1,9 +1,11 @@
 {
+  "_status": "historical",
+  "_historical_note": "Historischer Lauf (Stand vor Reduktion, E12 / WP-110)",
   "timestamp": "2026-09-03T10:00:00Z",
   "corpus_size_docs": 50,
   "total_test_queries": 10,
   "scenario_a_context_prefix": {
-    "scenario_name": "Baseline vs. Kontext-Präfix",
+    "scenario_name": "Baseline vs. Kontext-Pr\u00e4fix",
     "baseline_metrics": {
       "total_queries": 5,
       "recall_at_1": 0.8,

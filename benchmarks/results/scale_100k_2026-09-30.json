@@ -1,5 +1,7 @@
 {
-  "disclaimer": "Hinweis: Diese Zahlen messen nur Speicher- und Indexlatenz bzw. Retrieval-Genauigkeit auf dem genannten Testkorpus. Embedding-Inferenz addiert 10 bis 500 ms. Der Testkorpus umfasst 100000 Chunks; die Zahlen sind nicht auf größere Bestände extrapolierbar.",
+  "_status": "historical",
+  "_historical_note": "Historischer Lauf (Stand vor Reduktion, E12 / WP-110)",
+  "disclaimer": "Hinweis: Diese Zahlen messen nur Speicher- und Indexlatenz bzw. Retrieval-Genauigkeit auf dem genannten Testkorpus. Embedding-Inferenz addiert 10 bis 500 ms. Der Testkorpus umfasst 100000 Chunks; die Zahlen sind nicht auf gr\u00f6\u00dfere Best\u00e4nde extrapolierbar.",
   "total_docs_requested": 100000,
   "step_size": 10000,
   "dimension": 128,
