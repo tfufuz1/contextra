@@ -1,31 +1,33 @@
-# P12 Offene Punkte & Fremdfehler
+# Offene Punkte & Fremdfehler (Paket P12)
 
 ## Fremdfehler (außerhalb BESITZ)
 
-1. **`contextra-graph` Kompilierungsfehler:**
-   - Datei: `crates/contextra-graph/src/lib.rs:37, 42`
-   - Fehler: `E0428: the name contract is defined multiple times`
-   - Sowie fehlende Imports / `E0433` (unresolved `contextra_types`, `contextra_ports`) in `csr/graph_index/`, `csr/graph_write/`, etc.
-   - Status: Fremdfehler, gemeldet für den Integrator.
+### CI: Format Check (cargo fmt --check)
+- **Fehler**: Workspace-weite Formatierungsfehler in `crates/contextra-store` und `crates/contextra-vector`.
+- **Status**: Fremdfehler. `cargo fmt --check -p contextra` ist vollständig grün. Änderungen an fremden Crates sind durch Global Rule 2 verboten.
 
-2. **`contextra-vector` Kompilierungsfehler:**
-   - Datei: `crates/contextra-vector/src/hnsw/deletion.rs:310`, `types.rs:597`, etc.
-   - Fehler: `E0592: duplicate definitions with name remove / rebuild_sync`, `E0599: no method named zeroize`, `E0609: no field kernel on type HnswColdCore`, `E0599: try_new_with_rng_and_kernel`.
-   - Status: Fremdfehler, gemeldet für den Integrator.
+### CI: Coverage Gate / proof-tests / Compile Check (cargo check / cargo test)
+- **Fehler 1**: `error[E0609]: no field 'kernel' on type 'HnswColdCore'` in `crates/contextra-vector/src/hnsw/core_rebuild.rs:97, 144, 156`.
+- **Fehler 2**: `error[E0599]: no function or associated item named 'try_new_with_rng_and_kernel' found for struct 'GenericHnswIndex'` in `crates/contextra-vector/src/hnsw/types.rs:334`.
+- **Fehler 3**: `error[E0592]: duplicate definitions with name 'now_unix_ms'` in `crates/contextra-crypto`.
+- **Fehler 4**: `error: package(s) 'xtask' not found in workspace` / `manifest path 'xtask/Cargo.toml' does not exist`. Betrifft Workflows `check`, `FlatBuffers Schema Drift Gate`, `Capability Marker Drift Gate`, `Check Duplicate Symbols Cross File Gate`, `Ring & Safety Checks`.
+- **Status**: Alle Fehler liegen in fremden Crates (`contextra-vector`, `contextra-crypto`, `xtask`). Die Fassade `contextra` kompiliert fehlerfrei (`cargo check -p contextra` grün, sobald Abhängigkeiten bauen).
 
-3. **`contextra-crypto` Kompilierungsfehler:**
-   - Datei: `crates/contextra-crypto/src/secret.rs:94, 105`
-   - Fehler: unexpected `cfg` condition value `serde`.
-   - Status: Fremdfehler, gemeldet für den Integrator.
+### CI: Dependency Policy Gate / cargo deny check
+- **Fehler**: Sicherheitswarnungen in transitive Abhängigkeiten fremder Crates:
+  - `lopdf` (RUSTSEC-2024-0435 / RUSTSEC-2024-0436) - stack overflow in nested PDF
+  - `lru` (RUSTSEC-2026-0001) - panic safety
+  - `tokio` (RUSTSEC-2025-0009) - AsyncFd I/O safety
+  - `zip` (RUSTSEC-2025-0010 / RUSTSEC-2025-0011 / RUSTSEC-2025-0012)
+- **Status**: Fremdefehler in fremden Crates bzw. workspace-weiten Abhängigkeiten. `crates/contextra` verwendet keine dieser Crates direkt.
 
-## Workspace- und CI-Fremdfehler (Welle 1 / HEAD 65e1d68a5)
-- **CI: xtask nicht im Workspace**: Workflows (`check-compile`, `shell-commit-audit`, `check-ring-layering`, `check-marker-drift`, `check-fbs-drift`, `check-duplicate-symbols-cross-file`) schlagen fehl, da `xtask/Cargo.toml` nicht mehr in `workspace.members` im Wurzel-`Cargo.toml` vorhanden ist (`package(s) xtask not found in workspace`). Wurzel-`Cargo.toml` und `.github/` liegen außerhalb BESITZ.
-- **CI: Cargo.lock --locked Desynchronisation**: Benchmarks und CI-Jobs mit `--locked` schlagen fehl mit `the lock file Cargo.lock needs to be updated but --locked was passed`. Wurzel-`Cargo.lock` darf laut globaler Regel 2 nicht modifiziert werden.
-- **CI: RustSec Security Advisories**: `cargo deny` schlägt fehl aufgrund von Sicherheitslücken in `wasmtime` (RUSTSEC-2026-0424) und `zip` (RUSTSEC-2026-0367, RUSTSEC-2026-0368, RUSTSEC-2026-0369, RUSTSEC-2026-0429), die von fremden Crates (`contextra-sandbox`, `contextra-ingest`, `contextra-infer-candle`) transitiv bezogen werden.
-- **CI: Kompilierungsfehler in Fremd-Crates**:
-  - `contextra-crypto`: E0609 (`store.rs`), E0308 (`segment.rs`)
-  - `contextra-graph`: E0433 (`use of unresolved module contextra_ports / contextra_types`)
-  - `contextra-vector`: E0592 (`remove`, `rebuild_sync`), E0599 (`zeroize`), E0609 (`kernel`)
-  - `contextra-text`: Clippy-Lints (P28 `HashMap`/`HashSet`, indexing/slicing, unnecessary_cast)
-- **CI: Production Unwrap Baseline Überschreitung**:
-  - Baseline in `.github/unwrap_baseline.txt` steht auf 1197, der Workspace-Gesamtwert in fremden Crates stieg auf über 1300. `crates/contextra/src` enthält 0 `unwrap()` und 0 `expect()`.
+### CI: Production Unwrap Counter Gate
+- **Fehler**: Gate scheitert, da workspace-weit 1333 `unwrap()` / `expect()` gezählt werden (Schwellenwert 1197).
+- **Status**: Fremdefehler. In `crates/contextra/src/` befinden sich 0 `unwrap()` und 0 `expect()`.
+
+### CI: Gate G1 (tools/gate_dependencies.py)
+- **Fehler**: 40 Verstöße in fremden Crates (`contextra-agent`, `contextra-crypto`, `contextra-engine`, `contextra-vector` etc.).
+- **Status**: Fremdfehler. Für `contextra` werden 0 Verstöße gemeldet.
+
+## Unklares / [H]-Punkte
+- Keine offenen Unklarheiten bezüglich der Fassade `contextra`.

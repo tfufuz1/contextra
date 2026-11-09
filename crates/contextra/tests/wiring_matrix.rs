@@ -74,7 +74,8 @@ async fn second_open_same_directory_rejected() -> Result<(), Box<dyn std::error:
 // ANCHOR[contextra:TEST-WIR-003]
 // Stellt sicher, dass das Anfordern des Compliance-Profils lizenzfrei erfolgreich initialisiert werden kann (direkter Durchlauf).
 #[tokio::test]
-async fn open_compliance_profile_succeeds_without_license() -> Result<(), Box<dyn std::error::Error>> {
+async fn open_compliance_profile_succeeds_without_license() -> Result<(), Box<dyn std::error::Error>>
+{
     let tmp = TempDir::new()?;
 
     // Nach Entfernen des Lizenz-Gates muss das Compliance-Profil ohne Lizenzschlüssel erfolgreich bauen

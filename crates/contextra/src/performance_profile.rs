@@ -27,10 +27,10 @@
 //! - **INV-PERF-PROFILE-2**: Lizenz-Erzwingung: Veraltet. Lizenzprüfung wurde entfernt,
 //!   alle Profile sind lizenzfrei nutzbar.
 
-pub use contextra_ports::license::VectorDeleteMode;
 use contextra_ports::license::FeatureRing;
 #[allow(deprecated)]
 use contextra_ports::license::LicenseGate;
+pub use contextra_ports::license::VectorDeleteMode;
 use serde::{Deserialize, Serialize};
 
 /// Durability mode for WAL persistence and integrity checks.
@@ -206,14 +206,18 @@ mod tests {
     struct MockLicenseGate;
 
     impl LicenseGate for MockLicenseGate {
-        fn check_ring(&self, _ring: FeatureRing) -> Result<(), contextra_ports::license::LicenseError> {
+        fn check_ring(
+            &self,
+            _ring: FeatureRing,
+        ) -> Result<(), contextra_ports::license::LicenseError> {
             Ok(())
         }
 
         fn authorize(
             &self,
             ring: FeatureRing,
-        ) -> Result<contextra_ports::license::GateToken, contextra_ports::license::LicenseError> {
+        ) -> Result<contextra_ports::license::GateToken, contextra_ports::license::LicenseError>
+        {
             Ok(contextra_ports::license::GateToken::for_test(ring))
         }
     }
