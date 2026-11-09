@@ -7,13 +7,13 @@
 //! Prüft die End-to-End-Verdrahtung aller Subsysteme über die Fassade (Spec §20.2 / Regel R1):
 //! - Snapshot-Stabilität über Memtable-Flushes hinweg.
 //! - Verzeichnis-Sperren (`DirLock`): Schutz vor zweifachem Öffnen desselben Pfads.
-//! - Lizenzsicherung privilegierter Ringe ohne Gate.
+//! - Profil-Initialisierung ohne Lizenzbeschränkungen (direkter Durchlauf).
 //! - Weitergabe von Profil-Durability in die LSM-Konfiguration.
 //! - Crash-/Reopen-Persistenz geschriebener Datensätze.
 
 use contextra::performance_profile::DurabilityMode;
 use contextra::performance_profile::PerformanceProfile;
-use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
+use contextra::{builder, open, open_with_config, ContextraConfig};
 use tempfile::TempDir;
 
 // ANCHOR[contextra:TEST-WIR-001]
@@ -72,29 +72,19 @@ async fn second_open_same_directory_rejected() -> Result<(), Box<dyn std::error:
 }
 
 // ANCHOR[contextra:TEST-WIR-003]
-// Stellt sicher, dass das Anfordern des Compliance-Profils ohne Lizenzschlüssel mit PolicyViolation abgelehnt wird.
+// Stellt sicher, dass das Anfordern des Compliance-Profils lizenzfrei erfolgreich initialisiert werden kann (direkter Durchlauf).
 #[tokio::test]
-async fn open_without_gate_never_grants_sovereign() -> Result<(), Box<dyn std::error::Error>> {
+async fn open_compliance_profile_succeeds_without_license() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
 
-    // Requesting Compliance performance profile (which requires Sovereign ring) without attaching a valid signed license gate must fail
-    let res = builder(16)
+    // Nach Entfernen des Lizenz-Gates muss das Compliance-Profil ohne Lizenzschlüssel erfolgreich bauen
+    let db = builder(16)
         .with_storage_path(tmp.path())
         .with_performance_profile(PerformanceProfile::Compliance)
         .build()
-        .await;
+        .await?;
 
-    assert!(
-        res.is_err(),
-        "Compliance/Sovereign feature ring without signed license must be rejected"
-    );
-    if let Err(err) = res {
-        assert!(
-            matches!(err, ContextraError::PolicyViolation(_)),
-            "Expected PolicyViolation error, got: {:?}",
-            err
-        );
-    }
+    assert_eq!(db.len().await?, 0);
 
     Ok(())
 }

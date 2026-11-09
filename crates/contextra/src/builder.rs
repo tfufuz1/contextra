@@ -23,17 +23,16 @@
 //! - **Sichere Geheimnisverwaltung**: Passphrasen werden umgehend in [`Zeroizing<String>`] gekapselt,
 //!   sodass ihr Speicherbereich beim Verlassen des Gültigkeitsbereichs mit Nullen überschrieben wird.
 //!   Zudem wird in Debug-Ausgaben der Platzhalter `[REDACTED]` ausgegeben.
-//! - **Lizenzprüfung (Fail-Closed)**: Zugriffe auf erweiterte Ringe (z. B. Sovereign) werden über
-//!   ein [`LicenseGate`] vor dem Hochfahren autorisiert. Ungültige Lizenzen führen zum Abbruch.
+//! - **Lizenzprüfung**: Wurde vollständig entfernt. Die Instanziierung erfolgt lizenzfrei im direkten Durchlauf.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
-#[cfg(feature = "license")]
-use contextra_license::SignedLicenseGate;
-use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
+use contextra_ports::license::FeatureRing;
+#[allow(deprecated)]
+use contextra_ports::license::{LicenseGate, OpenFastGate};
 use contextra_types::error::ContextraError;
 use contextra_types::DistanceMetric;
 use zeroize::Zeroizing;
@@ -88,8 +87,6 @@ pub struct ContextraBuilder {
     encryption_error: Option<String>,
     explicit_user_config: bool,
     embedder: Option<Arc<dyn TextEmbeddingEngine>>,
-    license_gate: Arc<dyn LicenseGate>,
-    signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
 }
 
@@ -104,8 +101,6 @@ impl std::fmt::Debug for ContextraBuilder {
                 "embedder",
                 &self.embedder.as_ref().map(|_| "<dyn TextEmbeddingEngine>"),
             )
-            .field("license_gate", &"<dyn LicenseGate>")
-            .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
             .finish()
     }
@@ -120,8 +115,6 @@ impl Clone for ContextraBuilder {
             encryption_error: self.encryption_error.clone(),
             explicit_user_config: self.explicit_user_config,
             embedder: self.embedder.clone(),
-            license_gate: Arc::clone(&self.license_gate),
-            signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
         }
     }
@@ -136,7 +129,6 @@ impl ContextraBuilder {
     ///
     /// # Standardwerte
     /// - Speicherpfad: `./contextra_data`
-    /// - Lizenzgate: `OpenFastGate` (Entwicklungsmodus ohne Lizenzschlüssel)
     /// - Verschlüsselung: Uninitialisiert (wird bei `build` gewarnt oder auf unverschlüsselt gesetzt)
     pub fn new(dimension: usize) -> Self {
         Self {
@@ -149,8 +141,6 @@ impl ContextraBuilder {
             encryption_error: None,
             explicit_user_config: false,
             embedder: None,
-            license_gate: Arc::new(OpenFastGate),
-            signed_license_error: None,
             performance_profile: None,
         }
     }
@@ -251,41 +241,11 @@ impl ContextraBuilder {
 
     // ANCHOR[contextra:BLD-014]
     /// Injiziert ein beliebiges Lizenzgate ([`LicenseGate`]) zur Ring-Autorisierung.
-    pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {
-        self.license_gate = gate;
-        self.signed_license_error = None;
-        self
-    }
-
-    // ANCHOR[contextra:BLD-015]
-    /// Konfiguriert ein kryptografisch signiertes Lizenzgate (Ed25519-Signaturprüfung).
     ///
-    /// Überprüft die Signatur des Lizenz-Payloads mit dem angegebenen öffentlichen Verifizierungsschlüssel.
-    /// Schlägt die Verifikation fehl, wird ein Fehler gespeichert, der beim Aufruf von `build()` fehlschlägt.
-    #[cfg(feature = "license")]
-    pub fn with_signed_license(
-        mut self,
-        payload_bytes: &[u8],
-        signature: &[u8; 64],
-        verifying_key_bytes: &[u8; 32],
-    ) -> Self {
-        match contextra_license::signed_gate::VerifyingKey::from_bytes(verifying_key_bytes) {
-            Ok(key) => {
-                match SignedLicenseGate::from_signed_payload(payload_bytes, signature, key) {
-                    Ok(gate) => {
-                        self.license_gate = Arc::new(gate);
-                        self.signed_license_error = None;
-                    }
-                    Err(e) => {
-                        self.signed_license_error = Some(e.to_string());
-                    }
-                }
-            }
-            Err(_) => {
-                self.signed_license_error =
-                    Some(contextra_ports::license::LicenseError::InvalidSignature.to_string());
-            }
-        }
+    /// # Veraltet
+    /// Die Lizenzüberprüfung wurde entfernt. Diese Methode ist ein No-op.
+    #[deprecated(note = "license gating was removed; no-op")]
+    pub fn with_license_gate(self, _gate: Arc<dyn LicenseGate>) -> Self {
         self
     }
 
@@ -325,25 +285,20 @@ impl ContextraBuilder {
     /// Baut und initialisiert die [`Contextra`]-Datenbankinstanz asynchron.
     ///
     /// # Ablauf von `build`:
-    /// 1. **Vorabprüfung**: Prüfe, ob frühere Fehler (z. B. leere Passphrase oder ungültige Signatur) vorliegen.
+    /// 1. **Vorabprüfung**: Prüfe, ob frühere Fehler (z. B. leere Passphrase) vorliegen.
     /// 2. **Verschlüsselung konfigurieren**: Passphrase aus dem `EncryptionMode` in die Laufzeitkonfiguration übertragen.
     /// 3. **Performance-Profil auflösen**: Falls ein Profil gesetzt ist, Durability- und Bereinigungsmodi übernehmen
     ///    oder bei Konflikten mit expliziten Parametern abbrechen.
-    /// 4. **Lizenz-Autorisierung**: Den angeforderten Ring (z. B. `Fast` oder `Sovereign`) über `license_gate.authorize` abfragen.
-    /// 5. **Instanziierung**: Aufruf von `Contextra::open_authorized` mit Pfad, Konfiguration und Token.
-    /// 6. **Embedder anhängen**: Falls ein benutzerdefinierter Text-Embedder hinterlegt wurde, diesen registrieren.
+    /// 4. **Instanziierung**: Aufruf von `Contextra::open_authorized` mit Pfad, Konfiguration und autorisiertem Token (direkter Durchlauf).
+    /// 5. **Embedder anhängen**: Falls ein benutzerdefinierter Text-Embedder hinterlegt wurde, diesen registrieren.
     ///
     /// # Fehlerfälle
     /// - [`ContextraError::InvalidInput`]: Leere Passphrase.
-    /// - [`ContextraError::PolicyViolation`]: Lizenz unzureichend oder Konflikt zwischen Profil und Konfiguration.
+    /// - [`ContextraError::PolicyViolation`]: Konflikt zwischen Profil und Konfiguration.
     /// - [`ContextraError::Io`]: Dateisystem- oder Speicherinitialisierungsfehler.
     pub async fn build(self) -> Result<Contextra, ContextraError> {
         if let Some(ref err_msg) = self.encryption_error {
             return Err(ContextraError::invalid_input(err_msg.clone()));
-        }
-
-        if let Some(ref err_msg) = self.signed_license_error {
-            return Err(ContextraError::PolicyViolation(err_msg.clone()));
         }
 
         let mut config_for_open = self.config.clone();
@@ -390,10 +345,9 @@ impl ContextraBuilder {
             FeatureRing::Fast
         };
 
-        let authorized_token = self
-            .license_gate
-            .authorize(requested_ring)
-            .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+        // Direkter Durchlauf ohne Lizenz-Gate: Alle Ringe sind lizenzfrei autorisiert.
+        let default_gate: Arc<dyn LicenseGate> = Arc::new(OpenFastGate);
+        let authorized_token = contextra_ports::license::GateToken::for_test(requested_ring);
 
         // ── Startsequenz B0–B9 (INV-BOOT-1, INV-WIRING-2, REQ-FAC-005) ─────────────
         crate::boot::execute_boot_sequence(
@@ -401,15 +355,13 @@ impl ContextraBuilder {
             config_for_open.dimension,
             self.encryption_mode.is_some(),
             self.encryption_error.is_some(),
-            requested_ring,
-            &self.license_gate,
         )?;
 
         let instance = Contextra::open_authorized(
             &self.storage_path,
             config_for_open,
             &authorized_token,
-            self.license_gate,
+            default_gate,
         )
         .await?;
 

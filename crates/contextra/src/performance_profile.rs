@@ -24,11 +24,13 @@
 //! - **INV-PERF-PROFILE-1**: Strikte Konsistenz: Volle Durability (`DurabilityMode::Full`) in Verbindung
 //!   mit aktiven Integritätsnachweisen verbietet asynchrone Vektor-Bereinigung (`VectorDeleteMode::BackgroundRepair`),
 //!   da Integritätsnachweise gewährleisten müssen, dass Vektoren synchron aus dem HNSW-Graphen getrennt wurden.
-//! - **INV-PERF-PROFILE-2**: Lizenz-Erzwingung: Profile mit erhöhtem Feature-Ring (wie `Sovereign` im Compliance-Profil)
-//!   dürfen nur instanziiert werden, wenn das hinterlegte [`LicenseGate`] die Berechtigung erteilt.
+//! - **INV-PERF-PROFILE-2**: Lizenz-Erzwingung: Veraltet. Lizenzprüfung wurde entfernt,
+//!   alle Profile sind lizenzfrei nutzbar.
 
 pub use contextra_ports::license::VectorDeleteMode;
-use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
+use contextra_ports::license::FeatureRing;
+#[allow(deprecated)]
+use contextra_ports::license::LicenseGate;
 use serde::{Deserialize, Serialize};
 
 /// Durability mode for WAL persistence and integrity checks.
@@ -128,8 +130,9 @@ pub enum PerformanceProfileError {
     Durability(#[from] DurabilityConfigError),
     #[error("DurabilityMode::Full combined with VectorDeleteMode::BackgroundRepair while integrity-proof is active breaks the integrity guarantee for the vector index")]
     DurabilityVectorMismatch,
+    #[deprecated(note = "license gating was removed; unused")]
     #[error("feature ring {0:?} requires a valid license: {1}")]
-    LicenseRequired(FeatureRing, LicenseError),
+    LicenseRequired(FeatureRing, contextra_ports::license::LicenseError),
 }
 
 impl PerformanceProfile {
@@ -168,13 +171,11 @@ impl ResolvedProfileConfig {
     // ANCHOR[contextra:PRF-014]
     /// Prüft den geforderten Feature-Ring gegen das übergebene [`LicenseGate`].
     ///
-    /// Der Basisring `FeatureRing::Fast` ist stets lizenzfrei erlaubt. Höhere Ringe
-    /// (wie `Sovereign`) fordern eine gültige Autorisierung an.
-    pub fn enforce_license(&self, gate: &dyn LicenseGate) -> Result<(), PerformanceProfileError> {
-        if self.feature_ring != FeatureRing::Fast {
-            gate.check_ring(self.feature_ring)
-                .map_err(|e| PerformanceProfileError::LicenseRequired(self.feature_ring, e))?;
-        }
+    /// # Veraltet
+    /// Lizenzprüfung wurde entfernt; diese Methode ist ein No-op und liefert stets `Ok(())`.
+    #[deprecated(note = "license gating was removed; no-op")]
+    pub fn enforce_license(&self, _gate: &dyn LicenseGate) -> Result<(), PerformanceProfileError> {
+        // Direkter Durchlauf: Alle Ringe sind lizenzfrei autorisiert.
         Ok(())
     }
 
@@ -202,24 +203,17 @@ impl ResolvedProfileConfig {
 mod tests {
     use super::*;
 
-    struct MockLicenseGate {
-        allowed_ring: FeatureRing,
-    }
+    struct MockLicenseGate;
 
     impl LicenseGate for MockLicenseGate {
-        fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
-            if ring <= self.allowed_ring {
-                Ok(())
-            } else {
-                Err(LicenseError::InsufficientRing)
-            }
+        fn check_ring(&self, _ring: FeatureRing) -> Result<(), contextra_ports::license::LicenseError> {
+            Ok(())
         }
 
         fn authorize(
             &self,
             ring: FeatureRing,
-        ) -> Result<contextra_ports::license::GateToken, LicenseError> {
-            self.check_ring(ring)?;
+        ) -> Result<contextra_ports::license::GateToken, contextra_ports::license::LicenseError> {
             Ok(contextra_ports::license::GateToken::for_test(ring))
         }
     }
@@ -264,40 +258,16 @@ mod tests {
     }
 
     #[test]
-    fn test_enforce_license_fast_ring_requires_no_gate() {
+    #[allow(deprecated)]
+    fn test_enforce_license_always_succeeds_as_noop() {
+        let comp = PerformanceProfile::Compliance.resolve();
         let bal = PerformanceProfile::Balanced.resolve();
-        let gate = MockLicenseGate {
-            allowed_ring: FeatureRing::Fast,
-        };
-        assert!(bal.enforce_license(&gate).is_ok());
-
         let bare = PerformanceProfile::BareMetal.resolve();
-        assert!(bare.enforce_license(&gate).is_ok());
-    }
+        let gate = MockLicenseGate;
 
-    #[test]
-    fn test_enforce_license_sovereign_ring_with_fast_gate_fails() {
-        let comp = PerformanceProfile::Compliance.resolve();
-        let gate = MockLicenseGate {
-            allowed_ring: FeatureRing::Fast,
-        };
-        let res = comp.enforce_license(&gate);
-        assert!(matches!(
-            res,
-            Err(PerformanceProfileError::LicenseRequired(
-                FeatureRing::Sovereign,
-                LicenseError::InsufficientRing
-            ))
-        ));
-    }
-
-    #[test]
-    fn test_enforce_license_sovereign_ring_with_sovereign_gate_succeeds() {
-        let comp = PerformanceProfile::Compliance.resolve();
-        let gate = MockLicenseGate {
-            allowed_ring: FeatureRing::Sovereign,
-        };
         assert!(comp.enforce_license(&gate).is_ok());
+        assert!(bal.enforce_license(&gate).is_ok());
+        assert!(bare.enforce_license(&gate).is_ok());
     }
 
     #[test]
@@ -315,6 +285,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_error_display_and_from_conversion() {
         let mismatch_err = PerformanceProfileError::DurabilityVectorMismatch;
         assert!(mismatch_err
@@ -323,7 +294,7 @@ mod tests {
 
         let lic_err = PerformanceProfileError::LicenseRequired(
             FeatureRing::Sovereign,
-            LicenseError::InsufficientRing,
+            contextra_ports::license::LicenseError::InsufficientRing,
         );
         assert!(lic_err.to_string().contains("requires a valid license"));
     }
