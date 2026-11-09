@@ -217,11 +217,8 @@ impl Wal {
     }
 
     #[cfg(any(test, feature = "test-hooks"))]
-    pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        match legacy_integrity_key() {
-            Ok(key) => key,
-            Err(e) => panic!("Legacy WAL key support is disabled or unavailable: {e}"),
-        }
+    pub fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
+        legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
