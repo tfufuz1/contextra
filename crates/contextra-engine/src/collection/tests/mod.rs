@@ -5,16 +5,11 @@
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
 
-// FILE-CONTEXT
-// ZWECK: Unit-Tests für Collection-CRUD, Indizierung, Repair und Grenzwerte.
-// INVARIANTEN: Keine Tautologien; Anti-Mirroring gewahrt; Unabhängig berechnete Erwartungswerte.
-// NICHT-OFFENSICHTLICH: Tests laufen isoliert in temporären Verzeichnissen.
-// STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
-
 mod fixtures;
 
 mod concurrency_tests;
-mod hybrid_search_tests;
+mod hybrid_search_part1_tests;
+mod hybrid_search_part2_tests;
 mod insert_tests;
 mod link_tests;
 mod misc_tests;
