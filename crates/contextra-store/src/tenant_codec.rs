@@ -85,12 +85,29 @@ impl TenantKeyCodec {
         let s = std::str::from_utf8(key).ok()?;
         let rest = s.strip_prefix("t:")?;
         let end = rest.find(':')?;
-        let id: u64 = rest[..end].parse().ok()?;
-        if id == 0 {
-            None
-        } else {
-            Some(TenantId(id))
+        let id_slice = rest.get(..end)?;
+        let id: u64 = id_slice.parse().ok()?;
+        TenantId::try_new(id).ok()
+    }
+
+    /// Dekodiert einen Chunk-Key vollständig in (TenantId, CollectionId, DocId).
+    /// Invariante: decode(encode(x)) == x (Injektivität).
+    pub fn decode_chunk_key(key: &[u8]) -> Option<(TenantId, CollectionId, DocId)> {
+        let s = std::str::from_utf8(key).ok()?;
+        let rest = s.strip_prefix("t:")?;
+        let mut parts = rest.split(':');
+        let tenant_raw: u64 = parts.next()?.parse().ok()?;
+        let col_raw: u64 = parts.next()?.parse().ok()?;
+        let doc_type = parts.next()?;
+        if doc_type != "chunk" {
+            return None;
         }
+        let doc_raw: u64 = parts.next()?.parse().ok()?;
+        if parts.next().is_some() {
+            return None; // keine nachfolgenden Segmente erlaubt
+        }
+        let tenant = TenantId::try_new(tenant_raw).ok()?;
+        Some((tenant, CollectionId(col_raw), DocId(doc_raw)))
     }
 }
 
