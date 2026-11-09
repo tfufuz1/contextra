@@ -42,3 +42,12 @@ Alle Invarianten bzgl. Sichtbarkeit, Snapshot-Registry, SSI-Validierung, Coarsen
   - `crates/contextra-mvcc/benches/mvcc_bench.rs`
   - `docs/handoff/MVCC-1.md`
 - Keine Dateien außerhalb von `crates/contextra-mvcc/**` und `docs/handoff/MVCC-1.md` wurden verändert. `Cargo.lock` bleibt unberührt.
+
+## 6. Workspace-CI-Blocker & Externe Abhängigkeiten
+- `cargo deny` schlägt im Workspace aufgrund bekannter externer Sicherheits- und Wartungs-Advisories fehl:
+  - `lopdf` 0.35.0 (RUSTSEC-2026-0187, via `contextra-ingest`)
+  - `lru` 0.16.4 (RUSTSEC-2026-0253, via `contextra-crypto`)
+  - `number_prefix` 0.4.0 (RUSTSEC-2025-0119, via `contextra-infer-candle`)
+  - `tokio` 1.53.1 (RUSTSEC-2026-0386, via Workspace Root)
+  - `zip` 0.6.6 / 8.6.0 (RUSTSEC-2026-0367, 0368, 0369, 0429, via `contextra-ingest` / `candle-core`)
+- Gemäß Dateibesitz-Governance (OWNS: `crates/contextra-mvcc/**`) sind `deny.toml`, `Cargo.lock` und externe Crates schreibgeschützt (READ-ONLY) und werden als CI-Blocker dokumentiert.
