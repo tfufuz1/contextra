@@ -67,14 +67,3 @@ impl<T: Clock + ?Sized> Clock for Arc<T> {
         (**self).monotonic_nanos()
     }
 }
-
-#[cfg(feature = "ports-compat")]
-impl Clock for contextra_ports::SystemClock {
-    fn now_unix_nanos(&self) -> u64 {
-        contextra_ports::Clock::now_unix_nanos(self)
-    }
-
-    fn monotonic_nanos(&self) -> u64 {
-        contextra_ports::Clock::monotonic_nanos(self)
-    }
-}

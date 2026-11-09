@@ -1104,3 +1104,67 @@ fn test_generate_sst_path_uniqueness() {
         "Rapid sequential calls must produce distinct SSTable paths"
     );
 }
+
+#[tokio::test]
+async fn test_compact_all_and_compact_range_neutral_maintenance() {
+    let tmp = TempDir::new().expect("temp dir");
+    let engine = CompactionEngine::new(
+        CompactionConfig {
+            min_sstables_per_tier: 2,
+            ..Default::default()
+        },
+        Arc::new(SnapshotRegistry::new()),
+        create_block_cache(10),
+        None,
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
+                memory_limit: 10 * 1024 * 1024,
+            },
+        )),
+        None,
+    );
+
+    // Create 3 SSTables: sst1 with key "a", sst2 with key "b", sst3 with key "c"
+    let p1 = tmp.path().join("sst-test-01.sst");
+    let p2 = tmp.path().join("sst-test-02.sst");
+    let p3 = tmp.path().join("sst-test-03.sst");
+
+    let mut b1 = SstableBuilder::new(create_block_cache(10));
+    b1.add(b"a", b"val_a", 1, 1).expect("add");
+    b1.build(&p1).await.expect("build sst1");
+
+    let mut b2 = SstableBuilder::new(create_block_cache(10));
+    b2.add(b"b", b"val_b", 2, 2).expect("add");
+    b2.build(&p2).await.expect("build sst2");
+
+    let mut b3 = SstableBuilder::new(create_block_cache(10));
+    b3.add(b"c", b"val_c", 3, 3).expect("add");
+    b3.build(&p3).await.expect("build sst3");
+
+    let r1 = Arc::new(SstableReader::open(&p1, create_block_cache(10)).await.expect("open sst1"));
+    let r2 = Arc::new(SstableReader::open(&p2, create_block_cache(10)).await.expect("open sst2"));
+    let r3 = Arc::new(SstableReader::open(&p3, create_block_cache(10)).await.expect("open sst3"));
+
+    let sstables = Arc::new(tokio::sync::RwLock::new(vec![r1, r2, r3]));
+
+    // Compact range [b"a", b"b"] -> should match 2 tables (sst1 and sst2)
+    let compacted_range = engine
+        .compact_range(b"a"..=b"b", &sstables, tmp.path())
+        .await
+        .expect("compact_range");
+    assert!(compacted_range, "compact_range should have merged matching SSTables");
+
+    let list_after_range = sstables.read().await;
+    assert_eq!(list_after_range.len(), 2, "Expected 2 SSTables after compact_range (merged 2 + sst3)");
+    drop(list_after_range);
+
+    // Compact all -> should merge remaining 2 into 1
+    let compacted_all = engine
+        .compact_all(&sstables, tmp.path())
+        .await
+        .expect("compact_all");
+    assert!(compacted_all, "compact_all should have merged all remaining SSTables");
+
+    let list_after_all = sstables.read().await;
+    assert_eq!(list_after_all.len(), 1, "Expected 1 SSTable after compact_all");
+}

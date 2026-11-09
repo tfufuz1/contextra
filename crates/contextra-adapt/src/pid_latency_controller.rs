@@ -34,7 +34,7 @@ pub const MAX_INTEGRAL: f64 = 10.0;
 /// Für Anwendungsfälle mit expliziter Aktuatorsättigung (z.B. Pool-Größe an Min-/Max-Grenzen)
 /// steht in `pid.rs` der Trait [`AntiWindupController`](crate::AntiWindupController) mit
 /// `update_with_anti_windup` bereit, welcher die Integrationsakkumulation bei Sättigung vollständig aussetzt.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PidLatencyController {
     /// Proportional gain coefficient.
     pub kp: f64,
@@ -137,6 +137,16 @@ impl PidLatencyController {
         } else {
             MAX_SCALING_FACTOR
         }
+    }
+
+    /// Liefert den akkumulierten Integratorwert.
+    pub fn integral(&self) -> f64 {
+        self.integral
+    }
+
+    /// Liefert den vorherigen Regelfehler.
+    pub fn previous_error(&self) -> Option<f64> {
+        self.previous_error
     }
 
     /// Resets the controller integral state and error history.

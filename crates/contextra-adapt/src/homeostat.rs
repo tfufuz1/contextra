@@ -17,7 +17,7 @@ use std::time::Duration;
     since = "0.1.0",
     note = "Consolidated into `crate::PidController`. Use `crate::PidController` directly."
 )]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RerankPidController {
     inner: crate::PidController,
 }

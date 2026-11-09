@@ -106,36 +106,5 @@ impl From<crate::rie_greedy::RieGreedyError> for AdaptError {
     }
 }
 
-#[cfg(feature = "types-compat")]
-impl From<AdaptError> for contextra_types::ContextraError {
-    fn from(err: AdaptError) -> Self {
-        match err {
-            AdaptError::DimensionMismatch { expected, actual } => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
-                ))
-            }
-            AdaptError::InvalidConfig(msg) => contextra_types::ContextraError::InvalidInput(format!(
-                "Invalid bandit configuration: {msg}"
-            )),
-            AdaptError::NonFinite(msg) => {
-                contextra_types::ContextraError::Internal(format!("Non-finite encountered: {msg}"))
-            }
-            AdaptError::PrecisionMatrixDriftDetected {
-                updates_since_reset,
-                denominator,
-            } => contextra_types::ContextraError::Internal(format!(
-                "Sherman-Morrison precision matrix drift detected after {updates_since_reset} updates (denominator = {denominator})"
-            )),
-            AdaptError::ZeroPropensityViolation(msg) => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Zero propensity violation: {msg}"
-                ))
-            }
-            AdaptError::InvalidInput(msg) => contextra_types::ContextraError::InvalidInput(msg),
-        }
-    }
-}
-
 /// Ergebnistyp für Operationen in `contextra-adapt`.
 pub type Result<T> = std::result::Result<T, AdaptError>;

@@ -408,10 +408,8 @@ impl McpServer {
                     _ => None,
                 };
 
-                // Key preflight check: Fail BEFORE deletion if no key is configured
-                let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-                    .key
-                    .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
+                // Key preflight check: Fail BEFORE deletion if no key is configured via ProofKeyProvider port
+                let proof_key = crate::proof_key::default_proof_key_provider().get_proof_key()?;
 
                 let tenant_id = self.tenant_id.ok_or_else(|| {
                     McpError::invalid_params("tenant_id not configured on server")

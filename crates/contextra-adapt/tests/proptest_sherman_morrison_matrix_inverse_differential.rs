@@ -1,4 +1,5 @@
 #![cfg(feature = "bandit-routing")]
+#![allow(clippy::needless_range_loop)]
 //! # Differential-Property-Tests für Sherman-Morrison Matrixinversion
 //!
 //! Vergleicht inkrementelle Sherman-Morrison Rang-1-Updates gegen eine naive
