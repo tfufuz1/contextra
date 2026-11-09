@@ -59,9 +59,21 @@ pub fn get_entry_at_index(
         ))
     };
 
+    if entry_off >= offsets_start {
+        return Err(ContextraError::Storage(
+            "malformed block: entry offset exceeds offsets_start".into(),
+        ));
+    }
+
     let k_len_end = entry_off.checked_add(2).ok_or_else(|| {
         ContextraError::Storage("overflow calculating key length end position".into())
     })?;
+
+    if k_len_end > offsets_start {
+        return Err(ContextraError::Storage(
+            "malformed block: key length header exceeds offsets_start".into(),
+        ));
+    }
 
     let k_len_slice = block_data
         .get(entry_off..k_len_end)
@@ -72,6 +84,13 @@ pub fn get_entry_at_index(
             .try_into()
             .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
     ));
+
+    let min_entry_len = 2usize.saturating_add(k_len).saturating_add(20);
+    if entry_off.saturating_add(min_entry_len) > offsets_start {
+        return Err(ContextraError::Storage(
+            "malformed block: entry exceeds offsets_start boundary".into(),
+        ));
+    }
 
     Ok((entry_off, k_len))
 }
@@ -86,12 +105,16 @@ pub fn get_entry_key_at_index(
     let ep = entry_off
         .checked_add(2)
         .ok_or_else(|| ContextraError::Storage("overflow calculating entry key position".into()))?;
+    let end_k = ep
+        .checked_add(k_len)
+        .ok_or_else(|| ContextraError::Storage("overflow calculating entry key length".into()))?;
+    if end_k > offsets_start {
+        return Err(ContextraError::Storage(
+            "malformed block: entry key exceeds offsets_start".into(),
+        ));
+    }
     block_data
-        .get(
-            ep..ep.checked_add(k_len).ok_or_else(|| {
-                ContextraError::Storage("overflow calculating entry key length".into())
-            })?,
-        )
+        .get(ep..end_k)
         .ok_or_else(|| ContextraError::Storage("malformed block: entry_key out of bounds".into()))
 }
 
