@@ -559,7 +559,10 @@ async fn test_snapshot_single_load_invariant() {
 
     // Populate data with tx 1
     let tx1 = TxId::new(1);
-    storage.put(tx1, b"key:single_load:1", b"val1").await.unwrap();
+    storage
+        .put(tx1, b"key:single_load:1", b"val1")
+        .await
+        .unwrap();
     storage.commit(tx1).await.unwrap();
 
     // Verify get_at_seq reads snapshot consistently
@@ -567,7 +570,10 @@ async fn test_snapshot_single_load_invariant() {
     assert_eq!(res, Some(bytes::Bytes::from_static(b"val1")));
 
     // Verify scan_prefix_at reads snapshot consistently
-    let entries = storage.scan_prefix_at(b"key:single_load:", 100).await.unwrap();
+    let entries = storage
+        .scan_prefix_at(b"key:single_load:", 100)
+        .await
+        .unwrap();
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].0, b"key:single_load:1".to_vec());
     assert_eq!(entries[0].1, b"val1".to_vec());
