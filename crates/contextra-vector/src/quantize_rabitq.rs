@@ -33,14 +33,20 @@ pub struct RaBitQQuantizer {
 }
 
 impl RaBitQQuantizer {
-    /// Safely trains a `RaBitQQuantizer` for vectors of the specified `dimension`.
+    /// Safely trains a `RaBitQQuantizer` for vectors of the specified `dimension` with a default seed.
+    pub fn try_train(vectors: &[Vec<f32>], dimension: usize) -> Result<Self> {
+        let default_seed = 0x0A_B1_0C_u64.wrapping_add(dimension as u64);
+        Self::try_train_with_seed(vectors, dimension, default_seed)
+    }
+
+    /// Safely trains a `RaBitQQuantizer` for vectors of the specified `dimension` with an explicit injected `seed`.
     ///
     /// Generates a deterministic orthogonal matrix $R \in \mathbb{R}^{D \times D}$ using
     /// Gram-Schmidt orthogonalization on a seeded Gaussian matrix.
     ///
     /// Returns `ContextraError::InvalidInput` if `dimension` is 0 or if any vector in `vectors`
     /// contains NaN / infinite values or has a dimension mismatch.
-    pub fn try_train(vectors: &[Vec<f32>], dimension: usize) -> Result<Self> {
+    pub fn try_train_with_seed(vectors: &[Vec<f32>], dimension: usize, seed: u64) -> Result<Self> {
         if dimension == 0 {
             return Err(ContextraError::invalid_input(
                 "RaBitQQuantizer dimension must be greater than 0",
@@ -63,7 +69,7 @@ impl RaBitQQuantizer {
             }
         }
 
-        let rotation_matrix = generate_orthogonal_matrix(dimension)?;
+        let rotation_matrix = generate_orthogonal_matrix(dimension, seed)?;
 
         Ok(Self {
             dimension,
@@ -226,11 +232,11 @@ impl RaBitQQuantizer {
 }
 
 /// Generates a $D \times D$ orthogonal rotation matrix using a Gram-Schmidt process.
-fn generate_orthogonal_matrix(dim: usize) -> Result<Vec<f32>> {
+fn generate_orthogonal_matrix(dim: usize, initial_seed: u64) -> Result<Vec<f32>> {
     let mut mat = vec![0.0f32; dim * dim];
 
-    // Simple deterministic pseudo-random Gaussian initialization (Box-Muller transform)
-    let mut seed = 0x0A_B1_0C_u64.wrapping_add(dim as u64);
+    // Deterministic pseudo-random Gaussian initialization (Box-Muller transform) using injected seed
+    let mut seed = initial_seed;
     let mut next_u32 = || {
         seed = seed
             .wrapping_mul(6364136223846793005)
@@ -305,6 +311,19 @@ fn generate_orthogonal_matrix(dim: usize) -> Result<Vec<f32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_rabitq_seed_determinism() -> Result<()> {
+        let dim = 16;
+        let v = vec![1.0; dim];
+        let q1 = RaBitQQuantizer::try_train_with_seed(&[v.clone()], dim, 42)?;
+        let q2 = RaBitQQuantizer::try_train_with_seed(&[v.clone()], dim, 42)?;
+        let q3 = RaBitQQuantizer::try_train_with_seed(&[v.clone()], dim, 99)?;
+
+        assert_eq!(q1.rotation_matrix, q2.rotation_matrix);
+        assert_ne!(q1.rotation_matrix, q3.rotation_matrix);
+        Ok(())
+    }
 
     #[test]
     fn test_rabitq_recall_synthetic() -> Result<()> {
@@ -383,10 +402,8 @@ mod tests {
             rabitq_distances.select_nth_unstable_by(top_k - 1, |a, b| {
                 a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
             });
-            let rabitq_top_k: std::collections::HashSet<usize> = rabitq_distances[..top_k]
-                .iter()
-                .map(|&(idx, _)| idx)
-                .collect();
+            let rabitq_top_k: std::collections::HashSet<usize> =
+                rabitq_distances[..top_k].iter().map(|&(idx, _)| idx).collect();
 
             let hits = gt_top_k.intersection(&rabitq_top_k).count();
             total_hits += hits;

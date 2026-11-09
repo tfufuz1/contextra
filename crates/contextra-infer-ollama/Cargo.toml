@@ -15,13 +15,8 @@ klasse = "A"
 
 [features]
 default = []
-types-compat = ["dep:contextra-ports", "dep:contextra-types"]
-ports-compat = ["types-compat"]
-http = ["dep:reqwest", "dep:tokio", "dep:futures", "dep:futures-util"]
-
-[features]
-default = []
-http = ["dep:reqwest", "dep:tokio", "dep:futures", "dep:futures-util"]
+client = ["dep:reqwest", "dep:tokio", "dep:futures", "dep:futures-util"]
+http = ["client"]
 types-compat = ["ports-compat"]
 ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
 

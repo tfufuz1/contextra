@@ -36,6 +36,18 @@
 //! 8. [`adapters`]: Brückenadapter zu Embedding-Providern und Storage-Engines.
 //! 9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung.
 
+pub mod cipher;
+pub mod compat;
+pub mod error;
+pub mod types;
+
+pub use cipher::{PlaintextSegmentCipher, SegmentCipher};
+pub use error::{KvCacheError, Result as KvResult};
+pub use types::{
+    CacheDirective as KvCacheDirective, ModelFingerprint as KvModelFingerprint,
+    RequestId as KvRequestId, StepId as KvStepId, TenantId as KvTenantId,
+};
+
 pub mod adapters;
 pub mod attention_score;
 pub mod eviction_worker;

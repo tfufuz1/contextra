@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Allocation Profiling Harness for contextra-text
 //! Measures heap allocation count, bytes allocated, execution time, and throughput
 //! for 10,000 documents (~500 words per document) across German and English workloads.
@@ -23,6 +24,7 @@ static ALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
 // 1. Thread Safety: Atomic counter increments (`ALLOC_COUNT`, `DEALLOC_COUNT`, `ALLOC_BYTES`) use relaxed atomic operations, preserving `Sync` safety.
 // 2. Memory Safety: All heap allocations and deallocations are forwarded unchanged to `std::alloc::System`.
 // 3. Trait Contract: `alloc` and `dealloc` obey all layout and pointer invariants required by the `GlobalAlloc` contract.
+// SAFETY: GlobalAlloc forwarder implementation.
 #[allow(unsafe_code)]
 unsafe impl GlobalAlloc for CountingAllocator {
     // SAFETY: Thread-safe delegation to System allocator.

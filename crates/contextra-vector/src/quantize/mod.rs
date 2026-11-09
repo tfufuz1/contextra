@@ -1,11 +1,19 @@
 // FILE-CONTEXT
 // ZWECK: 8-Bit Skalare Quantisierung (SQ8) mit pro-Dimension Min/Max Skalierung.
-// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben.
+// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben; INV-SQ8-ERROR-BOUND-1.
 // NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen vor Rekalibrierung der Min/Max-Grenzen.
 // HOTSPOTS: quantize.rs (ScalarQuantizer::try_train, quantize, dequantize)
 // STAND: TS:2026-08-30T21:55:29Z (SESSION: 10569099)
 
 //! Scalar Quantization (SQ8) for HNSW Index.
+//!
+//! # Error Bounds Guarantee (INV-SQ8-ERROR-BOUND-1)
+//! For each dimension $i \in [0, D-1]$, given quantization interval $[\text{min}_i, \text{max}_i]$ with
+//! range $\Delta_i = \text{max}_i - \text{min}_i$:
+//! Rounding into 256 discrete levels ($u8 \in [0, 255]$) guarantees that for any in-distribution value $v_i \in [\text{min}_i, \text{max}_i]$,
+//! the reconstruction error $e_i = |v_i - \hat{v}_i|$ satisfies:
+//! $$e_i \le \frac{\Delta_i}{2 \cdot 255} = \frac{\Delta_i}{510}$$
+//! For normalized vectors ($\|v\|_2 = 1$), the reconstructed Euclidean distance error is strictly bounded.
 
 use crate::distance::euclidean_distance_sq_f32_u8;
 use contextra_types::DistanceMetric;
@@ -17,6 +25,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub const DEFAULT_P_LOW: f32 = 0.005;
 /// Default high percentile for quantization scaling (99.5%).
 pub const DEFAULT_P_HIGH: f32 = 0.995;
+
+/// Theoretical maximum quantization error bound factor per dimension: $1 / (2 \cdot 255) = 1 / 510$.
+pub const SQ8_MAX_ERROR_FACTOR_PER_DIM: f32 = 1.0 / 510.0;
 
 /// An 8-bit Scalar Quantizer (SQ8) with per-dimension scaling.
 ///
@@ -221,6 +232,19 @@ impl ScalarQuantizer {
     /// Returns a reference to per-dimension inverse scale values.
     pub fn inv_scales(&self) -> &[f32] {
         &self.inv_scales
+    }
+
+    /// Returns the theoretical maximum quantization reconstruction error bound for dimension `dim`.
+    ///
+    /// According to INV-SQ8-ERROR-BOUND-1:
+    /// $$e_i \le \frac{\text{max}_i - \text{min}_i}{2 \cdot 255} = \frac{\Delta_i}{510}$$
+    pub fn max_reconstruction_error_per_dim(&self, dim: usize) -> Option<f32> {
+        if dim < self.dimension {
+            let range = self.maxes.get(dim)? - self.mins.get(dim)?;
+            Some(range * SQ8_MAX_ERROR_FACTOR_PER_DIM)
+        } else {
+            None
+        }
     }
 
     /// Returns the target dimension of the quantizer.
@@ -562,6 +586,30 @@ mod quantize_validation_tests {
         let _ = sq.quantize(&out_of_bounds)?;
         assert!((sq.drift_ratio() - 0.5).abs() < f32::EPSILON);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_sq8_theoretical_error_bound_property() -> contextra_types::Result<()> {
+        let dim = 4;
+        let batch = [
+            [-10.0, 0.0, 50.0, 100.0].as_slice(),
+            [10.0, 100.0, 150.0, 200.0].as_slice(),
+        ];
+        let sq = ScalarQuantizer::try_train(&batch, dim)?;
+
+        let test_vec = [0.0, 50.0, 100.0, 150.0];
+        let q = sq.quantize(&test_vec)?;
+        let deq = sq.dequantize(&q)?;
+
+        for i in 0..dim {
+            let max_bound = sq.max_reconstruction_error_per_dim(i).unwrap();
+            let actual_err = (test_vec[i] - deq[i]).abs();
+            assert!(
+                actual_err <= max_bound + 1e-5,
+                "Dim {i}: error {actual_err} exceeds bound {max_bound}"
+            );
+        }
         Ok(())
     }
 }

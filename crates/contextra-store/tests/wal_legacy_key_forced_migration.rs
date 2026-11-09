@@ -14,7 +14,7 @@ async fn test_forced_legacy_key_migration_creates_secure_key_and_marker() {
         key: b"legacy_key_1".to_vec(),
         value: b"legacy_val_1".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry1 = WalEntry::try_new(op1, 1, &legacy_key, [0u8; 32]).expect("legacy entry 1");
 
     let op2 = WalOp::Put {
@@ -103,7 +103,7 @@ async fn test_standard_wal_open_succeeds_post_migration() {
         key: b"key_before_migration".to_vec(),
         value: b"val_before_migration".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 10, &legacy_key, [0u8; 32]).expect("entry");
 
     let mut wal_bytes = Vec::new();
@@ -150,7 +150,7 @@ async fn test_re_migration_open_does_not_use_legacy_key() {
         key: b"remigrate_k".to_vec(),
         value: b"remigrate_v".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 100, &legacy_key, [0u8; 32]).expect("entry");
 
     let mut wal_bytes = Vec::new();
@@ -196,7 +196,7 @@ async fn test_crash_recovery_step1_interrupted_before_rewrite() {
         key: b"crash_step1_key".to_vec(),
         value: b"crash_step1_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("entry");
 
     let mut wal_bytes = Vec::new();

@@ -1,19 +1,19 @@
-//! # Purge-Scanner (Ring 1)
+//! # Purge-Implementierung (Ring 1)
 //!
-//! Identifiziert gezielt zu bereinigende Schluesselbereiche ueber Speicherschichten hinweg.
+//! Bereinigt endgueltig physische Spuren geloeschter Daten auf Platten- und Speicher-Ebene.
 
 // FILE-CONTEXT
-// ZWECK: Physical Purger implementation für LSM-Storage-Schichten (§12.7.4, INV-WITNESS-MINT-1).
-// INVARIANTEN: Physikalische Entfernung durch Flush, Range Compaction, File Zeroing und Unlink.
-// HOTSPOTS: [1-120]
+// ZWECK: Physischer Purger für LSM Storage (§12.7.4, Verträge W1-P01).
+// INVARIANTEN: Nullt und unlinkt verwaiste SSTable- und WAL-Segmente; atomarer Memtable-Flush.
+// HOTSPOTS: [1-100]
 
 #![forbid(unsafe_code)]
 
-use super::sstable::block_on_future;
+use super::runtime::ScannerRuntime;
 use crate::lsm::LsmStorage;
 use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
-use crate::wal::{Wal, WalConfig, WalOp};
+use crate::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
 use ahash::AHashSet;
 use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
 use contextra_ports::StorageEngine;
@@ -23,12 +23,18 @@ use std::sync::Arc;
 /// Purger für LSM Storage Engine.
 pub struct LsmPurger {
     storage: Arc<LsmStorage>,
+    runtime: ScannerRuntime,
 }
 
 impl LsmPurger {
-    /// Erzeugt einen neuen `LsmPurger`.
+    /// Erzeugt einen neuen `LsmPurger` mit implizit erfasster Laufzeit.
     pub fn new(storage: Arc<LsmStorage>) -> Self {
-        Self { storage }
+        Self::with_runtime(storage, ScannerRuntime::capture())
+    }
+
+    /// Erzeugt einen neuen `LsmPurger` mit expliziter `ScannerRuntime`.
+    pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self {
+        Self { storage, runtime }
     }
 }
 
@@ -42,32 +48,20 @@ impl Purger for LsmPurger {
         }
 
         let codec = TenantKeyCodec::new(ctx.tenant_id);
-        let target_prefix = codec.scan_prefix();
+        let target_prefix = codec.scan_prefix().to_vec();
 
         let mut purged_units = 0u64;
         let mut bytes_freed = 0u64;
 
-        // Dekker-Write-Fence: Purge vs Flush Koordination
-        if !self.storage.flush_purge_fence.enter_purge() {
-            return Err(ContextraError::Storage(
-                "Purge conflict: active flush in progress".to_string(),
-            ));
-        }
-        struct PurgeFenceGuard<'a>(&'a crate::lsm::fence::FlushPurgeFence);
-        impl<'a> Drop for PurgeFenceGuard<'a> {
-            fn drop(&mut self) {
-                self.0.leave_purge();
-            }
-        }
-        let _purge_fence_guard = PurgeFenceGuard(&self.storage.flush_purge_fence);
+        let storage = Arc::clone(&self.storage);
 
-        block_on_future(async {
+        self.runtime.block_on(async {
             // 2. Erzwungener Flush der Memtables in SSTables
-            self.storage.flush().await?;
+            storage.flush().await?;
 
             // 3. SSTables filtern / neu schreiben ohne Target-Records
-            let readers = self.storage.sstables_for_scanner().await;
-            let block_cache = self.storage.block_cache();
+            let readers = storage.sstables_for_scanner().await;
+            let block_cache = storage.block_cache();
 
             let mut new_readers = Vec::new();
             let mut sst_files_to_purge = Vec::new();
@@ -77,7 +71,7 @@ impl Purger for LsmPurger {
                 let mut retained = Vec::new();
 
                 for (k, v, seq) in entries {
-                    if !k.starts_with(target_prefix) {
+                    if !k.starts_with(&target_prefix) {
                         retained.push((k, v, seq));
                     } else {
                         purged_units += 1;
@@ -94,7 +88,10 @@ impl Purger for LsmPurger {
                     // Datei filtern und neu schreiben
                     let old_path = reader.file_path();
                     let new_path = old_path.with_extension("purged.sst");
-                    if let Ok(mut builder) = SstableBuilder::create(&new_path).await {
+                    if let Ok(mut builder) =
+                        SstableBuilder::create_with_vfs(&new_path, None, self.storage.vfs().clone())
+                            .await
+                    {
                         for (rk, rv, rseq) in retained {
                             let _ = builder.add(&rk, &rv, rseq, 1).await;
                         }
@@ -116,21 +113,22 @@ impl Purger for LsmPurger {
 
             // SSTables im Store aktualisieren
             {
-                let sst_arc = self.storage.sstables_arc();
+                let sst_arc = storage.sstables_arc();
                 let mut sst_guard = sst_arc.write().await;
                 *sst_guard = new_readers;
             }
 
             // Altdateien (.sst) Nullen und Entfernen
-            let data_dir = self.storage.data_path();
+            let data_dir = storage.data_path();
             let mut active_paths = AHashSet::new();
-            for r in &self.storage.sstables_for_scanner().await {
+            for r in &storage.sstables_for_scanner().await {
                 active_paths.insert(r.file_path().to_path_buf());
             }
 
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
+            let vfs = self.storage.vfs();
+            if let Ok(dir_entries) = vfs.list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
                     if path.extension().and_then(|s| s.to_str()) == Some("sst")
                         && !active_paths.contains(&path)
                     {
@@ -142,7 +140,7 @@ impl Purger for LsmPurger {
             for old_path in sst_files_to_purge {
                 if let Ok(metadata) = tokio::fs::metadata(&old_path).await {
                     let len = metadata.len();
-                    let zeros = vec![0u8; len as usize];
+                    let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
                     let _ = tokio::fs::write(&old_path, zeros).await;
                     if tokio::fs::remove_file(&old_path).await.is_ok() {
                         bytes_freed += len;
@@ -152,13 +150,12 @@ impl Purger for LsmPurger {
 
             // 4. WAL-Segmente filtern / bereinigen
             let mut wal_files = Vec::new();
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
-                    let name = path.file_name().unwrap_or_default().to_string_lossy();
-                    let is_wal = (name.starts_with("wal-") && name.ends_with(".log"))
-                        || name == "wal.log"
-                        || name.ends_with(".wal");
+            if let Ok(dir_entries) = vfs.list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
+                    let is_wal = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
+                        || name_str == "wal.log"
+                        || name_str.ends_with(".wal");
                     if is_wal {
                         wal_files.push(path);
                     }
@@ -171,7 +168,7 @@ impl Purger for LsmPurger {
                         let has_target =
                             entries.iter().any(|(_seq, entry, _pos)| match &entry.op {
                                 WalOp::Put { key, .. } | WalOp::Delete { key, .. } => {
-                                    key.starts_with(target_prefix)
+                                    key.starts_with(&target_prefix)
                                 }
                                 WalOp::TxEnd { .. } => false,
                             });
@@ -181,7 +178,7 @@ impl Purger for LsmPurger {
                                 .into_iter()
                                 .filter_map(|(_seq, entry, _pos)| match entry.op {
                                     WalOp::Put { key, value, tx_id }
-                                        if !key.starts_with(target_prefix) =>
+                                        if !key.starts_with(&target_prefix) =>
                                     {
                                         Some((
                                             WalOp::Put {
@@ -193,7 +190,7 @@ impl Purger for LsmPurger {
                                         ))
                                     }
                                     WalOp::Delete { key, tx_id }
-                                        if !key.starts_with(target_prefix) =>
+                                        if !key.starts_with(&target_prefix) =>
                                     {
                                         Some((
                                             WalOp::Delete {
@@ -214,7 +211,7 @@ impl Purger for LsmPurger {
                                 // WAL enthielt nur Target -> Nullen und Entfernen
                                 if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
                                     let len = metadata.len();
-                                    let zeros = vec![0u8; len as usize];
+                                    let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
                                     let _ = tokio::fs::write(&wal_path, zeros).await;
                                     let _ = tokio::fs::remove_file(&wal_path).await;
                                     bytes_freed += len;
@@ -222,21 +219,28 @@ impl Purger for LsmPurger {
                             } else {
                                 // WAL neu schreiben ohne Target-Records
                                 let tmp_wal_path = wal_path.with_extension("purged.log");
-                                if let Ok(new_wal) =
-                                    Wal::open_with_config(&tmp_wal_path, WalConfig::default()).await
-                                {
-                                    if let Ok((batch, _)) =
-                                        new_wal.prepare_batch(retained_wal).await
+                                let integrity_key = Wal::load_or_create_integrity_key(&wal_path)
+                                    .await
+                                    .unwrap_or([0u8; 32]);
+                                let mut file_bytes = Vec::new();
+                                file_bytes.extend_from_slice(&WAL_V3_HEADER);
+                                for (op, seq_no) in retained_wal {
+                                    if let Ok(entry) =
+                                        WalEntry::try_new(op, seq_no, &integrity_key, [0u8; 32])
                                     {
-                                        let _ = new_wal.append_batch(batch).await;
+                                        if let Ok(ebytes) = entry.to_bytes() {
+                                            file_bytes.extend_from_slice(&ebytes);
+                                        }
                                     }
+                                }
 
+                                if tokio::fs::write(&tmp_wal_path, file_bytes).await.is_ok() {
                                     if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
                                         let len = metadata.len();
-                                        let zeros = vec![0u8; len as usize];
+                                        let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
                                         let _ = tokio::fs::write(&wal_path, zeros).await;
                                     }
-                                    let _ = tokio::fs::rename(&tmp_wal_path, &wal_path).await;
+                                    let _ = self.storage.vfs().rename(&tmp_wal_path, &wal_path);
                                 }
                             }
                         }

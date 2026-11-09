@@ -16,10 +16,12 @@
 
 ---
 
-## 2. Invarianten (INV-ING-*)
+## 2. Invarianten (INV-INGEST-*)
 
 | ID | Invariante | Prüfung |
 |---|---|---|
+| **INV-INGEST-BOUNDED-1** | **Beschränkte Erkennung:** Die Dateierkennung liest/analysiert strikt maximal `MAX_DETECT_BYTES` (64 KiB) ein, auch bei Streams ohne bekannte Länge. | `tests/inv_ingest_bounded_tests.rs`, `tests/detect_proptest.rs` |
+| **INV-INGEST-NO-ARCHIVE-BOMB-1** | **Archiv- & XML-Bombenschutz:** Dekomprimierung von ZIP/OOXML/ODF ist durch strikte Ratio-, Größen-, Eintrags- und Pfadlimits geschützt; Zip-Slip wird abgewiesen; XML-Tiefe und DTD/Entitäten sind blockiert. | `tests/inv_ingest_archive_bomb_tests.rs`, `fuzz_safe_archive`, `fuzz_safe_xml` |
 | **INV-ING-01** | **Vertikale Autarkie (Klasse A):** Keine internen Abhängigkeiten zu anderen `contextra-*` Crates im Produktionscode. | `cargo tree -p contextra-ingest -e normal --depth 1` |
 | **INV-ING-02** | **Zero-Panic:** Alle Parser und Chunking-Routinen sind fehlergekapselt und lösen niemals Panics aus. | `tools/zero_panic_analyzer.py` / `catch_unwind` |
 | **INV-ING-03** | **Ressourcen- und DoS-Schutz:** Striktes Einhalten von `IngestLimits` (Dokumentgröße, Entpackgröße, Dekompressionsverhältnis, XML-Tiefe, Rekursionstiefe). | `safe::archive::validate_zip_archive`, `SafeArchive`, `SafeXmlReader` |

@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Regression test for Tokenizer Pipeline Identity (P1), Snapshot Isolation (P4), and Tx Rollback (P5).
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};

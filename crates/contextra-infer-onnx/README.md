@@ -1,56 +1,36 @@
 # contextra-infer-onnx
 
-ONNX Embeddings und Cross-Encoder Reranking Execution Provider.
+Autarke In-Process ONNX Inferenz Engine für Embeddings und Cross-Encoder Reranking (Klasse A, Ring 2).
 
-Normativitätsklasse: **Rand `[R]`** (Ring 2, `experimental`; §6.0, `capabilities.toml`).
+## Baukasten-Profil (SPEC v4.0, B1–B12)
+- **Ring:** Ring 2
+- **Klasse:** A (Vollkommen autarker Baustein)
+- **0 Interne Abhängigkeiten:** Baut und testet vollständig isoliert ohne Abhängigkeiten zu `contextra-*`.
+- **Zero-Panic Invariante:** `#![forbid(unsafe_code)]`, keine Panics/Unwraps in Produktivpfaden, bounds-checked Tensoren.
+- **Determinismus:** Deterministische Fake-Implementierungen (`FakeEmbedder`, `FakeReranker`) für Standalone-Betrieb.
 
-`contextra-infer-onnx` stellt die In-Process ONNX Embedding Engine und Cross-Encoder-Reranker bereit (Ring 2).
+## Features
+- `default = []` (reiner Pure-Rust Minimalbau ohne externe Shared-Libraries oder C-FFI).
+- `onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:sha2"]` (aktiviert In-Process Inferenz via ONNX Runtime).
+- `download = ["dep:reqwest"]` (optionaler Download von Modellen über gesicherte HTTPS-Kanäle).
+- `std`, `serde`, `tracing`, `inspect`, `experimental` (Standard-Baukasten Features).
 
-## Zweck
-
-Erzeugt Vektor-Embeddings und führt Cross-Encoder-Reranking über ONNX Runtime aus. Dient als optionaler Embedding- und Reranker-Provider.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 2 (Blatt-Crate / Flüchtige Abhängigkeit)
-- **Status:** 🟡 Experimentell / Optional
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Baukasten-Eigenschaften (M1–M11)
-
-- **Abhängigkeiten (nur abwärts):** `contextra-types`, `contextra-ports`, `contextra-rank`.
-- **Features:**
-  - `default = []` (minimaler Build ohne Schwergewichte, kein automatischer Download von ONNX-Modellen oder Binaries).
-  - `reranking = ["dep:ort"]`: Aktiviert ONNX Runtime für Cross-Encoder.
-  - `onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:reqwest", "dep:sha2"]`: Aktiviert vollständige lokale In-Process-Embeddings und Reranking.
-- **Offline-First:** Downloads sind standardmäßig verboten (`allow_download = false`). Bei aktiven Downloads sind Prüfsummen und HTTPS-Host-Allowlists verpflichtend.
-- **Vfs-Integration:** Dateiprüfungen und Modellvalidierungen unterstützen das abstrakte VFS-Port-Interface (`ensure_onnx_model_exists_vfs`).
-
-## Öffentliche API-Übersicht
-
-- **Embedder:** `TextEmbedder`, `TextEmbedderConfig`, `OnnxEmbedder`, `default_model_cache_dir`, `ensure_onnx_model_exists_vfs`.
-- **Reranker:** `CrossEncoderReranker`, `RerankConfig`, `OnnxConfig`, `OnnxRerankerBuilder`, `RerankResult`, `PlattScaledSigmoid`.
-
-## Einbettungsbeispiel
+## Schnelleinstieg
 
 ```rust
-use contextra_infer_onnx::reranker::CrossEncoderReranker;
-use contextra_ports::Reranker;
+use contextra_infer_onnx::traits::{Embedder, Reranker};
+use contextra_infer_onnx::{FakeEmbedder, FakeReranker};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Reranker im isolierten Passthrough-Modus ohne ONNX Runtime
-    let reranker = CrossEncoderReranker::passthrough();
-    let query = "Contextra Baukasten";
-    let candidates = vec![
-        "Sichere lokale Speicherkerne".to_string(),
-        "Generische Volltextsuche".to_string(),
-    ];
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Deterministischer Fake-Embedder für Tests und Offline-Betrieb
+    let embedder = FakeEmbedder::new(128)?;
+    let vec = embedder.embed("Contextra Autarker Baustein")?;
+    assert_eq!(vec.len(), 128);
 
-    let results = reranker.rerank(query, &candidates).await?;
-    assert_eq!(results.len(), 2);
+    // Deterministischer Cross-Encoder Reranker
+    let reranker = FakeReranker::new();
+    let scores = reranker.score("query", &["relevanter text", "irrelevanter text"])?;
+    assert_eq!(scores.len(), 2);
     Ok(())
 }
 ```
-
-Ein vollständiges eigenständiges Beispiel befindet sich unter `examples/fake_reranker.rs`.

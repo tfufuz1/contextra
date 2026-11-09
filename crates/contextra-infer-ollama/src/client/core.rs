@@ -1,7 +1,7 @@
 use super::circuit_breaker::CircuitBreaker;
 use super::config::{OllamaConfig, MAX_BATCH_SIZE};
 use super::errors::{classify_reqwest_error, is_transient_error};
-use super::policy::{EgressAuditSink, NoopEgressAuditSink};
+use super::policy::{EgressAuditSink, NoopEgressAuditSink, PayloadGate, PermissivePayloadGate};
 use super::validation::{
     build_rag_prompt, validate_batch_size, validate_model_name, validate_text_length,
 };
@@ -67,6 +67,7 @@ pub struct OllamaClient {
     pub(crate) rng: Arc<dyn LocalRng>,
     pub(crate) clock: Arc<dyn LocalClock>,
     pub(crate) audit_sink: Arc<dyn EgressAuditSink>,
+    pub(crate) payload_gate: Arc<dyn PayloadGate>,
     pub(crate) circuit_breaker: Arc<CircuitBreaker>,
 }
 
@@ -79,6 +80,7 @@ impl std::fmt::Debug for OllamaClient {
             .field("rng", &"Arc<dyn LocalRng>")
             .field("clock", &"Arc<dyn LocalClock>")
             .field("audit_sink", &"Arc<dyn EgressAuditSink>")
+            .field("payload_gate", &"Arc<dyn PayloadGate>")
             .field("circuit_breaker", &self.circuit_breaker)
             .finish()
     }
@@ -125,6 +127,7 @@ impl OllamaClient {
         let rng: Arc<dyn LocalRng> = Arc::new(LocalSeededRng::default());
         let clock: Arc<dyn LocalClock> = Arc::new(SystemClock);
         let audit_sink: Arc<dyn EgressAuditSink> = Arc::new(NoopEgressAuditSink);
+        let payload_gate: Arc<dyn PayloadGate> = Arc::new(PermissivePayloadGate);
         let circuit_breaker = Arc::new(CircuitBreaker::new(
             config.failure_threshold,
             config.circuit_reset_timeout,
@@ -137,6 +140,7 @@ impl OllamaClient {
             rng,
             clock,
             audit_sink,
+            payload_gate,
             circuit_breaker,
         }
     }
@@ -163,6 +167,7 @@ impl OllamaClient {
 
         let rng: Arc<dyn LocalRng> = Arc::new(LocalSeededRng::default());
         let clock: Arc<dyn LocalClock> = Arc::new(SystemClock);
+        let payload_gate: Arc<dyn PayloadGate> = Arc::new(PermissivePayloadGate);
         let circuit_breaker = Arc::new(CircuitBreaker::new(
             config.failure_threshold,
             config.circuit_reset_timeout,
@@ -175,6 +180,7 @@ impl OllamaClient {
             rng,
             clock,
             audit_sink,
+            payload_gate,
             circuit_breaker,
         })
     }
@@ -209,6 +215,13 @@ impl OllamaClient {
         self.audit_sink = audit_sink;
         self
     }
+
+    /// Sets a custom payload gate.
+    pub fn with_payload_gate(mut self, payload_gate: Arc<dyn PayloadGate>) -> Self {
+        self.payload_gate = payload_gate;
+        self
+    }
+
 
     /// Pre-request policy and circuit breaker validation.
     fn prepare_request(&self) -> Result<()> {
@@ -296,6 +309,7 @@ impl OllamaClient {
         }
         for (i, t) in texts.iter().enumerate() {
             validate_text_length(t, &format!("texts[{i}]"))?;
+            self.payload_gate.check_payload(t)?;
         }
 
         if texts.len() > MAX_BATCH_SIZE {
@@ -339,6 +353,7 @@ impl OllamaClient {
         validate_batch_size(texts.len())?;
         for (i, t) in texts.iter().enumerate() {
             validate_text_length(t, &format!("texts[{i}]"))?;
+            self.payload_gate.check_payload(t)?;
         }
         let url = format!("{}/api/embed", self.base_url());
         let request = BatchEmbedRequest {
@@ -506,6 +521,7 @@ impl OllamaClient {
         self.prepare_request()?;
         validate_model_name(model)?;
         validate_text_length(prompt, "prompt")?;
+        self.payload_gate.check_payload(prompt)?;
         if prompt.trim().is_empty() {
             return Err(OllamaError::InvalidInput(
                 "generate_text_stream: prompt is empty".into(),
@@ -671,6 +687,7 @@ impl OllamaClient {
         self.prepare_request()?;
         validate_model_name(model)?;
         validate_text_length(prompt, "prompt")?;
+        self.payload_gate.check_payload(prompt)?;
         if prompt.trim().is_empty() {
             return Err(OllamaError::InvalidInput(
                 "generate_text: prompt is empty".into(),
@@ -781,6 +798,7 @@ impl OllamaClient {
         self.prepare_request()?;
         validate_model_name(model)?;
         validate_text_length(prompt, "prompt")?;
+        self.payload_gate.check_payload(prompt)?;
         let url = format!("{}/api/generate", self.base_url());
         let request = GenerateRequest {
             model,
@@ -889,6 +907,7 @@ impl OllamaClient {
         self.prepare_request()?;
         validate_model_name(model)?;
         validate_text_length(text, "text")?;
+        self.payload_gate.check_payload(text)?;
         let url = format!("{}/api/embeddings", self.base_url());
         let request = EmbedRequest {
             model,

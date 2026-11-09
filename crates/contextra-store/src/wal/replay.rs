@@ -245,7 +245,7 @@ impl Wal {
         }
     }
 
-    #[allow(deprecated)]
+        #[allow(deprecated)]
     fn verify_entry_snapshot(
         &self,
         snapshot: &WalEntrySnapshot,
@@ -326,8 +326,8 @@ impl Wal {
             return Ok(version);
         }
 
-        let integrity_key = self.get_integrity_key()?;
-        let mut verifier = IntegrityVerifier::new(&integrity_key);
+                let integrity_key = self.get_integrity_key()?;
+                let mut verifier = IntegrityVerifier::new(&integrity_key);
         let mut using_legacy_key = false;
 
         // Detect version from header
@@ -426,7 +426,7 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
-            {
+                        {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some()
                 {
                     let km = match self.key_manager.as_ref() {
@@ -672,6 +672,8 @@ impl Wal {
                     }
                 }
             }
+
+
         }
 
         Ok(version)

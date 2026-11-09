@@ -210,12 +210,15 @@ impl Wal {
         self.get_integrity_key()
     }
 
+    /// Exposes internal `last_hmac` lock for concurrency testing.
     #[cfg(any(test, feature = "test-hooks"))]
-    pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        match legacy_integrity_key() {
-            Ok(key) => key,
-            Err(e) => panic!("Legacy WAL key support is disabled or unavailable: {e}"),
-        }
+    pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {
+        std::sync::Arc::clone(&self.last_hmac)
+    }
+
+    #[cfg(any(test, feature = "test-hooks"))]
+    pub fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
+        legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).

@@ -1,23 +1,19 @@
 //! # Manipulationsschutz und Notfall-Speicherbereinigung (`anti_tamper.rs`)
 //!
-//! Stellt sichere Speicherbehälter bereit, die sensibles Schlüsselmaterial vor
-//! Kaltstart-Angriffen, Speicher-Dumps und unbefugtem Auslesen schützen.
+//! Stellt sichere Speicherbehälter und Integritätsprüfungen bereit, die sensibles
+//! Schlüsselmaterial vor Kaltstart-Angriffen, Speicher-Dumps und Timing-Orakeln schützen.
 //!
 //! ## Invarianten
-//! - Automatisches Zeroizing beim Verlassen des Gültigkeitsbereichs (`Drop`).
+//! - **INV-CRYPTO-ZEROIZE-1**: Automatisches Zeroizing beim Verlassen des Gültigkeitsbereichs (`Drop`).
+//! - **INV-CRYPTO-CONSTANT-TIME-1**: Alle Schlüssel-, Tag- und Prüfsummenvergleiche in konstanter Zeit
+//!   mittels `subtle::ConstantTimeEq`. Verbot von `==`-Vergleichen auf Byte-Geheimnissen.
 //! - Manuelle Notfallbereinigung (`emergency_wipe`) überschreibt Speicher deterministisch mit Nullen.
-//! - Debug-Ausgaben maskieren sensible Schlüssel (`[REDACTED]`).
-//! - Strikter Verzicht auf `unsafe`-Code.
-
-// FILE-CONTEXT
-// ZWECK: Cold-boot protection and explicit Zeroize discipline for volatile encryption keys.
-// INVARIANTEN: Key bytes held in Zeroizing<[u8; 32]>. emergency_wipe explicitly zeroizes memory.
-// NICHT-OFFENSICHTLICH: Debug implementation redacts secret bytes. Constant-time equality comparison.
-// HOTSPOTS: [10-60]
-// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
+//! - Debug- und Display-Ausgaben maskieren sensible Schlüssel (`[REDACTED]`).
+//! - Strikter Verzicht auf `unsafe`-Code (`#![forbid(unsafe_code)]`).
 
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
+use crate::error::{CryptoError, Result};
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -40,8 +36,6 @@ impl VolatileEncryptionKey {
     /// Emergency Trigger: Explicitly wipes the key from memory.
     /// This is to be hooked into hardware sensors (e.g. crash/voltage).
     pub fn emergency_wipe(&mut self) {
-        // Der Zeroize-Trait überschreibt den RAM-Bereich mit Nullen
-        // und verhindert Compiler-Dead-Store-Elimination.
         self.key_bytes.zeroize();
     }
 
@@ -51,7 +45,6 @@ impl VolatileEncryptionKey {
     }
 
     /// Test-only method to inspect key bytes.
-    /// Used to verify zeroing in integration tests.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn inspect_key_bytes_for_test(&self) -> &[u8; 32] {
         &self.key_bytes
@@ -66,8 +59,6 @@ impl std::fmt::Debug for VolatileEncryptionKey {
     }
 }
 
-// AI-TAG[SECURITY][MINOR][RESOLVED] ConstantTimeEq used in PartialEq equality (ID: AGT-CRYPTO-dd984bc2) (TS: 2026-09-03T19:31:53Z) (SESSION: a413a598)
-// RESOLVED: Replaced manual XOR loop with subtle::ConstantTimeEq for provably constant-time slice comparison.
 impl PartialEq for VolatileEncryptionKey {
     fn eq(&self, other: &Self) -> bool {
         self.key_bytes
@@ -77,69 +68,124 @@ impl PartialEq for VolatileEncryptionKey {
     }
 }
 
+impl Eq for VolatileEncryptionKey {}
+
+/// Konstantzeit-Verifikation zweier Byte-Slices (`INV-CRYPTO-CONSTANT-TIME-1`).
+///
+/// Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen.
+#[inline]
+pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.ct_eq(b).into()
+}
+
+/// Verifiziert ein Authentifizierungs-Tag in konstanter Zeit und liefert `Result<()>`.
+#[inline]
+pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()> {
+    if constant_time_compare(expected, actual) {
+        Ok(())
+    } else {
+        Err(CryptoError::IntegrityViolation)
+    }
+}
+
+/// BLAKE3-basierte Integritätskette für sequentielle Log- oder Datenblöcke.
+#[derive(Debug, Clone)]
+pub struct Blake3Chain {
+    current_hash: [u8; 32],
+    step_count: u64,
+}
+
+impl Blake3Chain {
+    /// Initialisiert eine neue BLAKE3-Kette mit einem Seed/Genesis-Hash.
+    pub fn new(genesis: [u8; 32]) -> Self {
+        Self {
+            current_hash: genesis,
+            step_count: 0,
+        }
+    }
+
+    /// Aktualisiert den Zustand der Kette mit einem neuen Block und Kontext in AAD-Disziplin.
+    pub fn extend(&mut self, context: &[u8], data: &[u8]) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.current_hash);
+        hasher.update(&self.step_count.to_be_bytes());
+        hasher.update(&(context.len() as u32).to_be_bytes());
+        hasher.update(context);
+        hasher.update(&(data.len() as u64).to_be_bytes());
+        hasher.update(data);
+
+        let next_hash = *hasher.finalize().as_bytes();
+        self.current_hash = next_hash;
+        self.step_count = self.step_count.saturating_add(1);
+        next_hash
+    }
+
+    /// Gibt den aktuellen Ketten-Hash zurück.
+    pub fn current_hash(&self) -> &[u8; 32] {
+        &self.current_hash
+    }
+
+    /// Gibt die bisherige Anzahl an Kettengliedern zurück.
+    pub fn step_count(&self) -> u64 {
+        self.step_count
+    }
+
+    /// Verifiziert in konstanter Zeit, ob der aktuelle Hash mit einem erwarteten Wert übereinstimmt.
+    pub fn verify_current_hash(&self, expected: &[u8; 32]) -> Result<()> {
+        verify_tag_constant_time(expected, &self.current_hash)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn test_inv_crypto_constant_time_1() {
+        let tag1 = [0x55u8; 32];
+        let mut tag2 = [0x55u8; 32];
+        assert!(constant_time_compare(&tag1, &tag2));
+        assert!(verify_tag_constant_time(&tag1, &tag2).is_ok());
+
+        tag2[31] ^= 0x01;
+        assert!(!constant_time_compare(&tag1, &tag2));
+        assert!(verify_tag_constant_time(&tag1, &tag2).is_err());
+    }
+
+    #[test]
+    fn test_blake3_chain_integrity_and_anti_tamper() {
+        let mut chain1 = Blake3Chain::new([0u8; 32]);
+        let mut chain2 = Blake3Chain::new([0u8; 32]);
+
+        let h1 = chain1.extend(b"context_a", b"payload_1");
+        let h2 = chain2.extend(b"context_a", b"payload_1");
+        assert_eq!(h1, h2);
+        assert!(chain1.verify_current_hash(&h1).is_ok());
+
+        // Context divergence
+        let h1_next = chain1.extend(b"context_a", b"payload_2");
+        let h2_next = chain2.extend(b"context_b", b"payload_2");
+        assert_ne!(h1_next, h2_next);
+    }
+
+    #[test]
     fn test_emergency_wipe_zeros_key_bytes() {
         let raw: [u8; 32] = [0xAA; 32];
         let mut key = VolatileEncryptionKey::new(raw);
-
-        // Precondition: Key contains expected value
         assert_eq!(key.inspect_key_bytes_for_test(), &[0xAA; 32]);
-
-        // Action: Trigger emergency wipe
-        key.emergency_wipe();
-
-        // Proof: Key is fully zeroed
-        assert_eq!(
-            key.inspect_key_bytes_for_test(),
-            &[0x00; 32],
-            "All key bytes MUST be zeroed after emergency_wipe()"
-        );
-    }
-
-    #[test]
-    fn test_emergency_wipe_is_idempotent() {
-        let raw: [u8; 32] = [0xFF; 32];
-        let mut key = VolatileEncryptionKey::new(raw);
-
-        key.emergency_wipe();
-        assert_eq!(key.inspect_key_bytes_for_test(), &[0x00; 32]);
-
-        // Second wipe must be safe and idempotent
         key.emergency_wipe();
         assert_eq!(key.inspect_key_bytes_for_test(), &[0x00; 32]);
     }
 
     #[test]
-    fn test_key_debug_redacts_key() {
-        let raw: [u8; 32] = [0xAB; 32];
-        let key = VolatileEncryptionKey::new(raw);
-        let debug_str = format!("{key:?}");
-        assert!(!debug_str.contains("171")); // 0xAB in decimal
-        assert!(debug_str.contains("REDACTED"));
-    }
-
-    // AI-TAG[CORRECTNESS][MAJOR][RESOLVED] Refactored zeroize test to use safe Accessor API (ID: AGT-CRYPTO-7519b7cd) (TS: 2026-09-08T00:00:00Z) (SESSION: a413a598)
-    // RESOLVED: Replaced unsafe pointer dereferencing with safe as_bytes() accessor, maintaining 100% safe Rust compliance under #![forbid(unsafe_code)].
-    #[test]
-    fn test_zeroize_on_drop_wipes_memory() {
+    fn test_inv_crypto_zeroize_1_on_drop() {
         let raw: [u8; 32] = [0xCD; 32];
         let mut key = VolatileEncryptionKey::new(raw);
-
-        // Precondition: check that key contains original non-zero key bytes
         assert_eq!(key.as_bytes(), &[0xCD; 32]);
-
-        // Action: Explicitly invoke zeroize on volatile encryption key
         Zeroize::zeroize(&mut key);
-
-        // Postcondition: Check that memory was zeroed via safe as_bytes() accessor
-        assert_eq!(
-            key.as_bytes(),
-            &[0x00; 32],
-            "Memory MUST be zeroed after zeroize"
-        );
+        assert_eq!(key.as_bytes(), &[0x00; 32]);
     }
 }

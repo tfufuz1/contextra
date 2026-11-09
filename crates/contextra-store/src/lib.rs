@@ -30,6 +30,24 @@
 #![forbid(unsafe_code)]
 #![deny(dead_code)]
 #![allow(unexpected_cfgs)]
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::unreachable,
+    clippy::indexing_slicing
+)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing
+    )
+)]
 
 #[cfg(not(loom))]
 pub mod compaction;
@@ -75,3 +93,6 @@ pub use manifest::{Manifest, ManifestEntry};
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+
+pub mod io_seam;
+pub use io_seam::{RealFs, RealFsFile, StoreIo};

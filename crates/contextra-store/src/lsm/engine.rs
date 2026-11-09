@@ -533,4 +533,8 @@ impl LsmStorage {
     pub fn data_path(&self) -> &std::path::Path {
         &self.config.path
     }
+
+    pub fn vfs(&self) -> &std::sync::Arc<dyn contextra_ports::Vfs> {
+        &self.compaction_engine.vfs
+    }
 }

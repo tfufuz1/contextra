@@ -1,4 +1,4 @@
-use ahash::AHashSet;
+use crate::fixed_hasher::new_fixed_hashset;
 use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -57,7 +57,7 @@ impl HnswIndexCore {
             arena: &self.hot.arena,
         };
 
-        let mut visited = AHashSet::with_capacity(ef.saturating_mul(4));
+        let mut visited = new_fixed_hashset(ef.saturating_mul(4));
         let mut candidates = BinaryHeap::new();
         let mut results = BinaryHeap::new();
 

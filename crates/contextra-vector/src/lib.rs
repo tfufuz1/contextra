@@ -16,17 +16,30 @@
 // DONE: #![feature(portable_simd)] ist entfernt und distance.rs nutzt stabiles Rust.
 // INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd, mmap an contextra-sys ausgelagert.
 #![forbid(unsafe_code)]
-// ADR-077: Vector index numerical conversions, array indexing, and internal collections.
-#![allow(
-    clippy::too_many_arguments,
+// WP-VEC-7: Zero-Panic & Checked Casts
+#![deny(
     clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::disallowed_types,
-    clippy::collapsible_if,
-    clippy::wrong_self_convention
+    clippy::cast_sign_loss
 )]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )
+)]
+pub mod casting;
 
+#[allow(dead_code)]
+mod contract;
 pub mod error;
 pub mod types;
 
@@ -40,6 +53,7 @@ pub mod quantize;
 pub mod acorn;
 pub mod candidate_stream;
 pub mod compute_pool;
+pub mod fixed_hasher;
 pub mod partial_rebuild;
 
 #[cfg(feature = "experimental-rabitq")]

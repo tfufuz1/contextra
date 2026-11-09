@@ -1,10 +1,10 @@
-//! Kompatibilitätstest für Port-Typdefinitionen zwischen `contextra-ports` und `contextra-graph`.
+//! Kompatibilitätstest für Port-Typdefinitionen und lokale Typen in `contextra-graph`.
 //!
 //! # Zweck
-//! Stellt Binärkompatibilität und saubere Typ-Konvertierungen über Crate-Grenzen hinweg sicher.
+//! Stellt Binärkompatibilität und saubere Typ-Konvertierungen sicher.
 
 use contextra_graph::hyperedge::{HyperEdgeId, RoleBinding, RoleId};
-use contextra_types::EntityId;
+use contextra_graph::types::EntityId;
 
 // ANCHOR[contextra-graph:TESTS-GOLDEN-PORTS-TYPE-COMPATIBILITY-001]
 #[test]
