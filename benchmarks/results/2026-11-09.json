@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-09",
+  "dataset_name": "de_mini (200 Dokumente, 50 Abfragen)",
+  "total_queries": 50,
+  "total_documents": 200,
+  "status": "nicht ausgeführt",
+  "blocker_reason": "Die End-to-End-Retrieval-Ausführung über contextra/contextra-db ist blockiert, weil vorgelagerte Kern-Crates (contextra-crypto, contextra-graph, contextra-vector) Kompilierfehler aufweisen (siehe docs/handoff/fragments/P14/OPEN_ISSUES.md).",
+  "rows": [
+    {
+      "strategy": "vector_only",
+      "name": "Vektor allein",
+      "metrics": null,
+      "status": "nicht ausgeführt (Kern-Crates bauen nicht)"
+    },
+    {
+      "strategy": "bm25_only",
+      "name": "BM25 allein",
+      "metrics": null,
+      "status": "nicht ausgeführt (Kern-Crates bauen nicht)"
+    },
+    {
+      "strategy": "rrf_vector_text",
+      "name": "RRF (Vektor + Text)",
+      "metrics": null,
+      "status": "nicht ausgeführt (Kern-Crates bauen nicht)"
+    },
+    {
+      "strategy": "rrf_vector_text_graph",
+      "name": "RRF (Vektor + Text + Graph)",
+      "metrics": null,
+      "status": "nicht ausgeführt (Kern-Crates bauen nicht)"
+    },
+    {
+      "strategy": "weighted_rrf",
+      "name": "Gewichtetes RRF",
+      "metrics": null,
+      "status": "nicht ausgeführt (Kern-Crates bauen nicht)"
+    },
+    {
+      "strategy": "score_normalized_linear",
+      "name": "Normalisierte Linearkombination",
+      "metrics": null,
+      "status": "nicht ausgeführt (Kern-Crates bauen nicht)"
+    }
+  ]
+}
