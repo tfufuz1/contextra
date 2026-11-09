@@ -142,7 +142,6 @@ impl Contextra {
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
-            proof_key_provider: parking_lot::RwLock::new(None),
         };
 
         db.initialize_collections().await?;

@@ -51,9 +51,19 @@ use crate::Result;
 /// ```
 pub trait LayerScanner: Send + Sync {
     /// Gibt die von diesem Scanner bediente Schicht zurück.
+    ///
+    /// # Fehler
+    /// Keine; statische Schichtabfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn layer(&self) -> WitnessLayer;
 
     /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O- oder Verifizierungsfehlern.
+    /// # Crash
+    /// Reiner Lese- und Messzugriff auf Speicherschichten; verändert niemals persistente Daten.
     fn scan_units(&self, session: &mut ScanSession, ctx: &crate::RequestContext) -> Result<()>;
 
     /// Default-Implementierung von `scan`, die `begin`, `scan_units` und `finish` ausführt.

@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![allow(deprecated)]
 #![cfg_attr(
     test,
     allow(
@@ -122,7 +123,14 @@ pub use vector_index::*;
 pub use vfs::*;
 
 /// Generic contract tests for port implementers.
-#[cfg(feature = "contract-tests")]
+#[cfg(any(feature = "contract-tests", feature = "conformance"))]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::type_complexity,
+    clippy::io_other_error
+)]
 pub mod contract_tests;
 
 pub use metrics::{

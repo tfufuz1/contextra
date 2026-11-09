@@ -69,9 +69,19 @@ pub enum LicenseError {
 /// und folgt in einem eigenen, separat zu beauftragenden Schritt.
 pub trait LicenseGate: Send + Sync {
     /// Checks if the requested feature ring is activated and accessible.
+    ///
+    /// # Fehler
+    /// Liefert `LicenseError::NotActivated`, `LicenseError::InvalidSignature` oder `LicenseError::Expired`.
+    /// # Crash
+    /// Reiner Lesevorgang von Lizenz-Zertifikaten oder RAM-Zustand; keine Seiteneffekte.
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError>;
 
     /// Authorizes the requested feature ring and yields an [`AuthorizedRing`] token on success.
+    ///
+    /// # Fehler
+    /// Liefert `LicenseError` falls die Autorisierungsprüfung fehlschlägt.
+    /// # Crash
+    /// Reiner Statusabruf und Token-Ausstellung ohne persistente Mutation.
     fn authorize(&self, requested: FeatureRing) -> Result<AuthorizedRing, LicenseError> {
         self.check_ring(requested)?;
         Ok(AuthorizedRing::new(requested))

@@ -39,27 +39,57 @@ impl PluginCapability {
 /// Manifest trait implemented by dynamic or static plugins.
 pub trait PluginManifest: Send + Sync {
     /// Returns the name of the plugin.
+    ///
+    /// # Fehler
+    /// Keine; statische Namensabfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn name(&self) -> &str;
 
     /// Returns the list of plugin names required prior to activation.
+    ///
+    /// # Fehler
+    /// Keine; statische Referenzliste.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn requires(&self) -> &[&str] {
         &[]
     }
 
     /// Returns the list of plugin names that conflict with this plugin.
+    ///
+    /// # Fehler
+    /// Keine; statische Referenzliste.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn conflicts(&self) -> &[&str] {
         &[]
     }
 
     /// Returns the required feature ring for this plugin.
+    ///
+    /// # Fehler
+    /// Keine; statischer Feature-Ring-Abruf.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn feature_ring_required(&self) -> FeatureRing {
         FeatureRing::Fast
     }
 
     /// Returns the static capability metadata for this plugin.
+    ///
+    /// # Fehler
+    /// Keine; liefert statischen Deskriptor.
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn capability(&self) -> PluginCapability;
 
     /// Activates the plugin instance.
+    ///
+    /// # Fehler
+    /// Liefert `PluginError` bei Initialisierungs-, Berechtigungs- oder Ressourcenfehlern.
+    /// # Crash
+    /// Idempotente Aktivierung im RAM; Fehler machen Zustandsänderungen rückgängig.
     fn activate(&self) -> Result<(), PluginError>;
 }
 

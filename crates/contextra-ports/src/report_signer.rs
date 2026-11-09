@@ -44,6 +44,11 @@ pub enum SignerError {
 /// Abstract port trait for signing audit reports (SPEC §8.2, D-130, T-SIG-1).
 pub trait ReportSigner: Send + Sync {
     /// Returns the unique numeric signer identifier according to SPEC F.10.
+    ///
+    /// # Fehler
+    /// Keine; statische Signer-ID-Abfrage.
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Mutation.
     fn signer_id(&self) -> SignerId;
 
     /// Signs the canonical report bytes.

@@ -176,7 +176,61 @@ pub mod check {
         drop(t.purge(ctx, target));
     }
 
-    /// Verifies dynamic object-safety and evaluation conformance of [`EgressPolicy`].
+    /// Verifies that [`crate::vfs::VfsFile`] methods can be invoked in generic contexts.
+    pub fn assert_vfs_file_contract<F: crate::vfs::VfsFile>(f: &F, buf: &mut [u8]) {
+        drop(f.write_at(buf, 0));
+        drop(f.set_len(0));
+        drop(f.sync_data());
+        drop(f.sync_all());
+    }
+
+    /// Verifies that [`crate::gate::ReadGate`] methods can be invoked in generic contexts.
+    pub fn assert_read_gate_contract<G: crate::gate::ReadGate>(
+        g: &G,
+        b: &crate::gate::KeyBound,
+        r: &crate::gate::KeyRange,
+        k: &crate::gate::KeyBuf,
+    ) {
+        let _ = g.check_bound(b);
+        let _ = g.variant_for_range(r);
+        let _ = g.gate_epoch();
+        let _ = g.covers(k);
+        let raw = [0u8; 78];
+        let _ = g.covers_raw(&raw);
+        let _ = g.gated_seq_raw(&raw);
+    }
+
+    /// Verifies that [`crate::keys::RecordSealer`] and [`crate::keys::FileKeyring`] methods can be invoked.
+    pub fn assert_keys_contract<S: crate::keys::RecordSealer, K: crate::keys::FileKeyring>(
+        s: &S,
+        k: &K,
+        file_id: &crate::keys::FileId,
+        ctx: &crate::keys::SealCtx,
+        key: &crate::gate::KeyBuf,
+    ) {
+        drop(s.seal(ctx, key, b"plain"));
+        drop(s.make_slots_durable());
+        drop(k.destroy(*file_id));
+    }
+
+    /// Verifies that [`crate::ledger::LedgerSink`] methods can be invoked.
+    pub fn assert_ledger_contract<L: crate::ledger::LedgerSink>(l: &L) {
+        drop(l.read_all());
+        drop(l.prune(crate::ledger::Timestamp(0)));
+    }
+
+    /// Verifies that [`crate::erasure::ErasureLayer`] methods can be invoked.
+    pub fn assert_erasure_layer_contract<E: crate::erasure::ErasureLayer>(
+        e: &E,
+        target: &crate::erasure::EraseTarget,
+        scope: &crate::erasure::LayerScope,
+    ) {
+        drop(e.resolve(target));
+        drop(e.on_gate(scope));
+        let _ = e.key_coverage();
+    }
+
+    /// Verifies dynamic object-safety and evaluation conformance of [`crate::policy::EgressPolicy`].
     pub fn assert_egress_policy_contract<T: crate::policy::EgressPolicy>(
         t: &T,
         ctx: &RequestContext,

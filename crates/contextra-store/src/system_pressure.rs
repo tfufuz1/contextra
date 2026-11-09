@@ -40,6 +40,14 @@ pub const SCHEDULER_QUEUE_ELEVATED: f32 = 0.60;
 pub const BLOCKING_UTIL_CRITICAL: f32 = SCHEDULER_QUEUE_CRITICAL;
 pub const BLOCKING_UTIL_ELEVATED: f32 = SCHEDULER_QUEUE_ELEVATED;
 
+/// Injektions-Trait für externe Speicherdruck-Signale (ohne globale Zustände).
+pub trait SystemPressureSignal: Send + Sync {
+    /// Liefert den aktuellen Druckpegel.
+    fn current_pressure(&self) -> PressureLevel;
+    /// Informiert über eine empfohlene Speicherreduktion (z. B. Cache-Verkleinerung).
+    fn advise_reduction_ratio(&self) -> f32;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PressureLevel {
     Normal,
