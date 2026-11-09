@@ -18,7 +18,7 @@ use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::{Embedding, Module};
 use candle_transformers::quantized_nn::RmsNorm;
 use contextra_types::ContextraError;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Maximale Sequenzlänge für die Vorberechnung der RoPE-Drehfrequenzen (Rotary Positional Embedding).
 // ANCHOR[contextra-infer-candle:LLAMA-INTERNAL-MAX-SEQ-LEN]
@@ -301,7 +301,7 @@ pub struct ModelWeights {
     /// Ausgabeprojektion auf das Vokabular.
     pub output: QuantizedMatMul,
     /// Gecachte Kausalitätsmasken.
-    pub masks: HashMap<(usize, usize), Tensor>,
+    pub masks: BTreeMap<(usize, usize), Tensor>,
     span: tracing::Span,
     span_output: tracing::Span,
 }
@@ -436,7 +436,7 @@ impl ModelWeights {
             norm: RmsNorm::from_qtensor(norm, rms_norm_eps as f64)
                 .map_err(|e| ContextraError::Internal(e.to_string()))?,
             output: QuantizedMatMul::from_qtensor(output)?,
-            masks: HashMap::new(),
+            masks: BTreeMap::new(),
             span,
             span_output,
         })

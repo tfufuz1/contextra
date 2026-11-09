@@ -16,7 +16,7 @@ mod core;
 mod prefix_reuse;
 
 #[cfg(test)]
-mod tests;
+mod inference_tests;
 
 pub use core::*;
 

@@ -1,3 +1,4 @@
+#![cfg(feature = "candle")]
 // FILE-CONTEXT
 // STAND: 2026-09-11T16:00:00Z
 // ZWECK: Property-based tests for numerical normalization, finite outputs, and empty/whitespace input edge cases.

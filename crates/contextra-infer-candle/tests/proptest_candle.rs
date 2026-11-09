@@ -1,3 +1,4 @@
+#![cfg(feature = "candle")]
 // FILE-CONTEXT
 // STAND: 2026-09-09T12:44:49Z (SESSION: c74a1828)
 // ZWECK: Property-based tests for contextra-infer-candle components (fingerprinting, GaspValidator, and clients).

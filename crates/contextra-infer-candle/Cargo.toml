@@ -13,44 +13,36 @@ description = "Native Candle GGUF ML inference backend for Contextra"
 ring = "2"
 
 [dependencies]
-candle-core = "0.11"
-candle-nn = "0.11"
-candle-transformers = "0.11"
-tokenizers = "0.21"
+candle-core = { version = "0.11", optional = true }
+candle-nn = { version = "0.11", optional = true }
+candle-transformers = { version = "0.11", optional = true }
+tokenizers = { version = "0.21", optional = true }
 bytes = { workspace = true }
 sha2 = "0.10"
-tokio = { workspace = true }
-futures-util = "0.3"
-serde = { workspace = true }
-tracing = { workspace = true }
-bincode = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+futures-util = { version = "0.3", optional = true }
+serde = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
 half = "2.4"
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-crypto = { workspace = true, optional = true }
 parking_lot = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { workspace = true }
-contextra-crypto = { workspace = true, features = ["kv-encryption"] }
-
-[[bench]]
-name = "kv_bridge_bench"
-harness = false
-required-features = ["kv-bridge"]
 
 [features]
 default = []
-candle = []
-kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
-kv-stage-b = ["dep:bincode"]
-cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
-test-utils = []
+std = []
+candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers", "dep:tokio", "dep:futures-util"]
+cuda = ["candle", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+metal = ["candle", "candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
+serde = ["dep:serde"]
+tracing = ["dep:tracing"]
+experimental = []
 
 [target.'cfg(target_os = "macos")'.dependencies]
-candle-core = { version = "0.11", features = ["metal"] }
-candle-nn = { version = "0.11", features = ["metal"] }
-candle-transformers = { version = "0.11", features = ["metal"] }
+candle-core = { version = "0.11", optional = true, features = ["metal"] }
+candle-nn = { version = "0.11", optional = true, features = ["metal"] }
+candle-transformers = { version = "0.11", optional = true, features = ["metal"] }

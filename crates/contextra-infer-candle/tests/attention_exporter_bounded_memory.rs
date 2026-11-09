@@ -1,3 +1,4 @@
+#![cfg(feature = "candle")]
 #![forbid(unsafe_code)]
 
 //! Integrationstest für speicherbegrenzte Aufmerksamkeits-Historie ([`CandleAttentionExporter`]).

@@ -1,4 +1,4 @@
-#![cfg(feature = "kv-bridge")]
+#![cfg(all(feature = "candle", feature = "experimental"))]
 // ANCHOR[contextra-infer-candle:TEST-KV-BRIDGE-VERSION-MISMATCH]
 //! Verification test for KV-Bridge mismatch and corruption scenarios: Model fingerprint mismatch, RoPE mismatch, truncated or corrupted bytes.
 
