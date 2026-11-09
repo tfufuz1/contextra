@@ -14,7 +14,55 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use contextra_types::{FilterExpr, MemoryType};
+use contextra_types::{ContextraError, FilterExpr, MemoryType, Result};
+
+/// Maximale Rekursionstiefe für verschachtelte Filterausdrücke (Schutz vor Stack Overflow).
+pub const MAX_FILTER_DEPTH: usize = 16;
+
+/// Maximale Anzahl von Filterknoten (Schutz vor DoS / unbeschränkter Allokation).
+pub const MAX_FILTER_NODES: usize = 128;
+
+/// Validiert, dass ein `FilterExpr` die Tiefen- und Knotengrenzen einhält.
+pub fn validate_filter_expr_bounds(expr: &FilterExpr) -> Result<()> {
+    fn check_bounds(expr: &FilterExpr, current_depth: usize, node_count: &mut usize) -> Result<()> {
+        *node_count = node_count.saturating_add(1);
+        if *node_count > MAX_FILTER_NODES {
+            return Err(ContextraError::invalid_input(format!(
+                "Filter node count exceeds maximum allowed limit of {MAX_FILTER_NODES}"
+            )));
+        }
+        if current_depth > MAX_FILTER_DEPTH {
+            return Err(ContextraError::invalid_input(format!(
+                "Filter depth exceeds maximum allowed limit of {MAX_FILTER_DEPTH}"
+            )));
+        }
+
+        match expr {
+            FilterExpr::And(left, right) | FilterExpr::Or(left, right) => {
+                let next_depth = current_depth.saturating_add(1);
+                check_bounds(left, next_depth, node_count)?;
+                check_bounds(right, next_depth, node_count)?;
+            }
+            FilterExpr::Not(inner) => {
+                check_bounds(inner, current_depth.saturating_add(1), node_count)?;
+            }
+            FilterExpr::Eq { .. }
+            | FilterExpr::Ne { .. }
+            | FilterExpr::Gt { .. }
+            | FilterExpr::Gte { .. }
+            | FilterExpr::Lt { .. }
+            | FilterExpr::Lte { .. }
+            | FilterExpr::In { .. }
+            | FilterExpr::NotIn { .. }
+            | FilterExpr::Exists { .. } => {}
+            _ => {}
+        }
+        Ok(())
+    }
+
+    let mut nodes = 0;
+    check_bounds(expr, 1, &mut nodes)
+}
 
 /// Extrahiert den MemoryType aus Dokument-Metadaten (Rückwärtskompatibel).
 pub fn extract_memory_type(metadata: &Option<Value>) -> MemoryType {
@@ -80,6 +128,44 @@ pub enum MetadataFilter {
 
 #[allow(deprecated)]
 impl MetadataFilter {
+    /// Validiert, dass der `MetadataFilter` die Tiefen- und Knotengrenzen einhält.
+    pub fn validate_bounds(&self) -> Result<()> {
+        fn check_bounds(
+            filter: &MetadataFilter,
+            current_depth: usize,
+            node_count: &mut usize,
+        ) -> Result<()> {
+            *node_count = node_count.saturating_add(1);
+            if *node_count > MAX_FILTER_NODES {
+                return Err(ContextraError::invalid_input(format!(
+                    "MetadataFilter node count exceeds limit of {MAX_FILTER_NODES}"
+                )));
+            }
+            if current_depth > MAX_FILTER_DEPTH {
+                return Err(ContextraError::invalid_input(format!(
+                    "MetadataFilter depth exceeds limit of {MAX_FILTER_DEPTH}"
+                )));
+            }
+
+            match filter {
+                MetadataFilter::Condition { .. } => Ok(()),
+                MetadataFilter::And(children) | MetadataFilter::Or(children) => {
+                    let next_depth = current_depth.saturating_add(1);
+                    for child in children {
+                        check_bounds(child, next_depth, node_count)?;
+                    }
+                    Ok(())
+                }
+                MetadataFilter::Not(inner) => {
+                    check_bounds(inner, current_depth.saturating_add(1), node_count)
+                }
+            }
+        }
+
+        let mut nodes = 0;
+        check_bounds(self, 1, &mut nodes)
+    }
+
     /// Evaluates the filter against a metadata object.
     #[deprecated(
         since = "0.1.0",
@@ -88,6 +174,9 @@ impl MetadataFilter {
     // ANCHOR[contextra-engine:FLT-003]
     /// Prüft, ob das gegebene JSON-Metadatenobjekt die Filterbedingungen erfüllt.
     pub fn matches(&self, metadata: &Value) -> bool {
+        if self.validate_bounds().is_err() {
+            return false;
+        }
         if let Ok(expr) = FilterExpr::try_from(self.clone()) {
             expr.evaluate(metadata)
         } else {
@@ -100,7 +189,8 @@ impl MetadataFilter {
 impl TryFrom<MetadataFilter> for FilterExpr {
     type Error = contextra_types::ContextraError;
 
-    fn try_from(filter: MetadataFilter) -> Result<Self, Self::Error> {
+    fn try_from(filter: MetadataFilter) -> std::result::Result<Self, Self::Error> {
+        filter.validate_bounds()?;
         match filter {
             MetadataFilter::Condition { field, op, value } => match op {
                 FilterOp::Eq => Ok(FilterExpr::Eq { field, value }),

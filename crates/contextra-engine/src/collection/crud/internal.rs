@@ -55,7 +55,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Applies configured backpressure delay if system pressure level is Critical (INV-PRESSURE-1).
     pub(crate) async fn apply_insert_backpressure(&self) {
         let delay_ms = self.config.read().backpressure_delay_ms;
-        if let Some(delay_ms) = delay_ms {
+        let sleep_duration = if let Some(delay_ms) = delay_ms {
             let rx_opt = self.pressure_rx.read().clone();
             if let Some(ref rx) = rx_opt {
                 let level = rx.borrow().pressure_level;
@@ -71,14 +71,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     &[],
                 );
                 if level == contextra_store::PressureLevel::Critical {
-                    let backpressure_delay = std::time::Duration::from_millis(delay_ms);
-                    tracing::warn!(
-                        "Insert backpressure active (Critical pressure level); delaying {}ms",
-                        backpressure_delay.as_millis()
-                    );
-                    tokio::time::sleep(backpressure_delay).await;
+                    Some(std::time::Duration::from_millis(delay_ms))
+                } else {
+                    None
                 }
+            } else {
+                None
             }
+        } else {
+            None
+        };
+
+        if let Some(backpressure_delay) = sleep_duration {
+            tracing::warn!(
+                "Insert backpressure active (Critical pressure level); delaying {}ms",
+                backpressure_delay.as_millis()
+            );
+            tokio::time::sleep(backpressure_delay).await;
         }
     }
 

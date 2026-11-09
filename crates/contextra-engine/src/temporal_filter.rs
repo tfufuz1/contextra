@@ -19,7 +19,7 @@ use contextra_types::TxId;
 use serde_json::Value;
 
 /// Type alias for search & fusion results in post-retrieval pipelines.
-pub type FusionResult = crate::SearchResult;
+pub type FusionResult = contextra_rank::SearchResult;
 
 /// Extracted bi-temporal validity window representation for a document or search candidate.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -158,16 +158,37 @@ pub fn extract_validity_window(metadata: Option<&Value>) -> ValidityWindow {
     }
 }
 
+/// Sorts candidates deterministically by score descending, breaking ties by document ID ascending (B11).
+#[inline]
+pub fn sort_candidates_deterministic(results: &mut [contextra_rank::SearchResult]) {
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+}
+
+/// Applies bi-temporal validity filtering using an injected `Clock` port trait (B11).
+pub fn apply_temporal_validity_filter_with_clock(
+    results: Vec<contextra_rank::SearchResult>,
+    current_tx: TxId,
+    clock: &dyn contextra_ports::Clock,
+) -> Vec<contextra_rank::SearchResult> {
+    let now_ms = clock.now_unix_nanos() / 1_000_000;
+    apply_temporal_validity_filter(results, current_tx, Some(now_ms))
+}
+
 /// Applies bi-temporal validity filtering to candidates post-RRF fusion.
 ///
 /// Filters out candidate results that are invalid relative to the current transaction `current_tx`
 /// or business timestamp `query_timestamp`.
 /// Candidates without validity window metadata (legacy data) are retained (Fail-Open).
 pub fn apply_temporal_validity_filter(
-    results: Vec<crate::SearchResult>,
+    results: Vec<contextra_rank::SearchResult>,
     current_tx: TxId,
     query_timestamp: Option<u64>,
-) -> Vec<crate::SearchResult> {
+) -> Vec<contextra_rank::SearchResult> {
     results
         .into_iter()
         .filter(|res| {
@@ -184,9 +205,9 @@ pub fn apply_temporal_validity_filter(
 /// transaction validity (`tx_valid_to`, ADR-033) is active at that historical timestamp.
 /// Candidates without validity window metadata (legacy data) are retained (Fail-Open for backward compatibility).
 pub fn apply_temporal_validity_filter_at(
-    results: Vec<crate::SearchResult>,
+    results: Vec<contextra_rank::SearchResult>,
     as_of_timestamp: u64,
-) -> Vec<crate::SearchResult> {
+) -> Vec<contextra_rank::SearchResult> {
     let as_of_tx = TxId::new(as_of_timestamp);
     results
         .into_iter()
@@ -202,8 +223,11 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn make_candidate(id: &str, metadata: Option<serde_json::Value>) -> crate::SearchResult {
-        crate::SearchResult {
+    fn make_candidate(
+        id: &str,
+        metadata: Option<serde_json::Value>,
+    ) -> contextra_rank::SearchResult {
+        contextra_rank::SearchResult {
             id: id.to_string(),
             score: 0.9,
             metadata,

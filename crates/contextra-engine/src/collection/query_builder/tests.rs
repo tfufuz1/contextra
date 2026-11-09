@@ -470,6 +470,7 @@ async fn test_pid_controller_integration_with_reranker() {
     assert_eq!(res.len(), 2);
     let updated_size = pid.lock().current_pool_size;
     assert!(updated_size.is_some());
+    drop(updated_size);
 
     // Second call: verify pid controller's stored current_pool_size is used as rerank_pool_max
     let res2 = col

@@ -48,8 +48,9 @@ impl KvKeyLocks {
     // ANCHOR[contextra-engine:COL-LOC-042]
     /// Dokumentation für `lock_shard` im Rahmen der Collection- und Suchabstraktion.
     pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {
-        let guard = self.shards[idx].lock().await;
-        KeyGuard { _guard: guard }
+        KeyGuard {
+            _guard: self.shards[idx].lock().await,
+        }
     }
 
     // ANCHOR[contextra-engine:COL-LOC-047]

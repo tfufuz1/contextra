@@ -167,7 +167,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     async fn repair_internal(&self) -> Result<()> {
-        let _guard = self.consolidation_guard.lock().await;
+        let _guard = self.consolidation_guard.clone().lock_owned().await;
         let docs = self.storage.scan_prefix(&self.prefix).await?;
         let indexed_ids: std::collections::HashSet<DocId> =
             self.index.all_doc_ids().await?.into_iter().collect();
@@ -553,7 +553,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// and `importance` metadata for TxId-based decay sweep (`effective_score < DECAY_DELETION_THRESHOLD`).
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {
-        let now_ms = self.clock.read().now_unix_nanos() / 1_000_000;
+        let now_ms = self.clock().now_unix_nanos() / 1_000_000;
 
         let now_tx = self.next_tx.load(Ordering::SeqCst);
         let user_prefix = self.namespaced_key(b"", 0);
@@ -850,7 +850,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Removes all data belonging to this collection from storage.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(&self) -> Result<()> {
-        let _guard = self.consolidation_guard.lock().await;
+        let _guard = self.consolidation_guard.clone().lock_owned().await;
         let prefix = if self.name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
                 "Cannot drop default collection",
