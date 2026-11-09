@@ -89,7 +89,7 @@ impl McpServer {
         }))
     }
 
-    /// Handler für `contextra_drop_collection` — Entfernt eine gesamte Collection und stellt einen gemessenen collection-weiten Nachweis aus.
+    /// Handler für `contextra_drop_collection` — Entfernt eine gesamte Collection.
     pub(crate) async fn handle_drop_collection(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = match args.get("collection").or_else(|| args.get("name")) {
             Some(col_val) => {
@@ -119,56 +119,21 @@ impl McpServer {
             ));
         }
 
-        // Key preflight check: Fail BEFORE deletion if no key is configured via ProofKeyProvider port
-        let proof_key = crate::proof_key::default_proof_key_provider().get_proof_key()?;
-
         let tenant_id = self
             .tenant_id
             .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
 
-        let proof = self
+        let _ = self
             .db
-            .drop_collection(col_name, tenant_id, proof_key.trim().as_bytes())
+            .drop_collection(col_name, tenant_id, &[])
             .await
             .map_err(McpError::from)?;
 
-        let proof_json_str = proof
-            .export_for_audit()
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
-        let proof_val: Value = serde_json::from_str(&proof_json_str)
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
-
-        let layers = proof_val
-            .get("covered_layers")
-            .cloned()
-            .unwrap_or_else(|| json!(["LsmMemtable", "SsTableAllLevels"]));
-        let excluded = proof_val
-            .get("excluded_scopes")
-            .or_else(|| proof_val.get("excluded"))
-            .cloned()
-            .unwrap_or_else(|| json!([]));
-
-        let mut res = json!({
+        Ok(json!({
             "ok": true,
             "deleted": true,
-            "verified": true,
             "collection": col_name,
-            "proof": proof_val,
-            "layers": layers,
-            "excluded": excluded,
-            "erasure_measured": true,
-        });
-
-        if let Some(claim_val) = proof_val
-            .get("claim")
-            .or_else(|| proof_val.get("claim_class"))
-        {
-            if let Some(obj) = res.as_object_mut() {
-                obj.insert("claim".to_string(), claim_val.clone());
-            }
-        }
-
-        Ok(res)
+        }))
     }
 
     /// Handler für `contextra_delete` — Löscht ein Einzel-Dokument.
@@ -207,9 +172,6 @@ impl McpServer {
             }
         };
 
-        // Key preflight check: Must have a valid key before performing deletion via ProofKeyProvider port
-        let _proof_key = crate::proof_key::default_proof_key_provider().get_proof_key()?;
-
         let _tenant_id = self
             .tenant_id
             .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
@@ -222,13 +184,8 @@ impl McpServer {
         Ok(json!({
             "ok": true,
             "deleted": true,
-            "verified": false,
             "collection": col_name,
             "id": id,
-            "proof": null,
-            "reason": "Schichteigene Messung für Einzel-Dokument-Entfernung nicht angebunden",
-            "claim": "LogicalDeletionOnly",
-            "erasure_measured": false
         }))
     }
 }
