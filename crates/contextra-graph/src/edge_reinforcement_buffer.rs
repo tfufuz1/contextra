@@ -53,34 +53,73 @@ pub struct TraversalSignal {
 pub struct EdgeReinforcementBuffer {
     cooccurrence: Mutex<Vec<CooccurrenceSignal>>,
     traversal: Mutex<Vec<TraversalSignal>>,
+    max_capacity: usize,
 }
 
 #[cfg(feature = "edge-reinforcement-learning")]
 impl EdgeReinforcementBuffer {
     // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-004]
+    pub const DEFAULT_MAX_CAPACITY: usize = 65_536;
+
     pub fn new() -> Self {
-        Self::default()
+        Self::with_capacity(Self::DEFAULT_MAX_CAPACITY)
+    }
+
+    pub fn with_capacity(max_capacity: usize) -> Self {
+        Self {
+            cooccurrence: Mutex::new(Vec::new()),
+            traversal: Mutex::new(Vec::new()),
+            max_capacity,
+        }
+    }
+
+    pub fn try_push_cooccurrence(
+        &self,
+        from: EntityId,
+        to: EntityId,
+        co_activation: f32,
+    ) -> Result<(), &'static str> {
+        let mut guard = self.cooccurrence.lock();
+        if guard.len() >= self.max_capacity {
+            return Err("CapacityExceeded");
+        }
+        guard.push(CooccurrenceSignal {
+            from,
+            to,
+            co_activation,
+        });
+        Ok(())
+    }
+
+    pub fn try_push_traversal(
+        &self,
+        from: EntityId,
+        to: EntityId,
+        path_length: usize,
+    ) -> Result<(), &'static str> {
+        let mut guard = self.traversal.lock();
+        if guard.len() >= self.max_capacity {
+            return Err("CapacityExceeded");
+        }
+        guard.push(TraversalSignal {
+            from,
+            to,
+            path_length,
+        });
+        Ok(())
     }
 
     /// Fügt ein Co-Occurrence-Signal hinzu (ko-aktivierte Entitäten in derselben
     /// Retrieval-Session). Kann von mehreren Threads gleichzeitig aufgerufen werden.
     // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-005]
     pub fn push_cooccurrence(&self, from: EntityId, to: EntityId, co_activation: f32) {
-        self.cooccurrence.lock().push(CooccurrenceSignal {
-            from,
-            to,
-            co_activation,
-        });
+        let _ = self.try_push_cooccurrence(from, to, co_activation);
     }
 
     /// Fügt ein Traversal-Signal hinzu (traversierte Kante mit Pfadlänge).
     // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-006]
     pub fn push_traversal(&self, from: EntityId, to: EntityId, path_length: usize) {
-        self.traversal.lock().push(TraversalSignal {
-            from,
-            to,
-            path_length,
-        });
+        let _ = self.try_push_traversal(from, to, path_length);
     }
 
     /// Gibt die Anzahl der gepufferten Co-Occurrence-Signale zurück (für Monitoring).

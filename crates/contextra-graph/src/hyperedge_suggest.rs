@@ -9,6 +9,28 @@ use contextra_types::{DocId, EntityId};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
+/// Neutraler Trait für die Validierung oder Generierung von Hyperkanten-Vorschlägen (Klasse A).
+pub trait SuggestionSource: Send + Sync {
+    /// Sendet einen Validierungsprompt an die Vorschlagsquelle.
+    fn generate<'a>(
+        &'a self,
+        prompt: &'a str,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = std::result::Result<String, String>> + Send + 'a>,
+    >;
+}
+
+impl<T: LlmTextGenerator + ?Sized> SuggestionSource for T {
+    fn generate<'a>(
+        &'a self,
+        prompt: &'a str,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = std::result::Result<String, String>> + Send + 'a>,
+    > {
+        Box::pin(async move { self.generate(prompt).await.map_err(|e| e.to_string()) })
+    }
+}
+
 /// Maximum allowed participants in a hyperedge candidate (Combinatorial explosion guard, P5).
 // ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-001]
 pub const MAX_RELATE_PARTICIPANTS: usize = 64;

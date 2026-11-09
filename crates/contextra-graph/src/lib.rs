@@ -34,6 +34,7 @@
 #[cfg(feature = "apprh-diffusion")]
 pub mod apprh;
 pub mod arc_slice;
+pub mod contract;
 pub mod cascade;
 pub mod community;
 pub mod consistency_enforcement;
