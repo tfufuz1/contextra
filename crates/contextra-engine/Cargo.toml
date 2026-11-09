@@ -17,7 +17,6 @@ contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
-contextra-crypto = { workspace = true }
 contextra-sandbox = { workspace = true, optional = true }
 contextra-infer-onnx = { workspace = true, optional = true }
 contextra-adapt = { workspace = true, optional = true }

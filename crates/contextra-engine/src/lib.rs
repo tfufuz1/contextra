@@ -386,11 +386,6 @@ pub struct Contextra {
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
-pub use contextra_impl::erasure::{
-    summary_from_witness, ErasureFailure, ErasureReport, LayerSummary,
-    UNMEASURED_ERASURE_LAYERS,
-};
-
 #[cfg(not(loom))]
 pub mod contextra_impl;
 
