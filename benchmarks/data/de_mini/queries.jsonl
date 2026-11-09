@@ -1,0 +1,50 @@
+{"id": "q_01", "text": "Wie funktioniert LSM-Tree Struktur?", "domain": "datenbank"}
+{"id": "q_02", "text": "Einsatz und Eigenschaften von LSM-Tree Struktur in Speichersystemen", "domain": "datenbank"}
+{"id": "q_03", "text": "Wie funktioniert Write-Ahead-Log?", "domain": "datenbank"}
+{"id": "q_04", "text": "Einsatz und Eigenschaften von Write-Ahead-Log in Speichersystemen", "domain": "datenbank"}
+{"id": "q_05", "text": "Wie funktioniert Bloom-Filter?", "domain": "datenbank"}
+{"id": "q_06", "text": "Einsatz und Eigenschaften von Bloom-Filter in Speichersystemen", "domain": "datenbank"}
+{"id": "q_07", "text": "Wie funktioniert Compaction-Strategien?", "domain": "datenbank"}
+{"id": "q_08", "text": "Einsatz und Eigenschaften von Compaction-Strategien in Speichersystemen", "domain": "datenbank"}
+{"id": "q_09", "text": "Wie funktioniert B-Tree vs LSM?", "domain": "datenbank"}
+{"id": "q_10", "text": "Einsatz und Eigenschaften von B-Tree vs LSM in Speichersystemen", "domain": "datenbank"}
+{"id": "q_11", "text": "Wie funktioniert HNSW Graph?", "domain": "vektorsuche"}
+{"id": "q_12", "text": "Einsatz und Eigenschaften von HNSW Graph in Speichersystemen", "domain": "vektorsuche"}
+{"id": "q_13", "text": "Wie funktioniert Skalare Quantisierung?", "domain": "vektorsuche"}
+{"id": "q_14", "text": "Einsatz und Eigenschaften von Skalare Quantisierung in Speichersystemen", "domain": "vektorsuche"}
+{"id": "q_15", "text": "Wie funktioniert Kosinus-Distanz?", "domain": "vektorsuche"}
+{"id": "q_16", "text": "Einsatz und Eigenschaften von Kosinus-Distanz in Speichersystemen", "domain": "vektorsuche"}
+{"id": "q_17", "text": "Wie funktioniert Vektordimensionen?", "domain": "vektorsuche"}
+{"id": "q_18", "text": "Einsatz und Eigenschaften von Vektordimensionen in Speichersystemen", "domain": "vektorsuche"}
+{"id": "q_19", "text": "Wie funktioniert DiskANN Indizierung?", "domain": "vektorsuche"}
+{"id": "q_20", "text": "Einsatz und Eigenschaften von DiskANN Indizierung in Speichersystemen", "domain": "vektorsuche"}
+{"id": "q_21", "text": "Wie funktioniert BM25 Algorithmus?", "domain": "textretrieval"}
+{"id": "q_22", "text": "Einsatz und Eigenschaften von BM25 Algorithmus in Speichersystemen", "domain": "textretrieval"}
+{"id": "q_23", "text": "Wie funktioniert Invertierter Index?", "domain": "textretrieval"}
+{"id": "q_24", "text": "Einsatz und Eigenschaften von Invertierter Index in Speichersystemen", "domain": "textretrieval"}
+{"id": "q_25", "text": "Wie funktioniert Stemming und Tokenisierung?", "domain": "textretrieval"}
+{"id": "q_26", "text": "Einsatz und Eigenschaften von Stemming und Tokenisierung in Speichersystemen", "domain": "textretrieval"}
+{"id": "q_27", "text": "Wie funktioniert WAND Algorithmus?", "domain": "textretrieval"}
+{"id": "q_28", "text": "Einsatz und Eigenschaften von WAND Algorithmus in Speichersystemen", "domain": "textretrieval"}
+{"id": "q_29", "text": "Wie funktioniert Stopwort-Filterung?", "domain": "textretrieval"}
+{"id": "q_30", "text": "Einsatz und Eigenschaften von Stopwort-Filterung in Speichersystemen", "domain": "textretrieval"}
+{"id": "q_31", "text": "Wie funktioniert RRF Reciprocal Rank Fusion?", "domain": "fusion"}
+{"id": "q_32", "text": "Einsatz und Eigenschaften von RRF Reciprocal Rank Fusion in Speichersystemen", "domain": "fusion"}
+{"id": "q_33", "text": "Wie funktioniert Score-Normalisierung?", "domain": "fusion"}
+{"id": "q_34", "text": "Einsatz und Eigenschaften von Score-Normalisierung in Speichersystemen", "domain": "fusion"}
+{"id": "q_35", "text": "Wie funktioniert Signal-Gewichtung?", "domain": "fusion"}
+{"id": "q_36", "text": "Einsatz und Eigenschaften von Signal-Gewichtung in Speichersystemen", "domain": "fusion"}
+{"id": "q_37", "text": "Wie funktioniert Cross-Encoder Reranking?", "domain": "fusion"}
+{"id": "q_38", "text": "Einsatz und Eigenschaften von Cross-Encoder Reranking in Speichersystemen", "domain": "fusion"}
+{"id": "q_39", "text": "Wie funktioniert Resonanz-Bonus?", "domain": "fusion"}
+{"id": "q_40", "text": "Einsatz und Eigenschaften von Resonanz-Bonus in Speichersystemen", "domain": "fusion"}
+{"id": "q_41", "text": "Wie funktioniert Personalized PageRank?", "domain": "graph"}
+{"id": "q_42", "text": "Einsatz und Eigenschaften von Personalized PageRank in Speichersystemen", "domain": "graph"}
+{"id": "q_43", "text": "Wie funktioniert CSR Datenstruktur?", "domain": "graph"}
+{"id": "q_44", "text": "Einsatz und Eigenschaften von CSR Datenstruktur in Speichersystemen", "domain": "graph"}
+{"id": "q_45", "text": "Wie funktioniert Path-RAG Pfadextraktion?", "domain": "graph"}
+{"id": "q_46", "text": "Einsatz und Eigenschaften von Path-RAG Pfadextraktion in Speichersystemen", "domain": "graph"}
+{"id": "q_47", "text": "Wie funktioniert Community Detection?", "domain": "graph"}
+{"id": "q_48", "text": "Einsatz und Eigenschaften von Community Detection in Speichersystemen", "domain": "graph"}
+{"id": "q_49", "text": "Wie funktioniert Hypergraphen?", "domain": "graph"}
+{"id": "q_50", "text": "Einsatz und Eigenschaften von Hypergraphen in Speichersystemen", "domain": "graph"}
