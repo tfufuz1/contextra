@@ -119,10 +119,8 @@ impl McpServer {
             ));
         }
 
-        // Key preflight check: Fail BEFORE deletion if no key is configured
-        let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-            .key
-            .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
+        // Key preflight check: Fail BEFORE deletion if no key is configured via ProofKeyProvider port
+        let proof_key = crate::proof_key::default_proof_key_provider().get_proof_key()?;
 
         let tenant_id = self
             .tenant_id
@@ -209,10 +207,8 @@ impl McpServer {
             }
         };
 
-        // Key preflight check: Must have a valid key before performing deletion
-        let _proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-            .key
-            .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
+        // Key preflight check: Must have a valid key before performing deletion via ProofKeyProvider port
+        let _proof_key = crate::proof_key::default_proof_key_provider().get_proof_key()?;
 
         let _tenant_id = self
             .tenant_id

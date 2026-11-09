@@ -7,6 +7,13 @@ impl McpServer {
     /// Gibt `Some(Value)` zurück, falls eine Antwort nach stdout gesendet werden muss,
     /// oder `None`, falls der Client eine Notification war (keine Antwort erforderlich).
     pub async fn handle_value(&self, val: Value) -> Option<Value> {
+        if let Err(depth_err) =
+            crate::protocol::validate_json_depth(&val, crate::protocol::MAX_JSON_DEPTH)
+        {
+            let resp = JsonRpcResponse::err(None, depth_err.code(), depth_err.to_string());
+            return serde_json::to_value(resp).ok();
+        }
+
         if let Some(arr) = val.as_array() {
             if arr.is_empty() {
                 return Some(
@@ -14,6 +21,21 @@ impl McpServer {
                         None,
                         -32600,
                         "Invalid Request: empty batch array",
+                    ))
+                    .unwrap_or_default(),
+                );
+            }
+
+            if arr.len() > crate::protocol::MAX_BATCH_SIZE {
+                return Some(
+                    serde_json::to_value(JsonRpcResponse::err(
+                        None,
+                        -32600,
+                        format!(
+                            "Invalid Request: batch size {} exceeds maximum allowed limit of {}",
+                            arr.len(),
+                            crate::protocol::MAX_BATCH_SIZE
+                        ),
                     ))
                     .unwrap_or_default(),
                 );
