@@ -27,7 +27,8 @@
     clippy::wrong_self_convention
 )]
 
-pub mod contract;
+#[allow(dead_code)]
+mod contract;
 pub mod error;
 pub mod types;
 
