@@ -94,3 +94,8 @@ Unsafe-Audit Zusammenfassung:
 - `contextra-sys`: 22 unsafe, 22 SAFETY:-Kommentare (kein Zuwachs)
 - `contextra-wire`: 45 unsafe (in generiertem Code), 45 SAFETY:-Kommentare (kein Zuwachs, handgeschriebener Code 0 unsafe)
 - `contextra-checkpoint`, `contextra-testkit`, `contextra-durable-fs`: `#![forbid(unsafe_code)]` / 0 unsafe.
+
+## Commit 2 (Docs update: Foreign CI triage)
+- Dateien: `docs/handoff/fragments/P09/OPEN_ISSUES.md`
+- Prüfbefehl: `cargo test -p contextra-checkpoint -p contextra-testkit -p contextra-sys -p contextra-wire -p contextra-durable-fs --offline`
+- Ergebnis: grün (alle 5 Crates bauen und testen fehlerfrei; Fremdfehler detailliert in OPEN_ISSUES.md inventarisiert).
