@@ -24,8 +24,6 @@ fn make_doc_with_community(id: &str, score: f32, community_id: u64) -> SearchRes
         provenance: None,
     }
 }
-
-// ANCHOR[contextra-rank:FUS-TEST-001]
 proptest! {
     // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]

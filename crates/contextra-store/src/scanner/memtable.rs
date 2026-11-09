@@ -9,7 +9,7 @@
 
 #![forbid(unsafe_code)]
 
-use super::sstable::block_on_future;
+use super::runtime::ScannerRuntime;
 use crate::lsm::LsmStorage;
 use crate::memtable::MemTable;
 use crate::tenant_codec::TenantKeyCodec;
@@ -21,12 +21,18 @@ use std::sync::Arc;
 /// Scanner für die `LsmMemtable`-Schicht.
 pub struct MemtableScanner {
     storage: Arc<LsmStorage>,
+    runtime: ScannerRuntime,
 }
 
 impl MemtableScanner {
-    /// Erzeugt einen neuen `MemtableScanner`.
+    /// Erzeugt einen neuen `MemtableScanner` mit implizit erfasster Laufzeit.
     pub fn new(storage: Arc<LsmStorage>) -> Self {
-        Self { storage }
+        Self::with_runtime(storage, ScannerRuntime::capture())
+    }
+
+    /// Erzeugt einen neuen `MemtableScanner` mit expliziter `ScannerRuntime`.
+    pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self {
+        Self { storage, runtime }
     }
 
     /// Führt die Positivkontrolle (Canary Check) in einer isolierten Scratch-Memtable aus.
@@ -61,11 +67,14 @@ impl LayerScanner for MemtableScanner {
 
         // 2. Tenant Scan-Präfix vorbereiten
         let codec = TenantKeyCodec::new(ctx.tenant_id);
-        let target_prefix = codec.scan_prefix();
+        let target_prefix = codec.scan_prefix().to_vec();
+
+        let storage = Arc::clone(&self.storage);
 
         // 3. Aktive und immutable Memtables erfassen
-        let (active_mt, immutable_mts) =
-            block_on_future(async { self.storage.memtables_for_scanner().await });
+        let (active_mt, immutable_mts) = self
+            .runtime
+            .block_on(async { Ok(storage.memtables_for_scanner().await) })?;
 
         let mut all_mts = Vec::with_capacity(1 + immutable_mts.len());
         all_mts.push(active_mt);
@@ -84,7 +93,7 @@ impl LayerScanner for MemtableScanner {
                     || key
                         .windows(b":scratch_canary_pctl:".len())
                         .any(|w| w == b":scratch_canary_pctl:");
-                let is_residual = key.starts_with(target_prefix) && !is_canary;
+                let is_residual = key.starts_with(&target_prefix) && !is_canary;
                 session.record_unit(unit_hash, is_residual);
             }
         }

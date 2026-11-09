@@ -12,7 +12,8 @@ use super::signal::{
     FusedEntry, MetadataMergePriority, SignalCalibrationContext, SignalKey, SignalKind,
 };
 use super::topk::{BoundedTopK, TopKCandidate};
-use super::types::{ProvenanceRecord, SearchResult, SignalContribution};
+use super::types::{ProvenanceRecord, ScoredItem, SearchResult, SignalContribution};
+use crate::error::{RankError, Result};
 pub use crate::local_types::FusionStrategy;
 use ahash::AHashMap;
 
@@ -20,7 +21,6 @@ use ahash::AHashMap;
 ///
 /// Returns $x / (1 + |x|)$, bounded in $(-1.0, 1.0)$ for all finite $x$.
 /// Returns `0.0` if $x$ is non-finite (`NaN` or `Infinity`).
-// ANCHOR[contextra-rank:RRF-001]
 /// Glatte, beschränkte Einflussfunktion $g(x) = \frac{x}{1 + |x|}$.
 pub fn g(x: f32) -> f32 {
     if !x.is_finite() {
@@ -29,8 +29,82 @@ pub fn g(x: f32) -> f32 {
     x / (1.0 + x.abs())
 }
 
+/// Standard RRF-Fusion gemäß Klassenvertrag RANK-1:
+/// `rrf_fuse(ranked_lists: &[Vec<ScoredItem>], k: usize) -> Result<Vec<ScoredItem>>`.
+///
+/// Berechnet:
+/// $\text{score}(d) = \sum_{l} \frac{1}{k + \text{rank}_l(d)}$
+/// mit 1-basiertem Rang.
+///
+/// # Fehler
+/// Gibt `RankError::InvalidInput` zurück, wenn $k < 1$ ist oder ein Score $\text{NaN}$ / unendlich ist.
+pub fn rrf_fuse(ranked_lists: &[Vec<ScoredItem>], k: usize) -> Result<Vec<ScoredItem>> {
+    if k < 1 {
+        return Err(RankError::InvalidInput(format!(
+            "RRF smoothing parameter k must be >= 1, got {k}"
+        )));
+    }
+
+    if ranked_lists.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Map document ID to accumulator
+    let mut doc_scores: AHashMap<String, f32> = AHashMap::new();
+
+    // Collect all unique IDs deterministically to ensure summation order is invariant
+    let mut doc_ranks_per_list: AHashMap<String, Vec<usize>> = AHashMap::new();
+
+    for list in ranked_lists {
+        let mut seen_in_list: AHashMap<&str, usize> = AHashMap::new();
+        for (idx, item) in list.iter().enumerate() {
+            if !item.score.is_finite() {
+                return Err(RankError::InvalidInput(format!(
+                    "Non-finite score {} encountered in document '{}'",
+                    item.score, item.id
+                )));
+            }
+            let rank = idx.saturating_add(1);
+            seen_in_list
+                .entry(item.id.as_str())
+                .and_modify(|best_r| *best_r = (*best_r).min(rank))
+                .or_insert(rank);
+        }
+
+        for (id, rank) in seen_in_list {
+            doc_ranks_per_list
+                .entry(id.to_string())
+                .or_default()
+                .push(rank);
+        }
+    }
+
+    for (id, mut ranks) in doc_ranks_per_list {
+        // Sort ranks before accumulating to guarantee bit-exact commutativity across list orders
+        ranks.sort_unstable();
+        let mut sum_f64 = 0.0f64;
+        for rank in ranks {
+            sum_f64 += 1.0f64 / (k as f64 + rank as f64);
+        }
+        doc_scores.insert(id, sum_f64 as f32);
+    }
+
+    let mut items: Vec<ScoredItem> = doc_scores
+        .into_iter()
+        .map(|(id, score)| ScoredItem {
+            id,
+            score,
+            provenance: None,
+        })
+        .collect();
+
+    // Deterministische Gleichstandsauflösung: Score absteigend, dann Id aufsteigend
+    items.sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.id.cmp(&b.id)));
+
+    Ok(items)
+}
+
 /// Fuses multiple sets of ranked search results into a single ranked list using Reciprocal Rank Fusion (RRF).
-// ANCHOR[contextra-rank:RRF-002]
 /// Führt mehrere ungewichtete Signal-Ergebnislisten mittels Standard-RRF ($k=60$) zusammen.
 pub fn reciprocal_rank_fusion(
     result_sets: Vec<Vec<SearchResult>>,
@@ -80,7 +154,6 @@ pub(super) fn merge_metadata_ref(
 }
 
 /// Weighted Reciprocal Rank Fusion with default signal metadata priority (`VectorFirst`).
-// ANCHOR[contextra-rank:RRF-003]
 /// Gewichtete reziproke Rangfusion (Weighted RRF) mit Standard-Metadatenpriorität.
 pub fn weighted_reciprocal_rank_fusion(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
@@ -96,7 +169,6 @@ pub fn weighted_reciprocal_rank_fusion(
 }
 
 /// Weighted Reciprocal Rank Fusion with explicit metadata merge priority.
-// ANCHOR[contextra-rank:RRF-004]
 /// Gewichtete reziproke Rangfusion mit expliziter Metadaten-Zusammenführungspriorität.
 pub fn weighted_reciprocal_rank_fusion_with_priority(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
@@ -110,7 +182,6 @@ pub fn weighted_reciprocal_rank_fusion_with_priority(
 /// $m_s = S_1 - S_2$ (when signal is calibrated AND `drift_status` is `Stable` and $\ge 2$ candidates exist).
 /// $w_s' = w_s \times (1 + g(\beta \times m_s))$.
 /// Renormalizes modulated weights to maintain sum equal to original weight sum (preserving weight norm in [0.999, 1.001]).
-// ANCHOR[contextra-rank:RRF-005]
 /// Moduliert Signalgewichte anhand der Margin-Differenz (mRRF) und renormalisiert sie.
 pub fn modulate_and_renormalize_weights(
     result_sets: &[(String, Vec<SearchResult>, f32)],
@@ -189,7 +260,6 @@ pub fn modulate_and_renormalize_weights(
 }
 
 /// Weighted Reciprocal Rank Fusion with options.
-// ANCHOR[contextra-rank:RRF-006]
 /// Vollständig konfigurierbare gewichtete Rangfusion mit Resonanz- und Provenance-Optionen.
 pub fn weighted_reciprocal_rank_fusion_with_options(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
@@ -551,7 +621,6 @@ fn accumulate_mrrf_scores<'a>(
 }
 
 /// Weighted Reciprocal Rank Fusion with mRRF margin-based calibration weight modulation.
-// ANCHOR[contextra-rank:RRF-007]
 /// Gewichtete Rangfusion mit margin-basierter mRRF-Gewichtsmodulation.
 pub fn weighted_reciprocal_rank_fusion_mrrf(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
@@ -772,7 +841,6 @@ fn evaluate_effective_signal_strategies(
 }
 
 /// Fuses search result sets using per-signal fusion strategies (`SignalFusionStrategies`).
-// ANCHOR[contextra-rank:RRF-008]
 /// Führt Teilergebnisse mit individuellen Strategien je Signalart zusammen.
 pub fn fuse_search_results_with_signal_strategies(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
@@ -854,7 +922,6 @@ pub fn fuse_search_results_with_signal_strategies(
 }
 
 /// Fuses search result sets using the specified `FusionStrategy`.
-// ANCHOR[contextra-rank:RRF-009]
 /// Universeller Einstiegspunkt zur Signal-Fusion basierend auf einer globalen `FusionStrategy`.
 pub fn fuse_search_results_with_strategy(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,

@@ -11,8 +11,10 @@ use super::bloom::BloomFilter;
 use super::builder::SstableMetadata;
 use super::io::pread_exact;
 use super::stream::SstableStream;
+use crate::io_seam::RealFs;
 use crate::wal::KeyManager;
 use bytes::Bytes;
+use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -221,7 +223,7 @@ pub(super) fn may_contain_key_in_block_bloom(
 // ANCHOR[contextra-store:SST-RDR-001]
 /// Liest SSTable-Dateien mit Block-Cache und Bloom-Filter-Unterstuetzung.
 pub struct SstableReader {
-    pub(super) file: Arc<std::fs::File>,
+    pub(super) file: Arc<dyn VfsFile>,
     pub(super) index: Vec<(Bytes, u64)>,
     pub(super) metadata: SstableMetadata,
     /// Byte offset where the index data begins (= end of last block).
@@ -264,13 +266,22 @@ impl SstableReader {
 
     /// Opens an existing SSTable file for reading.
     pub async fn open(path: impl AsRef<Path>, block_cache: Arc<BlockCache>) -> Result<Self> {
-        Self::open_with_key_manager(path, block_cache, None).await
+        Self::open_with_vfs(path, block_cache, None, Arc::new(RealFs)).await
     }
 
     pub async fn open_with_key_manager(
         path: impl AsRef<Path>,
         block_cache: Arc<BlockCache>,
         key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<Self> {
+        Self::open_with_vfs(path, block_cache, key_manager, Arc::new(RealFs)).await
+    }
+
+    pub async fn open_with_vfs(
+        path: impl AsRef<Path>,
+        block_cache: Arc<BlockCache>,
+        key_manager: Option<Arc<KeyManager>>,
+        vfs: Arc<dyn Vfs>,
     ) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
         let derived_km = if let Some(ref km) = key_manager {
@@ -284,22 +295,20 @@ impl SstableReader {
         };
 
         let path_for_open = path_buf.clone();
+        let vfs_clone = Arc::clone(&vfs);
         let (file, file_size) =
-            tokio::task::spawn_blocking(move || -> std::io::Result<(std::fs::File, u64)> {
-                let file = std::fs::File::open(&path_for_open)?;
-                let metadata = file.metadata()?;
-                let file_size = metadata.len();
+            tokio::task::spawn_blocking(move || -> Result<(Arc<dyn VfsFile>, u64)> {
+                let file = vfs_clone.open(&path_for_open, &VfsOpenOptions::read_only())?;
+                let file_size = file.len().map_err(ContextraError::Io)?;
+                let file: Arc<dyn VfsFile> = Arc::from(file);
                 Ok((file, file_size))
             })
             .await
-            .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
-            .map_err(|e| ContextraError::Storage(format!("File open failed: {}", e)))?;
+            .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))??;
 
         if file_size < 12 {
             return Err(ContextraError::Storage("SSTable file too small".into()));
         }
-
-        let file = Arc::new(file);
 
         // Read trailer: last 54 bytes (v1..v4) or 52 bytes (v0)
         let trailer_data = {
@@ -309,7 +318,7 @@ impl SstableReader {
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; read_len];
                 let offset = file_size.saturating_sub(54);
-                pread_exact(&f, &mut buf, offset)?;
+                pread_exact(f.as_ref(), &mut buf, offset)?;
                 Ok(buf)
             })
             .await
@@ -478,7 +487,7 @@ impl SstableReader {
                 let f = Arc::clone(&file);
                 tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                     let mut buf = vec![0u8; bloom_read_len];
-                    pread_exact(&f, &mut buf, bloom_offset)?;
+                    pread_exact(f.as_ref(), &mut buf, bloom_offset)?;
                     Ok(buf)
                 })
                 .await
@@ -538,7 +547,7 @@ impl SstableReader {
 
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; index_read_len];
-                pread_exact(&f, &mut buf, index_offset)?;
+                pread_exact(f.as_ref(), &mut buf, index_offset)?;
                 Ok(buf)
             })
             .await
@@ -602,6 +611,19 @@ impl SstableReader {
                 return Err(ContextraError::Storage(
                     "corrupted SSTable index: block offset exceeds index offset".into(),
                 ));
+            }
+
+            if let Some((prev_key, prev_offset)) = index.last() {
+                if key < *prev_key {
+                    return Err(ContextraError::Storage(
+                        "corrupted SSTable index: keys out of order".into(),
+                    ));
+                }
+                if offset < *prev_offset {
+                    return Err(ContextraError::Storage(
+                        "corrupted SSTable index: block offsets out of order".into(),
+                    ));
+                }
             }
 
             index.push((key, offset));
@@ -679,26 +701,32 @@ impl SstableReader {
     }
 
     async fn read_block_at_file(
-        file: Arc<std::fs::File>,
+        file: Arc<dyn VfsFile>,
         offset: u64,
         next_offset: u64,
         key_manager: &Option<Arc<KeyManager>>,
         has_crc: bool,
         path: &Path,
     ) -> Result<Bytes> {
-        let len = usize::try_from(next_offset.saturating_sub(offset)).map_err(|_| {
+        if next_offset <= offset {
+            return Err(ContextraError::Storage(
+                "corrupted SSTable block offsets: next_offset <= offset".into(),
+            ));
+        }
+
+        let len = usize::try_from(next_offset - offset).map_err(|_| {
             ContextraError::Storage("Block offset difference exceeds platform usize".into())
         })?;
 
-        if len > 16 * 1024 * 1024 {
+        if len < 4 || len > 16 * 1024 * 1024 {
             return Err(ContextraError::Storage(
-                "SSTable block size exceeds maximum allowed size".into(),
+                "SSTable block size invalid or exceeds maximum allowed size".into(),
             ));
         }
 
         let data = tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
             let mut buf = vec![0u8; len];
-            pread_exact(&file, &mut buf, offset)?;
+            pread_exact(file.as_ref(), &mut buf, offset)?;
             Ok(buf)
         })
         .await
@@ -878,7 +906,7 @@ impl SstableReader {
                         let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                             ContextraError::Storage("overflow calculating value position".into())
                         })?;
-                        if end_val > block_data.len() {
+                        if end_val > offsets_start {
                             return Err(ContextraError::Storage(
                                 "malformed block: value length out of bounds".into(),
                             ));
@@ -1065,7 +1093,7 @@ impl SstableReader {
                 let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                     ContextraError::Storage("overflow calculating value position".into())
                 })?;
-                if end_val > block_data.len() {
+                if end_val > offsets_start {
                     return Err(ContextraError::Storage(
                         "malformed block: value length out of bounds".into(),
                     ));

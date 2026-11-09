@@ -5,27 +5,33 @@ workspace = true
 name = "contextra-infer-onnx"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license = "MIT OR Apache-2.0"
 rust-version.workspace = true
+description = "Autonomous in-process ONNX inference engine for embeddings and cross-encoder reranking (Klasse A, Ring 2)"
 
 [package.metadata.contextra]
 ring = "2"
+klasse = "A"
 
-[dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-rank = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-serde = { workspace = true }
-parking_lot = { workspace = true }
-sha2 = { version = "0.10", optional = true }
-
-# Optional — nur mit Feature-Flag aktiv
 [features]
 default = []
-reranking = ["dep:ort"]
-onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:reqwest", "dep:sha2"]
+std = []
+serde = ["dep:serde", "dep:serde_json"]
+tracing = ["dep:tracing"]
+inspect = []
+experimental = []
+download = ["dep:reqwest"]
+reranking = ["onnx"]
+onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:sha2"]
+
+[dependencies]
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+blake3 = { workspace = true }
+tracing = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+sha2 = { version = "0.10", optional = true }
 
 [dependencies.reqwest]
 version = "0.12"
@@ -52,3 +58,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 criterion = { workspace = true }
 proptest = "1.4"
+
+[[bench]]
+name = "infer_bench"
+harness = false

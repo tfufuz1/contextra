@@ -13,21 +13,18 @@ klasse = "A"
 [dependencies]
 ahash = { workspace = true }
 blake3 = { workspace = true }
-contextra-ports = { workspace = true, optional = true }
-contextra-types = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [features]
-default = ["bandit-routing", "flow-corrected-thompson", "types-compat", "ports-compat"]
+default = ["std", "bandit-routing", "flow-corrected-thompson", "rie-greedy-personalization"]
+std = []
 bandit-routing = []
 flow-corrected-thompson = ["bandit-routing"]
 sketched-bandit = ["bandit-routing"]
 rie-greedy-personalization = []
-types-compat = ["dep:contextra-types"]
-ports-compat = ["dep:contextra-ports"]
 
 [dev-dependencies]
 criterion = { workspace = true }

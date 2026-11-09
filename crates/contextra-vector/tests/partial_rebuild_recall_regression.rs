@@ -152,7 +152,7 @@ async fn extract_raw_layer0_connections(
     index: &HnswIndex,
     save_path: &std::path::Path,
 ) -> HashMap<u64, Vec<u32>> {
-    index.save(save_path).await.expect("save failed");
+    index.save(save_path).expect("save failed");
     let mmap = MmapIndex::open(save_path).expect("MmapIndex open failed");
     let node_count = mmap.header.node_count() as usize;
 

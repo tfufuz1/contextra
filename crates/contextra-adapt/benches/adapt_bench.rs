@@ -1,4 +1,3 @@
-use contextra_adapt::bandit::{BanditImplementation, BanditProfileState};
 use contextra_adapt::pid::PidController;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::Duration;
@@ -13,7 +12,9 @@ fn bench_pid_update(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "bandit-routing")]
 fn bench_bandit_sherman_morrison(c: &mut Criterion) {
+    use contextra_adapt::bandit::{BanditImplementation, BanditProfileState};
     let d = 32;
     let mut state = BanditProfileState::cold_start(d, 0.5);
     state.implementation = BanditImplementation::ShermanMorrison;
@@ -24,6 +25,9 @@ fn bench_bandit_sherman_morrison(c: &mut Criterion) {
         });
     });
 }
+
+#[cfg(not(feature = "bandit-routing"))]
+fn bench_bandit_sherman_morrison(_c: &mut Criterion) {}
 
 criterion_group!(benches, bench_pid_update, bench_bandit_sherman_morrison);
 criterion_main!(benches);

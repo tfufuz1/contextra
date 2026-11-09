@@ -28,7 +28,6 @@ mod loom_tests {
             let index = Arc::new(HnswIndex::try_new(config).expect("valid index"));
 
             let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
                 .build()
                 .unwrap();
 
@@ -69,13 +68,82 @@ mod loom_tests {
             }
 
             let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
                 .build()
                 .unwrap();
 
             rt.block_on(async {
                 assert_eq!(index.len().await, 5);
             });
+        });
+    }
+
+    #[test]
+    fn test_loom_insert_search_rebuild_swap() {
+        loom::model(|| {
+            use loom::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+            let active_index = Arc::new(AtomicU64::new(1));
+            let rebuilding = Arc::new(AtomicBool::new(false));
+
+            let a_idx1 = Arc::clone(&active_index);
+            let a_idx2 = Arc::clone(&active_index);
+            let reb = Arc::clone(&rebuilding);
+
+            let t1 = thread::spawn(move || {
+                let id = a_idx1.load(Ordering::Acquire);
+                assert!(id == 1 || id == 2);
+            });
+
+            let t2 = thread::spawn(move || {
+                if !reb.swap(true, Ordering::SeqCst) {
+                    a_idx2.store(2, Ordering::Release);
+                    reb.store(false, Ordering::SeqCst);
+                }
+            });
+
+            t1.join().unwrap();
+            t2.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn test_loom_remove_search_visibility() {
+        loom::model(|| {
+            use loom::sync::atomic::{AtomicBool, Ordering};
+            let deleted = Arc::new(AtomicBool::new(false));
+            let d_clone = Arc::clone(&deleted);
+
+            let t_search = thread::spawn(move || {
+                let is_del = d_clone.load(Ordering::Acquire);
+                let _ = is_del;
+            });
+
+            let t_delete = thread::spawn(move || {
+                deleted.store(true, Ordering::Release);
+            });
+
+            t_search.join().unwrap();
+            t_delete.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn test_loom_snapshot_pin_compact_seq_log() {
+        loom::model(|| {
+            use loom::sync::atomic::{AtomicU64, Ordering};
+            let min_pinned = Arc::new(AtomicU64::new(10));
+            let p_clone = Arc::clone(&min_pinned);
+
+            let t_reader = thread::spawn(move || {
+                let pin = p_clone.load(Ordering::Acquire);
+                assert!(pin >= 10);
+            });
+
+            let t_compactor = thread::spawn(move || {
+                min_pinned.fetch_max(20, Ordering::SeqCst);
+            });
+
+            t_reader.join().unwrap();
+            t_compactor.join().unwrap();
         });
     }
 }
@@ -128,5 +196,69 @@ mod normal_tests {
         }
 
         assert_eq!(index.len().await, 5);
+    }
+
+    #[test]
+    fn test_sync_insert_search_rebuild_swap_model() {
+        use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+        let active_index = Arc::new(AtomicU64::new(1));
+        let rebuilding = Arc::new(AtomicBool::new(false));
+
+        let a_idx1 = Arc::clone(&active_index);
+        let a_idx2 = Arc::clone(&active_index);
+        let reb = Arc::clone(&rebuilding);
+
+        let t1 = std::thread::spawn(move || {
+            let id = a_idx1.load(Ordering::Acquire);
+            assert!(id == 1 || id == 2);
+        });
+
+        let t2 = std::thread::spawn(move || {
+            if !reb.swap(true, Ordering::SeqCst) {
+                a_idx2.store(2, Ordering::Release);
+                reb.store(false, Ordering::SeqCst);
+            }
+        });
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+    }
+
+    #[test]
+    fn test_sync_remove_search_visibility_model() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let deleted = Arc::new(AtomicBool::new(false));
+        let d_clone = Arc::clone(&deleted);
+
+        let t_search = std::thread::spawn(move || {
+            let is_del = d_clone.load(Ordering::Acquire);
+            let _ = is_del;
+        });
+
+        let t_delete = std::thread::spawn(move || {
+            deleted.store(true, Ordering::Release);
+        });
+
+        t_search.join().unwrap();
+        t_delete.join().unwrap();
+    }
+
+    #[test]
+    fn test_sync_snapshot_pin_compact_seq_log_model() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let min_pinned = Arc::new(AtomicU64::new(10));
+        let p_clone = Arc::clone(&min_pinned);
+
+        let t_reader = std::thread::spawn(move || {
+            let pin = p_clone.load(Ordering::Acquire);
+            assert!(pin >= 10);
+        });
+
+        let t_compactor = std::thread::spawn(move || {
+            min_pinned.fetch_max(20, Ordering::SeqCst);
+        });
+
+        t_reader.join().unwrap();
+        t_compactor.join().unwrap();
     }
 }

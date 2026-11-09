@@ -14,7 +14,7 @@
 //! - Verarbeitet bis zu 64 x `u8` parallel mittels VNNI dot-product Instruktionen (`_mm512_dpbusd_epi32`).
 //!
 //! **Sicherheitsgarantien (Safety-Invariante):**
-//! Alle Funktionen in diesem Modul sind als `pub(crate) unsafe fn` deklariert und erfordern
+//! Alle Funktionen in diesem Modul sind als `pub(crate) unsichere Funktionen` deklariert und erfordern
 //! verifizierte CPU-Unterstützung für das jeweilige `target_feature`. Der Aufruf erfolgt
 //! strikt über `dispatch.rs`.
 
@@ -32,6 +32,7 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 /// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -101,6 +102,7 @@ pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 /// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -151,6 +153,7 @@ pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 /// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -198,6 +201,7 @@ pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 /// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -279,6 +283,7 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8])
 /// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -341,6 +346,7 @@ pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u
 /// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
@@ -398,6 +404,7 @@ pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> 
 /// Caller must ensure that target CPU supports `avx512f` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
     // SAFETY: Target feature `avx512f` is enabled. `_mm512_extractf32x8_ps` requires `unsafe` block for intrinsic target feature `avx512dq`.
     let v256 = unsafe { _mm256_add_ps(_mm512_extractf32x8_ps(v, 0), _mm512_extractf32x8_ps(v, 1)) };
@@ -422,6 +429,7 @@ pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
 /// Caller must ensure that target CPU supports `avx512f`, `avx512bw`, and `avx512vnni` instruction set extensions.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
@@ -467,6 +475,7 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 /// Caller must ensure that target CPU supports `avx512f` and `avx512bw` instruction set extensions.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
@@ -535,6 +544,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 
 /// Caller must ensure that target CPU supports `avx512f`, `avx512bw`, and `avx512vnni` instruction set extensions.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
     a: &[u8],
     b: &[u8],
@@ -603,6 +613,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
 /// Caller must ensure that target CPU supports `avx512f` instruction set extension.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
+// SAFETY: Preconditions (target feature availability, buffer bounds) verified by caller.
 pub(crate) unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
     // SAFETY: Target feature `avx512f` is enabled. `_mm512_extracti32x8_epi32` requires `unsafe` block for intrinsic target feature `avx512dq`.
     let v256 =

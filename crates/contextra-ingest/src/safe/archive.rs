@@ -176,11 +176,24 @@ impl<'a> SafeArchive<'a> {
         let uncompressed_size = file.size();
         budget.charge_decompressed(uncompressed_size)?;
 
-        let mut content = Vec::with_capacity(usize::try_from(uncompressed_size).unwrap_or(0));
-        std::io::Read::read_to_end(&mut file, &mut content).map_err(|e| IngestError::Corrupt {
-            format: None,
-            detail: format!("Fehler beim Dekomprimieren: {e}"),
-        })?;
+        // DoS-Schutz: Niemals unvalidierte Größen direkt vorab allozieren
+        // Max initial capacity auf 64 KiB deckeln, Rest wächst dynamisch mit Leseoperationen
+        let initial_cap = (usize::try_from(uncompressed_size).unwrap_or(0)).min(64 * 1024);
+        let mut content = Vec::with_capacity(initial_cap);
+        let mut chunk = [0u8; 8192];
+        loop {
+            let n = std::io::Read::read(&mut file, &mut chunk).map_err(|e| IngestError::Corrupt {
+                format: None,
+                detail: format!("Fehler beim Dekomprimieren: {e}"),
+            })?;
+            if n == 0 {
+                break;
+            }
+            content.extend_from_slice(chunk.get(..n).ok_or_else(|| IngestError::Corrupt {
+                format: None,
+                detail: "Puffergrenzenfehler beim Lesen".into(),
+            })?);
+        }
 
         Ok(content)
     }
@@ -215,10 +228,46 @@ impl<'a> SafeArchive<'a> {
     }
 }
 
+/// Validiert einen Pfadnamen im Archiv gegen Zip-Slip und Pfadlängenbeschränkungen.
+pub fn validate_archive_entry_path(path: &str, max_len: usize) -> Result<(), IngestError> {
+    if path.len() > max_len {
+        return Err(IngestError::LimitExceeded {
+            kind: LimitKind::PathLength,
+            limit: max_len as u64,
+            observed: path.len() as u64,
+        });
+    }
+
+    // Zip-Slip Schutz: keine relative Pfadnavigation (`..`), keine absoluten Pfade (`/`, `\`, Laufwerksbuchstaben)
+    if path.contains("..") {
+        return Err(IngestError::Corrupt {
+            format: None,
+            detail: format!("Zip-Slip-Angriff erkannt (Pfad enthält '..'): {path}"),
+        });
+    }
+
+    if path.starts_with('/') || path.starts_with('\\') {
+        return Err(IngestError::Corrupt {
+            format: None,
+            detail: format!("Zip-Slip-Angriff erkannt (absoluter Pfad): {path}"),
+        });
+    }
+
+    // Windows Laufwerksbuchstabe (z. B. "C:")
+    if path.as_bytes().get(1) == Some(&b':') {
+        return Err(IngestError::Corrupt {
+            format: None,
+            detail: format!("Zip-Slip-Angriff erkannt (Laufwerkspfad): {path}"),
+        });
+    }
+
+    Ok(())
+}
+
 /// Validiert ein Zip-Archiv vor der Verarbeitung gegen `IngestLimits`.
 ///
-/// Prüft Eintragsanzahl, kumulierte unkomprimierte Bytes und Kompressionsverhältnis,
-/// um Zip-Bomben und DoS-Angriffe frühzeitig abzulehnen.
+/// Prüft Eintragsanzahl, kumulierte unkomprimierte Bytes, Kompressionsverhältnis,
+/// Zip-Slip-Pfade und Pfadlängen, um Zip-Bomben und DoS-Angriffe frühzeitig abzulehnen.
 pub fn validate_zip_archive<R: Read + Seek>(
     reader: R,
     limits: &IngestLimits,
@@ -228,10 +277,7 @@ pub fn validate_zip_archive<R: Read + Seek>(
         detail: format!("Ungültiges Zip-Archiv: {e}"),
     })?;
 
-    let num_entries = match u32::try_from(archive.len()) {
-        Ok(v) => v,
-        Err(_) => u32::MAX,
-    };
+    let num_entries = u32::try_from(archive.len()).unwrap_or(u32::MAX);
     if num_entries > limits.max_archive_entries {
         return Err(IngestError::LimitExceeded {
             kind: LimitKind::ArchiveEntries,
@@ -248,6 +294,9 @@ pub fn validate_zip_archive<R: Read + Seek>(
             format: None,
             detail: format!("Zip-Eintrag {i} nicht lesbar: {e}"),
         })?;
+
+        // Pfadvalidierung (Zip-Slip & Pfadlänge)
+        validate_archive_entry_path(file.name(), limits.max_path_len)?;
 
         total_uncompressed = total_uncompressed.saturating_add(file.size());
         total_compressed = total_compressed.saturating_add(file.compressed_size());

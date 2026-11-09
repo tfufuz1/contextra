@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! PE-01-TEXT-002 — Concurrent Metadata Contention Tests.
 //!
 //! Verifies that the global `meta:stats` key in InvertedIndex handles

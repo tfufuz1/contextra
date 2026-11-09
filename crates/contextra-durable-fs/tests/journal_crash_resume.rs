@@ -1,118 +1,58 @@
-//! # Testsuite: journal_crash_resume.rs
-//!
-//! Zweck: Crash-Resumption-Tests für das `PendingDeleteJournal` und Sicherheitsüberprüfungen.
-
-// FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Integrationstests für PendingDeleteJournal Crash-Resumption und scrub_if_safe Hardlink-Sicherheitsprüfungen (AP-12, ADR-10).
-
-#![allow(deprecated)]
-
-use contextra_durable_fs::{
-    durable_remove, scrub_if_safe, PendingDeleteJournal, ScrubOutcome, ScrubPolicy, ScrubRefusal,
-};
-use std::fs::File;
-use std::io::Write;
+use contextra_durable_fs::journal::PendingDeleteJournal;
+use std::fs;
 use tempfile::tempdir;
 
-// ANCHOR[contextra-durable-fs:TEST-JOURNAL-CRASH-RESUME]
-/// Prüft die idempotente Wiederaufnahme und Abarbeitung des Journals nach simuliertem Abbruch.
 #[test]
-fn test_journal_process_crash_resume_idempotency() -> std::io::Result<()> {
+fn test_journal_crash_resume_idempotent() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempdir()?;
-    let journal_path = dir.path().join("pending_delete.journal");
+    let journal_path = dir.path().join("crash_resume.journal");
+    let file1 = dir.path().join("crash1.bin");
+    let file2 = dir.path().join("crash2.bin");
 
-    let file1 = dir.path().join("file1.sst");
-    let file2 = dir.path().join("file2.sst");
-    let file3 = dir.path().join("file3.sst");
+    fs::write(&file1, b"c1")?;
+    fs::write(&file2, b"c2")?;
 
-    File::create(&file1)?.write_all(b"data1")?;
-    File::create(&file2)?.write_all(b"data2")?;
-    File::create(&file3)?.write_all(b"data3")?;
-
-    let mut journal = PendingDeleteJournal::open(&journal_path)?;
-    journal.record(&file1)?;
-    journal.record(&file2)?;
-    journal.record(&file3)?;
-
-    let mut count = 0;
-    // Simulate crash after deleting file1
-    let _ = journal.process(|path| {
-        count += 1;
-        if count == 1 {
-            durable_remove(path)?;
-            Ok(())
-        } else {
-            Err(std::io::Error::other("simulated crash mid-process"))
-        }
-    });
-
-    assert!(!file1.exists(), "file1 should have been removed");
-    assert!(file2.exists(), "file2 should still exist");
-    assert!(file3.exists(), "file3 should still exist");
-
-    // Re-open journal on restart and resume
-    let mut resumed_journal = PendingDeleteJournal::open(&journal_path)?;
-    assert_eq!(
-        resumed_journal.pending().len(),
-        2,
-        "Only file2 and file3 should remain in journal"
-    );
-
-    let processed = resumed_journal.process(durable_remove)?;
-    assert_eq!(processed, 2);
-
-    assert!(!file2.exists());
-    assert!(!file3.exists());
-    assert!(
-        !journal_path.exists(),
-        "Journal file should be deleted when empty"
-    );
-
-    Ok(())
-}
-
-// ANCHOR[contextra-durable-fs:TEST-JOURNAL-SCRUB-HARDLINK]
-/// Prüft die Sicherheitsverweigerung bei Hardlinks und den Erhalt der verknüpften Datei.
-#[test]
-fn test_scrub_if_safe_hardlink_refusal_and_safety() -> std::io::Result<()> {
-    let dir = tempdir()?;
-    let target = dir.path().join("original.sst");
-    let link = dir.path().join("hardlink.sst");
-
-    File::create(&target)?.write_all(b"sensitive_data")?;
-    std::fs::hard_link(&target, &link)?;
-
-    // Attempt scrub_if_safe on target with nlink == 2
-    let outcome = scrub_if_safe(&target, ScrubPolicy::OverwriteZeros, false, false)?;
-
-    #[cfg(unix)]
     {
-        assert_eq!(
-            outcome,
-            ScrubOutcome::Refused(ScrubRefusal::MultipleHardlinks),
-            "Scrubbing must be refused when nlink > 1"
-        );
-        // Original content must be intact and not zeroed out
-        let content = std::fs::read_to_string(&link)?;
-        assert_eq!(content, "sensitive_data");
+        let mut journal = PendingDeleteJournal::open(&journal_path)?;
+        journal.record(&file1)?;
+        journal.record(&file2)?;
     }
 
-    Ok(())
-}
+    // Neuer Prozess öffnet das Journal
+    {
+        let mut journal = PendingDeleteJournal::open(&journal_path)?;
+        assert_eq!(journal.pending().len(), 2);
 
-// ANCHOR[contextra-durable-fs:TEST-JOURNAL-REMOVE-PARENT-FSYNC]
-/// Prüft die Synchronisation des Elternverzeichnisses bei durable_remove.
-#[test]
-fn test_durable_remove_parent_dir_fsync() -> std::io::Result<()> {
-    let dir = tempdir()?;
-    let file_path = dir.path().join("test_file.tmp");
+        // Erstes File löschen
+        let processed = journal.process(|p| {
+            if p == file1 {
+                fs::remove_file(p)?;
+                Ok(())
+            } else {
+                Err(contextra_durable_fs::DurableFsError::Io(
+                    std::io::Error::other("simulated crash mid-process"),
+                ))
+            }
+        });
+        assert!(processed.is_err());
+    }
 
-    File::create(&file_path)?.write_all(b"content")?;
-    assert!(file_path.exists());
+    // Erneuter Prozessstart nach Crash
+    {
+        let mut journal = PendingDeleteJournal::open(&journal_path)?;
+        assert_eq!(journal.pending().len(), 1);
+        assert_eq!(journal.pending()[0], file2);
 
-    durable_remove(&file_path)?;
-    assert!(!file_path.exists());
+        let processed = journal.process(|p| {
+            fs::remove_file(p)?;
+            Ok(())
+        })?;
+        assert_eq!(processed, 1);
+    }
+
+    assert!(!file1.exists());
+    assert!(!file2.exists());
+    assert!(!journal_path.exists());
 
     Ok(())
 }

@@ -33,5 +33,36 @@ fn bench_bm25_scoring(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_tokenizer, bench_bm25_scoring);
+criterion_group!(
+    benches,
+    bench_tokenizer,
+    bench_bm25_scoring,
+    bench_analyzer_pipeline
+);
 criterion_main!(benches);
+
+fn bench_analyzer_pipeline(c: &mut Criterion) {
+    use contextra_text::tokenizer::{Analyzer, AnalyzerPipeline};
+
+    let p_en = AnalyzerPipeline::default_english();
+    let p_de = AnalyzerPipeline::default_german();
+
+    let short_text = "Die Softwarearchitektur von Contextra ist modular und deterministisch.";
+    let long_text = "Das Bundesverfassungsgericht entschied über die Verfassungsmäßigkeit der Regelung zur Vorratsdatenspeicherung und Datenschutzrichtlinie. ".repeat(50);
+
+    c.bench_function("analyzer_pipeline_short_de", |b| {
+        b.iter(|| p_de.analyze(black_box(short_text)));
+    });
+
+    c.bench_function("analyzer_pipeline_long_de", |b| {
+        b.iter(|| p_de.analyze(black_box(&long_text)));
+    });
+
+    c.bench_function("analyzer_pipeline_short_en", |b| {
+        b.iter(|| p_en.analyze(black_box(short_text)));
+    });
+
+    c.bench_function("analyzer_pipeline_long_en", |b| {
+        b.iter(|| p_en.analyze(black_box(&long_text)));
+    });
+}

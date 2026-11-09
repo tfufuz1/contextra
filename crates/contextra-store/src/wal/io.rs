@@ -648,10 +648,10 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
-        if self.is_poisoned() {
-            return Err(ContextraError::Storage(
-                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
-            ));
+        if let Some(cause) = self.poison_cause() {
+            return Err(ContextraError::Storage(format!(
+                "WAL handle poisoned ({cause:?}); requires explicit recovery or reload before further appends"
+            )));
         }
         let entries = &batch.0;
         if entries.is_empty() {
@@ -713,10 +713,10 @@ impl Wal {
         batch: PreparedBatch,
         _guard: &tokio::sync::MutexGuard<'_, ()>,
     ) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {
-        if self.is_poisoned() {
-            return Err(ContextraError::Storage(
-                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
-            ));
+        if let Some(cause) = self.poison_cause() {
+            return Err(ContextraError::Storage(format!(
+                "WAL handle poisoned ({cause:?}); requires explicit recovery or reload before further appends"
+            )));
         }
         let entries = &batch.0;
         if entries.is_empty() {

@@ -108,17 +108,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     ) -> Result<Vec<crate::SearchResult>> {
         let k = k.min(contextra_types::MAX_SEARCH_K);
         let embedding = {
-            let embedder = {
-                let guard = self.embedder.read();
-                guard
-                    .as_ref()
-                    .ok_or_else(|| {
-                        contextra_types::ContextraError::Internal(
-                            "No embedder configured for this collection".into(),
-                        )
-                    })?
-                    .clone()
-            };
+            let embedder = self.embedder().ok_or_else(|| {
+                contextra_types::ContextraError::Internal(
+                    "No embedder configured for this collection".into(),
+                )
+            })?;
             embedder.embed(query_text).await?
         };
         self.search(&embedding, k).await

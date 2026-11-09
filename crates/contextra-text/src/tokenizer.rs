@@ -304,6 +304,421 @@ pub fn tokenize(text: &str) -> Vec<String> {
     DefaultTokenizer.tokenize(text)
 }
 
+// ANCHOR[contextra-text:TOK-013]
+/// Repräsentiert ein strukturiertes Token aus der Textanalyse-Pipeline.
+///
+/// Ein Token umfasst den extrahierten Term, Byte-Offsets in den Originaltext
+/// (stets auf validen UTF-8 Zeichengrenzen) sowie das Positionsinkrement
+/// für Phrasen- und Proximity-Suchen.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Token {
+    /// Normalisierter Termwert.
+    pub term: String,
+    /// Start-Byte-Offset im Originaltext (auf gültiger Zeichengrenze).
+    pub start_offset: usize,
+    /// End-Byte-Offset im Originaltext (auf gültiger Zeichengrenze).
+    pub end_offset: usize,
+    /// Positionsinkrement (Standard: 1 für aufeinanderfolgende Wörter, 0 für Synonyme/Komponenten an gleicher Position).
+    pub position_increment: usize,
+}
+
+impl Token {
+    /// Erzeugt ein neues Token mit Term, Offsets und Positionsinkrement.
+    pub fn new(
+        term: impl Into<String>,
+        start_offset: usize,
+        end_offset: usize,
+        position_increment: usize,
+    ) -> Self {
+        Self {
+            term: term.into(),
+            start_offset,
+            end_offset,
+            position_increment,
+        }
+    }
+}
+
+// ANCHOR[contextra-text:TOK-014]
+/// Strategie bei Überschreitung konfigurierter Kapazitätsgrenzen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum OverflowPolicy {
+    /// Überschüssige Eingaben oder Token werden deterministisch abgeschnitten.
+    #[default]
+    Truncate,
+    /// Eine Überschreitung führt zu einem Fail-Closed Fehler.
+    Error,
+}
+
+// ANCHOR[contextra-text:TOK-015]
+/// Konfigurierbare Ressourcen- und Sicherheitsgrenzen der Analyse-Pipeline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PipelineLimits {
+    /// Maximale Eingabelänge in Bytes (Default: 1 MiB).
+    pub max_input_length: usize,
+    /// Maximale Tokenlänge in Bytes (Default: 256 Bytes).
+    pub max_token_length: usize,
+    /// Maximale Anzahl von Tokens je Dokument (Default: 100_000).
+    pub max_tokens_per_doc: usize,
+    /// Strategie bei Überschreitung der Grenzen.
+    pub overflow_policy: OverflowPolicy,
+}
+
+impl Default for PipelineLimits {
+    fn default() -> Self {
+        Self {
+            max_input_length: 1_048_576, // 1 MiB
+            max_token_length: 256,       // 256 Bytes
+            max_tokens_per_doc: 100_000, // 100,000 Tokens
+            overflow_policy: OverflowPolicy::Truncate,
+        }
+    }
+}
+
+// ANCHOR[contextra-text:TOK-016]
+/// Konfigurierbare Normalisierungsrichtlinie für Textanalyse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum NormalizationPolicy {
+    /// Nur Unicode Lowercasing.
+    #[default]
+    Lowercase,
+    /// NFKC-Normalisierung (Ligaturen auflösen, ZWJ/Formatzeichen entfernen, Fullwidth normalisieren) + Lowercasing.
+    Nfkc,
+    /// Spezifische deutsche Umlaut-Normalisierung (`ä->ae`, `ö->oe`, `ü->ue`, `ß->ss`) + Lowercasing.
+    GermanUmlauts,
+    /// Vollständige Kombination aus NFKC, Umlaut-Normalisierung und Lowercasing.
+    Complete,
+}
+
+impl NormalizationPolicy {
+    /// Führt die Normalisierung deterministisch und idempotent auf dem String aus.
+    pub fn normalize(&self, text: &str) -> String {
+        match self {
+            Self::Lowercase => text.to_lowercase(),
+            Self::Nfkc => {
+                let mut out = String::with_capacity(text.len());
+                for c in text.chars() {
+                    match c {
+                        'ﬁ' => out.push_str("fi"),
+                        'ﬂ' => out.push_str("fl"),
+                        'ﬀ' => out.push_str("ff"),
+                        'ﬃ' => out.push_str("ffi"),
+                        'ﬄ' => out.push_str("ffl"),
+                        'ﬅ' => out.push_str("ft"),
+                        'ﬆ' => out.push_str("st"),
+                        'ß' | 'ẞ' => out.push_str("ss"),
+                        '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{FEFF}' => {}
+                        '\u{FF01}'..='\u{FF5E}' => {
+                            if let Some(ascii) = char::from_u32(c as u32 - 0xFEE0) {
+                                out.push(ascii);
+                            } else {
+                                out.push(c);
+                            }
+                        }
+                        other => out.push(other),
+                    }
+                }
+                out.to_lowercase()
+            }
+            Self::GermanUmlauts => crate::morphology::normalize_umlauts(text),
+            Self::Complete => {
+                let nfkc = Self::Nfkc.normalize(text);
+                crate::morphology::normalize_umlauts(&nfkc)
+            }
+        }
+    }
+}
+
+// ANCHOR[contextra-text:TOK-017]
+/// Trait für Token-Filter in einer Analyse-Pipeline.
+pub trait TokenFilter: Send + Sync {
+    /// Wendet den Filter auf eine Sequenz von Tokens an.
+    fn filter(&self, tokens: Vec<Token>) -> Vec<Token>;
+    /// Eindeutiger Bezeichner des Filters für die Fingerprint-Generierung.
+    fn filter_id(&self) -> &str;
+}
+
+// ANCHOR[contextra-text:TOK-018]
+/// Trait für vollständige Textanalyse-Pipelines (`Tokenizer -> Filter* -> Stemmer`).
+///
+/// Garantiert den identischen Ergebnisvertrag für Dokumenten-Indexierung und Abfrage.
+pub trait Analyzer: Send + Sync {
+    /// Analysiert den gegebenen Text und liefert eine strukturierte Token-Sequenz.
+    fn analyze(&self, text: &str) -> Result<Vec<Token>>;
+
+    /// Liefert die stabile, kryptographisch eindeutige Fingerprint-Zeichenkette
+    /// bestehend aus Name, Version und Konfigurations-Hash.
+    fn fingerprint(&self) -> String;
+}
+
+// ANCHOR[contextra-text:TOK-019]
+/// Modulare, konfigurierbare Textanalyse-Pipeline.
+pub struct AnalyzerPipeline {
+    name: String,
+    version: u32,
+    limits: PipelineLimits,
+    normalization: NormalizationPolicy,
+    stopwords: Option<HashSet<String>>,
+    filters: Vec<Arc<dyn TokenFilter>>,
+    german_splitter: Option<Arc<crate::morphology::GermanCompoundSplitter>>,
+}
+
+impl AnalyzerPipeline {
+    /// Erzeugt eine neue leere Analyse-Pipeline mit Standard-Grenzen.
+    pub fn new(name: impl Into<String>, version: u32) -> Self {
+        Self {
+            name: name.into(),
+            version,
+            limits: PipelineLimits::default(),
+            normalization: NormalizationPolicy::default(),
+            stopwords: None,
+            filters: Vec::new(),
+            german_splitter: None,
+        }
+    }
+
+    /// Konfiguriert die Ressourcen- und Sicherheitsgrenzen.
+    pub fn with_limits(mut self, limits: PipelineLimits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Konfiguriert die Normalisierungsrichtlinie.
+    pub fn with_normalization(mut self, norm: NormalizationPolicy) -> Self {
+        self.normalization = norm;
+        self
+    }
+
+    /// Konfiguriert die Stoppwortliste.
+    pub fn with_stopwords(mut self, stopwords: HashSet<String>) -> Self {
+        self.stopwords = Some(stopwords);
+        self
+    }
+
+    /// Fügt einen Token-Filter am Ende der Filterkette hinzu.
+    pub fn with_filter(mut self, filter: Arc<dyn TokenFilter>) -> Self {
+        self.filters.push(filter);
+        self
+    }
+
+    /// Aktiviert die deutsche Komposita-Zerlegung.
+    pub fn with_german_morphology(
+        mut self,
+        splitter: Arc<crate::morphology::GermanCompoundSplitter>,
+    ) -> Self {
+        self.german_splitter = Some(splitter);
+        self
+    }
+
+    /// Erzeugt die Standard-Pipeline für englischen und generischen Text.
+    pub fn default_english() -> Self {
+        let stopwords = get_stopwords().clone();
+        Self::new("standard_english", 1)
+            .with_normalization(NormalizationPolicy::Lowercase)
+            .with_stopwords(stopwords)
+    }
+
+    /// Erzeugt die Standard-Pipeline für deutsche Texte inklusive Komposita-Zerlegung und Umlauten.
+    pub fn default_german() -> Self {
+        let stopwords = crate::morphology::get_german_stopwords().clone();
+        let splitter = get_shared_splitter();
+        Self::new("standard_german", 1)
+            .with_normalization(NormalizationPolicy::GermanUmlauts)
+            .with_stopwords(stopwords)
+            .with_german_morphology(splitter)
+    }
+}
+
+impl Analyzer for AnalyzerPipeline {
+    #[allow(clippy::useless_conversion)]
+    fn analyze(&self, text: &str) -> Result<Vec<Token>> {
+        // 1. Eingabelängen-Prüfung
+        let input_to_process = if text.len() > self.limits.max_input_length {
+            match self.limits.overflow_policy {
+                OverflowPolicy::Error => {
+                    return Err(crate::error::TextError::CapacityExceeded {
+                        requested: text.len(),
+                        maximum: self.limits.max_input_length,
+                    }
+                    .into());
+                }
+                OverflowPolicy::Truncate => {
+                    // Strikt an UTF-8 Zeichengrenze abschneiden
+                    let mut cut = self.limits.max_input_length;
+                    while cut > 0 && !text.is_char_boundary(cut) {
+                        cut = cut.saturating_sub(1);
+                    }
+                    &text[..cut]
+                }
+            }
+        } else {
+            text
+        };
+
+        let segments = segment_text(input_to_process);
+        let mut tokens = Vec::new();
+        let mut position = 0usize;
+
+        for seg in segments {
+            if tokens.len() >= self.limits.max_tokens_per_doc {
+                match self.limits.overflow_policy {
+                    OverflowPolicy::Error => {
+                        return Err(crate::error::TextError::CapacityExceeded {
+                            requested: tokens.len() + 1,
+                            maximum: self.limits.max_tokens_per_doc,
+                        }
+                        .into());
+                    }
+                    OverflowPolicy::Truncate => break,
+                }
+            }
+
+            match seg {
+                TextSegment::Regular(s) => {
+                    // Offset von s innerhalb input_to_process bestimmen
+                    let s_offset = s.as_ptr() as usize - input_to_process.as_ptr() as usize;
+
+                    for (word_offset, word) in s.unicode_word_indices() {
+                        if tokens.len() >= self.limits.max_tokens_per_doc {
+                            if self.limits.overflow_policy == OverflowPolicy::Error {
+                                return Err(crate::error::TextError::CapacityExceeded {
+                                    requested: tokens.len() + 1,
+                                    maximum: self.limits.max_tokens_per_doc,
+                                }
+                                .into());
+                            }
+                            break;
+                        }
+
+                        let start = s_offset.saturating_add(word_offset);
+                        let end = start.saturating_add(word.len());
+
+                        // Zeichengrenzen-Invariante absichern
+                        if !input_to_process.is_char_boundary(start)
+                            || !input_to_process.is_char_boundary(end)
+                        {
+                            continue;
+                        }
+
+                        // Normalisierung
+                        let normalized = self.normalization.normalize(word);
+
+                        // Tokenlängen-Filter
+                        if normalized.len() > self.limits.max_token_length {
+                            if self.limits.overflow_policy == OverflowPolicy::Error {
+                                return Err(crate::error::TextError::CapacityExceeded {
+                                    requested: normalized.len(),
+                                    maximum: self.limits.max_token_length,
+                                }
+                                .into());
+                            }
+                            continue;
+                        }
+
+                        // Stoppwort-Filter
+                        if let Some(ref sw) = self.stopwords {
+                            let lower = word.to_lowercase();
+                            if sw.contains(&lower) || sw.contains(&normalized) {
+                                continue;
+                            }
+                        }
+
+                        position = position.saturating_add(1);
+
+                        // Komposita-Zerlegung falls konfiguriert
+                        if let Some(ref splitter) = self.german_splitter {
+                            use crate::morphology::MorphologicalTokenizer;
+                            let components = if normalized.chars().all(|c| !c.is_uppercase()) {
+                                splitter.decompose(&normalized)
+                            } else {
+                                vec![normalized.as_str()]
+                            };
+
+                            if components.len() > 1 {
+                                // Original-Token auf Position position
+                                tokens.push(Token::new(&normalized, start, end, 1));
+
+                                // Zerlegte Komponenten mit pos_inc = 0 (Synonym an gleicher Position)
+                                for comp in components {
+                                    let comp_norm = self.normalization.normalize(comp);
+                                    if !comp_norm.is_empty()
+                                        && comp_norm.len() <= self.limits.max_token_length
+                                    {
+                                        if let Some(ref sw) = self.stopwords {
+                                            if sw.contains(&comp_norm) {
+                                                continue;
+                                            }
+                                        }
+                                        tokens.push(Token::new(comp_norm, start, end, 0));
+                                    }
+                                }
+                            } else {
+                                tokens.push(Token::new(normalized, start, end, 1));
+                            }
+                        } else {
+                            tokens.push(Token::new(normalized, start, end, 1));
+                        }
+                    }
+                }
+                TextSegment::Protected(p) => {
+                    let p_len = p.len();
+                    if p_len <= self.limits.max_token_length {
+                        let start = input_to_process.find(&p).unwrap_or(0);
+                        let end = (start + p_len).min(input_to_process.len());
+                        position = position.saturating_add(1);
+                        tokens.push(Token::new(p, start, end, 1));
+                    }
+                }
+            }
+        }
+
+        // Benutzerdefinierte Filter anwenden
+        for filter in &self.filters {
+            tokens = filter.filter(tokens);
+        }
+
+        Ok(tokens)
+    }
+
+    fn fingerprint(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.version.to_le_bytes());
+        hasher.update(self.name.as_bytes());
+        hasher.update(&(self.limits.max_input_length as u64).to_le_bytes());
+        hasher.update(&(self.limits.max_token_length as u64).to_le_bytes());
+        hasher.update(&(self.limits.max_tokens_per_doc as u64).to_le_bytes());
+        let norm_id = match self.normalization {
+            NormalizationPolicy::Lowercase => "lowercase",
+            NormalizationPolicy::Nfkc => "nfkc",
+            NormalizationPolicy::GermanUmlauts => "german_umlauts",
+            NormalizationPolicy::Complete => "complete",
+        };
+        hasher.update(norm_id.as_bytes());
+
+        if let Some(ref sw) = self.stopwords {
+            hasher.update(b"stopwords:");
+            let mut sorted_sw: Vec<&String> = sw.iter().collect();
+            sorted_sw.sort_unstable();
+            for w in sorted_sw {
+                hasher.update(w.as_bytes());
+                hasher.update(b",");
+            }
+        }
+
+        for f in &self.filters {
+            hasher.update(b"filter:");
+            hasher.update(f.filter_id().as_bytes());
+        }
+
+        if self.german_splitter.is_some() {
+            hasher.update(b"german_morphology:active");
+        }
+
+        let hash = hasher.finalize();
+        format!("{}-v{}-{}", self.name, self.version, &hash.to_hex()[..16])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -553,5 +968,64 @@ mod tests {
                 .any(|t| t.contains("pruefung") || t.contains("prüfung")),
             "GermanMorphTokenizer must tokenize umlaut words across boundaries without panic"
         );
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+    fn test_analyzer_pipeline_offsets_and_identity() {
+        let pipeline = AnalyzerPipeline::default_english();
+        let text = "Hello world! Test of the emergency broadcast system.";
+        let tokens1 = pipeline.analyze(text).expect("analyze succeeds");
+        let tokens2 = pipeline.analyze(text).expect("analyze succeeds");
+
+        assert_eq!(
+            tokens1, tokens2,
+            "Analyzer pipeline must be 100% deterministic"
+        );
+        for t in &tokens1 {
+            assert!(text.is_char_boundary(t.start_offset));
+            assert!(text.is_char_boundary(t.end_offset));
+            assert!(t.start_offset < t.end_offset);
+            assert_eq!(&text[t.start_offset..t.end_offset].to_lowercase(), &t.term);
+        }
+    }
+
+    #[test]
+    fn test_analyzer_pipeline_fingerprint_stability() {
+        let p1 = AnalyzerPipeline::default_english();
+        let p2 = AnalyzerPipeline::default_english();
+        assert_eq!(p1.fingerprint(), p2.fingerprint());
+
+        let p_de = AnalyzerPipeline::default_german();
+        assert_ne!(p1.fingerprint(), p_de.fingerprint());
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+    fn test_analyzer_pipeline_limits_overflow_policy() {
+        let limits = PipelineLimits {
+            max_input_length: 10,
+            max_token_length: 256,
+            max_tokens_per_doc: 100_000,
+            overflow_policy: OverflowPolicy::Error,
+        };
+        let p = AnalyzerPipeline::new("test_err", 1).with_limits(limits);
+        let res = p.analyze("This string is way longer than 10 bytes");
+        assert!(res.is_err(), "Must error on max_input_length overflow");
+
+        let limits_trunc = PipelineLimits {
+            max_input_length: 10,
+            max_token_length: 256,
+            max_tokens_per_doc: 100_000,
+            overflow_policy: OverflowPolicy::Truncate,
+        };
+        let p_trunc = AnalyzerPipeline::new("test_trunc", 1).with_limits(limits_trunc);
+        let tokens = p_trunc
+            .analyze("This string is way longer than 10 bytes")
+            .unwrap();
+        assert!(!tokens.is_empty());
+        for t in tokens {
+            assert!(t.end_offset <= 10);
+        }
     }
 }

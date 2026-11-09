@@ -44,8 +44,6 @@ fn make_doc_id(key_num: u64) -> DocId {
 fn make_doc_key_string(key_num: u64) -> String {
     format!("doc_{key_num:05}")
 }
-
-// ANCHOR[contextra-rank:DIBUD-TEST-001]
 #[test]
 fn test_dibud_unlimited_budget_equivalence_200_fixtures() {
     let mut lcg = SimpleLcg::new(0xDEAD_BEEF_1234_5678);

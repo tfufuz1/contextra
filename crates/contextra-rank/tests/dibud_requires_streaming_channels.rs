@@ -27,8 +27,6 @@ fn block_on<F: Future>(fut: F) -> F::Output {
 fn make_doc_id(idx: usize) -> DocId {
     DocId::from_key(&format!("stream_doc_{idx:06}")).expect("valid doc id")
 }
-
-// ANCHOR[contextra-rank:DIBUD-TEST-002]
 #[test]
 fn test_dibud_lazy_streaming_infinite_iterators_ak17() {
     let counter_vec = Arc::new(AtomicUsize::new(0));

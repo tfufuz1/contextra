@@ -1,5 +1,5 @@
-use ahash::AHashSet;
 use roaring::RoaringTreemap;
+use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
 
 use contextra_types::{ContextraError, DocId, Result};
@@ -9,35 +9,17 @@ use super::batch::{PreparedInsert, SearchContext};
 use super::sq8_bias::Sq8Bias;
 use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
 
-static LAST_REBUILD_MAP: parking_lot::Mutex<Option<ahash::AHashMap<usize, u64>>> =
-    parking_lot::Mutex::new(None);
-
 fn get_last_rebuild_nanos(core: &HnswIndexCore) -> Option<u64> {
-    let key = core as *const _ as usize;
-    let guard = LAST_REBUILD_MAP.lock();
-    guard.as_ref().and_then(|map| map.get(&key).copied())
-}
-
-fn set_last_rebuild_nanos(core: &HnswIndexCore, nanos: u64) {
-    let key = core as *const _ as usize;
-    let mut guard = LAST_REBUILD_MAP.lock();
-    let map = guard.get_or_insert_with(ahash::AHashMap::new);
-    map.insert(key, nanos);
-}
-
-impl Drop for HnswIndexCore {
-    fn drop(&mut self) {
-        let key = self as *const _ as usize;
-        let mut guard = LAST_REBUILD_MAP.lock();
-        if let Some(map) = guard.as_mut() {
-            map.remove(&key);
-        }
+    let val = core.cold.last_rebuild_nanos.load(Ordering::Acquire);
+    if val == 0 {
+        None
+    } else {
+        Some(val)
     }
 }
 
-fn default_clock() -> &'static contextra_ports::SystemClock {
-    static CLOCK: std::sync::OnceLock<contextra_ports::SystemClock> = std::sync::OnceLock::new();
-    CLOCK.get_or_init(contextra_ports::SystemClock::new)
+fn set_last_rebuild_nanos(core: &HnswIndexCore, nanos: u64) {
+    core.cold.last_rebuild_nanos.store(nanos, Ordering::Release);
 }
 
 impl HnswIndexCore {
@@ -49,36 +31,44 @@ impl HnswIndexCore {
         }
     }
 
-    pub async fn wait_for_rebuild(&self) -> bool {
-        let clock = default_clock();
-        self.wait_for_rebuild_with_clock(clock).await
+    pub fn wait_for_rebuild_blocking(
+        &self,
+        timeout: std::time::Duration,
+        _clock: &dyn contextra_ports::Clock,
+    ) -> bool {
+        if !self.hot.rebuilding.load(Ordering::Acquire) {
+            return true;
+        }
+        let mut guard = self.hot.rebuild_mutex.lock();
+        while self.hot.rebuilding.load(Ordering::Acquire) {
+            let res = self.hot.rebuild_condvar.wait_for(&mut guard, timeout);
+            if res.timed_out() {
+                return !self.hot.rebuilding.load(Ordering::Acquire);
+            }
+        }
+        true
     }
 
-    pub async fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {
-        self.wait_for_rebuild_with_timeout_and_clock(std::time::Duration::from_secs(60), clock)
-            .await
+    pub fn wait_for_rebuild(&self) -> bool {
+        let clock = self.cold.clock.read().clone();
+        self.wait_for_rebuild_with_clock(clock.as_ref())
     }
 
-    pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
-        let clock = default_clock();
-        self.wait_for_rebuild_with_timeout_and_clock(timeout, clock)
-            .await
+    pub fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {
+        self.wait_for_rebuild_blocking(std::time::Duration::from_secs(60), clock)
     }
 
-    pub async fn wait_for_rebuild_with_timeout_and_clock(
+    pub fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
+        let clock = self.cold.clock.read().clone();
+        self.wait_for_rebuild_blocking(timeout, clock.as_ref())
+    }
+
+    pub fn wait_for_rebuild_with_timeout_and_clock(
         &self,
         timeout: std::time::Duration,
         clock: &dyn contextra_ports::Clock,
     ) -> bool {
-        let timeout_nanos = timeout.as_nanos() as u64;
-        let start_nanos = clock.monotonic_nanos();
-        while self.hot.rebuilding.load(Ordering::Acquire) {
-            if clock.monotonic_nanos().saturating_sub(start_nanos) >= timeout_nanos {
-                return false;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(50));
-        }
-        true
+        self.wait_for_rebuild_blocking(timeout, clock)
     }
 
     /// Assigns a random layer for node insertion using geometric distribution.
@@ -519,18 +509,17 @@ impl HnswIndexCore {
         false
     }
 
-    pub async fn rebuild(&self) -> Result<()> {
-        let clock = default_clock();
-        self.rebuild_sync_with_clock(clock)
+    pub fn rebuild(&self) -> Result<()> {
+        self.rebuild_sync()
     }
 
-    pub async fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+    pub fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
         self.rebuild_sync_with_clock(clock)
     }
 
     pub fn rebuild_sync(&self) -> Result<()> {
-        let clock = default_clock();
-        self.rebuild_sync_with_clock(clock)
+        let clock = self.cold.clock.read().clone();
+        self.rebuild_sync_with_clock(clock.as_ref())
     }
 
     pub fn rebuild_sync_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
@@ -607,7 +596,7 @@ impl HnswIndexCore {
             tracing::debug!("HNSW rebuild already in progress, skipping");
             return Ok(());
         }
-        let _guard = RebuildGuard(&self.hot.rebuilding);
+        let _guard = RebuildGuard(&self.hot.rebuilding, &self.hot.rebuild_condvar);
 
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
         let start_nanos = clock.monotonic_nanos();
@@ -641,7 +630,7 @@ impl HnswIndexCore {
         rebuild_res
     }
 
-    pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
+    pub fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
         self.rebuild_region_sync(region_node_ids)
     }
 
@@ -652,7 +641,7 @@ impl HnswIndexCore {
 
         let _write_lock = self.hot.write_mutex.lock();
 
-        let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
+        let region_set: BTreeSet<u64> = region_node_ids.into_iter().collect();
 
         let mmap_count = self
             .cold
@@ -676,7 +665,7 @@ impl HnswIndexCore {
             return Ok(());
         }
 
-        let tombstoned_set: AHashSet<u32> =
+        let tombstoned_set: BTreeSet<u32> =
             tombstoned_in_region.iter().map(|&id| id as u32).collect();
 
         let m = self.cold.config.m;
@@ -785,7 +774,8 @@ impl HnswIndexCore {
         };
 
         let rng = self.cold.rng.clone();
-        let new_index = HnswIndex::try_new_with_rng(config, rng)?;
+        let clock = self.cold.clock.read().clone();
+        let new_index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock)?;
         *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         {
@@ -990,6 +980,112 @@ impl HnswIndexCore {
     }
 }
 
+impl HnswIndex {
+    /// Führt Graphtraversierung durch zur Überprüfung von `INV-VEC-CONNECTIVITY-1`.
+    ///
+    /// Verifiziert, dass jeder lebende Knoten im Index vom Einstiegspunkt über
+    /// Graphkanten erreichbar ist.
+    pub fn verify_full_connectivity(&self) -> bool {
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_node_count = mmap_guard
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        let nodes = self.inner.hot.nodes.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        let total = mmap_node_count + nodes.len();
+
+        let mut alive_nodes = ahash::AHashSet::new();
+        for i in 0..total {
+            if !deleted.contains(i as u64) {
+                alive_nodes.insert(i as u32);
+            }
+        }
+
+        if alive_nodes.is_empty() {
+            return true;
+        }
+
+        let ep = match self.inner.hot.get_entry_point() {
+            Some(e) => e as u32,
+            None => return false,
+        };
+
+        if !alive_nodes.contains(&ep) {
+            return false;
+        }
+
+        let m = self.inner.cold.config.m;
+        let mut visited = ahash::AHashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+
+        visited.insert(ep);
+        queue.push_back(ep);
+
+        while let Some(curr) = queue.pop_front() {
+            let curr_idx = curr as usize;
+            let max_layer = if curr_idx < mmap_node_count {
+                if let Some(mmap) = mmap_guard.as_ref() {
+                    mmap.get_node_record(curr_idx)
+                        .map(|r| r.max_layer as usize)
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            } else {
+                let ram_idx = curr_idx - mmap_node_count;
+                nodes.get(ram_idx).map(|n| n.max_layer).unwrap_or(0)
+            };
+
+            for layer in 0..=max_layer {
+                let conns = if curr_idx < mmap_node_count {
+                    if let Some(mmap) = mmap_guard.as_ref() {
+                        if let Ok(rec) = mmap.get_node_record(curr_idx) {
+                            mmap.get_connections(&rec, layer).unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    let ram_idx = curr_idx - mmap_node_count;
+                    self.inner
+                        .hot
+                        .arena
+                        .get_ram_node_connections(ram_idx, layer, m)
+                };
+
+                for &neighbor in &conns {
+                    if alive_nodes.contains(&neighbor) && visited.insert(neighbor) {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        alive_nodes.is_subset(&visited)
+    }
+}
+
+impl crate::types::Maintain for HnswIndex {
+    fn compact(&self) -> crate::error::Result<()> {
+        self.inner
+            .rebuild_sync()
+            .map_err(|e| crate::error::VectorError::Index(e.to_string()))?;
+        if !self.verify_full_connectivity() {
+            return Err(crate::error::VectorError::ConnectivityDegraded {
+                deleted_ratio: self.deleted_ratio(),
+            });
+        }
+        Ok(())
+    }
+
+    fn is_rebuild_required(&self) -> bool {
+        self.is_rebuild_required()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1075,5 +1171,32 @@ mod tests {
         assert_eq!(run1.2, run2.2, "Entry points must be bit-identical");
         assert_eq!(run1.1, run2.1, "RAM connections must be bit-identical");
         assert_eq!(run1.0, run2.0, "Distances must be bit-identical");
+    }
+
+    #[test]
+    fn test_core_rebuild_last_rebuild_nanos_field_backoff() {
+        let clock = Arc::new(TestClock::new(10_000_000_000));
+        let mut config = HnswConfig::default();
+        config.dimension = 4;
+        config.backoff_base_delay = std::time::Duration::from_millis(500);
+        let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(42));
+        let index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock.clone())
+            .expect("index creation succeeds");
+
+        // Initial rebuild sets last_rebuild_nanos
+        assert_eq!(index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire), 0);
+        index.inner.rebuild_sync().expect("rebuild succeeds");
+        let first_rebuild_nanos = index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire);
+        assert_eq!(first_rebuild_nanos, 10_000_000_000);
+
+        // Immediate rebuild suppressed by backoff
+        let err = index.inner.rebuild_sync().unwrap_err();
+        assert!(format!("{err:?}").contains("Rebuild rate limited by backoff"));
+
+        // Advance clock past cooldown
+        clock.advance_nanos(600_000_000); // 600ms > 500ms
+        index.inner.rebuild_sync().expect("second rebuild succeeds after clock advance");
+        let second_rebuild_nanos = index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire);
+        assert_eq!(second_rebuild_nanos, 10_600_000_000);
     }
 }

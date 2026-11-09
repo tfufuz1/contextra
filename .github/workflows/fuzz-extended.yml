@@ -14,10 +14,10 @@ jobs:
         target:
           - { crate: contextra-store,  target: wal_mutation_chaos }
           - { crate: contextra-store,  target: fuzz_manifest_load }
-          - { crate: contextra-vector,  target: fuzz_hnsw_persistence }
-          - { crate: contextra-db,     target: fuzz_rrf_edge_cases }
-          - { crate: contextra-text,   target: fuzz_bm25_query }
-          - { crate: contextra-vector,  target: fuzz_distance_boundaries }
+          - { crate: contextra-vector, target: fuzz_hnsw_persistence }
+          - { crate: contextra-vector, target: hnsw_insert_search }
+          - { crate: contextra-db,     target: rrf_fusion }
+          - { crate: contextra-text,   target: fuzz_bm25_tokenize }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@nightly

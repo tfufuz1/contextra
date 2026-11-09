@@ -51,7 +51,28 @@ struct ContentMatch {
     reason: &'static str,
 }
 
+/// Formaterkennung anhand eines Streams (z. B. Reader ohne bekannte Gesamtlänge).
+///
+/// **Invariante `INV-INGEST-BOUNDED-1`**: Liest strikt niemals mehr als `MAX_DETECT_BYTES` (64 KiB).
+pub fn detect_reader<R: std::io::Read>(
+    reader: R,
+    hints: &DetectHints<'_>,
+) -> Result<Detection, IngestError> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    let mut limited_reader = reader.take(MAX_DETECT_BYTES as u64);
+    limited_reader
+        .read_to_end(&mut buf)
+        .map_err(|e| IngestError::Corrupt {
+            format: None,
+            detail: format!("Fehler beim Lesen der Erkennungs-Bytes: {e}"),
+        })?;
+    detect(&buf, hints)
+}
+
 /// Formaterkennung anhand von Inhalts-Bytes (max 64 KiB) und Hinweisen.
+///
+/// **Invariante `INV-INGEST-BOUNDED-1`**: Analysiert strikt niemals mehr als `MAX_DETECT_BYTES` (64 KiB).
 pub fn detect(bytes: &[u8], hints: &DetectHints<'_>) -> Result<Detection, IngestError> {
     let analyze_len = bytes.len().min(MAX_DETECT_BYTES);
     let data = match bytes.get(..analyze_len) {

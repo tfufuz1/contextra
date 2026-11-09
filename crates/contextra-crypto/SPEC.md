@@ -5,7 +5,7 @@
 - **AEAD:** AES-256-GCM-SIV (RFC 8452) mit deterministischer Nonce-Isolation.
 - **KDF:** Argon2id (RFC 9106) für Passphrasen-Ableitung und HKDF-Expand (RFC 5869 / HMAC-SHA256).
 - **WAL-Integrität & Anti-Tamper:** HMAC-SHA256 Integritätsketten, Sequenznummern-Validierung und Anti-Mirroring.
-- **Schlüsselspeicher & Memory-Hygiene:** `Zeroize` und `ZeroizeOnDrop` für flüchtige Schlüsselmaterialien (`SecretKey`, `VolatileEncryptionKey`, `UnitKey`, `Dek`).
+- **Schlüsselspeicher & Memory-Hygiene:** `Zeroize` und `ZeroizeOnDrop` für flüchtige Schlüsselmaterialien (`SecretKey`, `Secret`, `VolatileEncryptionKey`, `UnitKey`, `Dek`).
 - **Audit-Kette:** Kryptographisch verknüpfte Audit-Log-Einträge mit Salted BLAKE3-Commitments.
 - **KV-Segment-Verschlüsselung:** Neutrale Segment-Chiffre (`KvSegmentCipher`, `EncryptedKvLayer`) zur Speicherung segmentierter Tensoren und Vektoren.
 
@@ -17,26 +17,24 @@
 
 ## 2. Invarianten und Verträge
 1. **INV-CRYPTO-NO-CUSTOM-PRIMITIVES:** Keine Eigenentwicklungen kryptographischer Algorithmen. Nur standardisierte, peer-reviewte Bibliotheken (`aes-gcm-siv`, `argon2`, `hkdf`, `hmac`, `sha2`, `blake3`, `ed25519-dalek`).
-2. **INV-CRYPTO-ZEROIZE-ON-DROP:** Sämtliches Schlüsselmaterial (`VolatileEncryptionKey`, `SecretKey`, `UnitKey`, `Dek`, `KvSegment`) überschreibt seinen Heap- und Stack-Speicher bei Freigabe (`Drop`) deterministisch mit Nullen.
-3. **INV-CRYPTO-CONSTANT-TIME:** Sämtliche kryptographischen MAC-, Hash- und Prüfsummen-Vergleiche werden in konstanter Zeit mittels `subtle::ConstantTimeEq` (`ct_eq`) ausgeführt.
-4. **INV-CRYPTO-KDF-BOUNDS:** Argon2id wird mit sicherem, zufälligem Salt (mindestens 16 Bytes), Mindestspeicher $m \ge 64\text{ MiB}$ und Iterationen $t \ge 3$ ausgeführt.
-5. **INV-CRYPTO-NONCE-ISOLATION:** Nonces für AES-256-GCM-SIV werden per Call zufällig über einen CSPRNG generiert; Counter-basierte Ableitungen schließen Zähler-Überlauf (fail-closed bei `u64::MAX`) aus.
+   - *Test:* `tests/rfc_vectors.rs` (RFC 8452, RFC 5869, RFC 4231).
+2. **INV-CRYPTO-ZEROIZE-1:** Sämtliches Schlüsselmaterial (`VolatileEncryptionKey`, `SecretKey`, `Secret`, `UnitKey`, `Dek`) überschreibt seinen Speicher bei Freigabe (`Drop`) deterministisch mit Nullen.
+   - *Test:* `tests/crypto_property_and_invariants.rs::test_inv_crypto_zeroize_1_contract`.
+3. **INV-CRYPTO-CONSTANT-TIME-1:** Sämtliche kryptographischen MAC-, Hash-, Schlüssel- und Prüfsummen-Vergleiche werden in konstanter Zeit mittels `subtle::ConstantTimeEq` (`ct_eq`) ausgeführt.
+   - *Test:* `tests/crypto_property_and_invariants.rs::test_inv_crypto_constant_time_1_contract`.
+4. **INV-CRYPTO-KDF-BOUNDS:** Argon2id wird mit sicherem, zufälligem Salt (mindestens 16 Bytes), Mindestspeicher $m \ge 19456\text{ KiB}$ und Iterationen $t \ge 2$ ausgeführt.
+   - *Test:* `tests/kdf_argon2id.rs`.
+5. **INV-CRYPTO-NONCE-ISOLATION:** Nonces für AES-256-GCM-SIV werden per Call zufällig über einen CSPRNG generiert oder explizit injiziert; Counter-basierte Ableitungen schließen Zähler-Überlauf (fail-closed bei `u64::MAX`) aus.
+   - *Test:* `tests/nonce_reuse.rs`, `tests/nonce_stress.rs`.
 6. **INV-CRYPTO-ZERO-PANIC:** Produktionscode enthält kein `unwrap()`, `expect()`, `panic!()` oder ungeprüfte Index-Zugriffe (P6).
+   - *Audit:* `tools/zero_panic_analyzer.py --crate contextra-crypto --fail-on-prod`.
 
 ---
 
-## 3. Architektur-Entscheidung (ADR): Zuordnung von `kv_segment/` und `kv_cipher.rs`
-- **Kontext:** `kv_cipher.rs` und `kv_segment/` stellen Segment-Verschlüsselung (`EncryptedKvLayer`) und Sharding-Stores (`TenantIsolatedKvStore`) für KV-Cache-Schichten bereit.
-- **Entscheidung:** Die Segment-Verschlüsselung verbleibt als neutrale Chiffre-Komponente (`SegmentCipher`) in `contextra-crypto`.
-- **Begründung:** Die Chiffrierung von Speicher- und Cache-Segmenten unter Einbindung von Mandanten- und Modell-Fingerprints ist eine hardware- und speicherbezogene Primitiv-Aufgabe (Ring 0) ohne DSGVO-Löschlogik.
-- **Status:** Offene Architekturentscheidung für Welle 4/5: Reines Envelope-Crypto verbleibt in `contextra-crypto`; das Crypto-Shredding (`KeyRegistry`) ist übergangsweise hinter `legacy-erasure` gebunden.
-
----
-
-## 4. Fehlermodell
+## 3. Fehlermodell
 Alle kryptographischen Fehler werden über den crate-lokalen Fehlertyp `CryptoError` typisiert zurückgegeben:
 - `CryptoError::Aead`: Authentifizierungs- oder Entschlüsselungsfehler.
-- `CryptoError::Kdf`: Unzureichende KDF-Parameter oder KDF-Berechnungsfehler.
-- `CryptoError::HmacMismatch`: Erkannte Integritätsverletzung oder fehlerhafter HMAC-Tag.
-- `CryptoError::ZeroizedKeyAccess`: Zugriff auf bereits gelöschtes Schlüsselmaterial.
-- `CryptoError::NonceCounterExhausted`: Fail-closed Schutz bei Nonce-Zählerüberlauf.
+- `CryptoError::KeyDerivation`: Unzureichende KDF-Parameter oder KDF-Berechnungsfehler.
+- `CryptoError::IntegrityViolation`: Erkannte Integritätsverletzung oder fehlerhafter MAC-Tag.
+- `CryptoError::WalCorruption`: WAL-Korruptionserkennung mit Byte-Offset.
+- `CryptoError::InvalidLength`: Ungültige Schlüssel- oder Nonce-Länge.

@@ -18,8 +18,9 @@
 #![forbid(unsafe_code)]
 
 use crate::csr::{CsrGraph, EdgeType};
+use crate::error::{GraphError, Result};
 use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
-use contextra_types::{DocId, Entity, EntityId, Result};
+use crate::types::{DocId, Entity, EntityId};
 
 /// Repräsentiert eine aus Freitext extrahierte Binärbeziehung zwischen zwei Entitäten.
 #[derive(Debug, Clone, PartialEq)]
@@ -261,15 +262,21 @@ pub fn ingest_extracted_relations(
             continue;
         }
 
-        let source_id = EntityId::from_key(&rel.source)?;
-        let target_id = EntityId::from_key(&rel.target)?;
+        let source_id = EntityId::from_key(&rel.source)
+            .map_err(|e| GraphError::InvalidInput(format!("ungültige Quell-Entität: {e}")))?;
+        let target_id = EntityId::from_key(&rel.target)
+            .map_err(|e| GraphError::InvalidInput(format!("ungültige Ziel-Entität: {e}")))?;
 
         // Stelle sicher, dass Entitäten im Graph existieren
         let source_entity = Entity::new(source_id, &rel.source, "ExtractedEntity");
         let target_entity = Entity::new(target_id, &rel.target, "ExtractedEntity");
 
-        graph.insert_entity_direct(source_entity)?;
-        graph.insert_entity_direct(target_entity)?;
+        graph
+            .insert_entity_direct(source_entity)
+            .map_err(|e| GraphError::Internal(format!("{e}")))?;
+        graph
+            .insert_entity_direct(target_entity)
+            .map_err(|e| GraphError::Internal(format!("{e}")))?;
 
         // Erstelle Hyperkanten-IDs
         let max_id = graph.max_hyperedge_id();
@@ -306,7 +313,7 @@ pub fn ingest_extracted_relations(
                 ) {
                     created_edges.push(he);
                 } else {
-                    return Err(contextra_types::ContextraError::Internal(format!(
+                    return Err(GraphError::Internal(format!(
                         "Failed to convert ExtractedRelation to hyperedge: {e}"
                     )));
                 }

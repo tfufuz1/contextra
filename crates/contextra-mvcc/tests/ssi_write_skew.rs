@@ -132,7 +132,10 @@ fn test_storage_independent_anti_dependency_cycle_detection() {
     // Tx1 modifiziert Account A und validiert/committet atomar bei Sequenz 12
     let write_keys_1 = [key_account_a.as_slice()];
     let res1 = validator.validate_and_record(tx1, &read_set_1, write_keys_1, 12);
-    assert!(res1.is_ok(), "Tx1 muss erfolgreich validieren und committen");
+    assert!(
+        res1.is_ok(),
+        "Tx1 muss erfolgreich validieren und committen"
+    );
 
     // Tx2 versucht Account B bei Sequenz 13 zu verändern und zu committen.
     // Da Tx2 jedoch Account A gelesen hat (Snapshot 10), welches bei Seq 12 von Tx1 modifiziert wurde,

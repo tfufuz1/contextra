@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! SD-05-TEXT-001 — Write Amplification Measurement Tests.
 //!
 //! Verifies that the tombstone update path reduces write amplification

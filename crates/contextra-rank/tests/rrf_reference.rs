@@ -37,8 +37,6 @@ fn rrf_fusion(result_lists: &[Vec<DocId>], k: usize) -> AHashMap<DocId, f32> {
     }
     scores
 }
-
-// ANCHOR[contextra-rank:RRF-TEST-002]
 #[test]
 fn rrf_known_values() {
     let list_a = vec![DocId::from(1), DocId::from(2), DocId::from(3)];

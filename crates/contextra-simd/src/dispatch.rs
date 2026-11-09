@@ -76,12 +76,72 @@ pub struct Dispatcher {
     target: SimdTarget,
 }
 
+#[cfg(feature = "std")]
+static DETECTED_TARGET: std::sync::OnceLock<SimdTarget> = std::sync::OnceLock::new();
+
+/// Detects the best supported SIMD target on the host CPU, with support for caching and env override.
+#[allow(clippy::disallowed_methods)]
+pub fn detect_best_target() -> SimdTarget {
+    #[cfg(feature = "std")]
+    {
+        *DETECTED_TARGET.get_or_init(|| {
+            if std::env::var("CONTEXTRA_SIMD_SCALAR")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false)
+            {
+                return SimdTarget::Scalar;
+            }
+
+            #[cfg(target_arch = "x86_64")]
+            {
+                if is_x86_feature_detected!("avx512f") {
+                    return SimdTarget::Avx512;
+                }
+                if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                    return SimdTarget::Avx2;
+                }
+            }
+
+            #[cfg(target_arch = "aarch64")]
+            {
+                if std::arch::is_aarch64_feature_detected!("neon") {
+                    return SimdTarget::Neon;
+                }
+            }
+
+            SimdTarget::Scalar
+        })
+    }
+
+    #[cfg(not(feature = "std"))]
+    {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if is_x86_feature_detected!("avx512f") {
+                return SimdTarget::Avx512;
+            }
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                return SimdTarget::Avx2;
+            }
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") {
+                return SimdTarget::Neon;
+            }
+        }
+
+        SimdTarget::Scalar
+    }
+}
+
 impl Dispatcher {
     /// Creates a new `Dispatcher` with automatic CPU feature detection.
     #[inline]
-    pub const fn auto() -> Self {
+    pub fn auto() -> Self {
         Self {
-            target: SimdTarget::Auto,
+            target: detect_best_target(),
         }
     }
 
@@ -579,7 +639,7 @@ impl Dispatcher {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::DimensionMismatch`] if `a.len() != b.len()`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -610,7 +670,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::DimensionMismatch`] if `a.len() != b.len()`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -641,7 +701,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::DimensionMismatch`] if `a.len() != b.len()`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -672,7 +732,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
+/// Returns [`SimdError::DimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -703,7 +763,7 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
+/// Returns [`SimdError::DimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -734,7 +794,7 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
+/// Returns [`SimdError::DimensionMismatch`] if `b_bytes.len() < a.len() * 4`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -765,7 +825,7 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> 
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::DimensionMismatch`] if `a.len() != b.len()`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -796,7 +856,7 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::DimensionMismatch`] if `a.len() != b.len()`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity
@@ -827,7 +887,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32> {
 ///
 /// # Errors
 ///
-/// Returns [`ContextraError::EmbeddingDimensionMismatch`] if `a.len() != b.len()`.
+/// Returns [`SimdError::DimensionMismatch`] if `a.len() != b.len()`.
 /// Returns [`SimdError::InvalidInput`] if a test path override specifies an unsupported CPU feature.
 ///
 /// # Complexity

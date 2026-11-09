@@ -1,5 +1,3 @@
-[lints]
-workspace = true
 
 [package]
 name = "contextra-wire-fuzz" # <!-- crate-ref-ignore -->

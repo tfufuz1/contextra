@@ -16,6 +16,22 @@ pub trait EgressAuditSink: Send + Sync + std::fmt::Debug {
     }
 }
 
+/// Trait zur Vorab-Prüfung von Nutzlasten vor dem Versand (z.B. Privacy/Egress-Filter).
+pub trait PayloadGate: Send + Sync + std::fmt::Debug {
+    /// Prüft den Payload-Inhalt vor dem Senden. Gibt `Ok(())` zurück oder bricht fail-closed ab.
+    fn check_payload(&self, payload: &str) -> Result<()>;
+}
+
+/// Standard-Implementierung von `PayloadGate`, die alle Nutzlasten passieren lässt.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PermissivePayloadGate;
+
+impl PayloadGate for PermissivePayloadGate {
+    fn check_payload(&self, _payload: &str) -> Result<()> {
+        Ok(())
+    }
+}
+
 /// Default no-op implementation of `EgressAuditSink`.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NoopEgressAuditSink;

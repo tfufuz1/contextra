@@ -1,0 +1,5 @@
+[capabilities]
+ring = "2"
+klasse = "A"
+may_depend_on = []
+transitional = []

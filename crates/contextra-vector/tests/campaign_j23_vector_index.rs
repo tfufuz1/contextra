@@ -259,7 +259,7 @@ async fn test_h4_twophase_rebuild_concurrency_and_determinism() -> Result<()> {
     let res_before = index.search(&query, 5).await?;
 
     // Trigger rebuild
-    index.rebuild().await?;
+    index.rebuild()?;
 
     let res_after = index.search(&query, 5).await?;
     assert_eq!(
@@ -308,7 +308,7 @@ async fn test_h5_arena_node_reuse_churn_no_ghost_pointers() -> Result<()> {
     }
     index.commit(TxId(2)).await?;
 
-    index.rebuild().await?;
+    index.rebuild()?;
 
     for i in 1..=10 {
         let doc_id = make_doc_id(i + 1000);
@@ -361,7 +361,7 @@ async fn test_h6_partial_rebuild_tombstone_only_pruning() -> Result<()> {
     }
     index.commit(TxId(2)).await?;
 
-    index.rebuild_region(vec![0, 1, 2, 3, 4]).await?;
+    index.rebuild_region(vec![0, 1, 2, 3, 4])?;
 
     let all_ids = index.all_doc_ids().await?;
     assert_eq!(all_ids.len(), 40);

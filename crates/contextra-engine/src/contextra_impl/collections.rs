@@ -294,47 +294,41 @@ impl Contextra {
 
     // ANCHOR[contextra-engine:DRO-288]
     /// Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    #[tracing::instrument(level = "trace", skip(self, proof_key))]
+    /// Führt die rein mechanische Löschung einer Collection und ihrer Daten durch.
+    #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(
         &self,
         name: &str,
         tenant_id: TenantId,
-        proof_key: &[u8],
-    ) -> Result<DeletionProof> {
-        struct InlineKeyProvider(Vec<u8>);
-        impl contextra_impl::erasure::ProofKeyProvider for InlineKeyProvider {
-            fn resolve_proof_key(&self, _tenant_id: TenantId) -> Result<Vec<u8>> {
-                Ok(self.0.clone())
-            }
+    ) -> Result<()> {
+        let cache_key = (tenant_id, name.to_string());
+
+        // 1. Aus Cache entfernen
+        let col = {
+            let mut write_guard = self.tenant_collections.write().await;
+            write_guard.remove(&cache_key)
+        };
+
+        let col = match col {
+            Some(c) => c,
+            None => self.collection_for_tenant(name, tenant_id).await?,
+        };
+
+        // 2. Mechanische Daten- und Indexbereinigung
+        col.drop_collection().await?;
+
+        // 3. Aus Collection-Index entfernen falls nicht default
+        if name != "default" {
+            let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
+            let tx = self.allocate_tx()?;
+            let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
+                self.storage.clone(),
+                tenant_id,
+            );
+            tenant_storage.delete(tx, &col_idx_key).await?;
+            tenant_storage.commit(tx).await?;
         }
 
-        let provider = Arc::new(InlineKeyProvider(proof_key.to_vec()));
-        let mut old_provider = self.proof_key_provider.write();
-        let prev = old_provider.take();
-        *old_provider = Some(provider);
-        drop(old_provider);
-
-        let report = self.erase_collection(tenant_id, name).await;
-
-        if let Some(p) = prev {
-            *self.proof_key_provider.write() = Some(p);
-        }
-
-        let report = report?;
-        if report.verified {
-            report.proof.ok_or_else(|| {
-                contextra_types::ContextraError::Internal(
-                    "ErasureReport was verified but contained no DeletionProof".to_string(),
-                )
-            })
-        } else {
-            let reason = report
-                .failure
-                .map(|f| format!("{}: {}", f.layer, f.reason))
-                .unwrap_or_else(|| "Unknown erasure failure".to_string());
-            Err(contextra_types::ContextraError::Internal(format!(
-                "Collection deletion verification failed: {reason}"
-            )))
-        }
+        Ok(())
     }
 }

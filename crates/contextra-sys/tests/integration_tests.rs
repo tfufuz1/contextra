@@ -1,6 +1,5 @@
-// FILE-CONTEXT
 // STAND: 2026-11-08T00:00:00Z
-// ZWECK: Comprehensive integration tests for contextra-sys public API and invariants (SPEC v4.0 B8/B10).
+// ZWECK: Comprehensive integration tests for contextra-sys public API and invariants (SPEC §10.1 / INV-SYS-FSYNC-1 / INV-SYS-MEMLOCK-1).
 // INVARIANTEN: Zero panic in test harness; verify cross-module contracts and invariants.
 
 #![allow(unsafe_code)]
@@ -15,7 +14,8 @@ use tempfile::tempdir;
 use contextra_sys::{
     durable_flush_dir, durable_flush_file, ensure_fd_limit, mem_lock, mem_lock_with_policy,
     mem_unlock, mmap_readonly, set_fd_limit, set_restrictive_file_acl, verify_file_acl_owner_only,
-    write_all_durable, LockedRegions, MemLockPolicy, SealedFile, SealedMap,
+    write_all_durable, DurableFile, Error, LockedRegions, MemLockPolicy, SealedFile, SealedMap,
+    VaultBuffer,
 };
 
 #[test]
@@ -50,6 +50,25 @@ fn test_durability_file_and_directory_lifecycle() {
 }
 
 #[test]
+fn test_durable_file_poisoning_contract() {
+    let dir = tempdir().expect("tempdir");
+    let file_path = dir.path().join("durable_file_contract.dat");
+
+    let raw = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&file_path)
+        .expect("open file");
+
+    let mut durable = DurableFile::new(raw);
+    assert!(!durable.is_poisoned());
+    durable.write_all(b"healthy chunk").expect("healthy write");
+    durable.sync_data().expect("sync data");
+    assert!(!durable.is_poisoned());
+}
+
+#[test]
 fn test_mmap_and_sealed_map_lifecycle() {
     let dir = tempdir().expect("tempdir");
     let file_path = dir.path().join("sealed_mmap.dat");
@@ -80,6 +99,9 @@ fn test_mmap_and_sealed_map_lifecycle() {
         assert!(!sealed_map.is_empty());
         assert_eq!(sealed_map.as_slice(), payload);
         assert_eq!(&sealed_map[..], payload);
+
+        let sub = sealed_map.get_subslice(14, 6).expect("subslice");
+        assert_eq!(sub, b"sealed");
     }
 
     // SealedFile length mismatch fails closed
@@ -98,7 +120,6 @@ fn test_memory_locking_and_vault() {
 
     // Raw mem_lock and mem_unlock
     let lock_res = mem_lock(ptr, len);
-    // On systems with strict ulimit -l, lock_res might be false without CAP_IPC_LOCK, which is acceptable
     if lock_res {
         mem_unlock(ptr as usize, len);
     }
@@ -131,6 +152,16 @@ fn test_memory_locking_and_vault() {
 }
 
 #[test]
+fn test_vault_buffer_allocation_and_zeroize() {
+    let raw = b"integration_test_secret_buffer_bytes_9876";
+    let mut buf = VaultBuffer::allocate_with_policy(raw.len(), MemLockPolicy::Tolerant)
+        .expect("allocate vault buffer");
+    buf.as_mut_slice().copy_from_slice(raw);
+    assert_eq!(&buf[..], raw);
+    drop(buf);
+}
+
+#[test]
 fn test_file_acl_restriction_and_verification() {
     let dir = tempdir().expect("tempdir");
     let file_path = dir.path().join("secure_key.dat");
@@ -154,11 +185,27 @@ fn test_file_acl_restriction_and_verification() {
 
 #[test]
 fn test_posix_resource_limits() {
-    // Check ensure_fd_limit and set_fd_limit
     let ok = ensure_fd_limit(256);
-    // In unprivileged containers, limit might already be higher or limited by hard cap
     let _ = ok;
 
     let res = set_fd_limit(512);
     let _ = res;
+}
+
+#[test]
+fn test_typed_error_conversions() {
+    let sync_err = Error::SyncFailed(libc::EIO);
+    let io_err: std::io::Error = sync_err.into();
+    assert_eq!(io_err.raw_os_error(), Some(libc::EIO));
+
+    let lock_err = Error::MemoryLockFailed {
+        errno: libc::ENOMEM,
+        reason: "failed locking memory",
+    };
+    let io_lock: std::io::Error = lock_err.into();
+    assert_eq!(io_lock.raw_os_error(), Some(libc::ENOMEM));
+
+    let poisoned = Error::HandlePoisoned;
+    let io_poisoned: std::io::Error = poisoned.into();
+    assert_eq!(io_poisoned.kind(), std::io::ErrorKind::Other);
 }

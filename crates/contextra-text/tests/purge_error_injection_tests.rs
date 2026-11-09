@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Testsuite `purge_error_injection_tests.rs` für contextra-text.
 //!
 //! # Ring-Zuordnung

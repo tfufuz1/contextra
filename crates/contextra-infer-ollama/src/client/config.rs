@@ -1,6 +1,6 @@
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use super::policy::EndpointPolicy;
-#[cfg(not(feature = "http"))]
+#[cfg(not(feature = "client"))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EndpointPolicy {
     pub allow_remote: bool,

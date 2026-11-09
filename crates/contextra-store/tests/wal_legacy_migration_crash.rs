@@ -13,7 +13,7 @@ async fn test_legacy_migration_crash_recovery_step_by_step() {
         key: b"migration_crash_key".to_vec(),
         value: b"migration_crash_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 42, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();

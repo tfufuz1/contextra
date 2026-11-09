@@ -5,13 +5,13 @@
 
 use super::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
 use super::bloom::BloomFilter;
+use crate::io_seam::RealFs;
 use crate::wal::KeyManager;
 use bytes::{BufMut, Bytes, BytesMut};
+use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 
 /// A builder for SSTable data blocks (Format v4 default, supports v3).
 pub struct BlockBuilder {
@@ -205,8 +205,11 @@ pub struct SstableMetadata {
 /// Erzeugt deterministisch geordnete SSTable-Dateien mit Datenbloecken und Index.
 pub struct SstableBuilder {
     path: PathBuf,
-    file: File,
+    tmp_path: PathBuf,
+    file: Box<dyn VfsFile>,
+    vfs: Arc<dyn Vfs>,
     block_builder: BlockBuilder,
+    block_size: usize,
     index: Vec<(Bytes, u64)>, // (last_key, offset)
     first_key: Option<Bytes>,
     last_key: Option<Bytes>,
@@ -221,6 +224,8 @@ pub struct SstableBuilder {
     min_seq: u64,
     max_seq: u64,
     format_version: u16,
+    poisoned: bool,
+    finished: bool,
 }
 
 impl SstableBuilder {
@@ -233,6 +238,14 @@ impl SstableBuilder {
         path: impl AsRef<Path>,
         key_manager: Option<Arc<KeyManager>>,
     ) -> Result<Self> {
+        Self::create_with_vfs(path, key_manager, Arc::new(RealFs)).await
+    }
+
+    pub async fn create_with_vfs(
+        path: impl AsRef<Path>,
+        key_manager: Option<Arc<KeyManager>>,
+        vfs: Arc<dyn Vfs>,
+    ) -> Result<Self> {
         let path_ref = path.as_ref();
         let derived_km = if let Some(km) = key_manager {
             let file_id = path_ref
@@ -243,14 +256,30 @@ impl SstableBuilder {
         } else {
             None
         };
-        let file = File::create(path_ref)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to create SSTable: {}", e)))?;
+
+        let parent = path_ref.parent().unwrap_or_else(|| Path::new("."));
+        let file_name = path_ref
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("sstable");
+        let tmp_path = parent.join(format!("{}.tmp.{}", file_name, std::process::id()));
+
+        let open_opts = VfsOpenOptions {
+            read: true,
+            write: true,
+            create_new: true,
+            ..Default::default()
+        };
+
+        let file = vfs.open(&tmp_path, &open_opts)?;
 
         Ok(Self {
             path: path_ref.to_path_buf(),
+            tmp_path,
             file,
+            vfs,
             block_builder: BlockBuilder::new_with_version(BLOCK_SIZE, 4),
+            block_size: BLOCK_SIZE,
             index: Vec::new(),
             first_key: None,
             last_key: None,
@@ -264,17 +293,78 @@ impl SstableBuilder {
             min_seq: u64::MAX,
             max_seq: 0,
             format_version: 4,
+            poisoned: false,
+            finished: false,
         })
+    }
+
+    /// Sets the target block size for data blocks.
+    pub fn with_block_size(mut self, size: usize) -> Self {
+        self.set_block_size(size);
+        self
+    }
+
+    /// Configures the target block size for data blocks.
+    pub fn set_block_size(&mut self, size: usize) {
+        self.block_size = size.clamp(512, 64 * 1024);
+        if self.block_builder.is_empty() {
+            self.block_builder =
+                BlockBuilder::new_with_version(self.block_size, self.format_version);
+        }
+    }
+
+    /// Sets the whole-SSTable bloom filter parameters.
+    pub fn with_bloom_fpr(mut self, expected_keys: usize, fpr: f64) -> Self {
+        self.set_bloom_filter(expected_keys, fpr);
+        self
+    }
+
+    /// Configures the whole-SSTable bloom filter parameters.
+    pub fn set_bloom_filter(&mut self, expected_keys: usize, fpr: f64) {
+        self.bloom_filter = BloomFilter::new(expected_keys, fpr);
+    }
+
+    fn write_to_file(&mut self, buf: &[u8], offset: u64) -> Result<()> {
+        if self.poisoned {
+            return Err(ContextraError::Storage(
+                "SstableBuilder handle is poisoned after IO failure (INV-FSYNC-1)".into(),
+            ));
+        }
+        let mut written = 0;
+        while written < buf.len() {
+            let res = self
+                .file
+                .write_at(&buf[written..], offset.saturating_add(written as u64));
+            match res {
+                Ok(0) => {
+                    self.poisoned = true;
+                    return Err(ContextraError::Storage(
+                        "Failed to write to SSTable tmp file (0 bytes written)".into(),
+                    ));
+                }
+                Ok(n) => written += n,
+                Err(e) => {
+                    self.poisoned = true;
+                    return Err(ContextraError::Io(e));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Explicitly configures the SSTable format version to write (default: 4).
     pub fn set_format_version(&mut self, version: u16) {
         self.format_version = version;
-        self.block_builder = BlockBuilder::new_with_version(BLOCK_SIZE, version);
+        self.block_builder = BlockBuilder::new_with_version(self.block_size, version);
     }
 
     /// Adds a key-value pair to the SSTable being built.
     pub async fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> Result<()> {
+        if self.poisoned {
+            return Err(ContextraError::Storage(
+                "SstableBuilder handle is poisoned after IO failure (INV-FSYNC-1)".into(),
+            ));
+        }
         if key.is_empty() {
             return Err(ContextraError::InvalidInput(
                 "SSTable key cannot be empty".to_string(),
@@ -346,7 +436,7 @@ impl SstableBuilder {
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
         let block_data = std::mem::replace(
             &mut self.block_builder,
-            BlockBuilder::new_with_version(BLOCK_SIZE, self.format_version),
+            BlockBuilder::new_with_version(self.block_size, self.format_version),
         )
         .build();
 
@@ -369,10 +459,7 @@ impl SstableBuilder {
         let block_len = u64::try_from(block.len())
             .map_err(|_| ContextraError::Storage("Block size exceeds u64::MAX".into()))?;
 
-        self.file
-            .write_all(&block)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("SSTable block write failed: {}", e)))?;
+        self.write_to_file(&block, self.offset)?;
 
         self.index.push((last_key, self.offset));
         self.offset = self
@@ -384,7 +471,18 @@ impl SstableBuilder {
 
     /// Finalizes the SSTable and returns metadata.
     pub async fn finish(mut self) -> Result<SstableMetadata> {
-        self.flush_block().await?;
+        if self.poisoned {
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(ContextraError::Storage(
+                "Cannot finish poisoned SstableBuilder (INV-FSYNC-1)".into(),
+            ));
+        }
+
+        if let Err(e) = self.flush_block().await {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(e);
+        }
 
         let index_offset = self.offset;
         let mut index_builder = BytesMut::new();
@@ -407,18 +505,17 @@ impl SstableBuilder {
         index_with_crc.extend_from_slice(&index_bytes);
         let index_to_write = index_with_crc;
 
-        self.file
-            .write_all(&index_to_write)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("SSTable index write failed: {}", e)))?;
-
+        if let Err(e) = self.write_to_file(&index_to_write, self.offset) {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(e);
+        }
         let index_write_len = u64::try_from(index_to_write.len())
             .map_err(|_| ContextraError::Storage("Index bytes length overflow".into()))?;
+        self.offset += index_write_len;
 
         // SPECCED: Write the whole-SSTable Bloom filter
-        let bloom_offset = index_offset
-            .checked_add(index_write_len)
-            .ok_or_else(|| ContextraError::Storage("Bloom offset overflow".into()))?;
+        let bloom_offset = self.offset;
         let bloom_data = self.bloom_filter.to_bytes();
 
         // Add CRC to bloom
@@ -428,62 +525,69 @@ impl SstableBuilder {
         bloom_with_crc.extend_from_slice(&bloom_data);
         let bloom_to_write = bloom_with_crc;
 
-        self.file
-            .write_all(&bloom_to_write)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("SSTable bloom write failed: {}", e)))?;
+        if let Err(e) = self.write_to_file(&bloom_to_write, self.offset) {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(e);
+        }
+        let bloom_write_len = u64::try_from(bloom_to_write.len())
+            .map_err(|_| ContextraError::Storage("Bloom bytes length overflow".into()))?;
+        self.offset += bloom_write_len;
 
         // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][version=4][magic]
         // This is 54 bytes.
-        self.file
-            .write_u64_le(self.min_tx_id)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        self.file
-            .write_u64_le(self.max_tx_id)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        self.file
-            .write_u64_le(self.min_seq)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        self.file
-            .write_u64_le(self.max_seq)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        self.file
-            .write_u64_le(bloom_offset)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        self.file
-            .write_u64_le(index_offset)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let mut trailer = BytesMut::with_capacity(54);
+        trailer.put_u64_le(self.min_tx_id);
+        trailer.put_u64_le(self.max_tx_id);
+        trailer.put_u64_le(self.min_seq);
+        trailer.put_u64_le(self.max_seq);
+        trailer.put_u64_le(bloom_offset);
+        trailer.put_u64_le(index_offset);
+        trailer.put_u16_le(self.format_version);
+        trailer.put_u32_le(SSTABLE_MAGIC_MFSX);
 
-        // Format version (default 4)
-        self.file
-            .write_u16_le(self.format_version)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        if let Err(e) = self.write_to_file(&trailer, self.offset) {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(e);
+        }
+        self.offset += 54;
 
-        self.file
-            .write_u32_le(SSTABLE_MAGIC_MFSX)
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        // 1. sync_all on written handle
+        if let Err(e) = self.file.sync_all() {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(ContextraError::Io(e));
+        }
 
-        self.file
-            .sync_all()
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let file_size = match self.file.len() {
+            Ok(s) => s,
+            Err(e) => {
+                self.poisoned = true;
+                let _ = self.vfs.remove_file(&self.tmp_path);
+                return Err(ContextraError::Io(e));
+            }
+        };
 
-        crate::util::fsync_parent_dir(&self.path).await?;
+        // Drop file handle before renaming (critical on Windows)
+        drop(self.file);
 
-        let file_size = self
-            .file
-            .metadata()
-            .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?
-            .len();
+        // 2. Atomic rename from tmp_path to path
+        if let Err(e) = self.vfs.rename(&self.tmp_path, &self.path) {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(e);
+        }
+
+        // 3. sync_dir on parent directory
+        let parent = self.path.parent().unwrap_or_else(|| Path::new("."));
+        if let Err(e) = self.vfs.sync_dir(parent) {
+            self.poisoned = true;
+            // Failure on sync_dir after rename: fail-closed (INV-FSYNC-1)
+            return Err(e);
+        }
+
+        self.finished = true;
 
         if self.key_count == 0 {
             self.min_tx_id = 0;
@@ -501,5 +605,13 @@ impl SstableBuilder {
             min_seq: self.min_seq,
             max_seq: self.max_seq,
         })
+    }
+}
+
+impl Drop for SstableBuilder {
+    fn drop(&mut self) {
+        if !self.finished {
+            let _ = self.vfs.remove_file(&self.tmp_path);
+        }
     }
 }

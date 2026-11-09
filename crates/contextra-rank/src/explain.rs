@@ -16,7 +16,6 @@ pub use crate::fusion::SignalKind;
 
 /// Breakdown entry representing the contribution of a single search signal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:EXP-001]
 /// Einzelner Beitrags-Eintrag für eine spezifische Signalquelle innerhalb der Erklärung.
 pub struct ExplanationEntry {
     /// Identified search signal type.
@@ -33,7 +32,6 @@ pub struct ExplanationEntry {
 
 /// Structured explanation detailing why a document was retrieved with its given rank.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:EXP-002]
 /// Strukturierte Gesamterklärung zur Nachvollziehbarkeit eines Retrieval-Ergebnisses.
 pub struct RetrievalExplanation {
     /// Individual signal contribution entries, sorted descending by `contribution_share`.
@@ -64,7 +62,6 @@ impl RetrievalExplanation {
     ///
     /// Formats all signal contributions using exact ranks and normalized percentage shares,
     /// along with any resonance coherence bonus or collection source.
-    // ANCHOR[contextra-rank:EXP-003]
     /// Erzeugt eine verständliche deutsche Textzusammenfassung für Audit-Logs oder UIs.
     pub fn to_human_readable_de(&self) -> String {
         if self.entries.is_empty() {
@@ -206,7 +203,6 @@ fn compute_contribution_shares(raw_entries: &[RawSignalEntry]) -> Vec<f32> {
 ///
 /// Computes per-signal `contribution_share` normalized such that all present signals sum to `1.0`
 /// (or `0.0` if no signals are present).
-// ANCHOR[contextra-rank:EXP-004]
 /// Erzeugt aus einem maschinenlesbaren `ProvenanceRecord` eine strukturierte `RetrievalExplanation`.
 pub fn explain(record: &ProvenanceRecord) -> RetrievalExplanation {
     let raw_entries = extract_raw_signal_entries(record);

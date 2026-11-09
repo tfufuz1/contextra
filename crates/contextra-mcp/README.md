@@ -2,16 +2,11 @@
 
 Model Context Protocol (MCP) Server über stdio/JSON-RPC 2.0 für Contextra.
 
-Normativitätsklasse: **Ring 4 (Protokoll & IPC)** (`stable`; SPEC §4, `capabilities.toml`).
-
-## Rolle & Zweck (Baukasten-Prinzip)
+## Rolle & Zweck
 `contextra-mcp` stellt einen gehärteten, zustandslosen Model Context Protocol (MCP) Server bereit, der über `stdio` mittels JSON-RPC 2.0 mit KI-Hostumgebungen (Claude Desktop, AI-Agenten, IDE-Erweiterungen) kommuniziert.
 
-Gemäß dem Baukasten-Vertrag (M1–M11) ist `contextra-mcp` modular isoliert:
-- **Abhängigkeiten abwärts (M1):** Verwendet ausschließlich wohldefinierte Schnittstellen.
-- **Entkopplung der Löschkette (M7):** Keine rechtlichen Löschzusagen oder Deletion-Proof-Interna im Produktionskern; diese sind als `#[deprecated]` markiert und gehören exklusiv zur `contextra-erasure`-Familie.
 - **Sicherheits-Invarianten:** `#![forbid(unsafe_code)]` strikt erzwungen; keine unwrap/expect/panic im Produktionspfad; Fail-Closed-Sicherheitsgates für Prompt-Injection und Cloud-Egress.
-- **Umwelt-Injektion (M4):** Deterministische Puffergrenzen (`MAX_RPC_BYTES`), injizierbare VFS- und Konfigurationspfade.
+- **Deterministische Puffergrenzen:** Bounded RPC Message Size (`MAX_RPC_BYTES`).
 
 ## Features
 - `candle`: Optionales Inferenz-Backend via `contextra-infer-candle`
@@ -19,7 +14,30 @@ Gemäß dem Baukasten-Vertrag (M1–M11) ist `contextra-mcp` modular isoliert:
 - `onnx`: Optionales ONNX-Runtime-Backend via `contextra-infer-onnx`
 - `test-utils`: Hilfsmittel für Tests
 
-## Einbettungsbeispiel (M10)
+## Verfügbare Tools
+- `contextra_search`: Hybride semantische Suche (Vektor + Text + Graph)
+- `contextra_get`: Dokument anhand der ID abrufen
+- `contextra_collections`: Kollektionen auflisten
+- `contextra_insert`: Neues Dokument indizieren
+- `contextra_upsert`: Dokument idempotent einfügen oder aktualisieren
+- `contextra_delete`: Einzelnes Dokument löschen
+- `contextra_forget`: Alias für `contextra_delete` (Löschen ohne Nachweisobjekt)
+- `contextra_create_collection`: Neue Kollektion anlegen
+- `contextra_drop_collection`: Kollektion löschen
+- `contextra_explain`: Erklärung und Provenienz für Suchergebnisse ausgeben
+
+## Konfiguration & Umgebungsvariablen
+- `CONTEXTRA_MCP_ALLOW_WRITE`: Steuert Schreibberechtigungen (`1`, `true`, `yes`). Standardmäßig `false` (Nur-Lese-Modus).
+- `CONTEXTRA_MCP_IDLE_TIMEOUT_SECS`: Inaktivitäts-Timeout in Sekunden für stdio (Standard: 30s).
+- `CONTEXTRA_INJECTION_POLICY`: Sicherheitsrichtlinie für Prompt-Injection (`quarantine`, `warn`, `disabled`).
+
+## Bekannte Grenzen
+- [V] Ein Nur-Lese-Betrieb ist per vorhandener Konfiguration bereits vollständig vorgesehen und aktiv:
+  - Über die Umgebungsvariable `CONTEXTRA_MCP_ALLOW_WRITE` (Standardwert: `false`) wird `allow_db_writes` in der `SandboxPolicy` gesteuert.
+  - Ohne explizites Setzen von `CONTEXTRA_MCP_ALLOW_WRITE=true` sind alle mutierenden Schreibwerkzeuge (`contextra_insert`, `contextra_upsert`, `contextra_delete`, `contextra_forget`, `contextra_create_collection`, `contextra_drop_collection`) fail-closed durch die `McpSandbox` gesperrt.
+- [H] Weitere feingranulare Filterung (z. B. lesende Beschränkung auf bestimmte Kollektionen) erfordert derzeit anwendungsspezifische Adapter oder Proxy-Schichten.
+
+## Einbettungsbeispiel
 Ein eigenständiges, autarkes Beispiel befindet sich unter `examples/mcp_standalone.rs` und kann ausgeführt werden:
 
 ```bash
@@ -50,8 +68,3 @@ let ping_req = JsonRpcRequest {
 };
 let resp = JsonRpcResponse::ok(ping_req.id, json!({}));
 ```
-
-## Garantien & Invarianten
-- **DbC (Design by Contract):** Strikte Eingangsparameter-Validierung und Bounded-Buffer-Reader (Schutz gegen DoS und übergroße Payloads).
-- **Zero Panic:** Alle Fehler werden deterministisch in typisierten `McpError`-Ergebnissen gekapselt.
-- **Isolation:** Keine unerlaubten Querverbindungen; autark im Baukastensystem integrierbar.

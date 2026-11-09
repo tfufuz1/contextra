@@ -663,3 +663,6 @@ mod tests {
         assert!(err_msg.contains("Unsupported key derivation version: 99"));
     }
 }
+
+/// Neutraler Segmentschlüssel (Klasse A Baustein).
+pub type SegmentKey = ShreddableSegmentKey;

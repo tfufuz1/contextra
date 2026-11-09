@@ -43,6 +43,8 @@ pub enum LimitKind {
     TableCells,
     /// Maximale Anzahl erzeugter Chunks
     Chunks,
+    /// Maximale Pfadlänge von Einträgen im Archiv
+    PathLength,
 }
 
 /// Einheitlicher Fehler-Enum für alle Ingestion- und Chunking-Vorgänge.

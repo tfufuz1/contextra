@@ -16,16 +16,21 @@ klasse = "A"
 [features]
 default = ["std"]
 std = []
+serde = []
+tracing = ["dep:tracing"]
+inspect = []
 
 [dependencies]
 flatbuffers = { workspace = true }
 bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tracing = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+proptest = "1.4"
 
 [[bench]]
 name = "wire_bench"

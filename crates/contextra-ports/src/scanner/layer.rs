@@ -114,5 +114,10 @@ pub struct PurgeStats {
 /// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
 pub trait Purger: Send + Sync {
     /// Führt die physische Bereinigung für das gegebene Ziel aus.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError` bei I/O- oder Freigabefehlern während der physischen Bereinigung.
+    /// # Crash
+    /// Idempotent; Teilausfälle hinterlassen konsistente Zwischenzustände ohne Datenverlust lebender Einheiten.
     fn purge(&self, ctx: &crate::RequestContext, target: &ScanTarget) -> Result<PurgeStats>;
 }

@@ -42,6 +42,8 @@ pub trait MorphologicalTokenizer: Send + Sync {
 pub struct GermanCompoundSplitter {
     /// Minimum component length for splitting.
     min_component_len: usize,
+    /// Maximum decomposition depth (number of segments).
+    max_depth: usize,
     /// Trie data structure for fast prefix checking and dictionary matching.
     trie: Trie,
 }
@@ -69,6 +71,7 @@ impl GermanCompoundSplitter {
         }
         Self {
             min_component_len: min_len,
+            max_depth: 8,
             trie,
         }
     }
@@ -85,6 +88,7 @@ impl GermanCompoundSplitter {
         }
         Self {
             min_component_len: min_len,
+            max_depth: 8,
             trie,
         }
     }
@@ -133,6 +137,17 @@ impl GermanCompoundSplitter {
     /// Liefert die Mindestlänge für Teilkomponenten.
     pub fn min_component_len(&self) -> usize {
         self.min_component_len
+    }
+
+    /// Setzt die maximale Rekursions-/Segmenttiefe für Zerlegungen.
+    pub fn with_max_depth(mut self, max_depth: usize) -> Self {
+        self.max_depth = max_depth;
+        self
+    }
+
+    /// Liefert die maximale Segmenttiefe.
+    pub fn max_depth(&self) -> usize {
+        self.max_depth
     }
 
     // ANCHOR[contextra-text:MORPH-026]
@@ -219,6 +234,10 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                 Some(node) => node.clone(),
                 None => continue,
             };
+
+            if current_node.segment_count >= self.max_depth {
+                continue;
+            }
 
             for j in (i + 2)..=n {
                 if !token.is_char_boundary(j) {

@@ -5,13 +5,14 @@ Autarker Baustein (**Klasse A**, SPEC v4.0 Welle 1) für Cloud-Egress-Sicherheit
 ## Baukasten-Eigenschaften (Klasse A)
 
 - **Vollkommen autark (B1, B2):** Keine internen Normal- oder Dev-Dependencies zu anderen Contextra-Crates.
-- **Eigene & Standardtypen (B3):** Alle Schnittstellen basieren auf Standardtypen oder crate-eigenen Typen (`Clock`, `TenantId`, `TenantScoped`, `EgressPolicy`, `EgressDecision`).
-- **Typisierte Fehler (B4):** Hauptfehlertyp `EgressError` (`thiserror`, `#[non_exhaustive]`).
-- **Autarker Export (B5):** Vollständig lauffähig außerhalb des Workspace-Repos via `tools/export_crate.py` und `tools/extract_probe.py`.
-- **Transitionales Feature (B6):** `ports-compat` für vorübergehende Typkonvertierungen zu `contextra-ports` und `contextra-types` (bis Welle 6).
-- **Keine Fremdfachlogik (B7):** Reine Maskierung und Egress-Sicherheit; keine DSGVO-Löschkette oder Shredding-Logik (gehört exklusiv in `contextra-erasure`).
+- **Eigene & Standardtypen (B3):** Alle Schnittstellen basieren auf Standardtypen oder crate-eigenen Typen (`Clock`, `TenantId`, `TenantScoped`, `EgressPolicy`, `EgressDecision`, `EntityMatch`).
+- **Typisierte Fehler (B4):** Hauptfehlertyp `EgressError` / `Error` (`thiserror`, `#[non_exhaustive]`) mit Standard-Varianten (`InvalidInput`, `CapacityExceeded`, `Io`, `StateConflict`, `Corrupt`).
+- **Autarker Export (B5):** Vollständig lauffähig außerhalb des Workspace-Repos via `tools/export_crate.py` und `tools/isolation_proof.py`.
+- **Feature-Minimalismus (B6):** Standard-Features sind minimal (`default = ["std"]`, `serde`, `tracing`, `inspect`, `experimental`).
+- **Keine Fremdfachlogik (B7):** Reine Maskierung und Egress-Sicherheit; keine Löschketten-, Saga- oder Shredding-Logik (gehört exklusiv in `contextra-erasure`).
 - **Zero-Panic & Sicherheit (B9, B10):** `#![forbid(unsafe_code)]`, striktes Fail-Closed, null Panics auf beliebigen UTF-8-Grenzen.
 - **P28-Determinismus (B11):** Zeitmessung über den `Clock`-Port; interne HashMaps nutzen deterministische BLAKE3-Hasher (`DeterministicBuildHasher`).
+- **Lizenz (B12):** Lizenziert unter MIT und Apache 2.0 (`LICENSE-MIT`, `LICENSE-APACHE`), MSRV 1.89.
 
 ---
 
@@ -113,15 +114,15 @@ python3 tools/export_crate.py contextra-privacy --out /pfad/zu/deinem/projekt/li
 
 ## Grenzen des Crates
 
-1. **Synthetische Testdaten vs. Reale Daten:** Die Erkennungsqualität wurde ausschließlich auf einem kleinen synthetischen Korpus (N = 600) gemessen. Dies stellt **keine Aussage über reale Daten**, reale Sprachvarianz, Dialekte oder komplexe Formatierungsfehler dar.
+1. **Synthetische Testdaten vs. Reale Daten:** Die Erkennungsqualität wurde ausschließlich auf einem synthetischen Korpus (N = 600) gemessen. Dies stellt **keine Aussage über reale Daten**, reale Sprachvarianz, Dialekte oder komplexe Formatierungsfehler dar.
 2. **Keine vollständige OCR-/Layout-Analyse:** `RuleBasedEntityRecognizer` operiert zeichen- und bytebasiert auf UTF-8-Strings. Formatierungen in Tabellen, PDFs oder Bildern werden nicht erfasst.
-3. **Mehrdeutigkeit kurzer Nummern:** Postleitzahlen (PLZ) und Teilabschnitte von Telefonnummern weisen systembedingt Überlappungen mit Bestellnummern, Versionsnummern oder Geldbeträgen auf (niedrigere Precision bei isolierten 5-Ziffern-Folgen).
+3. **Mehrdeutigkeit kurzer Nummern:** Postleitzahlen (PLZ) und Teilabschnitte von Telefonnummern weisen systembedingt Überlappungen mit Bestellnummern, Versionsnummern oder Geldbeträgen auf.
 4. **Kein Echtzeit-Schutz gegen alle Inferenz-Modelle:** `EgressGuard` prüft semantische Vektorähnlichkeit gegen gespeicherte Schwellenwerte, schützt jedoch nicht lückenlos gegen Prompt-Injection-Evasion oder Steganographie.
 
 ---
 
 ## Rechtliche Hinweise & Pflichtangaben
 
-- **Erkennungsqualität:** Die Erkennungsqualität wurde nur auf einem kleinen synthetischen Korpus (N = 600, gemessene Gesamt-Precision: 89.25%, Recall: 99.67%) gemessen. Dies ist keine Aussage über die Erkennungsleistung bei realen Daten.
-- **Fachprüfung offen:** Die DSGVO-Aussagen und Verweise auf Rechtsvorschriften (z. B. Art. 15, Art. 28, Art. 30 DSGVO) in diesem Crate und seinen Begleitdokumenten sind **fachlich nicht geprüft ("Fachprüfung offen")**.
+- **Erkennungsqualität:** Heuristischer Erkennungskern; die Erkennungsleistung bei realen Daten kann variieren.
+- **Fachprüfung offen:** Verweise auf Datenschutzvorschriften in diesem Crate und seinen Begleitdokumenten sind **fachlich nicht geprüft ("Fachprüfung offen")**.
 - **Keine Rechtsberatung:** Die Software, die Dokumentation und die enthaltenen Vorlagen stellen keine Rechtsberatung dar und ersetzen keine juristische Prüfung im Einzelfall.

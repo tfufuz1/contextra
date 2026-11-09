@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Integration and negative tests for `TextScanner` and `TextPurger` (§12.7.4, INV-WITNESS-MINT-1).
 
 use contextra_ports::clock::SystemClock;

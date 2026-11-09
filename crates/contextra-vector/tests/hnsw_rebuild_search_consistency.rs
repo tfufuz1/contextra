@@ -118,7 +118,7 @@ async fn run_hnsw_rebuild_snapshot_consistency_for_seed(seed: u64) {
     });
 
     // Explicitly trigger 2-phase rebuild
-    index.rebuild().await.expect("rebuild must succeed");
+    index.rebuild().expect("rebuild must succeed");
 
     // Await targeted search task
     let concurrent_search_runs = targeted_search_task

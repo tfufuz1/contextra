@@ -15,8 +15,6 @@ mod tests {
         reciprocal_rank_fusion, BoundedTopK, ProvenanceBuilder, SearchResult,
     };
     use contextra_rank::ConfigFingerprint;
-
-    // ANCHOR[contextra-rank:RNK-TEST-001]
     #[test]
     fn test_rrf_k_zero_boundary() {
         let prov = ProvenanceBuilder::new(0.0)

@@ -30,13 +30,30 @@
 #![forbid(unsafe_code)]
 #![deny(dead_code)]
 #![allow(unexpected_cfgs)]
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::todo,
+    clippy::unimplemented,
+    clippy::unreachable,
+    clippy::indexing_slicing
+)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing
+    )
+)]
 
 #[cfg(not(loom))]
 pub mod compaction;
 pub mod engine;
 pub mod fsync;
 pub mod key_source;
-pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
@@ -51,11 +68,11 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
-pub(crate) mod util;
+pub mod util;
 pub mod wal;
 
-#[cfg(not(loom))]
-pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
+pub use util::{RecordAuthenticator, RecordSealer, SealedEnvelope};
+
 #[cfg(not(loom))]
 pub use compaction::{
     adaptive::{
@@ -64,6 +81,8 @@ pub use compaction::{
     },
     CompactionConfig, CompactionEngine, MergeOperator, TtlMetadata,
 };
+#[cfg(not(loom))]
+pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
 #[cfg(not(loom))]
 pub use lsm::{
     CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
@@ -75,3 +94,6 @@ pub use manifest::{Manifest, ManifestEntry};
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+
+pub mod io_seam;
+pub use io_seam::{RealFs, RealFsFile, StoreIo};

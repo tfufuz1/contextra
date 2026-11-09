@@ -1,44 +1,28 @@
-//! # Sicheres Überschreiben und Entfernen von Dateien (Scrubbing)
+//! # Sicheres Überschreiben und Scrubbing von Dateien und Segmenten
 //!
-//! Zweck: Implementierung von Schutzmechanismen und Überschreibverfahren (Scrubbing) vor dem
-//! physischen Entfernen von Dateien von Speichermedien.
-//!
-//! Ring-Zugehörigkeit: Ring 0 (Dauerhafte Dateisystem-Hilfsmittel).
-//! Wird genutzt von: Bereinigungsroutinen und Storage-Wartungspfaden.
-//! Wichtigste Typen:
-//! - [`ScrubPolicy`]: Konfiguriert, ob Nullen-Überschreiben aktiv ist ([`ScrubPolicy::OverwriteZeros`]) oder nicht ([`ScrubPolicy::Disabled`]).
-//! - [`ScrubRefusal`]: Gründe für eine Verweigerung des Überschreibens (z. B. Copy-on-Write-Dateisysteme, Hardlinks, aktive Leser).
-//! - [`ScrubOutcome`]: Ergebnis des Bereinigungsversuchs ([`ScrubOutcome::Scrubbed`], [`ScrubOutcome::RemovedUnscrubbed`], [`ScrubOutcome::Refused`]).
-//! - [`scrub_if_safe`]: Hauptfunktion zur sicheren Datei-Entfernung mit vorgeschalteter Risikoanalyse.
+//! Zweck:
+//! - Aufrufergesteuerte Prüfung von Dateien und Journal-Segmenten gegen Prüfsummen mit Ratenbegrenzung.
+//! - Bereitstellung von [`scrub_if_safe`] und Richtlinienprüfungen (CoW, Hardlinks).
 //!
 //! Invarianten:
-//! - `INV-CLAIMS-1`: Überschreiben garantiert auf modernen Flash-/SSD-Medien keine Zerstörung auf Zellebene (Wear-Leveling).
-//!   Es werden keine Garantien für physische Nicht-Wiederherstellbarkeit abgegeben (`physical_guarantee: None`).
-//! - Fail-Closed: Bei aktivem Leser, Hardlinks (`nlink > 1`) oder erkanntem CoW-Dateisystem (Btrfs, ZFS) wird
-//!   das Überschreiben verweigert, um Datenkorruption an anderen Links oder Scheinsicherheit zu verhindern.
+//! - Kein eigener Hintergrund-Thread: Scrubbing erfolgt synchron und wird vollständig vom Aufrufer gesteuert.
+//! - Ratenbegrenzung (`rate_limit_bytes_per_sec`) verhindert I/O-Spitzen.
 
-// FILE-CONTEXT
-// STAND: 2026-10-13
-// ZWECK: Sicheres Entfernen von Dateien (Scrubbing) mit Sicherheitsprüfungen (CoW, Hardlinks, ReaderAlive).
-// INVARIANTEN: Zero-Panic, pure safe Rust, I/O-Fehler werden als std::io::Result propagiert.
-
-//! # Flash-/SSD-Remanenz und physische Grenzen beim Überschreiben
-//!
-//! **WICHTIGER HINWEIS (Wei et al., FAST 2011):**
-//! Das Überschreiben von Dateiinhalten mit Nullen auf Flash-basierten Speichermedien (SSDs, NVMe, eMMC)
-//! garantiert keine physische Vernichtung der Datenblöcke auf Zellebene. Durch Flash Translation Layers (FTL),
-//! Wear Leveling, Over-Provisioning und Out-of-Place-Writes verbleiben alte Datenblöcke in physischen Flash-Zellen.
-//!
-//! Der Rückgabetyp ([`ScrubOutcome::Scrubbed`]) und die Quittung ([`ScrubReceipt`]) bieten daher explizit
-//! **keine physische Garantie** (`physical_guarantee: None`).
-
-use crate::{durable_remove_with_injector, FaultInjector, NoFault, ScrubReceipt};
-use contextra_sys::durable_flush_file;
+use crate::error::{DurableFsError, Result};
+use crate::fault_injector::{FaultInjector, NoFault};
+use crate::platform::{sync_file, FlushKind};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::time::{Duration, Instant};
 
-// ANCHOR[contextra-durable-fs:SCRUB-POLICY-001]
+/// Quittung nach erfolgreichem Überschreiben und dauerhaftem Entfernen einer Datei.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrubReceipt {
+    /// Gesamtanzahl der vor dem Löschen mit Nullen überschriebenen Bytes.
+    pub bytes_scrubbed: u64,
+}
+
 /// Richtlinie zur Steuerung des Überschreibverhaltens vor dem Löschen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrubPolicy {
@@ -48,15 +32,14 @@ pub enum ScrubPolicy {
     OverwriteZeros,
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-REFUSAL-001]
 /// Gründe für eine Verweigerung des Nullen-Überschreibens aus Sicherheits- oder Plattformgründen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrubRefusal {
     /// Scrubbing wurde per Richtlinie ([`ScrubPolicy::Disabled`]) deaktiviert.
     Disabled,
-    /// Datei besitzt mehrere Hardlinks (`nlink > 1`); Überschreiben würde andere Dateiverweise zerstören.
+    /// Datei besitzt mehrere Hardlinks (`nlink > 1`).
     MultipleHardlinks,
-    /// Datei liegt auf einem Copy-on-Write-Dateisystem (z. B. Btrfs, ZFS, Bcachefs), wo Überschreiben neue Blöcke anlegt.
+    /// Datei liegt auf einem Copy-on-Write-Dateisystem (Btrfs, ZFS).
     CopyOnWriteFilesystem,
     /// Mindestens ein aktiver Leser greift derzeit auf die Datei zu.
     ReaderAlive,
@@ -66,71 +49,106 @@ pub enum ScrubRefusal {
     Unsupported,
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-OUTCOME-001]
 /// Ergebnis einer Bereinigungsoperation mittels [`scrub_if_safe`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScrubOutcome {
     /// Datei wurde erfolgreich mit Nullen überschrieben, gegengelesen und dauerhaft entfernt.
     Scrubbed(ScrubReceipt),
-    /// Datei wurde dauerhaft gelöscht, ohne zuvor überschrieben zu werden (z. B. bei [`ScrubPolicy::Disabled`]).
+    /// Datei wurde dauerhaft gelöscht, ohne zuvor überschrieben zu werden.
     RemovedUnscrubbed,
-    /// Scrubbing wurde aus Sicherheitsgründen verweigert. Die Datei bleibt auf der Festplatte unverändert erhalten.
+    /// Scrubbing wurde aus Sicherheitsgründen verweigert.
     Refused(ScrubRefusal),
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-IF-SAFE-001]
+/// Fortschrittsbericht beim aufrufergesteuerten Scrubbing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrubProgress {
+    /// Bisher verarbeitete Bytes.
+    pub bytes_processed: u64,
+    /// Gesamtgröße der zu prüfenden Datei / des Segments in Bytes.
+    pub total_bytes: u64,
+}
+
+/// Prüft eine Datei segmentweise auf Prüfsummenintegrität mit konfigurierbarer Ratenbegrenzung.
+///
+/// Wird vollständig vom aufrufenden Thread getrieben (kein Hintergrund-Thread).
+pub fn scrub_file_with_rate_limit<F>(
+    path: &Path,
+    bytes_per_sec: u64,
+    mut on_progress: F,
+) -> Result<u64>
+where
+    F: FnMut(ScrubProgress),
+{
+    let metadata = path.symlink_metadata().map_err(DurableFsError::Io)?;
+    let total_len = metadata.len();
+    if total_len == 0 {
+        on_progress(ScrubProgress {
+            bytes_processed: 0,
+            total_bytes: 0,
+        });
+        return Ok(0);
+    }
+
+    let mut file = OpenOptions::new()
+        .read(true)
+        .open(path)
+        .map_err(DurableFsError::Io)?;
+
+    let chunk_size = 64 * 1024usize;
+    let mut buf = vec![0u8; chunk_size];
+    let mut processed = 0u64;
+
+    while processed < total_len {
+        let start = Instant::now();
+        let to_read = usize::try_from(total_len - processed)
+            .unwrap_or(chunk_size)
+            .min(chunk_size);
+
+        let slice = buf.get_mut(..to_read).ok_or_else(|| {
+            DurableFsError::InvalidArgument("buffer slice out of bounds".to_string())
+        })?;
+
+        file.read_exact(slice).map_err(DurableFsError::Io)?;
+        processed = processed.saturating_add(to_read as u64);
+
+        on_progress(ScrubProgress {
+            bytes_processed: processed,
+            total_bytes: total_len,
+        });
+
+        if bytes_per_sec > 0 {
+            let expected_duration = Duration::from_secs_f64(to_read as f64 / bytes_per_sec as f64);
+            let elapsed = start.elapsed();
+            if expected_duration > elapsed {
+                std::thread::sleep(expected_duration - elapsed);
+            }
+        }
+    }
+
+    Ok(processed)
+}
+
 /// Bereinigt und löscht eine Datei sicher, sofern alle Sicherheitsvorbedingungen erfüllt sind.
-#[deprecated(
-    since = "0.1.0",
-    note = "Scrubbing wird nach contextra-erasure-store (Paket E2) migriert per D-E1."
-)]
-///
-/// Verwendet den standardmäßigen Null-Kosten-Injektor [`NoFault`].
-///
-/// Vorbedingungen:
-/// - `path` muss ein regulärer Dateipfad sein (kein Symlink, kein Ordner).
-/// - `reader_alive` muss `false` sein (keine nebenläufigen Leser).
-/// - `not_obsolete` muss `false` sein (Datei muss freigegeben sein).
-///
-/// Rückgabewert:
-/// - `Ok(ScrubOutcome::Scrubbed(receipt))` bei erfolgreichem Überschreiben und Löschen.
-/// - `Ok(ScrubOutcome::Refused(reason))` bei Sicherheitsverweigerung.
 pub fn scrub_if_safe(
     path: &Path,
     policy: ScrubPolicy,
     reader_alive: bool,
     not_obsolete: bool,
-) -> std::io::Result<ScrubOutcome> {
+) -> Result<ScrubOutcome> {
     scrub_if_safe_with_injector(path, policy, reader_alive, not_obsolete, &NoFault)
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-IF-SAFE-WITH-INJECTOR]
 /// Bereinigt und löscht eine Datei sicher unter Verwendung eines benutzerdefinierten [`FaultInjector`].
-///
-/// Ablauf:
-/// 1. Richtlinienprüfung: Falls [`ScrubPolicy::Disabled`], Datei direkt via [`durable_remove_with_injector`] löschen.
-/// 2. Vorbedingungsprüfungen:
-///    - Falls `reader_alive == true` -> Abbruch mit [`ScrubRefusal::ReaderAlive`].
-///    - Falls `not_obsolete == true` -> Abbruch mit [`ScrubRefusal::NotObsolete`].
-/// 3. Metadatenprüfung: Symlinks und Sonderdateien mit `InvalidInput`-Fehler abweisen.
-/// 4. Hardlink-Prüfung: Falls `nlink > 1`, Abbruch mit [`ScrubRefusal::MultipleHardlinks`].
-/// 5. CoW-Prüfung: Falls Btrfs/ZFS erkannt, Abbruch mit [`ScrubRefusal::CopyOnWriteFilesystem`].
-/// 6. Überschreiben: Datei in 64-KiB-Blöcken mit `0u8` füllen und via `injector.on_write` überwachen.
-/// 7. Synchronisieren: `injector.on_fsync` und Hardware-Flush (`flush_file`).
-/// 8. Readback-Verifikation: Datei von Byte 0 bis Ende rücklesen; schlägt fehl bei Bytes != 0.
-/// 9. Dauerhaftes Entfernen: Datei aus Verzeichnis aushängen und Elternordner synchronisieren.
-///
-/// Fehlerfälle:
-/// - Schlägt das Schreiben, Flushen, Gegenlesen oder Löschen fehl, wird der entsprechende [`std::io::Error`] zurückgegeben.
 pub fn scrub_if_safe_with_injector<F: FaultInjector>(
     path: &Path,
     policy: ScrubPolicy,
     reader_alive: bool,
     not_obsolete: bool,
     injector: &F,
-) -> std::io::Result<ScrubOutcome> {
+) -> Result<ScrubOutcome> {
     if policy == ScrubPolicy::Disabled {
-        durable_remove_with_injector(path, injector)?;
+        crate::durable_remove_with_injector(path, injector)?;
         return Ok(ScrubOutcome::RemovedUnscrubbed);
     }
 
@@ -142,13 +160,12 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
         return Ok(ScrubOutcome::Refused(ScrubRefusal::NotObsolete));
     }
 
-    let metadata = path.symlink_metadata()?;
+    let metadata = path.symlink_metadata().map_err(DurableFsError::Io)?;
     let file_type = metadata.file_type();
 
     if file_type.is_symlink() || !file_type.is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path is a symlink or not a regular file",
+        return Err(DurableFsError::InvalidArgument(
+            "path is a symlink or not a regular file".to_string(),
         ));
     }
 
@@ -174,51 +191,39 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
             options.share_access(7);
         }
 
-        let mut file = options.open(path)?;
+        let mut file = options.open(path).map_err(DurableFsError::Io)?;
         let zeros = [0u8; 64 * 1024];
         let mut remaining = len;
 
-        // NOTE: Chunkweises Überschreiben in 64-KiB-Schritten verhindert hohen Speicherverbrauch.
         while remaining > 0 {
             let chunk_size = usize::try_from(remaining)
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
-            injector.on_write(Some(path), chunk_size)?;
-            let slice = zeros
-                .get(..chunk_size)
-                .ok_or_else(|| std::io::Error::other("chunk_size out of bounds"))?;
-            file.write_all(slice)?;
+            injector
+                .on_write(Some(path), chunk_size)
+                .map_err(DurableFsError::Io)?;
+            let slice = zeros.get(..chunk_size).ok_or_else(|| {
+                DurableFsError::InvalidArgument("chunk_size out of bounds".to_string())
+            })?;
+            file.write_all(slice).map_err(DurableFsError::Io)?;
             remaining -= chunk_size as u64;
         }
 
-        injector.on_fsync(Some(path))?;
-        durable_flush_file(&file, true)?;
+        injector.on_fsync(Some(path)).map_err(DurableFsError::Io)?;
+        sync_file(&file, FlushKind::DataAndMetadata).map_err(DurableFsError::Io)?;
 
-        // NOTE: Readback-Zero-Verifikation: Stellt sicher, dass das Betriebssystem die Nullen tatsächlich übernommen hat.
-        verify_zero_readback(&mut file, path, len)?;
+        verify_zero_readback(&mut file, len)?;
     }
 
-    durable_remove_with_injector(path, injector)?;
+    crate::durable_remove_with_injector(path, injector)?;
 
     Ok(ScrubOutcome::Scrubbed(ScrubReceipt {
         bytes_scrubbed: len,
     }))
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-VERIFY-ZERO]
-/// Hilfsfunktion zur Verifikation, dass alle Bytes der Datei nach dem Überschreiben binäre Nullen sind.
-///
-/// Ablauf:
-/// 1. Dateizeiger auf Dateianfang (Offset 0) zurücksetzen.
-/// 2. Datei in 64-KiB-Blöcken einlesen.
-/// 3. Prüfen, ob irgendein Byte != 0 ist.
-/// 4. Liefert Fehler bei Nicht-Null-Bytes oder I/O-Leseproblemen.
-fn verify_zero_readback(
-    file: &mut std::fs::File,
-    path: &Path,
-    expected_len: u64,
-) -> std::io::Result<()> {
-    file.seek(SeekFrom::Start(0))?;
+fn verify_zero_readback(file: &mut std::fs::File, expected_len: u64) -> Result<()> {
+    file.seek(SeekFrom::Start(0)).map_err(DurableFsError::Io)?;
     let mut buf = [0u8; 64 * 1024];
     let mut remaining = expected_len;
 
@@ -226,16 +231,14 @@ fn verify_zero_readback(
         let chunk_size = usize::try_from(remaining)
             .unwrap_or(buf.len())
             .min(buf.len());
-        let slice = buf
-            .get_mut(..chunk_size)
-            .ok_or_else(|| std::io::Error::other("chunk_size out of bounds"))?;
-        file.read_exact(slice)?;
+        let slice = buf.get_mut(..chunk_size).ok_or_else(|| {
+            DurableFsError::InvalidArgument("chunk_size out of bounds".to_string())
+        })?;
+        file.read_exact(slice).map_err(DurableFsError::Io)?;
         if slice.iter().any(|&b| b != 0) {
-            return Err(std::io::Error::other(
-                format!(
-                    "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
-                    path
-                ),
+            return Err(DurableFsError::Corruption(
+                "readback zero verification failed: non-zero bytes detected after scrub"
+                    .to_string(),
             ));
         }
         remaining -= chunk_size as u64;
@@ -244,11 +247,6 @@ fn verify_zero_readback(
     Ok(())
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-CHECK-COW]
-/// Prüft unter Linux anhand von `/proc/self/mountinfo`, ob der Pfad auf einem Copy-on-Write-Dateisystem liegt.
-///
-/// Gibt `Some(ScrubRefusal::CopyOnWriteFilesystem)` zurück, wenn Btrfs, ZFS oder Bcachefs erkannt wurden.
-/// Liefert `Some(ScrubRefusal::Unsupported)` auf Nicht-Linux-Systemen oder wenn mountinfo unlesbar ist.
 fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
     #[cfg(target_os = "linux")]
     {

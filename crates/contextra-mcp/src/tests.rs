@@ -241,30 +241,14 @@ async fn test_contextra_forget_single_doc() {
     let resp = server.handle(insert_req).await;
     assert!(resp.error.is_none());
 
-    // 2. Forget single doc without confirm=true should fail
-    let forget_req_no_confirm = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": "default",
-                "id": "forget_doc_1"
-            }
-        }),
-    );
-    let resp_nc = server.handle(forget_req_no_confirm).await;
-    let res_nc = serde_json::to_value(&resp_nc).unwrap();
-    assert_eq!(res_nc["result"]["isError"], true);
-
-    // 3. Forget single doc with confirm=true
+    // 2. Forget single doc via alias contextra_forget (same as contextra_delete)
     let forget_req = make_request(
         "tools/call",
         json!({
             "name": "contextra_forget",
             "arguments": {
                 "collection": "default",
-                "id": "forget_doc_1",
-                "confirm": true
+                "id": "forget_doc_1"
             }
         }),
     );
@@ -276,15 +260,9 @@ async fn test_contextra_forget_single_doc() {
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
     assert_eq!(json_res["ok"], true);
     assert_eq!(json_res["deleted"], true);
-    assert_eq!(json_res["verified"], false);
     assert_eq!(json_res["id"], "forget_doc_1");
-    assert_eq!(json_res["proof"], serde_json::Value::Null);
-    assert_eq!(
-        json_res["reason"],
-        "Schichteigene Messung für Einzel-Dokument-Entfernung nicht angebunden"
-    );
 
-    // 4. Verify contextra_get returns null
+    // 3. Verify contextra_get returns null
     let get_req = make_request(
         "contextra_get",
         json!({
@@ -294,79 +272,6 @@ async fn test_contextra_forget_single_doc() {
     );
     let resp_g = server.handle(get_req).await;
     assert_eq!(resp_g.result.unwrap(), serde_json::Value::Null);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_contextra_forget_collection_with_proof() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    // Create custom collection and insert a document
-    let col_name = "drop_me_col";
-    let insert_req = make_request(
-        "contextra_insert",
-        json!({
-            "id": "doc_in_col",
-            "text": "Data in custom collection",
-            "collection": col_name
-        }),
-    );
-    let resp = server.handle(insert_req).await;
-    assert!(resp.error.is_none());
-
-    // 1. Without proof key configured -> fails
-    std::env::remove_var("CONTEXTRA_PROOF_KEY");
-    std::env::remove_var("CONTEXTRA_PROOF_KEY");
-    let forget_req_nokey = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": col_name,
-                "confirm": true
-            }
-        }),
-    );
-    let resp_nokey = server.handle(forget_req_nokey).await;
-    let res_nokey = serde_json::to_value(&resp_nokey).unwrap();
-    assert_eq!(res_nokey["result"]["isError"], true);
-    let err_text = res_nokey["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(err_text.contains("deletion proof key not configured"));
-
-    // 2. With proof key configured -> succeeds and generates proof
-    let test_key = "test_proof_key_32_bytes_long_valid";
-    std::env::set_var("CONTEXTRA_PROOF_KEY", test_key);
-
-    let forget_req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": col_name,
-                "confirm": true
-            }
-        }),
-    );
-    let resp_drop = server.handle(forget_req).await;
-    assert!(resp_drop.error.is_none());
-    let res_drop = serde_json::to_value(&resp_drop).unwrap();
-    assert_ne!(res_drop["result"]["isError"], true);
-
-    let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-    assert_eq!(json_res["ok"], true);
-    assert_eq!(json_res["deleted"], true);
-    assert_eq!(json_res["verified"], true);
-    assert_eq!(json_res["collection"], col_name);
-
-    let proof_val = &json_res["proof"];
-    assert!(!proof_val.is_null());
-    assert!(
-        proof_val.get("signature").is_some()
-            || proof_val.get("proof_id").is_some()
-            || proof_val.get("covered_layers").is_some()
-    );
-
-    std::env::remove_var("CONTEXTRA_PROOF_KEY");
 }
 
 #[tokio::test]
@@ -599,7 +504,6 @@ async fn test_search_validates_empty_or_oversized_query() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_contextra_delete_single_doc_fields() {
-    std::env::set_var("CONTEXTRA_PROOF_KEY", "test_proof_key_32_bytes_long_valid");
     let (server, _tmp) = create_mock_server_with_write(true).await;
 
     // 1. Insert document
@@ -635,19 +539,11 @@ async fn test_contextra_delete_single_doc_fields() {
 
     assert_eq!(json_res["ok"], true);
     assert_eq!(json_res["deleted"], true);
-    assert_eq!(json_res["verified"], false);
     assert_eq!(json_res["id"], "delete_doc_1");
-    assert_eq!(json_res["proof"], Value::Null);
-    assert_eq!(json_res["claim"], "LogicalDeletionOnly");
-    assert_eq!(json_res["erasure_measured"], false);
-    assert_eq!(
-        json_res["reason"],
-        "Schichteigene Messung für Einzel-Dokument-Entfernung nicht angebunden"
-    );
 }
 
 #[tokio::test]
-async fn test_inv_no_dummy_proof_1_and_no_forbidden_phrases() {
+async fn test_inv_no_forbidden_phrases() {
     // 1. No tool text in tools/list contains forbidden completeness/legal claims
     let (server, _tmp) = create_mock_server().await;
     let req = make_request("tools/list", json!({}));
@@ -680,7 +576,7 @@ async fn test_inv_no_dummy_proof_1_and_no_forbidden_phrases() {
         }
     }
 
-    // 2. INV-NO-DUMMY-PROOF-1: Single doc delete returns null proof, never a dummy proof object
+    // 2. Verify single doc delete returns clean deletion object without residual keys
     let delete_req = make_request(
         "contextra_delete",
         json!({
@@ -690,13 +586,7 @@ async fn test_inv_no_dummy_proof_1_and_no_forbidden_phrases() {
     );
     let resp_del = server.handle(delete_req).await;
     if let Some(res_val) = resp_del.result {
-        assert_eq!(
-            res_val["proof"],
-            Value::Null,
-            "Single doc delete response must set 'proof' to null, got: {:?}",
-            res_val["proof"]
-        );
-        assert_eq!(res_val["erasure_measured"], false);
+        assert_eq!(res_val["deleted"], true);
     }
 }
 

@@ -1,6 +1,10 @@
 //! Error taxonomy and Result types for `contextra-graph` (Klasse A, B4).
 
+pub use crate::contract::{Error as ContractError, Result as ContractResult};
 use thiserror::Error;
+
+/// Primary error alias for Klasse A (B4).
+pub type Error = GraphError;
 
 /// Crate-level Result type.
 pub type Result<T, E = GraphError> = std::result::Result<T, E>;
@@ -37,9 +41,38 @@ pub enum GraphError {
     #[error("Mutation error: {0}")]
     Mutation(#[from] GraphMutationError),
 
+    /// Capacity exceeded error mapping to contract capacity error.
+    #[error("Capacity exceeded: requested {requested}, maximum {maximum}")]
+    CapacityExceeded {
+        /// Requested capacity.
+        requested: usize,
+        /// Maximum allowable capacity.
+        maximum: usize,
+    },
+
     /// Internal unexpected error.
     #[error("Internal graph error: {0}")]
     Internal(String),
+}
+
+impl From<crate::contract::Error> for GraphError {
+    fn from(err: crate::contract::Error) -> Self {
+        match err {
+            crate::contract::Error::InvalidInput(msg) => GraphError::InvalidInput(msg.to_string()),
+            crate::contract::Error::CapacityExceeded { requested, maximum } => {
+                GraphError::CapacityExceeded { requested, maximum }
+            }
+            crate::contract::Error::Io(err) => GraphError::Storage(err.to_string()),
+            crate::contract::Error::StateConflict(msg) => GraphError::PolicyViolation(msg.to_string()),
+            crate::contract::Error::Corrupt(msg) => GraphError::Serialization(msg.to_string()),
+        }
+    }
+}
+
+impl From<std::io::Error> for GraphError {
+    fn from(err: std::io::Error) -> Self {
+        GraphError::Storage(err.to_string())
+    }
 }
 
 /// Detailed errors occurring during graph mutations.

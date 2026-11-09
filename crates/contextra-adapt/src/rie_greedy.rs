@@ -26,30 +26,11 @@ pub enum RieGreedyError {
     InvalidConfig(String),
 }
 
-#[cfg(feature = "types-compat")]
-impl From<RieGreedyError> for contextra_types::ContextraError {
-    fn from(err: RieGreedyError) -> Self {
-        match err {
-            RieGreedyError::DimensionMismatch { expected, actual } => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
-                ))
-            }
-            RieGreedyError::NonFinite => contextra_types::ContextraError::InvalidInput(
-                "Non-finite numerical value encountered".to_string(),
-            ),
-            RieGreedyError::InvalidConfig(msg) => contextra_types::ContextraError::InvalidInput(
-                format!("Invalid configuration: {msg}"),
-            ),
-        }
-    }
-}
-
 /// Laufzeitzustand eines RIE-Greedy-Profils (§10.4.1).
 ///
 /// Implementiert die deterministisch-gierige Personalisierung mit
 /// zeitlich diskontierter Präzisionsmatrix $\Lambda_t$ und Informationsvektor $\eta_t$.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RieGreedyProfile {
     /// Inverse Präzisionsmatrix $\Lambda^{-1}$ ($d \times d$, row-major).
     pub precision_inv: Vec<f32>,

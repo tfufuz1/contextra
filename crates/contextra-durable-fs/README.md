@@ -1,57 +1,54 @@
 # contextra-durable-fs
 
-Crash-sichere Dateisystem-Operationen, synchrone Disk-Flushes und POSIX-VFS-Implementierung.
+Crash-sichere Dateisystem-Operationen, synchrone Disk-Flushes und synchrones VFS.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `beta`; §4.1, `capabilities.toml`).
+## Zweck
+`contextra-durable-fs` ist ein vollständig autarker Baustein für crash-konsistente Dateisystem-Operationen (`vfs`), deterministisches Append-only Logging mit Prüfsummen (`journal`) und unumkehrbares Handle-Poisoning bei `fsync`-Fehlern (`DurableHandle`).
 
-## Rolle & Zweck
-`contextra-durable-fs` stellt die kanonische Produktionsimplementierung des virtuellen Dateisystem-Ports (`contextra_ports::Vfs` und `contextra_ports::VfsFile` via `RealFs` und `RealFsFile`) bereit. Es kapselt plattformspezifische I/O-Aufrufe, garantiert crash-konsistente Schreiboperationen und Fail-Closed-Verhalten bei `fsync`-Fehlern (`INV-FSYNC-1`).
+## Reifegrad
+- **Status:** Stabil / Produktionsreif (P1–P6 erfüllt)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` – 100 % sicheres Rust ohne `unsafe`.
+- **Zero-Panic-Doktrin:** Typisierte Fehlercodes via `DurableFsError`.
+- **Durability-Invariante:** Strikter Fail-Closed-Zustandsautomat (`AtomicHealthState`).
 
-## Baukasten-Einordnung & Status (M1–M11)
-- **Ring:** Ring 0 (Fundament)
-- **Status:** 🟢 Autarker Baustein
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`, zero-panic doctrine (`deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)`).
-- **Abhängigkeiten (Produktion):**
-  - `contextra-ports`: Abstrakte Port-Definitionen (`Vfs`, `VfsFile`, `VfsOpenOptions`, `VerifiedVia`)
-  - `contextra-sys`: Low-Level Plattform-Durability-Primitive (`durable_flush_file`, `durable_flush_dir`)
-  - `contextra-types`: Kanonische Fehlertypen (`ContextraError`, `Result`)
-- **Features:** Minimal, keine schweren Abhängigkeiten.
+## Interne Abhängigkeiten
+`contextra-durable-fs` ist ein vollständig eigenständiger Baustein:
+- **0 interne Workspace-Abhängigkeiten** (keine Abhängigkeit zu `contextra-store`, `contextra-types`, `contextra-ports` oder anderen Crates).
+- Externe Abhängigkeiten: `thiserror`, optional: `crc32fast`, `serde`, `tracing`.
 
-## Kernkomponenten & Garantien
-- **`RealFs` (`vfs.rs`):** Implementierung des einheitlichen `contextra_ports::Vfs`-Ports für POSIX/Windows-Dateisysteme. Unterstützt positionsbasiertes I/O (`read_at`, `write_at`), atomare Ersetzungen (`write_atomic`), Metadaten-Synchronisation (`sync_dir`) und Verifikation (`read_verified`).
-- **`DurableHandle` (`lib.rs`):** Kapselt Dateihandles und vergiftet sich dauerhaft (`Poisoned`) bei jedem Hardware- oder `fsync`-Fehler (`INV-FSYNC-1`). Kein stilles Wiederholen auf demselben Deskriptor.
-- **`DirLock` (`lib.rs`):** Exklusive Verzeichnissperre mit Prüfung der Dateisystemklasse (`FsClass`). Weist unsichere Netzwerk- (NFS/SMB), FUSE- und Cloud-Sync-Ordner (OneDrive, Dropbox, iCloud) ab.
-- **`AtomicHealthState` (`health.rs`):** Lock-freier Fail-Closed-Zustandsautomat (`Healthy` → `Degraded` → `ReadOnly` → `Poisoned`) nach Spezifikation §7.8/§18.4.
-- **`PendingDeleteJournal` (`journal.rs`):** Crash-sicheres Journal zur idempotenten Aufzeichnung und Abarbeitung ausstehender Dateientfernungen.
-- **`FaultInjector` (`fault_injector.rs`):** Zero-Cost Monomorphisierungs-Trait für deterministische Chaos- und Fehlerinjektion in Persistenzpfaden.
+## Features
+- `default = ["std", "crc"]`
+- `std`: Standardbibliotheksunterstützung.
+- `crc`: CRC32-Prüfsummenvalidierung für das Append-only Journal.
+- `serde`: Serde-Serialisierung.
+- `tracing`: Tracing-Integration.
+- `inspect`: Diagnose- und Inspektionswerkzeuge.
 
-## Einbettungsbeispiel
-
+## Minimalbeispiel
 ```rust
-use contextra_durable_fs::{RealFs, Vfs, VfsOpenOptions, atomic_replace, DirLock, LockMode};
-use std::path::Path;
+use contextra_durable_fs::vfs::{StdVfs, Vfs};
+use tempfile::tempdir;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = Path::new("/tmp/my_storage");
-    std::fs::create_dir_all(dir)?;
+let dir = tempdir().unwrap();
+let test_file = dir.path().join("durable_test.txt");
 
-    // 1. Verzeichnissperre erwerben
-    let _lock = DirLock::acquire(dir, LockMode::Normal)?;
+let vfs = StdVfs::new();
+vfs.write_atomic(&test_file, b"crash-consistent-data").unwrap();
 
-    // 2. Atomares Ersetzen mit fsync und Directory-Sync
-    let target = dir.join("data.bin");
-    atomic_replace(&target, b"durable-content")?;
-
-    // 3. Zugriff über den standardmäßigen Vfs-Port
-    let vfs = RealFs;
-    let data = vfs.read(&target)?;
-    assert_eq!(data, b"durable-content");
-
-    Ok(())
-}
+let read_back = vfs.read(&test_file).unwrap();
+assert_eq!(read_back, b"crash-consistent-data");
 ```
 
-Ein vollständiges, autark lauffähiges Beispiel findet sich unter `examples/durable_ops.rs`:
-```bash
-cargo run --example durable_ops -p contextra-durable-fs
+## Entnahme-Rezept (Einzeln entnehmbar)
+`contextra-durable-fs` ist vollständig entkoppelt und kann ohne Vorbedingungen einzeln in jedes beliebige Rust-Projekt entnommen werden:
+1. Kopiere den Ordner `crates/contextra-durable-fs` in dein Projektverzeichnis.
+2. Füge ihn in deiner `Cargo.toml` hinzu:
+```toml
+[dependencies]
+contextra-durable-fs = { path = "../contextra-durable-fs" }
 ```
+3. Es sind keine weiteren internen Crates oder Laufzeitkomponenten erforderlich.
+
+## Bekannte Grenzen
+- Atomare Schreiboperationen (`write_atomic`) nutzen temporäre Dateien und `rename`; Quell- und Zielpfad müssen auf demselben physischen Dateisystem liegen.
+- Synchrones fsync blockiert den aufrufenden Thread bis zum Abschluss durch das Betriebssystem.

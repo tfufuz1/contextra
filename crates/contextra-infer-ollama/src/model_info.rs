@@ -7,9 +7,9 @@
 
 //! Bekannte Ollama-Modell-Dimensionen für Embedding-Modelle.
 
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::client::OllamaClient;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::error::{OllamaError, Result};
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +20,7 @@ pub struct ModelInfo {
     pub quantization_level: Option<String>,
 }
 
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 impl OllamaClient {
     /// Validates that the model exists in Ollama via GET /api/tags before invoking embeddings/chat.
     pub async fn validate_model_available(&self, model: &str) -> Result<()> {
@@ -125,17 +125,17 @@ pub fn known_dimension(model: &str) -> Option<usize> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     use crate::OllamaClient;
     use super::*;
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     use crate::error::OllamaError;
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     use crate::OllamaClient;
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_validate_model_available() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -180,9 +180,9 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_model_info_fetch_offline_returns_io_error() {
         let client = OllamaClient::new("http://127.0.0.1:1");
         let result = client.show_model("llama3.2").await;
@@ -214,9 +214,9 @@ mod tests {
         assert_eq!(known_dimension("unknown-model-xyz"), None);
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_show_model_success_and_error_paths() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -251,9 +251,9 @@ mod tests {
         assert_eq!(info.quantization_level.as_deref(), Some("Q4_0"));
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_show_model_http_404_and_500_error_mappings() {
         // HTTP 404 test
         let listener_404 = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -304,9 +304,9 @@ mod tests {
         assert!(matches!(err_500, OllamaError::Server(_)));
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_show_model_invalid_json_returns_internal_error() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();

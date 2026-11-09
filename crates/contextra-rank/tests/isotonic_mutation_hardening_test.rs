@@ -5,8 +5,6 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// FILE-CONTEXT
-// STAND: 2026-09-11T00:00:00Z (SESSION: JULES-20260911-MUTATION-HARDENING)
 // ZWECK: Mutation hardening test suite for IsotonicCalibrator (PAVA/ECE).
 // INVARIANTEN: INV-CAL-1 (no fallback before warmup), INV-CAL-2 (fingerprint reset), P8 compliance.
 
@@ -16,8 +14,6 @@ use proptest::prelude::*;
 // ============================================================================
 // 1. VERIFICATION & DUPLICATE RAW SCORE DETERMINISTIC POOLING
 // ============================================================================
-
-// ANCHOR[contextra-rank:ISO-TEST-001]
 #[test]
 fn test_pava_duplicate_raw_score_deterministic_pooling() {
     let pairs = vec![

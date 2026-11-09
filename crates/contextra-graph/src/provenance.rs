@@ -1,11 +1,11 @@
 //! Provenienz- und Herkunftsverfolgung für Graph-Kanten und Relationen.
 //!
 //! # Zweck
-//! Verknüpft Kanten mit Quell-Dokumenten (`DocId`) und Transaktionen (`TxId`) für revisionssichere Rückverfolgbarkeit.
+//! Verknüpft Kanten mit Quell-Dokumenten (`DocId`) und Transaktionen (`TxId`) für Rückverfolgbarkeit.
 
 // FILE-CONTEXT
 // STAND: 2026-09-10T00:00:00Z (SESSION: 61b93a6f)
-// ZWECK: Herkunftsnachweis für Graph-Kanten (DocEdgeIndex & EdgeProvenance)
+// ZWECK: Herkunftsverfolgung für Graph-Kanten (DocEdgeIndex & EdgeProvenance)
 // INVARIANTEN: INV-GRAPH-PROV-1: Jede CSR-Kante ordnet sich ihren Quelldokumenten zu.
 // SIEHE AUCH: crates/contextra-graph/src/cascade.rs
 
@@ -15,7 +15,7 @@ use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-/// Herkunftsnachweis für eine Graph-Kante.
+/// Herkunftsverfolgung für eine Graph-Kante.
 /// INV-GRAPH-PROV-1: Jede aktive CSR-Kante trägt einen EdgeProvenance-Eintrag,
 /// der ihre Quell-Dokumente zurückverfolgbar macht.
 #[derive(Debug, Clone, Serialize, Deserialize)]

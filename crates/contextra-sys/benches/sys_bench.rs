@@ -1,13 +1,12 @@
-// FILE-CONTEXT
 // STAND: 2026-11-08T00:00:00Z
-// ZWECK: Criterion benchmarks for contextra-sys low-level OS primitives (SPEC v4.0 §8 / B8)
-// INVARIANTEN: Zero panic; reliable benchmarking of lock, flush, and mmap operations.
+// ZWECK: Criterion benchmarks for contextra-sys low-level OS primitives (SPEC §10.1 / B8)
+// INVARIANTEN: Zero panic; reliable benchmarking of lock, flush, vault, and mmap operations.
 
 //! # Benchmark-Suite: `sys_bench`
 //!
 //! Misst Durchsatz und Latenz zentraler Betriebssystem-Primitive aus `contextra-sys`:
-//! - **Durability Flushes:** `durable_flush_file` und `write_all_durable`.
-//! - **Memory-Locking & Vault:** `mem_lock` / `mem_unlock`, `LockedRegions` Allokation, Sperrung und Zeroization.
+//! - **Durability Flushes:** `durable_flush_file`, `write_all_durable`, und `DurableFile`.
+//! - **Memory-Locking & Vault:** `mem_lock` / `mem_unlock`, `LockedRegions` Allokation, Sperrung und Zeroization, sowie `VaultBuffer`.
 //! - **Memory-Mapping:** `mmap_readonly` und `SealedMap` Zugriffe.
 
 #![allow(unsafe_code)]
@@ -20,8 +19,8 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 use contextra_sys::{
-    durable_flush_file, mem_lock, mem_unlock, mmap_readonly, write_all_durable, LockedRegions,
-    MemLockPolicy, SealedFile,
+    durable_flush_file, mem_lock, mem_unlock, mmap_readonly, write_all_durable, DurableFile,
+    LockedRegions, MemLockPolicy, SealedFile, VaultBuffer,
 };
 
 fn bench_durability_primitives(c: &mut Criterion) {
@@ -33,7 +32,8 @@ fn bench_durability_primitives(c: &mut Criterion) {
     // Pre-create file
     {
         let mut f = File::create(&file_path).expect("create file");
-        f.write_all(&vec![0xAAu8; 64 * 1024]).expect("write dummy");
+        let dummy = vec![0xAAu8; 64 * 1024];
+        f.write_all(&dummy).expect("write dummy");
         f.sync_all().expect("sync");
     }
 
@@ -68,6 +68,21 @@ fn bench_durability_primitives(c: &mut Criterion) {
         })
     });
 
+    let durable_path = temp_dir.path().join("bench_durable_file.bin");
+    let durable_raw = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&durable_path)
+        .expect("open durable file");
+    let mut durable_file = DurableFile::new(durable_raw);
+
+    group.bench_function("durable_file_sync_data", |b| {
+        b.iter(|| {
+            durable_file.sync_data().expect("durable file sync data");
+        })
+    });
+
     group.finish();
 }
 
@@ -96,6 +111,15 @@ fn bench_memory_locking_primitives(c: &mut Criterion) {
             );
             LockedRegions::zeroize_slice(black_box(&mut secret));
             regions.unlock_all();
+        })
+    });
+
+    group.bench_function("vault_buffer_alloc_zeroize_64b", |b| {
+        b.iter(|| {
+            let mut buf = VaultBuffer::allocate_with_policy(black_box(64), MemLockPolicy::Tolerant)
+                .expect("vault alloc");
+            buf[0] = 0xAA;
+            drop(black_box(buf));
         })
     });
 

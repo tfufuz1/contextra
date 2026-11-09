@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Testsuite `wand_tie_break_threshold.rs` für contextra-text.
 //!
 //! # Ring-Zuordnung

@@ -1,0 +1,7 @@
+[crates.contextra-kvcache]
+klasse = "A"
+may_depend_on = []          # Autarker Baustein (Klasse A)
+transitional = [
+    "ports-compat",         # Übergangs-Feature für contextra-ports / contextra-types
+    "crypto-compat",        # Übergangs-Feature für contextra-crypto
+]

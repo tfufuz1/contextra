@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 // FILE-CONTEXT: WAND Differential Test Suite against Exhaustive BM25 Reference.
 // ZWECK: Verifiziert Block-Max WAND Optimierung gegen naive, vollstaendige BM25-Berechnung ueber alle Dokumente.
 // INVARIANTEN: Zero-Panic Doctrine, deterministische Seeds (Regel 3: keine Systemzeit/Systemzufall), identische Rangfolge.

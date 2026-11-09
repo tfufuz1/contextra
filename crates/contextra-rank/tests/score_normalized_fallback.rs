@@ -19,8 +19,6 @@ fn make_doc(id: &str, score: f32) -> SearchResult {
         provenance: None,
     }
 }
-
-// ANCHOR[contextra-rank:NORM-TEST-001]
 #[test]
 fn test_score_normalized_fallback_empty_signal_list() {
     // (a) Active signal with an empty list when total_active_signals > 1

@@ -13,11 +13,11 @@
 //! Empirisch: 49% weniger Retrieval-Fehler vs. naïves Chunking.
 //! Mit Cross-Encoder Reranking: 67% Reduktion.
 
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::client::xml_escape;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::OllamaClient;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::error::{OllamaError, Result};
 
 /// Konfiguration für Kontext-Präfix-Generierung.
@@ -57,7 +57,7 @@ impl Default for ContextPrefixConfig {
 /// # Ok(()) }
 /// ```
 pub struct ContextPrefixEngine {
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     client: OllamaClient,
     pub config: ContextPrefixConfig,
 }
@@ -70,12 +70,12 @@ impl ContextPrefixEngine {
         &self.config
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     pub fn new(client: OllamaClient, config: ContextPrefixConfig) -> Self {
         Self { client, config }
     }
 
-    #[cfg(not(feature = "http"))]
+    #[cfg(not(feature = "client"))]
     pub fn new(config: ContextPrefixConfig) -> Self {
         Self { config }
     }
@@ -88,7 +88,7 @@ impl ContextPrefixEngine {
     /// # Fehler
     /// - `ContextraError::Storage` / `ContextraError::Io` wenn Ollama nicht erreichbar
     /// - `OllamaError::InvalidInput` wenn document oder chunk leer
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     pub async fn generate_prefix(
         &self,
         full_document: &str,
@@ -136,7 +136,7 @@ impl ContextPrefixEngine {
     ///
     /// Nutzt sequentielle Verarbeitung (Ollama ist single-threaded per default).
     /// Für Parallel-Verarbeitung: Mehrere ContextPrefixEngine-Instanzen nutzen.
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     pub async fn generate_prefix_batch(
         &self,
         full_document: &str,
@@ -334,7 +334,7 @@ mod tests {
         assert_eq!(truncate_chars("hello", 6), "hello");
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
     async fn test_generate_prefix_max_prefix_tokens_prompt_assertion() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(prefix, "Dies ist ein Kontext-Präfix.");
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
     async fn test_generate_prefix_mock() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(prefix, "Dies ist ein Kontext-Präfix.");
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
     async fn test_generate_prefix_batch_mock() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap

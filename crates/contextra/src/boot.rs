@@ -7,9 +7,7 @@
 //! Contextra-Fassade gemäß SPEC §13.5 (INV-BOOT-1, INV-WIRING-2, REQ-FAC-005).
 
 use std::path::Path;
-use std::sync::Arc;
 
-use contextra_ports::license::{FeatureRing, LicenseGate};
 use contextra_types::error::ContextraError;
 
 /// Repräsentiert die normativen Startphasen B0–B9 gemäß SPEC §13.5.
@@ -31,7 +29,7 @@ pub enum BootPhase {
     B6ReadBarrierArming,
     /// B7: Fortsetzungsprüfung für Hintergrundsagas
     B7SagaContinuation,
-    /// B8: Verdrahtungs-Selbsttest der Sicherheits-Ports
+    /// B8: Verdrahtungs-Selbsttest
     B8SecurityPortsWiring,
     /// B9: Verkehr zulassen
     B9OperationalTraffic,
@@ -43,8 +41,6 @@ pub fn execute_boot_sequence(
     dimension: usize,
     passphrase_configured: bool,
     empty_passphrase: bool,
-    requested_ring: FeatureRing,
-    license_gate: &Arc<dyn LicenseGate>,
 ) -> Result<(), ContextraError> {
     // Phase B0: Konfiguration und Dimension prüfen
     if dimension == 0 {
@@ -101,10 +97,7 @@ pub fn execute_boot_sequence(
 
     // Phase B7: Saga-Fortsetzungsprüfung
 
-    // Phase B8: Verdrahtungs-Selbsttest der Sicherheits-Ports (INV-WIRING-2)
-    license_gate
-        .check_ring(requested_ring)
-        .map_err(|e| ContextraError::PolicyViolation(format!("Boot phase B8 rejected: {e}")))?;
+    // Phase B8: Direkter Durchlauf (Lizenz-Gate wurde entfernt, geschützte Funktionen werden immer ausgeführt)
 
     // Phase B9: Verkehr zugelassen
     Ok(())

@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Integration tests for B-5: Tombstone read evaluation & MVCC snapshot isolation in inverted index search.
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};

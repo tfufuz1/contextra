@@ -1,28 +1,41 @@
 # contextra-infer-candle
 
-Candle LLM Inference Client und KV-Bridge Adapter.
+Native Candle GGUF ML Inferenz-Baustein für Contextra (Klasse A).
 
-Normativitätsklasse: **Rand `[R]`** (Ring 2, `stable`; §6.0, `capabilities.toml`).
-
-
-`contextra-infer-candle` stellt die native GGUF-Inferenz und In-Memory-Inferenzunterstützung via Candle bereit (Ring 2).
+Normativitätsklasse: **Klasse A – Autarker Baustein** (Ring 2, Baukasten B16).
 
 ## Zweck
 
-Führt lokale LLM-/SLM-Modelle im GGUF-Format ohne externe Serverabhängigkeit aus. Dient als Grundlage für eingebettetes Local Retrieval und Prompt-Verarbeitung.
+Führt lokale LLM-/SLM-Modelle und Embedding-Modelle (GGUF, Quantized Llama, BERT) aus.
+Funktioniert als autarker Baustein mit zero internal workspace dependencies und bietet bei inaktivem Feature `candle` ein leichtgewichtiges Fake-/Mock-Backend.
 
-## Ring-Zugehörigkeit & Status
+## Schnittstellen & Traits
 
-- **Ring:** Ring 2 (Blatt-Crate / Flüchtige Abhängigkeit)
-- **Status:** 🟡 In Migration (Zielzustand: `contextra-infer-candle`)
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+- `Embedder`: Text-Embedding-Generierung (`embed`, `embed_batch`, `dimension`).
+- `TextGenerator`: Deterministische Textgenerierung mit `GenerationConfig`.
+- `parse_gguf_metadata`: Defensiver GGUF-Header- und Metadaten-Parser mit SHA-256 Validierung.
 
-## Öffentliche API-Übersicht
+## Minimalbeispiel (Pure Rust ohne Candle)
 
-- **Client & Embedding:** `CandleEmbedClient`, `CandleEmbedConfig`
-- **Model Registry & Fingerprint:** `ModelFingerprint`
-- **Grounding & Validation:** `GaspConfig`, `GaspValidator`
+```rust
+use contextra_infer_candle::{Embedder, FakeEmbedder, TextGenerator, FakeTextGenerator, GenerationConfig};
 
-## Architektur & Verweise
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let embedder = FakeEmbedder::new(384);
+    let vector = embedder.embed("Hallo Welt")?;
+    assert_eq!(vector.len(), 384);
 
-Details zum schrittweisen Umbau in `contextra-infer-candle` gemäß §20 finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §9.
+    let generator = FakeTextGenerator::new("Antwort");
+    let config = GenerationConfig::default();
+    let text = generator.generate("Was ist Contextra?", &config)?;
+    println!("{}", text);
+    Ok(())
+}
+```
+
+## Features
+
+- `default = []` (Pure-Rust Fallbacks und Traits ohne externe Frameworks).
+- `candle`: Aktiviert die vollständige Candle-Inferenz und Tokenizer-Unterstützung.
+- `cuda`: Aktiviert CUDA-Beschleunigung für Candle.
+- `metal`: Aktiviert Metal-Beschleunigung für Candle.

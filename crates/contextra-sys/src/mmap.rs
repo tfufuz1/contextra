@@ -1,8 +1,7 @@
-// FILE-CONTEXT
-// STAND: 2026-10-28T00:00:00Z
-// ZWECK: Read-only memory mapping facade over memmap2 (Ring 0 / SPEC 7.7)
-// INVARIANTEN: Zero panic; typed io::Error propagation; read-only mapping
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
+// STAND: 2026-11-08T00:00:00Z
+// ZWECK: Read-only memory mapping facade over memmap2 (Ring 0 / SPEC §10.1 / INV-IO-1 / INV-ENCRYPT-REST-2)
+// INVARIANTEN: Zero panic; typed error propagation; read-only mapping; bounded bounds checks
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
 
 //! # Modul: Nur-Lese-Speicherabbildung (`mmap`)
 //!
@@ -24,42 +23,10 @@
 use std::fs::File;
 use std::io;
 
+use crate::error::{Error, Result};
+
 // ANCHOR[contextra-sys:MMAP-READONLY-001]
 /// Erstellt eine unveränderliche Nur-Lese-Speicherabbildung (Read-Only Memory Map) für eine geöffnete Datei.
-///
-/// # Ablauf
-/// 1. Übergibt die geöffnete Dateireferenz `file` an `memmap2::Mmap::map`.
-/// 2. Das Betriebssystem richtet über seine Paging-Tabellen virtuelle Adressen ein,
-///    die direkt auf die Seiten im Dateisystemcache verweisen.
-/// 3. Gibt bei Erfolg eine typisierte [`memmap2::Mmap`]-Struktur zurück, die wie ein `&[u8]`-Slice dereferenziert werden kann.
-///
-/// # Vorbedingungen
-/// - `file` muss eine gültige, geöffnete Datei mit Leserechten referenzieren.
-///
-/// # Nachbedingungen
-/// - Die Speicherabbildung bleibt gültig, solange die zurückgegebene Struktur existiert.
-/// - Zugriffe auf den Speicherbereich erfolgen Zero-Copy direkt aus dem Betriebssystem-Cache.
-///
-/// # Fehlerfälle
-/// Gibt einen [`std::io::Error`] zurück, wenn das Speicherabbilden durch das Betriebssystem
-/// fehlschlägt (z. B. unzureichender virtueller Adressraum oder Berechtigungsfehler).
-///
-/// # Safety
-/// Die Invariante wird hergestellt, da die Datei nur lesend eingebunden wird (`Mmap`, nicht `MmapMut`).
-/// Modifikationen im Adressraum sind typtechnisch unmöglich.
-///
-/// # Beispiel
-/// ```no_run
-/// use std::fs::File;
-/// use contextra_sys::mmap_readonly;
-///
-/// # fn run() -> std::io::Result<()> {
-/// let file = File::open("vector_index.bin")?;
-/// let mmap = mmap_readonly(&file)?;
-/// println!("Dateigröße im Speicher: {} Bytes", mmap.len());
-/// # Ok(())
-/// # }
-/// ```
 pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
     // SAFETY: `file` ist ein gültiger, geöffneter Read-Only-Dateideskriptor. Die Read-Only-Abbildung verhindert Data Races im Rust-Adressraum. Seitenfehler (Page Faults) werden transparent vom Betriebssystemkernel behandelt.
     unsafe { memmap2::Mmap::map(file) }
@@ -77,10 +44,6 @@ pub struct Unsealed;
 
 /// Ein typisierter Dateiwächter, der den Versiegelungszustand einer Datei zur Compilezeit
 /// und Laufzeit abbildet.
-///
-/// Invariante gemäß SPEC INV-IO-1:
-/// Eine Datei darf erst per Memory-Mapping eingebunden werden, wenn sie versiegelt (`SealedReadOnly`)
-/// und auf unveränderlichen Zustand geprüft wurde.
 #[derive(Debug)]
 pub struct SealedFile<State = SealedReadOnly> {
     file: File,
@@ -90,14 +53,6 @@ pub struct SealedFile<State = SealedReadOnly> {
 
 impl SealedFile<SealedReadOnly> {
     /// Erstellt eine versiegelte Dateireferenz nach erfolgreicher Integritäts- und Prüfsummenverifikation.
-    ///
-    /// # Ablauf
-    /// 1. Liest die Dateimetadaten aus `file`.
-    /// 2. Verifiziert, dass die tatsächliche Dateigröße exakt `expected_len` entspricht.
-    /// 3. Gibt bei Übereinstimmung eine versiegelte Dateistruktur zurück.
-    ///
-    /// # Fehler
-    /// Liefert [`std::io::ErrorKind::InvalidData`], wenn die Dateigröße von `expected_len` abweicht.
     pub fn new_verified(file: File, expected_len: u64) -> io::Result<Self> {
         let meta = file.metadata()?;
         if meta.len() != expected_len {
@@ -135,9 +90,6 @@ impl SealedFile<SealedReadOnly> {
 
 // ANCHOR[contextra-sys:MMAP-SEALED-MAP-001]
 /// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien (INV-IO-1).
-///
-/// Im Gegensatz zu rohem `mmap` kann eine [`SealedMap`] ausschließlich aus einer [`SealedFile`]
-/// erzeugt werden. Dies erzwingt die Architekturinvariante INV-IO-1 im Typensystem.
 #[derive(Debug)]
 pub struct SealedMap {
     inner: memmap2::Mmap,
@@ -145,14 +97,10 @@ pub struct SealedMap {
 
 impl SealedMap {
     /// Mappt eine nachweislich versiegelte Datei in den virtuellen Adressraum.
-    ///
-    /// # Ablauf
-    /// 1. Übergibt die verifizierte Datei an `mmap_readonly`.
-    /// 2. Prüft, ob die gemappte Länge exakt mit der verifizierten Dateilänge übereinstimmt.
-    /// 3. Liefert die gekapselte `SealedMap` zurück.
     pub fn map_sealed(file: &SealedFile<SealedReadOnly>) -> io::Result<Self> {
         let inner = mmap_readonly(file.as_file())?;
-        if inner.len() as u64 != file.verified_len() {
+        let mapped_len = inner.len() as u64;
+        if mapped_len != file.verified_len() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
@@ -165,7 +113,17 @@ impl SealedMap {
         Ok(Self { inner })
     }
 
-    /// Gibt den Speicherinhalt als Byte-Slice zurück.
+    /// Liest einen Teilbereich der Speicherabbildung mit sicherer Grenzenprüfung.
+    pub fn get_subslice(&self, offset: usize, len: usize) -> Result<&[u8]> {
+        let end = offset.checked_add(len).ok_or_else(|| {
+            Error::InvalidInput("slice offset + len overflowed usize".to_string())
+        })?;
+        self.inner
+            .get(offset..end)
+            .ok_or_else(|| Error::InvalidInput("slice bounds exceed mmap length".to_string()))
+    }
+
+    /// Gibt den gesamten Speicherinhalt als Byte-Slice zurück.
     pub fn as_slice(&self) -> &[u8] {
         &self.inner[..]
     }
@@ -201,10 +159,8 @@ mod tests {
     use super::*;
     use std::io::Write;
 
-    // ANCHOR[contextra-sys:MMAP-TEST-READ-001]
-    // Prüft das Einlesen von Daten über eine Nur-Lese-Speicherabbildung und vergleicht den Inhalt exakt.
     #[test]
-    fn test_mmap_readonly() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_mmap_readonly() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_mmap_test_{}.bin",
@@ -221,10 +177,8 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:MMAP-TEST-EMPTY-001]
-    // Prüft das Abbilden einer leeren Datei (0 Bytes) auf eine leere Speicherabbildung.
     #[test]
-    fn test_mmap_readonly_empty_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_mmap_readonly_empty_file() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_mmap_empty_{}.bin",
@@ -240,10 +194,8 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:MMAP-TEST-LARGE-001]
-    // Prüft das Abbilden einer größeren Datei (1 MiB), um mehrseitiges Paging zu verifizieren.
     #[test]
-    fn test_mmap_readonly_large_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_mmap_readonly_large_file() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_mmap_large_{}.bin",
@@ -262,10 +214,8 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:MMAP-TEST-BOUNDS-001]
-    // Prüft Zugriffsgrenzen (`get` mit Index/Slice) auf der erstellten Speicherabbildung.
     #[test]
-    fn test_mmap_readonly_access_boundary() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_mmap_readonly_access_boundary() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_mmap_bound_{}.bin",
@@ -283,10 +233,8 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:MMAP-TEST-SEALED-001]
-    // Prüft die typisierte SealedMap- und SealedFile-Abstraktion (INV-IO-1).
     #[test]
-    fn test_sealed_map_and_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_sealed_map_and_file() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_sealed_map_test_{}.bin",
@@ -298,7 +246,6 @@ mod tests {
             file.write_all(payload)?;
         }
 
-        // Test mit korrekter verifizierter Länge
         let file = File::open(&path)?;
         let sealed_file = SealedFile::new_verified(file, payload.len() as u64)?;
         assert_eq!(sealed_file.verified_len(), payload.len() as u64);
@@ -308,7 +255,15 @@ mod tests {
         assert_eq!(&sealed_map[..], payload);
         assert_eq!(sealed_map.as_slice(), payload);
 
-        // Test mit inkorrekter Länge -> InvalidData Fehler (Fail-Closed)
+        let sub = sealed_map.get_subslice(7, 7)?;
+        assert_eq!(sub, b"payload");
+
+        let err_overflow = sealed_map.get_subslice(usize::MAX, 1);
+        assert!(err_overflow.is_err());
+
+        let err_oob = sealed_map.get_subslice(20, 100);
+        assert!(err_oob.is_err());
+
         let file_wrong = File::open(&path)?;
         let res_wrong = SealedFile::new_verified(file_wrong, payload.len() as u64 + 10);
         assert!(res_wrong.is_err());

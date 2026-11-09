@@ -5,10 +5,12 @@
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
+use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::StorageStats;
+use contextra_ports::Vfs;
 use contextra_types::{Result, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -33,6 +35,7 @@ pub struct CompactionEngine {
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
     clock: Arc<dyn contextra_ports::Clock>,
+    pub(crate) vfs: Arc<dyn Vfs>,
 }
 
 impl CompactionEngine {
@@ -69,7 +72,14 @@ impl CompactionEngine {
             adaptive_planner,
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
+            vfs: Arc::new(RealFs),
         }
+    }
+
+    /// Configures a custom VFS implementation for compaction file operations.
+    pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
+        self.vfs = vfs;
+        self
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
@@ -137,7 +147,11 @@ impl CompactionEngine {
         // happen atomically under one lock acquisition to prevent TOCTOU race conditions.
         let (mut input_ssts, is_full_compaction) = {
             let ssts = sstables.read().await;
-            if ssts.len() < self.config.min_sstables_per_tier {
+            let trigger_threshold = self
+                .config
+                .min_sstables_per_tier
+                .min(self.config.l0_compaction_trigger);
+            if ssts.len() < trigger_threshold {
                 return Ok(false);
             }
 
@@ -190,7 +204,91 @@ impl CompactionEngine {
             input_ssts.len()
         );
 
-        // 1b. Peak Memory Estimation Check
+        self.execute_compaction_for_candidates(
+            input_ssts,
+            is_full_compaction,
+            sstables,
+            data_path,
+            cancel_token,
+        )
+        .await
+    }
+
+    /// Forces a full compaction over all existing SSTables.
+    ///
+    /// This maintenance API merges all currently registered SSTables into a single
+    /// consolidated SSTable, evaluating tombstones against the active snapshot watermark.
+    pub async fn compact_all(
+        &self,
+        sstables: &RwLock<Vec<Arc<SstableReader>>>,
+        data_path: &std::path::Path,
+    ) -> Result<bool> {
+        let (mut input_ssts, is_full) = {
+            let ssts = sstables.read().await;
+            if ssts.len() < 2 {
+                return Ok(false);
+            }
+            (ssts.clone(), true)
+        };
+
+        input_ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+
+        self.execute_compaction_for_candidates(input_ssts, is_full, sstables, data_path, None)
+            .await
+    }
+
+    /// Compacts all SSTables that overlap with the specified key range `[start, end]`.
+    ///
+    /// Neutral maintenance API without domain-specific erasure/shredding semantics.
+    pub async fn compact_range(
+        &self,
+        range: std::ops::RangeInclusive<&[u8]>,
+        sstables: &RwLock<Vec<Arc<SstableReader>>>,
+        data_path: &std::path::Path,
+    ) -> Result<bool> {
+        let (start_key, end_key) = range.into_inner();
+        let (mut input_ssts, is_full) = {
+            let ssts = sstables.read().await;
+            if ssts.len() < 2 {
+                return Ok(false);
+            }
+
+            let mut overlapping = Vec::new();
+            for sst in ssts.iter() {
+                // If SSTable has key bounds, check overlap.
+                // An SSTable overlaps if its range intersects [start_key, end_key].
+                let meta = sst.metadata();
+                let first = meta.first_key.as_ref();
+                let last = meta.last_key.as_ref();
+                if !(last < start_key || first > end_key) {
+                    overlapping.push(Arc::clone(sst));
+                }
+            }
+
+            if overlapping.len() < 2 {
+                return Ok(false);
+            }
+
+            let is_full = overlapping.len() == ssts.len();
+            (overlapping, is_full)
+        };
+
+        input_ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
+
+        self.execute_compaction_for_candidates(input_ssts, is_full, sstables, data_path, None)
+            .await
+    }
+
+    /// Helper executing candidate merge, swap and manifest recording for a determined set of SSTables.
+    async fn execute_compaction_for_candidates(
+        &self,
+        input_ssts: Vec<Arc<SstableReader>>,
+        is_full_compaction: bool,
+        sstables: &RwLock<Vec<Arc<SstableReader>>>,
+        data_path: &std::path::Path,
+        cancel_token: Option<&tokio_util::sync::CancellationToken>,
+    ) -> Result<bool> {
+        // Peak Memory Estimation Check
         if let Some(limit_bytes) = self.config.max_peak_memory_bytes {
             let estimated_peak = self.estimate_compaction_peak_bytes(&input_ssts);
             if estimated_peak > limit_bytes {
@@ -210,7 +308,7 @@ impl CompactionEngine {
             }
         }
 
-        // 2. Perform the merge (no lock held — this is the expensive part)
+        // Perform the merge
         let min_snapshot_seq = self.snapshot_registry.min_active_seqno();
         let output_path = self.generate_sst_path(data_path)?;
         self.merge_sstables_with_cancel(
@@ -223,19 +321,22 @@ impl CompactionEngine {
         .await?;
 
         // Explicit fsync of output file and parent directory
-        crate::util::fsync_parent_dir(&output_path).await?;
+        if let Some(parent) = output_path.parent() {
+            self.vfs.sync_dir(parent)?;
+        }
 
         // Open the new SSTable reader
         let new_reader = Arc::new(
-            SstableReader::open_with_key_manager(
+            SstableReader::open_with_vfs(
                 &output_path,
                 Arc::clone(&self.block_cache),
                 self.key_manager.clone(),
+                Arc::clone(&self.vfs),
             )
             .await?,
         );
 
-        // 4. In-memory SSTable swap under write-lock with MANIFEST durability
+        // In-memory SSTable swap under write-lock with MANIFEST durability
         let old_paths = {
             let mut ssts = sstables.write().await;
 
@@ -259,7 +360,7 @@ impl CompactionEngine {
                     "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
                      (concurrent flush or rollback detected)"
                 );
-                if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                if let Err(e) = self.vfs.remove_file(&output_path) {
                     tracing::warn!(
                         "Failed to clean up aborted compaction output {:?}: {}",
                         output_path,
@@ -275,7 +376,7 @@ impl CompactionEngine {
                 .map(|s| s.file_path().to_path_buf())
                 .collect();
 
-            // 5. Write EXACTLY ONE atomic `Replace` entry to MANIFEST before swapping in-memory state
+            // Write EXACTLY ONE atomic `Replace` entry to MANIFEST before swapping in-memory state
             if let Some(ref manifest) = self.manifest {
                 manifest
                     .append(&crate::manifest::ManifestEntry::Replace {
@@ -287,7 +388,7 @@ impl CompactionEngine {
                     .await?;
             }
 
-            // Remove input SSTables by identity (Arc::ptr_eq), which form a contiguous window
+            // Remove input SSTables by identity (Arc::ptr_eq)
             ssts.retain(|sst| !input_ssts.iter().any(|inp| Arc::ptr_eq(inp, sst)));
 
             // Add new SSTable at insertion point
@@ -307,14 +408,14 @@ impl CompactionEngine {
             old_paths
         };
 
-        // 7. Delete old SSTable files (best-effort cleanup outside lock)
+        // Delete old SSTable files
         for path in &old_paths {
-            if let Err(e) = tokio::fs::remove_file(path).await {
+            if let Err(e) = self.vfs.remove_file(path) {
                 tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
             let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
-            if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {
-                if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+            if matches!(self.vfs.exists(&uuid_sidecar), Ok(true)) {
+                if let Err(e) = self.vfs.remove_file(&uuid_sidecar) {
                     tracing::debug!(
                         "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
                         uuid_sidecar,
@@ -430,8 +531,8 @@ impl CompactionEngine {
             .await;
 
         if merge_res.is_err() {
-            if let Err(e) = tokio::fs::remove_file(output_path).await {
-                if e.kind() != std::io::ErrorKind::NotFound {
+            if let Err(e) = self.vfs.remove_file(output_path) {
+                if !matches!(e, contextra_ports::ContextraError::NotFound(_)) {
                     tracing::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
                         output_path,
@@ -521,8 +622,12 @@ impl CompactionEngine {
             }
         }
 
-        let mut builder =
-            SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;
+        let mut builder = SstableBuilder::create_with_vfs(
+            output_path,
+            self.key_manager.clone(),
+            Arc::clone(&self.vfs),
+        )
+        .await?;
         let mut last_key: Option<bytes::Bytes> = None;
         let mut floor_emitted = false;
         let mut processed_count = 0;

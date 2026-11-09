@@ -7,7 +7,7 @@
 use super::types::{DiskAnnIndex, SearchCandidate};
 use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashSet};
 
 impl DiskAnnIndex {
     /// Executes a predicate-augmented vector search using ACORN 2-hop neighbor expansion during graph traversal.
@@ -56,7 +56,7 @@ impl DiskAnnIndex {
         let tombstones = self.inner.tombstones.read();
 
         let ep = header.entry_point;
-        let mut visited = HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
 
         let ep_node = self.load_node(ep)?;
         let ep_dist = self.get_dist_to_query(query, ep)?;
@@ -148,8 +148,8 @@ impl DiskAnnIndex {
         }
 
         // Deduplicate matching results by DocId, retaining best distance
-        let mut best_matching: std::collections::HashMap<DocId, f32> =
-            std::collections::HashMap::new();
+        let mut best_matching: BTreeMap<DocId, f32> =
+            BTreeMap::new();
         for (doc_id, dist) in matching_results {
             best_matching
                 .entry(doc_id)

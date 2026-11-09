@@ -37,7 +37,7 @@ pub trait DocumentExtractor: Send + Sync {
 /// Atomares Ressourcen-Budget zur Absicherung gegen DoS/Zip-Bomben (arbeitsbasiert, ohne Zeit).
 #[derive(Debug)]
 pub struct ResourceBudget {
-    limits: IngestLimits,
+    pub limits: IngestLimits,
     decompressed_bytes: AtomicU64,
     xml_events: AtomicU64,
     text_bytes: AtomicU64,

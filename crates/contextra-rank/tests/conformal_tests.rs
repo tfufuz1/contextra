@@ -5,8 +5,6 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// FILE-CONTEXT
-// STAND: 2026-09-27T19:30:00Z
 // ZWECK: Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs).
 // INVARIANTEN: INV-CALIBRATION-CONFORMAL-1 (marginal coverage guarantee, strict determinism, zero-panic input validation).
 
@@ -38,8 +36,6 @@ impl SimpleLcg {
 // ============================================================================
 // 1. MARGINAL COVERAGE PROPERTY TEST
 // ============================================================================
-
-// ANCHOR[contextra-rank:CONF-TEST-001]
 #[test]
 fn test_conformal_marginal_coverage_guarantee() {
     let alpha = 0.10f32; // Target error rate 10% -> 90% coverage target

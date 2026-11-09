@@ -51,7 +51,7 @@ async fn test_quantizer_recalibration() {
     index.commit(TxId(2)).await.unwrap();
 
     // Trigger rebuild to recalibrate
-    index.rebuild().await.unwrap();
+    index.rebuild().unwrap();
 
     // Verify new quantizer state (codebook stability preserved; drift counters reset)
     let q_after = index.quantizer().expect("Quantizer must be trained");

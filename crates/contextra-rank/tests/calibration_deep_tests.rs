@@ -5,8 +5,6 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// FILE-CONTEXT
-// STAND: 2026-09-09T12:37:35Z (SESSION: 20c1aaf4)
 // ZWECK: Deep integration, proptest, and adversarial test suite for contextra-rank calibration.
 // INVARIANTEN: INV-CAL-1 (no silent fallback before warmup), INV-CAL-2 (invalidation resets observations/weights), P8 compliance.
 
@@ -17,8 +15,6 @@ use proptest::prelude::*;
 // ============================================================================
 // 1. ISOTONIC CALIBRATOR TESTS (PAVA & ECE)
 // ============================================================================
-
-// ANCHOR[contextra-rank:CAL-TEST-001]
 #[test]
 fn test_isotonic_warmup_invariant_inv_cal1() {
     let mut cal = IsotonicCalibrator::new(20, 100);

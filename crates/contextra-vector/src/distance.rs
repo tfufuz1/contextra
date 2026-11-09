@@ -1,13 +1,18 @@
 // FILE-CONTEXT
-// ZWECK: Crate-lokale Distanz-Abstraktion und skalare Referenzimplementierung ohne contextra-simd (WP-VEC-3).
+// ZWECK: Crate-lokale Distanz-Abstraktion und skalare Referenzimplementierung ohne contextra-simd (WP-VEC-3, VEC-4).
 // INVARIANTEN: Zero unsafe code in distance.rs (#![forbid(unsafe_code)]); INV-SIMD-FINITE-1; INV-SIMD-ALIGN-1.
-// HOTSPOTS: compute_distance, compute_distance_trusted, compute_distance_f32_bytes_trusted, ScalarKernel
+// HOTSPOTS: compute_distance, compute_distance_trusted, compute_distance_f32_bytes_trusted, ScalarKernel, ScalarDistance
 
 //! # Distance Computation Module
 //!
-//! This module defines the crate-local [`DistanceKernel`] trait and the safe, allocation-free
-//! scalar reference implementation [`ScalarKernel`] according to architecture principles §3.1 and §3.3.
+//! This module defines the crate-local [`DistanceKernel`] trait, the contract adapter [`DistanceFn`],
+//! [`Metric`] support and the safe, allocation-free scalar reference implementation [`ScalarKernel`]
+//! according to architecture principles §3.1 and §3.3.
 
+#[path = "contract.rs"]
+pub mod contract;
+
+use contract::{DistanceFn, Error as ContractError, Metric as ContractMetric};
 use contextra_types::{ContextraError, DistanceMetric, Result};
 
 /// Raw integer sum components for u8 cosine similarity calculation.
@@ -352,6 +357,169 @@ impl DistanceKernel for ScalarKernel {
 }
 
 // ---------------------------------------------------------------------------
+// DistanceFn & Metric Crate-Local Adapter (Baukasten Contract Klasse A)
+// ---------------------------------------------------------------------------
+
+/// Crate-local scalar distance function implementing [`DistanceFn`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScalarDistance {
+    pub metric: ContractMetric,
+}
+
+impl ScalarDistance {
+    pub const fn new(metric: ContractMetric) -> Self {
+        Self { metric }
+    }
+
+    /// Computes distance with strict validation of finiteness and dimension match.
+    pub fn compute(&self, a: &[f32], b: &[f32]) -> core::result::Result<f32, ContractError> {
+        if a.len() != b.len() {
+            return Err(ContractError::InvalidInput("Vektordimensionen stimmen nicht überein"));
+        }
+        if a.iter().any(|v| !v.is_finite()) || b.iter().any(|v| !v.is_finite()) {
+            return Err(ContractError::InvalidInput("Vektor enthält NaN oder Unendlich"));
+        }
+        match self.metric {
+            ContractMetric::Cosine => {
+                let mut dot = 0.0f32;
+                let mut norm_a = 0.0f32;
+                let mut norm_b = 0.0f32;
+                for (&x, &y) in a.iter().zip(b.iter()) {
+                    dot += x * y;
+                    norm_a += x * x;
+                    norm_b += y * y;
+                }
+                if norm_a == 0.0 || norm_b == 0.0 {
+                    Ok(1.0)
+                } else {
+                    let denom = norm_a.sqrt() * norm_b.sqrt();
+                    let sim = (dot / denom).clamp(-1.0, 1.0);
+                    Ok(1.0 - sim)
+                }
+            }
+            ContractMetric::Euclidean => {
+                let mut sum = 0.0f32;
+                for (&x, &y) in a.iter().zip(b.iter()) {
+                    let diff = x - y;
+                    sum += diff * diff;
+                }
+                Ok(sum.sqrt())
+            }
+            ContractMetric::DotProduct => {
+                let mut dot = 0.0f32;
+                for (&x, &y) in a.iter().zip(b.iter()) {
+                    dot += x * y;
+                }
+                Ok(-dot)
+            }
+        }
+    }
+}
+
+impl DistanceFn for ScalarDistance {
+    #[inline]
+    fn distance(&self, a: &[f32], b: &[f32]) -> f32 {
+        self.compute(a, b).unwrap_or(f32::NAN)
+    }
+}
+
+/// Dynamic adapter enabling any injected [`DistanceFn`] to be used as a [`DistanceKernel`].
+#[derive(Clone)]
+pub struct InjectedDistanceKernel<D: DistanceFn> {
+    pub distance_fn: D,
+}
+
+impl<D: DistanceFn + 'static> InjectedDistanceKernel<D> {
+    pub fn new(distance_fn: D) -> Self {
+        Self { distance_fn }
+    }
+}
+
+impl<D: DistanceFn + 'static> DistanceKernel for InjectedDistanceKernel<D> {
+    #[inline]
+    fn distance(&self, _metric: DistanceMetric, a: &[f32], b: &[f32]) -> Result<f32> {
+        ScalarKernel::validate_slices(a, b)?;
+        let d = self.distance_fn.distance(a, b);
+        if d.is_nan() {
+            Err(ContextraError::invalid_input("Distance computation produced NaN"))
+        } else {
+            Ok(d)
+        }
+    }
+
+    #[inline]
+    fn distance_f32_bytes(&self, metric: DistanceMetric, a: &[f32], b_bytes: &[u8]) -> Result<f32> {
+        ScalarKernel.distance_f32_bytes(metric, a, b_bytes)
+    }
+
+    #[inline]
+    fn distance_trusted(&self, _metric: DistanceMetric, a: &[f32], b: &[f32]) -> Result<f32> {
+        Ok(self.distance_fn.distance(a, b))
+    }
+
+    #[inline]
+    fn distance_f32_bytes_trusted(
+        &self,
+        metric: DistanceMetric,
+        a: &[f32],
+        b_bytes: &[u8],
+    ) -> Result<f32> {
+        ScalarKernel.distance_f32_bytes_trusted(metric, a, b_bytes)
+    }
+
+    #[inline]
+    fn cosine_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
+        ScalarKernel.cosine_distance(a, b)
+    }
+
+    #[inline]
+    fn dot_product_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
+        ScalarKernel.dot_product_distance(a, b)
+    }
+
+    #[inline]
+    fn euclidean_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
+        ScalarKernel.euclidean_distance(a, b)
+    }
+
+    #[inline]
+    fn euclidean_distance_sq_u8(&self, a: &[u8], b: &[u8]) -> u32 {
+        ScalarKernel.euclidean_distance_sq_u8(a, b)
+    }
+
+    #[inline]
+    fn euclidean_distance_sq_f32_u8(
+        &self,
+        a: &[f32],
+        b: &[u8],
+        alphas: &[f32],
+        mins: &[f32],
+    ) -> f32 {
+        ScalarKernel.euclidean_distance_sq_f32_u8(a, b, alphas, mins)
+    }
+
+    #[inline]
+    fn dot_product_u8(&self, a: &[u8], b: &[u8]) -> u32 {
+        ScalarKernel.dot_product_u8(a, b)
+    }
+
+    #[inline]
+    fn dot_product_f32_u8(&self, a: &[f32], b: &[u8]) -> f32 {
+        ScalarKernel.dot_product_f32_u8(a, b)
+    }
+
+    #[inline]
+    fn cosine_similarity_parts_u8(&self, a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
+        ScalarKernel.cosine_similarity_parts_u8(a, b)
+    }
+
+    #[inline]
+    fn normalize_inplace(&self, v: &mut [f32]) {
+        ScalarKernel.normalize_inplace(v);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Standalone Functions & Backward Compatibility Helper
 // ---------------------------------------------------------------------------
 
@@ -449,6 +617,32 @@ pub fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
 mod tests {
     use super::*;
     use contextra_types::DistanceMetric;
+
+    #[test]
+    fn test_scalar_distance_contract() {
+        let sd = ScalarDistance::new(ContractMetric::Euclidean);
+        let a = [0.0, 3.0];
+        let b = [4.0, 0.0];
+        assert_eq!(sd.distance(&a, &b), 5.0);
+        assert_eq!(sd.compute(&a, &b).unwrap(), 5.0);
+
+        let sd_cos = ScalarDistance::new(ContractMetric::Cosine);
+        let c1 = [1.0, 0.0];
+        let c2 = [0.0, 1.0];
+        assert_eq!(sd_cos.distance(&c1, &c2), 1.0);
+
+        let sd_dot = ScalarDistance::new(ContractMetric::DotProduct);
+        assert_eq!(sd_dot.distance(&c1, &c2), 0.0);
+    }
+
+    #[test]
+    fn test_scalar_distance_nan_rejection() {
+        let sd = ScalarDistance::new(ContractMetric::Euclidean);
+        let a = [0.0, f32::NAN];
+        let b = [4.0, 0.0];
+        assert!(sd.compute(&a, &b).is_err());
+        assert!(sd.distance(&a, &b).is_nan());
+    }
 
     #[test]
     fn test_compute_distance_f32_bytes_equivalence() {

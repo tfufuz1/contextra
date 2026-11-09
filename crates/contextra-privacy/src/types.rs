@@ -3,13 +3,11 @@
 //! # Zweck
 //! Stellt sicher, dass `contextra-privacy` als autarker Baustein ohne interne Abhängigkeiten
 //! zu `contextra-ports` oder `contextra-types` funktioniert (SPEC v4.0 §4, B1–B4).
-//! Bei aktiviertem transitionalen Feature `ports-compat` stehen Konvertierungen zu den
-//! Workspace-Typen bereit.
 
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Trait für monotone und reale Zeitabfragen ohne Abhängigkeit von `contextra-ports`.
+/// Trait für monotone und reale Zeitabfragen ohne Abhängigkeit von externen Ports.
 pub trait Clock: Send + Sync {
     /// Liefert die aktuelle Zeit in Unix-Nanosekunden.
     fn now_unix_nanos(&self) -> u64;
@@ -42,21 +40,8 @@ impl Clock for SystemClock {
     }
 }
 
-#[cfg(feature = "ports-compat")]
-impl<T: contextra_ports::Clock + ?Sized> Clock for T {
-    fn now_unix_nanos(&self) -> u64 {
-        contextra_ports::Clock::now_unix_nanos(self)
-    }
-
-    fn monotonic_nanos(&self) -> u64 {
-        contextra_ports::Clock::monotonic_nanos(self)
-    }
-}
-
 /// Numerischer Mandanten-Identifikator (64-Bit).
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
 
@@ -163,59 +148,4 @@ pub enum EgressDecision {
 pub trait EgressPolicy: Send + Sync {
     /// Bewertet, ob der ausgehende Payload die Richtlinie erfüllt.
     fn evaluate(&self, payload: &str) -> EgressDecision;
-}
-
-#[cfg(feature = "ports-compat")]
-mod compat {
-    use super::*;
-
-    impl From<TenantId> for contextra_types::TenantId {
-        fn from(t: TenantId) -> Self {
-            contextra_types::TenantId(t.0)
-        }
-    }
-
-    impl From<contextra_types::TenantId> for TenantId {
-        fn from(t: contextra_types::TenantId) -> Self {
-            TenantId(t.0)
-        }
-    }
-
-    impl From<TenantScopeViolation> for contextra_types::TenantScopeViolation {
-        fn from(v: TenantScopeViolation) -> Self {
-            match v {
-                TenantScopeViolation::Mismatch { expected, actual } => {
-                    contextra_types::TenantScopeViolation::Mismatch {
-                        expected: expected.into(),
-                        actual: actual.into(),
-                    }
-                }
-                TenantScopeViolation::InvalidZero => {
-                    contextra_types::TenantScopeViolation::Mismatch {
-                        expected: contextra_types::TenantId(0),
-                        actual: contextra_types::TenantId(0),
-                    }
-                }
-            }
-        }
-    }
-
-    impl From<contextra_types::TenantScopeViolation> for TenantScopeViolation {
-        fn from(v: contextra_types::TenantScopeViolation) -> Self {
-            match v {
-                contextra_types::TenantScopeViolation::Mismatch { expected, actual } => {
-                    TenantScopeViolation::Mismatch {
-                        expected: expected.into(),
-                        actual: actual.into(),
-                    }
-                }
-            }
-        }
-    }
-
-    impl<T> From<TenantScoped<T>> for contextra_types::TenantScoped<T> {
-        fn from(s: TenantScoped<T>) -> Self {
-            contextra_types::TenantScoped::new(s.tenant_id.into(), s.data)
-        }
-    }
 }

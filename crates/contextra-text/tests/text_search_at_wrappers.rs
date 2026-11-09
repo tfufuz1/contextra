@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! Integration tests for Bm25Scorer and BM25MorphIndex search_at delegation (ADR-024 Snapshot Isolation).
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};

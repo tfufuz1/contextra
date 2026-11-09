@@ -17,6 +17,9 @@ pub enum SimdError {
 
 pub type Result<T> = core::result::Result<T, SimdError>;
 
+/// Typ-Alias `Error` für B4-Konformität (genau ein primärer Fehlertyp `Error`).
+pub type Error = SimdError;
+
 #[cfg(feature = "types-compat")]
 impl From<SimdError> for contextra_types::ContextraError {
     fn from(err: SimdError) -> Self {

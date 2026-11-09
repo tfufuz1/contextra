@@ -28,6 +28,9 @@ pub enum CryptoError {
     #[error("decryption failed: {0}")]
     Decryption(String),
 
+    #[error("AEAD operation failed: {0}")]
+    Aead(String),
+
     #[error("invalid nonce or key length: {0}")]
     InvalidLength(String),
 

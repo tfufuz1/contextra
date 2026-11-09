@@ -15,7 +15,6 @@ use super::types::SearchResult;
 
 /// Configuration for `GlobalFusionStrategy`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-rank:GLOB-001]
 /// Konfigurationsparameter für die globale Community-Fusionsstrategie.
 pub struct GlobalFusionConfig {
     /// Maximum number of community nodes to include in the final result set.
@@ -44,7 +43,6 @@ struct CommunityResult {
 
 /// Community-aware fusion strategy for corpus-wide topic retrieval (LeanRAG-backed).
 #[derive(Debug, Clone, Default)]
-// ANCHOR[contextra-rank:GLOB-002]
 /// Globale Fusionsstrategie für hierarchische und korpusweite Retrieval-Szenarien.
 pub struct GlobalFusionStrategy {
     config: GlobalFusionConfig,

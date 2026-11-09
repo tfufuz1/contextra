@@ -681,6 +681,35 @@ impl SequenceLogSsiValidator {
         removed
     }
 
+    /// Bereinigt bestätigte Schreib-Einträge bis zu einem optionalen Grenzwert mit expliziter Fehlerbehandlung.
+    ///
+    /// ### Fehlerfälle:
+    /// Liefert `Err(ContextraError::InvalidState(...))`, wenn der Sentinel-Wert `u64::MAX`
+    /// oder das `TOMBSTONE_BIT` gesetzt ist. `None` führt kein Pruning aus und liefert `Ok(0)`.
+    pub fn prune_through_checked(&self, bound: Option<u64>) -> Result<usize> {
+        match bound {
+            None => Ok(0),
+            Some(seq) => {
+                if seq == u64::MAX {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Invalid sequence number {seq} for prune_through: sentinel MAX not allowed"
+                    )));
+                }
+                if (seq & crate::types::TOMBSTONE_BIT) != 0 {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Invalid sequence number {seq} for prune_through: TOMBSTONE_BIT must not be set"
+                    )));
+                }
+                if seq >= (i64::MAX as u64) {
+                    return Err(ContextraError::InvalidInput(format!(
+                        "Invalid sequence number {seq} for prune_through: sequence exceeds maximum allowable range"
+                    )));
+                }
+                Ok(self.prune_through(seq))
+            }
+        }
+    }
+
     /// Entfernt alle Commit-Registrierungen mit `commit_seq >= first_seq` (z. B. nach Transaktionsabbruch).
     pub fn forget_from(&self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;

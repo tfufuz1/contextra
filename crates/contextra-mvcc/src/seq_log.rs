@@ -58,6 +58,13 @@ pub struct SeqLogEntry {
 impl SeqLogEntry {
     /// Prüft in O(1), ob dieser Protokolleintrag zu einem bestimmten Snapshot-Stand `as_of` sichtbar ist.
     ///
+    /// ### Formale Sichtbarkeitsinvariante (INV-INDEX-SNAPSHOT-1):
+    /// Eine Version `(key, seq)` ist für Snapshot `s` mit Lese-Sequenz `as_of` genau dann sichtbar, wenn:
+    /// `seq <= as_of && (delete_seq.is_none() || delete_seq > as_of)`.
+    ///
+    /// Dies gilt universell für reguläre Datensätze, Updates (neue Version erzeugt `insert_seq` und schließt Vorgänger)
+    /// sowie Tombstones (Tombstone markiert `delete_seq` und maskiert ältere Versionen aus).
+    ///
     /// ### Ablauf der Sichtbarkeitsprüfung:
     /// 1. Maskiere eventuell gesetzte Tombstone-Bits (höchstwertiges Bit) auf allen Sequenznummern aus.
     /// 2. Prüfe, ob der Eintrag vor oder genau zum Snapshot-Zeitpunkt eingefügt wurde (`insert_seq <= as_of`).
@@ -799,5 +806,31 @@ mod tests {
         assert!(expired.is_empty());
 
         assert_eq!(log.min_retention_seq(), Some(50));
+    }
+
+    // Prüft, dass Updates und Tombstones demselben formalen Sichtbarkeitsgesetz (INV-INDEX-SNAPSHOT-1) folgen.
+    #[test]
+    fn test_sequence_log_tombstones_and_updates_follow_same_law() {
+        let mut log = SequenceLog::new();
+        let doc1 = DocId::from_key("doc_tombstone_test").expect("valid doc id");
+
+        // V1 eingefügt bei Seq 10
+        log.record_insert(doc1, 10);
+        // V2 (Update) bei Seq 20 schließt V1 ab und öffnet V2
+        log.record_insert(doc1, 20);
+        // Tombstone (Delete) bei Seq 30 schließt V2 ab
+        log.record_delete(doc1, 30);
+
+        // Vor Einfügung
+        assert!(!log.is_visible(doc1, 9));
+        // Während V1 aktiv war (10..20)
+        assert!(log.is_visible(doc1, 10));
+        assert!(log.is_visible(doc1, 19));
+        // Während V2 aktiv war (20..30)
+        assert!(log.is_visible(doc1, 20));
+        assert!(log.is_visible(doc1, 29));
+        // Nach Tombstone (ab 30)
+        assert!(!log.is_visible(doc1, 30));
+        assert!(!log.is_visible(doc1, 35));
     }
 }

@@ -1,18 +1,19 @@
-// FILE-CONTEXT
-// STAND: 2026-10-28T00:00:00Z
-// ZWECK: Platform-aware RAM memory locking abstractions with policy enforcement (Ring 0 / SPEC 7.7)
-// INVARIANTEN: Zero panic; configurable mlock policy (FailClosed vs Tolerant); typed io::Error propagation
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
+// STAND: 2026-11-08T00:00:00Z
+// ZWECK: Platform-aware RAM memory locking abstractions with policy enforcement (Ring 0 / SPEC §10.1 / INV-SYS-MEMLOCK-1)
+// INVARIANTEN: Zero panic; configurable mlock policy; madvise(MADV_DONTDUMP) integration; structured error propagation
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
 
 //! # Modul: Speichersperrung im Arbeitsspeicher (`mlock`)
 //!
 //! Dieses Modul kapselt das Festpinnen (Locking) von virtuellem Speicher im physischen RAM
 //! (Random Access Memory). Dadurch wird das Betriebssystem angewiesen, die betroffenen Speicherseiten
 //! nicht in die Auslagerungsdatei (Swap / Pagefile) auf den persistenten Datenträger auszulagern.
+//! Zusätzlich wird unter Unix `madvise(..., MADV_DONTDUMP)` angewandt, um sensible Daten aus
+//! Core-Dumps auszuschließen (INV-SYS-MEMLOCK-1).
 //!
 //! ## Ring-Zugehörigkeit und Sicherheitsrelevanz
 //! - **Ring 0 (Kern / Unsafe-Insel):** Direkte Aufrufe von POSIX `libc::mlock` / `libc::munlock`
-//!   bzw. Windows `VirtualLock` / `VirtualUnlock`.
+//!   / `libc::madvise(MADV_DONTDUMP)` bzw. Windows `VirtualLock` / `VirtualUnlock`.
 //! - **Kryptografischer Schutz:** Wenn kryptografische Schlüssel (z. B. für die Verschlüsselung
 //!   im Ruhezustand = Encryption-at-Rest) in den RAM geladen werden, bestünde bei einem Swap
 //!   das Risiko, dass Klartext-Schlüssel auf unverschlüsselten Swap-Partitionen landen.
@@ -21,7 +22,30 @@
 //!   - `Tolerant`: Scheitert `mlock` (z. B. in unprivilegierten Docker-Containern), wird eine Warnung protokolliert
 //!     und der Speicher ungesperrt belassen.
 
-use std::io::{Error, Result};
+use std::io::{Error as IoError, Result as IoResult};
+
+use crate::error::{Error, Result};
+
+#[cfg(test)]
+pub(crate) mod fault_injection {
+    use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+
+    static FAIL_MLOCK: AtomicBool = AtomicBool::new(false);
+    static INJECTED_ERRNO: AtomicI32 = AtomicI32::new(libc::ENOMEM);
+
+    pub fn set_fail_mlock(fail: bool, errno: i32) {
+        FAIL_MLOCK.store(fail, Ordering::SeqCst);
+        INJECTED_ERRNO.store(errno, Ordering::SeqCst);
+    }
+
+    pub fn should_fail_mlock() -> Option<i32> {
+        if FAIL_MLOCK.load(Ordering::SeqCst) {
+            Some(INJECTED_ERRNO.load(Ordering::SeqCst))
+        } else {
+            None
+        }
+    }
+}
 
 // ANCHOR[contextra-sys:MLOCK-POLICY-001]
 /// Konfigurierbare Richtlinie für das Sperren von Speicherregionen (`mlock` / `VirtualLock`).
@@ -36,168 +60,186 @@ pub enum MemLockPolicy {
     Tolerant,
 }
 
-// ANCHOR[contextra-sys:MLOCK-LOCK-UNIX-001]
-/// Sperrt unter Unix eine Speicherregion im RAM, um das Auslagern (Swapping) zu verhindern.
-///
-/// # Ablauf
-/// 1. Prüft, ob `len == 0` oder `ptr.is_null()` ist: In diesem Fall ist nichts zu tun (`Ok(true)`).
-/// 2. Ruft den POSIX-Systemaufruf `libc::mlock` mit dem Speicherzeiger und der Länge auf.
-/// 3. War der Systemaufruf erfolgreich (`ret == 0`), wird `Ok(true)` zurückgegeben.
-/// 4. Scheitert der Systemaufruf (`ret != 0`):
-///    - Unter [`MemLockPolicy::FailClosed`] wird ein typisierter [`std::io::Error`] erzeugt und zurückgegeben.
-///    - Unter [`MemLockPolicy::Tolerant`] wird eine Warnung protokolliert und `Ok(false)` zurückgegeben.
-///
-/// # Vorbedingungen
-/// - `ptr` muss auf einen gültigen, allokierten Speicherbereich von mindestens `len` Bytes zeigen.
-///
-/// # Fehlerfälle
-/// - Gibt bei unzureichenden Rechten (`EPERM`) oder überschrittenem Limit (`ENOMEM`) einen Fehler zurück,
-///   sofern `policy` auf [`MemLockPolicy::FailClosed`] steht.
-#[cfg(unix)]
-pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
+// ANCHOR[contextra-sys:MLOCK-APPLY-DONTDUMP-001]
+/// Schließt eine Speicherregion per `madvise(MADV_DONTDUMP)` aus Core-Dumps aus (Unix).
+/// Auf Nicht-Unix-Systemen ist dies ein no-op.
+pub fn apply_dont_dump(ptr: *const u8, len: usize) -> Result<()> {
     if len == 0 || ptr.is_null() {
-        return Ok(true);
+        return Ok(());
     }
-    // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes gültig allokierten Speicher. `libc::mlock` pinnt Seiten im RAM.
-    let ret = unsafe { libc::mlock(ptr as *const libc::c_void, len) };
-    if ret != 0 {
-        let err = Error::last_os_error();
-        match policy {
-            MemLockPolicy::FailClosed => Err(Error::new(
-                err.kind(),
-                format!(
-                    "mlock() failed for memory region at {:p} (len={}): {} (FailClosed)",
-                    ptr, len, err
-                ),
-            )),
-            MemLockPolicy::Tolerant => {
-                tracing::warn!(
-                    "mlock() failed for memory region at {:p} (len={}): {}. \
-                     Data remains unlocked in memory (swap-risk, Tolerant).",
-                    ptr,
-                    len,
-                    err
-                );
-                Ok(false)
-            }
-        }
-    } else {
-        Ok(true)
-    }
-}
 
-// ANCHOR[contextra-sys:MLOCK-UNLOCK-UNIX-001]
-/// Entsperrt eine zuvor unter Unix gesperrte Speicherregion im RAM.
-///
-/// # Vorbedingungen
-/// - `addr` und `len` müssen exakt einer zuvor über [`mem_lock_with_policy`] gesperrten Region entsprechen.
-#[cfg(unix)]
-pub fn mem_unlock(addr: usize, len: usize) {
-    if len == 0 || addr == 0 {
-        return;
-    }
-    // SAFETY: `addr` und `len` referenzieren eine gültige Speicherallokation, die zuvor an `mem_lock` übergeben wurde.
-    unsafe {
-        libc::munlock(addr as *mut libc::c_void, len);
-    }
-}
+    #[cfg(unix)]
+    {
+        #[cfg(target_os = "linux")]
+        let advice = libc::MADV_DONTDUMP;
+        #[cfg(target_os = "macos")]
+        let advice = libc::MADV_ZERO_WIRED_PAGES;
+        #[cfg(all(unix, not(target_os = "linux"), not(target_os = "macos")))]
+        let advice = libc::MADV_DONTDUMP;
 
-// ANCHOR[contextra-sys:MLOCK-LOCK-WIN32-001]
-/// Sperrt unter Windows eine Speicherregion im RAM gemäß der übergebenen [`MemLockPolicy`].
-///
-/// # Ablauf
-/// 1. Behandelt Nullzeiger oder Nulllänge sofort mit `Ok(true)`.
-/// 2. Ruft die Win32-API-Funktion `VirtualLock` auf.
-/// 3. Gibt bei Erfolg `Ok(true)` zurück.
-/// 4. Scheitert `VirtualLock`:
-///    - Bei [`MemLockPolicy::FailClosed`] Rückgabe eines Fehlers.
-///    - Bei [`MemLockPolicy::Tolerant`] Warnung via `tracing` und Rückgabe von `Ok(false)`.
-#[cfg(windows)]
-pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
-    if len == 0 || ptr.is_null() {
-        return Ok(true);
-    }
-    // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes gültig allokierten Speicher. `VirtualLock` pinnt Seiten im physischen RAM.
-    let ret = unsafe {
-        windows_sys::Win32::System::Memory::VirtualLock(ptr as *const std::ffi::c_void, len)
-    };
-    if ret == 0 {
-        let err = Error::last_os_error();
-        match policy {
-            MemLockPolicy::FailClosed => Err(Error::new(
-                err.kind(),
-                format!(
-                    "VirtualLock() failed for region at {:p} (len={}): {} (FailClosed)",
-                    ptr, len, err
-                ),
-            )),
-            MemLockPolicy::Tolerant => {
-                tracing::warn!(
-                    "VirtualLock() failed for memory region at {:p} (len={}): {}. \
-                     Data remains unlocked in memory (swap-risk, Tolerant).",
-                    ptr,
-                    len,
-                    err
-                );
-                Ok(false)
-            }
-        }
-    } else {
-        Ok(true)
-    }
-}
-
-// ANCHOR[contextra-sys:MLOCK-UNLOCK-WIN32-001]
-/// Entsperrt eine zuvor unter Windows gesperrte Speicherregion im RAM über `VirtualUnlock`.
-#[cfg(windows)]
-pub fn mem_unlock(addr: usize, len: usize) {
-    if len == 0 || addr == 0 {
-        return;
-    }
-    // SAFETY: `addr` und `len` referenzieren eine gültige Speicherallokation, die zuvor an `VirtualLock` übergeben wurde.
-    unsafe {
-        windows_sys::Win32::System::Memory::VirtualUnlock(addr as *const std::ffi::c_void, len);
-    }
-}
-
-// ANCHOR[contextra-sys:MLOCK-FALLBACK-001]
-/// Fallback-Implementierung für Zielarchitekturen, die weder Unix noch Windows unterstützen.
-///
-/// # Fehlerfälle
-/// Liefert bei [`MemLockPolicy::FailClosed`] und `len > 0` stets einen `Unsupported`-Fehler.
-#[cfg(not(any(unix, windows)))]
-pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
-    if len == 0 || ptr.is_null() {
-        return Ok(true);
-    }
-    match policy {
-        MemLockPolicy::FailClosed => Err(Error::new(
-            std::io::ErrorKind::Unsupported,
-            "Memory locking is not supported on this target architecture (FailClosed)",
-        )),
-        MemLockPolicy::Tolerant => {
-            tracing::warn!(
-                "Memory locking is not supported on this target architecture for region at {:p} (len={}).",
-                ptr,
-                len
+        // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes gültig allokierten Speicher.
+        let ret = unsafe { libc::madvise(ptr as *mut libc::c_void, len, advice) };
+        if ret != 0 {
+            let err = IoError::last_os_error();
+            let errno = err.raw_os_error().unwrap_or(0);
+            tracing::debug!(
+                "madvise(DONTDUMP) advisory call returned errno {}: {}",
+                errno,
+                err
             );
-            Ok(false)
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = (ptr, len);
+    }
+
+    Ok(())
+}
+
+// ANCHOR[contextra-sys:MLOCK-LOCK-TYPED-001]
+/// Sperrt eine Speicherregion im RAM gemäß Richtlinie und liefert ein typisiertes [`Result<bool>`].
+pub fn mem_lock_typed(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
+    if len == 0 || ptr.is_null() {
+        return Ok(true);
+    }
+
+    #[cfg(test)]
+    if let Some(injected_errno) = fault_injection::should_fail_mlock() {
+        return match policy {
+            MemLockPolicy::FailClosed => Err(Error::MemoryLockFailed {
+                errno: injected_errno,
+                reason: "injected mlock fault",
+            }),
+            MemLockPolicy::Tolerant => {
+                tracing::warn!(
+                    "mlock() failed for memory region at {:p} (len={}): injected fault. \
+                     Data remains unlocked in memory (swap-risk, Tolerant).",
+                    ptr,
+                    len
+                );
+                Ok(false)
+            }
+        };
+    }
+
+    #[cfg(unix)]
+    {
+        // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes allokierten Speicher.
+        let ret = unsafe { libc::mlock(ptr as *const libc::c_void, len) };
+        if ret != 0 {
+            let err = IoError::last_os_error();
+            let errno = err.raw_os_error().unwrap_or(0);
+            match policy {
+                MemLockPolicy::FailClosed => Err(Error::MemoryLockFailed {
+                    errno,
+                    reason: "mlock system call failed",
+                }),
+                MemLockPolicy::Tolerant => {
+                    tracing::warn!(
+                        "mlock() failed for memory region at {:p} (len={}): {}. \
+                         Data remains unlocked in memory (swap-risk, Tolerant).",
+                        ptr,
+                        len,
+                        err
+                    );
+                    Ok(false)
+                }
+            }
+        } else {
+            let _ = apply_dont_dump(ptr, len);
+            Ok(true)
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes gültig allokierten Speicher.
+        let ret = unsafe {
+            windows_sys::Win32::System::Memory::VirtualLock(ptr as *const std::ffi::c_void, len)
+        };
+        if ret == 0 {
+            let err = IoError::last_os_error();
+            let errno = err.raw_os_error().unwrap_or(0);
+            match policy {
+                MemLockPolicy::FailClosed => Err(Error::MemoryLockFailed {
+                    errno,
+                    reason: "VirtualLock Win32 API call failed",
+                }),
+                MemLockPolicy::Tolerant => {
+                    tracing::warn!(
+                        "VirtualLock() failed for memory region at {:p} (len={}): {}. \
+                         Data remains unlocked in memory (swap-risk, Tolerant).",
+                        ptr,
+                        len,
+                        err
+                    );
+                    Ok(false)
+                }
+            }
+        } else {
+            Ok(true)
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        match policy {
+            MemLockPolicy::FailClosed => Err(Error::Unsupported(
+                "Memory locking is not supported on this target architecture (FailClosed)",
+            )),
+            MemLockPolicy::Tolerant => {
+                tracing::warn!(
+                    "Memory locking is not supported on this target architecture for region at {:p} (len={}).",
+                    ptr,
+                    len
+                );
+                Ok(false)
+            }
         }
     }
 }
 
-// ANCHOR[contextra-sys:MLOCK-UNLOCK-FALLBACK-001]
-/// Fallback No-Op zum Entsperren von Speicher auf nicht unterstützten Plattformen.
-#[cfg(not(any(unix, windows)))]
-pub fn mem_unlock(_addr: usize, _len: usize) {}
+// ANCHOR[contextra-sys:MLOCK-LOCK-WITH-POLICY-001]
+/// Sperrt unter POSIX/Windows eine Speicherregion im RAM, um das Auslagern (Swapping) zu verhindern.
+pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> IoResult<bool> {
+    mem_lock_typed(ptr, len, policy).map_err(Into::into)
+}
+
+// ANCHOR[contextra-sys:MLOCK-UNLOCK-001]
+/// Entsperrt eine zuvor gesperrte Speicherregion im RAM.
+pub fn mem_unlock(addr: usize, len: usize) {
+    if len == 0 || addr == 0 {
+        return;
+    }
+
+    #[cfg(unix)]
+    {
+        // SAFETY: `addr` und `len` referenzieren eine zuvor gesperrte Region.
+        unsafe {
+            libc::munlock(addr as *mut libc::c_void, len);
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // SAFETY: `addr` und `len` referenzieren eine zuvor an `VirtualLock` übergebene Region.
+        unsafe {
+            windows_sys::Win32::System::Memory::VirtualUnlock(addr as *const std::ffi::c_void, len);
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (addr, len);
+    }
+}
 
 // ANCHOR[contextra-sys:MLOCK-CONVENIENCE-001]
 /// Sperrt eine Speicherregion im RAM mit der Standard-Richtlinie [`MemLockPolicy::Tolerant`].
-///
-/// Gibt `true` zurück, falls das Sperren erfolgreich war, oder `false`, falls das Betriebssystem
-/// das Sperren verweigert hat (z. B. wegen Ressourcenbeschränkungen).
 pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
-    mem_lock_with_policy(ptr, len, MemLockPolicy::Tolerant).unwrap_or(false)
+    mem_lock_typed(ptr, len, MemLockPolicy::Tolerant).unwrap_or(false)
 }
 
 // ANCHOR[contextra-sys:MLOCK-TESTS-001]
@@ -205,16 +247,14 @@ pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
 mod tests {
     use super::*;
 
-    // ANCHOR[contextra-sys:MLOCK-TEST-NULL-001]
-    // Prüft, dass Nullzeiger und Nulllänge von allen Policies ohne Fehler und ohne Systemaufruf akzeptiert werden.
     #[test]
     fn test_mem_lock_null_or_zero_len() -> Result<()> {
-        assert!(mem_lock_with_policy(
+        assert!(mem_lock_typed(
             std::ptr::null(),
             0,
             MemLockPolicy::FailClosed
         )?);
-        assert!(mem_lock_with_policy(
+        assert!(mem_lock_typed(
             std::ptr::null(),
             0,
             MemLockPolicy::Tolerant
@@ -224,51 +264,42 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:MLOCK-TEST-TOLERANT-001]
-    // Prüft das Sperren eines gültigen Puffers im toleranten Modus und anschließendes Entsperren.
     #[test]
     fn test_mem_lock_valid_slice_tolerant() -> Result<()> {
         let buf = vec![0u8; 1024];
         let ptr = buf.as_ptr();
         let len = buf.len();
 
-        let ok = mem_lock_with_policy(ptr, len, MemLockPolicy::Tolerant)?;
+        let ok = mem_lock_typed(ptr, len, MemLockPolicy::Tolerant)?;
         if ok {
             mem_unlock(ptr as usize, len);
         }
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:MLOCK-TEST-FAILCLOSED-OK-001]
-    // Prüft das Verhalten im FailClosed-Modus für einen regulären Speicherpuffer.
     #[test]
     fn test_mem_lock_valid_slice_fail_closed_or_ok() {
         let buf = vec![0u8; 1024];
         let ptr = buf.as_ptr();
         let len = buf.len();
 
-        let res = mem_lock_with_policy(ptr, len, MemLockPolicy::FailClosed);
+        let res = mem_lock_typed(ptr, len, MemLockPolicy::FailClosed);
         if let Ok(true) = res {
             mem_unlock(ptr as usize, len);
         }
     }
 
-    // ANCHOR[contextra-sys:MLOCK-TEST-SIM-FAILCLOSED-001]
-    // Simuliert einen Fehler durch Übergabe einer ungemappten Adresse im FailClosed-Modus und erwartet Err.
     #[test]
     fn test_mem_lock_invalid_address_fail_closed_simulation() {
-        // Pass a dangling non-null pointer with unmapped address to simulate mlock failure.
         let invalid_ptr = (usize::MAX - 4096) as *const u8;
-        let res = mem_lock_with_policy(invalid_ptr, 4096, MemLockPolicy::FailClosed);
+        let res = mem_lock_typed(invalid_ptr, 4096, MemLockPolicy::FailClosed);
         assert!(res.is_err());
     }
 
-    // ANCHOR[contextra-sys:MLOCK-TEST-SIM-TOLERANT-001]
-    // Simuliert einen Fehler durch ungültige Adresse im Tolerant-Modus und prüft, dass false ohne Err zurückkehrt.
     #[test]
     fn test_mem_lock_invalid_address_tolerant_simulation() -> Result<()> {
         let invalid_ptr = (usize::MAX - 4096) as *const u8;
-        let res = mem_lock_with_policy(invalid_ptr, 4096, MemLockPolicy::Tolerant)?;
+        let res = mem_lock_typed(invalid_ptr, 4096, MemLockPolicy::Tolerant)?;
         assert!(!res);
         Ok(())
     }

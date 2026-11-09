@@ -23,6 +23,7 @@
 // --- Lokale Grundabstraktionen (B3, B4, B11) ---
 
 pub mod clock;
+pub mod contract;
 pub mod error;
 pub mod rng;
 pub mod strategy;

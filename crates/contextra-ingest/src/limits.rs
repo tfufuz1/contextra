@@ -42,6 +42,8 @@ pub struct IngestLimits {
     pub max_pages: u32,
     /// Maximale Anzahl extrahierter Tabellenzellen (Standard: 5_000_000)
     pub max_table_cells: u64,
+    /// Maximale Pfadlänge von Einträgen in Archiven (Standard: 1024 Zeichen)
+    pub max_path_len: usize,
 }
 
 impl Default for IngestLimits {
@@ -58,6 +60,7 @@ impl Default for IngestLimits {
             max_text_bytes: 64 * 1024 * 1024,
             max_pages: 5_000,
             max_table_cells: 5_000_000,
+            max_path_len: 1024,
         }
     }
 }

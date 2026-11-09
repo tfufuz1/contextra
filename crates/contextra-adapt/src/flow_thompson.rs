@@ -43,25 +43,6 @@ pub enum FcTsError {
     InvalidConfig(String),
 }
 
-#[cfg(feature = "types-compat")]
-impl From<FcTsError> for contextra_types::ContextraError {
-    fn from(err: FcTsError) -> Self {
-        match err {
-            FcTsError::DimensionMismatch { expected, actual } => {
-                contextra_types::ContextraError::InvalidInput(format!(
-                    "Embedding dimension mismatch: expected {expected}, actual {actual}"
-                ))
-            }
-            FcTsError::NonFinite => contextra_types::ContextraError::InvalidInput(
-                "Non-finite numerical value encountered".to_string(),
-            ),
-            FcTsError::InvalidConfig(msg) => contextra_types::ContextraError::InvalidInput(
-                format!("Invalid configuration: {msg}"),
-            ),
-        }
-    }
-}
-
 /// Trait für deterministischen Zufallszahlengenerator im Thompson-Sampling.
 // ANCHOR[contextra-adapt:FCTS-RNG-TRAIT-001]
 pub trait FcTsRng {
@@ -110,7 +91,7 @@ impl FcTsRng for SplitMix64 {
 }
 
 /// Konfigurationsparameter für Flow-Corrected Thompson Sampling (§21.3).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-adapt:FCTS-CONFIG-001]
 pub struct FcTsConfig {
     /// Feature-Dimension $d$.
@@ -688,15 +669,6 @@ impl DiagonalApproximationBandit {
             propensities: pairs.into_iter().collect(),
         }
     }
-    /// Erstellt eine `DiagonalApproximationBandit`-Instanz aus `contextra_types::RetrievalStrategy`-Paaren.
-    #[cfg(feature = "types-compat")]
-    pub fn from_compat_pairs(
-        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
-    ) -> Self {
-        Self {
-            propensities: pairs.into_iter().map(|(s, p)| (s.into(), p)).collect(),
-        }
-    }
 
     /// Liefert die Propensity P(a | x) für eine gegebene RetrievalStrategy.
     pub fn propensity(&self, strategy: crate::strategy::RetrievalStrategy) -> f32 {
@@ -724,13 +696,6 @@ pub enum OffPolicyError {
     /// Ein Arm hat Propensity 0 unter der Referenzpolicy, aber eine positive FC-TS-Sampling-Wahrscheinlichkeit.
     #[error("arm {0:?} has zero propensity under reference policy but positive FC-TS sampling probability — IPS weight would diverge")]
     ZeroPropensityViolation(crate::strategy::RetrievalStrategy),
-}
-
-#[cfg(feature = "types-compat")]
-impl From<OffPolicyError> for contextra_types::ContextraError {
-    fn from(err: OffPolicyError) -> Self {
-        contextra_types::ContextraError::InvalidInput(err.to_string())
-    }
 }
 
 /// Sampling-Wahrscheinlichkeitsverteilung über FC-TS-Arme/Strategien (§B.3.2).
@@ -766,15 +731,6 @@ impl FcTsSamplingDistribution {
     ) -> Self {
         Self {
             probabilities: pairs.into_iter().collect(),
-        }
-    }
-    /// Erstellt eine `FcTsSamplingDistribution`-Instanz aus `contextra_types::RetrievalStrategy`-Paaren.
-    #[cfg(feature = "types-compat")]
-    pub fn from_compat_pairs(
-        pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
-    ) -> Self {
-        Self {
-            probabilities: pairs.into_iter().map(|(s, p)| (s.into(), p)).collect(),
         }
     }
 

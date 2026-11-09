@@ -1,4 +1,4 @@
 [crates.contextra-adapt]
 klasse = "A"
 may_depend_on = []          # Soll nach Abschluss dieses Auftrags (interne Crates, nur Namen)
-transitional = ["types-compat", "ports-compat"]  # Features/Kanten mit internen Deps, Entfernung in Welle 6
+transitional = []           # Vollständig entkoppelt (MISSION ADAPT-1)

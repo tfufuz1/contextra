@@ -8,8 +8,6 @@
 // ZWECK: Snapshot-Vergleich, der garantiert, dass Isotonic- und Platt-Kalibrierung nach dem Verschieben nach contextra-rank identische Ergebnisse liefern.
 
 use contextra_rank::{IsotonicCalibrator, PlattScaler};
-
-// ANCHOR[contextra-rank:CAL-TEST-003]
 #[test]
 fn test_isotonic_migration_snapshot() {
     let mut calibrator = IsotonicCalibrator::new(10, 100);

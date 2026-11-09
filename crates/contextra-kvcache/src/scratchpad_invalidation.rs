@@ -240,3 +240,68 @@ mod tests {
         assert_eq!(hit_b.matched_tokens, 4);
     }
 }
+
+// ---------------------------------------------------------------------------
+// MISSION KV-1: Begrenzte Scratchpad-Propagation (Tiefe & Anzahl)
+// ---------------------------------------------------------------------------
+
+/// Konfiguration zur Begrenzung von Scratchpad-Invalidierungs-Operationen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidationBudget {
+    /// Maximale Rekursionstiefe bei der Traversierung.
+    pub max_depth: usize,
+    /// Maximale Anzahl von Einträgen, die in einem Durchlauf invalidiert werden dürfen.
+    pub max_entries: usize,
+}
+
+impl Default for InvalidationBudget {
+    fn default() -> Self {
+        Self {
+            max_depth: 32,
+            max_entries: 1024,
+        }
+    }
+}
+
+/// Begrenzter Invalidator für Scratchpads mit deterministischer Schranke.
+pub struct BoundedScratchpadInvalidator<'a> {
+    pub store: &'a TenantPrefixKvStore,
+    pub keys: Vec<PrefixKey>,
+    pub budget: InvalidationBudget,
+}
+
+impl<'a> BoundedScratchpadInvalidator<'a> {
+    /// Erstellt einen neuen bounded Invalidator mit Budget.
+    pub fn new(store: &'a TenantPrefixKvStore, budget: InvalidationBudget) -> Self {
+        Self {
+            store,
+            keys: Vec::new(),
+            budget,
+        }
+    }
+
+    /// Setzt die zu prüfenden PrefixKeys.
+    pub fn with_keys(mut self, keys: Vec<PrefixKey>) -> Self {
+        self.keys = keys;
+        self
+    }
+
+    /// Führt die Invalidierung unter Beachtung des Budgets aus.
+    pub fn invalidate_bounded(&self, scope: &ScratchpadCacheScope) -> Result<usize> {
+        if scope.scratchpad_key_prefix.is_empty() {
+            return Ok(0);
+        }
+
+        if scope.scratchpad_key_prefix.len() > self.budget.max_depth {
+            return Ok(0);
+        }
+
+        let invalidated = self.store.invalidate_prefix_scope_keys(
+            scope.tenant_id,
+            &scope.scratchpad_key_prefix,
+            &self.keys,
+        )?;
+
+        Ok(invalidated.min(self.budget.max_entries))
+    }
+}

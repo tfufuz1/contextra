@@ -9,7 +9,6 @@ use crate::local_types::ConfigFingerprint;
 
 /// Platt Scaler for parametric logit/score calibration.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-rank:PLATT-001]
 /// Parametrischer Kalibrierer nach Platt (1999).
 pub struct PlattScaler {
     a: f32,
@@ -71,7 +70,6 @@ impl PlattScaler {
     }
 
     /// Applies Platt Scaling `sigmoid(A * logit + B)`.
-    // ANCHOR[contextra-rank:PLATT-002]
     /// Führt die logistische Transformation `sigmoid(A * logit + B)` aus.
     pub fn transform(&self, logit: f32) -> f32 {
         if !logit.is_finite() {
@@ -101,7 +99,6 @@ impl PlattScaler {
 
     /// Fits parameters `A` and `B` via Negative Log-Likelihood minimization with L2 regularization
     /// and target smoothing (Platt, 1999).
-    // ANCHOR[contextra-rank:PLATT-003]
     /// Trainiert die Parameter A und B anhand von Beobachtungen mittels Gradientenabstieg.
     pub fn fit(observations: &[(f32, bool)]) -> Self {
         let valid_obs: Vec<(f32, bool)> = observations

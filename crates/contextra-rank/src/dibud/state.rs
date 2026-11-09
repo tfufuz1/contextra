@@ -17,7 +17,6 @@ const RRF_K: f32 = 60.0;
 
 /// Represents the step action requested by `DiBudFusionState::next_request`.
 #[derive(Debug, Clone, PartialEq)]
-// ANCHOR[contextra-rank:DIBUD-004]
 /// Nächste durchzuführende Aktion im DiBud-Zustandsautomaten.
 pub enum DiBudStep {
     /// Request reading the next item from the specified channel.
@@ -35,7 +34,6 @@ struct ObservedDocState {
 
 /// Core state machine tracking channel depths, observed document scores, and prefix certification.
 #[derive(Debug, Clone)]
-// ANCHOR[contextra-rank:DIBUD-005]
 /// Zustandsautomat für die budgetierte Streaming-Rangfusion.
 pub struct DiBudFusionState {
     channel_depths: [usize; 3],
@@ -125,7 +123,6 @@ impl DiBudFusionState {
     }
 
     /// Determines whether fusion is done or returns the next channel to poll.
-    // ANCHOR[contextra-rank:DIBUD-006]
     /// Bestimmt die nächste Abfrageaktion oder schließt die Fusion ab.
     pub fn next_request(&self, budget: &FusionBudget) -> DiBudStep {
         let (ranked, certified_len) = self.certify_prefix(budget);

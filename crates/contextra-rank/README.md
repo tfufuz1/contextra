@@ -21,36 +21,27 @@ python3 tools/export_crate.py contextra-rank --out /pfad/zu/deinem/projekt
 ## Minimalbeispiel (RRF-Fusion)
 
 ```rust
-use ahash::AHashSet;
-use contextra_rank::fusion::{reciprocal_rank_fusion, SearchResult};
-use contextra_rank::metrics::reciprocal_rank;
+use contextra_rank::fusion::{rrf_fuse, ScoredItem};
+use contextra_rank::calibration::{calibrate_score, Calibrator, PlattScaler};
 
-// Suchergebnisse aus zwei Signalquellen definieren
-let bm25_set = vec![SearchResult {
-    id: "doc_1".to_string(),
-    score: 12.0,
-    metadata: None,
-    matched_signals: vec!["bm25".to_string()],
-    provenance: None,
-}];
-let vector_set = vec![SearchResult {
-    id: "doc_1".to_string(),
-    score: 0.95,
-    metadata: None,
-    matched_signals: vec!["vector".to_string()],
-    provenance: None,
-}];
+// 1. Multi-Signal-Fusion via rrf_fuse
+let bm25_list = vec![
+    ScoredItem::new("doc_1", 12.0),
+    ScoredItem::new("doc_2", 8.5),
+];
+let vector_list = vec![
+    ScoredItem::new("doc_2", 0.95),
+    ScoredItem::new("doc_1", 0.82),
+];
 
-// RRF-Fusion
-let fused = reciprocal_rank_fusion(vec![bm25_set, vector_set], 10);
+let fused = rrf_fuse(&[bm25_list, vector_list], 60).unwrap();
 assert_eq!(fused.first().map(|r| r.id.as_str()), Some("doc_1"));
 
-// Evaluierung
-let mut relevant = AHashSet::new();
-relevant.insert("doc_1");
-let ranked_ids: Vec<&str> = fused.iter().map(|r| r.id.as_str()).collect();
-let rr = reciprocal_rank(&ranked_ids, &relevant);
-assert_eq!(rr, 1.0);
+// 2. Score-Kalibrierung via calibrate_score
+let platt = PlattScaler::new(1.5, -0.2);
+let calibrator = Calibrator::platt(platt);
+let calibrated_prob = calibrate_score(0.85, &calibrator).unwrap();
+assert!(calibrated_prob >= 0.0 && calibrated_prob <= 1.0);
 ```
 
 ## Garantien & Nicht-Ziele

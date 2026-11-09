@@ -7,7 +7,7 @@
 
 /// Diskrepanz-Eintrag: Baseline-Ergebnis vs. Kandidaten-Ergebnis, ohne Einfluss auf das
 /// tatsächlich zurückgegebene Nutzerergebnis (§12 Integrationsregel).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ShadowDiscrepancy<T> {
     /// Das Ergebnis des etablierten Baseline-Algorithmus.
     pub baseline: T,

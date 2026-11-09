@@ -17,14 +17,14 @@ pub(crate) type TombstoneSet = roaring::RoaringTreemap;
 #[cfg(feature = "docid-128")]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TombstoneSet {
-    pub(crate) set: std::collections::HashSet<u128>,
+    pub(crate) set: std::collections::BTreeSet<u128>,
 }
 
 #[cfg(feature = "docid-128")]
 impl TombstoneSet {
     pub(crate) fn new() -> Self {
         Self {
-            set: std::collections::HashSet::new(),
+            set: std::collections::BTreeSet::new(),
         }
     }
 

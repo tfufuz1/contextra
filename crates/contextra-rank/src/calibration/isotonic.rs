@@ -35,7 +35,7 @@ impl SystemClock {
 impl Clock for SystemClock {
     #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn now_unix_nanos(&self) -> u64 {
-        std::time::SystemTime::now()
+        std::time::SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28)
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0)
@@ -43,7 +43,7 @@ impl Clock for SystemClock {
 
     #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn monotonic_nanos(&self) -> u64 {
-        std::time::SystemTime::now()
+        std::time::SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28)
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0)
@@ -79,9 +79,10 @@ const DEFAULT_WARMUP_REQUIRED: u32 = 50;
 const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
+use serde::{Deserialize, Serialize};
+
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
-#[derive(Clone)]
-// ANCHOR[contextra-rank:ISO-001]
+#[derive(Clone, Serialize, Deserialize)]
 /// Nicht-parametrischer Kalibrierer auf Basis von PAVA.
 pub struct IsotonicCalibrator {
     observations: VecDeque<(f32, bool)>,
@@ -93,7 +94,26 @@ pub struct IsotonicCalibrator {
     fingerprint: Option<ConfigFingerprint>,
     last_calibration_at: Option<u64>,
     cached_ece: Option<f32>,
+    #[serde(skip, default = "_default_clock")]
     clock: Arc<dyn Clock>,
+}
+
+fn _default_clock() -> Arc<dyn Clock> {
+    Arc::new(SystemClock::new())
+}
+
+impl PartialEq for IsotonicCalibrator {
+    fn eq(&self, other: &Self) -> bool {
+        self.observations == other.observations
+            && self.warmup_required == other.warmup_required
+            && self.max_observations == other.max_observations
+            && self.cached_model == other.cached_model
+            && self.model_dirty == other.model_dirty
+            && self.observations_since_rebuild == other.observations_since_rebuild
+            && self.fingerprint == other.fingerprint
+            && self.last_calibration_at == other.last_calibration_at
+            && self.cached_ece == other.cached_ece
+    }
 }
 
 impl fmt::Debug for IsotonicCalibrator {
@@ -152,7 +172,6 @@ impl IsotonicCalibrator {
     }
 
     /// Records a new observation `(raw_score, outcome)`. Non-finite `raw_score` values are safely ignored.
-    // ANCHOR[contextra-rank:ISO-002]
     /// Nimmt eine neue Beobachtung `(raw_score, outcome)` auf.
     pub fn record_outcome(&mut self, raw_score: f32, outcome: bool) {
         if !raw_score.is_finite() {
@@ -191,7 +210,6 @@ impl IsotonicCalibrator {
     }
 
     /// Returns calibrated probability if warm, or `None` if below warmup requirement.
-    // ANCHOR[contextra-rank:ISO-003]
     /// Liefert die kalibrierte Wahrscheinlichkeit für einen Roh-Score.
     pub fn calibrated_probability(&mut self, raw_score: f32) -> Option<f32> {
         if !self.is_calibrated() {
@@ -231,8 +249,6 @@ impl IsotonicCalibrator {
             self.cached_ece = None;
         }
     }
-
-    // ANCHOR[contextra-rank:ISO-004]
     // Ablauf des PAVA-Rebuilds (Pool-Adjacent Violators Algorithm):
     // 1. Sortieren: Beobachtungen aufsteigend nach raw_score ordnen.
     // 2. Pooling: Identische Scores zusammenfassen und Labels akkumulieren.

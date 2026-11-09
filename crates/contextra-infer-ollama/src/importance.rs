@@ -7,9 +7,9 @@
 
 //! LLM-based Memory Importance scoring using Ollama generate_text.
 
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::client::xml_escape;
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 use crate::OllamaClient;
 use crate::error::{LocalImportanceScore, OllamaError, Result};
 use parking_lot::Mutex;
@@ -36,7 +36,7 @@ pub trait ImportanceCalibrator: Send + Sync {
 /// # Performance
 /// Spawns one tokio task per chunk up to `max_concurrent` (default: 8).
 /// Uses `futures::stream::buffer_unordered` to limit concurrency without blocking.
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub async fn score_importance_batch(
     client: &Arc<OllamaClient>,
     chunks: &[&str],
@@ -175,7 +175,7 @@ fn get_score_regex() -> Result<&'static Regex> {
 /// - Returns `OllamaError::InvalidInput` if `chunk_text` is empty.
 /// - Returns `ContextraError::Storage` / `ContextraError::Io` on network or Ollama API errors.
 // AI-TAG[ML-SCORING][MAJOR] RESOLVED: Score importance enriches output with model_id provenance and optional calibrated_confidence via IsotonicCalibrator. Post-hoc outcome feedback interface record_importance_outcome added (ID: AGT-OLLAMA-14c0c140) (TS: 2026-09-07T06:00:00Z) (SESSION: jules)
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub async fn score_importance(
     client: &OllamaClient,
     chunk_text: &str,
@@ -187,7 +187,7 @@ pub async fn score_importance(
 ///
 /// Populates `model_id` provenance from `client.config().model` and enriches
 /// `calibrated_confidence` when the calibrator has completed warmup.
-#[cfg(feature = "http")]
+#[cfg(feature = "client")]
 pub async fn score_importance_with_calibrator(
     client: &OllamaClient,
     chunk_text: &str,
@@ -279,22 +279,22 @@ pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessme
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     use crate::OllamaClient;
     use super::*;
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_batch_empty_returns_empty() {
         let client = Arc::new(OllamaClient::new("http://localhost:11434"));
         let res = score_importance_batch(&client, &[], None, 8).await;
         assert!(res.is_empty());
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_batch_preserves_order() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -350,9 +350,9 @@ mod tests {
         assert_eq!(results[4].value(), 0.5);
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_batch_single_error_doesnt_kill_batch() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -397,18 +397,18 @@ mod tests {
         assert_eq!(results[2].value(), 0.7);
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_empty_text_error() {
         let client = OllamaClient::new("http://localhost:11434");
         let res = score_importance(&client, "   ").await;
         assert!(matches!(res, Err(OllamaError::InvalidInput(_))));
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_mock_success() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -444,9 +444,9 @@ mod tests {
         assert!(assessment.is_parsed());
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_mock_invalid_response_error() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap
@@ -548,9 +548,9 @@ mod tests {
         assert!(logs_contain("Completely unparseable model response string"));
     }
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     #[tokio::test]
-    #[cfg(feature = "http")]
+    #[cfg(feature = "client")]
     async fn test_score_importance_with_calibrator_provenance_and_warmup() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
         let addr = listener.local_addr().unwrap(); // unwrap

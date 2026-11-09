@@ -131,10 +131,10 @@ fn child_truncation_runner() {
             hnsw.insert(tx, ids[i], &vectors[i]).await.unwrap();
         }
         hnsw.commit(tx).await.unwrap();
-        hnsw.save(&hnsw_path).await.unwrap();
+        hnsw.save(&hnsw_path).unwrap();
 
         let hnsw_mmap = HnswIndex::try_new(hnsw_config).unwrap();
-        hnsw_mmap.load_mmap(&hnsw_path).await.unwrap();
+        hnsw_mmap.load_mmap(&hnsw_path).unwrap();
 
         let mmap_index = MmapIndex::open(&hnsw_path).unwrap();
 
@@ -235,10 +235,10 @@ fn child_deletion_runner() {
             hnsw.insert(tx, ids[i], &vectors[i]).await.unwrap();
         }
         hnsw.commit(tx).await.unwrap();
-        hnsw.save(&hnsw_path).await.unwrap();
+        hnsw.save(&hnsw_path).unwrap();
 
         let hnsw_mmap = HnswIndex::try_new(hnsw_config).unwrap();
-        hnsw_mmap.load_mmap(&hnsw_path).await.unwrap();
+        hnsw_mmap.load_mmap(&hnsw_path).unwrap();
 
         println!("Deleting index files from filesystem...");
         #[cfg(feature = "experimental-diskann")]

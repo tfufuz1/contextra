@@ -233,10 +233,10 @@ proptest! {
 }
 
 // ANCHOR[contextra-simd:TEST-CROSS-1000-PAIRS]
-// Prüft 1000 normalisierte Zufallsvektorpaare auf strikte Äquivalenz (Delta < 1e-4).
+// Prüft 1000 normalisierte Zufallsvektorpaare auf strikte Äquivalenz (Delta < 1e-4) bis Dimension 4097.
 #[test]
 fn test_s4_1000_pairs_equivalence_threshold() {
-    let dimensions = [128, 512, 1536, 4096];
+    let dimensions = [1, 3, 15, 17, 31, 33, 128, 512, 1536, 4096, 4097];
     let num_pairs = 1000;
 
     for &dim in &dimensions {

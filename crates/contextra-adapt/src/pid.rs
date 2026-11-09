@@ -124,7 +124,7 @@ impl PidController {
     /// ANTI-WINDUP: Führt Integral-Update nur durch, wenn Stellwert nicht gesättigt ist.
     pub fn update(&mut self, dt: Duration, measured_latency_ms: f32) -> usize {
         let current_pool = self.current_pool_size.unwrap_or(self.min_pool_size);
-        if !measured_latency_ms.is_finite() {
+        if !measured_latency_ms.is_finite() || dt.is_zero() {
             return current_pool;
         }
 
@@ -171,7 +171,7 @@ impl AntiWindupController for PidController {
         is_actuator_saturated: bool,
     ) -> usize {
         let current_pool = self.current_pool_size.unwrap_or(self.min_pool_size);
-        if !measured_latency_ms.is_finite() {
+        if !measured_latency_ms.is_finite() || dt.is_zero() {
             return current_pool;
         }
 

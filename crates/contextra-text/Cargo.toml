@@ -6,7 +6,7 @@ name = "contextra-text"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 description = "Contextra — Text processing and BM25 search for Hybrid Search"
 
 [package.metadata.contextra]
@@ -16,9 +16,12 @@ klasse = "A"
 [features]
 default = ["std", "types-compat"]
 std = []
+serde = []
+tracing = []
+inspect = []
+experimental = []
 types-compat = ["dep:contextra-types", "dep:contextra-ports"]
 ports-compat = ["types-compat"]
-inspect = []
 bm25f = []
 docid-128 = []
 

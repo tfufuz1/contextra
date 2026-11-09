@@ -1,8 +1,7 @@
-// FILE-CONTEXT
-// STAND: 2026-10-28T00:00:00Z
-// ZWECK: Low-level POSIX syscall wrappers (Ring 0 / SPEC 7.7)
-// INVARIANTEN: Zero panic; typed io::Error propagation; single safe abstractions over libc syscalls
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
+// STAND: 2026-11-08T00:00:00Z
+// ZWECK: Low-level POSIX syscall wrappers (Ring 0 / SPEC §10.1)
+// INVARIANTEN: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls
+// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
 
 //! # Modul: POSIX-Systemaufrufe (`posix`)
 //!
@@ -21,31 +20,22 @@ use std::path::Path;
 
 // ANCHOR[contextra-sys:POSIX-DUP2-001]
 /// Öffnet den Pfad `path` mit den angegebenen POSIX-Flags (z. B. `O_RDONLY`) und ersetzt atomar `target_fd` via `dup2`.
-///
-/// # Ablauf
-/// 1. Konvertiert den Dateipfad `path` in einen nullterminierten C-String ([`std::ffi::CString`]).
-/// 2. Öffnet die Datei mittels `libc::open(path_c.as_ptr(), flags)`. Schlägt dies fehl (`fd < 0`), wird der OS-Fehler zurückgegeben.
-/// 3. Dupliziert den neu erhaltenen Deskriptor mit `libc::dup2(fd, target_fd)` auf das Ziellimit.
-/// 4. Schließt den temporären Zwischendeskriptor `fd` über `libc::close(fd)`.
-///
-/// # Vorbedingungen
-/// - `path` darf kein Null-Byte (`\0`) im Dateipfad enthalten.
-/// - `target_fd` muss ein gültiger Deskriptorindex sein.
-///
-/// # Nachbedingungen
-/// - `target_fd` zeigt nun auf dieselbe offene Dateitabelle wie der neu geöffnete Pfad.
-///
-/// # Fehlerfälle
-/// Gibt einen [`std::io::Error`] zurück, wenn die Pfadkonvertierung ungültig ist oder einer der Systemaufrufe fehlschlägt.
 #[cfg(target_os = "linux")]
 pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
 
+    if target_fd < 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "target_fd must be non-negative",
+        ));
+    }
+
     let path_c = CString::new(path.as_os_str().as_bytes())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-    // SAFETY: `path_c` ist ein gültiger nullterminierter C-String. `target_fd` ist eine ganzzahlige Deskriptornummer. `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
+    // SAFETY: `path_c` ist ein gültiger nullterminierter C-String. `target_fd` ist validiert >= 0. `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
     unsafe {
         let fd = libc::open(path_c.as_ptr(), flags);
         if fd < 0 {
@@ -62,9 +52,6 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
 
 // ANCHOR[contextra-sys:POSIX-DUP2-FALLBACK-001]
 /// Fallback für Nicht-Linux-Systeme, auf denen `reopen_and_dup2` nicht unterstützt wird.
-///
-/// # Fehlerfälle
-/// Liefert stets [`std::io::ErrorKind::Unsupported`].
 #[cfg(not(target_os = "linux"))]
 pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()> {
     Err(std::io::Error::new(
@@ -75,17 +62,6 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
 
 // ANCHOR[contextra-sys:POSIX-ENSURE-FD-001]
 /// Stellt sicher, dass das weiche Limit für offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` beträgt.
-///
-/// # Ablauf
-/// 1. Liest das aktuelle Limit des Prozesses über `libc::getrlimit(RLIMIT_NOFILE, ...)`.
-/// 2. Ist das weiche Limit (`rlim_cur`) kleiner als `min_fds`:
-///    - Ermittelt das Ziel als Minimum aus `min_fds` und dem erlaubten harten Limit (`rlim_max`).
-///    - Versucht, das weiche Limit mittels `libc::setrlimit` heraufzusetzen.
-/// 3. Liest das Limit erneut aus und prüft, ob das aktuelle weiche Limit mindestens `min_fds` erreicht.
-/// 4. Gibt `true` zurück, wenn das geforderte Limit erreicht ist, andernfalls `false`.
-///
-/// # Nebenwirkungen
-/// Modifiziert das Prozessressourcenlimit für offene Dateien im Erfolgsfall.
 pub fn ensure_fd_limit(min_fds: u64) -> bool {
     #[cfg(unix)]
     {
@@ -120,11 +96,6 @@ pub fn ensure_fd_limit(min_fds: u64) -> bool {
 
 // ANCHOR[contextra-sys:POSIX-SET-FD-001]
 /// Setzt das weiche und harte Dateideskriptorlimit (`RLIMIT_NOFILE`) des aktuellen Prozesses exakt auf `limit`.
-///
-/// # Ablauf
-/// 1. Initialisiert eine `libc::rlimit`-Struktur mit `rlim_cur = limit` und `rlim_max = limit`.
-/// 2. Ruft `libc::setrlimit(RLIMIT_NOFILE, &rlim)` auf.
-/// 3. Liefert `true`, wenn der Rückgabewert `0` (Erfolg) ist, andernfalls `false`.
 pub fn set_fd_limit(limit: u64) -> bool {
     #[cfg(unix)]
     {
@@ -150,33 +121,25 @@ mod tests {
     use std::fs::File;
     use std::io::{Read, Write};
 
-    // ANCHOR[contextra-sys:POSIX-TEST-ENSURE-FD-001]
-    // Prüft, dass ein moderates Deskriptorlimit (64) problemlos zugesichert werden kann.
     #[test]
     fn test_ensure_fd_limit() {
         let ok = ensure_fd_limit(64);
         assert!(ok);
     }
 
-    // ANCHOR[contextra-sys:POSIX-TEST-ENSURE-FD-HIGH-001]
-    // Prüft den Aufruf mit einem hohen Deskriptorlimit (8192), ohne abzustürzen.
     #[test]
     fn test_ensure_fd_limit_high() {
         let _ = ensure_fd_limit(8192);
     }
 
-    // ANCHOR[contextra-sys:POSIX-TEST-SET-FD-001]
-    // Prüft das Setzen bzw. Sicherstellen des Deskriptorlimits auf 1024 Deskriptoren.
     #[test]
     fn test_set_fd_limit() {
         let ok = ensure_fd_limit(1024);
         assert!(ok);
     }
 
-    // ANCHOR[contextra-sys:POSIX-TEST-REOPEN-DUP2-001]
-    // Prüft das Ersetzen eines Dateideskriptors durch erneutes Öffnen einer Datei via `dup2`.
     #[test]
-    fn test_reopen_and_dup2() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_reopen_and_dup2() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let dir = std::env::temp_dir();
         let path = dir.join(format!(
             "contextra_sys_posix_test_{}.bin",
@@ -217,15 +180,13 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:POSIX-TEST-REOPEN-INVALID-001]
-    // Prüft, dass `reopen_and_dup2` bei einem ungültigen Dateipfad sauber einen Fehler liefert.
     #[test]
     fn test_reopen_and_dup2_invalid_path() {
         let invalid_path = Path::new("/nonexistent/file/path/dup2_test");
         let res = reopen_and_dup2(invalid_path, 999, 0);
-        #[cfg(target_os = "linux")]
         assert!(res.is_err());
-        #[cfg(not(target_os = "linux"))]
-        assert!(res.is_err());
+
+        let neg_res = reopen_and_dup2(invalid_path, -1, 0);
+        assert!(neg_res.is_err());
     }
 }
