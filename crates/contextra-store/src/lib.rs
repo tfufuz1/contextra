@@ -75,3 +75,6 @@ pub use manifest::{Manifest, ManifestEntry};
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+
+pub mod io_seam;
+pub use io_seam::{RealFs, RealFsFile, StoreIo};

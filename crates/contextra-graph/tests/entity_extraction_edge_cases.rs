@@ -10,8 +10,8 @@
 use contextra_graph::entity_extraction::{
     ingest_extracted_relations, EntityExtractor, ExtractedRelation, RuleBasedEntityExtractor,
 };
+use contextra_graph::types::DocId;
 use contextra_graph::CsrGraph;
-use contextra_types::DocId;
 
 #[test]
 fn test_empty_and_whitespace_and_punctuation_only_input() {
