@@ -241,3 +241,130 @@ async fn test_multi_level_sstable_and_wal_only_purge() {
         "WAL scanner must report remaining == 0 after purge"
     );
 }
+
+#[test]
+fn test_scanner_and_purger_without_runtime_returns_err() {
+    let dir = tempfile::tempdir().unwrap();
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let storage = rt.block_on(async {
+        let config = LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        Arc::new(LsmStorage::open(config).await.unwrap())
+    });
+
+    // Create scanners/purgers with empty runtime handle
+    let empty_runtime = ScannerRuntime::empty();
+    let scanners = lsm_scanners_with_runtime(&storage, empty_runtime.clone());
+    let purgers = lsm_purgers_with_runtime(&storage, empty_runtime);
+
+    let ctx = RequestContext::new(TenantId::try_new(99).unwrap(), TxId(1));
+    let target = ScanTarget::new("t:99:".to_string(), [0x99; 32]);
+    let clock = SystemClock::new();
+
+    // 1. Purger without runtime returns Err
+    let purge_res = purgers[0].purge(&ctx, &target);
+    assert!(
+        purge_res.is_err(),
+        "Purger without runtime handle must return Err"
+    );
+
+    // 2. All scanners without runtime return Err
+    for scanner in &scanners {
+        let scan_res = scanner.scan(&ctx, target.clone(), ScanTechnique::Structural, &clock);
+        assert!(
+            scan_res.is_err(),
+            "Scanner {:?} without runtime handle must return Err",
+            scanner.layer()
+        );
+    }
+}
+
+#[test]
+fn test_current_thread_and_multithread_runtime_parity() {
+    let dir = tempfile::tempdir().unwrap();
+
+    // 1. Setup data using a multithread runtime
+    let mt_rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let storage = mt_rt.block_on(async {
+        let config = LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let s = Arc::new(LsmStorage::open(config).await.unwrap());
+        let tenant_id = TenantId::try_new(42).unwrap();
+        let codec = TenantKeyCodec::new(tenant_id);
+        let key = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(7));
+        s.put(TxId(1), &key, b"parity_test_value").await.unwrap();
+        s.commit(TxId(1)).await.unwrap();
+        s.flush().await.unwrap();
+        s
+    });
+
+    let ctx = RequestContext::new(TenantId::try_new(42).unwrap(), TxId(10));
+    let target = ScanTarget::new("t:42:".to_string(), [0x42; 32]);
+    let clock = SystemClock::new();
+
+    // Run scan with multi-thread runtime
+    let mt_scanners = lsm_scanners_with_handle(&storage, mt_rt.handle().clone());
+    let mt_witness = mt_scanners[1] // SsTableAllLevels
+        .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
+        .expect("Multi-thread scan should succeed");
+
+    // Run scan with current-thread runtime
+    let ct_rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let ct_scanners = lsm_scanners_with_handle(&storage, ct_rt.handle().clone());
+    let ct_witness = ct_scanners[1]
+        .scan(&ctx, target, ScanTechnique::Structural, &clock)
+        .expect("Current-thread scan should succeed");
+
+    assert_eq!(
+        mt_witness.remaining(),
+        ct_witness.remaining(),
+        "Remaining count must match between MultiThread and CurrentThread runtimes"
+    );
+    assert_eq!(
+        mt_witness.scanned(),
+        ct_witness.scanned(),
+        "Scanned count must match between MultiThread and CurrentThread runtimes"
+    );
+    assert_eq!(
+        mt_witness.digest(),
+        ct_witness.digest(),
+        "Witness digest must match between MultiThread and CurrentThread runtimes"
+    );
+}
+
+#[tokio::test]
+async fn test_worker_panic_mapped_to_err() {
+    let handle = tokio::runtime::Handle::current();
+    let runtime = ScannerRuntime::with_handle(handle);
+
+    let res = runtime.block_on(async {
+        if true {
+            panic!("Simulierter Worker Panic in Port-Operation");
+        }
+        Ok::<(), contextra_types::ContextraError>(())
+    });
+
+    assert!(res.is_err(), "Panics in worker must be caught and mapped to Err");
+    let err_str = res.unwrap_err().to_string();
+    assert!(
+        err_str.contains("Simulierter Worker Panic"),
+        "Error message must contain panic payload message, got: {err_str}"
+    );
+}

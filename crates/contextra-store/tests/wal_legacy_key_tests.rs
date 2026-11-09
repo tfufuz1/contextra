@@ -46,7 +46,7 @@ async fn test_regular_open_rejects_legacy_integrity_key() {
         key: b"secret_key".to_vec(),
         value: b"secret_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 1, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();
@@ -82,7 +82,7 @@ async fn test_open_for_legacy_migration_accepts_and_logs_warning() {
         key: b"legacy_user_key".to_vec(),
         value: b"legacy_user_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 10, &legacy_key, [0u8; 32]).expect("legacy entry");
 
     let mut wal_bytes = Vec::new();
@@ -139,7 +139,7 @@ async fn test_fallback_remains_inactive_without_explicit_migration_call() {
         key: b"unmigrated_key".to_vec(),
         value: b"unmigrated_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 42, &legacy_key, [0u8; 32]).expect("entry");
 
     let mut wal_bytes = Vec::new();
@@ -181,7 +181,7 @@ async fn test_explicit_migrate_legacy_wal_produces_structured_audit_log_and_v3_s
         key: b"mig_key".to_vec(),
         value: b"mig_val".to_vec(),
     };
-    let legacy_key = Wal::legacy_integrity_key_for_test();
+    let legacy_key = Wal::legacy_integrity_key_for_test().expect("legacy key");
     let legacy_entry = WalEntry::try_new(op, 100, &legacy_key, [0u8; 32]).expect("entry");
 
     let mut wal_bytes = Vec::new();
