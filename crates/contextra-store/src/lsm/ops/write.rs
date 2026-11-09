@@ -394,8 +394,7 @@ async fn single_commit_path(
         fn drop(&mut self) {
             if !self.committed {
                 if !self.wal.rollback_hmac_sync(self.prev_hmac) {
-                    self.wal
-                        .poison_with_cause(PoisonCause::HmacChainDiverged);
+                    self.wal.poison_with_cause(PoisonCause::HmacChainDiverged);
                 }
                 if self.first_seq > 0 {
                     if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
@@ -627,8 +626,7 @@ async fn leader_commit_path(
                 let mut hmac_diverged = false;
                 if let Some(prev) = self.prev_hmac {
                     if !self.wal.rollback_hmac_sync(prev) {
-                        self.wal
-                            .poison_with_cause(PoisonCause::HmacChainDiverged);
+                        self.wal.poison_with_cause(PoisonCause::HmacChainDiverged);
                         hmac_diverged = true;
                     }
                 }
