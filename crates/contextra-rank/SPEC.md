@@ -6,11 +6,18 @@
 `contextra-rank` ist ein reiner Logik-Baustein zur Signal- und Rangfusion (RRF, mRRF), Score-Normalisierung, Kalibrierung (Isotonic via PAVA, Platt-Scaling, Conformal Prediction) sowie Drift-Erkennung und Explainability.
 
 ## 2. Invarianten und Verträge
+- **INV-RANK-DETERMINISM-1:** Bei identischen Eingabelisten ist das Fusionsergebnis bitgenau reproduzierbar, unabhängig von Hash-Reihenfolge und Thread-Zahl.
+- **INV-RANK-MONOTONIC-1:** Isotonische Kalibrierung invertiert nie die relative Rangfolge (monoton nicht fallend) und stimmt mit dem Orakel-PAVA überein.
 - **INV-RRF-1 (Gleichstandsauflösung):** Gleichstände werden deterministisch über Score absteigend, gefolgt von stabiler ID-Reihenfolge aufgelöst.
 - **INV-RRF-2 (K_RRF Konstante):** Standard-Glättungsparameter ist `k = 60.0`. Formel: `1.0 / (k + rank)`.
 - **INV-CAL-1 (Isotonische Monotonie):** Nach dem PAVA-Rebuild ist die kalibrierte Wahrscheinlichkeitsfunktion schwach monoton steigend über die sortierten Roh-Scores.
 - **INV-CONF-1 (Marginal Coverage):** Der konforme Prädiktor garantiert finite-sample coverage für gegebene Irrtumswahrscheinlichkeit $\alpha \in (0, 1)$.
 - **INV-ZERO-PANIC:** Produktionscode enthält kein `unwrap`, `expect` oder `panic!`. Alle Fehler werden typisiert als `RankError` bzw. `ConformalError` zurückgegeben.
+
+## 2.1 Standardisierte Schnittstellen (RANK-1)
+- `rrf_fuse(ranked_lists: &[Vec<ScoredItem>], k: usize) -> Result<Vec<ScoredItem>>`
+- `calibrate_score(raw: f32, calibrator: &Calibrator) -> Result<f32>`
+- Typen `ScoredItem` und `Calibrator` (unterstützt Platt, Isotonic, Conformal).
 
 ## 3. Konstanten
 - `MAX_SEARCH_K = 10_000`: Obergrenze für Top-K-Heap.
