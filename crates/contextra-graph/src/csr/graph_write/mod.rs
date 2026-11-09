@@ -267,7 +267,7 @@ impl GraphCollectionMutation for CsrGraph {
                 }
                 GraphMutationError::DuplicateHyperEdgeId(id) => {
                     contextra_ports::graph::GraphMutationError::DuplicateHyperEdgeId(
-                        contextra_ports::graph::HyperEdgeId::new(id.inner()),
+                        contextra_ports::graph::HyperEdgeId::new(id),
                     )
                 }
             })?;

@@ -12,7 +12,6 @@ use std::collections::VecDeque;
 
 /// Drift status summary representation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-// ANCHOR[contextra-rank:DRIFT-001]
 /// Zusammenfassung des aktuellen Drift-Status einer Signalverteilung.
 pub enum DriftStatus {
     /// Distribution is stable.
@@ -56,7 +55,6 @@ impl DriftStatus {
 
 /// Drift detector monitoring score shifts over sliding windows.
 #[derive(Debug, Clone)]
-// ANCHOR[contextra-rank:DRIFT-002]
 /// Detektor zur Überwachung von Score-Verschiebungen über ein gleitendes Fenster.
 pub struct DriftDetector {
     window_size: usize,

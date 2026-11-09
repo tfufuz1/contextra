@@ -428,3 +428,239 @@ mod tests {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// MISSION KV-1: NamespacePrefixStore mit Pinning & deterministischer LRU-Eviction
+// ---------------------------------------------------------------------------
+
+use crate::radix::NamespaceRadixTree;
+
+/// Repräsentiert einen gepinnten oder ungepinnten Cache-Eintrag im `NamespacePrefixStore`.
+#[derive(Debug, Clone)]
+struct NamespaceBlockGroup {
+    _group_id: u64,
+    tokens: Vec<u32>,
+    blocks: Vec<KvBlock>,
+    bytes: usize,
+    tick: u64,
+    pinned: bool,
+}
+
+/// Partition für einen konkreten `namespace: u64`.
+struct NamespacePartition {
+    tree: NamespaceRadixTree,
+    groups: AHashMap<u64, NamespaceBlockGroup>,
+    total_bytes: usize,
+}
+
+impl NamespacePartition {
+    fn new(namespace: u64) -> Self {
+        Self {
+            tree: NamespaceRadixTree::new(namespace),
+            groups: AHashMap::new(),
+            total_bytes: 0,
+        }
+    }
+}
+
+/// Partitionsisolierter Prefix-Store über `namespace: u64`.
+pub struct NamespacePrefixStore {
+    partitions: RwLock<AHashMap<u64, NamespacePartition>>,
+    byte_budget_per_namespace: usize,
+    max_blocks_per_namespace: usize,
+    reuse_policy: KvReusePolicy,
+    next_tick: AtomicU64,
+    next_group_id: AtomicU64,
+}
+
+impl NamespacePrefixStore {
+    /// Erstellt einen neuen `NamespacePrefixStore`.
+    pub fn new(byte_budget: usize, max_blocks: usize) -> Self {
+        Self {
+            partitions: RwLock::new(AHashMap::new()),
+            byte_budget_per_namespace: byte_budget,
+            max_blocks_per_namespace: max_blocks,
+            reuse_policy: KvReusePolicy::default(),
+            next_tick: AtomicU64::new(1),
+            next_group_id: AtomicU64::new(1),
+        }
+    }
+
+    /// Konfiguriert die Wiederverwendungs-Policy.
+    pub fn with_reuse_policy(mut self, policy: KvReusePolicy) -> Self {
+        self.reuse_policy = policy;
+        self
+    }
+
+    /// Sucht nach dem längsten Präfix für den gegebenen Namespace.
+    pub fn lookup(&self, namespace: u64, tokens: &[u32]) -> Option<KvPrefixHit> {
+        if tokens.is_empty() {
+            return None;
+        }
+
+        let mut partitions = self.partitions.write();
+        let partition = partitions.get_mut(&namespace)?;
+
+        let pm = partition.tree.find_longest_prefix(tokens, self.reuse_policy)?;
+        let group = partition.groups.get_mut(&pm.block_id)?;
+
+        group.tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
+
+        Some(KvPrefixHit {
+            matched_tokens: pm.matched_len,
+            blocks: group.blocks.clone(),
+        })
+    }
+
+    /// Pinnt eine Sequenz im Namespace (schützt vor Verdrängung).
+    pub fn pin_sequence(&self, namespace: u64, tokens: &[u32]) -> Result<bool, ContextraError> {
+        let mut partitions = self.partitions.write();
+        let partition = match partitions.get_mut(&namespace) {
+            Some(p) => p,
+            None => return Ok(false),
+        };
+
+        if let Some(pm) = partition.tree.find_longest_prefix(tokens, KvReusePolicy::Always) {
+            if pm.matched_len == tokens.len() {
+                if let Some(group) = partition.groups.get_mut(&pm.block_id) {
+                    group.pinned = true;
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Hebt das Pinning einer Sequenz im Namespace auf.
+    pub fn unpin_sequence(&self, namespace: u64, tokens: &[u32]) -> Result<bool, ContextraError> {
+        let mut partitions = self.partitions.write();
+        let partition = match partitions.get_mut(&namespace) {
+            Some(p) => p,
+            None => return Ok(false),
+        };
+
+        if let Some(pm) = partition.tree.find_longest_prefix(tokens, KvReusePolicy::Always) {
+            if pm.matched_len == tokens.len() {
+                if let Some(group) = partition.groups.get_mut(&pm.block_id) {
+                    group.pinned = false;
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Fügt Blöcke für eine Token-Sequenz im Namespace ein.
+    pub fn insert(
+        &self,
+        namespace: u64,
+        tokens: &[u32],
+        blocks: Vec<KvBlock>,
+    ) -> Result<(), ContextraError> {
+        if tokens.is_empty() {
+            return Err(ContextraError::InvalidInput("Tokens cannot be empty".to_string()));
+        }
+        if blocks.is_empty() {
+            return Err(ContextraError::InvalidInput("Blocks cannot be empty".to_string()));
+        }
+
+        let group_bytes: usize = blocks.iter().map(|b| b.data.len()).sum();
+        if group_bytes > self.byte_budget_per_namespace {
+            return Err(ContextraError::limit_exceeded(
+                self.byte_budget_per_namespace,
+                format!("Block group size ({} bytes) exceeds byte budget", group_bytes),
+            ));
+        }
+
+        let mut partitions = self.partitions.write();
+        let partition = partitions
+            .entry(namespace)
+            .or_insert_with(|| NamespacePartition::new(namespace));
+
+        if let Some(old_id) = partition.tree.remove(tokens) {
+            if let Some(old_group) = partition.groups.remove(&old_id) {
+                partition.total_bytes = partition.total_bytes.saturating_sub(old_group.bytes);
+            }
+        }
+
+        Self::evict_namespace_to_budget(
+            partition,
+            self.byte_budget_per_namespace.saturating_sub(group_bytes),
+            self.max_blocks_per_namespace.saturating_sub(blocks.len()),
+        )?;
+
+        let group_id = self.next_group_id.fetch_add(1, Ordering::Relaxed);
+        let tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
+
+        partition.tree.insert(tokens, group_id)?;
+        partition.groups.insert(
+            group_id,
+            NamespaceBlockGroup {
+                _group_id: group_id,
+                tokens: tokens.to_vec(),
+                blocks,
+                bytes: group_bytes,
+                tick,
+                pinned: false,
+            },
+        );
+        partition.total_bytes += group_bytes;
+
+        Ok(())
+    }
+
+    fn evict_namespace_to_budget(
+        partition: &mut NamespacePartition,
+        target_bytes: usize,
+        target_blocks: usize,
+    ) -> Result<(), ContextraError> {
+        loop {
+            let current_blocks: usize = partition.groups.values().map(|g| g.blocks.len()).sum();
+            if partition.total_bytes <= target_bytes && current_blocks <= target_blocks {
+                return Ok(());
+            }
+
+            let mut oldest_candidate: Option<(u64, u64)> = None;
+            for (&gid, group) in &partition.groups {
+                if group.pinned {
+                    continue;
+                }
+                match oldest_candidate {
+                    None => oldest_candidate = Some((gid, group.tick)),
+                    Some((best_gid, best_tick)) => {
+                        if group.tick < best_tick || (group.tick == best_tick && gid < best_gid) {
+                            oldest_candidate = Some((gid, group.tick));
+                        }
+                    }
+                }
+            }
+
+            let (target_gid, _) = match oldest_candidate {
+                Some(pair) => pair,
+                None => {
+                    return Err(ContextraError::limit_exceeded(
+                        target_bytes,
+                        "All candidate blocks are pinned and cannot be evicted",
+                    ));
+                }
+            };
+
+            if let Some(group) = partition.groups.remove(&target_gid) {
+                partition.tree.remove(&group.tokens);
+                partition.total_bytes = partition.total_bytes.saturating_sub(group.bytes);
+            }
+        }
+    }
+
+    /// Gibt die Gesamtzahl gespeicherter Block-Gruppen im Namespace zurück.
+    pub fn entry_count(&self, namespace: u64) -> usize {
+        let partitions = self.partitions.read();
+        partitions.get(&namespace).map(|p| p.groups.len()).unwrap_or(0)
+    }
+
+    /// Gibt die gesamten allokierten Bytes im Namespace zurück.
+    pub fn total_bytes(&self, namespace: u64) -> usize {
+        let partitions = self.partitions.read();
+        partitions.get(&namespace).map(|p| p.total_bytes).unwrap_or(0)
+    }
+}

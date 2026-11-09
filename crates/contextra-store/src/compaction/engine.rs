@@ -5,10 +5,12 @@
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
+use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::StorageStats;
+use contextra_ports::Vfs;
 use contextra_types::{Result, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -33,6 +35,7 @@ pub struct CompactionEngine {
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
     clock: Arc<dyn contextra_ports::Clock>,
+    pub(crate) vfs: Arc<dyn Vfs>,
 }
 
 impl CompactionEngine {
@@ -69,7 +72,14 @@ impl CompactionEngine {
             adaptive_planner,
             merge_operator: None,
             clock: Arc::new(contextra_ports::SystemClock::new()),
+            vfs: Arc::new(RealFs),
         }
+    }
+
+    /// Configures a custom VFS implementation for compaction file operations.
+    pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
+        self.vfs = vfs;
+        self
     }
 
     /// Attaches a custom merge operator for compaction value merging (§4.12).
@@ -223,14 +233,17 @@ impl CompactionEngine {
         .await?;
 
         // Explicit fsync of output file and parent directory
-        crate::util::fsync_parent_dir(&output_path).await?;
+        if let Some(parent) = output_path.parent() {
+            self.vfs.sync_dir(parent)?;
+        }
 
         // Open the new SSTable reader
         let new_reader = Arc::new(
-            SstableReader::open_with_key_manager(
+            SstableReader::open_with_vfs(
                 &output_path,
                 Arc::clone(&self.block_cache),
                 self.key_manager.clone(),
+                Arc::clone(&self.vfs),
             )
             .await?,
         );
@@ -259,7 +272,7 @@ impl CompactionEngine {
                     "Compaction aborted under write lock: input SSTables are no longer contiguous or modified \
                      (concurrent flush or rollback detected)"
                 );
-                if let Err(e) = tokio::fs::remove_file(&output_path).await {
+                if let Err(e) = self.vfs.remove_file(&output_path) {
                     tracing::warn!(
                         "Failed to clean up aborted compaction output {:?}: {}",
                         output_path,
@@ -309,12 +322,12 @@ impl CompactionEngine {
 
         // 7. Delete old SSTable files (best-effort cleanup outside lock)
         for path in &old_paths {
-            if let Err(e) = tokio::fs::remove_file(path).await {
+            if let Err(e) = self.vfs.remove_file(path) {
                 tracing::warn!("Failed to delete compacted SSTable {:?}: {}", path, e);
             }
             let uuid_sidecar = PathBuf::from(format!("{}.uuid", path.display()));
-            if matches!(tokio::fs::try_exists(&uuid_sidecar).await, Ok(true)) {
-                if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
+            if matches!(self.vfs.exists(&uuid_sidecar), Ok(true)) {
+                if let Err(e) = self.vfs.remove_file(&uuid_sidecar) {
                     tracing::debug!(
                         "Could not remove SSTable UUID sidecar {:?}: {} (non-critical)",
                         uuid_sidecar,
@@ -430,8 +443,8 @@ impl CompactionEngine {
             .await;
 
         if merge_res.is_err() {
-            if let Err(e) = tokio::fs::remove_file(output_path).await {
-                if e.kind() != std::io::ErrorKind::NotFound {
+            if let Err(e) = self.vfs.remove_file(output_path) {
+                if !matches!(e, contextra_ports::ContextraError::NotFound(_)) {
                     tracing::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
                         output_path,
@@ -521,15 +534,19 @@ impl CompactionEngine {
             }
         }
 
-        let mut builder =
-            SstableBuilder::create_with_key_manager(output_path, self.key_manager.clone()).await?;
+        let mut builder = SstableBuilder::create_with_vfs(
+            output_path,
+            self.key_manager.clone(),
+            Arc::clone(&self.vfs),
+        )
+        .await?;
         let mut last_key: Option<bytes::Bytes> = None;
         let mut floor_emitted = false;
         let mut processed_count = 0;
 
         // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
         let mut io_token_bytes_written: u64 = 0;
-        let mut io_token_last_reset = std::time::Instant::now();
+        let mut io_token_last_reset_nanos = self.clock.monotonic_nanos();
 
         while let Some(item) = heap.pop() {
             if let Some(ct) = cancel_token {
@@ -558,9 +575,15 @@ impl CompactionEngine {
                 // FIND-STO-002: Budgeted Compaction
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
-                    let wait_start = std::time::Instant::now();
+                    let wait_start_nanos = self.clock.monotonic_nanos();
+                    let max_wait_nanos = u64::try_from(self.config.max_backpressure_wait.as_nanos())
+                        .unwrap_or(u64::MAX);
                     while !self.budget.has_memory_capacity() {
-                        if wait_start.elapsed() >= self.config.max_backpressure_wait {
+                        let wait_elapsed_nanos = self
+                            .clock
+                            .monotonic_nanos()
+                            .saturating_sub(wait_start_nanos);
+                        if wait_elapsed_nanos >= max_wait_nanos {
                             let limit_bytes =
                                 self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
                             let used_mb = limit_bytes.div_ceil(1024 * 1024);
@@ -669,7 +692,11 @@ impl CompactionEngine {
                                     if let Some(max_bps) = self.config.max_io_bytes_per_second {
                                         if max_bps > 0 {
                                             io_token_bytes_written += entry_bytes;
-                                            let elapsed = io_token_last_reset.elapsed();
+                                            let elapsed_nanos = self
+                                                .clock
+                                                .monotonic_nanos()
+                                                .saturating_sub(io_token_last_reset_nanos);
+                                            let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                                             let target = std::time::Duration::from_secs_f64(
                                                 io_token_bytes_written as f64 / max_bps as f64,
                                             );
@@ -677,13 +704,17 @@ impl CompactionEngine {
                                                 let delay = (target - elapsed)
                                                     .min(std::time::Duration::from_millis(100));
                                                 tokio::time::sleep(delay).await;
-                                                let total_elapsed = io_token_last_reset.elapsed();
+                                                let total_elapsed_nanos = self
+                                                    .clock
+                                                    .monotonic_nanos()
+                                                    .saturating_sub(io_token_last_reset_nanos);
+                                                let total_elapsed = std::time::Duration::from_nanos(total_elapsed_nanos);
                                                 let allowed_bytes = (total_elapsed.as_secs_f64()
                                                     * max_bps as f64)
                                                     as u64;
                                                 io_token_bytes_written = io_token_bytes_written
                                                     .saturating_sub(allowed_bytes);
-                                                io_token_last_reset = std::time::Instant::now();
+                                                io_token_last_reset_nanos = self.clock.monotonic_nanos();
                                             }
                                         }
                                     }
@@ -745,7 +776,11 @@ impl CompactionEngine {
                         if let Some(max_bps) = self.config.max_io_bytes_per_second {
                             if max_bps > 0 {
                                 io_token_bytes_written += entry_bytes;
-                                let elapsed = io_token_last_reset.elapsed();
+                                let elapsed_nanos = self
+                                    .clock
+                                    .monotonic_nanos()
+                                    .saturating_sub(io_token_last_reset_nanos);
+                                let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                                 let target = std::time::Duration::from_secs_f64(
                                     io_token_bytes_written as f64 / max_bps as f64,
                                 );
@@ -756,12 +791,16 @@ impl CompactionEngine {
                                     // Verifiziert durch Lektüre von merge_sstables() — kein RwLock::write() im Merge-Loop.
                                     tokio::time::sleep(delay).await;
                                     // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
-                                    let total_elapsed = io_token_last_reset.elapsed();
+                                    let total_elapsed_nanos = self
+                                        .clock
+                                        .monotonic_nanos()
+                                        .saturating_sub(io_token_last_reset_nanos);
+                                    let total_elapsed = std::time::Duration::from_nanos(total_elapsed_nanos);
                                     let allowed_bytes =
                                         (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
                                     io_token_bytes_written =
                                         io_token_bytes_written.saturating_sub(allowed_bytes);
-                                    io_token_last_reset = std::time::Instant::now();
+                                    io_token_last_reset_nanos = self.clock.monotonic_nanos();
                                 }
                             }
                         }

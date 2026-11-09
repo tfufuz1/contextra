@@ -13,8 +13,9 @@ description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine,
 ring = "tooling"
 
 [features]
-default = ["testkit"]
+default = ["testkit", "erasure-conformance"]
 testkit = []
+erasure-conformance = []
 
 [dependencies]
 contextra-ports = { workspace = true, features = ["testkit"] }
@@ -24,5 +25,10 @@ parking_lot = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[[bench]]
+name = "testkit_bench"
+harness = false

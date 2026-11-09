@@ -32,7 +32,7 @@ Für `contextra-vector` gelten im Rahmen der Transformation zum modularen Baukas
 
 ### 2.2 Abhängigkeitsmatrix & Schnittstellen
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports, contextra-mvcc, contextra-simd, contextra-sys`
+- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports, contextra-mvcc, contextra-sys`
 - **Verbotene Abhängigkeiten:** `contextra-crypto`, höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
 - **Konsumierte / Implementierte Ports:** Spezifiziert in `AGENTS.md` und `docs/SPEC.md`.
 

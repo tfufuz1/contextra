@@ -17,7 +17,7 @@ use crate::bm25::score_term;
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
 
 // ANCHOR[contextra-text:WAND-001]
@@ -287,8 +287,8 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
     let total_docs_u32 = u32::try_from(total_docs).unwrap_or(u32::MAX).max(1);
 
-    let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
-    let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
+    let mut doc_len_cache: BTreeMap<DocId, Option<u32>> = BTreeMap::new();
+    let mut tbs_cache: BTreeMap<Vec<u8>, bool> = BTreeMap::new();
 
     // Prefetch active tombstones globally at snapshot `seq` in a single prefix scan
     let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
@@ -348,7 +348,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::new(doc_id_raw);
+                                        let doc_id = DocId::new(doc_id_raw as _);
                                         let tf_bytes = val_bytes.get(..4).ok_or_else(|| {
                                             ContextraError::Storage(
                                                 "Invalid val_bytes length".into(),
@@ -498,7 +498,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::new(pivot_doc_id);
+            let doc_id = DocId::new(pivot_doc_id as _);
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
@@ -626,19 +626,19 @@ mod tests {
     use contextra_ports::BoxFuture;
     use parking_lot::RwLock;
 
-    type MockStoreMap = RwLock<HashMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
+    type MockStoreMap = RwLock<BTreeMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
 
     struct MockStorage {
         store: MockStoreMap,
-        staged: RwLock<HashMap<contextra_types::TxId, Vec<Vec<u8>>>>,
+        staged: RwLock<BTreeMap<contextra_types::TxId, Vec<Vec<u8>>>>,
         next_seq: std::sync::atomic::AtomicU64,
     }
 
     impl MockStorage {
         fn new() -> Self {
             Self {
-                store: MockStoreMap::new(HashMap::new()),
-                staged: RwLock::new(HashMap::new()),
+                store: MockStoreMap::new(BTreeMap::new()),
+                staged: RwLock::new(BTreeMap::new()),
                 next_seq: std::sync::atomic::AtomicU64::new(1),
             }
         }
@@ -825,12 +825,12 @@ mod tests {
         // Index 500 documents:
         // "common" occurs in all 500 documents.
         // "rare" occurs in only 5 documents (DocId 100, 200, 300, 400, 500) with high frequency.
-        for i in 1..=500 {
-            let doc_id = DocId::new(i as u64);
+        for i in 1u64..=500u64 {
+            let doc_id = DocId::new(i);
             let text = if i % 100 == 0 {
-                format!("common rare rare rare rare rare doc {}", i)
+                format!("common rare rare rare rare rare doc {i}")
             } else {
-                format!("common doc {}", i)
+                format!("common doc {i}")
             };
             index.upsert_document(tx, doc_id, &text).await?;
         }

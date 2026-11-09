@@ -88,7 +88,10 @@ impl Purger for LsmPurger {
                     // Datei filtern und neu schreiben
                     let old_path = reader.file_path();
                     let new_path = old_path.with_extension("purged.sst");
-                    if let Ok(mut builder) = SstableBuilder::create(&new_path).await {
+                    if let Ok(mut builder) =
+                        SstableBuilder::create_with_vfs(&new_path, None, self.storage.vfs().clone())
+                            .await
+                    {
                         for (rk, rv, rseq) in retained {
                             let _ = builder.add(&rk, &rv, rseq, 1).await;
                         }
@@ -122,9 +125,10 @@ impl Purger for LsmPurger {
                 active_paths.insert(r.file_path().to_path_buf());
             }
 
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
+            let vfs = self.storage.vfs();
+            if let Ok(dir_entries) = vfs.list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
                     if path.extension().and_then(|s| s.to_str()) == Some("sst")
                         && !active_paths.contains(&path)
                     {
@@ -146,13 +150,12 @@ impl Purger for LsmPurger {
 
             // 4. WAL-Segmente filtern / bereinigen
             let mut wal_files = Vec::new();
-            if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
-                while let Ok(Some(entry)) = dir.next_entry().await {
-                    let path = entry.path();
-                    let name = path.file_name().unwrap_or_default().to_string_lossy();
-                    let is_wal = (name.starts_with("wal-") && name.ends_with(".log"))
-                        || name == "wal.log"
-                        || name.ends_with(".wal");
+            if let Ok(dir_entries) = vfs.list_dir(data_dir) {
+                for name_str in dir_entries {
+                    let path = data_dir.join(&name_str);
+                    let is_wal = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
+                        || name_str == "wal.log"
+                        || name_str.ends_with(".wal");
                     if is_wal {
                         wal_files.push(path);
                     }
@@ -237,7 +240,7 @@ impl Purger for LsmPurger {
                                         let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
                                         let _ = tokio::fs::write(&wal_path, zeros).await;
                                     }
-                                    let _ = tokio::fs::rename(&tmp_wal_path, &wal_path).await;
+                                    let _ = self.storage.vfs().rename(&tmp_wal_path, &wal_path);
                                 }
                             }
                         }

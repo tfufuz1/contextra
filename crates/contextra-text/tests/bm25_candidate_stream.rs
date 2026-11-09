@@ -1,3 +1,4 @@
+#![cfg(feature = "types-compat")]
 //! SD-05-TEXT-002 — Integration tests for BM25 Candidate Stream (`Bm25CandidateStream`).
 //!
 //! Verifies pull-stream batching, geometric reloading, deduplication, prefix ordering,

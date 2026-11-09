@@ -36,12 +36,13 @@ regex = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
+default = ["legacy-erasure", "kv-encryption", "test-utils"]
+legacy-erasure = []
 test-utils = []
-kv-encryption = []
+kv-encryption = ["legacy-erasure"]
 cloud-egress-guard = []
 
 [dev-dependencies]
-contextra-crypto = { path = ".", features = ["test-utils"] }
 contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
@@ -56,3 +57,4 @@ harness = false
 [[bench]]
 name = "deletion_proof_latency_bench"
 harness = false
+required-features = ["legacy-erasure"]

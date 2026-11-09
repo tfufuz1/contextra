@@ -1,8 +1,9 @@
+#![cfg(feature = "http")]
 // campaign_stub_ollama.rs — Campaign stub tests for contextra-infer-ollama (J-19)
 // Oracle source: Local HTTP mock server simulating Ollama API edge cases.
 
+use contextra_infer_ollama::OllamaError;
 use contextra_infer_ollama::{OllamaClient, OllamaConfig};
-use contextra_types::ContextraError;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -113,7 +114,7 @@ async fn campaign_stub_malformed_json() {
     let client = OllamaClient::new(server_url);
     let res = client.embed("nomic-embed-text", "hello").await;
     assert!(res.is_err());
-    assert!(matches!(res.unwrap_err(), ContextraError::Internal(_)));
+    assert!(matches!(res.unwrap_err(), OllamaError::Internal(_)));
 }
 
 #[tokio::test]
@@ -139,7 +140,7 @@ async fn campaign_stub_empty_response() {
     let client = OllamaClient::new(server_url);
     let res = client.embed("nomic-embed-text", "hello").await;
     assert!(res.is_err());
-    assert!(matches!(res.unwrap_err(), ContextraError::Internal(_)));
+    assert!(matches!(res.unwrap_err(), OllamaError::Internal(_)));
 }
 
 #[tokio::test]
@@ -167,7 +168,7 @@ async fn campaign_stub_batch_dimension_mismatch() {
         .try_embed_batch("nomic-embed-text", &["item1", "item2"])
         .await;
     assert!(res.is_err());
-    assert!(matches!(res.unwrap_err(), ContextraError::Internal(_)));
+    assert!(matches!(res.unwrap_err(), OllamaError::Internal(_)));
 }
 
 #[tokio::test]

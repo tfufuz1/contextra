@@ -45,7 +45,7 @@ impl SstableScanner {
 
         self.runtime.block_on(async {
             let temp_dir = std::env::temp_dir();
-            let canary_path = temp_dir.join(format!("canary_{}.sst", uuid::Uuid::new_v4()));
+            let canary_path = temp_dir.join(format!("canary_{}_{}.sst", std::process::id(), crate::lsm::recovery::next_temp_file_counter()));
             let canary_key = b"t:canary:1:chunk:1";
             let canary_val = b"canary_val";
 

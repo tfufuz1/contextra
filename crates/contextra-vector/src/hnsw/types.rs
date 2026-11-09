@@ -1,13 +1,14 @@
 use roaring::RoaringTreemap;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
-use ahash::AHashMap;
 use contextra_types::{ContextraError, DocId, Result};
 use parking_lot::{Mutex, RwLock};
 
 use super::arena::HnswArena;
 use super::config::HnswConfig;
 use super::sq8_bias::Sq8Bias;
+use crate::distance::{DistanceKernel, ScalarKernel};
 
 /// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
@@ -61,11 +62,13 @@ impl Ord for Candidate {
     }
 }
 
-pub struct RebuildGuard<'a>(pub &'a AtomicBool);
+pub struct RebuildGuard<'a>(pub &'a AtomicBool, pub &'a parking_lot::Condvar);
 
 impl<'a> Drop for RebuildGuard<'a> {
     fn drop(&mut self) {
+        // NOTE: SeqCst guarantees all threads observing rebuilding flag observe completed rebuild state.
         self.0.store(false, Ordering::SeqCst);
+        self.1.notify_all();
     }
 }
 
@@ -84,18 +87,22 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
     }
 }
 
-/// The HNSW (Hierarchical Navigable Small World) vector index.
-pub struct HnswIndex {
+/// Generic HNSW (Hierarchical Navigable Small World) vector index parameterized by distance kernel.
+pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
+    pub(super) _kernel: std::marker::PhantomData<K>,
 }
+
+/// The default HNSW vector index using the scalar reference distance kernel.
+pub type HnswIndex = GenericHnswIndex<ScalarKernel>;
 
 #[repr(align(64))]
 pub struct HnswHotCore {
     pub nodes: RwLock<Vec<HnswNode>>,
     #[cfg(not(feature = "docid-128"))]
-    pub doc_to_node: RwLock<AHashMap<u64, usize>>,
+    pub doc_to_node: RwLock<BTreeMap<u64, usize>>,
     #[cfg(feature = "docid-128")]
-    pub doc_to_node: RwLock<AHashMap<u128, usize>>,
+    pub doc_to_node: RwLock<BTreeMap<u128, usize>>,
     pub entry_point: AtomicU32,
     pub ram_entry_point: AtomicU32,
     pub max_layer: AtomicU64,
@@ -105,12 +112,15 @@ pub struct HnswHotCore {
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
     pub rebuilding: AtomicBool,
+    pub rebuild_condvar: parking_lot::Condvar,
+    pub rebuild_mutex: Mutex<()>,
     pub arena: HnswArena,
 }
 
 impl HnswIndexCore {
     /// Sets the random seed used for HNSW layer selection during insertions.
     pub fn set_layer_seed(&self, seed: u64) {
+        // NOTE: Relaxed ordering is sufficient for independent pseudo-random seed updates.
         self.hot.layer_seed.store(seed, Ordering::Relaxed);
     }
 
@@ -123,11 +133,22 @@ impl HnswIndexCore {
     pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
         *self.cold.metrics_sink.write() = sink;
     }
+
+    /// Returns the clock instance used by this index.
+    pub fn clock(&self) -> std::sync::Arc<dyn contextra_ports::Clock> {
+        self.cold.clock.read().clone()
+    }
+
+    /// Sets the clock instance.
+    pub fn set_clock(&self, clock: std::sync::Arc<dyn contextra_ports::Clock>) {
+        *self.cold.clock.write() = clock;
+    }
 }
 
 impl HnswHotCore {
     #[inline]
     pub fn get_entry_point(&self) -> Option<usize> {
+        // NOTE: Acquire ensures visibility of nodes and layers created prior to publishing entry point.
         let ep = self.entry_point.load(Ordering::Acquire);
         if ep == SENTINEL_NO_ENTRY_POINT {
             None
@@ -142,11 +163,13 @@ impl HnswHotCore {
             Some(idx) => idx as u32,
             None => SENTINEL_NO_ENTRY_POINT,
         };
+        // NOTE: Release ensures node connections and memory are fully visible before entry point is published.
         self.entry_point.store(val, Ordering::Release);
     }
 
     #[inline]
     pub fn get_ram_entry_point(&self) -> Option<usize> {
+        // NOTE: Acquire ensures visibility of RAM nodes linked before entry point publication.
         let ep = self.ram_entry_point.load(Ordering::Acquire);
         if ep == SENTINEL_NO_ENTRY_POINT {
             None
@@ -161,6 +184,7 @@ impl HnswHotCore {
             Some(idx) => idx as u32,
             None => SENTINEL_NO_ENTRY_POINT,
         };
+        // NOTE: Release synchronizes RAM node initialization with concurrent readers.
         self.ram_entry_point.store(val, Ordering::Release);
     }
 
@@ -182,8 +206,9 @@ pub struct HnswColdCore {
     pub deleted_nodes: RwLock<RoaringTreemap>,
     pub compute_pool: crate::compute_pool::ComputePool,
     pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    pub clock: RwLock<std::sync::Arc<dyn contextra_ports::Clock>>,
     pub metrics_sink: RwLock<std::sync::Arc<dyn contextra_ports::MetricsSink>>,
-    pub last_rebuild_instant: Mutex<Option<std::time::Instant>>,
+    pub last_rebuild_nanos: AtomicU64,
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: Option<RwLock<crate::partial_rebuild::TraversalTracker>>,
@@ -210,10 +235,11 @@ pub enum RebuildStatus {
 }
 
 impl HnswIndex {
-    /// Creates a new HNSW index with an explicit random number generator for deterministic testing or custom seeding.
-    pub fn try_new_with_rng(
+    /// Creates a new HNSW index with explicit random number generator and clock injection for full determinism (B11).
+    pub fn try_new_with_rng_and_clock(
         config: HnswConfig,
         rng: std::sync::Arc<dyn contextra_ports::Rng>,
+        clock: std::sync::Arc<dyn contextra_ports::Clock>,
     ) -> Result<Self> {
         config.validate()?;
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
@@ -222,10 +248,11 @@ impl HnswIndex {
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
         Ok(Self {
+            _kernel: std::marker::PhantomData,
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
-                    doc_to_node: RwLock::new(AHashMap::new()),
+                    doc_to_node: RwLock::new(BTreeMap::new()),
                     entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     max_layer: AtomicU64::new(0),
@@ -235,6 +262,8 @@ impl HnswIndex {
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    rebuild_condvar: parking_lot::Condvar::new(),
+                    rebuild_mutex: Mutex::new(()),
                     arena: HnswArena::new(),
                 },
                 cold: HnswColdCore {
@@ -253,10 +282,11 @@ impl HnswIndex {
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
                     rng,
+                    clock: RwLock::new(clock),
                     metrics_sink: RwLock::new(std::sync::Arc::new(
                         contextra_ports::NoopMetricsSink,
                     )),
-                    last_rebuild_instant: Mutex::new(None),
+                    last_rebuild_nanos: AtomicU64::new(0),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: if partial_rebuild_config.traversal_window > 0 {
@@ -275,12 +305,33 @@ impl HnswIndex {
         })
     }
 
+    /// Creates a new HNSW index with an explicit random number generator for deterministic testing or custom seeding.
+    ///
+    /// Uses [`MonotonicCounterClock`] by default (never `SystemTime`).
+    pub fn try_new_with_rng(
+        config: HnswConfig,
+        rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    ) -> Result<Self> {
+        let clock = std::sync::Arc::new(super::clock::MonotonicCounterClock::default());
+        Self::try_new_with_rng_and_clock(config, rng, clock)
+    }
+
     /// Creates a new HNSW index, validating configuration upfront.
     ///
-    /// Uses an internal, non-cryptographic, reproducible default RNG seeded with `DEFAULT_LAYER_SEED`.
+    /// Uses an internal, non-cryptographic, reproducible default RNG seeded with `DEFAULT_LAYER_SEED`
+    /// and a deterministic [`MonotonicCounterClock`].
     pub fn try_new(config: HnswConfig) -> Result<Self> {
         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
+    }
+
+    /// Creates a new HNSW index with a custom distance kernel.
+    pub fn try_new_with_kernel(
+        config: HnswConfig,
+        kernel: std::sync::Arc<dyn DistanceKernel>,
+    ) -> Result<Self> {
+        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        Self::try_new_with_rng_and_kernel(config, rng, kernel)
     }
 
     /// Creates a new HNSW index.
@@ -293,14 +344,17 @@ impl HnswIndex {
         let ml = 1.0 / (config.m as f64).ln();
         let rng: std::sync::Arc<dyn contextra_ports::Rng> =
             std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        let clock: std::sync::Arc<dyn contextra_ports::Clock> =
+            std::sync::Arc::new(super::clock::MonotonicCounterClock::default());
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
 
         Self {
+            _kernel: std::marker::PhantomData,
             inner: std::sync::Arc::new(HnswIndexCore {
                 hot: HnswHotCore {
                     nodes: RwLock::new(Vec::new()),
-                    doc_to_node: RwLock::new(AHashMap::new()),
+                    doc_to_node: RwLock::new(BTreeMap::new()),
                     entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
                     max_layer: AtomicU64::new(0),
@@ -310,6 +364,8 @@ impl HnswIndex {
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    rebuild_condvar: parking_lot::Condvar::new(),
+                    rebuild_mutex: Mutex::new(()),
                     arena: HnswArena::new(),
                 },
                 cold: HnswColdCore {
@@ -328,10 +384,11 @@ impl HnswIndex {
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
                     compute_pool,
                     rng,
+                    clock: RwLock::new(clock),
                     metrics_sink: RwLock::new(std::sync::Arc::new(
                         contextra_ports::NoopMetricsSink,
                     )),
-                    last_rebuild_instant: Mutex::new(None),
+                    last_rebuild_nanos: AtomicU64::new(0),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: if partial_rebuild_config.traversal_window > 0 {
@@ -389,6 +446,17 @@ impl HnswIndex {
         self
     }
 
+    /// Sets the clock instance.
+    pub fn set_clock(&self, clock: std::sync::Arc<dyn contextra_ports::Clock>) {
+        self.inner.set_clock(clock);
+    }
+
+    /// Builder method to set the clock port.
+    pub fn with_clock(self, clock: std::sync::Arc<dyn contextra_ports::Clock>) -> Self {
+        self.set_clock(clock);
+        self
+    }
+
     /// Sets the random seed used for HNSW layer selection during insertions.
     pub fn set_layer_seed(&self, seed: u64) {
         self.inner.set_layer_seed(seed);
@@ -418,12 +486,20 @@ impl HnswIndex {
         self.inner.is_rebuild_required()
     }
 
-    pub async fn rebuild(&self) -> Result<()> {
-        self.inner.rebuild().await
+    pub fn rebuild(&self) -> Result<()> {
+        self.inner.rebuild()
     }
 
-    pub async fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
-        self.inner.rebuild_region(region_node_ids).await
+    pub fn rebuild_sync(&self) -> Result<()> {
+        self.inner.rebuild_sync()
+    }
+
+    pub fn rebuild_region(&self, region_node_ids: Vec<u64>) -> Result<()> {
+        self.inner.rebuild_region(region_node_ids)
+    }
+
+    pub fn rebuild_region_sync(&self, region_node_ids: Vec<u64>) -> Result<()> {
+        self.inner.rebuild_region_sync(region_node_ids)
     }
 
     #[cfg(feature = "partial-index-rebuild")]
@@ -434,7 +510,7 @@ impl HnswIndex {
         let global_tombstone_ratio = self.deleted_ratio() as f32;
         let tracker = tracker_lock.read();
 
-        let mut tombstone_map = ahash::AHashMap::new();
+        let mut tombstone_map = BTreeMap::new();
         let total_nodes = self.inner.hot.nodes.read().len();
         let deleted_guard = self.inner.cold.deleted_nodes.read();
 
@@ -443,11 +519,11 @@ impl HnswIndex {
             tombstone_map.insert(id, deleted_guard.contains(id));
         }
 
-        let std_map: std::collections::HashMap<u64, bool> = tombstone_map.into_iter().collect();
+        let std_map = tombstone_map;
 
         let regions = crate::partial_rebuild::should_trigger_partial_rebuild(
             &tracker,
-            &std_map,
+            &tombstone_map,
             global_tombstone_ratio,
             &self.inner.cold.config.partial_rebuild_config,
         );
@@ -473,6 +549,53 @@ impl HnswIndex {
 
     pub fn unpin_snapshot(&self, seq_no: u64) {
         self.inner.cold.seq_log.write().unpin_snapshot(seq_no);
+    }
+
+    /// Gibt den aktuellen globalen Entry-Point-Knotenindex zurück (falls vorhanden).
+    pub fn entry_point(&self) -> Option<usize> {
+        self.inner.hot.get_entry_point()
+    }
+
+    /// Gibt den internen Knotenindex für eine `DocId` zurück (falls vorhanden und nicht gelöscht).
+    pub fn node_idx_for_doc(&self, doc_id: DocId) -> Option<usize> {
+        let map = self.inner.hot.doc_to_node.read();
+        let deleted = self.inner.cold.deleted_nodes.read();
+        map.get(&doc_id.inner())
+            .copied()
+            .filter(|&idx| !deleted.contains(idx as u64))
+    }
+
+    /// Gibt die Layer-0-Verbindungen für einen Knotenindex zurück.
+    pub fn layer0_connections(&self, node_idx: usize) -> Vec<u32> {
+        let mmap_count = self
+            .inner
+            .cold
+            .mmap_index
+            .read()
+            .as_ref()
+            .map(|m| m.header.node_count() as usize)
+            .unwrap_or(0);
+        let m = self.inner.cold.config.m;
+        if node_idx < mmap_count {
+            let mmap_guard = self.inner.cold.mmap_index.read();
+            if let Some(mmap) = mmap_guard.as_ref() {
+                if let Ok(rec) = mmap.get_node_record(node_idx) {
+                    mmap.get_connections(&rec, 0).unwrap_or_default()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        } else {
+            let ram_idx = node_idx - mmap_count;
+            self.inner.hot.arena.get_ram_node_connections(ram_idx, 0, m)
+        }
+    }
+
+    /// Führt einen synchronen vollständigen Rebuild aus (`INV-HNSW-SLOT-1`).
+    pub fn rebuild_sync(&self) -> Result<()> {
+        self.inner.rebuild_sync()
     }
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
@@ -510,21 +633,38 @@ impl HnswIndex {
         }
     }
 
+    /// Returns the clock instance used by this index.
+    pub fn clock(&self) -> std::sync::Arc<dyn contextra_ports::Clock> {
+        self.inner.clock()
+    }
+
     pub fn rebuild_status(&self) -> RebuildStatus {
         self.inner.rebuild_status()
     }
 
-    pub async fn wait_for_rebuild(&self) -> bool {
-        self.inner.wait_for_rebuild().await
+    pub fn wait_for_rebuild_blocking(
+        &self,
+        timeout: std::time::Duration,
+        clock: &dyn contextra_ports::Clock,
+    ) -> bool {
+        self.inner.wait_for_rebuild_blocking(timeout, clock)
     }
 
-    pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
-        self.inner.wait_for_rebuild_with_timeout(timeout).await
+    pub fn wait_for_rebuild(&self) -> bool {
+        self.inner.wait_for_rebuild()
     }
 
-    pub async fn load_mmap(&self, path: impl AsRef<std::path::Path> + Send) -> Result<()> {
-        let mmap_index = crate::persistence::MmapIndex::open_async(path).await?;
+    pub fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
+        self.inner.wait_for_rebuild_with_timeout(timeout)
+    }
+
+    pub fn load_mmap_sync(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+        let mmap_index = crate::persistence::MmapIndex::open(path)?;
         self.load_mmap_from_instance(mmap_index)
+    }
+
+    pub fn load_mmap(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+        self.load_mmap_sync(path)
     }
 
     pub(super) fn load_mmap_from_instance(
@@ -831,7 +971,7 @@ impl HnswIndex {
         self.save_internal(path)
     }
 
-    pub async fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+    pub fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         self.save_sync(path)
     }
 }

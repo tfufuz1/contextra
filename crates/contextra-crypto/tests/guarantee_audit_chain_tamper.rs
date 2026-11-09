@@ -1,3 +1,4 @@
+#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `guarantee_audit_chain_tamper.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `guarantee_audit_chain_tamper`.

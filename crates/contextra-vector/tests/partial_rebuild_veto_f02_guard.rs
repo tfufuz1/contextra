@@ -78,7 +78,6 @@ async fn test_veto_f02_guard_partial_rebuild_tombstone_pruning() {
     // Execute local rebuild on region containing deleted node indices
     let region_node_indices: Vec<u64> = (0..20).collect();
     idx.rebuild_region(region_node_indices)
-        .await
         .expect("rebuild_region");
 
     // Verify deleted documents are completely excluded from search results

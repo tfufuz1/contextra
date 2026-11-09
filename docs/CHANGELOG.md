@@ -17,6 +17,7 @@ Alle relevanten Aenderungen im Contextra Baukastensystem werden in dieser Datei 
 
 ### Changed
 - Dokumentation (`docs/SOURCE_OF_TRUTH.md`, `docs/CONSTITUTION.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CONTRIBUTING.md`, `docs/VETOES.md`, `docs/TYPE_REGISTRY.md`, `PLAN.md`, `AGENTS.md`) an die Baukasten-Spezifikation v4.1 angeglichen.
+- **`contextra-store` Spezifikation & Crate-Dokumentation (Paket B8 / M11):** `SPEC.md` nach P01–P10 und SPEC v4.1 mit vollständiger Modulkarte, Invarianten INV-STORE-1 bis 5, Lock-Register und Poison-Matrix verfasst. `README.md` auf Klasse-B Storage-Bundle ausgerichtet; `AGENTS.md`, `PLAN.md` und `lib.rs` konsolidiert; ADR-Index für `contextra-store` erstellt.
 
 ## [Paket B31] - 2026-11-07
 

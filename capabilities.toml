@@ -466,3 +466,16 @@ may_depend_on = ['contextra-crypto', 'contextra-ports', 'contextra-types']
 ci_class = 'pr'
 spec = ['5.1', '11']
 test = "cargo test -p contextra-erasure --locked"
+
+[crates.contextra-bench]
+klasse = "T"
+ring = "Tooling"
+maturity = "stable"
+description = "Benchmark-Harness und Performanz-Regressionstests"
+capabilities = ["benchmarking", "regression-testing"]
+path = "benchmarks/contextra-bench"
+unsafe_island = false
+may_depend_on = ["contextra-db", "contextra-ports", "contextra-store", "contextra-sys", "contextra-text", "contextra-types", "contextra-vector"]
+ci_class = "pr"
+spec = ["0", "3", "4"]
+test = "cargo test -p contextra-bench --locked"

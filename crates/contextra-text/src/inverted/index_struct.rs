@@ -210,7 +210,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
-                        let doc_id = DocId::new(doc_id_raw);
+                        let doc_id = DocId::new(doc_id_raw as _);
                         let tf =
                             u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
                                 ContextraError::Storage("Invalid posting tf length".into())
@@ -416,7 +416,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
             let doc_id_raw_opt = std::str::from_utf8(parts[0])
                 .ok()
                 .and_then(|s| s.parse::<u128>().ok())
-                .map(|v| DocId::new(v));
+                .map(|v| DocId::new(v as _));
             let doc_id = match doc_id_raw_opt {
                 Some(v) => v,
                 None => continue,
@@ -562,9 +562,12 @@ impl<S: StorageEngine> InvertedIndex<S> {
             let docs = self.total_docs.load(Ordering::SeqCst);
             let tokens = self.total_tokens.load(Ordering::SeqCst);
             let avg_len = if docs > 0 {
-                ((tokens as f64 / docs as f64) * 1000.0)
-                    .round()
-                    .clamp(0.0, u64::MAX as f64) as u64
+                let ratio = (tokens as f64) / (docs as f64);
+                if ratio.is_finite() && ratio >= 0.0 {
+                    (ratio * 1000.0).round().clamp(0.0, u64::MAX as f64) as u64
+                } else {
+                    0
+                }
             } else {
                 0
             };

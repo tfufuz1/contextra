@@ -42,6 +42,10 @@ pub struct EncryptedSegmentPayload {
 #[derive(Zeroize, ZeroizeOnDrop)]
 // ANCHOR[contextra-crypto:KV-003]
 /// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherbereinigung.
+#[deprecated(
+    since = "0.1.0",
+    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
+)]
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,
@@ -330,7 +334,7 @@ mod tests {
         assert_eq!(decrypted, plaintext);
 
         // Revoke key in single consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment.segment_id);
+        let revoked = cipher.registry().revoke_subkey(segment.segment_id).unwrap();
         assert!(revoked, "Subkey revocation must succeed");
 
         let res = segment.decrypt_data(&cipher);

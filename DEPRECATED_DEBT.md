@@ -17,8 +17,11 @@ Dieses Dokument deklariert diese Relikte offiziell als **Deprecated Debt** (tech
 ### DEBT-01: Monolithische Löschkette in Core- und Speicher-Crates
 - **Betroffene Crates:** `contextra-store`, `contextra-vector`, `contextra-text`, `contextra-crypto`, `contextra-db`, `contextra-mcp`, `contextra-engine`.
 - **Beschreibung:** Ursprünglich war die mehrstufige Löschlogik (Saga, Gate, Vault, Journal, Witness, Audit Reports) hart in den Speicher- und Indexkernen verdrahtet. Dies führte zu über 660 verstreuten Fundstellen von Lösch- und Rechts-Relikten in an sich neutralen Datenstrukturen.
+- **Status `contextra-store`:** Weitgehend bereinigt (Paket B8 / Welle 3). Direkte Abhängigkeiten zu Deletion-Proofs, Audit-Trails und DSGVO-Sagas wurden aus dem LSM-Speicherkern eliminiert. Die verbleibenden Relikte in `kv/segment.rs` und `kv/delete_mode.rs` sind isoliert und als veraltet markiert. Neutrale Bereinigungsoperationen (`compact`, `reclaim`) und Port-Implementierungen (`Purger`, `LayerScanner`) sind aktiv.
 - **Zielarchitektur:** Vollständige Kapselung aller Lösch-Orchestrierungs- und Nachweislogiken in [`contextra-erasure`](crates/contextra-erasure/).
 - **Migrationsanweisung für Speicherkerne:** Speicherkerne implementieren ausschließlich minimale, neutrale Bereinigungs-Ports (`Purger`, `LayerScanner` in `contextra-ports`). Alle direkten Abhängigkeiten zu Deletion-Proofs, Audit-Trails und DSGVO-Kontexten werden entfernt.
+- **Aktive Deprecations:**
+  - `contextra_store::lsm::DurabilityMode::validate_against_features(deletion_proof_active, feature_ring)`: Ersetzt durch neutrale Signatur `validate_durability(integrity_chain_required, require_persistence)`. Die alte Methode bleibt als `#[deprecated]`-Weiterleitung erhalten. Ablauf-Meilenstein: **M8 / v0.2.0**.
 
 ### DEBT-02: Historische Robotik- & SQLite-Agenten-Relikte
 - **Betroffene Crates:** `contextra-agent`, `contextra-db`, `contextra-cognition`.
