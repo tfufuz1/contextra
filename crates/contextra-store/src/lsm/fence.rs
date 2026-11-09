@@ -94,7 +94,12 @@ impl FlushPurgeFence {
 pub fn publish_visibility(target: &AtomicU64, new_tx: u64) {
     let mut current = target.load(Ordering::Acquire);
     while new_tx > current {
-        match target.compare_exchange_weak(current, new_tx, Ordering::Release, Ordering::Acquire) {
+        match target.compare_exchange_weak(
+            current,
+            new_tx,
+            Ordering::Release,
+            Ordering::Acquire,
+        ) {
             Ok(_) => break,
             Err(actual) => current = actual,
         }

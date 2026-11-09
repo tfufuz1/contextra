@@ -6,7 +6,7 @@
 
 #[cfg(loom)]
 mod loom_tests {
-    use loom::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+    use loom::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
     use loom::sync::{Arc, Mutex};
     use loom::thread;
 
@@ -68,9 +68,7 @@ mod loom_tests {
 
             // Flush thread (versucht 0 -> 1 mit compare_exchange)
             let flush_t = thread::spawn(move || {
-                let entered = s1
-                    .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_ok();
+                let entered = s1.compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst).is_ok();
                 if entered {
                     let prev = cs1.fetch_add(1, Ordering::SeqCst);
                     assert_eq!(prev, 0, "Mutual exclusion violated: concurrent CS");
@@ -84,9 +82,7 @@ mod loom_tests {
 
             // Purge thread (versucht 0 -> 2 mit compare_exchange)
             let purge_t = thread::spawn(move || {
-                let entered = s2
-                    .compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_ok();
+                let entered = s2.compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst).is_ok();
                 if entered {
                     let prev = cs2.fetch_add(1, Ordering::SeqCst);
                     assert_eq!(prev, 0, "Mutual exclusion violated: concurrent CS");
@@ -104,7 +100,7 @@ mod loom_tests {
 #[cfg(not(loom))]
 #[test]
 fn test_commit_flush_visibility_non_loom() {
-    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::thread;
 
@@ -148,9 +144,7 @@ fn test_commit_flush_visibility_non_loom() {
     let cs1 = Arc::clone(&in_cs);
 
     let flush_t = thread::spawn(move || {
-        let entered = s1
-            .compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok();
+        let entered = s1.compare_exchange(0, 1, Ordering::SeqCst, Ordering::SeqCst).is_ok();
         if entered {
             let prev = cs1.fetch_add(1, Ordering::SeqCst);
             assert_eq!(prev, 0);
@@ -163,9 +157,7 @@ fn test_commit_flush_visibility_non_loom() {
     let cs2 = Arc::clone(&in_cs);
 
     let purge_t = thread::spawn(move || {
-        let entered = s2
-            .compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok();
+        let entered = s2.compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst).is_ok();
         if entered {
             let prev = cs2.fetch_add(1, Ordering::SeqCst);
             assert_eq!(prev, 0);
