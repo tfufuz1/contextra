@@ -294,42 +294,19 @@ impl Contextra {
 
     // ANCHOR[contextra-engine:DRO-288]
     /// Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    #[tracing::instrument(level = "trace", skip(self, proof_key))]
+    #[tracing::instrument(level = "trace", skip(self))]
     pub async fn drop_collection(
         &self,
         name: &str,
         tenant_id: TenantId,
-        proof_key: &[u8],
-    ) -> Result<DeletionProof> {
-        struct InlineKeyProvider(Vec<u8>);
-        impl contextra_impl::erasure::ProofKeyProvider for InlineKeyProvider {
-            fn resolve_proof_key(&self, _tenant_id: TenantId) -> Result<Vec<u8>> {
-                Ok(self.0.clone())
-            }
-        }
-
-        let provider = Arc::new(InlineKeyProvider(proof_key.to_vec()));
-        let mut old_provider = self.proof_key_provider.write();
-        let prev = old_provider.take();
-        *old_provider = Some(provider);
-        drop(old_provider);
-
-        let report = self.erase_collection(tenant_id, name).await;
-
-        if let Some(p) = prev {
-            *self.proof_key_provider.write() = Some(p);
-        }
-
-        let report = report?;
+    ) -> Result<ErasureReport> {
+        let report = self.erase_collection(tenant_id, name).await?;
         if report.verified {
-            report.proof.ok_or_else(|| {
-                contextra_types::ContextraError::Internal(
-                    "ErasureReport was verified but contained no DeletionProof".to_string(),
-                )
-            })
+            Ok(report)
         } else {
             let reason = report
                 .failure
+                .as_ref()
                 .map(|f| format!("{}: {}", f.layer, f.reason))
                 .unwrap_or_else(|| "Unknown erasure failure".to_string());
             Err(contextra_types::ContextraError::Internal(format!(
