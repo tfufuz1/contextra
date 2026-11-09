@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing)]
 //! # DiBud-Zustandsautomat (`dibud::state`)
 //!
 //! **Ring:** Ring 0 (Ranking & Kalibrierung)
@@ -98,7 +99,7 @@ impl DiBudFusionState {
         self.accesses += 1;
         let ch_idx = ch.index();
         self.channel_depths[ch_idx] += 1;
-        let rank_1based = self.channel_depths[ch_idx] as u32;
+        let rank_1based = u32::try_from(self.channel_depths[ch_idx]).unwrap_or(u32::MAX);
 
         if let Some(doc_id) = item {
             let doc_state = self.observed_docs.entry(doc_id).or_default();

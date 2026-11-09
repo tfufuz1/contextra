@@ -35,7 +35,7 @@ impl SystemClock {
 impl Clock for SystemClock {
     #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn now_unix_nanos(&self) -> u64 {
-        std::time::SystemTime::now()
+        std::time::SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28) // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28)
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0)
@@ -43,7 +43,7 @@ impl Clock for SystemClock {
 
     #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn monotonic_nanos(&self) -> u64 {
-        std::time::SystemTime::now()
+        std::time::SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28) // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock (P28)
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0)
@@ -80,7 +80,7 @@ const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-rank:ISO-001]
 /// Nicht-parametrischer Kalibrierer auf Basis von PAVA.
 pub struct IsotonicCalibrator {
@@ -93,6 +93,7 @@ pub struct IsotonicCalibrator {
     fingerprint: Option<ConfigFingerprint>,
     last_calibration_at: Option<u64>,
     cached_ece: Option<f32>,
+    #[serde(skip, default = "_default_clock")]
     clock: Arc<dyn Clock>,
 }
 
@@ -383,6 +384,24 @@ impl IsotonicCalibrator {
             ece += (bin_n / n) * (avg_confidence - avg_accuracy).abs();
         }
         Some(ece)
+    }
+}
+
+fn _default_clock() -> Arc<dyn Clock> {
+    Arc::new(SystemClock::new())
+}
+
+impl PartialEq for IsotonicCalibrator {
+    fn eq(&self, other: &Self) -> bool {
+        self.observations == other.observations
+            && self.warmup_required == other.warmup_required
+            && self.max_observations == other.max_observations
+            && self.cached_model == other.cached_model
+            && self.model_dirty == other.model_dirty
+            && self.observations_since_rebuild == other.observations_since_rebuild
+            && self.fingerprint == other.fingerprint
+            && self.last_calibration_at == other.last_calibration_at
+            && self.cached_ece == other.cached_ece
     }
 }
 

@@ -212,3 +212,60 @@ pub struct SearchReport {
     /// Number of adaptive candidate overfetch stages executed (1, 2, or 3).
     pub overfetch_stages: u8,
 }
+
+/// Crate-local scored item representing a ranked result with score and optional provenance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScoredItem {
+    /// Unique document identifier string.
+    pub id: String,
+    /// Ranking or relevance score.
+    pub score: f32,
+    /// Optional provenance tracking identifying signal contributions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<String>,
+}
+
+impl ScoredItem {
+    /// Creates a new `ScoredItem` with the given identifier and score.
+    #[inline]
+    #[must_use]
+    pub const fn new(id: String, score: f32) -> Self {
+        Self {
+            id,
+            score,
+            provenance: None,
+        }
+    }
+
+    /// Attaches provenance information to the `ScoredItem`.
+    #[inline]
+    #[must_use]
+    pub fn with_provenance(mut self, provenance: impl Into<String>) -> Self {
+        self.provenance = Some(provenance.into());
+        self
+    }
+}
+
+impl From<SearchResult> for ScoredItem {
+    #[inline]
+    fn from(res: SearchResult) -> Self {
+        Self {
+            id: res.id,
+            score: res.score,
+            provenance: None,
+        }
+    }
+}
+
+impl From<ScoredItem> for SearchResult {
+    #[inline]
+    fn from(item: ScoredItem) -> Self {
+        Self {
+            id: item.id,
+            score: item.score,
+            metadata: None,
+            matched_signals: Vec::new(),
+            provenance: None,
+        }
+    }
+}

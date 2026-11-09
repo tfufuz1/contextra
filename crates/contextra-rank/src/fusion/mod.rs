@@ -35,3 +35,6 @@ pub use types::{
     FusedScore, ProvenanceRecord, SearchReport, SearchResult, Signal, SignalContribution,
     SignalFailurePolicy,
 };
+
+pub use rrf::rrf_fuse;
+pub use types::ScoredItem;

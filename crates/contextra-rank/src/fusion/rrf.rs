@@ -765,7 +765,7 @@ fn evaluate_effective_signal_strategies(
         } else {
             req_strat
         };
-        effective_strategies.insert((*sig_name).clone(), eff_strat);
+        effective_strategies.insert((*sig_name).to_string(), eff_strat);
     }
 
     effective_strategies
@@ -872,4 +872,72 @@ pub fn fuse_search_results_with_strategy(
         resonance_config,
         strategy.into(),
     )
+}
+
+/// Standard unweighted Reciprocal Rank Fusion on slices of `ScoredItem` lists.
+pub fn rrf_fuse(
+    ranked_lists: &[Vec<crate::fusion::types::ScoredItem>],
+    k: usize,
+) -> crate::error::Result<Vec<crate::fusion::types::ScoredItem>> {
+    use crate::fusion::types::ScoredItem;
+    use std::cmp::Ordering;
+
+    if k < 1 {
+        return Err(crate::error::RankError::InvalidInput(
+            "RRF parameter k must be >= 1".to_string(),
+        ));
+    }
+
+    if ranked_lists.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    for list in ranked_lists {
+        for item in list {
+            if !item.score.is_finite() {
+                return Err(crate::error::RankError::InvalidInput(
+                    "Score must be a finite number".to_string(),
+                ));
+            }
+        }
+    }
+
+    let mut doc_ranks: ahash::AHashMap<String, Vec<usize>> = ahash::AHashMap::new();
+
+    for list in ranked_lists {
+        let mut seen_in_list = ahash::AHashMap::new();
+        for (idx, item) in list.iter().enumerate() {
+            let rank = idx.saturating_add(1);
+            seen_in_list
+                .entry(item.id.clone())
+                .and_modify(|best_rank: &mut usize| {
+                    if rank < *best_rank {
+                        *best_rank = rank;
+                    }
+                })
+                .or_insert(rank);
+        }
+
+        for (id, rank) in seen_in_list {
+            doc_ranks.entry(id).or_default().push(rank);
+        }
+    }
+
+    let mut results: Vec<ScoredItem> = Vec::with_capacity(doc_ranks.len());
+    let k_f64 = k as f64;
+
+    for (id, mut ranks) in doc_ranks {
+        ranks.sort_unstable();
+        let total_score: f64 = ranks.iter().map(|&r| 1.0f64 / (k_f64 + (r as f64))).sum();
+
+        #[allow(clippy::cast_possible_truncation)]
+        results.push(ScoredItem::new(id, total_score as f32));
+    }
+
+    results.sort_by(|a, b| match b.score.total_cmp(&a.score) {
+        Ordering::Equal => a.id.cmp(&b.id),
+        other => other,
+    });
+
+    Ok(results)
 }

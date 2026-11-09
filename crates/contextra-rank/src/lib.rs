@@ -45,14 +45,13 @@ pub use local_types::{
     SignalFusionStrategies, MAX_SEARCH_K,
 };
 
-#[cfg(feature = "dibud")]
 pub mod dibud;
 
 pub use calibration::{
     AdaptiveConformalCalibrator, Clock, ConformalCalibrator, ConformalError, IsotonicCalibrator,
     PlattScaler, SystemClock,
 };
-#[cfg(feature = "dibud")]
+
 pub use dibud::{
     fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, DiBudOutcome,
     DiBudStep, FusionBudget,
@@ -69,3 +68,6 @@ pub use fusion::{
     SignalKind,
 };
 pub use metrics::{mean_reciprocal_rank, ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank};
+
+pub use calibration::{calibrate_score, Calibrator, CalibratorModel};
+pub use fusion::{rrf_fuse, ScoredItem};
