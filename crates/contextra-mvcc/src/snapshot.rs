@@ -30,6 +30,7 @@
 // INVARIANTE: Solange SnapshotGuard lebt → keine Tombstone-GC für seq >= guard.seq_no.
 // RAII-PATTERN: Drop deregistriert automatisch. unwrap_or(u64::MAX) ist KORREKT.
 
+use crate::error::{ContextraError, Result};
 use crate::types::{TenantId, TOMBSTONE_BIT};
 use contextra_ports::{Clock, SystemClock};
 use parking_lot::Mutex;
@@ -38,14 +39,33 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+/// Konfigurationsoptionen für die [`SnapshotRegistry`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnapshotRegistryConfig {
+    /// Maximale Anzahl gleichzeitig aktiver Snapshots (Default: 100.000).
+    pub max_active_snapshots: usize,
+    /// Maximales Alter eines Snapshots (Default: 300 s / 5 min), bevor er als überaltert gilt.
+    pub max_snapshot_age: Duration,
+}
+
+impl Default for SnapshotRegistryConfig {
+    fn default() -> Self {
+        Self {
+            max_active_snapshots: 100_000,
+            max_snapshot_age: Duration::from_secs(300),
+        }
+    }
+}
+
 /// Zentrale Registrierung für aktive Lese-Snapshots im System.
 ///
 /// ### Synchronisationsstrategie:
 /// - `active`: Ein sortierter `BTreeMap`, geschützt durch einen `parking_lot::Mutex`.
-///   Schlüssel ist die Snapshot-Sequenznummer; Wert ist eine Liste von Nanosekunden-Zeitstempeln
+///   Schlüssel ist die Snapshot-Sequenznummer; Wert ist eine Liste von Metadaten
 ///   aller Guards, die diesen Snapshot halten (Referenzzählung).
 /// - `min_active_seqno`: Atomarer 64-Bit-Ganzzahlwert für lock-freies Auslesen durch Hintergrund-Threads.
 /// - `clock`: Zeitport zur Erfassung der Haltedauer aktiver Snapshots.
+/// - `config`: Konfigurierte Kapazitäts- und Altersgrenzen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SnapshotMeta {
     tenant: Option<TenantId>,
@@ -57,6 +77,7 @@ pub struct SnapshotRegistry {
     active: Mutex<BTreeMap<u64, Vec<SnapshotMeta>>>,
     min_active_seqno: AtomicU64,
     clock: Arc<dyn Clock>,
+    config: SnapshotRegistryConfig,
 }
 
 impl std::fmt::Debug for SnapshotRegistry {
@@ -75,17 +96,23 @@ impl Default for SnapshotRegistry {
 }
 
 impl SnapshotRegistry {
-    /// Erstellt eine neue, leere Snapshot-Registry mit Standard-[`SystemClock`].
+    /// Erstellt eine neue, leere Snapshot-Registry mit Standard-[`SystemClock`] und Standardkonfiguration.
     pub fn new() -> Self {
         Self::with_clock(Arc::new(SystemClock::new()))
     }
 
     /// Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port (für Tests).
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
+        Self::with_clock_and_config(clock, SnapshotRegistryConfig::default())
+    }
+
+    /// Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port und Konfiguration.
+    pub fn with_clock_and_config(clock: Arc<dyn Clock>, config: SnapshotRegistryConfig) -> Self {
         Self {
             active: Mutex::new(BTreeMap::new()),
             min_active_seqno: AtomicU64::new(u64::MAX),
             clock,
+            config,
         }
     }
 
@@ -109,6 +136,96 @@ impl SnapshotRegistry {
     /// Liefert eine Referenz auf den aktiven Zeitport ([`Clock`]).
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
+    }
+
+    /// Liefert die aktuelle Konfiguration der Registry.
+    pub fn config(&self) -> SnapshotRegistryConfig {
+        self.config
+    }
+
+    /// Setzt eine neue Konfiguration für die Registry.
+    pub fn set_config(&mut self, config: SnapshotRegistryConfig) {
+        self.config = config;
+    }
+
+    /// Liefert die Untergrenze für Garbage Collection (älteste aktive Snapshot-Sequenz).
+    /// Entspricht dem Vertrag für Store-Kompaktierung und ist äquivalent zu `min_read_snapshot()`.
+    #[inline]
+    pub fn oldest_active_snapshot(&self) -> Option<u64> {
+        self.min_read_snapshot()
+    }
+
+    /// Versucht, einen Lese-Snapshot zu registrieren.
+    ///
+    /// Im Gegensatz zu `register` schlägt diese Methode fail-closed mit `ContextraError::LimitExceeded` fehl,
+    /// wenn die konfigurierte Maximalanzahl aktiver Snapshots (`max_active_snapshots`) erreicht ist.
+    pub fn try_register(self: &Arc<Self>, seq_no: u64) -> Result<SnapshotGuard> {
+        let now_nanos = self.clock.monotonic_nanos();
+        self.try_register_at(seq_no, now_nanos)
+    }
+
+    /// Versucht, einen Lese-Snapshot zu einem expliziten Nanosekunden-Zeitstempel zu registrieren.
+    pub fn try_register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> Result<SnapshotGuard> {
+        self.try_register_for_tenant_at(None, seq_no, at_nanos)
+    }
+
+    /// Versucht, einen Lese-Snapshot für einen bestimmten Mandanten zu registrieren.
+    pub fn try_register_for_tenant(
+        self: &Arc<Self>,
+        tenant: TenantId,
+        seq_no: u64,
+    ) -> Result<SnapshotGuard> {
+        let now_nanos = self.clock.monotonic_nanos();
+        self.try_register_for_tenant_at(Some(tenant), seq_no, now_nanos)
+    }
+
+    /// Versucht, einen Lese-Snapshot für einen Mandanten zu einem expliziten Zeitstempel zu registrieren.
+    pub fn try_register_for_tenant_at(
+        self: &Arc<Self>,
+        tenant: Option<TenantId>,
+        seq_no: u64,
+        at_nanos: u64,
+    ) -> Result<SnapshotGuard> {
+        let seq_no = seq_no & !TOMBSTONE_BIT;
+        let mut active = self.active.lock();
+
+        let total_active: usize = active.values().map(|v| v.len()).sum();
+        if total_active >= self.config.max_active_snapshots {
+            return Err(ContextraError::limit_exceeded(
+                self.config.max_active_snapshots,
+                format!(
+                    "Snapshot registry capacity exceeded ({} active snapshots >= max {})",
+                    total_active, self.config.max_active_snapshots
+                ),
+            ));
+        }
+
+        let max_nanos = u64::try_from(self.config.max_snapshot_age.as_nanos()).unwrap_or(u64::MAX);
+        if max_nanos < u64::MAX {
+            for metas in active.values() {
+                for meta in metas {
+                    if at_nanos.saturating_sub(meta.created_at) > max_nanos {
+                        return Err(ContextraError::Transaction(format!(
+                            "Snapshot registration rejected: oldest active snapshot exceeds max age {:?} (age: {:?})",
+                            self.config.max_snapshot_age,
+                            Duration::from_nanos(at_nanos.saturating_sub(meta.created_at))
+                        )));
+                    }
+                }
+            }
+        }
+
+        active.entry(seq_no).or_default().push(SnapshotMeta {
+            tenant,
+            created_at: at_nanos,
+        });
+        self.update_min(&active);
+        Ok(SnapshotGuard {
+            registry: self.clone(),
+            seq_no,
+            created_at: Some(at_nanos),
+            tenant,
+        })
     }
 
     /// Registriert einen Lese-Snapshot und liefert einen RAII-Guard ([`SnapshotGuard`]) zurück.
@@ -504,7 +621,10 @@ mod tests {
 
         // Widerrufe Snapshots von Tenant A im Bereich 100..200
         let revoked_count = registry.revoke_covering(tenant_a, 100..200, 150);
-        assert_eq!(revoked_count, 1, "Exakt 1 Snapshot für Mandant A muss widerrufen werden");
+        assert_eq!(
+            revoked_count, 1,
+            "Exakt 1 Snapshot für Mandant A muss widerrufen werden"
+        );
 
         // Mandant B ist nach wie vor aktiv auf Sequenz 150!
         assert_eq!(
@@ -662,6 +782,67 @@ mod tests {
         let reaped = registry.reap_expired_pins(Duration::from_secs(300));
         assert_eq!(reaped, vec![100]);
         assert_eq!(registry.min_active_seqno(), 200);
+    }
+
+    // Prüft try_register und Kapazitätsbegrenzung für SnapshotRegistry.
+    #[test]
+    fn test_snapshot_registry_try_register_capacity_limit() {
+        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let config = SnapshotRegistryConfig {
+            max_active_snapshots: 2,
+            max_snapshot_age: Duration::from_secs(60),
+        };
+        let registry = Arc::new(SnapshotRegistry::with_clock_and_config(clock, config));
+
+        assert_eq!(registry.oldest_active_snapshot(), None);
+
+        let g1 = registry.try_register(10).expect("first snapshot succeeds");
+        assert_eq!(registry.oldest_active_snapshot(), Some(10));
+
+        let g2 = registry.try_register(20).expect("second snapshot succeeds");
+        assert_eq!(registry.oldest_active_snapshot(), Some(10));
+
+        // Third snapshot must fail closed with LimitExceeded
+        let res3 = registry.try_register(30);
+        assert!(matches!(res3, Err(ContextraError::LimitExceeded { .. })));
+
+        drop(g1);
+        assert_eq!(registry.oldest_active_snapshot(), Some(20));
+
+        // Now third snapshot succeeds
+        let g3 = registry
+            .try_register(30)
+            .expect("third snapshot succeeds after drop");
+        assert_eq!(registry.oldest_active_snapshot(), Some(20));
+
+        drop(g2);
+        drop(g3);
+        assert_eq!(registry.oldest_active_snapshot(), None);
+    }
+
+    #[test]
+    fn test_snapshot_registry_try_register_overaged_rejection() {
+        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let config = SnapshotRegistryConfig {
+            max_active_snapshots: 10,
+            max_snapshot_age: Duration::from_secs(10),
+        };
+        let registry = Arc::new(SnapshotRegistry::with_clock_and_config(
+            clock.clone(),
+            config,
+        ));
+
+        let _s1 = registry.try_register(10).expect("s1 ok");
+
+        // Advance clock past max_snapshot_age (10s)
+        clock.advance(Duration::from_secs(15));
+
+        // Attempting to register another snapshot while an over-aged snapshot exists must be rejected
+        let s2 = registry.try_register(20);
+        assert!(
+            s2.is_err(),
+            "Registration must be rejected if an existing active snapshot exceeds max age"
+        );
     }
 
     proptest::proptest! {
