@@ -133,7 +133,7 @@ impl SstableReader {
                     let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                         ContextraError::Storage("overflow calculating value position".into())
                     })?;
-                    if end_val > block_data.len() {
+                    if end_val > offsets_start {
                         return Err(ContextraError::Storage(
                             "malformed block: value length out of bounds".into(),
                         ));
@@ -284,7 +284,7 @@ impl SstableReader {
                 let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                     ContextraError::Storage("overflow calculating value position".into())
                 })?;
-                if end_val > block_data.len() {
+                if end_val > offsets_start {
                     return Err(ContextraError::Storage(
                         "malformed block: value length out of bounds".into(),
                     ));
