@@ -184,6 +184,9 @@ pub trait Vfs: Send + Sync + 'static {
     ///
     /// # Fehler
     /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei I/O-Fehlern.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff ohne persistente Mutation.
     fn read_at(&self, path: &Path, offset: u64, buf: &mut [u8]) -> Result<usize> {
         let file = self.open(path, &VfsOpenOptions::read_only())?;
         file.read_at(buf, offset).map_err(crate::ContextraError::Io)
@@ -249,6 +252,11 @@ pub trait Vfs: Send + Sync + 'static {
     fn remove_file(&self, path: &Path) -> Result<()>;
 
     /// Canonical alias for removing a file (SPEC D-113 / Purge-Primitive).
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound).
+    /// # Crash
+    /// Entfernt Verzeichniseintrag; Persistenz erfordert `sync_dir`.
     fn unlink(&self, path: &Path) -> Result<()> {
         self.remove_file(path)
     }
@@ -309,6 +317,11 @@ pub trait Vfs: Send + Sync + 'static {
     fn list_dir(&self, path: &Path) -> Result<Vec<String>>;
 
     /// Canonical alias for listing entries in directory `path` (SPEC 3.1).
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound).
+    /// # Crash
+    /// Reiner Lesezugriff auf Verzeichniseinträge.
     fn list(&self, path: &Path) -> Result<Vec<String>> {
         self.list_dir(path)
     }

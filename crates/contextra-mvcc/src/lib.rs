@@ -48,6 +48,31 @@
 //!
 //! **Regel (INV-LOCK-ORDER-1):** Kein Sperr-Guard wird über `.await`-Punkte hinweg gehalten
 //! (`contextra-mvcc` ist vollkommen synchron und frei von Async-Runtimes wie Tokio).
+//!
+//! ## Anwendungsbeispiel (Doctest)
+//!
+//! ```rust
+//! use std::sync::Arc;
+//! use contextra_mvcc::{SnapshotRegistry, TxBuffer, ReadSet, SequenceLogSsiValidator, SsiValidator, IndexOp};
+//! use contextra_mvcc::types::{TxId, DocId};
+//!
+//! let registry = Arc::new(SnapshotRegistry::new());
+//! let ssi = SequenceLogSsiValidator::new();
+//! let buffer = TxBuffer::<String>::new();
+//!
+//! let tx = TxId::new(1);
+//! let guard = registry.register(100);
+//!
+//! let mut read_set = ReadSet::new();
+//! read_set.record_read(b"account:42", 100);
+//!
+//! buffer.begin(tx);
+//! buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(1u64), data: "value".into() }).unwrap();
+//!
+//! // Validierung vor Commit gegen Anti-Dependencies
+//! assert!(ssi.validate(tx, &read_set).is_ok());
+//! drop(guard);
+//! ```
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]

@@ -159,6 +159,12 @@ pub trait BlockCacheBackend: Send + Sync {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.get(key).is_some()
     }
+
+    /// Returns the current memory usage in bytes.
+    fn current_bytes(&self) -> usize;
+
+    /// Returns the capacity limit in bytes.
+    fn capacity_bytes(&self) -> usize;
 }
 
 struct LruBlockCacheState {
@@ -182,6 +188,16 @@ impl BlockCacheBackend for LruBlockCacheBackend {
                 capacity_bytes,
             }),
         }
+    }
+
+    #[inline]
+    fn current_bytes(&self) -> usize {
+        self.state.read().current_bytes
+    }
+
+    #[inline]
+    fn capacity_bytes(&self) -> usize {
+        self.state.read().capacity_bytes
     }
 
     #[inline]
@@ -215,6 +231,16 @@ impl BlockCacheBackend for LruBlockCacheBackend {
     #[inline]
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.state.read().cache.contains(key)
+    }
+
+    #[inline]
+    fn current_bytes(&self) -> usize {
+        self.state.read().current_bytes
+    }
+
+    #[inline]
+    fn capacity_bytes(&self) -> usize {
+        self.state.read().capacity_bytes
     }
 }
 
@@ -274,6 +300,16 @@ impl BlockCacheBackend for QuickCacheBlockCacheBackend {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.cache.get(key).is_some()
     }
+
+    #[inline]
+    fn current_bytes(&self) -> usize {
+        self.cache.weight() as usize
+    }
+
+    #[inline]
+    fn capacity_bytes(&self) -> usize {
+        self.cache.capacity() as usize
+    }
 }
 
 #[cfg(not(feature = "block-cache-v2"))]
@@ -285,6 +321,8 @@ pub type BlockCacheShard = QuickCacheBlockCacheBackend;
 pub struct BlockCache {
     shards: Vec<BlockCacheShard>,
     hash_builder: ahash::RandomState,
+    hits: std::sync::atomic::AtomicU64,
+    misses: std::sync::atomic::AtomicU64,
 }
 
 impl BlockCache {
@@ -316,6 +354,8 @@ impl BlockCache {
                 BLOCK_CACHE_SEED_2,
                 BLOCK_CACHE_SEED_3,
             ),
+            hits: std::sync::atomic::AtomicU64::new(0),
+            misses: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -333,7 +373,14 @@ impl BlockCache {
 
     #[inline]
     pub fn get(&self, file_id: u64, offset: u64) -> Option<Bytes> {
-        self.shard(file_id, offset).get(&(file_id, offset))
+        let res = self.shard(file_id, offset).get(&(file_id, offset));
+        if res.is_some() {
+            self.hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        } else {
+            self.misses
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        res
     }
 
     #[inline]
@@ -354,6 +401,45 @@ impl BlockCache {
     #[inline]
     pub fn contains(&self, file_id: u64, offset: u64) -> bool {
         self.shard(file_id, offset).contains(&(file_id, offset))
+    }
+
+    /// Returns the total number of cache hits recorded.
+    #[inline]
+    pub fn hits(&self) -> u64 {
+        self.hits.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Returns the total number of cache misses recorded.
+    #[inline]
+    pub fn misses(&self) -> u64 {
+        self.misses.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Returns the cache hit ratio (0.0 .. 1.0).
+    pub fn hit_ratio(&self) -> f64 {
+        let hits = self.hits() as f64;
+        let total = hits + self.misses() as f64;
+        if total == 0.0 {
+            0.0
+        } else {
+            hits / total
+        }
+    }
+
+    /// Resets hit and miss metrics counters.
+    pub fn reset_metrics(&self) {
+        self.hits.store(0, std::sync::atomic::Ordering::Relaxed);
+        self.misses.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Returns current memory usage in bytes across all shards.
+    pub fn current_bytes(&self) -> usize {
+        self.shards.iter().map(|s| s.current_bytes()).sum()
+    }
+
+    /// Returns total configured byte capacity across all shards.
+    pub fn total_capacity_bytes(&self) -> usize {
+        self.shards.iter().map(|s| s.capacity_bytes()).sum()
     }
 }
 

@@ -2,33 +2,25 @@
 
 Multi-Version Concurrency Control (MVCC) und Serializable Snapshot Isolation (SSI).
 
-Normativitätsklasse: **Klasse B (Storage-Bundle)** (Ring 0, `stable`; SPEC §5.2, `capabilities.toml`).
-
-## Rolle in einem Satz
+## Zweck
 `contextra-mvcc` bietet deterministische Multi-Version Concurrency Control (SequenceLog, SnapshotRegistry, TxBuffer, ReadSet, SSI-Validator) für serielle Transaktionsisolation ohne Tokio-Laufzeitabhängigkeit.
 
-## Baukasten-Export (Copy-Paste)
-```bash
-python3 tools/export_crate.py contextra-mvcc --out /tmp/export-contextra-mvcc
-```
+## Reifegrad
+- **Status:** Stabil (`stable`), autarker Kernbaustein.
+- **Sicherheitsstufe:** `#![forbid(unsafe_code)]`, Zero-Panic in Nicht-Test-Code.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Transaktionsisolation)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
+## Interne Abhängigkeiten
+`contextra-mvcc` hängt ausschließlich von minimalen Basis-Crates ab:
+- `contextra-types`: Domänentypen wie `TxId`, `DocId`, `TenantId`, `ContextraError`.
+- `contextra-ports`: Zeitabstraktion (`Clock`).
+- Externe Abhängigkeiten: `ahash`, `bytes`, `parking_lot`, `serde`, `thiserror`, `tracing`.
+Keine Abhängigkeiten zu höheren Schichten (`store`, `vector`, `graph`, `engine`, `db`).
 
-## Garantien & Invarianten
-- **Baukasten-Reinheit (M1, M8):** Keine asynchronen Abhängigkeiten (kein Tokio in `[dependencies]` oder `[dev-dependencies]`).
-- **Sperrenordnung (INV-LOCK-ORDER-1):** Totale, dokumentierte Sperrenhierarchie:
-  `Document -> TxBuffer (Shards 0..N-1) -> SnapshotRegistry -> SequenceLog / SSI (CommittedWrites)`. Keine Locks über `.await`.
-- **SSI-Validierung (INV-SSI-ACTIVE-1):** Erkennung von Anti-Dependency-Zyklen (Write-Skew) und Phantomschutz über Prefix-Tracking.
-- **Fail-Closed & Sentinel-Schutz:** Sentinel `u64::MAX` oder Sequenzen mit `TOMBSTONE_BIT` / `>= i64::MAX as u64` werden in `prune_through` strikt abgewiesen, um eine vorzeitige Invalidierung von Snapshots zu verhindern.
-- **Zero-Unsafe (M9):** `#![forbid(unsafe_code)]` strikt durchgesetzt.
+## Features
+- `default = []`: Vollständig synchron nutzbar ohne Runtimes.
+- Keine versteckten I/O- oder Async-Feature-Flags.
 
-## Einbettungsbeispiel
-Ein vollständiges, autarkes Verwendungsbeispiel findet sich unter `examples/mvcc_basic.rs`.
-
+## Doctest
 ```rust
 use std::sync::Arc;
 use contextra_mvcc::{SnapshotRegistry, TxBuffer, ReadSet, SequenceLogSsiValidator, SsiValidator, IndexOp};
@@ -42,12 +34,30 @@ let tx = TxId::new(1);
 let guard = registry.register(100);
 
 let mut read_set = ReadSet::new();
-read_set.record_read(b"key:1", 100);
+read_set.record_read(b"account:42", 100);
 
 buffer.begin(tx);
-buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(1u64), data: "val".into() }).unwrap();
+buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(1u64), data: "value".into() }).unwrap();
 
-// Validierung vor Commit
+// Validierung vor Commit gegen Anti-Dependencies
 assert!(ssi.validate(tx, &read_set).is_ok());
 drop(guard);
 ```
+
+## Entnahme-Rezept
+Zur isolierten Nutzung in externen Projekten:
+```bash
+# Kopieren des Crates zusammen mit seinen Basis-Abhängigkeiten
+cp -r crates/contextra-mvcc /path/to/target/
+cp -r crates/contextra-types /path/to/target/
+cp -r crates/contextra-ports /path/to/target/
+```
+In `Cargo.toml` des Zielprojekts:
+```toml
+[dependencies]
+contextra-mvcc = { path = "./contextra-mvcc" }
+```
+
+## Bekannte Grenzen
+- **In-Memory-Fokus:** `contextra-mvcc` speichert Transaktionszustände, ReadSets und Staging-Puffer flüchtig im Arbeitsspeicher (RAM). Persistente WAL- und SSTable-Verwaltung wird durch das Zusammenspiel mit dem Storage-Layer (`contextra-store`) sichergestellt.
+- **Speicherbegrenzung:** Bei Erreichen von 80 % der maximal getrackten Commit-Schlüssel (`DEFAULT_MAX_TRACKED_COMMIT_KEYS = 1.000.000`) schaltet der SSI-Validator auf konservatives Präfix-Coarsening um, um den Arbeitsspeicher zu begrenzen (0 % False Negatives, erhöhte Abort-Rate bei hohem Durchsatz).
