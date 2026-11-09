@@ -46,6 +46,10 @@ use std::time::Duration;
 pub struct CompactionConfig {
     /// Minimum number of SSTables in a size tier to trigger compaction.
     pub min_sstables_per_tier: usize,
+    /// Number of SSTables in L0 that trigger compaction.
+    pub l0_compaction_trigger: usize,
+    /// Size multiplier between adjacent levels (e.g., 10.0 for leveled compaction).
+    pub level_size_multiplier: f64,
     /// Size ratio between adjacent tiers (e.g., 4.0 means each tier is ~4x the previous).
     pub size_ratio: f64,
     /// Interval between compaction checks.
@@ -79,6 +83,8 @@ impl Default for CompactionConfig {
     fn default() -> Self {
         Self {
             min_sstables_per_tier: 4,
+            l0_compaction_trigger: 4,
+            level_size_multiplier: 10.0,
             size_ratio: 4.0,
             check_interval: Duration::from_secs(30),
             yield_threshold: 1000,

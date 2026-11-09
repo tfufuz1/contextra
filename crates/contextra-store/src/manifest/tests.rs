@@ -412,3 +412,28 @@ async fn test_manifest_explicit_rollover() {
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0], entry1);
 }
+
+#[tokio::test]
+async fn test_manifest_poisoning_on_fsync_failure() {
+    let dir = tempdir().expect("tempdir");
+    let manifest_path = dir.path().join("MANIFEST");
+
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+    assert!(!manifest.is_poisoned());
+
+    // Manually trigger poison state to simulate fsync failure (INV-FSYNC-1)
+    manifest.is_poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+    assert!(manifest.is_poisoned());
+
+    let entry = ManifestEntry::Add {
+        path: PathBuf::from("sst-fail.sst"),
+        max_tx: 99,
+    };
+    let err = manifest.append(&entry).await;
+    assert!(err.is_err(), "Poisoned manifest must reject append operations");
+    let err_msg = err.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("poisoned") && err_msg.contains("INV-FSYNC-1"),
+        "Error message should mention poisoned and INV-FSYNC-1"
+    );
+}
