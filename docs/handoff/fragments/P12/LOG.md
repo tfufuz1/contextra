@@ -32,3 +32,8 @@
   - `license_gate_always_enforced.rs` -> nach `archive/tests-legacy/contextra/`
   - `deletion_chain_e2e.rs` -> nach `archive/tests-legacy/contextra/`
   - `wiring_matrix.rs` -> Test `open_without_gate_never_grants_sovereign` anpassen.
+
+## Commit: WP-11 G1 Gate Hygiene (contextra-testkit Entfernung)
+- **Dateien**: `crates/contextra/Cargo.toml`, `docs/handoff/fragments/P12/LOG.md`, `docs/handoff/fragments/P12/OPEN_ISSUES.md`
+- **Prüfbefehl**: `python3 tools/gate_dependencies.py --json`
+- **Ergebnis**: grün für `contextra` (Verletzung "[G1-VIOLATION] Klasse-C-Crate contextra hängt von contextra-testkit (dev) ab" vollständig beseitigt).

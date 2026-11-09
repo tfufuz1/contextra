@@ -346,6 +346,7 @@ impl ContextraBuilder {
         };
 
         // Direkter Durchlauf ohne Lizenz-Gate: Alle Ringe sind lizenzfrei autorisiert.
+        // TODO(migration): GateToken::for_test will be eliminated when contextra-db is folded in P42
         let default_gate: Arc<dyn LicenseGate> = Arc::new(OpenFastGate);
         let authorized_token = contextra_ports::license::GateToken::for_test(requested_ring);
 
