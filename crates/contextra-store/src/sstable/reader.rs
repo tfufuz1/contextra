@@ -613,6 +613,19 @@ impl SstableReader {
                 ));
             }
 
+            if let Some((prev_key, prev_offset)) = index.last() {
+                if key < *prev_key {
+                    return Err(ContextraError::Storage(
+                        "corrupted SSTable index: keys out of order".into(),
+                    ));
+                }
+                if offset < *prev_offset {
+                    return Err(ContextraError::Storage(
+                        "corrupted SSTable index: block offsets out of order".into(),
+                    ));
+                }
+            }
+
             index.push((key, offset));
         }
 
@@ -695,13 +708,19 @@ impl SstableReader {
         has_crc: bool,
         path: &Path,
     ) -> Result<Bytes> {
-        let len = usize::try_from(next_offset.saturating_sub(offset)).map_err(|_| {
+        if next_offset <= offset {
+            return Err(ContextraError::Storage(
+                "corrupted SSTable block offsets: next_offset <= offset".into(),
+            ));
+        }
+
+        let len = usize::try_from(next_offset - offset).map_err(|_| {
             ContextraError::Storage("Block offset difference exceeds platform usize".into())
         })?;
 
-        if len > 16 * 1024 * 1024 {
+        if len < 4 || len > 16 * 1024 * 1024 {
             return Err(ContextraError::Storage(
-                "SSTable block size exceeds maximum allowed size".into(),
+                "SSTable block size invalid or exceeds maximum allowed size".into(),
             ));
         }
 
@@ -887,7 +906,7 @@ impl SstableReader {
                         let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                             ContextraError::Storage("overflow calculating value position".into())
                         })?;
-                        if end_val > block_data.len() {
+                        if end_val > offsets_start {
                             return Err(ContextraError::Storage(
                                 "malformed block: value length out of bounds".into(),
                             ));
@@ -1074,7 +1093,7 @@ impl SstableReader {
                 let end_val = ep_val.checked_add(v_len).ok_or_else(|| {
                     ContextraError::Storage("overflow calculating value position".into())
                 })?;
-                if end_val > block_data.len() {
+                if end_val > offsets_start {
                     return Err(ContextraError::Storage(
                         "malformed block: value length out of bounds".into(),
                     ));
