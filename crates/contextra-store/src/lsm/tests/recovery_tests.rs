@@ -698,7 +698,7 @@ async fn test_wal_discovery_mixed_filenames() {
     let tmp = TempDir::new().expect("temp dir");
 
     let salt_path = tmp.path().join("SALT");
-    let salt = crate::lsm::recovery::generate_crypto_salt();
+    let salt = crate::lsm::recovery::generate_crypto_salt().unwrap();
     crate::lsm::recovery::write_salt_atomically(&salt_path, &salt)
         .await
         .expect("write salt");
@@ -869,7 +869,7 @@ async fn test_uncommitted_transaction_discarded_on_open_recovery() {
     let wal_path = tmp.path().join("wal.log");
 
     let salt_path = tmp.path().join("SALT");
-    let salt = crate::lsm::recovery::generate_crypto_salt();
+    let salt = crate::lsm::recovery::generate_crypto_salt().unwrap();
     crate::lsm::recovery::write_salt_atomically(&salt_path, &salt)
         .await
         .expect("write salt");
@@ -950,7 +950,7 @@ async fn test_aborted_transaction_discarded_on_open_recovery() {
     let wal_path = tmp.path().join("wal.log");
 
     let salt_path = tmp.path().join("SALT");
-    let salt = crate::lsm::recovery::generate_crypto_salt();
+    let salt = crate::lsm::recovery::generate_crypto_salt().unwrap();
     crate::lsm::recovery::write_salt_atomically(&salt_path, &salt)
         .await
         .expect("write salt");

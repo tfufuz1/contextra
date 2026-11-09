@@ -37,9 +37,9 @@ pub(crate) fn generate_crypto_salt_with_source(
 }
 
 /// Helper to generate a 32-byte cryptographic salt with default OS-CSPRNG.
-pub(crate) fn generate_crypto_salt() -> [u8; 32] {
+pub(crate) fn generate_crypto_salt() -> Result<[u8; 32]> {
     let source = crate::key_source::OsKeyMaterialSource;
-    generate_crypto_salt_with_source(&source).expect("OS CSPRNG entropy failed during salt generation")
+    generate_crypto_salt_with_source(&source)
 }
 
 pub(crate) async fn write_salt_atomically(
