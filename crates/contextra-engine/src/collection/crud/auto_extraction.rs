@@ -12,7 +12,7 @@
 #![forbid(unsafe_code)]
 
 use crate::collection::Collection;
-#[cfg(feature = "entity-extraction")]
+#[cfg(any(feature = "exp-extraction", feature = "entity-extraction"))]
 pub use crate::extraction::{EntityExtractionConfig, ExtractorMode};
 use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, VectorIndex};
 pub use contextra_types::AutoExtractionMode;
@@ -22,14 +22,14 @@ use std::sync::Arc;
 
 // ANCHOR[contextra-engine:COL-EXT-025]
 /// Dokumentation für `ExtractorMode` im Rahmen der Collection- und Suchabstraktion.
-#[cfg(not(feature = "entity-extraction"))]
+#[cfg(not(any(feature = "exp-extraction", feature = "entity-extraction")))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExtractorMode {
     OpenIe,
     RuleBased,
 }
 
-#[cfg(not(feature = "entity-extraction"))]
+#[cfg(not(any(feature = "exp-extraction", feature = "entity-extraction")))]
 impl Default for ExtractorMode {
     fn default() -> Self {
         Self::OpenIe
@@ -38,7 +38,7 @@ impl Default for ExtractorMode {
 
 // ANCHOR[contextra-engine:COL-ENT-039]
 /// Dokumentation für `EntityExtractionConfig` im Rahmen der Collection- und Suchabstraktion.
-#[cfg(not(feature = "entity-extraction"))]
+#[cfg(not(any(feature = "exp-extraction", feature = "entity-extraction")))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityExtractionConfig {
     pub enabled: bool,
@@ -46,7 +46,7 @@ pub struct EntityExtractionConfig {
     pub min_confidence: f32,
 }
 
-#[cfg(not(feature = "entity-extraction"))]
+#[cfg(not(any(feature = "exp-extraction", feature = "entity-extraction")))]
 impl Default for EntityExtractionConfig {
     fn default() -> Self {
         Self {
@@ -253,7 +253,7 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
         .map(|(_, _, m)| m)
         .unwrap_or(ExtractorMode::OpenIe);
 
-    #[cfg(feature = "entity-extraction")]
+    #[cfg(any(feature = "exp-extraction", feature = "entity-extraction"))]
     {
         let triples = match crate::extraction::extract_triples_for_mode(
             extractor_mode,
@@ -307,7 +307,7 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
         Ok(created_edges)
     }
 
-    #[cfg(not(feature = "entity-extraction"))]
+    #[cfg(not(any(feature = "exp-extraction", feature = "entity-extraction")))]
     {
         let _ = (collection, doc_id, text, generator, extractor_mode);
         Ok(0)

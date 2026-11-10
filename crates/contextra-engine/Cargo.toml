@@ -44,6 +44,7 @@ sha2 = "0.10"
 loom = "0.7"
 
 [dev-dependencies]
+contextra-ingest = { workspace = true }
 contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
@@ -62,5 +63,6 @@ background-maintenance = []
 graph-connectivity-health = ["contextra-graph/graph-connectivity-health"]
 edge-reinforcement-learning = []
 adaptive-candidate-pool-sizing = ["dep:contextra-adapt"]
-entity-extraction = []
+exp-extraction = []
+entity-extraction = ["exp-extraction"]
 auto-extraction-opt-out = []
