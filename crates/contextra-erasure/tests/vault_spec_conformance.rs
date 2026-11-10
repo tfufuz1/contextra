@@ -14,7 +14,10 @@
     clippy::panic,
     clippy::indexing_slicing,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
+    clippy::cast_sign_loss,
+    unused_imports,
+    dead_code,
+    clippy::disallowed_types
 )]
 
 use contextra_erasure::types_local::{FileId, FileKeyring, FileKind};
@@ -324,7 +327,7 @@ mod durable_tests {
         fn sync_data(&self) -> std::io::Result<()> {
             self.sync_count.fetch_add(1, Ordering::Relaxed);
             if self.fail_sync.load(Ordering::Acquire) {
-                return Err(Error::new(ErrorKind::Other, "injected sync_data failure"));
+                return Err(Error::other("injected sync_data failure"));
             }
             Ok(())
         }
@@ -349,10 +352,7 @@ mod durable_tests {
 
         fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
             if self.fail_sync.load(Ordering::Acquire) {
-                return Err(ContextraError::Io(Error::new(
-                    ErrorKind::Other,
-                    "injected sync failure",
-                )));
+                return Err(ContextraError::Io(Error::other("injected sync failure")));
             }
             let mut files = self.files.lock();
             files.insert(path.to_path_buf(), Arc::new(Mutex::new(data.to_vec())));

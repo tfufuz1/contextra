@@ -1,6 +1,12 @@
 //! Reale Mess- und Verifikationstests mit Positivkontrolle (SPEC 12.1, 12.2, 12.4, D-35, D-72, D-113, T-RAW-1..6, T-MUT-1, T-PROOF-1, T-KEYCOV-1).
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    unused_imports,
+    dead_code
+)]
 
 use contextra_erasure::error::ErasureError;
 use contextra_erasure::measure::field::{Mk3StatusInput, ScanPlan, StructureDecoder};

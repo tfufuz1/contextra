@@ -14,6 +14,7 @@ pub use field::{
     collect_all_files, read_file_verified, scan_mk1_structures, scan_mk2_raw, scan_mk3_keys,
     Mk1Result, Mk2Result, Mk3Result, ScanPlan, StructureDecoder, VerifiedVia,
 };
+#[allow(deprecated)]
 pub use scanner_flow::{run_scanner_flow, scan_with_control};
 pub use witness::{arm_scanner, finish_scan};
 
@@ -27,6 +28,7 @@ use crate::error::ErasureError;
 /// Art des Positivkontroll-Nachweises (ER-25).
 #[deprecated(note = "Verwende crate::types_local::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(deprecated)]
 pub enum EvidenceKind {
     /// Muster wurde erfolgreich in der Kontrolldatei nachgewiesen
     Observed,
@@ -35,6 +37,7 @@ pub enum EvidenceKind {
 /// Nachweis über erfolgreiche Positivkontrolle für Test-Scanner.
 #[deprecated(note = "Verwende crate::types_local::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(deprecated)]
 pub struct LocalControlEvidence {
     #[allow(deprecated)]
     kind: EvidenceKind,

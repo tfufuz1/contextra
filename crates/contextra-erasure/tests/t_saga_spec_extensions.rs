@@ -90,6 +90,69 @@ fn test_t_erid_1_2_3_idempotency_open_lookup() {
     );
 }
 
+/// SPEC §11.2, ER-18..24: Vollständige 10x10 Zustandsübergangsmatrix & Verifikation ungültiger Übergänge.
+#[test]
+fn test_saga_state_transition_matrix_exhaustive() {
+    let all_states = [
+        SagaState::Requested,
+        SagaState::Gated,
+        SagaState::KeyDestroyed,
+        SagaState::Purging,
+        SagaState::Verifying,
+        SagaState::Completed,
+        SagaState::Restricted,
+        SagaState::Lifted,
+        SagaState::Pending,
+        SagaState::Refused,
+    ];
+
+    let mut valid_count = 0;
+    let mut invalid_count = 0;
+
+    for &from in &all_states {
+        for &to in &all_states {
+            let mut saga = EraseSaga::with_state(ErasureId::new([0x33; 16]), from);
+            let can = from.can_transition_to(to);
+            let res = saga.transition_to(to);
+
+            if can {
+                assert!(
+                    res.is_ok(),
+                    "Transition {:?} -> {:?} should succeed according to can_transition_to",
+                    from,
+                    to
+                );
+                assert_eq!(saga.state(), to);
+                valid_count += 1;
+            } else {
+                assert!(
+                    res.is_err(),
+                    "Transition {:?} -> {:?} must fail with Err(InvalidTransition)",
+                    from,
+                    to
+                );
+                match res.unwrap_err() {
+                    contextra_erasure::error::ErasureError::InvalidTransition {
+                        from: err_from,
+                        to: err_to,
+                    } => {
+                        assert_eq!(err_from, from.to_string());
+                        assert_eq!(err_to, to.to_string());
+                    }
+                    other => panic!("Expected InvalidTransition, got {:?}", other),
+                }
+                invalid_count += 1;
+            }
+        }
+    }
+
+    assert!(valid_count > 10, "Must have valid transitions");
+    assert!(
+        invalid_count > 50,
+        "Majority of arbitrary state transitions must be invalid"
+    );
+}
+
 /// SPEC: T-EPOCH-1 (D-125 Epochenschlüssel-Rotation Slot E)
 #[test]
 fn test_t_epoch_1_rotation_slot_e() {

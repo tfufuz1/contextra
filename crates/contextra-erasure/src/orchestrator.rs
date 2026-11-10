@@ -10,10 +10,7 @@
 
 use crate::deletion_proof::{DeletionProof, ExcludedScope};
 use crate::error::ErasureError;
-use crate::types_local::{
-    CollectionId,
-    ScanTechnique, ScanWitness, TenantId,
-};
+use crate::types_local::{CollectionId, ScanTechnique, ScanWitness, TenantId};
 use serde::{Deserialize, Serialize};
 
 /// Status einer Collection im System.

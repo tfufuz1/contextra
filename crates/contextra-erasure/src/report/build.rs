@@ -98,7 +98,7 @@ impl LayerWitnessReport {
             scanned_bytes: w.bytes(),
             matches: w.matches(),
             control_ok: true, // LayerWitness kann nur aus Armed erzeugt werden
-            duration_us: w.duration().as_micros() as u64,
+            duration_us: u64::try_from(w.duration().as_micros()).unwrap_or(u64::MAX),
             hash: hex_encode(w.hash()),
         }
     }
@@ -490,12 +490,17 @@ pub fn build_report(
     bytes_rewritten: u64,
     purge_complete: bool,
 ) -> ErasureReport {
-    let mut opts = ReportBuildOptions::default();
-    opts.requested_at = gated_at.saturating_sub(100);
-    opts.gated_at = gated_at;
-    opts.key_destroyed_at = gated_at.saturating_add(50);
-    opts.completed_at = completed_at;
-    opts.risk_context.purge_complete = purge_complete;
+    let opts = ReportBuildOptions {
+        requested_at: gated_at.saturating_sub(100),
+        gated_at,
+        key_destroyed_at: gated_at.saturating_add(50),
+        completed_at,
+        risk_context: ResidualRiskContext {
+            purge_complete,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     build_report_with_options(
         erasure_id,
