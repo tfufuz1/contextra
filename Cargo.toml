@@ -40,8 +40,6 @@ members = [
     "crates/contextra-erasure",
     "crates/contextra-ingest",
     "crates/contextra-prompt-guard",
-]
-exclude = [
     "crates/contextra-vault",
 ]
 # Restored archived crates to default-members:

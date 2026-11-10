@@ -222,7 +222,6 @@ impl OllamaClient {
         self
     }
 
-
     /// Pre-request policy and circuit breaker validation.
     fn prepare_request(&self) -> Result<()> {
         if let Some(ref build_err) = self.client_build_error {

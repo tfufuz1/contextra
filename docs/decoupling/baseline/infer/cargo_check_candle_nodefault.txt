@@ -1,0 +1,23 @@
+    Checking contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
+error[E0599]: no method named `invalidate_on_config_change` found for struct `IdentityCalibrator` in the current scope
+   --> crates/contextra-infer-candle/src/gasp.rs:120:17
+    |
+120 |             cal.invalidate_on_config_change(config.fingerprint.clone());
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `IdentityCalibrator`
+    |
+   ::: crates/contextra-infer-candle/src/calibrator.rs:12:8
+    |
+12  |     fn invalidate_on_config_change(&mut self, new_fingerprint: ConfigFingerprint);
+    |        --------------------------- the method is available for `IdentityCalibrator` here
+...
+19  | pub struct IdentityCalibrator {
+    | ----------------------------- method `invalidate_on_config_change` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `ConfidenceCalibrator` which provides `invalidate_on_config_change` is implemented but not in scope; perhaps you want to import it
+    |
+21  + use crate::calibrator::ConfidenceCalibrator;
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `contextra-infer-candle` (lib) due to 1 previous error

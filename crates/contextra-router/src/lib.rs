@@ -51,6 +51,8 @@ mod tests;
 // Konsumenten importieren direkt aus `contextra_adapt`:
 //   use contextra_adapt::{BanditProfileState, LyapunovDriftWatcher, OffPolicyEvaluator};
 pub use arm_registry::{ArmRegistry, ArmRegistryError};
+pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
+pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
 #[cfg(feature = "subprocess-dispatch")]
 pub use dispatch::dispatch_to_slm;
 pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};

@@ -28,7 +28,7 @@
 | Standalone-Build | `cargo build -p contextra-infer-candle --no-default-features --locked` |
 | Contextra-Abhängigkeiten **Ist** (Cargo) | `crypto`, `ports`, `rank`, `types` |
 | Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `rank` |
-| Features | `candle`, `cuda`, `kv-bridge`, `kv-stage-b`, `test-utils` |
+| Features | `candle` (default), `cuda`, `kv-bridge`, `kv-stage-b`, `exp-kv-stage-b`, `exp-gasp`, `test-utils` |
 | Lints | `#![forbid(unsafe_code)]` |
 
 ## 2. Abhängigkeiten & Schulden
