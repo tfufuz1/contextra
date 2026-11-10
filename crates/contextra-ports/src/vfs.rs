@@ -145,7 +145,7 @@ pub trait VfsFile: Send + Sync {
     /// Liefert `std::io::Error` bei fehlschlagendem Flush. Bei Sync-Fehlern muss das Handle vergiftet werden (DF-03, D-55, T-FSYNC-1).
     ///
     /// # Crash
-    /// Garantiert die Haltbarkeit der geschriebenen Datenblöcke bis zum Aufrufzeitpunkt.
+    /// Schreibt Datenblöcke bis zum Aufrufzeitpunkt persistent auf das Speichermedium.
     fn sync_data(&self) -> std::io::Result<()>;
 
     /// Flushes data blocks and metadata to disk (`fsync`).
