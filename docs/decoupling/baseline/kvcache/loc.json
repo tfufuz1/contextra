@@ -1,0 +1,95 @@
+{
+  "core_crates": [
+    "contextra-types",
+    "contextra-ports",
+    "contextra-mvcc",
+    "contextra-crypto",
+    "contextra-vector",
+    "contextra-text",
+    "contextra-store",
+    "contextra-durable-fs",
+    "contextra-simd",
+    "contextra-sys",
+    "contextra-rank",
+    "contextra-erasure",
+    "contextra-engine",
+    "contextra"
+  ],
+  "crates": {
+    "contextra-kvcache": {
+      "files": [
+        {
+          "loc": 29,
+          "path": "crates/contextra-kvcache/examples/standalone_prefix_cache.rs"
+        },
+        {
+          "loc": 170,
+          "path": "crates/contextra-kvcache/src/adapters.rs"
+        },
+        {
+          "loc": 199,
+          "path": "crates/contextra-kvcache/src/attention_score.rs"
+        },
+        {
+          "loc": 16,
+          "path": "crates/contextra-kvcache/src/cipher.rs"
+        },
+        {
+          "loc": 59,
+          "path": "crates/contextra-kvcache/src/compat.rs"
+        },
+        {
+          "loc": 31,
+          "path": "crates/contextra-kvcache/src/error.rs"
+        },
+        {
+          "loc": 235,
+          "path": "crates/contextra-kvcache/src/eviction_worker.rs"
+        },
+        {
+          "loc": 50,
+          "path": "crates/contextra-kvcache/src/lib.rs"
+        },
+        {
+          "loc": 529,
+          "path": "crates/contextra-kvcache/src/prefix_store.rs"
+        },
+        {
+          "loc": 650,
+          "path": "crates/contextra-kvcache/src/quantize_kivi.rs"
+        },
+        {
+          "loc": 862,
+          "path": "crates/contextra-kvcache/src/radix.rs"
+        },
+        {
+          "loc": 211,
+          "path": "crates/contextra-kvcache/src/scratchpad_invalidation.rs"
+        },
+        {
+          "loc": 443,
+          "path": "crates/contextra-kvcache/src/segment.rs"
+        },
+        {
+          "loc": 414,
+          "path": "crates/contextra-kvcache/src/service.rs"
+        },
+        {
+          "loc": 1023,
+          "path": "crates/contextra-kvcache/src/store.rs"
+        },
+        {
+          "loc": 73,
+          "path": "crates/contextra-kvcache/src/types.rs"
+        }
+      ],
+      "files_count": 16,
+      "loc": 4994
+    }
+  },
+  "summary": {
+    "core_loc": 0,
+    "total_crates": 1,
+    "total_loc": 4994
+  }
+}
