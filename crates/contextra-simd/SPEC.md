@@ -1,50 +1,117 @@
-# Baustein-Spezifikation: `contextra-simd`
+# contextra-simd — Spezifikation
 
-**Klasse:** A (Vollständig autarker Baustein)
-**Normativität:** Ring 0 (Unsafe-Insel)
-**Status:** Stabil
-**MSRV:** 1.89.0
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
----
+**Pfad:** `crates/contextra-simd/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
-## 1. Zweck & Abgrenzung
-`contextra-simd` stellt hardwarebeschleunigte mathematische Distanzkerne für Vektoren bereit (Kosinus-Distanz, Euklidische Distanz, Skalarprodukt-Distanz) sowohl für 32-Bit Gleitkommazahlen (`f32`) als auch für quantisierte 8-Bit Ganzzahlen (`u8`).
+## 1. Zweck
 
-### Nicht-Ziele
-- Keine Vektor-Indexierungsstrukturen (HNSW, IVFPQ leben in `contextra-vector`).
-- Keine Einbettungsmodelle oder Inferenz (gehört in `contextra-infer-*`).
-- Keine Speicherpersistenz, WAL oder Transaktionslogik.
-- Keine Mandanten- oder Löschverwaltung (Löschung lebt in `contextra-erasure`).
+SIMD-Distanzkerne mit Dispatch über eine Metrik. Eine der zwei Unsafe-Inseln des Workspace. *[S]*
 
----
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
 
-## 2. Architektur & Invarianten
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | foundation |
+| Ebene (Kern-Closure) | 0 |
+| Kern-Closure | — |
+| Default-Features | `std` |
+| Fehlertyp (R3) | `SimdError` (besteht) |
+| Brücke (hinter Feature `workspace`, §1.1) | `From<DistanceMetric>`↔`types` |
 
-### Invarianten
-1. **Skalares Orakel:** Die skalare Implementierung in `kernels/scalar.rs` ist die deterministische Referenz für alle ISA-Kerne.
-2. **INV-SIMD-DETERMINISM-1 (Determinismus):** Reduktionen folgen einer festen Summationsordnung über Vektor-Lanes und deterministische Baumreduktion. Numerische Abweichungen zwischen SIMD- und Skalarpfad liegen strikt innerhalb der dokumentierten Toleranz (< 1e-5 relativ, < 1e-4 absolut für hohe Dimensionen). Test: `test_inv_simd_determinism_1`.
-3. **INV-SIMD-FINITE-1 (Endlichkeit):** Ungültige Gleitkommazahlen (NaN, ±Inf) werden via `validate_vector` Fail-Closed zurückgewiesen. Es wird nie mit ungültigen Werten gerechnet. Test: `test_inv_simd_finite_1`.
-4. **INV-SIMD-ALIGN-1 (Byte-Ausrichtung):** Byte-Puffer müssen eine durch 4 teilbare Länge aufweisen. Es werden keine Alignment-Annahmen an Speicheradressen getroffen (unaligned Zero-Copy Reads). Test: `test_inv_simd_align_1`.
-5. **AVX-512 VNNI Vorzeichen- und Wrapping-Semantik:** Bei `dot_product_u8_avx512vnni` (`_mm512_dpbusd_epi32`) und `cosine_similarity_parts_u8_avx512` werden die Operanden auf Byte-Ebene mit 32-Bit Unsigned Wrapping-Akkumulation addiert.
-6. **Zero-Panic & Design by Contract:** Öffentliche Funktionen geraten niemals in unkontrollierte Panics; Vorbedingungsverletzungen liefern typisierte `SimdError`/`Error`-Fehler.
-7. **Unsafe-Insel (B10):** Jeder `unsafe`-Block ist durch einen expliziten `// SAFETY:`-Beweis mit Host-Feature- und Slice-Garantien dokumentiert.
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
 
----
+## 3. Ist-Zustand (tools/)
 
-## 3. Schnittstellen & Typen
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 1863 Zeilen in 10 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | types |
+| Interne Dev-Abhängigkeiten (Ist) | keine |
+| Features (Ist, Anzahl) | 5 |
+| Default-Features (Ist) | std |
+| `cfg(feature = …)`-Stellen in src/ | 6 |
+| `#[test]`-Vorkommen (grep, src + tests) | 90 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 0 (Tool 0; 0 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 269 / 0 / True |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 0 (Tool 0) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | SimdError |
 
-### Primäre Typen
-- `DistanceMetric`: Lokales Enum (`Cosine`, `Euclidean`, `DotProduct`).
-- `SimdError`: Typisierter `thiserror`-Fehlertyp (`InvalidInput`, `DimensionMismatch`, `UnsupportedMetric`), markiert mit `#[non_exhaustive]`.
-- `Dispatcher`: Zustandsloser, thread-sicherer Dispatcher mit `SimdTarget` (`Auto`, `Scalar`, `Avx2`, `Avx512`, `Neon`).
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
 
-### Transitional-Features
-- `types-compat`: Bietet `From`-Konvertierungen zu `contextra_types::{DistanceMetric, ContextraError}` für abwärtskompatible Workspace-Kanten bis Welle 6.
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
 
----
+## 4. Ist-vs-Ziel-Abgleich [V]
 
-## 4. Concurrency & Performance
-- Alle Funktionen und Dispatcher sind `Send + Sync` und vollständig zustandslos.
-- Keine Allokationen auf dem Berechnungspfad.
-- Zeitkomplexität: $O(d)$ für Distanzberechnung von Dimension $d$.
-- Zusatzspeicher: $O(1)$.
+- **Ist-Kanten, die das Ziel nicht vorsieht:** `types` (optional)
+- **Ziel-Kanten, die im Ist fehlen:** keine
+- **Default-Features:** Ist = Ziel (std).
+
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
+
+- Verifiziert: `DistanceMetric` in `src/metric.rs:5` (eine von drei Kopien, B09). 269 unsafe-Vorkommen, als Insel klassifiziert. `forbid(unsafe_code)` ist nicht gesetzt.
+
+## 6. Anforderungen
+
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
+
+`types-compat` → `workspace`, Brücke nach `compat/` (13 Referenzen, laut Manifest/Zählung ungegatet 0 [V]). `DistanceMetric` bleibt lokal (B09). Sonst unverändert. Tier beta.
+
+### 6.2 Brückenmuster [S]
+
+Die Brücke liegt ausschließlich in `src/compat/` hinter dem Feature `workspace`. Verbindliche Muster: docs/SPEC.md §4.3 (a–d). R2 gilt: `contextra_types`, `contextra_ports`, `contextra_testkit` dürfen im Kern nirgends vorkommen, auch nicht in Doc-Kommentaren oder `#[cfg(test)]`.
+
+### 6.3 Regeln für jeden Schritt [S]
+
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
+
+### 6.5 Fehlerabbildung [S]
+
+Eigener Fehlertyp: `SimdError` (besteht) (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+Keine Zeile aus dem Golden-Korpus (§5.1) bezieht sich auf dieses Crate.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**unsafe-Dateien (4):**
+
+- `crates/contextra-simd/src/dispatch.rs`
+- `crates/contextra-simd/src/kernels/neon.rs`
+- `crates/contextra-simd/src/kernels/avx2.rs`
+- `crates/contextra-simd/src/kernels/avx512.rs`
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-simd/src/error.rs:7` — SimdError
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B09 — `ports` und `types` ohne Zielbild für `DistanceMetric`; mehrere Distanz-Implementierungen**
+> **Entscheidung (R4-Ausnahme):** Die drei Enums bleiben je im Besitz ihres Crates. Erlaubt sind kleine geschlossene Wert-Enums (≤ 8 Unit-Varianten) als **gespiegelte Kopie**, wenn (a) Variantennamen und -reihenfolge identisch sind und (b) ein Konformitätstest die serde-Namen aller Kopien gleichsetzt. Verbindung per `From` in `compat/`. `vector` bekommt das optionale Feature `simd`, das `compute_distance` durch `contextra_simd::dispatch` ersetzt; die Skalarpfade bleiben als Orakel. Differenztest §5.4 (Toleranz relativ 1e-5, f32).
+
+## 10. Entscheidungen und Risiken [S]
+
+Keine Einträge in §9.1 oder §9.2.
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-simd --no-default-features --locked
+cargo hack check -p contextra-simd --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-simd --modes no-default,default,each-feature
+```
+
