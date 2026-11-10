@@ -224,7 +224,7 @@ mod diff_tests {
 
             let mapped_strategy = registry
                 .strategy_for(expected_arm)
-                .expect("valid arm index in test");
+                .expect("valid arm index in test"); // #[cfg(test)]
             match strategy {
                 RetrievalStrategy::Global { .. } => {
                     assert!(matches!(mapped_strategy, RetrievalStrategy::Global { .. }));

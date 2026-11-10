@@ -182,7 +182,7 @@ mod tests {
 
         let mut all_ids = BTreeSet::new();
         for handle in handles {
-            let thread_ids = handle.join().expect("thread join ok");
+            let thread_ids = handle.join().expect("thread join ok"); // #[cfg(test)]
             for id in thread_ids {
                 assert!(
                     all_ids.insert(id),
