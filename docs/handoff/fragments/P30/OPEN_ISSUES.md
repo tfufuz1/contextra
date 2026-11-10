@@ -17,6 +17,9 @@ Folgende Alttests in fremden Crates referenzieren noch archivierte Beweis-Symbol
    - `contextra-engine` gehört nicht zu BESITZ.
    - Maßnahme: Eintrag in `PENDING_API_CHANGES.md`.
 
-## Vorherige Workspace-Fehler [V]
-- `crates/contextra-graph` hat Namenskollision `contract`, wodurch abhängige Crates (`engine`, `db`, `mcp`, `py`, `agent`, `cognition`) in `BUILD_LADDER.md` als rot vermerkt sind.
-- `crates/contextra-infer-candle`: fehlt `thiserror` (dokumentiert in `P00/BUILD_LADDER.md`).
+## CI- und Workspace-Befunde außerhalb von BESITZ [V]
+- **Cargo Deny:** `deny.toml` meldet bekannte Advisories in `lopdf` (contextra-ingest), `number_prefix` (indicatif/candle), `tokio`, und `zip` (candle-core, contextra-ingest). Da diese Abhängigkeiten in fremden Crates liegen, liegen sie außerhalb von BESITZ und dürfen nicht angefasst werden.
+- **Cargo xtask:** In CI schlägt der Schritt `cargo xtask shell-commit-audit` fehl, da das Crate `xtask` im Workspace nicht existiert (dokumentiert in `BUILD_LADDER.md` und Memory: `xtask existiert nicht`).
+- **Format Check (cargo fmt):** Meldet Formatierungsabweichungen in `crates/contextra-store/` und `crates/contextra-vector/`. Da beide Crates außerhalb von BESITZ liegen, sind sie read-only.
+- **Unwrap Baseline Gate:** Die Baseline in `.github/unwrap_baseline.txt` steht auf 1197, während die Basis vor P30 bereits 1333 `unwrap`/`expect` enthielt. `crates/contextra-crypto/src/` hat keine neuen `unwrap()` oder `expect()` eingeführt (durch die Archivierung wurden unwrap-Stellen in crypto sogar reduziert von 1333 auf 1318). Da `.github/` außerhalb von BESITZ liegt, darf die Baseline nicht geändert werden.
+- **Compile Check / proof-tests / loom:** Schlagen in `contextra-store` fehl (duplizierte Methoden in `block_cache.rs`, `key_source`/`clock`-Felder in `recovery.rs`, Move aus `Drop` in `builder.rs`, `ScanTarget::Key` / `found()` in `scanner/mod.rs`), sowie in `contextra-graph` (Namenskollision `contract`) und `contextra-vector`. Diese Fehler liegen außerhalb von BESITZ.
