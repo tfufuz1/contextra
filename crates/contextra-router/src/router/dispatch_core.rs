@@ -558,10 +558,9 @@ impl RouterEngine {
                     return None;
                 }
                 Err(err) => {
-                    let contextra_err = ContextraError::from(err);
                     tracing::warn!(
                         profile = %profile.name,
-                        err = %contextra_err,
+                        err = %err,
                         "Bandit-Dispatch Fallback auf Cascade: BanditError bei Score-Berechnung"
                     );
                     return None;

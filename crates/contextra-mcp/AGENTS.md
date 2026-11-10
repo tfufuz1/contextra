@@ -43,7 +43,7 @@
 |---|---|
 | `server.rs`, `server_dispatch.rs`, `server_tools.rs`, `tools_crud.rs` | Transport, Dispatch, Werkzeuge (`contextra_search`, `_insert`, `_upsert`, `_get`, `_collections`, …) |
 | `protocol.rs`, `validation.rs`, `io.rs`, `config.rs` | JSON-RPC, Eingabevalidierung |
-| `prompt_injection/` (`guard`, `policy`, `audit`) | Quarantäne |
+| `prompt_injection.rs` (Re-Export aus `contextra-prompt-guard`) | Quarantäne |
 | `sandbox.rs`, `egress_*.rs`, `explain.rs`, `routing.rs` | Policy, Egress, Erklärungen |
 | `bin/contextra-mcp-server.rs` | Binär |
 

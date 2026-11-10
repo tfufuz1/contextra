@@ -41,6 +41,7 @@
 pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
+pub mod compat;
 pub mod crypto;
 pub mod dek;
 pub mod error;

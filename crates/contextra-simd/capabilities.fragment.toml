@@ -1,4 +1,15 @@
+[version]
+schema = "3"
+
 [crates.contextra-simd]
-klasse = "A"
-may_depend_on = []          # Soll nach Abschluss dieses Auftrags (interne Crates, nur Namen)
-transitional = ["types-compat"] # Features/Kanten mit internen Deps, Entfernung in Welle 6
+group = "foundation"
+level = 0
+tier = "beta"
+path = "crates/contextra-simd"
+unsafe_island = true
+allowed_internal = []
+dev_allowed = []
+
+[crates.contextra-simd.feature_closure_allowed]
+workspace = ["contextra-types"]
+types-compat = ["contextra-types"]

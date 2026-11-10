@@ -10,7 +10,7 @@
 //!
 //! ## Öffentliche Checkpoint-Subsystem Architecture (gemäß ADR-011)
 //! `contextra-checkpoint` ist der **einzige öffentlich sichtbare Einstiegspunkt** für das Checkpoint-Konzept.
-//! Es stellt den Trait [`contextra_ports::CheckpointCoordinator`], die Registry [`PersistentCheckpointStore`]
+//! Es stellt den Trait [`CheckpointCoordinator`], die Registry [`PersistentCheckpointStore`]
 //! sowie den RAII-Guard [`CheckpointGuard`] für automatisches Rollback bei Fehlern bereit.
 //!
 //! **Hinweis zur Abgrenzung:**
@@ -19,7 +19,7 @@
 //! des Store-Crates verwendet werden.
 //!
 //! ## Architektur & Crash-Safety
-//! `PersistentCheckpointStore` delegiert Persistenz an ein [`contextra_ports::StorageEngine`]-Objekt
+//! `PersistentCheckpointStore` delegiert Persistenz an ein [`SnapshotSource`]-Objekt
 //! und cacht aktive Checkpoints in einem thread-sicheren In-Memory-Store (`parking_lot::RwLock`).
 //!
 //! **Drop-Semantik & Non-Blocking-I/O:**
@@ -53,7 +53,7 @@ pub use hardlink_cloner::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult, SnapshotPinner,
 };
 pub use manifest::CheckpointManifest;
-pub use meta::{CheckpointMeta, StateCheckpoint};
+pub use meta::{CheckpointMeta, StateCheckpoint, CURRENT_ID_WIDTH_BITS};
 #[allow(deprecated)]
 pub use orphan::{
     await_pending_rollbacks, clear_all_orphaned_checkpoints, clear_orphaned_checkpoint,

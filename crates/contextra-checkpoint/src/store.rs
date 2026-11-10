@@ -4,7 +4,7 @@
 //!
 //! ## Ring & Rolle
 //! Gehört zu **Ring 1 (Persistenz)**. Verwaltet Metadaten und MVCC-Sequenznummern konsistent über Neustarts hinweg
-//! und synchronisiert diese mit der physischen Speicher-Engine ([`contextra_ports::StorageEngine`]).
+//! und synchronisiert diese mit der physischen Speicher-Engine ([`SnapshotSource`]).
 //!
 //! ## Hauptkomponenten
 //! - [`CheckpointRegistry`]: Trait für erweiterte Checkpoint-Operationen (Save, Load, Orphan-Recovery).
@@ -41,7 +41,7 @@ use std::sync::Arc;
 /// Trait für die erweiterte Checkpoint-Verwaltung inklusive Orphan-Recovery.
 ///
 /// Definiert die Schnittstelle zum Speichern, Laden und Bereinigen von Checkpoints.
-pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
+pub trait CheckpointRegistry: Send + Sync {
     /// Speichert die Metadaten eines Checkpoints asynchron ab.
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>>;
     /// Lädt die Metadaten eines Checkpoints anhand der Sequenznummer.
@@ -140,7 +140,7 @@ struct TxCounterMeta {
 const TX_BATCH_SIZE: u64 = 100;
 
 /// Ermittelt beim Öffnen des Stores die Grenzen für den internen TxId-Zähler.
-async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
+async fn determine_tx_counter_bounds<S: SnapshotSource>(
     storage: &Arc<S>,
     namespace: &str,
 ) -> Result<(u64, u64)> {
@@ -183,7 +183,7 @@ async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
 
     if let (Some(persisted), Some(scanned)) = (persisted_val, scanned_max_raw) {
         if persisted < scanned {
-            return Err(ContextraError::Internal(format!(
+            return Err(CheckpointError::Internal(format!(
                 "TxId collision / regression detected in namespace '{namespace}': \
                  persisted tx_counter HWM ({persisted}) is strictly less than highest tx_id found in store ({scanned})"
             )));
@@ -200,7 +200,7 @@ async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
 }
 
 /// Persistiert den neuen High-Water-Mark des TxId-Zählers synchron in der Storage-Engine.
-async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
+async fn persist_hwm_internal<S: SnapshotSource>(
     storage: &Arc<S>,
     namespace: &str,
     hwm: u64,
@@ -209,7 +209,7 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
         high_water_mark: hwm,
     };
     let bytes =
-        serde_json::to_vec(&meta).map_err(|e| ContextraError::Serialization(e.to_string()))?;
+        serde_json::to_vec(&meta).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
     let key = format!("{namespace}:checkpoint:__sys_tx_counter__");
     let tx = TxId::new(TxId::INTERNAL_BASE + hwm);
     storage.put(tx, key.as_bytes(), &bytes).await?;
@@ -229,8 +229,8 @@ async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
 /// - Alle Methoden sind durch `RwLock` thread-sicher
 /// - `StorageEngine`-Zugriffe nutzen atomare Transaktionen via `TxId`
 /// - Keine Panics (Zero-Panic Doctrine)
-pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
-    storage: Arc<S>,
+pub struct PersistentCheckpointStore<S: SnapshotSource> {
+    pub(crate) storage: Arc<S>,
     /// Registrierter Checkpoint-Index im Arbeitsspeicher — geschützt durch ein konsolidiertes RwLock (P-23)
     index: RwLock<CheckpointIndex>,
     /// Namespace-Präfix für Storage-Keys
@@ -250,12 +250,12 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     /// Instanz-spezifischer Zähler für verpasste Rollbacks
     skipped_rollbacks: Arc<AtomicU64>,
     /// Injizierbarer Zeitgeber (P28)
-    clock: Arc<dyn contextra_ports::Clock>,
+    clock: Arc<dyn Clock>,
     /// Injected metrics sink for operational monitoring
-    metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+    metrics_sink: Option<Arc<dyn MetricsSink>>,
 }
 
-impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
+impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     // ANCHOR[contextra-checkpoint:STO-003]
     /// Öffnet einen PersistentCheckpointStore und führt eine vollständige Orphan-Recovery für Pins und Checkpoints durch.
     ///
@@ -361,7 +361,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                     let rt = tokio::runtime::Builder::new_current_thread()
                         .enable_all()
                         .build()
-                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                        .map_err(|e| CheckpointError::Internal(e.to_string()))?;
                     rt.block_on(Self::open_with_orphan_registry(
                         storage_clone,
                         ns_clone,
@@ -370,7 +370,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                 })
                 .join()
                 .map_err(|_| {
-                    ContextraError::Internal(
+                    CheckpointError::Internal(
                         "Thread panic during PersistentCheckpointStore initialization".into(),
                     )
                 })
@@ -381,7 +381,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                 .enable_all()
                 .build()
                 .map_err(|e| {
-                    ContextraError::Internal(format!("Failed to create Tokio runtime: {e}"))
+                    CheckpointError::Internal(format!("Failed to create Tokio runtime: {e}"))
                 })?;
             rt.block_on(Self::open_with_orphan_registry(
                 storage_clone,
@@ -391,7 +391,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         };
 
         res.map_err(|e| {
-            ContextraError::Internal(format!(
+            CheckpointError::Internal(format!(
                 "Failed to initialize PersistentCheckpointStore for namespace '{ns}': {e}"
             ))
         })
@@ -411,7 +411,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     pub async fn allocate_tx(&self) -> Result<TxId> {
         let raw = self.tx_counter.fetch_add(1, Ordering::SeqCst);
         if raw >= 1_000_000 {
-            return Err(ContextraError::Internal(
+            return Err(CheckpointError::Internal(
                 "Checkpoint TxId counter overflow".to_string(),
             ));
         }
@@ -449,7 +449,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     ///
     /// # Composition Root
     /// Der Composition Root setzt per `with_clock` eine injizierte Uhr (Default ist `SystemClock`).
-    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         if let Some(reg) = Arc::get_mut(&mut self.orphan_registry) {
             reg.set_clock(clock.clone());
         }
@@ -458,17 +458,17 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Liefert den aktuellen Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
     /// Setzt die Metrik-Senke.
-    pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
+    pub fn set_metrics_sink(&mut self, sink: Arc<dyn MetricsSink>) {
         self.metrics_sink = Some(sink);
     }
 
     /// Konfiguriert den Store mit einer Metrik-Senke.
-    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+    pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
@@ -531,6 +531,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             tx_id,
             metadata,
             created_at: self.monotonic_timestamp_ms(),
+            id_width_bits: crate::meta::CURRENT_ID_WIDTH_BITS,
         };
 
         let _guard = self.write_lock.lock().await;
@@ -651,7 +652,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let key = format!("{}:checkpoint:{}", self.namespace, meta.name);
         let manifest = CheckpointManifest::new(meta.clone(), vec!["storage".to_string()])?;
         let value = serde_json::to_vec(&manifest)
-            .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+            .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
 
         let tx = self.allocate_tx().await?;
         if let Err(e) = self.storage.put(tx, key.as_bytes(), &value).await {
@@ -689,7 +690,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                         manifest.meta
                     } else {
                         serde_json::from_slice::<CheckpointMeta>(&bytes)
-                            .map_err(|e| ContextraError::Serialization(e.to_string()))?
+                            .map_err(|e| CheckpointError::Serialization(e.to_string()))?
                     };
                 self.index.write().insert(meta.clone());
                 Ok(Some(meta))
@@ -722,7 +723,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                     manifest.meta
                 } else {
                     serde_json::from_slice::<CheckpointMeta>(&value_bytes)
-                        .map_err(|e| ContextraError::Serialization(e.to_string()))?
+                        .map_err(|e| CheckpointError::Serialization(e.to_string()))?
                 };
             result.push(meta);
         }
@@ -760,11 +761,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let meta = self
             .get_checkpoint_internal(name)
             .await?
-            .ok_or(ContextraError::CheckpointNotFound)?;
+            .ok_or(CheckpointError::CheckpointNotFound)?;
 
         let last_tx = self.storage.last_tx_id().await?;
         if last_tx > meta.tx_id {
-            return Err(ContextraError::Transaction(format!(
+            return Err(CheckpointError::Transaction(format!(
                 "Serialization barrier violation: Cannot restore checkpoint '{}' at TxId {} because newer committed transaction TxId {} exists in storage",
                 name,
                 meta.tx_id.inner(),
@@ -796,7 +797,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         self.orphan_registry
             .flush_orphan_registry()
             .await
-            .map_err(|e| ContextraError::Internal(format!("Failed to flush orphan registry: {e}")))
+            .map_err(|e| CheckpointError::Internal(format!("Failed to flush orphan registry: {e}")))
     }
 
     /// Führt einen expliziten Flush der Orphan-Registry beim Herunterfahren durch.
@@ -911,7 +912,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 }
 
-impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
+impl<S: SnapshotSource> CheckpointRegistry for PersistentCheckpointStore<S> {
     fn save_checkpoint<'a>(&'a self, meta: CheckpointMeta) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let _guard = self.write_lock.lock().await;

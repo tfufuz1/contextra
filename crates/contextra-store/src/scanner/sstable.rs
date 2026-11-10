@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 use super::runtime::ScannerRuntime;
+use super::store_scan_view::StoreScanView;
 use crate::lsm::LsmStorage;
 use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
@@ -20,26 +21,32 @@ use std::sync::Arc;
 
 /// Scanner für die `SsTableAllLevels`-Schicht.
 pub struct SstableScanner {
-    storage: Arc<LsmStorage>,
+    view: StoreScanView,
     runtime: ScannerRuntime,
 }
 
 impl SstableScanner {
     /// Erzeugt einen neuen `SstableScanner` mit implizit erfasster Laufzeit.
-    pub fn new(storage: Arc<LsmStorage>) -> Self {
-        Self::with_runtime(storage, ScannerRuntime::capture())
+    pub fn new(view: StoreScanView) -> Self {
+        Self::with_runtime(view, ScannerRuntime::capture())
     }
 
     /// Erzeugt einen neuen `SstableScanner` mit expliziter `ScannerRuntime`.
-    pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self {
-        Self { storage, runtime }
+    pub fn with_runtime(view: StoreScanView, runtime: ScannerRuntime) -> Self {
+        Self { view, runtime }
+    }
+
+    /// Erzeugt einen `SstableScanner` aus einem `Arc<LsmStorage>` (Kompatibilitätspfad).
+    pub fn from_storage_blocking(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Result<Self> {
+        let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;
+        Ok(Self::with_runtime(view, runtime))
     }
 
     /// Positivkontrolle für SSTables: Erzeugt eine temporäre Canary-Datei,
     /// führt die volle Reader-Iterationslogik darüber aus, verifiziert den Treffer
     /// und entfernt die Canary-Datei rückstandslos.
     fn run_positive_control(&self, session: &mut ScanSession) -> Result<()> {
-        let storage = Arc::clone(&self.storage);
+        let block_cache = Arc::clone(self.view.block_cache());
         let mut control_matched = false;
         let mut control_unit: Option<[u8; 32]> = None;
 
@@ -53,7 +60,6 @@ impl SstableScanner {
                 if builder.add(canary_key, canary_val, 1, 1).await.is_ok()
                     && builder.finish().await.is_ok()
                 {
-                    let block_cache = storage.block_cache();
                     if let Ok(reader) =
                         SstableReader::open_with_key_manager(&canary_path, block_cache, None).await
                     {
@@ -99,13 +105,13 @@ impl LayerScanner for SstableScanner {
         let codec = TenantKeyCodec::new(ctx.tenant_id);
         let target_prefix = codec.scan_prefix().to_vec();
 
-        let storage = Arc::clone(&self.storage);
+        let view = self.view.clone();
 
         let discovered_units = self.runtime.block_on(async {
             let mut units = Vec::new();
 
             // 1. Offene / Aktive SSTables im Store erfassen
-            let readers = storage.sstables_for_scanner().await;
+            let readers = view.sstables.read().await.clone();
             let mut active_paths = AHashSet::new();
 
             for reader in &readers {
@@ -140,7 +146,7 @@ impl LayerScanner for SstableScanner {
             }
 
             // 2. Inventar-Diff: Suche nach Altdateien (.sst), die nicht im Manifest/Store stehen
-            let data_dir = storage.data_path();
+            let data_dir = view.data_path();
             if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {
                 while let Ok(Some(entry)) = dir.next_entry().await {
                     let path = entry.path();
@@ -148,7 +154,7 @@ impl LayerScanner for SstableScanner {
                         && !active_paths.contains(&path)
                     {
                         // Orphan SSTable gefunden
-                        let block_cache = storage.block_cache();
+                        let block_cache = Arc::clone(view.block_cache());
                         if let Ok(orphan_reader) =
                             SstableReader::open_with_key_manager(&path, block_cache, None).await
                         {

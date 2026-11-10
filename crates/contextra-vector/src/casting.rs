@@ -2,13 +2,13 @@
 //!
 //! Provides typed, checked bounds validation replacing unconstrained `as` casts.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{VectorError, Result};
 
-/// Converts `usize` to `u32`, returning `ContextraError::invalid_input` if out of bounds.
+/// Converts `usize` to `u32`, returning `VectorError::InvalidInput` if out of bounds.
 #[inline]
 pub fn to_u32(val: usize) -> Result<u32> {
     u32::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("value exceeds u32 capacity limit")
+        VectorError::invalid_input("value exceeds u32 capacity limit")
     })
 }
 
@@ -18,27 +18,27 @@ pub fn u32_to_usize(val: u32) -> usize {
     val as usize
 }
 
-/// Converts `u64` to `usize`, returning `ContextraError::invalid_input` if out of bounds.
+/// Converts `u64` to `usize`, returning `VectorError::InvalidInput` if out of bounds.
 #[inline]
 pub fn u64_to_usize(val: u64) -> Result<usize> {
     usize::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("u64 value exceeds pointer width")
+        VectorError::invalid_input("u64 value exceeds pointer width")
     })
 }
 
-/// Converts `u64` to `u32`, returning `ContextraError::invalid_input` if out of bounds.
+/// Converts `u64` to `u32`, returning `VectorError::InvalidInput` if out of bounds.
 #[inline]
 pub fn u64_to_u32(val: u64) -> Result<u32> {
     u32::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("u64 value exceeds u32 bounds")
+        VectorError::invalid_input("u64 value exceeds u32 bounds")
     })
 }
 
-/// Converts `usize` to `u8`, returning `ContextraError::invalid_input` if out of bounds.
+/// Converts `usize` to `u8`, returning `VectorError::InvalidInput` if out of bounds.
 #[inline]
 pub fn to_u8(val: usize) -> Result<u8> {
     u8::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("value exceeds u8 capacity limit")
+        VectorError::invalid_input("value exceeds u8 capacity limit")
     })
 }
 
@@ -52,7 +52,7 @@ pub fn to_u64(val: usize) -> u64 {
 #[inline]
 pub fn f32_to_usize(val: f32) -> Result<usize> {
     if !val.is_finite() || val < 0.0 {
-        return Err(ContextraError::invalid_input(
+        return Err(VectorError::invalid_input(
             "floating point value cannot be converted to unsigned index",
         ));
     }
@@ -64,7 +64,7 @@ pub fn f32_to_usize(val: f32) -> Result<usize> {
 #[inline]
 pub fn f64_to_usize(val: f64) -> Result<usize> {
     if !val.is_finite() || val < 0.0 {
-        return Err(ContextraError::invalid_input(
+        return Err(VectorError::invalid_input(
             "floating point value cannot be converted to unsigned index",
         ));
     }

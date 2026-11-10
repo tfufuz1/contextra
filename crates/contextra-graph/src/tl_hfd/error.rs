@@ -15,6 +15,7 @@ pub enum TlHfdError {
     NonFinite,
 }
 
+#[cfg(feature = "types-compat")]
 impl From<TlHfdError> for contextra_types::ContextraError {
     fn from(err: TlHfdError) -> Self {
         contextra_types::ContextraError::InvalidInput(err.to_string())

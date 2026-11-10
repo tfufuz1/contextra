@@ -14,9 +14,11 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat"]
+default = ["std", "workspace", "test-utils"]
 std = ["serde/std"]
-types-compat = ["dep:contextra-types"]
+workspace = ["dep:contextra-types"]
+types-compat = ["workspace"]
+test-utils = []
 
 [dependencies]
 contextra-types = { workspace = true, optional = true }
@@ -31,3 +33,40 @@ criterion = "0.5"
 [[bench]]
 name = "audit_export_bench"
 harness = false
+required-features = ["test-utils"]
+
+[[example]]
+name = "audit_export_standalone"
+required-features = ["test-utils"]
+
+[[test]]
+name = "campaign_j27_compliance_test"
+required-features = ["test-utils"]
+
+[[test]]
+name = "error_and_edge_cases"
+required-features = ["test-utils"]
+
+[[test]]
+name = "golden_contract_test"
+required-features = ["test-utils"]
+
+[[test]]
+name = "golden_file_test"
+required-features = ["test-utils"]
+
+[[test]]
+name = "golden_generator"
+required-features = ["test-utils"]
+
+[[test]]
+name = "register_rendering"
+required-features = ["test-utils"]
+
+[[test]]
+name = "sanitization_tests"
+required-features = ["test-utils"]
+
+[[test]]
+name = "validation_tests"
+required-features = ["test-utils"]

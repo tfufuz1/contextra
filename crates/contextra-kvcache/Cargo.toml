@@ -35,9 +35,10 @@ ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
 crypto-compat = ["dep:contextra-crypto"]
 kv-encryption = ["crypto-compat", "contextra-crypto/kv-encryption"]
 content-addressed-kv-cache = []
-kvcache-attention-eviction = []
+exp-content-addressed = ["content-addressed-kv-cache"]
 kvcache-kivi-quant = []
 kivi-quantization = []
+exp-kivi = ["kivi-quantization"]
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }

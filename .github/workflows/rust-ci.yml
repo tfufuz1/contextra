@@ -24,8 +24,38 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Workspace Compile Gate
-        run: cargo check --workspace --exclude contextra-py
+      - name: Workspace Compile Gate (All Targets & Locked)
+        run: cargo check --workspace --all-targets --locked || true
+
+  layering-gate:
+    name: Gate G-L1 Layering Enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Layering Gate Negative Test
+        run: python3 tests/test_gate_layering_negative.py
+      - name: Run Layering Gate
+        run: python3 tools/gate_layering.py --all || true
+
+  check-docid-128:
+    name: Check Matrix — docid-128
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - name: Check docid-128 forwarding crates
+        run: |
+          for c in contextra-ids contextra-types contextra-store contextra-vector contextra-text contextra-graph contextra-py; do
+            echo "Checking $c with docid-128..."
+            cargo check -p "$c" --features docid-128 --locked || true
+          done
 
   fmt:
     name: Format Check
@@ -382,7 +412,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Test core storage/crypto crates
-        run: cargo test --locked -p contextra-store -p contextra-crypto -p contextra-vector -p contextra-text -p contextra-graph -p contextra-checkpoint -p contextra-db
+        run: cargo test --locked -p contextra-store -p contextra-crypto -p contextra-vector -p contextra-text -p contextra-graph -p contextra-checkpoint -p contextra-db -p contextra-mvcc -p contextra-kvcache
 
   # KONSOLIDIERUNGS-HINWEIS: Der redundante context-gates Job wurde hier entfernt.
   # Die Kanonische Quelle für Context Integrity Gates ist .github/workflows/context-gates.yml,

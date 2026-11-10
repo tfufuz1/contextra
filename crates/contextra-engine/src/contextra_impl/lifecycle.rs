@@ -396,7 +396,7 @@ impl Contextra {
             return Err(contextra_types::ContextraError::Storage(format!(
                 "repair_on_open: {} Collection(s) konnten nach Crash nicht \
                  wiederhergestellt werden: {}. \
-                 Datenbankintegrität nicht garantiert — manuelle Intervention erforderlich.",
+                 Datenbankintegrität nicht sichergestellt — manuelle Intervention erforderlich.",
                 repair_errors.len(),
                 repair_errors.join(", ")
             )));
