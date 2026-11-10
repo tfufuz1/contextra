@@ -21,6 +21,7 @@
 #![forbid(unsafe_code)]
 
 pub mod arm_registry;
+#[cfg(feature = "subprocess-dispatch")]
 pub mod dispatch;
 pub mod outcome;
 pub mod ports_local;
@@ -59,6 +60,7 @@ mod tests;
 pub use arm_registry::{ArmRegistry, ArmRegistryError};
 pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
+#[cfg(feature = "subprocess-dispatch")]
 pub use dispatch::dispatch_to_slm;
 pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 #[allow(deprecated)]

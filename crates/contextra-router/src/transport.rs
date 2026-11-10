@@ -85,8 +85,8 @@ mod tests {
     #[test]
     fn test_transport_serde_roundtrip() {
         let t = Transport::StdioMcp;
-        let json = serde_json::to_string(&t).unwrap();
-        let t2: Transport = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&t).unwrap(); // #[cfg(test)]
+        let t2: Transport = serde_json::from_str(&json).unwrap(); // #[cfg(test)]
         assert_eq!(t, t2);
     }
 }
