@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Crate-level structured error types for contextra-sys (Ring 0 / SPEC §10.1 / B4)
 // INVARIANTEN: Zero panic; structured error propagation; no string-parsed errnos; thiserror integration
 
@@ -49,6 +48,10 @@ pub enum Error {
     #[error("file handle is permanently poisoned due to previous sync failure")]
     HandlePoisoned,
 }
+
+/// Spezifischer Result-Typ für `contextra-sys`.
+/// Typ-Alias für das Crate-Fehlermodell gemäß Baukasten-Spezifikation (docs/SPEC.md §3.1 / R3).
+pub type SysError = Error;
 
 /// Spezifischer Result-Typ für `contextra-sys`.
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: RAII manager for RAM memory-locked sensitive buffer regions, protected page allocations, and zeroization (Ring 0 / SPEC §10.1 / INV-SYS-MEMLOCK-1)
 // INVARIANTEN: Zero panic; VaultBuffer protected allocation; non-optimizable volatile zeroize + compiler fence; mlock + MADV_DONTDUMP; munlock after zeroize
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
@@ -28,7 +27,6 @@ use crate::mlock::{
     apply_dont_dump, mem_lock_typed, mem_lock_with_policy, mem_unlock, MemLockPolicy,
 };
 
-// ANCHOR[contextra-sys:VAULT-LOCKED-REGIONS-001]
 /// Kapselt und verfolgt im RAM gesperrte Speicherbereiche (Adressen und Längen) für sensible Schlüsseldaten.
 #[derive(Debug, Default)]
 pub struct LockedRegions {
@@ -36,7 +34,6 @@ pub struct LockedRegions {
 }
 
 impl LockedRegions {
-    // ANCHOR[contextra-sys:VAULT-NEW-001]
     /// Erstellt eine neue, leere Nachverfolgungsinstanz für gesperrte Speicherregionen.
     pub fn new() -> Self {
         Self {
@@ -44,14 +41,12 @@ impl LockedRegions {
         }
     }
 
-    // ANCHOR[contextra-sys:VAULT-LOCK-SLICE-001]
     /// Versucht einen Byte-Slice im RAM zu sperren, falls `attempt_mlock` wahr ist, unter Verwendung der Standardrichtlinie [`MemLockPolicy::Tolerant`].
     pub fn lock_slice(&mut self, slice: &[u8], attempt_mlock: bool) -> bool {
         self.lock_slice_with_policy(slice, attempt_mlock, MemLockPolicy::Tolerant)
             .unwrap_or(false)
     }
 
-    // ANCHOR[contextra-sys:VAULT-LOCK-SLICE-POLICY-001]
     /// Versucht einen Byte-Slice im RAM gemäß der angegebenen [`MemLockPolicy`] zu sperren, falls `attempt_mlock == true`.
     pub fn lock_slice_with_policy(
         &mut self,
@@ -76,7 +71,6 @@ impl LockedRegions {
         Ok(locked)
     }
 
-    // ANCHOR[contextra-sys:VAULT-ZEROIZE-001]
     /// Überschreibt einen veränderbaren Byte-Slice sicher mit Nullen unter Verwendung von flüchtigen Schreibzugriffen (`write_volatile`)
     /// und einer Compiler-Fence (`Ordering::SeqCst`), um Dead-Store Elimination durch den Compiler zuverlässig zu verhindern.
     pub fn zeroize_slice(slice: &mut [u8]) {
@@ -89,7 +83,6 @@ impl LockedRegions {
         compiler_fence(Ordering::SeqCst);
     }
 
-    // ANCHOR[contextra-sys:VAULT-UNLOCK-ALL-001]
     /// Entsperrt alle registrierten Speicherregionen und leert die interne Nachverfolgungsliste.
     pub fn unlock_all(&mut self) {
         for (addr, len) in self.regions.drain(..) {
@@ -114,7 +107,6 @@ impl Drop for LockedRegions {
     }
 }
 
-// ANCHOR[contextra-sys:VAULT-BUFFER-001]
 /// Ein im RAM verankerter, geschützter Speicherpuffer für hochsensible kryptografische Schlüsseldaten (INV-SYS-MEMLOCK-1).
 #[derive(Debug)]
 pub struct VaultBuffer {
@@ -210,7 +202,6 @@ impl Drop for VaultBuffer {
     }
 }
 
-// ANCHOR[contextra-sys:VAULT-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,7 +254,6 @@ mod tests {
         assert_eq!(secret, vec![0u8; 16]);
     }
 
-    // ANCHOR[contextra-sys:INV-SYS-MEMLOCK-1-TEST-001]
     /// Prüft INV-SYS-MEMLOCK-1: VaultBuffer wird gesperrt, mit Nullen überschrieben und schlägt fail-closed fehl, wenn mlock scheitert.
     #[test]
     fn test_inv_sys_memlock_1_vault_protection() -> Result<()> {

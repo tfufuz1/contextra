@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Platform-aware RAM memory locking abstractions with policy enforcement (Ring 0 / SPEC §10.1 / INV-SYS-MEMLOCK-1)
 // INVARIANTEN: Zero panic; configurable mlock policy; madvise(MADV_DONTDUMP) integration; structured error propagation
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
@@ -47,7 +46,6 @@ pub(crate) mod fault_injection {
     }
 }
 
-// ANCHOR[contextra-sys:MLOCK-POLICY-001]
 /// Konfigurierbare Richtlinie für das Sperren von Speicherregionen (`mlock` / `VirtualLock`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MemLockPolicy {
@@ -60,7 +58,6 @@ pub enum MemLockPolicy {
     Tolerant,
 }
 
-// ANCHOR[contextra-sys:MLOCK-APPLY-DONTDUMP-001]
 /// Schließt eine Speicherregion per `madvise(MADV_DONTDUMP)` aus Core-Dumps aus (Unix).
 /// Auf Nicht-Unix-Systemen ist dies ein no-op.
 pub fn apply_dont_dump(ptr: *const u8, len: usize) -> Result<()> {
@@ -98,7 +95,6 @@ pub fn apply_dont_dump(ptr: *const u8, len: usize) -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-sys:MLOCK-LOCK-TYPED-001]
 /// Sperrt eine Speicherregion im RAM gemäß Richtlinie und liefert ein typisiertes [`Result<bool>`].
 pub fn mem_lock_typed(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
     if len == 0 || ptr.is_null() {
@@ -201,13 +197,11 @@ pub fn mem_lock_typed(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Resu
     }
 }
 
-// ANCHOR[contextra-sys:MLOCK-LOCK-WITH-POLICY-001]
 /// Sperrt unter POSIX/Windows eine Speicherregion im RAM, um das Auslagern (Swapping) zu verhindern.
 pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> IoResult<bool> {
     mem_lock_typed(ptr, len, policy).map_err(Into::into)
 }
 
-// ANCHOR[contextra-sys:MLOCK-UNLOCK-001]
 /// Entsperrt eine zuvor gesperrte Speicherregion im RAM.
 pub fn mem_unlock(addr: usize, len: usize) {
     if len == 0 || addr == 0 {
@@ -236,13 +230,11 @@ pub fn mem_unlock(addr: usize, len: usize) {
     }
 }
 
-// ANCHOR[contextra-sys:MLOCK-CONVENIENCE-001]
 /// Sperrt eine Speicherregion im RAM mit der Standard-Richtlinie [`MemLockPolicy::Tolerant`].
 pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
     mem_lock_typed(ptr, len, MemLockPolicy::Tolerant).unwrap_or(false)
 }
 
-// ANCHOR[contextra-sys:MLOCK-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
