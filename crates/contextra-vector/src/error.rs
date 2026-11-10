@@ -49,6 +49,13 @@ pub enum VectorError {
     Unsupported(String),
 }
 
+impl VectorError {
+    /// Helper to construct InvalidInput with String conversion
+    pub fn invalid_input(msg: impl Into<String>) -> Self {
+        Self::InvalidInput(msg.into())
+    }
+}
+
 /// Standard Result type for .
 pub type Result<T> = std::result::Result<T, VectorError>;
 
