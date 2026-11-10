@@ -16,6 +16,14 @@ Für `contextra-vector` gelten im Rahmen der Transformation zum modularen Baukas
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-vector` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 13563 LOC über 52 Rust-Dateien (Budget: 13600 LOC)
+- **Autarkie-Score:** 35/100 | **Interne Abhängigkeiten:** 4 (contextra-mvcc, contextra-ports, contextra-sys, contextra-types)
+- **Löschdomänen-Leaks:** 11 Vorkommen
+- **Schnittstelleninventar:** 16 Traits, 65 Structs, 10 Enums, 315 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

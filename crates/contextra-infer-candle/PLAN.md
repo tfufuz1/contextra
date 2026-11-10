@@ -16,6 +16,14 @@ Für `contextra-infer-candle` gelten im Rahmen der Transformation zum modularen 
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-infer-candle` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 5150 LOC über 20 Rust-Dateien (Budget: 5200 LOC)
+- **Autarkie-Score:** 71/100 | **Interne Abhängigkeiten:** 4 (contextra-crypto, contextra-ports, contextra-rank, contextra-types)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 6 Traits, 35 Structs, 3 Enums, 73 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

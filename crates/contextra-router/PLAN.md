@@ -16,6 +16,14 @@ Für `contextra-router` gelten im Rahmen der Transformation zum modularen Baukas
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-router` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 5793 LOC über 28 Rust-Dateien (Budget: 5800 LOC)
+- **Autarkie-Score:** 61/100 | **Interne Abhängigkeiten:** 4 (contextra-adapt, contextra-ports, contextra-types, contextra-wire)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 0 Traits, 25 Structs, 6 Enums, 73 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

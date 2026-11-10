@@ -16,6 +16,14 @@ Für `contextra-checkpoint` gelten im Rahmen der Transformation zum modularen Ba
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-checkpoint` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 3585 LOC über 11 Rust-Dateien (Budget: 3600 LOC)
+- **Autarkie-Score:** 88/100 | **Interne Abhängigkeiten:** 2 (contextra-ports, contextra-types)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 3 Traits, 21 Structs, 0 Enums, 104 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

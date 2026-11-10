@@ -16,6 +16,14 @@ Für `contextra-wire` gelten im Rahmen der Transformation zum modularen Baukaste
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** Unsafe-Blöcke sind strikt auf das Notwendigste beschränkt, auditierbar und in `docs/unsafe-register.md` registriert.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-wire` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 2131 LOC über 6 Rust-Dateien (Budget: 2200 LOC)
+- **Autarkie-Score:** 100/100 | **Interne Abhängigkeiten:** 0 (keine)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 1 Traits, 33 Structs, 11 Enums, 121 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

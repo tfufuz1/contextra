@@ -16,6 +16,14 @@ Für `contextra-avv-generator` gelten im Rahmen der Transformation zum modularen
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-avv-generator` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 550 LOC über 9 Rust-Dateien (Budget: 600 LOC)
+- **Autarkie-Score:** 70/100 | **Interne Abhängigkeiten:** 0 (keine)
+- **Löschdomänen-Leaks:** 229 Vorkommen
+- **Schnittstelleninventar:** 0 Traits, 3 Structs, 1 Enums, 17 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

@@ -16,6 +16,14 @@ Für `contextra-erasure` gelten im Rahmen der Transformation zum modularen Bauka
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-erasure` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 12392 LOC über 66 Rust-Dateien (Budget: 13000 LOC)
+- **Autarkie-Score:** 99/100 | **Interne Abhängigkeiten:** 0 (keine)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 30 Traits, 149 Structs, 58 Enums, 473 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

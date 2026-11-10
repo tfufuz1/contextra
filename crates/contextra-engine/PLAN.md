@@ -16,6 +16,14 @@ Für `contextra-engine` gelten im Rahmen der Transformation zum modularen Baukas
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-engine` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 17641 LOC über 87 Rust-Dateien (Budget: 18000 LOC)
+- **Autarkie-Score:** 10/100 | **Interne Abhängigkeiten:** 12 (contextra-adapt, contextra-checkpoint, contextra-graph, contextra-infer-onnx, contextra-mvcc, contextra-ports, contextra-rank, contextra-sandbox, contextra-store, contextra-text, contextra-types, contextra-vector)
+- **Löschdomänen-Leaks:** 9 Vorkommen
+- **Schnittstelleninventar:** 7 Traits, 75 Structs, 9 Enums, 357 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

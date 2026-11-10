@@ -16,6 +16,14 @@ Für `contextra-cognition` gelten im Rahmen der Transformation zum modularen Bau
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-cognition` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 5335 LOC über 24 Rust-Dateien (Budget: 5400 LOC)
+- **Autarkie-Score:** 71/100 | **Interne Abhängigkeiten:** 4 (contextra-engine, contextra-graph, contextra-ports, contextra-types)
+- **Löschdomänen-Leaks:** 1 Vorkommen
+- **Schnittstelleninventar:** 3 Traits, 45 Structs, 1 Enums, 77 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

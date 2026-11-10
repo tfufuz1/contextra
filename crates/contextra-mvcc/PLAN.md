@@ -16,6 +16,14 @@ Für `contextra-mvcc` gelten im Rahmen der Transformation zum modularen Baukaste
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-mvcc` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 3179 LOC über 5 Rust-Dateien (Budget: 3200 LOC)
+- **Autarkie-Score:** 83/100 | **Interne Abhängigkeiten:** 2 (contextra-ports, contextra-types)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 2 Traits, 20 Structs, 3 Enums, 139 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

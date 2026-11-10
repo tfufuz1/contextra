@@ -1,28 +1,57 @@
-# SPEC: contextra-types (Klasse B)
+# Spezifikation: `contextra-types`
 
-Normatives Spezifikationsdokument für den Klassen-B-Baustein `contextra-types` gemäß SPEC v4.0.
+**Ring:** Ring 0 (Foundation)
+**Normativität:** Normativ gemäß `docs/SPEC.md` §1.1, §4, §6.3
+**Klasse:** B (Storage Bundle Basistypen)
+**MSRV:** 1.89.0
+**Code-Disziplin:** `#![forbid(unsafe_code)]`, Zero-Panic
 
-## 1. Zweck und Rolle
-* **Rolle:** Fundament des Storage-Bundles: kanonische Identifikatoren, Kern-Datenstrukturen, Fehlerdomänen und Request-Kontext.
-* **Klasse:** Klasse B (Storage-Bundle-Kerne).
-* **Grenzen:**
-  * Keine I/O- oder Netzwerkanbindungen.
-  * Keine nicht-deterministischen Zeit- oder Entropie-Quellen in Kern-Typen.
-  * Neutralität gegenüber konkreten Speichermodellen (LSM, HNSW, BM25).
-  * Vollständige Entkopplung von der Löschdomäne (`contextra-erasure`).
+---
 
-## 2. Kanonische Identifikatoren und Invarianten
-* `DocId`: Kanonische Dokumenten-ID (64-Bit Standard oder 128-Bit mit Feature `docid-128`).
-* `TxId`: Monoton steigende Transaktions-ID mit geschützten System- und Benutzerbereichen.
-* `TenantId`: Mandanten-Identifikator mit reserviertem System-Bereich (`SYSTEM_TENANT_ID`).
-* `CollectionId`: Typsichere Sammlungs-Kennung.
+## 1. Zweck & Systemgrenzen
+`contextra-types` bildet das fundamentale, typentheoretische Rückgrat des Contextra-Ökosystems:
+- **Scope:** Kanonische Identifikatoren (`DocId`, `TenantId`, `TxId`, `CollectionId`), Datenstrukturen (`Document`, `KeyBuf`), geschlossene Fehlerdomäne (`ContextraError`) und `RequestContext`.
+- **Systemgrenzen:** Rein in-memory, null Netzwerk/Dateisystem-I/O, kein Tokio/Async-Runtime. Vollständige Entkopplung von konkreten Speichertriebwerken.
+- **Löschdomänen-Entkopplung:** Spezifische Löschketten- und Saga-Typen (`SagaRecord`, `ScanMethod`, `ErasureId`, `GateId`) sind als `#[deprecated]` markiert und verbleiben nur bis zur vollständigen Auslagerung nach `contextra-erasure-spi`.
 
-## 3. Fehlerdomänen
-* `ContextraError`: Zentraler typisierter Fehler-Enum für alle Kernoperationen des Storage-Bundles.
-* Sub-Fehler: Modul-disjunkte Fehlerstrukturen mit Zero-Panic-Konstruktoren und deterministischer Konvertierung.
-* Modell-Neutralität: Speichermodell-spezifische Fehler wie `HnswDeletionError` sind als deprecated markiert und gehören in die jeweiligen Engines (`contextra-vector`).
+---
 
-## 4. Garantien
-* **Zero-Panic:** Keine Panics, ungeprüften Indexierungen oder Konstruktor-Abbrüche in Produktionscode.
-* **Determinismus:** Bit-identische Repräsentationen und deterministische Sortier- und Hash-Ordnungen.
-* **Kompatibilität:** Additive Features für `docid-128` und `auto-extraction-opt-out`.
+## 2. Metriken & Werkzeug-Audit-Befunde
+*Erfasst via `tools/decouple_inspector.py -c contextra-types`:*
+- **LOC:** 5.684 LOC über 25 Rust-Dateien.
+- **Typen-Inventar:** 0 Traits, 40 Structs, 15 Enums, 140 öffentliche Funktionen (`pub fn`).
+- **Autarkie-Score:** 90/100 (0 interne Workspace-Abhängigkeiten).
+- **Zero-Panic-Audit:** 0 unkontrollierte Panics im Produktionscode (`tools/zero_panic_analyzer.py`).
+
+---
+
+## 3. Architektur & Modulkarte
+
+| Modul | Verantwortung | Primäre Typen |
+|---|---|---|
+| `ids` | Typsichere Identifikatoren | `DocId` (64/128 Bit), `TenantId`, `TxId`, `CollectionId` |
+| `tags` | Deterministische Bit-Tags und Metadaten-Flags | `DocTag`, `CollTag`, `TenantTag` |
+| `key` | Fixierte Key-Buffer und Präfix-Codierung | `KeyBuf` (78 Bytes fixiert) |
+| `error` | Zentraler Systemfehler-Enum | `ContextraError`, `ErrorDto` |
+| `domain` | Dokumenten- und Felddefinitionen | `Document`, `FieldValue`, `Schema` |
+| `limits` | Kapazitäts- und Ressourcenbegrenzungen | `ResourceBudget`, `ResourceTracker` |
+| `secret` | Zeroize-geschützte Geheimnisträger | `VolatileSecret`, `Sensitive` |
+
+---
+
+## 4. Invarianten (INV-TYP-*)
+
+| Invariante | Beschreibung | Verifikation |
+|---|---|---|
+| `INV-TYP-ZERO-UNSAFE` | `#![forbid(unsafe_code)]` wird ausnahmslos im gesamten Crate erzwungen. | `cargo check -p contextra-types` |
+| `INV-TYP-DETERMINISM-1` | Bit-identische Repräsentationen für alle ID-Typen; deterministische Sortier- und Hash-Ordnung. | `tests/golden_bytes_suite.rs` |
+| `INV-TYP-DOCID-WIDTH` | `DocId` unterstützt via Feature `docid-128` nahtlos 128-Bit breite IDs bei vollständiger Wire-Format-Stabilität. | `cargo test -p contextra-types --features docid-128` |
+| `INV-TYP-NO-IO` | Der gesamte Crate enthält keinerlei synchrone oder asynchrone I/O-Primitive. | `tools/rust_ast_inspector.py` |
+
+---
+
+## 5. Zielzustand & Migrationspfad
+Gemäß `docs/SPEC.md` §6.3:
+1. Verlagerung der Kern-IDs nach `contextra-ids`.
+2. Übertragung von `tombstone.rs` nach `contextra-mvcc`.
+3. Vollständiger Rückbau der Deprecated Re-Exporte in Welle 6.

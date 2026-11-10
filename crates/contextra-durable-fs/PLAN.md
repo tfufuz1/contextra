@@ -16,6 +16,14 @@ Für `contextra-durable-fs` gelten im Rahmen der Transformation zum modularen Ba
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-durable-fs` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 1428 LOC über 8 Rust-Dateien (Budget: 1500 LOC)
+- **Autarkie-Score:** 100/100 | **Interne Abhängigkeiten:** 0 (keine)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 2 Traits, 13 Structs, 12 Enums, 56 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

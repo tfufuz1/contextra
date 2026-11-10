@@ -16,6 +16,14 @@ Für `contextra-mcp` gelten im Rahmen der Transformation zum modularen Baukasten
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-mcp` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 4844 LOC über 22 Rust-Dateien (Budget: 4900 LOC)
+- **Autarkie-Score:** 53/100 | **Interne Abhängigkeiten:** 11 (contextra, contextra-crypto, contextra-infer-candle, contextra-infer-ollama, contextra-infer-onnx, contextra-ports, contextra-privacy, contextra-rank, contextra-router, contextra-types, contextra-wire)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 0 Traits, 27 Structs, 3 Enums, 79 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

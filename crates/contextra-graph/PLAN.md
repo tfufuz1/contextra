@@ -16,6 +16,14 @@ Für `contextra-graph` gelten im Rahmen der Transformation zum modularen Baukast
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-graph` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 17501 LOC über 77 Rust-Dateien (Budget: 18000 LOC)
+- **Autarkie-Score:** 46/100 | **Interne Abhängigkeiten:** 2 (contextra-ports, contextra-types)
+- **Löschdomänen-Leaks:** 18 Vorkommen
+- **Schnittstelleninventar:** 13 Traits, 110 Structs, 11 Enums, 299 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

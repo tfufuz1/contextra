@@ -16,6 +16,14 @@ Für `contextra-audit-export` gelten im Rahmen der Transformation zum modularen 
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-audit-export` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 744 LOC über 6 Rust-Dateien (Budget: 800 LOC)
+- **Autarkie-Score:** 64/100 | **Interne Abhängigkeiten:** 1 (contextra-types)
+- **Löschdomänen-Leaks:** 33 Vorkommen
+- **Schnittstelleninventar:** 2 Traits, 9 Structs, 1 Enums, 16 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur

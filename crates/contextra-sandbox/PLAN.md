@@ -16,6 +16,14 @@ Für `contextra-sandbox` gelten im Rahmen der Transformation zum modularen Bauka
 4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
 5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
 
+
+### 1.1 Werkzeug-Audit-Metriken (Ist-Zustand)
+- **Erfasst durch:** `tools/decouple_inspector.py -c contextra-sandbox` & `tools/audit_modular_building_blocks.py`
+- **Aktuelle LOC:** 1905 LOC über 13 Rust-Dateien (Budget: 2000 LOC)
+- **Autarkie-Score:** 100/100 | **Interne Abhängigkeiten:** 0 (keine)
+- **Löschdomänen-Leaks:** 0 Vorkommen
+- **Schnittstelleninventar:** 0 Traits, 11 Structs, 4 Enums, 26 `pub fn`
+
 ---
 
 ## 2. Modul- & Komponentenarchitektur
