@@ -78,13 +78,20 @@
 #![warn(missing_docs)]
 
 pub use crate::mvcc_error::{MvccError, Result as MvccResult};
-pub use contextra_types::{
-    error::{self, ContextraError, Result},
-    tombstone::{SeqBitTombstone, TombstoneSemanticsCheck},
-    types::{self, DocId, TenantId, TxId, TOMBSTONE_BIT},
-};
+pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
 
+/// Kanonische Typen und Identifikatoren für MVCC.
+pub mod types {
+    pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
+}
+
+#[cfg(feature = "workspace")]
 pub mod compat;
+
+#[cfg(feature = "workspace")]
+pub use crate::compat::{
+    workspace_error as error, ContextraError, Result, SeqBitTombstone, TombstoneSemanticsCheck,
+};
 pub mod mvcc_error;
 pub mod seq_log;
 pub mod snapshot;

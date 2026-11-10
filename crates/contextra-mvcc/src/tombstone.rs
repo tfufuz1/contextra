@@ -3,7 +3,7 @@
 
 //! Trait und Referenzimplementierung für Tombstone-Semantikprüfung in Sequenzprotokollen und Indizes.
 
-use contextra_types::types::TOMBSTONE_BIT;
+use contextra_ids::TOMBSTONE_BIT;
 
 // ANCHOR[contextra-mvcc:TOMB-001]
 /// Trait defining tombstone semantics for index sequence numbers and key-value records.

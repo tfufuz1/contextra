@@ -38,7 +38,7 @@ use crate::mvcc_error::{MvccError, Result};
 use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, SystemClock};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -879,7 +879,7 @@ impl<T: Clone> Default for TxBuffer<T> {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use contextra_env::ManualClock;
     use proptest::{prop_assert, prop_assert_eq};
 
     // Prüft das Registrieren und Verfolgen von Lesezugriffen im ReadSet einer Transaktion sowie die Freigabe beim Drain.
@@ -1013,19 +1013,19 @@ mod tests {
     // Prüft die Begrenzung der Anzahl abgeräumter verwaister Transaktionen über reap_orphans_bounded.
     #[test]
     fn test_tx_buffer_reap_orphans_bounded_capping() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
         let config = TxBufferConfig {
             tx_timeout: Duration::from_millis(5),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone(), 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 1, config);
 
         buffer.begin(TxId::new(1));
         buffer.begin(TxId::new(2));
         buffer.begin(TxId::new(3));
 
         // Advance clock by 20ms
-        clock.advance(Duration::from_millis(20));
+        clock.advance_nanos(20_000_000);
 
         let reaped = buffer.reap_orphans_bounded(2);
         assert_eq!(reaped.len(), 2);
@@ -1093,16 +1093,16 @@ mod tests {
     // Prüft das Timeout-basierte Bereinigen verwaister Transaktionen nach Ablauf der Timeout-Frist.
     #[test]
     fn test_tx_buffer_reap_orphans() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
         let config = TxBufferConfig {
             tx_timeout: Duration::from_millis(10),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone(), 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 1, config);
         let tx = TxId::new(1);
         buffer.begin(tx);
 
-        clock.advance(Duration::from_millis(20));
+        clock.advance_nanos(20_000_000);
 
         let expired = buffer.reap_orphans();
         assert_eq!(expired, vec![tx]);
@@ -1112,15 +1112,15 @@ mod tests {
     // Prüft das Bereinigen verwaister Transaktionen mit deterministischer Zeiteinspeisung über ManualClock.
     #[test]
     fn test_tx_buffer_reap_orphans_deterministic_time_injection() {
-        let clock = Arc::new(ManualClock::new(20_000_000_000));
+        let clock = Arc::new(ManualClock::new(20_000_000_000, 20_000_000_000));
         let config = TxBufferConfig {
             tx_timeout: Duration::from_secs(10),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone(), 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 1, config);
         let tx = TxId::new(100);
 
-        let past_nanos = clock.now_nanos().saturating_sub(15_000_000_000);
+        let past_nanos = clock.now_unix_nanos().saturating_sub(15_000_000_000);
 
         // Begin transaction at 15 seconds in the past
         buffer.begin_at(tx, past_nanos);
@@ -1311,18 +1311,18 @@ mod tests {
             tx_count in 1..100usize,
             timeout_ms in 1..100u64
         ) {
-            let clock = Arc::new(ManualClock::new(1_000_000_000));
+            let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
             let config = TxBufferConfig {
                 tx_timeout: Duration::from_millis(timeout_ms),
                 ..Default::default()
             };
-            let buffer = TxBuffer::<u8>::new_with_clock_and_config(clock.clone(), 16, config);
+            let buffer = TxBuffer::<u8>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 16, config);
 
             for i in 0..tx_count {
                 buffer.begin(TxId::new(u64::try_from(i).expect("valid u64")));
             }
 
-            clock.advance(Duration::from_millis(timeout_ms * 2));
+            clock.advance_nanos(timeout_ms.saturating_mul(2).saturating_mul(1_000_000));
 
             let reaped = buffer.reap_orphans();
             prop_assert_eq!(reaped.len(), tx_count);

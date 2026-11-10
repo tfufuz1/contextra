@@ -32,7 +32,7 @@
 
 use crate::mvcc_error::{MvccError, Result};
 use crate::types::{TenantId, TOMBSTONE_BIT};
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, SystemClock};
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -536,7 +536,7 @@ impl Drop for SnapshotGuard {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use contextra_env::ManualClock;
     use proptest::prop_assert_eq;
 
     // Prüft den Basis-Lebenszyklus eines SnapshotGuards: Registrierung, Minimum-Berechnung und automatisches Zurücksetzen beim Drop.
@@ -747,21 +747,21 @@ mod tests {
     // Prüft das automatische Bereinigen überalterter Pins nach Ablauf der maximalen Haltedauer.
     #[test]
     fn test_snapshot_registry_reap_expired_pins() {
-        let clock = Arc::new(ManualClock::new(10_000_000_000));
-        let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
+        let clock = Arc::new(ManualClock::new(10_000_000_000, 10_000_000_000));
+        let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone() as Arc<dyn Clock>));
 
         registry.pin(100);
         assert_eq!(registry.min_active_seqno(), 100);
 
         // Advance clock by 10 seconds
-        clock.advance(Duration::from_secs(10));
+        clock.advance_nanos(10_000_000_000);
 
         // Pin 200 at t = 10s
         registry.pin(200);
         assert_eq!(registry.min_active_seqno(), 100);
 
         // Advance clock by 295s (total elapsed for pin 100: 305s > 300s max_pin_duration)
-        clock.advance(Duration::from_secs(295));
+        clock.advance_nanos(295_000_000_000);
 
         // Reap expired pins with 300s limit
         let reaped = registry.reap_expired_pins(Duration::from_secs(300));
@@ -772,12 +772,12 @@ mod tests {
     // Prüft try_register und Kapazitätsbegrenzung für SnapshotRegistry.
     #[test]
     fn test_snapshot_registry_try_register_capacity_limit() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
         let config = SnapshotRegistryConfig {
             max_active_snapshots: 2,
             max_snapshot_age: Duration::from_secs(60),
         };
-        let registry = Arc::new(SnapshotRegistry::with_clock_and_config(clock, config));
+        let registry = Arc::new(SnapshotRegistry::with_clock_and_config(clock as Arc<dyn Clock>, config));
 
         assert_eq!(registry.oldest_active_snapshot(), None);
 
