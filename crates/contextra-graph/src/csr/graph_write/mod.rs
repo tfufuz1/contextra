@@ -97,6 +97,7 @@ impl CsrGraph {
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-007]
     /// Delegiert an [`GraphIndex::personalized_page_rank_at`].
+    #[cfg(feature = "ports-compat")]
     pub fn personalized_page_rank_at<'a>(
         &'a self,
         seed_nodes: &'a [contextra_types::EntityId],
@@ -110,6 +111,7 @@ impl CsrGraph {
     }
 
     /// Delegiert an [`GraphIndex::rollback_to_tx`].
+    #[cfg(feature = "ports-compat")]
     pub fn rollback_to_tx<'a>(
         &'a self,
         tx_id: contextra_types::TxId,

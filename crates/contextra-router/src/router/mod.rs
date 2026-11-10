@@ -64,7 +64,7 @@ pub(crate) struct PendingBanditDecision {
 #[cfg(feature = "bandit-routing")]
 pub(crate) struct BanditExploration {
     pub epsilon: f32,
-    pub rng_state: parking_lot::Mutex<u64>,
+    pub rng: parking_lot::Mutex<Box<dyn contextra_adapt::Rng + Send>>,
 }
 
 #[cfg(feature = "bandit-routing")]
@@ -72,25 +72,25 @@ impl BanditExploration {
     pub fn new(epsilon: f32, seed: u64) -> Self {
         Self {
             epsilon,
-            rng_state: parking_lot::Mutex::new(if seed == 0 {
+            rng: parking_lot::Mutex::new(Box::new(contextra_adapt::SeededRng::new(if seed == 0 {
                 0x9e37_79b9_7f4a_7c15
             } else {
                 seed
-            }),
+            }))),
         }
     }
 
-    /// Liefert eine deterministische Pseudo-Zufallszahl in [0.0, 1.0) (SplitMix64).
+    /// Injiziert einen benutzerdefinierten PRNG für deterministische Tests.
+    pub fn with_rng(epsilon: f32, rng: Box<dyn contextra_adapt::Rng + Send>) -> Self {
+        Self {
+            epsilon,
+            rng: parking_lot::Mutex::new(rng),
+        }
+    }
+
+    /// Liefert eine Pseudo-Zufallszahl in [0.0, 1.0) über den injizierten Rng-Port.
     pub fn next_sample(&self) -> f32 {
-        let mut state = self.rng_state.lock();
-        *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
-        let mut z = *state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        let u = z ^ (z >> 31);
-        #[allow(clippy::cast_possible_truncation)]
-        let sample = ((u >> 11) as f64 / ((1u64 << 53) as f64)) as f32;
-        sample
+        self.rng.lock().next_f32()
     }
 }
 

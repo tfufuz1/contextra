@@ -13,11 +13,12 @@ pub mod types;
 use self::cost::{estimate_ppr_cost, GraphStats};
 use self::dense::compute_ppr_dense;
 use self::forward_push::forward_push_ppr;
+pub use self::snapshot::compute_ppr_at;
 pub use self::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 
-pub(crate) fn compute_ppr(
+pub fn compute_ppr(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
     config: &PprConfig,

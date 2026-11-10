@@ -112,10 +112,10 @@ pub use percolation::{
 };
 #[cfg(feature = "apprh-diffusion")]
 pub use ppr::compute_ppr_with_apprh_selector;
-pub use ppr::{DeletedView, PprContext};
+pub use ppr::{compute_ppr, compute_ppr_at, DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
-#[cfg(feature = "ports-compat")]
+#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
 pub use provider::{
     compute_pagerank, detect_communities_on_provider, GraphProvider, InMemoryGraphProvider,
 };
