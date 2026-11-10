@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 //! Fehlertypen für `Contextra`.
 //!
-//! # Architektur-Rolle: Ring 0 (Kanonische Fehlerdefinition)
+//! # Architektur-Rolle: Typen-Fundament (Kanonische Fehlerdefinition)
 //!
 //! Dieses Modul stellt das zentrale `ContextraError`-Enum bereit.
 //! In Übereinstimmung mit dem Zero-Panic-Prinzip werden Fehler strukturiert modelliert
@@ -509,7 +509,6 @@ impl From<std::array::TryFromSliceError> for ContextraError {
         Self::ParseError(e.to_string())
     }
 }
-
 
 impl From<contextra_ids::IdError> for ContextraError {
     fn from(err: contextra_ids::IdError) -> Self {
