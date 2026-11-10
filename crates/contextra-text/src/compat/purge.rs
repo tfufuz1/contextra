@@ -12,12 +12,12 @@
 //!
 //! # Zweck
 //! Stellt sicher, dass bei physischer Bereinigung sämtliche Spuren
-//! eines Dokuments (Postings, Vorwärtsindex, Dokumentlänge, Tombstones) unwiderruflich
+//! eines Dokuments (Postings, Vorwärtsindex, Dokumentlänge, Tombstones) physisch
 //! aus dem persistenten Storage entfernt und die BM25-Statistiken atomar korrigiert werden.
 
-use crate::inverted::index_struct::InvertedIndex;
 use crate::inverted::scanner::ParsedTextTarget;
-use crate::inverted::types::TextIndexMetadata;
+use crate::inverted::InvertedIndex;
+use crate::inverted::TextIndexMetadata;
 use crate::posting_list::PostingList;
 use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
 use contextra_ports::StorageEngine;

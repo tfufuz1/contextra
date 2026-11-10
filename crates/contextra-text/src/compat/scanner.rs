@@ -16,7 +16,7 @@
 //! Vor jedem Scan wird zwingend eine Positivkontrolle mit einem temporären Kanarienvogel-Dokument
 //! durchgeführt, um Fehlalarme (False Negatives) auszuschließen.
 
-use crate::inverted::index_struct::InvertedIndex;
+use crate::inverted::InvertedIndex;
 use crate::posting_list::PostingList;
 use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTarget, WitnessLayer};
 use contextra_ports::{StorageEngine, TextIndex};

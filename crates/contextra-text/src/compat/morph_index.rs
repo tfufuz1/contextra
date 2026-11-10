@@ -1,6 +1,6 @@
 //! Morphologisch optimierter Invertierter Index (`BM25MorphIndex`).
 
-use super::index_struct::InvertedIndex;
+use crate::inverted::InvertedIndex;
 use crate::morphology::MorphologicalTokenizer;
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
 use contextra_types::{DocId, Result, ScoredDocument, TxId};
@@ -25,7 +25,7 @@ impl<S: StorageEngine> BM25MorphIndex<S> {
             inner: InvertedIndex::new_with_language(
                 storage,
                 namespace,
-                super::types::Language::German,
+                crate::inverted::Language::German,
             ),
             tokenizer,
         }
