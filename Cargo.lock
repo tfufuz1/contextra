@@ -838,11 +838,11 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
+ "contextra-crypto",
  "contextra-ports",
  "contextra-testkit",
  "contextra-types",
  "criterion",
- "ed25519-dalek",
  "hkdf",
  "hmac",
  "loom",
@@ -871,6 +871,7 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
+ "contextra-cognition",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",
@@ -878,6 +879,7 @@ dependencies = [
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
+ "contextra-vault",
  "contextra-vector",
  "criterion",
  "parking_lot 0.12.5",
@@ -1414,6 +1416,18 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "contextra-vault"
+version = "0.1.0"
+dependencies = [
+ "contextra-sys",
+ "contextra-types",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
