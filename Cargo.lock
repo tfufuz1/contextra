@@ -713,6 +713,8 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "blake3",
+ "contextra-ports",
+ "contextra-types",
  "criterion",
  "proptest",
  "serde",
@@ -840,6 +842,7 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
+ "contextra-crypto",
  "contextra-ports",
  "contextra-testkit",
  "contextra-types",
@@ -898,13 +901,10 @@ dependencies = [
 name = "contextra-durable-fs"
 version = "0.1.0"
 dependencies = [
- "crc32fast",
- "criterion",
- "proptest",
- "serde",
+ "contextra-ports",
+ "contextra-sys",
+ "contextra-types",
  "tempfile",
- "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]
@@ -982,6 +982,7 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-ports",
+ "contextra-testkit",
  "contextra-types",
  "criterion",
  "futures",
@@ -1029,17 +1030,16 @@ version = "0.1.0"
 dependencies = [
  "contextra-ports",
  "contextra-types",
- "criterion",
  "futures",
  "futures-util",
  "parking_lot 0.12.5",
  "proptest",
  "quick-xml 0.41.0",
+ "rand 0.8.8",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 2.0.20",
  "tokio",
  "tracing",
  "tracing-test",
@@ -1049,7 +1049,9 @@ dependencies = [
 name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
- "blake3",
+ "contextra-ports",
+ "contextra-rank",
+ "contextra-types",
  "criterion",
  "ndarray 0.15.6",
  "ort",
@@ -1057,10 +1059,8 @@ dependencies = [
  "proptest",
  "reqwest",
  "serde",
- "serde_json",
  "sha2",
  "tempfile",
- "thiserror 2.0.20",
  "tokenizers 0.19.1",
  "tokio",
  "tracing",
@@ -1103,13 +1103,11 @@ dependencies = [
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
- "criterion",
  "lru",
  "parking_lot 0.12.5",
  "proptest",
  "serde",
  "serde_json",
- "thiserror 2.0.20",
  "tokio",
  "tracing",
  "zeroize",
@@ -1202,6 +1200,8 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
+ "contextra-ports",
+ "contextra-types",
  "criterion",
  "parking_lot 0.12.5",
  "rand 0.8.8",
@@ -1342,7 +1342,6 @@ dependencies = [
  "libc",
  "memmap2",
  "tempfile",
- "thiserror 2.0.20",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -1370,7 +1369,6 @@ dependencies = [
  "bytes",
  "contextra-ports",
  "contextra-types",
- "criterion",
  "futures",
  "itoa",
  "parking_lot 0.12.5",
@@ -1410,7 +1408,6 @@ dependencies = [
  "blake3",
  "contextra-mvcc",
  "contextra-ports",
- "contextra-simd",
  "contextra-sys",
  "contextra-types",
  "criterion",
@@ -1423,7 +1420,6 @@ dependencies = [
  "serde",
  "subtle",
  "tempfile",
- "thiserror 2.0.20",
  "tokio",
  "tracing",
  "zeroize",
@@ -1436,11 +1432,9 @@ dependencies = [
  "bytes",
  "criterion",
  "flatbuffers",
- "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]
