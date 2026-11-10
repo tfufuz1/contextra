@@ -84,18 +84,16 @@ impl StoreInspector {
         let mem_scanner =
             MemtableScanner::with_runtime(view.clone(), self.runtime.clone());
         let sst_scanner =
-            SstableScanner::with_runtime(view.clone(), self.runtime.clone());
-        let wal_scanner = WalScanner::with_runtime(view, self.runtime.clone());
+            SstableScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
+        let wal_scanner = WalScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
 
-        let key_hash = *blake3::hash(key).as_bytes();
-        let target = contextra_ports::scanner::ScanTarget::new(
-            String::from_utf8_lossy(key),
-            key_hash,
+        let target_hash = *blake3::hash(key).as_bytes();
+        let target = contextra_ports::scanner::ScanTarget::new(String::from_utf8_lossy(key), target_hash);
+        let ctx = contextra_types::RequestContext::new(
+            contextra_types::TenantId::try_new(1).unwrap_or(contextra_types::TenantId::SYSTEM),
+            contextra_types::TxId::new(0),
         );
-        let tenant_id = crate::tenant_codec::TenantKeyCodec::decode_tenant_id(key)
-            .unwrap_or(contextra_types::TenantId::SYSTEM);
-        let ctx = contextra_types::RequestContext::new(tenant_id, contextra_types::TxId(0));
-        let technique = contextra_ports::scanner::ScanTechnique::Structural;
+        let technique = contextra_ports::scanner::ScanTechnique::NeedleScan;
         let clock = contextra_ports::SystemClock::new();
 
         let in_mem = mem_scanner

@@ -50,8 +50,13 @@
     )
 )]
 
+pub mod error;
+pub mod compat;
+pub use error::{StoreError, StoreResult};
+
 #[cfg(not(loom))]
 pub mod compaction;
+#[cfg(not(loom))]
 pub mod engine;
 pub mod fsync;
 pub mod key_source;

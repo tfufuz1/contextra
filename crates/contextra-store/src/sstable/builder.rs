@@ -331,12 +331,11 @@ impl SstableBuilder {
             ));
         }
         let file = self.file.as_mut().ok_or_else(|| {
-            ContextraError::Storage("SstableBuilder file handle already closed".into())
+            ContextraError::Storage("SstableBuilder file already closed".into())
         })?;
         let mut written = 0;
         while written < buf.len() {
-            let res = file
-                .write_at(&buf[written..], offset.saturating_add(written as u64));
+            let res = file.write_at(&buf[written..], offset.saturating_add(written as u64));
             match res {
                 Ok(0) => {
                     self.poisoned = true;
@@ -556,25 +555,26 @@ impl SstableBuilder {
         self.offset += 54;
 
         // 1. sync_all on written handle
-        let file_size = if let Some(mut file) = self.file.take() {
-            if let Err(e) = file.sync_all() {
+        let file = self.file.take().ok_or_else(|| {
+            ContextraError::Storage("SstableBuilder file already closed".into())
+        })?;
+
+        if let Err(e) = file.sync_all() {
+            self.poisoned = true;
+            let _ = self.vfs.remove_file(&self.tmp_path);
+            return Err(ContextraError::Io(e));
+        }
+
+        let file_size = match file.len() {
+            Ok(s) => s,
+            Err(e) => {
                 self.poisoned = true;
                 let _ = self.vfs.remove_file(&self.tmp_path);
                 return Err(ContextraError::Io(e));
             }
 
-            match file.len() {
-                Ok(s) => s,
-                Err(e) => {
-                    self.poisoned = true;
-                    let _ = self.vfs.remove_file(&self.tmp_path);
-                    return Err(ContextraError::Io(e));
-                }
-            }
-            // `file` is dropped here, closing file handle before renaming (critical on Windows)
-        } else {
-            return Err(ContextraError::Storage("SstableBuilder file handle already closed".into()));
-        };
+        // Drop file handle before renaming (critical on Windows)
+        drop(file);
 
         // 2. Atomic rename from tmp_path to path
         if let Err(e) = self.vfs.rename(&self.tmp_path, &self.path) {
