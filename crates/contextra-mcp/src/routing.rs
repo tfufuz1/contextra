@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 struct CollectionAdapter(Arc<contextra::Collection>);
 
-impl contextra_router::ports_local::HybridSearchProvider for CollectionAdapter {
+impl contextra_ports::HybridSearchProvider for CollectionAdapter {
     fn search_hybrid<'a>(
         &'a self,
         query_text: &'a str,
@@ -35,7 +35,7 @@ impl contextra_router::ports_local::HybridSearchProvider for CollectionAdapter {
 
 struct CommunityAdapter;
 
-impl contextra_router::ports_local::CommunityResolver for CommunityAdapter {
+impl contextra_ports::CommunityResolver for CommunityAdapter {
     fn get_community<'a>(
         &'a self,
         _entity_id: EntityId,
@@ -46,7 +46,7 @@ impl contextra_router::ports_local::CommunityResolver for CommunityAdapter {
 
 struct ContextPreparerAdapter;
 
-impl contextra_router::ports_local::ContextPreparer for ContextPreparerAdapter {
+impl contextra_ports::ContextPreparer for ContextPreparerAdapter {
     fn prepare_context(
         &self,
         chunks: Vec<ContextChunk>,

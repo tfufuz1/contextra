@@ -295,6 +295,7 @@ fn test_inv_privacy_failclosed_1_limit_and_error_handling() {
 }
 
 #[test]
+#[allow(clippy::disallowed_methods)] // Messung der Ausführungsdauer gegen ReDoS
 fn test_redos_adversarial_patterns_linear_execution_time() {
     let recognizer = PatternRecognizer::new();
 

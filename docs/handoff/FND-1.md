@@ -76,3 +76,13 @@ Keine. Alle vorhandenen Signaturen und Aufrufer bleiben über die Re-Exports und
 ## 7. Offene Risiken
 
 Keine offenen Risiken für nachfolgende Pakete. Store, Vector, Graph und Engine können nun konfliktfrei auf `contextra-ids` und `contextra-env` migrieren.
+
+## 8. CI-Blocker & Workspace-Status (Head origin/main)
+
+Die folgenden CI-Fehler sind im Upstream-Zweig `origin/main` vorhanden und liegen außerhalb des Eigentums von FND-1 (`BESITZ`):
+1. **Production Unwrap Counter Gate**: Zähler auf `origin/main` liegt bei 1309 (Baseline in `.github/unwrap_baseline.txt` steht auf 1197).
+2. **Cargo Deny**: Bekannte Advisories in externen Abhängigkeiten (`lopdf`, `lru`, `number_prefix`, `tokio`, `zip`).
+3. **Compile Check (`cargo check`)**: `contextra-store` kompiliert auf `origin/main` nicht aufgrund von Duplikaten in `block_cache.rs`, fehlenden Methoden in `scanner/mod.rs` und Move in `builder.rs`.
+4. **Format Check (`cargo fmt`)**: Formatierungsabweichungen in `crates/contextra-store` und `crates/contextra-vector`.
+
+Alle FND-1-Bestandteile (`contextra-ids`, `contextra-env`, Re-Exports in `contextra-types` und `contextra-ports`) kompilieren fehlerfrei, sind formatiert, besitzen 0 interne Abhängigkeiten und bestehen alle Unit-, Conformance-, Golden- und 10k-Differenztests.
