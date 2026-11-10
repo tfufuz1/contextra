@@ -26,7 +26,7 @@
 | Aspekt | Wert |
 |---|---|
 | Standalone-Build | `cargo build -p contextra-types --no-default-features --locked` |
-| Contextra-Abhängigkeiten (Ist = Soll) | keine |
+| Contextra-Abhängigkeiten (Ist = Soll) | `contextra-ids` (Re-Exports) |
 | Externe Abhängigkeiten | `thiserror`, `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes` (dev: `proptest`) |
 | Features | `docid-128` (breite `DocId`), `auto-extraction-opt-out`; `default = []` |
 | Lints im Crate | `#![forbid(unsafe_code)]`, `#![deny(dead_code)]`, `#![warn(missing_docs)]` |

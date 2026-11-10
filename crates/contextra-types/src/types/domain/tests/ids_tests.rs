@@ -383,14 +383,14 @@ fn test_tx_id_system_range_wraparound_safety() {
     assert!(tx_max.is_valid_origin());
 
     // Overflow attempt (offset > 1_000_000)
-    let err_overflow = TxId::try_from_internal_offset(max_offset + 1);
+    let err_overflow = TxId::try_from_internal_offset(max_offset + 1).map_err(ContextraError::from);
     assert!(
         matches!(err_overflow, Err(ContextraError::Transaction(ref msg)) if msg.contains("overflows u64::MAX")),
         "Expected controlled error on offset overflow, got: {:?}",
         err_overflow
     );
 
-    let err_huge = TxId::try_from_internal_offset(u64::MAX);
+    let err_huge = TxId::try_from_internal_offset(u64::MAX).map_err(ContextraError::from);
     assert!(
         matches!(err_huge, Err(ContextraError::Transaction(ref msg)) if msg.contains("overflows u64::MAX")),
         "Expected controlled error on u64::MAX offset, got: {:?}",

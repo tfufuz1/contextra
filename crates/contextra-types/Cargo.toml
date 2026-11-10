@@ -14,10 +14,11 @@ ring = "0"
 
 [features]
 default = []
-docid-128 = []
+docid-128 = ["contextra-ids/docid-128"]
 auto-extraction-opt-out = []
 
 [dependencies]
+contextra-ids = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

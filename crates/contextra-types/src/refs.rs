@@ -1,6 +1,5 @@
 //! Opake Betreiber- und Domänenreferenzen.
 
-pub use crate::ids::{
-    CollectionRef, DocKey, DocRef, OperatorRef, SubjectRef, TenantRef, MAX_REF_LEN,
+pub use contextra_ids::{
+    CollectionRef, DocKey, DocRef, OperatorRef, SubjectRef, TenantRef, TenantScoped, MAX_REF_LEN,
 };
-pub use crate::tenant_scope::TenantScoped;

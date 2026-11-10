@@ -19,6 +19,7 @@ contract-tests = []
 testkit = []
 
 [dependencies]
+contextra-env = { workspace = true }
 contextra-types = { workspace = true }
 blake3 = { workspace = true }
 futures-util = "0.3"

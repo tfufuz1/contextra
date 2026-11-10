@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/contextra-ids",
+    "crates/contextra-env",
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",
@@ -41,6 +43,8 @@ members = [
 # Restored archived crates to default-members:
 # contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama
 default-members = [
+    "crates/contextra-ids",
+    "crates/contextra-env",
     "crates/contextra-durable-fs",
     "crates/contextra-wire",
     "crates/contextra-sys",
@@ -76,6 +80,8 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.89"
 
 [workspace.dependencies]
+contextra-ids = { path = "crates/contextra-ids" }
+contextra-env = { path = "crates/contextra-env" }
 contextra-durable-fs = { path = "crates/contextra-durable-fs" }
 # Error handling
 thiserror = "2"
