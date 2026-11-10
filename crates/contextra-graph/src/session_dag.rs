@@ -10,6 +10,7 @@
 // HOTSPOTS: L100-L150 (branch_from & path_to_head)
 // SIEHE AUCH: DECISIONS.md ADR-004
 
+#[cfg(feature = "ports-compat")]
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -407,6 +408,7 @@ impl SessionBranchTree {
     }
 
     /// Persists all nodes, edges, active head, and next_id of the Session-DAG to the storage engine under the given namespace prefix.
+    #[cfg(feature = "ports-compat")]
     pub async fn save<S: StorageEngine + ?Sized>(
         &self,
         storage: &S,
@@ -455,6 +457,7 @@ impl SessionBranchTree {
     }
 
     /// Loads and reconstructs a `SessionBranchTree` from storage for the specified namespace.
+    #[cfg(feature = "ports-compat")]
     pub async fn load<S: StorageEngine + ?Sized>(storage: &S, namespace: &str) -> Result<Self> {
         let prefix_str = format!("__session_dag:{namespace}:");
         let prefix_bytes = prefix_str.as_bytes();

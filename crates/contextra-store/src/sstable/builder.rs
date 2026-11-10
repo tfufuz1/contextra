@@ -206,7 +206,7 @@ pub struct SstableMetadata {
 pub struct SstableBuilder {
     path: PathBuf,
     tmp_path: PathBuf,
-    file: Box<dyn VfsFile>,
+    file: Option<Box<dyn VfsFile>>,
     vfs: Arc<dyn Vfs>,
     block_builder: BlockBuilder,
     block_size: usize,
@@ -276,7 +276,7 @@ impl SstableBuilder {
         Ok(Self {
             path: path_ref.to_path_buf(),
             tmp_path,
-            file,
+            file: Some(file),
             vfs,
             block_builder: BlockBuilder::new_with_version(BLOCK_SIZE, 4),
             block_size: BLOCK_SIZE,
@@ -330,10 +330,12 @@ impl SstableBuilder {
                 "SstableBuilder handle is poisoned after IO failure (INV-FSYNC-1)".into(),
             ));
         }
+        let file = self.file.as_mut().ok_or_else(|| {
+            ContextraError::Storage("SstableBuilder file handle already closed".into())
+        })?;
         let mut written = 0;
         while written < buf.len() {
-            let res = self
-                .file
+            let res = file
                 .write_at(&buf[written..], offset.saturating_add(written as u64));
             match res {
                 Ok(0) => {
@@ -554,23 +556,25 @@ impl SstableBuilder {
         self.offset += 54;
 
         // 1. sync_all on written handle
-        if let Err(e) = self.file.sync_all() {
-            self.poisoned = true;
-            let _ = self.vfs.remove_file(&self.tmp_path);
-            return Err(ContextraError::Io(e));
-        }
-
-        let file_size = match self.file.len() {
-            Ok(s) => s,
-            Err(e) => {
+        let file_size = if let Some(mut file) = self.file.take() {
+            if let Err(e) = file.sync_all() {
                 self.poisoned = true;
                 let _ = self.vfs.remove_file(&self.tmp_path);
                 return Err(ContextraError::Io(e));
             }
-        };
 
-        // Drop file handle before renaming (critical on Windows)
-        drop(self.file);
+            match file.len() {
+                Ok(s) => s,
+                Err(e) => {
+                    self.poisoned = true;
+                    let _ = self.vfs.remove_file(&self.tmp_path);
+                    return Err(ContextraError::Io(e));
+                }
+            }
+            // `file` is dropped here, closing file handle before renaming (critical on Windows)
+        } else {
+            return Err(ContextraError::Storage("SstableBuilder file handle already closed".into()));
+        };
 
         // 2. Atomic rename from tmp_path to path
         if let Err(e) = self.vfs.rename(&self.tmp_path, &self.path) {
