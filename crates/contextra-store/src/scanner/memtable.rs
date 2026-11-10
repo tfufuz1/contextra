@@ -1,6 +1,10 @@
 //! # MemTable-Scanner (Ring 1)
 //!
 //! Liest Eintraege aus MemTable-Strukturen ohne Panic-Gefahr fuer Snapshot-Suchen.
+//!
+//! ## Entkopplung
+//! Hält [`StoreScanView`] statt `Arc<LsmStorage>`. Der Scan-Kontext wird über
+//! [`LsmStorage::scan_view`] erzeugt — die einzige Stelle mit direkter Kopplung.
 
 // FILE-CONTEXT
 // ZWECK: Memtable-Scanner für LsmMemtable-Schicht (§12.7.4, INV-WITNESS-MINT-1).
@@ -10,6 +14,7 @@
 #![forbid(unsafe_code)]
 
 use super::runtime::ScannerRuntime;
+use super::store_scan_view::StoreScanView;
 use crate::lsm::LsmStorage;
 use crate::memtable::MemTable;
 use crate::tenant_codec::TenantKeyCodec;
@@ -19,20 +24,35 @@ use contextra_types::{RequestContext, Result};
 use std::sync::Arc;
 
 /// Scanner für die `LsmMemtable`-Schicht.
+///
+/// Hält [`StoreScanView`] statt `Arc<LsmStorage>` — keine direkte Kopplung an die
+/// Speicher-Engine. Kann daher mit isolierten Test-Daten instanziiert werden.
 pub struct MemtableScanner {
-    storage: Arc<LsmStorage>,
-    runtime: ScannerRuntime,
+    view: StoreScanView,
+    _runtime: ScannerRuntime,
 }
 
 impl MemtableScanner {
-    /// Erzeugt einen neuen `MemtableScanner` mit implizit erfasster Laufzeit.
-    pub fn new(storage: Arc<LsmStorage>) -> Self {
-        Self::with_runtime(storage, ScannerRuntime::capture())
+    /// Erzeugt einen neuen `MemtableScanner` aus einer [`StoreScanView`].
+    pub fn new(view: StoreScanView) -> Self {
+        Self::with_runtime(view, ScannerRuntime::capture())
     }
 
-    /// Erzeugt einen neuen `MemtableScanner` mit expliziter `ScannerRuntime`.
-    pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self {
-        Self { storage, runtime }
+    /// Erzeugt einen neuen `MemtableScanner` aus einer [`StoreScanView`] mit expliziter Runtime.
+    pub fn with_runtime(view: StoreScanView, runtime: ScannerRuntime) -> Self {
+        Self {
+            view,
+            _runtime: runtime,
+        }
+    }
+
+    /// Erzeugt einen `MemtableScanner` aus einem `Arc<LsmStorage>` (Kompatibilitätspfad).
+    ///
+    /// Intern wird [`LsmStorage::scan_view`] aufgerufen — die Kopplung bleibt auf
+    /// diese Fabrikmethode beschränkt.
+    pub fn from_storage_blocking(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Result<Self> {
+        let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;
+        Ok(Self::with_runtime(view, runtime))
     }
 
     /// Führt die Positivkontrolle (Canary Check) in einer isolierten Scratch-Memtable aus.
@@ -69,19 +89,8 @@ impl LayerScanner for MemtableScanner {
         let codec = TenantKeyCodec::new(ctx.tenant_id);
         let target_prefix = codec.scan_prefix().to_vec();
 
-        let storage = Arc::clone(&self.storage);
-
-        // 3. Aktive und immutable Memtables erfassen
-        let (active_mt, immutable_mts) = self
-            .runtime
-            .block_on(async { Ok(storage.memtables_for_scanner().await) })?;
-
-        let mut all_mts = Vec::with_capacity(1 + immutable_mts.len());
-        all_mts.push(active_mt);
-        all_mts.extend(immutable_mts);
-
-        // 4. Alle Memtables auf Rohebene iterieren
-        for mt in all_mts {
+        // 3. Alle MemTables aus der View iterieren (kein Lock auf LsmStorage nötig)
+        for mt in self.view.all_memtables() {
             let entries = mt.iter();
             for (key, _val, seq_no, _tx) in entries {
                 let mut hasher = blake3::Hasher::new();

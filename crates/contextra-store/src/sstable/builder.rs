@@ -572,7 +572,6 @@ impl SstableBuilder {
                 let _ = self.vfs.remove_file(&self.tmp_path);
                 return Err(ContextraError::Io(e));
             }
-        };
 
         // Drop file handle before renaming (critical on Windows)
         drop(file);

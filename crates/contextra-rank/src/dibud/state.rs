@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing, clippy::cast_possible_truncation)]
 //! # DiBud-Zustandsautomat (`dibud::state`)
 //!
 //! **Ring:** Ring 0 (Ranking & Kalibrierung)

@@ -82,6 +82,9 @@ pub mod vector_index;
 /// Virtual File System (VFS) port interface and contracts.
 pub mod vfs;
 
+/// Kryptografischer Port-Trait für Schlüssel- und Salt-Generierung (P28, ADR-098).
+pub mod key_material;
+
 /// Environment abstractions (Clock, Rng, IdGen, MetricsSink) with sub-prelude.
 pub mod env;
 /// Legacy erasure ports isolated under Decision D-E1 prior to relocation to `contextra-erasure-spi`.
@@ -121,6 +124,7 @@ pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
 pub use vfs::*;
+pub use key_material::KeyMaterialSource;
 
 /// Generic contract tests for port implementers.
 #[cfg(any(feature = "contract-tests", feature = "conformance"))]

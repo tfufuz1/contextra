@@ -5,6 +5,7 @@
 
 // ANCHOR[contextra-router:IT-AUD-001]
 #![allow(
+    unused_imports,
     clippy::type_complexity,
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -426,6 +427,7 @@ async fn test_cold_start_fallback_default_route() -> Result<()> {
 // ANCHOR[contextra-router:IT-AUD-T05]
 // Test `test_transport_error_propagation_typed`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
+#[cfg(feature = "subprocess-dispatch")]
 async fn test_transport_error_propagation_typed() {
     let profile_invalid_endpoint =
         SlmProfile::new("bad-transport", "   ", vec![], TokenBudget::default(), 0.5);

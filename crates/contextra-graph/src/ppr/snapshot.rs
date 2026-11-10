@@ -95,7 +95,7 @@ fn populate_snapshot_hyperedges(inner: &GraphInner, snapshot: &mut GraphInner, a
     }
 }
 
-pub(crate) fn compute_ppr_at(
+pub fn compute_ppr_at(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
     config: &PprConfig,

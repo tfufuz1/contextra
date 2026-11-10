@@ -4,11 +4,13 @@
 //! Markiert gelöschte Elemente mit Transaktionszeitstempeln zur Wahrung von MVCC-Sichtbarkeiten.
 
 use super::CsrGraph;
+#[cfg(feature = "ports-compat")]
 use contextra_ports::GraphIndex;
 use contextra_types::{EntityId, Result, TxId};
 use std::collections::HashSet;
 
 impl CsrGraph {
+    #[cfg(feature = "ports-compat")]
     pub async fn tombstone_edge(
         &self,
         edge_id: crate::consistency_enforcement::EdgeId,

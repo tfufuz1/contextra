@@ -1,7 +1,8 @@
 // FILE-CONTEXT
-// STAND: 2026-10-29
+// STAND: 2026-11-10
 // ZWECK: Haupt-Routing-Engine für Hybrid-Search-Kontext auf SLM-Profile.
 // INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload, NaN-Safety bei Distanz-Eingaben.
+// HOTSPOTS: 59-90 (BanditExploration), 161-220 (RouterEngine Struct)
 // SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
 //! # Haupt-Routing-Engine für Kontext-Zuweisung an SLM-Profile
@@ -15,17 +16,19 @@
 //! - Verwaltet den Systemzustand über einen atomaren Snapshot [`ArcSwap<RouterState>`] für lock-freie Lesezugriffe beim Routing.
 //! - Modifikationen (wie Neukalibrierungen oder Profil-Updates) erfolgen serialisiert über ein `parking_lot::RwLock`.
 //! - Erkennt Konzeptdrift über adaptive Ljapunow-Wächter ([`LyapunovDriftWatcher`]).
+//! - [`BanditExploration`]: Zufall wird über injiziertem `contextra_adapt::Rng`-Port erzeugt —
+//!   hartcodierter SplitMix64-State wurde durch eine via `parking_lot::Mutex` geschützte
+//!   Port-Implementierung ersetzt (WP-R03).
 //!
 //! **Abhängigkeiten:**
 //! - Upstream: `contextra_types`, `contextra_ports`, `contextra_adapt`, `arc_swap`, `parking_lot`.
 //! - Downstream: Agent-Orchestrierung (`contextra-agent`), MCP-Server (`contextra-mcp`).
 
-use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
+use contextra_adapt::{LyapunovDriftWatcher, LyapunovResult};
 use contextra_ports::clock::{Clock, SystemClock};
-use contextra_ports::vfs::Vfs;
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
     HybridSearchProvider,
@@ -60,7 +63,7 @@ pub(crate) struct PendingBanditDecision {
 #[cfg(feature = "bandit-routing")]
 pub(crate) struct BanditExploration {
     pub epsilon: f32,
-    pub rng_state: parking_lot::Mutex<u64>,
+    pub rng: parking_lot::Mutex<Box<dyn contextra_adapt::Rng + Send>>,
 }
 
 #[cfg(feature = "bandit-routing")]
@@ -68,25 +71,25 @@ impl BanditExploration {
     pub fn new(epsilon: f32, seed: u64) -> Self {
         Self {
             epsilon,
-            rng_state: parking_lot::Mutex::new(if seed == 0 {
+            rng: parking_lot::Mutex::new(Box::new(contextra_adapt::SeededRng::new(if seed == 0 {
                 0x9e37_79b9_7f4a_7c15
             } else {
                 seed
-            }),
+            }))),
         }
     }
 
-    /// Liefert eine deterministische Pseudo-Zufallszahl in [0.0, 1.0) (SplitMix64).
+    /// Injiziert einen benutzerdefinierten PRNG für deterministische Tests.
+    pub fn with_rng(epsilon: f32, rng: Box<dyn contextra_adapt::Rng + Send>) -> Self {
+        Self {
+            epsilon,
+            rng: parking_lot::Mutex::new(rng),
+        }
+    }
+
+    /// Liefert eine Pseudo-Zufallszahl in [0.0, 1.0) über den injizierten Rng-Port.
     pub fn next_sample(&self) -> f32 {
-        let mut state = self.rng_state.lock();
-        *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
-        let mut z = *state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        let u = z ^ (z >> 31);
-        #[allow(clippy::cast_possible_truncation)]
-        let sample = ((u >> 11) as f64 / ((1u64 << 53) as f64)) as f32;
-        sample
+        self.rng.lock().next_f32()
     }
 }
 
@@ -156,7 +159,6 @@ pub struct RouterEngine {
     pub(crate) community_resolver: Arc<dyn CommunityResolver>,
     pub(crate) context_preparer: Arc<dyn ContextPreparer>,
     pub(crate) clock: Arc<dyn Clock>,
-    pub(crate) vfs: Option<Arc<dyn Vfs>>,
     pub(crate) state: ArcSwap<RouterState>,
     pub(crate) pending_decisions: RwLock<BTreeMap<DecisionId, (String, u64)>>,
     pub(crate) decision_ids: DecisionIdGenerator,

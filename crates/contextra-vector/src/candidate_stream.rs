@@ -20,7 +20,7 @@ pub const DEFAULT_VECTOR_STREAM_BATCH_SIZE: usize = 16;
 ///
 /// # Non-Prefix-Stability (Known Limitation)
 /// Approximate Nearest Neighbor (ANN) search algorithms (such as HNSW or DiskANN) are
-/// **not prefix-stable**: `search(q, 32)` is not guaranteed to return the exact top-16
+/// **not prefix-stable**: `search(q, 32)` does not invariably return the exact top-16
 /// of `search(q, 16)` in identical positions or order.
 ///
 /// To handle this robustly:

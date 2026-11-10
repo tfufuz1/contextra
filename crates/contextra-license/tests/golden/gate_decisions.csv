@@ -1,0 +1,7 @@
+gate,ring,decision
+signed,fast,true
+signed,sovereign,true
+signed,compliance,false
+open_fast,fast,true
+open_fast,sovereign,false
+open_fast,compliance,false

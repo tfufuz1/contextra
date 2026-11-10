@@ -120,7 +120,7 @@ pub(super) async fn put_if_absent(
         if locks.get(key) == Some(&tx_id) {
             locks.remove(key);
         }
-        return Err(e);
+        return Err(e.into());
     }
 
     Ok(true)
@@ -268,7 +268,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         if !rs.is_empty() {
             if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
                 storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(e);
+                return Err(e.into());
             }
         }
     }

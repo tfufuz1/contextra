@@ -1,4 +1,4 @@
-//! Fehlerdefinitionen für `contextra-text` (Klasse A / SPEC §4.1).
+//! Fehlerdefinitionen für `contextra-text` (Klasse A / SPEC §4.1 / §5.3 / B12).
 
 use thiserror::Error;
 
@@ -72,5 +72,55 @@ impl From<contextra_types::ContextraError> for TextError {
             contextra_types::ContextraError::Io(e) => TextError::Storage(e.to_string()),
             other => TextError::Internal(other.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "types-compat")]
+mod tests {
+    use super::*;
+    use contextra_types::ContextraError;
+
+    #[test]
+    fn test_error_mapping_table_driven() {
+        let cases: Vec<(TextError, fn(&ContextraError) -> bool)> = vec![
+            (
+                TextError::InvalidInput("bad query".into()),
+                |ce| matches!(ce, ContextraError::InvalidInput(msg) if msg == "bad query"),
+            ),
+            (
+                TextError::Text("regex fail".into()),
+                |ce| matches!(ce, ContextraError::Text(msg) if msg == "regex fail"),
+            ),
+            (
+                TextError::CapacityExceeded {
+                    requested: 10,
+                    maximum: 5,
+                },
+                |ce| matches!(ce, ContextraError::InvalidInput(_)),
+            ),
+            (
+                TextError::Storage("corrupt wal".into()),
+                |ce| matches!(ce, ContextraError::Storage(msg) if msg == "corrupt wal"),
+            ),
+            (
+                TextError::Serialization("bincode err".into()),
+                |ce| matches!(ce, ContextraError::Storage(msg) if msg == "bincode err"),
+            ),
+            (
+                TextError::Internal("state lock".into()),
+                |ce| matches!(ce, ContextraError::Internal(msg) if msg == "state lock"),
+            ),
+        ];
+
+        for (te, predicate) in cases {
+            let ce: ContextraError = te.into();
+            assert!(predicate(&ce));
+        }
+
+        // Reverse conversion
+        let c_inv = ContextraError::InvalidInput("inv".into());
+        let t_inv: TextError = c_inv.into();
+        assert!(matches!(t_inv, TextError::InvalidInput(s) if s == "inv"));
     }
 }

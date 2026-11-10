@@ -1,7 +1,18 @@
 //! Clock implementation for HNSW vector index ensuring determinism (B11).
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use contextra_ports::Clock;
+use crate::types::Clock;
+
+#[cfg(feature = "ports-compat")]
+impl contextra_ports::Clock for MonotonicCounterClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::SeqCst)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::SeqCst)
+    }
+}
 
 /// Deterministic monotonic counter clock for HNSW vector index.
 ///

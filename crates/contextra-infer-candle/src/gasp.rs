@@ -21,7 +21,6 @@
 use contextra_ports::{
     BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
 };
-use contextra_rank::IsotonicCalibrator;
 use contextra_types::{ConfigFingerprint, ContextChunk, ContextraError, Result};
 use std::sync::Mutex;
 
@@ -95,7 +94,7 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
 /// Post-Hoc-Halluzinations-Validator (GASP / TPA-Pattern).
 pub struct GaspValidator {
     config: GaspConfig,
-    calibrator: Mutex<IsotonicCalibrator>,
+    calibrator: Mutex<Box<dyn crate::calibrator::ConfidenceCalibrator>>,
 }
 
 impl GaspValidator {
@@ -106,11 +105,38 @@ impl GaspValidator {
 
     /// Erstellt einen `GaspValidator` mit angegebener Konfiguration.
     pub fn with_config(config: GaspConfig) -> Self {
-        let mut cal = IsotonicCalibrator::new(config.warmup_required, config.max_observations);
-        cal.invalidate_on_config_change(config.fingerprint.clone());
+        #[cfg(feature = "candle")]
+        {
+            let mut cal = contextra_rank::IsotonicCalibrator::new(
+                config.warmup_required,
+                config.max_observations,
+            );
+            cal.invalidate_on_config_change(config.fingerprint.clone());
+            Self {
+                config,
+                calibrator: Mutex::new(Box::new(cal)),
+            }
+        }
+        #[cfg(not(feature = "candle"))]
+        {
+            let mut cal = crate::calibrator::IdentityCalibrator::default();
+            cal.invalidate_on_config_change(config.fingerprint.clone());
+            Self {
+                config,
+                calibrator: Mutex::new(Box::new(cal)),
+            }
+        }
+    }
+
+    /// Erstellt einen `GaspValidator` mit einem benutzerdefinierten Kalibrator.
+    pub fn with_calibrator(
+        config: GaspConfig,
+        mut calibrator: Box<dyn crate::calibrator::ConfidenceCalibrator>,
+    ) -> Self {
+        calibrator.invalidate_on_config_change(config.fingerprint.clone());
         Self {
             config,
-            calibrator: Mutex::new(cal),
+            calibrator: Mutex::new(calibrator),
         }
     }
 

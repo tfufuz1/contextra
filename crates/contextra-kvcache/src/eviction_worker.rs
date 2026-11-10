@@ -10,7 +10,7 @@
 //!    den Tokio-Async-Executor blockieren.
 //!
 //! 2. **[`emergency_wipe()`]**: Für seltene Notfall-Bereinigungen (z. B. Prozess-Shutdown,
-//!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
+//!    Sicherheits-Alarm). Synchron, blockierend, vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
 use super::attention_score::{AttentionScoreSource, NullAttentionScoreSource};

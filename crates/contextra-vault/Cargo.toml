@@ -1,0 +1,24 @@
+[package]
+name = "contextra-vault"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Ephemerer, speichergesicherter Chunk- und Kontext-Tresor (Ebene 1, Kern-Closure sys)"
+publish = false
+
+[dependencies]
+contextra-sys = { path = "../contextra-sys" }
+thiserror = "2"
+zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
+tracing = "0.1"
+
+# Workspace-Brücke (optional, liegt rein unter compat/)
+contextra-types = { path = "../contextra-types", optional = true }
+
+[features]
+default = []
+workspace = ["dep:contextra-types"]
+
+[dev-dependencies]
+tempfile = "3"
+

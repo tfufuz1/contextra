@@ -348,7 +348,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         start: DocId,
         max_depth: usize,
     ) -> Result<Vec<(DocId, usize)>> {
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
         let mut queue = std::collections::VecDeque::new();
         let mut results = Vec::new();
 

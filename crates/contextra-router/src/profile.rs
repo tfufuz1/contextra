@@ -76,7 +76,7 @@ pub struct SlmProfile {
     /// Feature `bandit-routing`: Aktiviert Contextual-Bandit-Routing.
     #[cfg(feature = "bandit-routing")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bandit_state: Option<crate::bandit::BanditProfileState>,
+    pub bandit_state: Option<contextra_adapt::BanditProfileState>,
 }
 
 impl SlmProfile {

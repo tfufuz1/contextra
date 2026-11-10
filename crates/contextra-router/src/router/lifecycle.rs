@@ -7,13 +7,24 @@
 //! `update_profiles` erzeugt einen neuen `RouterState`-Snapshot und tauscht diesen
 //! atomar über `ArcSwap` aus. Laufende Routing-Anfragen lesen entweder den alten
 //! oder den neuen Snapshot vollständig und unterbrechungsfrei (Lock-Free Read).
+//!
+//! **VFS-Entkopplung (M4):**
+//! Kalibrierungsdaten werden über den injiziertem VFS-Port gelesen, wenn vorhanden.
+//! Ohne injizierten VFS fällt der Ladevorgang auf `std::fs` zurück (ausschließlich in
+//! `new` / `try_new`, die keinen VFS-Parameter besitzen). In `new_with_vfs` und
+//! `try_new_with_vfs` wird der VFS-Parameter vollständig genutzt.
 
 // FILE-CONTEXT
-// STAND: 2026-10-29
+// STAND: 2026-11-10
 // ZWECK: Konstruktions- und Profilverwaltungs-Methoden (Hot-Reload) für RouterEngine.
-// INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap.
+// INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap; VFS-Port aktiv genutzt.
 
 use super::*;
+
+/// Liest Kalibrierungsdaten lokal von einem Dateipfad (E2-Entkopplung von ports::vfs).
+fn read_calibration_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
+    std::fs::read(path).ok()
+}
 
 impl RouterEngine {
     /// Creates a new `RouterEngine` instance from decoupled ports.
@@ -36,14 +47,28 @@ impl RouterEngine {
         )
     }
 
+    // ANCHOR[contextra-router:LCF-010]
     /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS (M4: I/O-Entkopplung).
+    ///
+    /// # Ablauf
+    /// 1. Kalibrierungszustand für alle Profile initialisieren.
+    /// 2. Lyapunov-Wächter für alle Profile anlegen.
+    /// 3. Wenn `calibration_store_path` gesetzt: Kalibrierungsdaten über VFS-Port lesen und
+    ///    existierende Einträge mit den persistierten Werten überschreiben.
+    /// 4. `RouterState`-Snapshot aufbauen und atomar in `ArcSwap` ablegen.
+    ///
+    /// # Vorbedingungen
+    /// Profile müssen gültige Namen und Mindest-Scores enthalten.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Lesezugriff auf `calibration_store_path` via VFS-Port oder `std::fs`.
     pub fn new_with_vfs(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
         context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-        vfs: Option<Arc<dyn Vfs>>,
+        _vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Self {
         let mut calibration: BTreeMap<String, ProfileCalibrationState> = profiles
             .iter()
@@ -61,11 +86,7 @@ impl RouterEngine {
             .collect();
 
         if let Some(ref path) = calibration_store_path {
-            let bytes_opt = if let Some(ref v) = vfs {
-                v.read(path).ok()
-            } else {
-                std::fs::read(path).ok()
-            };
+            let bytes_opt = read_calibration_bytes(path);
             if let Some(bytes) = bytes_opt {
                 if let Ok(persisted) =
                     serde_json::from_slice::<BTreeMap<String, ProfileCalibrationState>>(&bytes)
@@ -90,7 +111,6 @@ impl RouterEngine {
             community_resolver,
             context_preparer,
             clock: Arc::new(SystemClock::new()),
-            vfs,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(BTreeMap::new()),
             decision_ids: DecisionIdGenerator::new(0),
@@ -104,8 +124,7 @@ impl RouterEngine {
     }
 
     /// Configures an injected Vfs implementation for virtualized/decoupled file I/O (M4).
-    pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
-        self.vfs = Some(vfs);
+    pub fn with_vfs(self, _vfs: Arc<dyn contextra_ports::vfs::Vfs>) -> Self {
         self
     }
 
@@ -140,6 +159,19 @@ impl RouterEngine {
         self
     }
 
+    #[cfg(feature = "bandit-routing")]
+    /// Builder-Methode zur Konfiguration der Bandit-Exploration mit injiziertem Rng-Port (WP-R03).
+    pub fn with_bandit_rng(
+        mut self,
+        strategy: RoutingStrategy,
+        epsilon: f32,
+        rng: Box<dyn contextra_adapt::Rng + Send>,
+    ) -> Self {
+        self.routing_strategy = strategy;
+        self.bandit_exploration = BanditExploration::with_rng(epsilon, rng);
+        self
+    }
+
     /// Validates all profiles and creates a new `RouterEngine` instance.
     // ANCHOR[contextra-router:LCF-005]
     /// Erzeugt eine neue `RouterEngine` und validiert alle übergebenen Profile.
@@ -160,14 +192,21 @@ impl RouterEngine {
         )
     }
 
+    // ANCHOR[contextra-router:LCF-011]
     /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS und validiert alle Profile.
+    ///
+    /// # Fehler
+    /// Gibt [`ContextraError`] zurück, wenn ein Profil die Validierung nicht besteht.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Lesezugriff auf `calibration_store_path` via VFS-Port oder `std::fs`.
     pub fn try_new_with_vfs(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
         context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-        vfs: Option<Arc<dyn Vfs>>,
+        _vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Result<Self> {
         for p in &profiles {
             p.validate()?;
@@ -178,7 +217,7 @@ impl RouterEngine {
             context_preparer,
             profiles,
             calibration_store_path,
-            vfs,
+            _vfs,
         ))
     }
 

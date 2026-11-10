@@ -2,9 +2,9 @@
 //!
 //! SPEC 8.1, D-61, D-124, V-MVCC, J09.
 
-use contextra_mvcc::error::ContextraError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::types::{TxId, TOMBSTONE_BIT};
+use contextra_mvcc::MvccError;
 
 #[test]
 fn test_ssi_prune_through_rejects_sentinel_and_tombstone() {
@@ -49,5 +49,5 @@ fn test_ssi_prune_through_rejects_sentinel_and_tombstone() {
     rs.record_read(b"key2", 180);
     // Key2 was committed at 200 > snapshot_seq 180, so conflict is detected properly, but NOT SnapshotTooOld
     let res = validator.validate(tx, &rs);
-    assert!(matches!(res, Err(ContextraError::Conflict(_))));
+    assert!(matches!(res, Err(MvccError::Conflict(_))));
 }

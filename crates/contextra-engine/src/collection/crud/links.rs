@@ -109,7 +109,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         to: DocId,
         relation: contextra_types::domain::LinkRelation,
     ) -> Result<()> {
-        let mut visited = std::collections::HashSet::new();
+        let mut visited = std::collections::BTreeSet::new();
         let mut queue = std::collections::VecDeque::new();
         visited.insert(to);
         queue.push_back(to);

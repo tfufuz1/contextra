@@ -7,7 +7,7 @@
 
 // FILE-CONTEXT
 // ZWECK: Suchoperationen (Vector-, Text-, Graph- & Hybrid-Retrieval) für Collection modularisiert nach Familien.
-// INVARIANTEN: Snapshot-Pinning garantiert Isolation während gefilterter Suche; MAX_SEARCH_K Obergrenze.
+// INVARIANTEN: Snapshot-Pinning wahrt Isolation während gefilterter Suche; MAX_SEARCH_K Obergrenze.
 // NICHT-OFFENSICHTLICH: Multi-Signal RRF vereint Ergebnisse ohne inkompatible Score-Skalen. Collection::query() ist der empfohlene Einstiegspunkt.
 // STAND: TS:2026-08-30T21:15:00Z (SESSION: 0dcb9f3b)
 

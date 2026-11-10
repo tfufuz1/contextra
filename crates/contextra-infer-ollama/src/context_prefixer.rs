@@ -16,9 +16,9 @@
 #[cfg(feature = "client")]
 use crate::client::xml_escape;
 #[cfg(feature = "client")]
-use crate::OllamaClient;
-#[cfg(feature = "client")]
 use crate::error::{OllamaError, Result};
+#[cfg(feature = "client")]
+use crate::OllamaClient;
 
 /// Konfiguration für Kontext-Präfix-Generierung.
 #[derive(Debug, Clone)]

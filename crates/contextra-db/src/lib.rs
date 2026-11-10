@@ -906,3 +906,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(feature = "cognition")]
+pub mod cognition;

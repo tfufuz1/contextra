@@ -4,8 +4,9 @@
 // INVARIANTEN: Zero-Panic doctrine; at least 1 token must be computed forward during prefill to obtain logits.
 
 use crate::kv_state::KvState;
+use crate::model_registry::ModelFingerprint;
 use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixHit, KvPrefixStore, PrefixKey, RopeConfig};
-use contextra_types::{ContextraError, ModelFingerprint, Result};
+use contextra_types::{ContextraError, Result};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::sync::Arc;
@@ -64,7 +65,7 @@ pub fn build_prefix_key(
     tokenizer_hash.copy_from_slice(&result);
 
     Ok(PrefixKey {
-        model: fingerprint.clone(),
+        model: fingerprint.clone().into(),
         tokenizer_hash,
         layout,
         rope,

@@ -14,7 +14,7 @@
 //! Index nachlädt. Dadurch muss bei großen Ergebnismengen nicht sofort die maximale
 //! Trefferzahl (`MAX_SEARCH_K`) ermittelt werden.
 
-use contextra_ports::StorageEngine;
+use crate::storage::PostingStore;
 use contextra_types::{DocId, Result, MAX_SEARCH_K};
 use std::collections::{BTreeSet, VecDeque};
 
@@ -39,7 +39,7 @@ pub const DEFAULT_STREAM_BATCH_SIZE: usize = 16;
 /// Zur Sicherstellung konsistenter Ergebnisse über mehrere Nachladestufen hinweg wird
 /// `max_seq = Some(snapshot_seq)` verwendet. Die maximale Tiefe ist hardgecapped auf
 /// `MAX_SEARCH_K` (1.000).
-pub struct Bm25CandidateStream<'a, S: StorageEngine> {
+pub struct Bm25CandidateStream<'a, S: PostingStore> {
     index: &'a InvertedIndex<S>,
     query: String,
     max_seq: Option<u64>,
@@ -51,7 +51,7 @@ pub struct Bm25CandidateStream<'a, S: StorageEngine> {
     exhausted: bool,
 }
 
-impl<'a, S: StorageEngine> Bm25CandidateStream<'a, S> {
+impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
     // ANCHOR[contextra-text:STREAM-003]
     /// Erzeugt einen neuen Kandidaten-Stream für die übergebene Abfrage und Index-Snapshot.
     ///

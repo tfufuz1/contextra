@@ -80,18 +80,7 @@ impl CryptoError {
     }
 }
 
-impl From<CryptoError> for contextra_types::ContextraError {
-    fn from(e: CryptoError) -> Self {
-        match e {
-            CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
-            CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
-            CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
-                format!("KV cache format version mismatch: expected {expected}, found {found}"),
-            ),
-            other => Self::Crypto(other.to_string()),
-        }
-    }
-}
+// NOTE: From<CryptoError> for contextra_types::ContextraError is provided by crate::compat::error
 
 #[cfg(test)]
 mod tests {

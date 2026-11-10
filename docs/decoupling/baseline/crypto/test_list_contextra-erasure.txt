@@ -1,0 +1,127 @@
+   Compiling zerocopy v0.8.56
+   Compiling serde_core v1.0.229
+   Compiling num-traits v0.2.19
+   Compiling regex-automata v0.4.18
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling signature v2.2.0
+   Compiling ed25519 v2.2.3
+   Compiling curve25519-dalek v4.1.3
+   Compiling serde v1.0.229
+   Compiling matchers v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling futures-util v0.3.34
+   Compiling ppv-lite86 v0.2.21
+   Compiling ahash v0.8.12
+   Compiling serde_json v1.0.151
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.8
+   Compiling rand_chacha v0.9.0
+   Compiling ed25519-dalek v2.2.0
+   Compiling bincode v1.3.3
+   Compiling proptest v1.11.0
+   Compiling loom v0.7.2
+   Compiling contextra-erasure v0.1.0 (/app/crates/contextra-erasure)
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs:22:28
+   |
+22 |         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs:52:28
+   |
+52 |         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs:86:28
+   |
+86 |         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+   --> crates/contextra-erasure/tests/deletion_proof_signature_version_serde.rs:110:33
+    |
+110 |         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+   --> crates/contextra-erasure/tests/deletion_proof_signature_version_serde.rs:135:33
+    |
+135 |         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-erasure` (test "deletion_proof_external_verify_rejects_tamper") generated 3 warnings
+warning: `contextra-erasure` (test "deletion_proof_signature_version_serde") generated 2 warnings
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_hash_collision.rs:93:28
+   |
+93 |         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap();
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: `contextra-erasure` (test "deletion_proof_hash_collision") generated 1 warning
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_v3_validation.rs:24:28
+   |
+24 |         LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_v3_validation.rs:25:28
+   |
+25 |         LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+  --> crates/contextra-erasure/tests/deletion_proof_v3_validation.rs:66:33
+   |
+66 |         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap()];
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated associated function `contextra_erasure::deletion_proof::LayerCleanupProof::new_after_verified_empty`: Umstellung auf DeletionProof::issue, siehe P-19
+   --> crates/contextra-erasure/tests/deletion_proof_v3_validation.rs:107:33
+    |
+107 |         vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()];
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-erasure` (test "deletion_proof_v3_validation") generated 4 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.02s
+  Executable unittests src/lib.rs (target/debug/deps/contextra_erasure-073e42effd9985ee)
+  Executable tests/crash_matrix_recovery.rs (target/debug/deps/crash_matrix_recovery-7c679c47db0cc431)
+  Executable tests/deletion_proof_external_verify_rejects_tamper.rs (target/debug/deps/deletion_proof_external_verify_rejects_tamper-200035615867e46c)
+  Executable tests/deletion_proof_hash_collision.rs (target/debug/deps/deletion_proof_hash_collision-034f64300e04bfeb)
+  Executable tests/deletion_proof_prefix_collision_proptest.rs (target/debug/deps/deletion_proof_prefix_collision_proptest-d085a8950da5e95c)
+  Executable tests/deletion_proof_signature_version_serde.rs (target/debug/deps/deletion_proof_signature_version_serde-6aa519085f722bb2)
+  Executable tests/deletion_proof_v3_validation.rs (target/debug/deps/deletion_proof_v3_validation-c3b71cb0f4e942ce)
+  Executable tests/gate_linearization_test.rs (target/debug/deps/gate_linearization_test-3fea856df3d0bfe3)
+  Executable tests/journal_durable_spec_tests.rs (target/debug/deps/journal_durable_spec_tests-32af69c6e95641ff)
+  Executable tests/ledger_spec_tests.rs (target/debug/deps/ledger_spec_tests-ddbffa21ec7e4a1b)
+  Executable tests/loom_gate.rs (target/debug/deps/loom_gate-4aaaf6d0fe967b8a)
+  Executable tests/measure_real_scan_tests.rs (target/debug/deps/measure_real_scan_tests-0ff829be9bf6c34a)
+  Executable tests/measure_spec_tests.rs (target/debug/deps/measure_spec_tests-768bfd12b6b6fc88)
+  Executable tests/proof_ed25519_external_verify.rs (target/debug/deps/proof_ed25519_external_verify-613ef13fa5e60f9b)
+  Executable tests/report_canonical_spec_tests.rs (target/debug/deps/report_canonical_spec_tests-02f9e2202ac2d435)
+  Executable tests/report_spec_tests.rs (target/debug/deps/report_spec_tests-0bbcf5109612e67c)
+  Executable tests/revocation_log_vfs.rs (target/debug/deps/revocation_log_vfs-63b39574c216809a)
+  Executable tests/saga_core_orchestration.rs (target/debug/deps/saga_core_orchestration-4ea7e49a6a7a475b)
+  Executable tests/scope_codec_spec_tests.rs (target/debug/deps/scope_codec_spec_tests-5506d064137206a6)
+  Executable tests/shredding_envelope_test.rs (target/debug/deps/shredding_envelope_test-93bb0c2c6f124ba6)
+  Executable tests/special_targets_test.rs (target/debug/deps/special_targets_test-b87cfad62568e518)
+  Executable tests/t_gate.rs (target/debug/deps/t_gate-ec79482ee8a4cf34)
+  Executable tests/t_measure.rs (target/debug/deps/t_measure-d26bd0e1b5821863)
+  Executable tests/t_observer.rs (target/debug/deps/t_observer-2e5ddb2bd2dd8f82)
+  Executable tests/t_report_ledger.rs (target/debug/deps/t_report_ledger-a28da814bfb8d239)
+  Executable tests/t_saga_journal.rs (target/debug/deps/t_saga_journal-18d2da44ce7336e8)
+  Executable tests/t_saga_spec_extensions.rs (target/debug/deps/t_saga_spec_extensions-084332cfa4aee769)
+  Executable tests/t_sealer_keyring.rs (target/debug/deps/t_sealer_keyring-9c0b1d60a2d7bc3c)
+  Executable tests/t_vault_core.rs (target/debug/deps/t_vault_core-43b920eb4fb93078)
+  Executable tests/vault_slot_layout.rs (target/debug/deps/vault_slot_layout-0aa7a3aa891aa6c0)
+  Executable tests/vault_spec_conformance.rs (target/debug/deps/vault_spec_conformance-93cd69450618c4ac)

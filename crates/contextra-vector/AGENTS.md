@@ -28,7 +28,7 @@
 | Standalone-Build | `cargo build -p contextra-vector --no-default-features --locked` |
 | Contextra-Abhängigkeiten **Ist** (Cargo) | `mvcc`, `ports`, `simd`, `sys`, `types` |
 | Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `mvcc`, `simd`, `sys` |
-| Features | `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `docid-128` |
+| Features | `ports-compat`, `simd`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `docid-128` |
 | Lints | `#![forbid(unsafe_code)]` |
 
 ## 2. Abhängigkeiten & Schulden
@@ -44,6 +44,7 @@
 | `hnsw/` (`core_insert`, `core_search`, `core_rebuild`, `arena`, `batch`, `adaptive_ef`, `acorn_filtered`, `sq8_bias`, `deletion`, `purge`, `scanner`, `vector_index_impl`) | HNSW; **`purge.rs`/`scanner.rs` = Port-Implementierungen** (Wartungsprimitive, deprecated) |
 | `quantize/`, `quantize_rabitq.rs` | SQ8, RaBitQ (experimentell) |
 | `persistence/` (`header`, `node`, `mmap`) | Dateiformat, Persistenz |
+| `compat/` | Kompatibilitätsbrücke für Workspace-Kerne (`compat/error.rs`, `compat/types.rs`) |
 | `diskann/` | DiskANN out-of-core Graphindex (experimentell) |
 | `acorn/`, `candidate_stream.rs`, `distance.rs`, `compute_pool.rs`, `partial_rebuild.rs` | gefilterte Suche, Kandidatenstrom, Distanz, Compute-Pool |
 

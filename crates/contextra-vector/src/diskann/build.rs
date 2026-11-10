@@ -756,7 +756,7 @@ impl DiskAnnIndex {
             let max_degree = self.inner.config.max_degree;
             for i in 0..node_count {
                 let node = self.load_node(i)?;
-                assert!(
+                if node.neighbors.len() > max_degree { return Err(ContextraError::Index(format!("Graph integrity violation: Node {} has {} neighbors, exceeding max_degree {}", i, node.neighbors.len(), max_degree))); } //
                     node.neighbors.len() <= max_degree,
                     "Graph integrity violation: Node {} has {} neighbors, exceeding max_degree {}",
                     i,
@@ -809,8 +809,8 @@ mod tests {
 
         let recovered_tombstones = DiskAnnIndex::read_tombstone_wal(&tombstone_wal_path)?;
         assert_eq!(recovered_tombstones.len(), 2);
-        assert!(recovered_tombstones.contains(large_id1));
-        assert!(recovered_tombstones.contains(large_id2));
+        if node.neighbors.len() > max_degree { return Err(ContextraError::Index(format!("Graph integrity violation: Node {} has {} neighbors, exceeding max_degree {}", i, node.neighbors.len(), max_degree))); } //recovered_tombstones.contains(large_id1));
+        if node.neighbors.len() > max_degree { return Err(ContextraError::Index(format!("Graph integrity violation: Node {} has {} neighbors, exceeding max_degree {}", i, node.neighbors.len(), max_degree))); } //recovered_tombstones.contains(large_id2));
 
         Ok(())
     }

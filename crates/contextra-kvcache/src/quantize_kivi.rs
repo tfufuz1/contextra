@@ -24,7 +24,7 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{KvCacheError, Result};
 use serde::{Deserialize, Serialize};
 
 // ANCHOR[contextra-kvcache:KIVI-002]
@@ -64,7 +64,7 @@ impl KvTensorView {
     /// Erstellt einen neuen `KvTensorView` und prüft die Dimensionen gegen die Elementanzahl.
     ///
     /// # Fehler
-    /// Liefert [`ContextraError::InvalidInput`], falls `keys.len()` oder `values.len()` nicht `num_tokens * num_channels` entsprechen.
+    /// Liefert [`KvCacheError::InvalidInput`], falls `keys.len()` oder `values.len()` nicht `num_tokens * num_channels` entsprechen.
     pub fn new(
         keys: Vec<f32>,
         values: Vec<f32>,
@@ -73,7 +73,7 @@ impl KvTensorView {
     ) -> Result<Self> {
         let expected = num_tokens * num_channels;
         if keys.len() != expected {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(KvCacheError::InvalidInput(format!(
                 "Keys length {} does not match num_tokens ({}) * num_channels ({}) = {}",
                 keys.len(),
                 num_tokens,
@@ -82,7 +82,7 @@ impl KvTensorView {
             )));
         }
         if values.len() != expected {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(KvCacheError::InvalidInput(format!(
                 "Values length {} does not match num_tokens ({}) * num_channels ({}) = {}",
                 values.len(),
                 num_tokens,
@@ -100,12 +100,12 @@ impl KvTensorView {
 
     /// Serialisiert die Tensor-Sicht in Bytes via Bincode.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        bincode::serialize(self).map_err(|e| ContextraError::Serialization(e.to_string()))
+        bincode::serialize(self).map_err(|e| KvCacheError::Serialization(e.to_string()))
     }
 
     /// Deserialisiert eine Tensor-Sicht aus Bytes via Bincode.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        bincode::deserialize(bytes).map_err(|e| ContextraError::Serialization(e.to_string()))
+        bincode::deserialize(bytes).map_err(|e| KvCacheError::Serialization(e.to_string()))
     }
 }
 
@@ -202,8 +202,8 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
             packed_keys: Vec::new(),
             packed_values: Vec::new(),
         };
-        let packed_bytes = bincode::serialize(&payload)
-            .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+        let packed_bytes =
+            bincode::serialize(&payload).map_err(|e| KvCacheError::Serialization(e.to_string()))?;
         return Ok(KiviQuantizedBlock {
             meta,
             packed: packed_bytes,
@@ -334,7 +334,7 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
         }
         p_vals
     } else {
-        bincode::serialize(&raw.values).map_err(|e| ContextraError::Serialization(e.to_string()))?
+        bincode::serialize(&raw.values).map_err(|e| KvCacheError::Serialization(e.to_string()))?
     };
 
     let meta = KiviBlockMeta {
@@ -357,7 +357,7 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
         packed_values,
     };
     let packed =
-        bincode::serialize(&payload).map_err(|e| ContextraError::Serialization(e.to_string()))?;
+        bincode::serialize(&payload).map_err(|e| KvCacheError::Serialization(e.to_string()))?;
 
     Ok(KiviQuantizedBlock { meta, packed })
 }
@@ -371,7 +371,7 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
 /// 3. 2-Bit-Codes entpacken und mit `v = zp + code * sc` in f32 zurückrechnen.
 pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorView> {
     if meta.bits_per_value != 2 {
-        return Err(ContextraError::kv_quantization(format!(
+        return Err(KvCacheError::QuantizationError(format!(
             "KIVI dequantization requires bits_per_value == 2, got {}",
             meta.bits_per_value
         )));
@@ -383,7 +383,7 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
     };
 
     if !active_meta.scale.is_finite() || !active_meta.zero_point.is_finite() {
-        return Err(ContextraError::kv_quantization(
+        return Err(KvCacheError::QuantizationError(
             "Non-finite key scale or zero_point encountered in metadata".to_string(),
         ));
     }
@@ -398,7 +398,7 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
     let payload: KiviPackedPayload = match bincode::deserialize(&packed_bytes) {
         Ok(p) => p,
         Err(e) => {
-            return Err(ContextraError::kv_quantization(format!(
+            return Err(KvCacheError::QuantizationError(format!(
                 "Failed to deserialize KIVI payload bytes: {}",
                 e
             )));
@@ -413,14 +413,14 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
 
     for sc in &active_meta.key_scales {
         if !sc.is_finite() {
-            return Err(ContextraError::kv_quantization(
+            return Err(KvCacheError::QuantizationError(
                 "Non-finite key scale encountered in metadata".to_string(),
             ));
         }
     }
     for zp in &active_meta.key_zero_points {
         if !zp.is_finite() {
-            return Err(ContextraError::kv_quantization(
+            return Err(KvCacheError::QuantizationError(
                 "Non-finite key zero_point encountered in metadata".to_string(),
             ));
         }
@@ -451,7 +451,7 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
             let byte = match payload.packed_keys.get(byte_idx) {
                 Some(&b) => b,
                 None => {
-                    return Err(ContextraError::kv_quantization(format!(
+                    return Err(KvCacheError::QuantizationError(format!(
                         "Packed key byte index {} out of bounds (len {})",
                         byte_idx,
                         payload.packed_keys.len()
@@ -486,7 +486,7 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
                 let byte = match payload.packed_values.get(byte_idx) {
                     Some(&b) => b,
                     None => {
-                        return Err(ContextraError::kv_quantization(format!(
+                        return Err(KvCacheError::QuantizationError(format!(
                             "Packed value byte index {} out of bounds (len {})",
                             byte_idx,
                             payload.packed_values.len()
@@ -504,7 +504,7 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
         match bincode::deserialize::<Vec<f32>>(&payload.packed_values) {
             Ok(v) => v,
             Err(e) => {
-                return Err(ContextraError::kv_quantization(format!(
+                return Err(KvCacheError::QuantizationError(format!(
                     "Failed to deserialize raw value floats: {}",
                     e
                 )));
@@ -519,7 +519,7 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
 /// Entpackt einen einzelnen linearen 2-Bit-Block zurück in ein `Vec<f32>`.
 pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>> {
     if block.meta.bits_per_value != 2 {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(KvCacheError::InvalidInput(format!(
             "KIVI dequantization requires bits_per_value == 2, got {}",
             block.meta.bits_per_value
         )));
@@ -527,7 +527,7 @@ pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>> {
 
     let expected_packed_len = block.meta.original_len.div_ceil(4);
     if block.packed.len() != expected_packed_len {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(KvCacheError::InvalidInput(format!(
             "Packed byte length mismatch: expected {} bytes for {} original elements, got {}",
             expected_packed_len,
             block.meta.original_len,
@@ -536,7 +536,7 @@ pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>> {
     }
 
     if !block.meta.scale.is_finite() || !block.meta.zero_point.is_finite() {
-        return Err(ContextraError::InvalidInput(
+        return Err(KvCacheError::InvalidInput(
             "KIVI metadata scale and zero_point must be finite floats".to_string(),
         ));
     }
@@ -548,7 +548,7 @@ pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>> {
         let byte = match block.packed.get(byte_idx) {
             Some(&b) => b,
             None => {
-                return Err(ContextraError::InvalidInput(format!(
+                return Err(KvCacheError::InvalidInput(format!(
                     "Unexpected out-of-bounds byte access at index {}",
                     byte_idx
                 )));
@@ -684,10 +684,10 @@ pub fn compress_bytes(input: &[u8]) -> Vec<u8> {
 /// Dekomprimiert ein zuvor mit [`compress_bytes`] komprimiertes Byte-Slice.
 ///
 /// # Fehler
-/// Liefert [`ContextraError::kv_quantization`], falls die Eingabe leer ist oder der Header ungültig ist.
+/// Liefert [`KvCacheError::QuantizationError`], falls die Eingabe leer ist oder der Header ungültig ist.
 pub fn decompress_bytes(input: &[u8]) -> Result<Vec<u8>> {
     if input.is_empty() {
-        return Err(ContextraError::kv_quantization(
+        return Err(KvCacheError::QuantizationError(
             "Empty compression payload".to_string(),
         ));
     }
@@ -704,7 +704,7 @@ pub fn decompress_bytes(input: &[u8]) -> Result<Vec<u8>> {
             }
             Ok(decompressed)
         }
-        other => Err(ContextraError::kv_quantization(format!(
+        other => Err(KvCacheError::QuantizationError(format!(
             "Invalid compression header byte 0x{:02x}",
             other
         ))),
