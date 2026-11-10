@@ -885,10 +885,7 @@ impl Wal {
 
     #[cfg(any(test, feature = "test-hooks"))]
     pub fn poison_for_test(&self) {
-        self.poison_state.store(
-            PoisonCause::FsyncFailed.to_u8(),
-            std::sync::atomic::Ordering::SeqCst,
-        );
+        self.poison_with_cause(PoisonCause::WriteFailed);
     }
 
     #[cfg(any(test, feature = "test-hooks"))]

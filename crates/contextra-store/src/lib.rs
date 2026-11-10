@@ -28,6 +28,7 @@
 //!   `contextra-sys`, `contextra-mvcc`.
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 #![deny(dead_code)]
 #![allow(unexpected_cfgs)]
 #![deny(

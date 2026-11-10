@@ -1,76 +1,30 @@
 # contextra-store
 
-LSM-Tree Storage Engine, WAL Durability und Compaction.
+Log-Structured Merge-Tree (LSM) Speichertriebwerk für persistente Schlüssel-Wert-Speicherung.
 
-Normativitätsklasse: **Klasse B (Storage Bundle)** (Ring 1, `beta`; SPEC v4.1 §2, §5).
+## 1. Zweck
+`contextra-store` stellt das persistente Speichertriebwerk für strukturierte Daten und Zustände bereit. Es kombiniert ein Write-Ahead-Log (WAL) mit HMAC-Integritätsketten, eine nebenläufige MemTable, unveränderliche SSTables (Format V4 Standard) mit zweistufigen Bloom-Filtern sowie hierarchische Hintergrund-Kompaktierung.
 
-## Rolle & Zweck
-`contextra-store` ist das persistente Key-Value-Speichertriebwerk der Contextra-Baukasten-Architektur. Es stellt eine autarke Log-Structured Merge-Tree (LSM) Engine bereit, bestehend aus:
-* **WAL (Write-Ahead-Log):** Append-Only Protokollierung mit HMAC-Integritätskette und Open-Heal bei plötzlichen Abbrüchen (Torn Writes).
-* **MemTable:** Nebenläufige, geschardete In-Memory-BTreeMap mit sequenzbasierter MVCC-Versionierung.
-* **SSTables (Sorted String Tables):** Unveränderliche Block-Dateien (Format V4 Standard) mit zweistufigen Bloom-Filtern (Block- und Dateiebene) und Block-Cache.
-* **Compaction:** Asynchrone, mehrstufige Kompaktierung (Leveled und Adaptive) zur Begrenzung von Lese- und Schreibverstärkung.
-* **Manifest:** Atomare, transaktionale Verwaltung des SSTable-Lebenszyklus (`MFMN`).
+## 2. Reifegrad
+- **Status:** `beta`
+- **Normativität:** Klasse B (Storage Bundle)
+- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` strikt erzwungen; null Panics in Produktionspfaden.
 
-## Baukasten-Einordnung (Klasse B: Storage Bundle)
-Im Baukastensystem von Contextra (SPEC §2, §5) ist `contextra-store` nicht als isolierter Einzelbaustein (Klasse A) konzipiert, sondern als Kernkomponente des kohärenten **Storage-Bundles** (Klasse B):
-- **Zugehörige Crate-Familie:** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-crypto`, `contextra-sys`, `contextra-store`.
-- **Ring:** Ring 1.
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` ohne Ausnahme.
-- **Export-Anleitung für das Bundle:**
-  Für die Verwendung in Drittprojekten wird das gesamte Storage-Bundle gemeinsam exportiert:
-  ```bash
-  # Export aller Bundle-Komponenten
-  python3 tools/export_crate.py contextra-types --out /ziel/vendor/
-  python3 tools/export_crate.py contextra-ports --out /ziel/vendor/
-  python3 tools/export_crate.py contextra-sys --out /ziel/vendor/
-  python3 tools/export_crate.py contextra-crypto --out /ziel/vendor/
-  python3 tools/export_crate.py contextra-mvcc --out /ziel/vendor/
-  python3 tools/export_crate.py contextra-store --out /ziel/vendor/
-  ```
+## 3. Interne Abhängigkeiten
+`contextra-store` gehört zum Storage-Bundle und hängt intern ausschließlich ab von:
+- `contextra-types` (Basistypen: `TxId`, `DocId`, `ContextraError`)
+- `contextra-ports` (Port-Schnittstellen: `StorageEngine`, `Clock`, `Vfs`)
+- `contextra-sys` (Dateisystem- und Sync-Primitive)
+- `contextra-crypto` (Verschlüsselung, KeyManager, WAL-HMAC-Kette)
+- `contextra-mvcc` (Transaktionsvalidierung und SSI-Prüfung)
 
-## Modul-Karte
-| Modul | Verantwortung |
-|---|---|
-| `wal` | Append-only WAL, HMAC-Kette (`encode`, `flusher`, `hmac`, `io`, `replay`), Open-Heal |
-| `memtable` | Geschardete In-Memory BTreeMap mit Sequenznummern und Tombstones |
-| `sstable` | Sortierte Segmente, Block-Cache, Bloom-Filter, Streaming-Reader & Builder |
-| `lsm` | Speicherorchester (`LsmStorage`), Commit-, Flush-, Scan- und Recovery-Prozesse |
-| `manifest` | Transaktionales Manifest für SSTable-Generationen und Versionierung |
-| `compaction` | Leveled / Adaptive Compaction Engine und Merge-Operatoren |
-| `scanner` | Übergangsweise Port-Implementierungen (`LayerScanner`, `LsmPurger`) — Ziel: `contextra-erasure-adapters` (Welle 4) |
-| `fsync` | Zentrale Flush- und Sync-Abstraktion (INV-FSYNC-1) |
-| `tenant_codec` | Mandanten-Präfixierung (`TenantId`) und Schlüssel-Isolation |
-| `system_pressure` | Systemdruck-Monitoring für adaptive Compaction |
-| `engine` | In-Memory-Double (`InMemoryStorageEngine`) für tests ohne I/O |
+## 4. Features
+- `default = ["wal-integrity"]`: Standard-Build mit vollständiger Integritätsprüfung.
+- `wal-integrity`: Aktiviert kryptografische HMAC-Integritätsketten für WAL-Frames.
+- `fault-injection`: Ermöglicht kontrollierte Fehlerinjektion an Dateisystem- und Fsync-Grenzen für Tests.
+- `test-hooks`: Exponiert interne Diagnose- und Testmethoden.
 
-## Physische Wartung & Introspektion
-- `storage.reclaim().await`: Flusht die MemTable und schneidet verwaiste oder unvollständige WAL-Schwänze ab (`wal.truncate_uncommitted_tail()`).
-- `storage.compact().await`: Triggert deterministische physische Zusammenführung und Bereinigung von SSTables.
-- Feature `inspect`: Öffnet unveränderliche Schnappschuss-APIs (`sstables_snapshot()`, `memtables_snapshot()`) für externe Audit- und Scan-Adapter.
-
-## Nicht-Ziele & Grenzen
-- **Keine Rechts- oder Löschsagas:** Juristische Begriffe (DSGVO/GDPR), Löschbeweise und Sagas gehören nach `contextra-erasure`. Der Speicher stellt neutrale Bereinigungs- und Scan-Primitive bereit.
-- **Keine Vektor-/Volltext-Logik:** Reines Key-Value-Triebwerk; Vektoren liegen in `contextra-vector`, Volltextindizes in `contextra-text`.
-- **Keine automatische Bit-Rot-Korrektur:** Bit-Rot wird über CRC32C und HMAC deterministisch erkannt, jedoch nicht automatisch repariert.
-- **Lokaler HMAC-Schlüssel:** Das Ablegen von `.wal_integrity_key` im Dateisystem schützt vor Bit-Rot, jedoch nicht vor Manipulation durch Angreifer mit Schreibrechten (SECURITY NOTE in `wal/hmac.rs`).
-
-## Abhängigkeiten & Features
-- **Abhängigkeiten (Produktion):** `contextra-types`, `contextra-ports`, `contextra-mvcc`. (Entkoppelt von Klasse-A-Crates `contextra-crypto` und `contextra-sys` via lokale Traits `RecordSealer`/`RecordAuthenticator` und den `Vfs`-Port).
-- **Features:**
-  - `default`: Minimaler synchroner Build.
-  - `inspect`: Öffnet neutrale Inspektions-Sicht (`StoreInspector`, `ResidualInspectionReport`).
-  - `block-cache-v2`: Aktiviert den optimierten Block-Cache via `quick_cache`.
-  - `memory-only-storage`: Ermöglicht flüchtigen In-Memory-Betrieb ohne Festplatten-I/O.
-  - `docid-128`: Unterstützt 128-Bit-Dokument-IDs.
-  - `legacy-wal-key`: Abwärtskompatibilitätsunterstützung für ältere WAL-Integritätsschlüssel.
-  - `fault-injection`, `test-hooks`: Test- und Chaos-Engineering-Schalter.
-
-## Garantien
-- **ACID / Durability:** Atomare Commits über Write-Ahead-Logging mit synchronen Gruppen-Flushes.
-- **Speichersicherheit:** Striktes `#![forbid(unsafe_code)]` im gesamten Produktionscode.
-- **Neutralität:** Datenhaltung und physische Bereinigung ohne Rechts- oder Berichtsbegrifflichkeiten (SPEC §6.1, E-04). Die Port-Namen in `scanner/` (`Purger`, `LayerScanner`, `WitnessLayer`) verbleiben bis zur Bereitstellung von `contextra-erasure-adapters` hier und bilden die einzige dokumentierte Ausnahme.
-
+## 5. Minimalbeispiel (Doctest / Usage)
 ```rust,no_run
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
@@ -78,21 +32,66 @@ use contextra_types::TxId;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let tmp_dir = tempfile::tempdir()?;
+    let temp_dir = tempfile::tempdir()?;
     let config = LsmConfig {
-        path: tmp_dir.path().to_path_buf(),
+        path: temp_dir.path().to_path_buf(),
         ..Default::default()
     };
-    let storage = LsmStorage::open(config).await?;
+
+    let storage = LsmStorage::new(config).await?;
 
     let tx = TxId::new(1);
-    storage.put(tx, b"benchmark_key", b"sample_value").await?;
+    storage.put(tx, b"user:100", b"Alice").await?;
     storage.commit(tx).await?;
 
-    let val = storage.get(b"benchmark_key").await?;
-    assert_eq!(val.as_deref(), Some(&b"sample_value"[..]));
+    let val = storage.get(b"user:100").await?;
+    assert_eq!(val.as_deref(), Some(&b"Alice"[..]));
 
     storage.close().await?;
     Ok(())
 }
 ```
+
+## 6. Entnahme-Rezept
+Zur Entnahme in Drittprojekte wird das kohärente Storage-Bundle exportiert:
+```bash
+python3 tools/export_crate.py contextra-types --out /ziel/vendor/
+python3 tools/export_crate.py contextra-ports --out /ziel/vendor/
+python3 tools/export_crate.py contextra-sys --out /ziel/vendor/
+python3 tools/export_crate.py contextra-crypto --out /ziel/vendor/
+python3 tools/export_crate.py contextra-mvcc --out /ziel/vendor/
+python3 tools/export_crate.py contextra-store --out /ziel/vendor/
+```
+
+## 7. Bekannte Grenzen
+- **Laufzeit-Bindung:** `contextra-store` setzt eine aktive Tokio-Asynchron-Laufzeit voraus (`tokio::runtime::Handle`). Ein Betrieb in rein synchronen Umgebungen ohne Tokio ist nicht vorgesehen.
+
+## 8. Commit-Semantik je DurabilityMode
+Wann gilt eine geschriebene Mutation (`put` / `delete`) als dauerhaft?
+- **`DurabilityMode::Full`:**
+  Ein `put` gilt erst dann als dauerhaft gesichert, wenn der zugehörige `commit(tx)` erfolgreich zurückgekehrt ist. Der Flusher führt vor der Bestätigung ein synchrones `sync_all()` (`fsync`/`fdatasync`) auf dem WAL durch. Nach erfolgreichem Commit übersteht der Datensatz Stromausfälle und plötzliche Prozessabstürze (verifiziert in `tests/fsync_syscall_verification.rs`, `tests/crash_recovery.rs`).
+- **`DurabilityMode::WalNoHmac`:**
+  Schreibt in das WAL ohne kryptografische HMAC-Kette. Gilt als dauerhaft nach Rückkehr von `commit(tx)` bei erfolgreichem Fsync.
+- **`DurabilityMode::MemoryOnly`:**
+  Hält Mutationen ausschließlich im Arbeitsspeicher (MemTable). Gilt als flüchtig; Daten gehen bei Prozessabbruch oder Absturz vollständig verloren (verifiziert in `tests/memory_only_crash_semantics.rs`).
+
+## 9. Dateiformat-Versionen und Kompatibilität
+Die drei Persistenzkomponenten von `contextra-store` führen explizite Versionsfelder zur Erkennung und Abwärtskompatibilität:
+
+1. **Write-Ahead-Log (WAL):**
+   - **Header:** Magic-Header `WAL_V3_HEADER` (`WLV3`), `WAL_V2_HEADER` (`WLV2`) oder unversioniertes V1.
+   - **Typisierung:** `WalVersion` (`V1`, `V2`, `V3`). Aktueller Standard: `V3`.
+   - **Kompatibilität:** Replay liest Versionen V1..V3. Ältere Versionen werden bei erfolgreichem Replay automatisch auf V3 migriert.
+   - **Ablehnung:** Versionen unterhalb von `min_wal_version` werden fail-closed mit `ContextraError::InvalidInput` abgewiesen.
+
+2. **SSTable (Sorted String Table):**
+   - **Magic:** `SSTABLE_MAGIC_MFSX` (`0x5853_464D` = `MFSX` im 54-Byte-Trailer am Dateiende) bzw. `SSTABLE_MAGIC_LEGACY` (`MFST`).
+   - **Versionsfeld:** 2-Byte Little-Endian `format_version` (Trailer-Bytes 48..50).
+   - **Unterstützte Versionen:** `v0` bis `v4` (Standard: `4`).
+   - **Ablehnung:** Versionen > 4 werden ohne Datenverlust oder Panik sauber abgewiesen (`Unsupported SSTable format version: {version}`).
+
+3. **Manifest (VersionSet):**
+   - **Header:** 4-Byte Magic `MANIFEST_HEADER_MAGIC` (`MFMN`) gefolgt von 1 Byte Versionsnummer (Bytes 0..5).
+   - **Aktuelle Version:** `CURRENT_MANIFEST_VERSION = 1`.
+   - **Kompatibilität:** Erkennt Legacy-Manifeste ohne Header (`v0`) sowie `v1`.
+   - **Ablehnung:** Unbekannte Versionen > 1 werden fail-closed mit `ContextraError::Storage("Unsupported MANIFEST format version: ...")` abgewiesen.
