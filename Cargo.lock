@@ -838,11 +838,11 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
+ "contextra-crypto",
  "contextra-ports",
  "contextra-testkit",
  "contextra-types",
  "criterion",
- "ed25519-dalek",
  "hkdf",
  "hmac",
  "loom",
@@ -1063,6 +1063,8 @@ name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-ports",
+ "contextra-types",
  "criterion",
  "ndarray 0.15.6",
  "ort",

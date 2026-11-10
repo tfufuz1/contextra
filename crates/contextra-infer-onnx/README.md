@@ -13,7 +13,7 @@ Autarke In-Process ONNX Inferenz Engine für Embeddings und Cross-Encoder Rerank
 - `default = []` (reiner Pure-Rust Minimalbau ohne externe Shared-Libraries oder C-FFI).
 - `onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:sha2"]` (aktiviert In-Process Inferenz via ONNX Runtime).
 - `download = ["dep:reqwest"]` (optionaler Download von Modellen über gesicherte HTTPS-Kanäle).
-- `std`, `serde`, `tracing`, `inspect`, `experimental` (Standard-Baukasten Features).
+- `std`, `serde`, `tracing`, `test-utils` (Standard-Baukasten Features).
 
 ## Schnelleinstieg
 
