@@ -42,7 +42,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "crates=${{ github.event.inputs.crate }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "crates=contextra-crypto contextra-checkpoint contextra-store contextra-db contextra-vector contextra-text contextra-graph contextra-rank" >> "$GITHUB_OUTPUT"
+            echo "crates=contextra-crypto contextra-checkpoint contextra-store contextra-db contextra-vector contextra-text contextra-graph contextra-rank contextra-mvcc contextra-kvcache" >> "$GITHUB_OUTPUT"
           else
             echo "crates=contextra-crypto" >> "$GITHUB_OUTPUT"
           fi
