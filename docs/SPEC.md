@@ -1,384 +1,304 @@
-# Contextra als Baukasten — Implementierungsspezifikation v2 (normativ)
+# Contextra als Baukasten — Implementierungsspezifikation v3 (normativ)
 
-Stand: 10. November 2026 · Ersetzt: „Entkopplungs- und Entnahmeplan“ (Teil 1) und „Implementierungsspezifikation der übrigen Crates“ (Teil 2) · Repo: `tfufuz1/contextra`
+*Stand: 10. November 2026 · Repository `tfufuz1/contextra` · Geprüfter HEAD `5408826f8` · Ersetzt `docs/SPEC.md` v2 (683 Zeilen; der Upload ist byte-identisch dazu)*
 
 ---
 
-## 0. Status, Geltung, Methode
+## 0. Status, Geltung, Änderungsprotokoll
 
 ### 0.1 Grundlage und Grenzen
 
 | Punkt | Inhalt |
-|---|---|
-| Analysierter Stand | Flacher Klon, HEAD `ef3364f` („Shell-Commit“, 10.11.2026 01:00). Die Entwürfe nennen `80f1c33`. Ob und was sich zwischen beiden Ständen geändert hat, ist **nicht** geprüft; S-00 erhebt die Baseline neu. |
-| Methode | Ausschließlich statische Analyse: Cargo-Manifeste (Python/`tomllib`), `rg`/`grep`-Zählungen, Dateivergleiche, Lesen von Quelltext. |
-| Nicht möglich | In der Analyseumgebung fehlt `cargo`. **Nichts wurde gebaut, getestet oder ausgeführt.** Jede Zeile „Nachweis“ in diesem Dokument ist ein Abnahmekriterium für die Umsetzung, kein Ergebnis. |
-| Beleg-Marken | **[V]** von mir am Quelltext/Manifest verifiziert. **[E]** aus den Entwürfen übernommen, nicht neu geprüft. **[A]** aus [V] abgeleitet. Eine Aussage ohne Marke ist eine Festlegung (Entscheidung) dieser Spezifikation. |
-| Plan-Datei im Repo | `docs/decoupling/Contextra als Baukasten Entkopplungs- und Entnahmeplan.md` ist byte-identisch zur Anlage (`cmp`) [V]. Daneben liegen dort `Implementierungsspezifikation_{store,vektor,graph}.md` (Schwester-Specs). |
-| Nicht auflösbare Verweise | Die Entwürfe verweisen auf `RESTRUCTURE_PLAN.md` (WP-xx, D1, E1–E7, Gate G3). Die Datei existiert weder im Repo noch in der Anlage [V]. Diese Spezifikation definiert die benötigten Regeln selbst (§3.3, X1–X8) und **verweist nirgends** auf diese Datei. |
+| --- | --- |
+| Analysierter Stand | HEAD `5408826f8` (Merge PR #5959, 10.11.2026). v2 beschreibt `ef3364f`. Was seitdem umgesetzt wurde, steht in §2. |
+| Methode | Statische Analyse: `tomllib` über alle Manifeste, `grep`-Zählungen, Dateisystemprüfung und die Skripte in `tools/` (`decouple_inspector.py`, `count_bridge_refs.py`, `feature_audit.py`, `loc.py`). |
+| Nicht möglich | In der Analyseumgebung fehlen `cargo`, `cargo-hack`, `rg` und `jq`. **Nichts wurde gebaut, getestet oder ausgeführt.** Jede Zeile „Nachweis“ ist ein Abnahmekriterium, kein Ergebnis. |
+| Beleg-Marken | **\[V\]** am HEAD gemessen · **\[T\]** aus einem `tools/`-Lauf · **\[A\]** aus \[V\] abgeleitet · **\[Ü\]** aus v2 übernommen, nicht neu geprüft · ohne Marke: Festlegung (Entscheidung) dieser Spezifikation. |
+| Crate-lokale Dokumente | 39 Crates tragen eine eigene `SPEC.md` (plus `PLAN.md` bei einem Teil). Sie enthalten Binnendetails und sind für ihr Crate verbindlich, soweit sie diesem Dokument nicht widersprechen. |
 
 ### 0.2 Rangfolge
 
-1. Dieses Dokument gilt für: Crate-Grenzen, Abhängigkeitsrichtung, `ids`/`env`, Brücken, Fehlerabbildung, Features, Reihenfolge, Gates.
-2. Die Schwester-Specs (`store`, `vector`, `graph`) gelten nur für die **Binnenzerlegung** der drei Crates und erst nach Abschluss von Phase 5. Wo sie widersprechen, gilt §2 B01.
-3. `AGENTS.md` und `docs/**` sind nachrangig und werden in S-03 an dieses Dokument angepasst.
+1. Dieses Dokument: Crate-Grenzen, Abhängigkeitsrichtung, `ids`/`env`, Brücken, Fehlerabbildung, Features, Reihenfolge, Gates, Score.
+2. Crate-lokale `SPEC.md`/`PLAN.md`: Binnenzerlegung und Dateizuordnung je Crate. Bei Widerspruch gilt dieses Dokument, der Widerspruch ist als Befund in §0.4 oder im Crate-Dokument zu vermerken.
+3. `AGENTS.md` und `docs/**` sind nachrangig und werden in S-03 angeglichen.
 
-### 0.3 Normative Sprache
+### 0.3 Normative Sprache und Prüfbarkeit
 
-MUSS / DARF NICHT / SOLL gemäß RFC 2119. „Commit“ = ein Schritt-Commit (siehe INV-3).
+MUSS / DARF NICHT / SOLL nach RFC 2119. **Jede MUSS-Aussage hat ein benanntes Prüfverfahren** (Gate nach §8 oder Test). Eine Aussage ohne Prüfverfahren gilt nur als SOLL, bis das Verfahren existiert.
+
+### 0.4 Änderungsprotokoll v2 → v3
+
+| ID | Befund in v2 | Änderung in v3 | Beleg |
+| --- | --- | --- | --- |
+| K1 | Stand `ef3364f`, alle Schritte offen | Ist-Stand je Schritt (§2.2), Reihenfolge auf den Rest verkürzt (§6) | \[V\] `ids`, `env`, `prompt-guard`, `vault` existieren; `types` und `ports` re-exportieren |
+| K2 | E1 = „Kern-Closure ⊆ E0“, aber `store` und `vector` hängen am E1-Crate `mvcc` | E1 wird in **E1a/E1b** geteilt (§1.1) | Widerspruch v2 §1.1 ↔ §3.1 |
+| K3 | INV-1 „kein Byte ändert sich“ ↔ §5.2 hebt Formatversionen an ↔ §9.3 | INV-1 mit enger, benannter Ausnahme (§1.2) | Widerspruch v2 |
+| K4 | `workspace` „nie Default“ (§3.1), aber Defaults enthalten es | Regel R10, Verstöße einzeln benannt (§2.4 B19) | \[V\] `license`, `audit-export` |
+| K5 | D-06: Beweisdateien in `crypto` bleiben bis Nachweis | Überholt: bereits nach `archive/contextra-crypto-proofs` verschoben. Nachprüfung als Schritt S-70a (§6) | \[V\] `crypto/src` ohne `deletion_proof`, `ed25519_proof` |
+| K6 | B11: Loom-Modell für `mvcc` fehlt möglicherweise | Vorbedingung von S-30 wird zur Verifikation | \[V\] `loom_sequence_log.rs`, `loom_snapshot_registry.rs`, `loom_tx_buffer.rs` |
+| K7 | §3.1 lässt `db`, `engine`, `mcp` ohne explizite Liste | Vollständige `allowed_internal`-Listen inkl. optionaler Closures (§3.1) | \[V\] Manifeste |
+| K8 | V-VETO verweist auf Test `partial_rebuild_veto_f02_guard` | Test existiert nicht \[V\]; Anlegen wird Voraussetzung von S-36 | `crates/contextra-vector/SPEC.md:58` |
+| K9 | Gates nur als Befehle beschrieben | Gate → Werkzeug → Exit-Code → Status (§8); fehlende Werkzeuge als Arbeitspakete | \[V\] kein Golden-Korpus, kein Doc-Lint, kein G-F2-Job |
+| K10 | Score nicht definiert | Modularitäts-Score M normativ (§8.6) | Anforderung „Score je Crate“ |
+| K11 | ID-Breite: „Feld je Format“ ohne Klärung, dass die Breite Compile-Zeit-Eigenschaft ist | §5.2 präzisiert (Matrix, Fehlerfälle, Reihenfolge) | \[V\] `checkpoint` führt `id_width_bits` bereits |
+| K12 | „Nachweis“ je Schritt uneinheitlich | Einheitliche Definition of Done (§6.1) | — |
+| K13 | `env` mit `test-utils` im Default | Default nur `std` (R10) | \[V\] `env` Default `std, test-utils` |
+| K14 | Tools verlangen `rg`, `jq`, `cargo-hack` ohne Voraussetzungsliste | Werkzeugliste in S-00 (§6) | \[V\] in der Analyseumgebung nicht vorhanden |
 
 ---
 
-## 1. Begriffe und Grundinvarianten
+## 1. Begriffe und Invarianten
 
 ### 1.1 Begriffe
 
 - **Kern** eines Crates: sein Code mit `--no-default-features`, ohne Feature `workspace`.
-- **Brücke:** Verzeichnis `src/compat/` (Modul `compat`) hinter dem Feature `workspace`. Nur dort stehen `contextra_types`, `contextra_ports` sowie alle Implementierungen von `ports`-Traits und alle `From`-Konvertierungen nach `ContextraError`.
-- **Kern-Closure:** Menge der internen `contextra-*`-Crates in `cargo tree -p <crate> -e normal --no-default-features`.
-- **Feature-Closure:** wie oben, je einzeln aktiviertem Feature.
-- **Ebene** wird an der **Kern-Closure** gemessen:
-  - **E0:** Kern-Closure leer.
-  - **E1:** Kern-Closure ⊆ {E0-Crates}, höchstens 4 Mitglieder (Ausnahme `store`, §3.1).
-  - **E2:** Integration; darf E0/E1/E2 nutzen, nie E3.
-  - **E3:** Anwendungen und Testwerkzeuge.
-- **Mikro-Kerne:** `contextra-ids`, `contextra-env`. Sie sind E0 und für **jeden** E1-/E2-/E3-Baustein als Kern-Abhängigkeit erlaubt (Regel R7 ersetzt hierfür K8 des Entwurfs nicht, sondern ergänzt sie).
+- **Brücke:** Modul `src/compat/` hinter dem Feature `workspace`. Nur dort stehen `contextra_types`, `contextra_ports`, alle Implementierungen von `ports`-Traits und alle `From`-Konvertierungen nach `ContextraError`.
+- **Kern-Closure:** transitive Menge der internen `contextra-*`-Crates in `cargo tree -p <crate> -e normal --no-default-features`. **Feature-Closure:** wie oben je einzeln aktiviertem Feature.
+- **Mikro-Kerne:** `contextra-ids`, `contextra-env`. Beide sind E0 und für jeden E1-, E2- und E3-Baustein als Kern-Abhängigkeit erlaubt. E0-Crates behalten lokale Mini-Traits (R7).
+- **Ebenen** (gemessen an der Kern-Closure):
 
-### 1.2 Invarianten (gelten für jeden Schritt)
+| Ebene | Definition | Crates (Ziel) |
+| --- | --- | --- |
+| **E0** | Kern-Closure leer | `ids`, `env`, `sys`, `durable-fs`, `simd`, `wire`, `adapt`, `ingest`, `privacy`, `sandbox`, `prompt-guard`, `infer-onnx`, `erasure`, `license`, `audit-export`, `avv-generator` |
+| **E1a** | Kern-Closure ⊆ E0, höchstens 4 Mitglieder | `mvcc`, `crypto`, `text`, `graph`, `rank`, `checkpoint`, `kvcache`, `vault`, `infer-ollama`, `infer-candle` |
+| **E1b** | Kern-Closure ⊆ E0 ∪ E1a, mindestens ein E1a-Mitglied, höchstens 4 Mitglieder (Ausnahme `store`: 5) | `store`, `vector` |
+| **E2** | Integration; darf E0, E1, E2 nutzen, nie E3 | `types`, `ports`, `router`, `agent`, `cognition`, `engine`, `db`, `contextra` |
+| **E3** | Anwendungen und Testwerkzeuge | `mcp`, `py`, `testkit`, `bench` |
 
-| ID | Invariante |
-|---|---|
-| INV-1 | **Formatgleichheit:** Kein persistiertes Byte ändert sich. Nachweis: Golden-Korpus (§5.1) vor und nach dem Schritt identisch. |
-| INV-2 | **Pfadgleichheit:** Öffentliche Importpfade bleiben für eine Übergangsfrist gültig (Re-Export mit `#[deprecated(since, note)]`). Entfernung nur in S-70. |
-| INV-3 | **Ein Schritt, ein Commit-Paar:** Commit A verschiebt oder benennt um (kein Umbau), Commit B baut um. Beide einzeln revertierbar. |
-| INV-4 | **Build-Pfad bleibt grün:** `cargo check --workspace --all-targets --locked` nach jedem Commit. |
-| INV-5 | **Determinismus:** Gleiche Eingabe ⇒ gleiche Rangfolge; Tie-Break nach ID aufsteigend [V: `AGENTS.md` §1.1]. |
-| INV-6 | **Durability-Pfade bleiben unberührt**, sofern der Schritt sie nicht ausdrücklich nennt (WAL, Manifest, Flush, Recovery). |
-| INV-7 | **Keine Compliance-Aussagen** in Code/Docs (`AGENTS.md` §1.2). Gate G-DOC1 (§8). |
-| INV-8 | **Kein Rückwärtspfeil:** Abhängigkeiten zeigen nur nach unten (E3→E2→E1→E0). Experimente zeigen auf Stabiles, nie umgekehrt. |
+*Begründung K2:* v2 definierte E1 als „Kern-Closure ⊆ E0“, ordnete aber `store` (→ `mvcc`, `crypto`) und `vector` (→ `mvcc`) selbst E1 zu. Die Teilung hebt den Widerspruch auf, ohne die Abhängigkeitsrichtung zu ändern.
+
+- **Entnehmbar:** ein Crate gilt nur als entnehmbar, wenn die Gates G-L2 → G-L1 → G-L3 → G-L4 in dieser Reihenfolge grün sind (§8.5).
+
+### 1.2 Invarianten (für jeden Schritt)
+
+| ID | Invariante | Prüfverfahren |
+| --- | --- | --- |
+| INV-1 | **Formatgleichheit.** Kein persistiertes Byte ändert sich. **Einzige Ausnahme:** die Versionsanhebungen mit Feld `id_width_bits` nach §5.2, und zwar nur in den dort benannten Schritten. Jede Ausnahme erzeugt Golden-Dateien für v(alt) und v(neu); der Lesepfad für v(alt) bleibt. | G-F1 |
+| INV-2 | **Pfadgleichheit.** Öffentliche Importpfade bleiben mit `#[deprecated(since, note)]`-Re-Export gültig. Entfernung nur in S-70. | G-A1 |
+| INV-3 | **Ein Schritt, ein Commit-Paar.** Commit A verschiebt oder benennt um, Commit B baut um. Beide einzeln revertierbar. | Review, Commit-Nachrichten `S-xx A/B` |
+| INV-4 | **Build-Pfad bleibt grün:** `cargo check --workspace --all-targets --locked` nach jedem Commit. | G-L3 |
+| INV-5 | **Determinismus.** Gleiche Eingabe ⇒ gleiche Rangfolge, Tie-Break nach ID aufsteigend. | `determinism_guard.py`, G-D1 |
+| INV-6 | **Durability-Pfade unberührt** (WAL, Manifest, Flush, Recovery), sofern der Schritt sie nicht ausdrücklich nennt. | Crash-/Recovery-Suite, G-F1 |
+| INV-7 | **Keine Compliance-Aussagen** in Code und Doku (`AGENTS.md` §1.2). | G-DOC1 |
+| INV-8 | **Kein Rückwärtspfeil:** E3→E2→E1b→E1a→E0, nie umgekehrt. | G-L1 |
+| INV-9 | **Reproduzierbarkeit.** Toolchain `1.89.0` (`rust-toolchain.toml` \[V\]), `--locked`, Werkzeugliste aus S-00. | CI |
+| INV-10 | **Keine stille Gate-Abschwächung.** Änderungen an `governance/gates.toml`, `ratchet.toml`, `protected-paths.toml` nur mit ADR und Label `protected-path`; Ratchet-Werte dürfen nur sinken. | `gate-weakening`, `ratchet` |
 
 ---
 
-## 2. Korrekturen und Blindstellen (Befund → bindende Entscheidung)
+## 2. Ist-Stand am HEAD `5408826f8`
 
-### B01 — Drei Dokumente, drei Architekturen
+### 2.1 Kennzahlen \[V\]/\[T\]
 
-**Befund [V]:** Der Plan sieht `crates/<gruppe>/`, **ein** Crate je Baustein mit `compat/`-Modul und die Mikro-Kerne `ids`/`env` vor. Die Schwester-Specs sehen `modules/<x>/<baustein>/`, viele Mikro-Crates (`store-io`, `store-wal`, `vector-hnsw`, `graph-csr` …), ein eigenes `*-contextra-compat`-**Crate** und crate-lokale Seam-Traits `Clock`/`Rng`/`MetricsSink`/`FileIo` vor („Kein Baustein importiert `contextra_*`“). Die Vektor-Spec legt `docid-128` an `vector-types` (M-3), der Plan an `ids`. Keines der Dokumente erwähnt das andere.
+| Größe | Wert |
+| --- | --- |
+| Crates in `crates/` | 39 (plus `benchmarks/contextra-bench`) |
+| Interne Kanten | 117: 96 normal (davon 35 optional), 21 dev |
+| Fan-in `types` / `ports` | 26 / 21 |
+| Crates mit Inspector-Score 100 | 9 (`adapt`, `durable-fs`, `env`, `ids`, `privacy`, `prompt-guard`, `sandbox`, `sys`, `wire`) |
+| Crates ohne ungegatete Brückenreferenz | 20 (Details §8.6, Anhang A) |
+| Unsafe-Inseln | nur `simd` (269 Stellen), `wire` (45), `sys` (22) |
+| `publish = false` | 1 von 39 Manifesten |
 
-**Entscheidung:**
-- Es gibt kein `modules/`-Verzeichnis. Die Brücke ist ein **Modul** `compat/` im Crate (kein Extra-Crate).
-- `ids`/`env` sind für alle Bausteine erlaubte E0-Abhängigkeiten. Die Seam-Definitionen `Clock`, `Rng`, `MetricsSink`, `IdGen` der Schwester-Specs entfallen zugunsten `env`; `DocKey`/`ExternalId`-Typen zugunsten `ids`. `docid-128` gehört **ausschließlich** `ids` (B03).
-- Die Mikro-Crate-Zerlegung der Schwester-Specs ist **Folgeprojekt F-1** und nicht Teil dieser Spezifikation (§9.3).
+### 2.2 Schrittstatus
 
-### B02 — Die `Clock`-/`Rng`-Kopien sind nicht kompatibel (Teil 2, G1 ist unvollständig)
+Status: **erledigt** · **teilweise** · **offen**. „Rest“ nennt die noch fehlende Arbeit.
 
-**Befund [V]** (Signaturen direkt gelesen):
+| Schritt | Status | Beleg \[V\] | Rest |
+| --- | --- | --- | --- |
+| S-00 Baseline | teilweise | `docs/decoupling/baseline/` mit Unterordnern je Crate | Neu erheben mit `cargo` (nicht verifiziert); Werkzeugliste fehlt |
+| S-01 Gate-Reparatur | teilweise | `xtask`-Alias entfernt; `tests/arch` entfernt; `gate_layering.py` und Negativtest vorhanden | `governance/protected-paths.toml` enthält noch zwei `xtask/**`-Globs; `justfile` kommentiert `xtask`; `ratchet.toml › not_run_baseline` listet 30+ Gates (u. a. `ring-dag`, `error-domain`, `capabilities-consistency`, `unsafe-inventory`, `doc-truth`) |
+| S-02 Golden-Korpus | teilweise | `mvcc/tests/golden_corpus.rs`, `mvcc/tests/golden/` | Kein `tests/golden/` im Wurzelverzeichnis, kein `tools/golden_regen.sh`, keine `MANIFEST.sha256` |
+| S-03 Doku/Schema | teilweise | `capabilities.toml` Schema v3, `AGENTS.md` nennt Ringe dekommissioniert | Verwenderliste in `types/lib.rs`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `sys/lib.rs:19`) einzeln prüfen |
+| S-10 `ids` | weitgehend erledigt | `ids` mit `IdError`, `ID_WIDTH_BITS`, `forbid(unsafe_code)`; `types/{ids,refs,tenant_scope}.rs` re-exportieren; `docid-128` in `types` weitergeleitet | Commit C: 86 Aufrufstellen von `::from_key(` außerhalb von Tests, davon exakt klassifizieren (mechanisch / nicht-mechanisch) |
+| S-11 `env` | erledigt | `ports/clock.rs` re-exportiert `contextra_env::clock::*`; `env` mit Feature `test-utils` | `env` hat `test-utils` im Default (K13) |
+| S-12 Feature-Hygiene | teilweise | `adapt` Default `std`; `crypto` ohne `legacy-erasure` im Default | Verstöße gegen R10: siehe B19 |
+| S-20 `license`, `audit-export` | teilweise | beide mit `compat/` | Defaults enthalten `workspace` (B19) |
+| S-21 `prompt-guard` | erledigt | `mcp` hängt an `contextra-prompt-guard` mit `file-audit`; `mcp/src/prompt_injection.rs` ist Wrapper | — |
+| S-22 `vault` | teilweise | Crate `vault` existiert, `db` hängt daran | `db/src` enthält weiter `volatile_vault.rs`, `vault_compat.inc`, `vault_sys.inc`: Quelle entfernen, Re-Export prüfen |
+| S-23 `adapt` | teilweise | je 1 `Clock`/`Rng`-Trait; `sketched-bandit` entfernt | Features `flow-corrected-thompson` und `rie-greedy-personalization` auf `exp-flow-thompson`/`exp-rie-greedy` umbenennen; `offpolicy.rs` gegen v2-Datei `off_policy.rs` prüfen |
+| S-24 `erasure` | offen | `erasure/Cargo.toml` ohne `[features]` | Features `signing`, `vault`, `async` einführen |
+| S-30 `mvcc` | teilweise | `mvcc/src/tombstone.rs`, `tests/tombstone_diff.rs`, `mvcc_error.rs`, `compat/error.rs`, drei Loom-Tests | Commit B: `types`/`ports` weiter nicht optional; `types/src/tombstone.rs` besteht noch; ungegatete Referenzen: 12 in 6 Dateien |
+| S-31 `crypto` | offen | `kv-encryption` im Default | `types`/`ports` nicht optional (34 Referenzen in 7 Dateien); `default = []`; `KeyManager`-Signaturen auf `[u8; 32]` |
+| S-32 `text` | teilweise | `compat/`, Feature `workspace` | 39 Referenzen in 6 Dateien (u. a. `wand.rs` 20); Default enthält `types-compat` |
+| S-33 `rank` | teilweise | `rank/src/temporal.rs` vorhanden | `engine/src/temporal_filter.rs` noch als eigene Kopie; Differenztest dokumentieren |
+| S-34 `graph` | teilweise | `compat/` | 109 Referenzen in 52 Dateien; Default `types-compat`, `ports-compat`, `experimental-graph`; `PprConfig` weiter in `types` |
+| S-35 `checkpoint` | weitgehend | `id_width_bits` in `meta.rs`, `manifest.rs`, `store.rs` | 4 Referenzen in 2 Dateien |
+| S-36 `vector` | teilweise | `compat/`, Default `std, ports-compat` | 150 Referenzen in 35 Dateien; V-VETO-Test fehlt (K8) |
+| S-37 `store` | teilweise | `kv/` nach `archive/contextra-store-kv`; `compat/` | 233 Referenzen in 65 Dateien; `CURRENT_MANIFEST_VERSION = 1`; `FeatureRing` noch vorhanden |
+| S-38 KV-Umzug | offen | `kv_cipher`, `kv_segment/*` weiter in `crypto` | Paar-Umzug nach `kvcache`; Konstante `CURRENT_KV_KEY_DERIVATION_VERSION` noch in `crypto` |
+| S-39 `infer-*` | teilweise | `infer-ollama` ohne ungegatete Referenz | `infer-candle`: 46 Referenzen in 14 Dateien, Kern hängt an `types`, `ports`, `rank` |
+| S-50 `ports` abgeben | offen | `ports/src` enthält `erasure*`, `gate`, `ledger`, `license`, `policy`, `keys`, `barrier`, `conformance`, `contract_tests` | Verschieben; `FeatureRing` in 6 Crates (`contextra`, `engine`, `kvcache`, `license`, `ports`, `store`) |
+| S-51 `types` abgeben | offen | `types/src/erasure.rs`, `PprConfig` in `types/types/domain/misc.rs` | Verschieben nach `erasure` und `graph` |
+| S-60 Regler | teilweise | `adapt` hat `decay_controller`, `homeostat`, `pid_latency_controller` | Kopien in `engine` und `db` ersetzen nach Differenztest |
+| S-61 Chunker | offen | `engine/src/chunker/` | Paritätstest, Adapter über `ingest::chunking` |
+| S-62 `router` | teilweise | `wire` optional hinter `subprocess-dispatch` | `ports_local.rs` entfernen nach `mcp`-Umstellung |
+| S-63 bis S-81 | offen | `contextra-vector-diskann` und `contextra-graph-research` existieren nicht | wie v2, verkürzt in §6 |
 
-| Ort | `Clock` | `Rng` |
-|---|---|---|
-| `ports/clock.rs:8`, `rng.rs:12` | `now_unix_nanos`, `monotonic_nanos`; `Send+Sync+'static` | `next_u64(&self)`, `fill_bytes(&self,…)`, `next_unit_f64(&self)`; `'static` |
-| `vector/types.rs:169/203` | wie ports, ohne `'static` | `next_u64(&self)`, `next_f64(&self)` |
-| `vector/contract.rs:39/45` | **`now_unix_ms`** (Millisekunden) | **`&mut self`**, `Send` |
-| `text/contract.rs:16/19`, `graph/contract.rs:15/17` | **`now_unix_ms`** | **`&mut self`**, `Send` |
-| `adapt/{clock,contract,rng}.rs` | nanos + monotonic; (`clock.rs` mit `'static`) | **`&mut self`**, `next_f64`/`next_f32` |
-| `license/types.rs:122`, `rank/.../isotonic.rs:14` | `monotonic_nanos` mit Default-Impl | — |
-| `erasure/types_local.rs:2059`, `privacy/types.rs:11` | nanos + monotonic | — |
+### 2.3 Messwerte Modularität (Auszug)
 
-Der Entwurf behauptet, `Rng` sei nur in `adapt` abweichend; tatsächlich weichen auch `text`, `graph` und `vector/contract.rs` ab, und `Clock` unterscheidet sich in der **Einheit** (ms vs. ns).
+Vollständige Tabelle in Anhang A. Spalte „M“ ist der Score nach §8.6.
 
-**Entscheidung:**
-- `env::Clock` = `ports::Clock` (Nanosekunden, `monotonic_nanos`, `Send+Sync+'static`). `env::Rng` = `ports::Rng` mit `&self` (siehe §4.2).
-- Millisekunden-Verbraucher (`text`, `graph`, `vector/contract.rs`) benutzen `env::Clock` und `env::unix_ms(&dyn Clock) -> u64` = `now_unix_nanos() / 1_000_000` (Abrunden). Persistierte ms-Zeitstempel MÜSSEN im Differenztest (§5.4) bitgleich zu `now_unix_ms` der alten Implementierung bei identischer Quelle sein.
-- `&mut self`-Verbraucher `text`/`graph`/`vector` wechseln auf `&self`-`env::Rng`. Das ist für alle heutigen Aufrufstellen ein Superset (Mutex/Atomic innerhalb `SeededRng`). Der Umstieg ist ein **Umbau-Commit** (INV-3 B).
-- E0-Crates (`adapt`, `privacy`, `license`, `erasure`, `ingest`, `audit-export`) behalten ihre lokalen Traits (R7/K8). Ihre Brücke bindet per Blanket-Impl **von `env` auf lokal** (Richtung `&self → &mut self` und `'static → ohne`), nie umgekehrt (§4.3).
+| Crate | Ebene | M | Ungegatete Refs (Dateien) | Kern hängt an E2 |
+| --- | --- | --- | --- | --- |
+| `infer-candle` | E1a | 15 | 46 (14) | ja (`types`, `ports`, `rank`) |
+| `store` | E1b | 15 | 233 (65) | ja (`types`, `ports`) |
+| `crypto` | E1a | 28 | 34 (7) | ja |
+| `mvcc` | E1a | 34 | 12 (6) | ja |
+| `vector` | E1b | 52 | 150 (35) | nein (optional) |
+| `graph` | E1a | 54 | 109 (52) | nein (optional) |
+| `text` | E1a | 61 | 39 (6) | nein (optional) |
+| `kvcache` | E1a | 69 | 11 (5) | nein (optional) |
+| `checkpoint` | E1a | 75 | 4 (2) | nein (optional) |
 
-### B03 — `docid-128` ändert die Typbreite und ist nicht additiv
+### 2.4 Neue Befunde (ergänzen B01–B16 aus v2)
 
-**Befund [V]:** Das Feature existiert in 6 Manifesten (`types`, `store`→`types`, `text`, `vector`, `graph` als leeres Feature, `py`→`types`). `types::DocId` ist `u64` (`repr(transparent)`) oder `u128` (`repr(C, align(16))`); `vector/types.rs:25` benutzt für `u128` stattdessen `repr(transparent)`. `DocId::from_key` nimmt die ersten 8 (bzw. 16) Bytes von BLAKE3 [V: `ids.rs:373–385`]. In `store/manifest/` und `store/wal/*.rs` fand ich **keine** Kennung der ID-Breite (nur `MFMN` + Version 1); `vector/persistence/header.rs` hat `HNSW_VERSION = 2` — ob dort ein Breitenfeld existiert, habe ich nicht gelesen. Cargo-Feature-Unification kann `docid-128` in `types` einschalten, während `vector`/`text`/`graph` ihre leeren/lokalen Kopien auf 64 Bit lassen (Typfehler oder, schlimmer, stilles Abschneiden).
+**B17 — Aufwärtskanten E1→E2 (INV-8) \[V\].** `mvcc`, `crypto`, `store` und `infer-candle` führen `contextra-types` und `contextra-ports` als nicht-optionale Abhängigkeit. Weil `store` auf `mvcc` und `crypto` aufbaut und `vector` auf `mvcc`, ist die Kette `store → mvcc → types/ports` die Haupt-Blockade der Entnahme.
 
-**Entscheidung:**
-1. `ids` besitzt `docid-128` allein. Jeder Crate mit Abhängigkeit auf `ids` leitet `docid-128 = ["contextra-ids/docid-128"]` weiter; leere/lokale Features entfallen. E0-Crates ohne `ids` (`ingest`, `erasure`) bekommen **kein** `docid-128`; ihre Konvertierung von `ids::DocId` ist `TryFrom` (fehlschlagend bei Überlauf), nie `as`.
-2. `ids` führt `pub const ID_WIDTH_BITS: u32` (64 oder 128) und die Compile-Time-Prüfung `size_of`/`align_of` (8/8 bzw. 16/16).
-3. Jedes persistierte Format, das IDs trägt, MUSS die Breite beim Öffnen prüfen (§5.2). Fehlt das Feld heute, wird die Formatversion erhöht und v(alt) als „Breite unbekannt“ nur mit expliziter Konfiguration geöffnet.
-4. CI-Matrix: `cargo hack check --workspace --features docid-128` zusätzlich zum Default.
+**B18 — Optional im Manifest, ungegatet im Quelltext \[V\]/\[A\].** Bei `vector`, `graph`, `text`, `kvcache`, `checkpoint` sind `types`/`ports` optional, der Kern referenziert sie aber in vielen Dateien ohne `cfg`-Gate. Hypothese: `cargo check -p <crate> --no-default-features` scheitert dort. Bei `graph`, `kvcache`, `rank`, `text`, `vector` ist das Kompatibilitäts-Feature sogar Default, sodass der isolierte Kern nie gebaut wird.
 
-### B04 — Entkopplungsstand von `text` ist falsch eingeschätzt; Zählungen weichen ab
+**B19 — Verstöße gegen die Default-Regel \[V\].** `license` und `audit-export`: `workspace` im Default; `audit-export` zusätzlich `test-utils`; `env`: `test-utils`; `testkit`: `erasure-conformance`; `graph`: `experimental-graph`; `rank`: `exp-dibud`, `exp-resonance`, `experimental-rank`; `kvcache`: `ports-compat`, `crypto-compat`; `crypto`: `kv-encryption` (Ziel: leer).
 
-**Befund [V]:** Meine Zählung (Zeilen mit `contextra_(types|ports|mvcc|sys|crypto)` in `src/`, ohne Test-Pfade und Kommentarzeilen; Datei gilt als „gegatet“, wenn sie irgendeine `cfg(…compat|workspace…)`-Zeile enthält):
+**B20 — Seam-Duplikate bestehen \[V\].** `trait Clock` in 10 Crates, `trait Rng` in 5, `IdGen` in 2, `MetricsSink` in 2; `struct DocId` in 7 Crates; `DistanceMetric` in 3. Die Kopien sind nach B02 nicht kompatibel (ms/ns, `&mut self`/`&self`).
 
-| Crate | Referenzen gesamt | davon in Dateien **ohne** jedes compat-`cfg` (Dateien) | Entwurf (ungegatet) |
-|---|---|---|---|
-| vector | 186 | 146 (36) | 114 (32) |
-| graph | 135 | 133 (54) | 134 (50) |
-| kvcache | 65 | 57 (10) | 55 (9) |
-| checkpoint | 65 | 65 (6) | 72 (7) |
-| mvcc | 8 | 8 (5) | 11 (5) |
-| **text** | 64 | **32 (6)** | **8 (4)** |
-| store | 160 | 160 (50) | — |
-| crypto | 67 | 67 (15) | — |
-| infer-candle | 43 | 43 (12) | — |
-| rank / simd / infer-ollama / license / audit-export | 40 / 13 / 50 / 30 / 4 | 0 | 0 |
+**B21 — Gate-Lücken \[V\].** Kein Golden-Korpus im Wurzelverzeichnis, kein Doc-Lint für G-DOC1, kein CI-Job für `contextra.fbs.sha256` (die Datei existiert in `wire/schemas/`), kein G-L2-Skript (nur Zählung per `count_bridge_refs.py`), `gate_layering.py` bricht ohne `cargo` ab. 30+ Gates stehen in `not_run_baseline`.
 
-Bei `text` fehlen im Entwurf `wand.rs` (20 Referenzen, Zeilen 18–19: `StorageEngine`, `ContextraError`, `DocId`, `MAX_SEARCH_K`; kein `cfg`), `inverted/scanner.rs` und `inverted/index_struct.rs`. `text` ist **nicht** „nahe am Ziel“. Dass `infer-ollama` 0 ungegatete Dateien hat, bedeutet nur „jede Datei enthält irgendein `cfg`“; die Entwurfs-Heuristik (siehe dort, F3) überschätzt dort die Gatung.
+**B22 — V-VETO-Test fehlt \[V\].** `partial_rebuild_veto_f02_guard` kommt nur in `crates/contextra-vector/SPEC.md` vor.
 
-**Entscheidung:** Zahlen sind Orientierung. Abnahme erfolgt ausschließlich über die Null-Prüfung G-L2 (§8.2) und den Build ohne Features, nie über Zählwerte. Aufwandsklasse `text`: mittel.
+**B23 — D-06 überholt \[V\].** Die Beweisdateien (`deletion_proof`, `ed25519_proof`, `audit_chain` teilweise) liegen nicht mehr in `crypto/src` bzw. `archive/contextra-crypto-proofs` existiert. Die in v2 geforderten Nachweise (Item-Diff und Mutation-Score) sind nicht belegt und werden nachgeholt (S-70a).
 
-### B05 — Die Gate-Infrastruktur, auf die das Konzept sich stützt, ist nicht durchsetzend
-
-**Befund [V]:**
-- `.cargo/config.toml` definiert `xtask = "run --package xtask --"`; ein Package `xtask` existiert nicht (kein Verzeichnis, nicht in `members`). `governance/gates.toml` und `protected-paths.toml` verweisen auf `xtask`; `ring-dag`, `capabilities-consistency`, `unsafe-inventory` sind als `builtin` (xtask) deklariert, `ring-dag` steht zudem in `ratchet.toml › not_run_baseline`.
-- `tests/layering.rs::test_gate_g1_layering_and_isolation` prüft nur, dass der Bericht **nicht leer** ist; ein Verstoß lässt den Test nicht scheitern. `tools/gate_g1_layering.py` ruft `cargo` auf und bricht ohne `cargo` mit Traceback ab (in meiner Umgebung).
-- `tests/arch` (`contextra-arch-tests`, „Ring-Schichtung“) ist **kein** Workspace-Mitglied.
-- Die in `gates.toml` verlangte Prüfung `public-api` läuft auf `nightly-2024-11-01`, der Workspace verlangt `rust-version = "1.89"` [V] ⇒ vermutlich nicht lauffähig [A].
-
-**Entscheidung:** S-01 stellt her: ein einziges, mit Exit-Code ≠ 0 scheiterndes Layering-Gate (§8.1), Anschluss an CI, Entfernen der toten `xtask`-Verweise, Aufnahme oder Entfernung von `tests/arch`, funktionierender `public-api`-Lauf. Ohne S-01 DARF kein weiterer Schritt gemergt werden.
-
-### B06 — `capabilities.toml` und `AGENTS.md` widersprechen sich
-
-**Befund [V]:** `AGENTS.md` erklärt Ringe/Klassen/Wellen für dekommissioniert. `capabilities.toml` führt weiter `klasse`, `ring`, `may_depend_on`; z. B. `contextra-adapt` mit `may_depend_on = ['contextra-ports','contextra-types']`, obwohl `adapt` keine interne Abhängigkeit hat. `types/src/lib.rs` Zeile 20–28 nennt 30 Verwender inklusive eines nicht existierenden Crates `contextra-agreement-generator` [V]; tatsächlich 24 Verwender [V].
-
-**Entscheidung:** Schema v3 (§8.3) ersetzt `klasse/ring`. `may_depend_on` wird aus dem Ziel (§3.1) erzeugt, nicht aus dem Ist.
-
-### B07 — Eine Verzeichnis-Regruppierung bricht messbar viel
-
-**Befund [V]:** Pfadabhängigkeiten außerhalb der Quelltexte: mindestens 9 Workflow-Dateien mit 30+ Pfadzeilen (`build-wheels`, `contextra-py-ci`, `fuzz-extended`, `loom-gate`, `publish-pypi`, `rust-ci`, `simd-cross-validation`, `tsan`, `unwrap-gate`; `mutation-testing` nennt Crate-Namen; meine Ausgabe war auf 30 Zeilen begrenzt), `capabilities.toml` (`path = …`), `CODEOWNERS` (je Crate), `justfile`, vier `fuzz/Cargo.toml` mit `path = "../../contextra-…"` (graph, crypto, vector, store), `include_str!("../../contextra-ports/src/storage.rs")` in `store/tests/toctou_put_if_absent.rs`, `db/tests/search_result_bound.rs` (Pfad zu `engine`), `.agents/rules`, 100+ Doku-Verweise.
-
-**Entscheidung (D-01):** Das Verzeichnislayout bleibt **flach** (`crates/contextra-*`). Die Gruppierung steht als Metadatum `group` in `capabilities.toml`. Die physische Regruppierung ist Nicht-Ziel (§9.3); sie liefert keinen Entnahmegewinn und kostet die oben genannten Brüche.
-
-### B08 — `Vfs` kann nicht verschoben werden, ohne den Fehlertyp zu ändern
-
-**Befund [V]:** `ports/vfs.rs` (404 Z.) nutzt `crate::Result` (= `ContextraError`) in den Datei-Methoden (58 Treffer); nur `VfsFile` nutzt `std::io::Result`. Die Plan-Anweisung „`vfs` nach `durable-fs`, `ports` re-exportiert“ würde (a) `ports` von `durable-fs` und transitiv `sys` abhängig machen und (b) den Rückgabetyp aller Implementierer (`store::io_seam::RealFs`, `testkit::FaultVfs`) und Nutzer (`store`, `checkpoint`, `router`) ändern. `clock.rs`, `rng.rs`, `id_gen.rs`, `metrics.rs` (zusammen 753 Z.) enthalten dagegen **keine** `ContextraError`-Nutzung [V] und lassen sich sauber verschieben.
-
-**Entscheidung:** `Vfs`, `VfsFile`, `VfsOpenOptions`, `VerifiedVia` bleiben in `ports`. `durable-fs` bleibt eigenständig (E0, Tier experimental, kein Verwender). Die Plan-Schritte „`io_seam`/`fsync.rs` nach `durable-fs`“ und „`sys-flush`“ entfallen (Nicht-Ziel). Verbraucher mit Dateisystembedarf (`store`, `checkpoint`) halten eine **crate-lokale** schmale Naht (siehe §6), die Brücke bindet an `ports::Vfs`.
-
-### B09 — `ports` und `types` ohne Zielbild für `DistanceMetric`; mehrere Distanz-Implementierungen
-
-**Befund [V]:** Drei gleichnamige Enums mit identischen Varianten und Reihenfolge (`Cosine`, `Euclidean`, `DotProduct`): `types/.../document.rs:20` (`#[non_exhaustive]`, nur `PartialEq`, **mit** `compute()`), `vector/types.rs:130` (`Eq+Hash`), `simd/metric.rs:5` (`Eq+Hash`, `serde` optional). Der Plan macht `simd` zum Besitzer und `vector → simd` optional — das ist nicht umsetzbar, weil `vector/distance.rs` die Metrik immer braucht. Zusätzlich existieren mindestens drei Distanzberechnungen (`types::DistanceMetric::compute`, `vector/distance.rs`, `simd`-Kernel); weitere Skalarpfade (z. B. in `quantize/`) habe ich nicht geprüft.
-
-**Entscheidung (R4-Ausnahme):** Die drei Enums bleiben je im Besitz ihres Crates. Erlaubt sind kleine geschlossene Wert-Enums (≤ 8 Unit-Varianten) als **gespiegelte Kopie**, wenn (a) Variantennamen und -reihenfolge identisch sind und (b) ein Konformitätstest die serde-Namen aller Kopien gleichsetzt. Verbindung per `From` in `compat/`. `vector` bekommt das optionale Feature `simd`, das `compute_distance` durch `contextra_simd::dispatch` ersetzt; die Skalarpfade bleiben als Orakel. Differenztest §5.4 (Toleranz relativ 1e-5, f32).
-
-### B10 — Das Verschieben der Krypto-Dateien bricht Garantie-Nachweise
-
-**Befund [V]:** `mutants-guarantees.toml` bindet G2 (Löschung/Krypto) an `crypto/src/{kv_shredding,kv_cipher,deletion_proof,ed25519_proof,kdf}.rs` und G3 (Audit) an `audit_chain.rs`, `wal_crypto.rs`. `loom-gate.yml` hat `crypto/tests/loom_kv_deferred_zeroize.rs`. `CURRENT_KV_KEY_DERIVATION_VERSION` existiert doppelt: `crypto/kv_segment/segment.rs:21` und `kvcache/segment.rs:60`; `CURRENT_KV_FORMAT_VERSION = 2` in `kv_cipher.rs:46`. Die gleichnamigen Dateien in `erasure` sind **keine** Kopien (z. B. `deletion_proof.rs` 2.744 Z. in `erasure` gegenüber rund 1.450 Z. in `crypto` [E]).
-
-**Entscheidung:**
-- `legacy-erasure` verlässt die Defaults von `crypto` (S-12). Die Dateien `audit_chain`, `deletion_proof/`, `ed25519_proof` werden **nicht** archiviert, solange nicht (a) ein Item-Diff gegen `erasure` Gleichwertigkeit zeigt **und** (b) der Mutation-Score der Zieldateien in `erasure` ≥ Score der Quelldateien ist (Gate G-C1). Bis dahin bleiben sie, hinter dem Feature, im Crate (Tier frozen).
-- Wandern `kv_cipher`, `kv_segment/*`, `kv_shredding`, `revocation_log` nach `kvcache`, MUSS derselbe Commit `mutants-guarantees.toml`, `loom-gate.yml` und `CODEOWNERS` auf die neuen Pfade ziehen und beide Versionskonstanten bis zur Vereinigung per `const_assert_eq` koppeln. Nach dem Umzug ist `kvcache` alleiniger Besitzer; `crypto` definiert keine KV-Versionskonstante mehr.
-- Schnitt und Umzug (S-38) bilden ein untrennbares Commit-Paar.
-
-### B11 — Nebenläufigkeits-Abdeckung fehlt genau dort, wo umgebaut wird
-
-**Befund [V]:** `loom-gate.yml` löst nur für `store`, `crypto`, `vector` aus; `tsan.yml` nur für `store`, `vector`, `graph`; `mutation-testing.yml` und `rust-ci.yml` (Zeile 385) kennen `mvcc` nicht. `mvcc` enthält SSI, `SequenceLog` und `TxBuffer` — den Nebenläufigkeitskern, den `store` und `vector` benutzen — sowie `kvcache` (`eviction_worker`, `radix`).
-
-**Entscheidung:** S-01 nimmt `mvcc`, `kvcache`, `checkpoint`, `ids`, `env` in die Pfadfilter von `tsan.yml`/`loom-gate.yml`, `mvcc`+`kvcache` in die Crate-Liste der Mutation-Tests und `rust-ci.yml` auf. Enthält `crates/contextra-mvcc/tests` kein Loom-Modell (`rg -l loom crates/contextra-mvcc` leer), ist vor S-30 ein Modell für `SequenceLog` (Publish/Visibility, zwei Schreiber, ein Leser) zu schreiben; sonst ist S-30 nicht abnehmbar.
-
-### B12 — Die Fehlerabbildung ist unterspezifiziert
-
-**Befund [V]:** `ContextraError` ist `#[non_exhaustive]` mit 43 Varianten. `ids` wirft heute `ContextraError::InvalidInput("Key cannot be empty")` (`ids.rs:226–229`); weitere Validierungsstellen bei Zeilen 14, 64, 98 [E]. Mit lokalem `IdError` ändert sich der **Rückgabetyp** inhärenter Methoden (`DocId::from_key`, `EntityId::from_key`, Ref-Konstruktoren), denn `ids`-Typen sind in `types` nur noch Re-Exports; inhärente Methoden fremder Typen lassen sich nicht wrappen. Aufrufer von `::from_key(` außerhalb von `types`: Treffer-Zählung 85, **doppelt gezählt** (überlappende Suchpfade) ⇒ real etwa 40–85; S-00 misst exakt.
-
-**Entscheidung:** §5.3 (Abbildungsvertrag) und S-10 mit separatem Aufrufstellen-Commit. Ausgangspunkt der Tabelle: **Display-Text und Variante bleiben bitgleich** (Test je Variante).
-
-### B13 — Dev-Kanten auf `testkit` und Entnahmenachweis
-
-**Befund [V]:** `testkit` (E3) ist Dev-Abhängigkeit von `checkpoint`, `crypto`, `mvcc`, `store` (E1) sowie `agent`, `cognition`, `db`, `engine`. Ein „Export in ein leeres Verzeichnis“ (R6 d) scheitert entweder oder nimmt `testkit` und damit `ports`/`types` mit.
-
-**Entscheidung:** Dev-Kanten zu `testkit` sind erlaubt, stehen aber im Manifest `dev_allowed` (§8.3). Der Isolationsnachweis (G-L4) prüft `--edges normal` und baut zusätzlich `--no-dev-deps`; Tests laufen im Export nur mit `--with-dev` (nimmt dann `testkit`-Closure mit). `env` (Feature `test-utils`) übernimmt `ManualClock` und die Clock/Rng-Konformitätssuite, damit E1-Crates dafür nicht auf `testkit` angewiesen sind.
-
-### B14 — Defaults und leere Features (Teil 2, G5/G6) — bestätigt, plus Ergänzungen
-
-**Befund [V]:** Defaults: `adapt` 3 Experimente; `crypto` `legacy-erasure, kv-encryption, test-utils`; `graph` `types-compat, ports-compat, experimental-graph`; `kvcache` `ports-compat, crypto-compat, kv-encryption`; `license` `ports-compat`; `audit-export` `types-compat`; `rank`/`text` `types-compat`; `vector` `ports-compat`; `testkit` `erasure-conformance`. Nicht in `default-members` stehen u. a. `ingest`, `privacy`, `sandbox`, `infer-candle`, `py`, `bench`, `erasure`, `license`, `audit-export`, `avv-generator`.
-
-**Entscheidung:** Zieldefaults §3.1. Da `default-members` diese Crates auslässt, genügt „wöchentlich `cargo check`“ nicht als Kompilierbarkeitsgarantie; CI führt bei **jedem** PR `cargo check --workspace --all-targets --locked` aus (S-01). Ein Feature ohne `cfg(feature = "x")` im Quelltext **und** ohne Weiterleitung in einem anderen Manifest wird entfernt; geprüft vom neuen `tools/feature_audit.py` (S-12).
-
-### B15 — Mehr nicht verifizierbare Plan-Annahmen
-
-- „Kein Verwender“ [V, nur Top-Level-`[dependencies]`/`[dev-dependencies]`/`[build-dependencies]` aller Manifeste inkl. `benchmarks/`; **nicht** ausgewertet: `[target.*.dependencies]`, `[patch]`, `examples/`, `tests/` im Wurzelverzeichnis]. S-00 ersetzt das durch `cargo metadata`.
-- `wire/build.rs` verweist auf `../../schemas/contextra.fbs`, relativ zum Crate-Verzeichnis ein nicht existierender Pfad [V: nur `crates/contextra-wire/schemas/` existiert]. Die FlatBuffers-Regeneration läuft damit nie; der eingecheckte Code wird benutzt. **Entscheidung:** nicht ändern (Regeneration wäre eine Verhaltensänderung); stattdessen G-F2: CI prüft `contextra.fbs.sha256`.
-- Crates tragen kein `publish = false`; interne Abhängigkeiten sind reine `path`-Abhängigkeiten ohne `version`. Eine crates.io-Veröffentlichung ist so nicht möglich. **Entscheidung:** „Entnahme“ = Git-Abhängigkeit (`git`+`rev`) oder Pfadkopie; crates.io ist Nicht-Ziel; neue Crates erhalten `publish = false`.
-- `ids`/`env` MÜSSEN `#![forbid(unsafe_code)]` tragen; `governance/ratchet.toml › forbid_unsafe_crates = 30` steigt auf 32 (ADR-pflichtig, geschützter Pfad).
-
-### B16 — Einzelentscheidungen, die der Entwurf offen ließ
-
-| Thema | Befund [V] | Entscheidung |
-|---|---|---|
-| `ModelFingerprint` (Plan: → `kvcache`; Teil 2 K9: → `ports/kv`) | `ports/kv.rs` importiert ihn aus `types`. Alle Verbraucher der Typ-Variante sind Brücken oder Re-Exports (`crypto` wird auf Roh-Bytes umgestellt). | **Bleibt in `types`.** Kein Umzug. `kvcache` und `infer-candle` führen im Kern einen eigenen Newtype `ModelFingerprint(pub [u8; 32])`; die Konvertierung steht in `kvcache/compat.rs` (existiert) und neu in `infer-candle/compat/`. Schritt P5 des Entwurfs entfällt. |
-| `RetrievalStrategy` | `types` und `adapt` führen verschiedene Gestalten | Bleibt in `types` (K10); `router/arm_registry.rs` bildet ab. |
-| `contextra-vault` vs. `sys/vault.rs` | Öffentliche Namen gemeinsam: 3; `sys::vault` = gesperrter Speicher (`allocate`, `as_slice`, `is_locked`), `db::volatile_vault` = Chunk-Tresor (`ingest`, `commit`, `SignalModality`) [V] | **Aufbauend, nicht ersetzend:** `contextra-vault` (E1, Kern-Closure `sys`) nutzt `sys::vault`. |
-| `mcp/protocol.rs` vs. `wire/jsonrpc.rs` | 5 gemeinsame, 7 nur-mcp (`McpError`, Tiefen-/Batch-Validierung), 10 nur-wire [V] | **Kein Merge**; beide bleiben. Dublette nur im Typnamen, nicht in der API. |
-| `adapt/drift` vs. `rank/drift` | 2 gemeinsame Namen (`adapt`: 8 eigene, `rank`: 7 eigene) [V] | **Keine Dubletten**, keine Konsolidierung. |
-| `contextra/query_rewriter` vs. `infer-ollama/query_rewriter` | 1 gemeinsamer Name [V] | **Keine Dubletten**, keine Konsolidierung. |
-| `decay_controller` adapt/engine | 9 gemeinsam; `engine` hat 5 zusätzliche (`with_clock`, `set_clock`, `effective_half_life_ms`, `effective_score_wall_clock`, `should_evict_wall_clock`), `adapt` 1 (`config`) [V] | `adapt` bleibt Besitzer, **muss zuerst die 5 Methoden aufnehmen**; Zusammenlegung erst nach Differenztest (S-60). Der Entwurf übersah die Richtung. |
-| `homeostat` adapt/db | 4 gemeinsam; `adapt` 11, `db` 3 zusätzliche (`is_expired`, `pool_size`, `remaining`) [V] | Wie oben: `adapt` nimmt die 3 Methoden auf, dann `pub use` in `db`. |
-| `pid_latency_controller` adapt/db | 10 gemeinsam; 6 vs. 5 zusätzliche [V] | Wie oben, 5 Methoden aufnehmen. |
-| `sketched-bandit` (leeres Feature) | kein `cfg(feature="sketched-bandit")` [E] | **Feature streichen**; Code bleibt unter `bandit-routing`. Verhalten unverändert. |
-| `AvvError`/`AvvGeneratorError` | beide exportiert [E] | Item-Diff in S-03; sind sie identisch: `type`-Alias, sonst unverändert beide. |
-| Optionale Plan-Schritte `store→durable-fs`, `checkpoint` in `mvcc` | — | Entfallen (B08) bzw. abgelehnt (Datei-Snapshot-Mechanik ≠ Transaktionsisolation). |
+**B24 — `erasure` ohne Features \[V\].** `erasure/Cargo.toml` hat keine `[features]`-Tabelle; die Trennung `signing`/`vault`/`async` aus v2 ist offen.
 
 ---
 
 ## 3. Zielzustand
 
-### 3.1 Crate-Tabelle (final)
+### 3.1 Crate-Tabelle (normativ, ersetzt v2 §3.1)
 
-Ebene = Kern-Ebene. „Fehler“ = eigener Fehlertyp (R3). „Brücke“ = Inhalt von `compat/`.
-`std` steht nur dort als Default, wo das Feature heute existiert (nicht bei `graph`, `checkpoint`, `erasure`); `workspace` ist **nie** Default.
+„Kern“ = Kern-Closure (direkte und transitive interne Abhängigkeiten bei `--no-default-features`). „Feature-Closures“ nennt nur Features mit zusätzlichen internen Crates; `workspace` zieht immer `types` und `ports` (bei E2/E3 entfällt das Feature). Die Spalte „Default“ gilt nach R10. Tier-Werte stehen in `capabilities.toml` (Single Source of Truth); v3 ändert nur: `durable-fs` = experimental, `erasure`, `license`, `audit-export`, `avv-generator`, `sandbox`, `infer-onnx`, `infer-candle` = frozen (AGENTS.md §2.3, D-08).
 
-| Crate | Gruppe (Meta) | Ebene | Kern-Closure (Ziel) | Default-Features (Ziel) | Fehler | Brücke (hinter `workspace`) |
-|---|---|---|---|---|---|---|
-| `ids` (neu) | foundation | 0 | — | `std` | `IdError` | — |
-| `env` (neu) | foundation | 0 | — | `std` | — | — |
-| `sys` | foundation | 0 | — | — | `SysError` (besteht) | — |
-| `durable-fs` | foundation | 0 | — | `std`, `crc` | besteht | — |
-| `simd` | foundation | 0 | — | `std` | `SimdError` (besteht) | `From<DistanceMetric>`↔`types` |
-| `wire` | foundation | 0 | — | `std` | besteht | — |
-| `mvcc` | foundation | 1 | ids, env | — | `MvccError` (neu) | `From<MvccError>`, Port-Impls |
-| `crypto` | foundation | 1 | ids, env | **leer** | `CryptoError` (besteht) | `From<CryptoError>` |
-| `types` | contracts | 2 | ids | — | `ContextraError` | — |
-| `ports` | contracts | 2 | types, ids, env | — | — | — |
-| `store` | storage | 1* | ids, env, sys, mvcc, crypto | — | `StoreError` (neu) | `engine/`, `scanner/`, `From` |
-| `vector` | retrieval | 1 | ids, env, mvcc (`sys` nur `mmap`, `simd` nur `simd`) | `std` | `VectorError` | `VectorIndex`-Impls, Purger, `From` |
-| `text` | retrieval | 1 | ids, env | `std` | `TextError` (neu) | `TextIndex`-Impl, Purge, `From` |
-| `graph` | retrieval | 1 | ids, env | **leer** (kein `std`-Feature vorhanden; ohne `experimental-graph`) | `GraphError` (neu) | `GraphIndex`, Purger, `From` |
-| `rank` | retrieval | 1 | ids, env | `std` | `RankError` | `From` |
-| `checkpoint` | retrieval | 1 | ids, env | — | `CheckpointError` (neu) | `Checkpoint`-Impls, `From` |
-| `kvcache` | llm | 1 | env, crypto (nur `kv-encryption`) | `std` | `KvCacheError` (besteht) | `prefix_store`, `adapters`, Purger |
-| `router` | llm | 2 | types, ports, adapt (`wire` nur `subprocess-dispatch`) | — | besteht | — |
-| `adapt` | llm | 0 | — | `std` | besteht | Blanket-Impl `env→lokal` |
-| `infer-ollama` | llm | 1 | env | — | `OllamaError` | `trait_impls`, `query_rewriter`, `From` |
-| `infer-candle` | llm | 1 | env (`kvcache` nur `kv-bridge`) | — (`candle` Feature steuert ML) | `CandleError` | Provider, Exporter, Gasp |
-| `infer-onnx` | llm | 0 | — | — | besteht | `ports::EmbeddingProvider`-Anbindung |
-| `ingest` | data | 0 | — | `fmt-text` | besteht | `ids`/`types::ContextChunk`-Mapping |
-| `privacy` | safety | 0 | — | `std` | besteht | — |
-| `sandbox` | safety | 0 | — | — | besteht | — |
-| `prompt-guard` (neu) | safety | 0 | — | `std` | `GuardError` | — |
-| `vault` (neu) | safety | 1 | sys | — | `VaultError` | `From` |
-| `agent` | agentic | 2 | types, ports | — | `AgentError` (neu) | Speicherbindung an `db`/`graph`/`checkpoint`/`router` |
-| `cognition` | agentic | 2 | types, ports, graph (nur `exp-hyperedge`) | — | `CognitionError` (neu) | Bindung an `engine` liegt in **`db`** (Feature `cognition`) |
-| `erasure` | compliance | 0 | — | `signing`, `vault`, `async` (Verhalten wie heute) | besteht | Scanner-Abbildung |
-| `license` | compliance | 0 | — | `std` | besteht | `ports`/`types` (aus Inline-Impls) |
-| `audit-export` | compliance | 0 | — | `std` | besteht | `types`-`From` |
-| `avv-generator` | compliance | 0 | — | `std` | besteht | — |
-| `engine` | integration | 2 | alle benötigten | — | `ContextraError` | — |
-| `db` | integration | 2 | engine, types, ports | — | — | — |
-| `contextra` | integration | 2 | db, types, ports (`license`, `infer-candle` optional) | `embedded` | — | — |
-| `mcp` | apps | 3 | contextra, types, ports, wire, rank, crypto, privacy, router, prompt-guard | — | `McpError` | — |
-| `py` | apps | 3 | types, contextra, wire | — | — | — |
-| `testkit` | testing | 3 | ports, types, env | `testkit` (ohne `erasure-conformance`) | — | — |
-| `bench` | testing | 3 | store, vector, text, db | — | — | — |
+| Crate | Ebene | Kern (Ziel) | Feature-Closures | Default (Ziel) | Eigener Fehler |
+| --- | --- | --- | --- | --- | --- |
+| `ids` | E0 | — | `docid-128` | — | `IdError` |
+| `env` | E0 | — | `test-utils` | `std` | — |
+| `sys` | E0 | — | — | — | `SysError` |
+| `durable-fs` | E0 | — | — | `std`, `crc` | besteht |
+| `simd` | E0 | — | `workspace`→types | `std` | `SimdError` |
+| `wire` | E0 | — | — | `std` | besteht |
+| `adapt` | E0 | — | `bandit-routing`, `exp-flow-thompson`, `exp-rie-greedy` | `std` | besteht |
+| `ingest` | E0 | — | `workspace`→ids, types | `fmt-text` | besteht |
+| `privacy` | E0 | — | — | `std` | besteht |
+| `sandbox` | E0 | — | — | — | besteht |
+| `prompt-guard` | E0 | — | `file-audit` | `std` | `GuardError` |
+| `infer-onnx` | E0 | — | `onnx`, `download`, `test-utils`, `workspace`→ports, types | — | besteht |
+| `erasure` | E0 | — | `signing`, `vault`, `async`, `conformance` | `signing`, `vault`, `async` | besteht |
+| `license` | E0 | — | `workspace`→types, ports | `std` | besteht |
+| `audit-export` | E0 | — | `workspace`→types, `test-utils` | `std` | besteht |
+| `avv-generator` | E0 | — | — | `std` | besteht |
+| `mvcc` | E1a | ids, env | `workspace`→types, ports | — | `MvccError` |
+| `crypto` | E1a | ids, env | `workspace`; `legacy-erasure` (nicht Default) | leer | `CryptoError` |
+| `text` | E1a | ids, env | `workspace` | `std` | `TextError` |
+| `graph` | E1a | ids, env | `workspace`; `exp-hyperedge` | leer | `GraphError` |
+| `rank` | E1a | ids, env | `workspace`; `exp-dibud`, `exp-resonance` | `std` | `RankError` |
+| `checkpoint` | E1a | ids, env | `workspace` | — | `CheckpointError` |
+| `kvcache` | E1a | env | `kv-encryption`→crypto; `kv-shredding`; `exp-kivi`; `workspace` | `std` | `KvCacheError` |
+| `vault` | E1a | sys | `workspace` | — | `VaultError` |
+| `infer-ollama` | E1a | env | `workspace` | — | `OllamaError` |
+| `infer-candle` | E1a | env | `candle`; `kv-bridge`→kvcache; `workspace` | — | `CandleError` |
+| `store` | E1b | ids, env, sys, mvcc, crypto | `workspace` | — | `StoreError` |
+| `vector` | E1b | ids, env, mvcc | `mmap`→sys; `simd`→simd; `exp-*`; `workspace` | `std` | `VectorError` |
+| `types` | E2 | ids | — | — | `ContextraError` |
+| `ports` | E2 | types, ids, env | — | — | — |
+| `router` | E2 | types, ports, adapt | `subprocess-dispatch`→wire | — | besteht |
+| `agent` | E2 | types, ports | `routing`→router | — | `AgentError` |
+| `cognition` | E2 | types, ports | `exp-hyperedge`→graph | — | `CognitionError` |
+| `engine` | E2 | ids, env, types, ports, mvcc, store, vector, text, graph, rank, checkpoint | `adaptive-*`→adapt; `onnx`→infer-onnx; `sandbox`→sandbox; `license`→license; `exp-extraction` | — | `ContextraError` |
+| `db` | E2 | engine, types, ports, vault | `cognition`→cognition; `experimental-diskann`→vector-diskann (nach S-80) | — | — |
+| `contextra` | E2 | db, types, ports | `license`→license; `infer-candle` | `embedded` | — |
+| `mcp` | E3 | contextra, types, ports, wire, rank, crypto, privacy, router, prompt-guard | — | — | `McpError` |
+| `py` | E3 | types, contextra, wire | `docid-128` | — | — |
+| `testkit` | E3 | ports, types, env | — | `testkit` | — |
+| `bench` | E3 | store, vector, text, db | — | — | — |
 
-\* `store` ist die einzige Ausnahme vom Budget „≤ 4 Mitglieder“ (5: ids, env, sys, mvcc, crypto): WAL-HMAC (`crypto`) und Sequenzen (`mvcc`) sind konstitutiv. Das Budget zählt die **Kern-Closure**; Feature-Closures dürfen größer sein.
-`router` ist E2, obwohl es nur E0/E2-Mitglieder zieht, weil `types`/`ports` E2 sind.
+**Anmerkungen**
+
+- `store` ist die einzige Ausnahme vom Budget „höchstens 4 Mitglieder“ (5: ids, env, sys, mvcc, crypto). Das Budget zählt nur die Kern-Closure.
+- `kvcache` ist E1a, weil `crypto` nur hinter `kv-encryption` in der Closure steht. Aktiviert `kvcache` dieses Feature, bleibt es E1a, da `crypto` selbst E1a ist.
+- `engine`: v2 sagte nur „alle benötigten“. v3 legt die Liste fest (11 Kern-Mitglieder inklusive Mikro-Kerne; `AGENTS.md` nennt „≤ 9“ ohne `ids`/`env`, bleibt damit gültig). `sandbox`, `infer-onnx` und `adapt` sind im Manifest bereits optional \[V\] und bleiben Features.
+- `db` braucht `vault` als Kern-Abhängigkeit, weil `db` den Typ re-exportiert (v2 §6.3 forderte das, §3.1 führte es nicht auf).
+- `ids` hat laut `capabilities.toml` nur das Feature `docid-128`; ein `std`-Feature ist nicht nötig (D-19: no\_std ist kein Ziel).
 
 ### 3.2 Regeln
 
-- **R1 Richtung:** Abhängigkeiten zeigen nach unten (INV-8).
-- **R2 Brücke:** `contextra_types`/`contextra_ports`/`contextra_testkit` DÜRFEN im Kern **nirgends** vorkommen, auch nicht in Doc-Kommentaren und `#[cfg(test)]`-Modulen des Kerns (Tests des Kerns nutzen `env::test-utils` und lokale Fakes). Ausnahme: `tests/`-Verzeichnis (Integrationstests) hinter `required-features = ["workspace"]`.
-- **R3 Eigene Fehler:** `thiserror`; `#[non_exhaustive]`. `impl From<LocalError> for ContextraError` nur in `compat/` (Orphan-Regel erfüllt, da `LocalError` lokal [A]).
-- **R4 Ein Besitzer je Konzept:** IDs → `ids`; `Clock`/`Rng`/`IdGen`/`MetricsSink` → `env`; `Tombstone*` → `mvcc`; `PprConfig`/`PprAlgorithm`/`TlHfdParams` → `graph`; KV-Verschlüsselung → `kvcache`; Lizenz-Traits → `license`. **R4-Ausnahme** gespiegelter Wert-Enums (B09).
-- **R5 Experimente:** siehe X1–X8 (§3.3).
-- **R6 Nachweis statt Behauptung:** „Entnehmbar“ gilt nur bei G-L1…G-L4 (§8) in Folge grün.
-- **R7 E0-Crates definieren ihre Umwelt-Traits lokal und minimal;** die Verbindung zu `env`/`ports` liegt ausschließlich in `compat/` (Muster §4.3).
-- **R8 Kein `unwrap`/`expect`/Panic** in neuen Kern-Pfaden von `ids`/`env`; Tests ausgenommen (Gate `unwrap-gate`).
-- **R9 `pub use`-Übergang:** Verlässt ein Typ ein Crate, bleibt am alten Ort ein `pub use` mit `#[deprecated(since = "0.1.0", note = "…neuer Pfad…")]`, außer wenn dadurch ein Rückwärtspfeil entstünde (z. B. `types → mvcc` für `Tombstone`; dort wird der Pfad ersatzlos entfernt, weil nur `mvcc` und `types` selbst ihn nutzen [V]).
+| Regel | Inhalt | Prüfverfahren |
+| --- | --- | --- |
+| **R1 Richtung** | Abhängigkeiten zeigen nach unten (INV-8). | G-L1 |
+| **R2 Brücke** | `contextra_types`, `contextra_ports`, `contextra_testkit` DEFINIEREN NICHT im Kern vor, auch nicht in Doc-Kommentaren und `#[cfg(test)]`-Modulen. Tests des Kerns nutzen `env` (`test-utils`) und lokale Fakes. Ausnahme: `tests/` hinter `required-features = ["workspace"]`. | G-L2 |
+| **R3 Eigene Fehler** | `thiserror`, `#[non_exhaustive]`. `impl From<LocalError> for ContextraError` nur in `compat/`. | G-E1 |
+| **R4 Ein Besitzer je Konzept** | IDs → `ids`; `Clock`/`Rng`/`IdGen`/`MetricsSink` → `env`; `Tombstone*` → `mvcc`; `PprConfig`/`PprAlgorithm`/`TlHfdParams` → `graph`; KV-Verschlüsselung → `kvcache`; Lizenz-Traits → `license`; Erasure-Familie → `erasure`. **Ausnahme:** gespiegelte, kleine, geschlossene Wert-Enums (≤ 8 Unit-Varianten) wie `DistanceMetric`, wenn Namen und Reihenfolge identisch sind und ein Konformitätstest die serde-Namen gleichsetzt. | Symbol-Eindeutigkeit (`symbol-uniqueness`) |
+| **R5 Experimente** | X1–X8 (§3.3). | `feature_audit.py`, G-L1 |
+| **R6 Nachweis statt Behauptung** | „Entnehmbar“ gilt nur nach §8.5. | Gates |
+| **R7 E0-Seams lokal** | E0-Crates definieren Umwelt-Traits lokal und minimal; die Verbindung zu `env`/`ports` liegt nur in `compat/`. | G-L2 |
+| **R8 Keine Panics** in neuen Kern-Pfaden von `ids`/`env` (außer Tests). | `unwrap-gate` |  |
+| **R9 `pub use`-Übergang** | Verlässt ein Typ sein Crate, bleibt ein `#[deprecated]`-Re-Export, außer er würde einen Rückwärtspfeil erzeugen (dann ersatzlose Entfernung, wenn nur Besitzer und Ursprung ihn nutzen). | G-A1 |
+| **R10 Feature-Regel (neu)** | `default` enthält NIE `workspace`, `test-utils`, `*-compat`, `exp-*`, `experimental-*`. `default` darf nur `std` und Eigenschaften enthalten, die für den Zweck des Crates wesensnotwendig sind (`crc`, `fmt-text`, `embedded`, `testkit`). Namensschema für Experimente: `exp-<name>`, Sammelfeature `experimental-all`. Ein Feature ohne `cfg(feature = "x")` im Quelltext und ohne Weiterleitung in einem anderen Manifest wird entfernt. | `feature_audit.py` (entrauscht, §8.4), G-L1 |
+| **R11 Fan-in-Ratchet (neu)** | Kein neuer Verwender von `types`/`ports` aus E0 oder E1. `ratchet.toml` führt `types_fan_in` und `ports_fan_in` (Start 26 und 21) und lässt nur sinkende Werte zu. | `ratchet` |
 
 ### 3.3 Experimente (X1–X8)
 
-- **X1** Experiment-Code hängt nur von Stabilem ab. Der Host-Kern kennt keine Experimente.
-- **X2** Feature `exp-<name>`; nie in `default`; Sammelfeature `experimental-all`; in der CI-Matrix.
+- **X1** Experiment-Code hängt nur von Stabilem ab; der Host-Kern kennt keine Experimente.
+- **X2** Feature `exp-<n>`, nie in `default`, Sammelfeature `experimental-all`, in der CI-Matrix.
 - **X3** Die Naht (Trait) liegt im Host-Kern in `ext.rs`, ohne `types`/`ports`.
-- **X4** Eigenes Crate, wenn > 2.000 Zeilen **oder** eigene externe Abhängigkeiten **oder** ≥ 2 Hosts.
+- **X4** Eigenes Crate bei ≥ 2.000 Zeilen **oder** eigenen externen Abhängigkeiten **oder** ≥ 2 Hosts.
 - **X5** Verhaltens-Baseline im selben Crate (z. B. Recall gegen Brute-Force).
 - **X6** Persistierte Experimentdaten haben eigene Magic-/Versionskennung; das Kernformat ändert sich nie.
 - **X7** Tier `experimental` in `capabilities.toml`.
-- **X8** Ein Experiment, das Daten schreibt, behält den Lesepfad oder dokumentiert eine Migrationssperre.
+- **X8** Ein schreibendes Experiment behält den Lesepfad oder dokumentiert eine Migrationssperre.
 
 ---
 
-## 4. Spezifikation der neuen Kerne
+## 4. Spezifikation der Kerne und Brücken
 
-### 4.1 `contextra-ids`
+### 4.1 `contextra-ids` (Ist: umgesetzt)
 
-**Zweck:** alle Identitäts- und Mandantentypen, ohne interne Abhängigkeit.
+**Zweck:** Identitäts- und Mandantentypen ohne interne Abhängigkeit. **Ist \[V\]:** Abhängigkeiten `blake3`, `serde`, `thiserror`; `forbid(unsafe_code)`; `IdError`; `ID_WIDTH_BITS`; Feature `docid-128`; `types/{ids,refs,tenant_scope}.rs` sind Re-Exports.
 
-**Inhalt (Quelle → Ziel)** [E, Zeilenzahlen nicht neu gezählt]:
-- `types/src/types/domain/ids.rs`: `DocId`, `EntityId`, `TxId` (inkl. `INTERNAL_BASE`), `TenantId` (inkl. `SYSTEM`), `CollectionId`; `from_key` per BLAKE3-Präfix.
-- `types/src/ids.rs`: `FileId`, `StoreId`, `Seq`, `Timestamp`. `ErasureId` und `GateId` gehen **nicht** hierher, sondern nach `erasure` (S-51).
-- `types/src/refs.rs`: `CollectionRef`, `DocKey`, `OperatorRef`, `SubjectRef`, `TenantRef`, `MAX_REF_LEN`.
-- `types/src/tenant_scope.rs`: `TenantScoped`, `TenantScopeViolation`.
-- Konstanten `TOMBSTONE_BIT`, `MAX_SEARCH_K` aus `types/.../misc.rs`.
-- Tests `types/.../tests/ids_tests.rs` (473 Z.) ziehen mit.
+**Vertrag (bindend):**
 
-**Dependencies:** `blake3`, `serde`, `thiserror`. Keine weiteren. `#![forbid(unsafe_code)]`.
+- `DocId` ist `u64` (`repr(transparent)`) oder mit `docid-128` `u128` (`repr(C, align(16))`). Das Feature gilt für das **gesamte** Build und ist nicht additiv (B03).
+- `ID_WIDTH_BITS: u32 = 64 oder 128`; Compile-Time-Prüfung von `size_of`/`align_of` (8/8 bzw. 16/16).
+- `DocId::from_key(&str) -> Result<Self, IdError>`: BLAKE3-Präfix, erste 8 bzw. 16 Bytes, Little Endian. Display-Text und Variante von `IdError` sind bitgleich zu den früheren `InvalidInput`-Texten.
+- `types` enthält `impl From<IdError> for ContextraError` (Variante `InvalidInput(String)`).
 
-**Öffentliche Schnittstelle (Vertrag):**
+**Offen:** 86 Aufrufstellen von `::from_key(` außerhalb von Tests, davon 0 in `ids`. Jede ist als *mechanisch* (`?` über `From`) oder *nicht-mechanisch* (Musterabgleich auf `ContextraError::InvalidInput`) zu klassifizieren; mehr als 20 nicht-mechanische Stellen lösen das Rückfall-Verfahren aus §9.2 aus.
 
-```rust
-// Feature `docid-128` wählt die Breite für das GANZE Workspace-Build (nicht additiv; siehe B03).
-#[cfg(not(feature = "docid-128"))] pub struct DocId(pub u64);        // repr(transparent)
-#[cfg(feature = "docid-128")]     pub struct DocId(pub u128);       // repr(C, align(16))
-pub const ID_WIDTH_BITS: u32 = if cfg!(feature = "docid-128") { 128 } else { 64 };
+**Abnahme:** `ids_tests` grün in `ids`; Differenztest gegen die verbliebenen `DocId`-Kopien (`erasure`, `graph`, `ingest`, `rank`, `text`, `vector`) über 10.000 zufällige Schlüssel plus Randfälle (leer, Unicode, 4 KiB): gleiche `from_key`-Bytes, gleiche serde-Ausgabe (JSON und `bincode`); Golden-Vektoren in 64 **und** 128 Bit.
 
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
-pub enum IdError {
-    #[error("Key cannot be empty")] EmptyKey,
-    // weitere Varianten 1:1 aus den heutigen InvalidInput-Stellen
-    // (Zeilen 14, 64, 98 in ids.rs sowie refs.rs/tenant_scope.rs, per S-10 erhoben):
-    // Text der Display-Ausgabe MUSS dem heutigen String entsprechen.
-}
+### 4.2 `contextra-env` (Ist: umgesetzt)
 
-impl DocId {
-    pub fn from_key(key: &str) -> Result<Self, IdError>;   // BLAKE3[..8] LE (64) bzw. [..16] (128)
-    pub fn inner(&self) -> /* u64 | u128 */;
-}
-impl From<u64> for DocId { /* wie heute: id as _ */ }
-```
+**Ist \[V\]:** `ports/clock.rs` re-exportiert `contextra_env::clock::*`; `env` hat Feature `test-utils`.
 
-**Re-Export:** `types` macht `pub use contextra_ids::*;` (Pfad `contextra_types::DocId` bleibt) und enthält `impl From<IdError> for ContextraError` (Variante `InvalidInput(String)`, Text = `IdError::to_string()`).
-**Kompatibilitätsbruch (bewusst):** `DocId::from_key` & Co. liefern `Result<_, IdError>`; `?` in Funktionen mit `ContextraError`-Fehlertyp funktioniert über `From`. Direkte Musterabgleiche auf `ContextraError::InvalidInput` an Aufrufstellen sind in S-10 Commit C zu korrigieren.
-
-**Abnahme (zusätzlich zu §8):**
-1. `ids_tests.rs` grün in `ids`.
-2. Differenztest gegen die **noch bestehenden** Kopien (`types`, `vector`, `text`, `graph`, `rank`) über 10.000 zufällige Schlüssel + Randfälle (leer, Unicode, 4 KiB): gleiche `from_key`-Bytes und gleiche serde-Ausgabe (JSON und `bincode`).
-3. Golden-Vektoren für `from_key` in 64 **und** 128 Bit (S-02).
-4. `static_assert` auf `size_of`/`align_of`.
-
-### 4.2 `contextra-env`
-
-**Zweck:** injizierbare Umwelt (Zeit, Zufall, IDs, Metriken). Quelle: `ports/{clock,rng,id_gen,metrics,env}.rs` (109+208+101+335+16 Z. [V]; keine `ContextraError`-Nutzung [V]).
-
-**Dependencies:** nur `std`. `#![forbid(unsafe_code)]`.
-
-**Vertrag:**
+**Vertrag (bindend):**
 
 ```rust
 pub trait Clock: Send + Sync + 'static {
-    fn now_unix_nanos(&self) -> u64;     // 0 vor Epoche, nie Panic
+    fn now_unix_nanos(&self) -> u64;   // 0 vor der Epoche, nie Panic
     fn monotonic_nanos(&self) -> u64;
 }
-pub struct SystemClock;
 pub fn unix_ms(c: &dyn Clock) -> u64 { c.now_unix_nanos() / 1_000_000 }   // Abrunden
 
 pub trait Rng: Send + Sync + 'static {
     fn next_u64(&self) -> u64;
     fn fill_bytes(&self, dest: &mut [u8]);
     fn next_unit_f64(&self) -> f64;
-    // + alle weiteren Methoden von ports::Rng 1:1 (Datei vollständig übernehmen)
 }
-pub struct SeededRng;                    // SplitMix64, Folge MUSS bitgleich bleiben
-pub trait IdGen: Send + Sync + 'static { /* wie ports::IdGen */ }
-pub struct SequentialIdGen;
-pub trait MetricsSink: Send + Sync + 'static { /* wie ports::MetricsSink */ }
-pub struct NoopMetricsSink; pub struct InMemoryMetricsSink; pub struct MetricKey; // + Snapshots
-// Feature `test-utils`: pub struct ManualClock;  (aus testkit/manual_clock.rs, 172 Z.)
 ```
 
-`ports` macht `pub use contextra_env::{Clock, SystemClock, Rng, SeededRng, IdGen, SequentialIdGen, MetricsSink, NoopMetricsSink, InMemoryMetricsSink, MetricKey /* … */};` und behält die Module `clock`, `rng`, `id_gen`, `metrics`, `env` als dünne Re-Export-Dateien, damit `contextra_ports::clock::Clock` gültig bleibt (R9).
+- `SeededRng` (SplitMix64): Folge bitgleich zu den Golden-Folgen (Seeds 0, 1, 42, `u64::MAX`; je 1.024 Werte).
+- `IdGen`, `SequentialIdGen`, `MetricsSink`, `NoopMetricsSink`, `InMemoryMetricsSink`, `MetricKey` wie in der früheren `ports`-Fassung.
+- Feature `test-utils` enthält `ManualClock` und die Konformitätssuite für Clock, Rng und Metrics.
 
-**Abnahme:**
-1. Golden-Folgen von `SeededRng` (Seeds 0, 1, 42, `u64::MAX`; je 1.024 Werte) vor dem Umzug aus `ports` erzeugt, danach bitgleich (S-02).
-2. Konformitätssuite (aus `testkit/conformance/{clock,rng,metrics}.rs`) läuft im Crate `env` unter `test-utils`.
-3. `unix_ms`-Differenztest gegen `now_unix_ms` der Kopien in `text`/`graph`/`vector/contract.rs` mit identischer Quelle (`ManualClock`).
+**Abweichung zu beheben (K13):** `default = ["std"]`; `test-utils` wird nur von Verbrauchern aktiviert, die es brauchen. Abnahme: `cargo tree -p contextra-env -e features` zeigt `test-utils` nicht im Default; `unix_ms`-Differenztest gegen die `now_unix_ms`-Kopien in `text`, `graph`, `vector/contract.rs` mit `ManualClock`.
 
 ### 4.3 Brückenmuster (verbindlich)
 
@@ -391,293 +311,169 @@ impl<T: contextra_env::Clock + ?Sized> crate::Clock for T {
     fn monotonic_nanos(&self) -> u64 { contextra_env::Clock::monotonic_nanos(self) }
 }
 ```
-Voraussetzung: das lokale Trait ist lokal (Orphan erfüllt); der Crate hat **keine** konkrete `impl crate::Clock for T` mit eigenem `T`, die mit dem Blanket überlappt — sonst Überlappung (E0119). Konkrete lokale Typen (`SystemClock` des Crates) werden hinter `cfg(not(feature = "workspace"))` oder als Newtype geführt. Vorlage: `license/types.rs:282` [V].
 
-**b) `Rng` (`&mut self`) ⇐ `env::Rng` (`&self`):** Blanket-Impl lokal-von-`env`, weil `&self` jederzeit als `&mut self` aufrufbar ist. Die umgekehrte Richtung (`&mut` → `env`) ist verboten; E1-Kerne nutzen ausschließlich `env::Rng`.
+Voraussetzung: das lokale Trait ist lokal (Orphan-Regel erfüllt) und es gibt keine konkrete `impl crate::Clock for T`, die mit dem Blanket überlappt (E0119). Konkrete lokale Typen stehen hinter `cfg(not(feature = "workspace"))` oder als Newtype.
+
+**b) `Rng` mit `&mut self` ⇐ `env::Rng` (`&self`):** Blanket-Impl lokal-von-`env`. Die Gegenrichtung ist verboten; E1-Kerne nutzen ausschließlich `env::Rng`.
 
 **c) Fehler:** `impl From<VectorError> for contextra_types::ContextraError` nur in `compat/error.rs`; Variantenabbildung nach §5.3.
 
-**d) Port-Implementierung:** `impl contextra_ports::VectorIndex for HnswIndex` nur in `compat/`; Kern-Trait-Methoden ohne `ContextraError`.
+**d) Port-Implementierung:** `impl contextra_ports::VectorIndex for HnswIndex` nur in `compat/`; Kern-Trait-Methoden enthalten kein `ContextraError`.
+
+**e) Konfliktregel (neu):** Zwei Brücken im selben Crate dürfen nicht dasselbe lokale Trait für denselben Blanket implementieren. Gibt es zwei Quellen (`env` und `ports`), implementiert nur `env` den Blanket; `ports`-Typen erreichen ihn, weil `ports` die `env`-Traits re-exportiert.
 
 ---
 
 ## 5. Persistenz-, Fehler- und Verhaltensvertrag
 
-### 5.1 Golden-Format-Korpus (S-02, vor jedem Umbau)
+### 5.1 Golden-Format-Korpus (S-02)
 
-Das Verzeichnis `tests/golden/` (Dateien + `MANIFEST.sha256`) enthält Byte-Ausgaben, erzeugt vom **unveränderten** HEAD:
+**Ort und Form (festgelegt):** Wurzel-Verzeichnis `tests/golden/<format>/` mit `MANIFEST.sha256`. Crate-lokale Korpora (wie `mvcc/tests/golden/`) bleiben gültig und werden im Wurzel-Manifest referenziert. Je Eintrag: Erzeugertest (`#[ignore]`) über `tools/golden_regen.sh` und Prüftest (läuft immer). Bei Abweichung bricht der Schritt ab; eine absichtliche Formatänderung ist nie Teil eines Umbauschritts.
 
-| Format | Quelle / Kennung [V] |
-|---|---|
-| Manifest | `store/manifest/core.rs`: `MFMN`, Version 1 |
-| SSTable | `store/sstable/block_cache.rs`: `MFSX`, Legacy `MFST` (Footer, Blöcke, Bloom) |
-| WAL | `store/wal/*` inkl. HMAC-Kette (`wal_crypto`) |
-| Rollback-Intent | `store/lsm/recovery.rs`: `MFRLBK\0\0` |
-| HNSW | `vector/persistence/header.rs`: `0x484E5357`, Version 2 |
-| DiskANN | `vector/diskann/format.rs`: `DANN` v1, `DANF`, `PWAL` v1, `TWAL` v1 |
-| KDF-Header | `crypto/kdf.rs`: `MFKD` |
-| KV-Segment | `crypto/kv_cipher.rs`: Formatversion 2; Schlüsselableitung Version 1 |
-| Text-Postings, Graph-Persistenz (bincode), Checkpoint-Meta/Manifest | aus `text`, `graph`, `checkpoint` zu erheben |
-| ID-Serialisierung | `DocId`, `EntityId`, `TxId`, `TenantId`, Refs in JSON und `bincode`, je 64/128 Bit |
-| `ContextraError` | `Display` aller 43 Varianten |
-| `SeededRng` | Folgen (B02) |
+| Format | Quelle / Kennung | Gate-Schritt |
+| --- | --- | --- |
+| Manifest | `store/manifest/core.rs`: `MFMN`, Version 1 (`CURRENT_MANIFEST_VERSION = 1`) \[V\] | S-37 |
+| SSTable | `store/sstable`: `MFSX`, Legacy `MFST` (Footer, Blöcke, Bloom) | S-37 |
+| WAL | `store/wal/*` inkl. HMAC-Kette (`wal_crypto`) | S-31, S-37 |
+| Rollback-Intent | `store/lsm/recovery.rs`: `MFRLBK\0\0` | S-37 |
+| HNSW | `vector/persistence/header.rs`: `0x484E5357`, `HNSW_VERSION = 2` \[V\] | S-36 |
+| DiskANN | `vector/diskann/format.rs`: `DANN` v1, `DANF`, `PWAL` v1, `TWAL` v1 | S-36, S-80 |
+| KDF-Header | `crypto/kdf.rs`: `MFKD` | S-31 |
+| KV-Segment | `crypto/kv_cipher.rs`: Formatversion 2; Schlüsselableitung Version 1 \[V\] | S-38 |
+| Text-Postings, Graph (bincode), Checkpoint Meta/Manifest | je Crate zu erheben | S-32, S-34, S-35 |
+| MVCC | `mvcc/tests/golden_corpus.rs` \[V\] | S-30 |
 
-Je Eintrag: Erzeugertest (`#[ignore]` + Script `tools/golden_regen.sh`), Prüftest (läuft immer). Bei Abweichung bricht der Schritt ab; eine absichtliche Formatänderung ist nie Teil dieser Spezifikation.
+### 5.2 ID-Breite (B03, präzisiert)
 
-### 5.2 ID-Breite (B03)
+Die Breite ist eine **Compile-Zeit-Eigenschaft** des gesamten Builds. Jedes persistierte Format mit IDs trägt `id_width_bits: u16` (64 oder 128) im Kopf und prüft es beim Öffnen. `checkpoint` führt das Feld bereits \[V\].
 
-- Jedes Format mit IDs bekommt ein Feld `id_width_bits: u16` (64|128). `store`: Manifest-Version 1 → **2** (Kopf: `MFMN`, Version, `id_width_bits`); v1-Dateien werden mit `OpenOptions::assume_legacy_id_width(Bits)` geöffnet, sonst mit `StoreError::IdWidthUnknown` abgelehnt. `vector`: `HNSW_VERSION` 2 → 3 analog. `text`, `graph`, `checkpoint`: nach Lesen des jeweiligen Headers dasselbe Muster.
-- Öffnen mit abweichender Breite ⇒ `…::IdWidthMismatch { stored, build }`, **kein** Panic, **keine** Teilmutation.
-- Schreibe-Reihenfolge der Versionsanhebung: erst Leser (liest v(alt)+v(neu)), danach Schreiber (S-37). Rückwärts-Lesetest mit Korpus-Dateien aus S-02.
+| Build-Breite | Datei | Verhalten |
+| --- | --- | --- |
+| 64 | 64 | Öffnen |
+| 128 | 128 | Öffnen |
+| 64 | 128 oder 128 | 64 |
+| beliebig | Formatversion ohne Feld | nur mit `OpenOptions::assume_legacy_id_width(bits)`, sonst `…::IdWidthUnknown` |
+
+**Prüfregel:** Nach abgelehntem Öffnen ist jede betroffene Datei byte-identisch zum Zustand davor (Hash-Vergleich im Test).
+
+**Versionsanhebungen (die einzige INV-1-Ausnahme):** `store` Manifest v1 → v2 (S-37); `vector` `HNSW_VERSION` 2 → 3 (S-36); `text`, `graph` nach Lesen des jeweiligen Headers dasselbe Muster (S-32, S-34); `checkpoint` nur Prüfung (S-35). Reihenfolge je Format: erst Leser (v alt und v neu), danach Schreiber; Rückwärts-Lesetest mit Golden-Dateien v alt.
+
+**CI:** `cargo hack check --workspace --features docid-128` zusätzlich zum Default. E0-Crates ohne Abhängigkeit auf `ids` (`ingest`, `erasure`) erhalten kein `docid-128`; Konvertierung von `ids::DocId` ist dort `TryFrom` (schlägt bei Überlauf fehl), nie `as`.
 
 ### 5.3 Fehlerabbildung
 
-Pro Baustein eine Tabelle `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt) mit Spalten: lokale Variante → `ContextraError`-Variante → Display-String. Anforderungen:
-1. Jede **heute genutzte** `ContextraError`-Variante des Kerns hat genau eine lokale Entsprechung (Erhebung: `rg 'ContextraError::[A-Z]' src`).
-2. `Display` des konvertierten Fehlers ist bitgleich zum alten Fehler (Table-driven-Test).
-3. Es gibt keine Sammelvariante `Other(String)`, die Kontext verwirft, außer für I/O (`std::io::Error` als Quelle, `#[source]`).
-4. Gate `error-domain` (steht in `ratchet.toml › not_run_baseline`) wird in S-01 so definiert und in S-12 aktiviert.
+Je Baustein eine Tabelle `docs/decoupling/errors/<crate>.md` (lokale Variante → `ContextraError`-Variante → Display-String). Für mindestens zehn Crates \[V\] (u. a. `agent`, `checkpoint`, `cognition`, `crypto`, `graph`, `kvcache`, `mvcc`, `prompt-guard`, `rank`) liegen sie vor; `store`, `vector`, `text`, `ids` sind zu prüfen. Anforderungen:
+
+1. Jede heute genutzte `ContextraError`-Variante des Kerns hat genau eine lokale Entsprechung (Erhebung: `grep -rn 'ContextraError::[A-Z]' src`).
+2. `Display` des konvertierten Fehlers ist bitgleich zum alten Fehler (tabellengetriebener Test je Variante).
+3. Keine Sammelvariante `Other(String)`, die Kontext verwirft; Ausnahme: I/O mit `#[source]`.
+4. Gate `error-domain` (heute in `not_run_baseline`) wird in S-01 definiert und in S-12 aktiviert; Ausgangsbasis ist `tools/error_topology_mapper.py`.
 
 ### 5.4 Differenztests (Verhaltensgleichheit)
 
-Jede Ablösung einer Kopie durch ihren Besitzer wird zuerst durch einen Differenztest abgesichert, der **alte und neue** Implementierung gleichzeitig kompiliert (Commit A) und gleiche Eingaben vergleicht:
-- IDs: §4.1. Clock/Rng/ms: §4.2.
-- Distanz: `types::DistanceMetric::compute` ↔ `vector::distance` ↔ `simd::dispatch` über 10.000 Vektorpaare (Dim 4/17/128/768, normale, Null-, Denormal-Werte): relative Abweichung ≤ 1e-5 bzw. **bitgleich** für Pfade, die heute dieselbe Skalarfunktion nutzen; NaN/Inf-Verhalten gleich.
-- Regler (`decay`, `homeostat`, `pid`): gleiche Eingabefolge mit `ManualClock` ⇒ gleiche Ausgaben (Toleranz 0, f64 bitgleich), vor jedem `pub use` (S-60).
-- Chunker (`engine::chunker` ↔ `ingest::chunking::prose`): identische Chunk-Folge, Reihenfolge und Breadcrumbs auf einem Korpus (S-61).
-Nach grünem Differenztest folgt Commit B (Ersetzung); der Test bleibt als Regressionstest bestehen, solange beide Seiten existieren.
+Jede Ablösung einer Kopie durch ihren Besitzer wird zuerst durch einen Differenztest abgesichert, der alte und neue Implementierung gleichzeitig kompiliert (Commit A) und gleiche Eingaben vergleicht. Nach grünem Test folgt Commit B; der Test bleibt als Regressionstest, solange beide Seiten existieren.
+
+| Bereich | Eingabe | Toleranz |
+| --- | --- | --- |
+| IDs | §4.1 | bitgleich |
+| Clock/Rng/ms | `ManualClock`, `SeededRng` | bitgleich |
+| Distanz (`types::DistanceMetric::compute` ↔ `vector::distance` ↔ `simd::dispatch`) | 10.000 Vektorpaare, Dim 4/17/128/768, normale, Null-, Denormal-Werte | relativ ≤ 1e-5 (f32) bzw. bitgleich, wo beide Seiten dieselbe Skalarfunktion nutzen; NaN/Inf-Verhalten gleich |
+| Regler (`decay`, `homeostat`, `pid`) | gleiche Eingabefolge mit `ManualClock` | bitgleich (f64) |
+| Chunker (`engine::chunker` ↔ `ingest::chunking::prose`) | Korpus | identische Chunk-Folge, Reihenfolge, Breadcrumbs |
+| Tombstone (`types` ↔ `mvcc`) | `mvcc/tests/tombstone_diff.rs` \[V\] | bitgleich |
+| Temporalfilter (`engine::temporal_filter` ↔ `rank::temporal`) | Filterausgaben | bitgleich |
 
 ---
 
-## 6. Spezifikation je Crate (final)
+## 6. Umsetzungsreihenfolge (Rest ab HEAD)
 
-Pfade relativ zu `crates/contextra-<name>/src/`. Zeilenzahlen aus dem Entwurf [E].
+### 6.1 Definition of Done (gilt für jeden Schritt)
 
-### 6.1 E0 (Kern-Closure leer)
+Ein Schritt ist abgeschlossen, wenn alle Punkte erfüllt sind:
 
-- **`sys`:** unverändert; `lib.rs:19` korrigieren (behauptet `durable-fs` baue darauf auf; beleglos). `vault.rs` bleibt (B16). Tier beta.
-- **`durable-fs`:** unverändert (B08); Tier experimental; Doku: „kein Verwender; unabhängig von `sys`“.
-- **`simd`:** `types-compat` → `workspace`, Brücke nach `compat/` (13 Referenzen, laut Manifest/Zählung ungegatet 0 [V]). `DistanceMetric` bleibt lokal (B09). Sonst unverändert. Tier beta.
-- **`wire`:** unverändert; generierten Code im LOC-Report getrennt führen; `router`-Referenzen: nur `dispatch.rs:23` [E] ⇒ `wire` bei `router` optional (S-62).
-- **`adapt`:** (1) `clock.rs`+`contract.rs` und `rng.rs`+`contract.rs` zu je **einem** Trait zusammenführen; `Rng` behält `&mut self` (R7). (2) `off_policy.rs` (6 Z.) entfernen, wenn `rg 'off_policy::'` leer. (3) `default = ["std"]`; `router` aktiviert `bandit-routing` und die Experimente gezielt. (4) `sketched-bandit` streichen (B16). (5) Features umbenennen: `exp-flow-thompson`, `exp-rie-greedy`; Aliasnamen **nicht** behalten (nur `router` setzt sie).
-- **`privacy`:** Docstring-Aussage „Ausgehend: types, ports“ streichen [V: falsch]. Features ohne `cfg`-Nutzung streichen (B14). Keine Codeänderung.
-- **`sandbox`:** keine Änderung; Doku-Hinweis, dass `mcp/sandbox.rs` ein anderes Ding ist.
-- **`ingest`:** `fuzz_support.rs` hinter `fuzz`; Brücke `compat/` (`ids::DocId` ↔ lokales `DocId(u64)` per `TryFrom` im 128-Bit-Modus; `types::ContextChunk`-Mapping); kein Split nach Format. Chunker-Parität: S-61.
-- **`erasure`:** Features `signing` (`ed25519-dalek`), `vault` (`aes-gcm-siv`), `async` (`tokio`, `futures-util`); Zuordnung Datei→Abhängigkeit per `rg 'use (ed25519_dalek|aes_gcm_siv|tokio|futures_util|bincode)'` in S-24 erheben und im Manifest festschreiben. Typen aus `types/erasure.rs` (616), `ports/{erasure,erasure_legacy,gate,ledger,observer,report_signer,keys,barrier}.rs` übernehmen **nach** Abgleich mit `types_local.rs`: identischer Name+Gestalt ⇒ eine Definition; abweichend ⇒ beide bleiben, Brücke wandelt. Scanner-Traits `Purger`/`LayerScanner` bleiben lokal **und** in `ports::scanner` (R7). `default = ["signing", "vault", "async"]` (erhält das heutige Verhalten); Nutzer ohne `tokio` wählen `--no-default-features`.
-- **`avv-generator`:** Doku „Ring 4“ entfernen; nur Item-Diff `AvvError`/`AvvGeneratorError` (B16); Textzusagen in `template.rs` mit den tatsächlichen Features abgleichen (G-DOC1).
-- **`license`:** `default = ["std"]`; Inline-Brücken (`types.rs:~210–290`, `signed_gate.rs:802`) → `compat/`. Danach bekommt `license` aus `ports` (S-50): `license.rs` ohne `VectorDeleteMode`, `policy.rs` (`LicenseGate`); `VectorDeleteMode` → `vector/hnsw/config.rs`.
-- **`audit-export`:** `default = ["std"]`; Brücke `lib.rs:106–118` → `compat/`; `testkit.rs` hinter `test-utils`. Die Brücke `ProcessingRegistryEntry → AuditRecord` (Feature `privacy`) wird **nicht** gebaut (Nicht-Ziel).
-- **`infer-onnx`:** `fakes` hinter `test-utils`; leere Features (`experimental`, `inspect`) streichen; `onnx` und `download` bleiben getrennt prüfbar.
-- **`prompt-guard` (neu):** Quelle `mcp/src/prompt_injection/{audit,guard,policy,tests}.rs` (1.162 Z.) + Wrapper `prompt_injection.rs` (57 Z.); Imports nur `std`, `serde` [E]; `SecurityAuditLogger` (schreibt per `OpenOptions`) hinter `file-audit`. `mcp` re-exportiert (`lib.rs:26,53`).
+1. Commit-Paar nach INV-3, Nachrichten `S-xx A` und `S-xx B`.
+2. `cargo check --workspace --all-targets --locked` grün (INV-4).
+3. Die in der Zeile genannten Gates sind grün. **GL** = G-L1 bis G-L4, **GF** = G-F1, **GD** = G-D1, **GE** = G-E1, **GC** = G-C1 (§8.4).
+4. Score und Brückenzählung neu erzeugt (§8.6); kein Crate hat einen niedrigeren Score als vorher (Ratchet).
+5. Crate-lokale `SPEC.md`/`PLAN.md` tragen den neuen Status.
+6. Keine neue Verletzung von R10 und R11.
+7. Der Revert-Commit baut (`git revert` auf einem Wegwerf-Zweig, `cargo check`).
 
-### 6.2 E1
+### 6.2 Schritte
 
-- **`mvcc`:** `tombstone.rs` aus `types` verbatim hierher (Commit A; nur `mvcc` und `types` nutzen ihn [V]); danach Umbau (Commit B): IDs aus `ids`, `Clock`/`MetricsSink` aus `env`, `MvccError`; `types` verliert die Re-Exports ersatzlos. Vorbedingung: Loom-Modell (B11). Port-Impls und `From` in `compat/`. Kern-Closure: ids, env.
-- **`crypto`:** Kern bleibt: `aead` (190), `dek` (153), `kdf` (319), `secret` (146), `error` (146), `anti_tamper` (191), `crypto.rs`/`KeyManager` (948), `wal_crypto` (1.163), `wal_completeness` (75). `TenantId`/`TenantScoped` aus `ids`. `KeyManager::{derive_kv_key, derive_kv_key_scoped, cipher_for, cipher_for_scoped}` (`crypto.rs:238–316`) nehmen `[u8; 32]` statt `kv_cipher::ModelFingerprint`; vor dem Umzug des KV-Teils umstellen (eigener Commit, Aufrufer in `kvcache`/`infer-candle` mit). `default = []`. `ed25519-dalek` bleibt, solange `ed25519_proof` im Crate bleibt (B10). KV-Teil und Altlast: B10, S-38.
-- **`text`:** Neues lokales Trait `PostingStore` = **exakt** die in `src/` aufgerufenen `StorageEngine`-Methoden (Erhebung: `rg 'storage\.' src` und alle `StorageEngine`-Aufrufe in `wand.rs`, `inverted*`, `stream.rs`, `memory_index.rs`); keine Methode mehr als genutzt. Brücke implementiert es für `StorageEngine`. In `compat/`: `inverted/purge.rs`, `inverted/scanner.rs`, `inverted/morph_index.rs` (`TextIndex`), Fehlerkonvertierung, `wand.rs`-Teile, die `ports` direkt brauchen (nach B04). `types.rs` (130) und `contract.rs` (39) → `pub use` auf `ids`/`env`; `docid-128` an `ids` (B03). Leere Features (`experimental`, `bm25f`, `serde`, `tracing`, `inspect`) per Audit streichen. `default = ["std"]`.
-- **`rank`:** `local_types.rs:10` (`DocId`) → `ids`; `calibration/isotonic.rs:14` (`Clock`) → `env`; `types-compat` → `workspace`/`compat/`. `engine/src/temporal_filter.rs` (383) → `rank/temporal.rs`. `dibud` → Feature `exp-dibud`, `fusion/resonance.rs` → `exp-resonance` (Naht `fusion/ext.rs`); `drift` bleibt (B16: keine Dublette).
-- **`graph`:** Brücke: `provider.rs`, `purger.rs`, `csr/graph_index/*` und alle Importe von `ports::{graph_index,graph}`; lokale `DocId`/`TxId` (`types.rs:58,104`) → `ids`; `default = []`. `PprConfig`, `PprAlgorithm`, `TlHfdParams` (aus `types/misc.rs` ab Z. 375) wandern hierher (S-51); `engine`/`cognition` importieren dann aus `graph`. Experimente: Klasse A/B laut Entwurf (Blätter `hyperedge_suggest`, `entity_extraction`, `percolation`, `edge_reinforcement_buffer`; mit Naht `apprh`, `tl_hfd`, `session_dag`, `edge_reinforcement`, `community`); Klasse C (`hyperedge` 19 Inbound-Dateien, `path_rag` 14, `consistency_enforcement` 6) bleibt im Kern, optional `exp-hyperedge`. Ab > 2.000 Z. (X4): Crate `contextra-graph-research` (S-81). `ports/graph.rs` gibt `HyperEdgeId`/`RoleBinding`/`RoleId` hinter `exp-hyperedge` frei.
-- **`checkpoint`:** lokales Trait `SnapshotSource` = exakt die in `src/` aufgerufenen `StorageEngine`-Methoden (29 Referenzen [E]); lokale schmale Dateisystemnaht (`hardlink_cloner.rs`) statt `ports::Vfs` (B08); `CheckpointError`; `WorkflowState` lokal abbilden; Brücke: `ports::{Checkpoint, CheckpointCoordinator}`-Impls, `From`. Kern-Closure: ids, env. Nicht mit `mvcc` zusammenlegen.
-- **`vector`:** Brücke: `hnsw/vector_index_impl.rs`, `diskann/vector_index_impl.rs`, `hnsw/purge.rs`, `hnsw/scanner.rs`, `error.rs:61–91`, `types.rs:279ff`. Kern: `hnsw/types.rs` (5, 128–143, 203–210, 241–242, 279), `quantize/mod.rs`, `hnsw/core_{rebuild,search,insert}.rs`, `persistence/*`, `distance.rs`, `candidate_stream.rs` auf `VectorError`/`ids`/`env`/`mvcc`. `contract.rs` (119 Z.) wird zu `env`/`ids`-basiert vereint: `Clock` (ms→`unix_ms`), `Rng` (`&self`), `ExternalId(u128)` → `ids::DocId`-Pfad nur, wenn serde/`from_key` unberührt; sonst Kopie entfällt **nicht** (Differenztest entscheidet, Abbruch bei Abweichung). `VectorDeleteMode` hierher (S-50). `default = ["std"]` (kein `ports-compat`). `mvcc` bleibt Kern-Abhängigkeit (`SequenceLog`/`TxBuffer`-Nutzung) — die Schwester-Spec M-5-Alternative (eigener `VisibilityLog`) ist Nicht-Ziel. Feature `simd` (B09). Feature-Schema: `exp-diskann`, `exp-rabitq`, `exp-acorn`, `experimental-all`; `diskann/` (12 Dateien, 4.168 Z.) → Crate `contextra-vector-diskann` (S-80), `quantize_rabitq.rs` → `experimental/rabitq.rs`; Regel V-VETO: `PartialRebuildConfig` bleibt aus (Test `partial_rebuild_veto_f02_guard` MUSS grün bleiben, Pfad per `rg` bestätigen [E]).
-- **`store`:** (1) Eigener `StoreError`; Abbildung der heute genutzten Varianten (`Storage`, `Io`, `WalCorruption`, `ChecksumMismatch`, `Transaction*`, `Conflict`, `WalTruncationDetected`, `CrossDeviceLink`) nach §5.3. (2) `compat/`: `engine/` (370), `scanner/` (1.400), `From<StoreError>`; `StorageEngine`-Impl nur dort. (3) `lsm/config.rs:68–92` (`validate_against_features`, `FeatureRing`) entfernen — **erst nach** S-50 (Lizenz-Ports); `validate_durability` bleibt. (4) `kv/` (56 Z., **nicht** in `lib.rs` eingebunden [V]) nach `archive/`. (5) `tenant_codec` → `ids::TenantId`; `Clock`/`MetricsSink`/`IdGen` → `env`. (6) `io_seam`/`fsync` unverändert (B08), `Vfs`-Bindung per Brücke. (7) ID-Breite im Manifest (§5.2) **zuletzt**. Kern-Closure: ids, env, sys, mvcc, crypto. INV-6 gilt strikt: WAL-, Flush- und Recovery-Code wird nur an Typ-/Importstellen berührt.
-- **`kvcache`:** Brücke: `prefix_store.rs`, `adapters.rs` (inkl. Entfernen von `FeatureRing` aus dem Kern), `store.rs:790–862` (`KvCachePruner`/`KvCacheScanner`), `scratchpad_invalidation.rs`, Port-Teil von `service.rs`, `compat.rs`. Kern: `radix.rs`, `quantize_kivi.rs`, `attention_score.rs`, `eviction_worker.rs`, `segment.rs`, Rest von `store.rs`/`service.rs` auf `KvCacheError`, lokalen `TenantId`, `env::Clock`. `CacheDirective`/`StepId` einmal lokal (heute doppelt). Features: `default = ["std"]`; `kv-encryption` ohne `legacy-erasure`; `kivi-quantization`+`kvcache-kivi-quant` → `exp-kivi`; `content-addressed-kv-cache` → `exp-content-addressed`; `kvcache-attention-eviction` streichen. Aufnahme des KV-Teils aus `crypto` (S-38) als Feature `kv-shredding` (experimentell).
-- **`infer-ollama`:** `OllamaError` lokal; `ImportanceScore` lokal (Skala 0..1 im Doc-Kommentar festhalten, bevor sie lokal wird) mit `From` in `compat/`; `trait_impls.rs`, `query_rewriter.rs`, `ContextraError`-Konvertierung, die eine `embedding.rs`-Referenz → `compat/`; `Rng`/`Clock` aus `env`. Vorbedingung: Prüfen, dass `--no-default-features` überhaupt kompiliert (ungegatetes `pub use error::…` neben `cfg(client)`). `workspace` ersetzt `types-compat`/`ports-compat`.
-- **`infer-candle`:** `candle-core`, `candle-nn`, `candle-transformers`, `tokenizers`, `half` werden optional hinter Feature `candle`; Module `inference`, `gguf_loader`, `embedding`, `model` bekommen `cfg(feature = "candle")`; `fake.rs` → `test-utils`. Brücke: `embedding_provider.rs`, `attention_exporter.rs`, `kv_bridge.rs` (Feature `kv-bridge`, benötigt dann `kvcache`), `gasp.rs` (`GroundingValidator`). `rank`-Kopplung (`gasp.rs:24`, `IsotonicCalibrator`): lokales Trait `ConfidenceCalibrator`, Brücke füllt es mit `rank`. Eigener Newtype `ModelFingerprint` (B16). Features: `exp-kv-stage-b`, `exp-gasp`, `kv-bridge`. Vorbedingung: `rg 'contextra_infer_candle::' crates/` über alle Verbraucher, damit kein Symbol durch das Gaten verschwindet.
-- **`vault` (neu):** Quelle `db/src/volatile_vault.rs` (592 Z.); `VaultError`; `contextra_types`-Bezug (2×) nur in `compat/`; baut auf `sys::vault`; `db` re-exportiert (`db/lib.rs:108`).
+Nummern und Reihenfolge entsprechen v2. „R“ hinter der Nummer bedeutet Restarbeit nach §2.2. Die Voraussetzungen nennen nur harte Abhängigkeiten.
 
-### 6.3 E2
+| Schritt | Inhalt | Voraussetzung | Nachweis |
+| --- | --- | --- | --- |
+| **S-00R** | Werkzeugliste (§7) bereitstellen; Baseline mit `cargo` neu erheben: `cargo metadata`, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `count_bridge_refs.py`, Score; exakte Klassifikation der 86 `from_key`-Aufrufstellen | — | Baseline in `docs/decoupling/baseline/`; Differenz zu `ef3364f` und zum Stand dieser Spezifikation dokumentiert; Aussage „`--no-default-features` baut“ je Crate belegt oder als Befund erfasst |
+| **S-01R** | `xtask`-Globs aus `protected-paths.toml` und Kommentar im `justfile` entfernen; für jedes Gate in `not_run_baseline` einen CI-Job oder einen ADR mit Frist; CI: `cargo check --workspace --all-targets --locked`, Matrix `docid-128`; `public-api` auf passender Toolchain; Ratchet `types_fan_in`, `ports_fan_in` (R11); `gate_g1_layering.py` entfernen, sobald G-L1 in CI läuft | S-00R | G-L1 scheitert bei absichtlichem Test-Verstoß (`test_gate_layering_negative.py`) und ist am Baseline-Stand grün |
+| **S-02R** | Wurzel-Korpus `tests/golden/` mit `MANIFEST.sha256`, `tools/golden_regen.sh`, Differenz-Harness (§5.1, §5.4); `mvcc`-Korpus einhängen | S-00R | GF am unveränderten Stand grün |
+| **S-03R** | Doku/Metadaten: `types/lib.rs`-Verwenderliste ersetzen (generierter Verweis), falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError`/`AvvGeneratorError`; `capabilities.toml` um `sublevel` (E1a/E1b) erweitern | S-01R | `capabilities-consistency` grün; G-DOC1 grün |
+| **S-10C** | `ids` Commit C: `from_key`-Aufrufstellen nach Klassifikation anpassen; Differenztest §4.1 gegen alle `DocId`-Kopien | S-02R | GF, GD, GE, GL |
+| **S-11R** | `env`: `default = ["std"]`; `test-utils` nur dort aktivieren, wo benutzt; `unix_ms`-Differenztest | S-02R | GD, GL |
+| **S-12R** | Feature-Hygiene nach R10 für `crypto` (leer), `graph`, `kvcache`, `rank`, `text`, `vector`, `testkit`, `license`, `audit-export`, `env`; `erasure` Features (S-24); Gate `error-domain` aktivieren | S-01R | `feature_audit` (entrauscht) grün; `cargo hack check --each-feature -p <crate>` je Crate |
+| **S-20R / S-22R / S-23R** | `license`, `audit-export`: `workspace` aus Default; `vault`: Quelle `volatile_vault.rs`, `vault_compat.inc`, `vault_sys.inc` aus `db` entfernen, Re-Export; `adapt`: Features auf `exp-flow-thompson`, `exp-rie-greedy`, `offpolicy.rs` gegen `off_policy.rs` abgleichen | S-12R | GL; `grep -rn 'volatile_vault' crates --exclude-dir=contextra-vault` nur Re-Exports; `grep -rn 'trait \(Clock\|Rng\)' crates/contextra-adapt/src` je 1 |
+| **S-24** | `erasure`: Features `signing`, `vault`, `async`, `conformance`; Datei→Abhängigkeit-Zuordnung per Erhebung im Manifest festschreiben; Default erhält heutiges Verhalten | S-12R | `cargo check --no-default-features` und je Feature |
+| **S-30B** | `mvcc` Commit B: `ids`/`env`/`MvccError`; `types`/`ports` hinter `workspace`; `types/src/tombstone.rs` ersatzlos entfernen (R9, nur `mvcc` und `types` nutzen ihn \[Ü\]). Vor Beginn: Loom-Tests (`loom_sequence_log`, `loom_snapshot_registry`, `loom_tx_buffer`) in `loom-gate.yml` prüfen (Pfadfilter) | S-10C, S-11R | GL, GF, GC, GD (Tombstone), GE |
+| **S-31** | `crypto` Kern: `TenantId` → `ids`; `KeyManager`-Signaturen auf `[u8; 32]` (eigener Commit); `default = []`; `types`/`ports` hinter `workspace` | S-10C, S-11R, S-12R | GL, GF (WAL-HMAC, MFKD, KV v2), GC, GE |
+| **S-32** | `text`: `PostingStore`, Brücke (`wand.rs`, `scanner.rs`, `index_struct.rs`, `purge.rs`, `morph_index.rs`), `TextError`, Clock → `unix_ms`, ID-Breite im Header | S-10C, S-11R | GL, GF (Postings v alt/neu), GD (ms), GE |
+| **S-33** | `rank`: `engine::temporal_filter` → `pub use` auf `rank::temporal` nach Differenztest; `types-compat` → `workspace` | S-10C, S-11R | GL, GD |
+| **S-34** | `graph`: Brücke, `GraphError`, `default = []`, ID-Breite im Header | S-10C, S-11R, S-12R | GL, GF (bincode v alt/neu), GC (TSan), GE |
+| **S-35** | `checkpoint`: `SnapshotSource`, Dateinaht, `CheckpointError`, restliche 4 Referenzen | S-10C, S-11R | GL, GF (Meta/Manifest) |
+| **S-36** | `vector`: **zuerst V-VETO-Test anlegen** (K8); Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; ID-Breite `HNSW_VERSION` 2 → 3; ohne DiskANN-Umzug | S-30B, S-10C, S-11R | GL, GF (HNSW v 2/3), GD (Distanz, Rng, ms), GC, GE |
+| **S-37** | `store`: `StoreError`, `compat/` (`engine/`, `scanner/`), Imports → `ids`/`env`; `FeatureRing`-Entfernung **nach** S-50; zuletzt Manifest v1 → v2 | S-30B, S-31, S-10C, S-11R | GL, GF, GC (Loom/TSan), Crash-/Recovery-Suite unverändert grün (INV-6), GE |
+| **S-38** | **Paar:** `crypto`-KV-Teil (`kv_cipher`, `kv_segment/*`, `kv_shredding`, `revocation_log`) → `kvcache`; `kvcache` Kern/Brücke/Features; `infer-candle/kv_bridge`; `mutants-guarantees.toml`, `loom-gate.yml`, `CODEOWNERS` im selben Commit; Konstanten `CURRENT_KV_KEY_DERIVATION_VERSION` und `CURRENT_KV_FORMAT_VERSION` per `const_assert_eq` koppeln | S-31, S-11R | GL, GF (KV-Segment), GC (`loom_kv_deferred_zeroize` am neuen Ort grün), Mutation-Score G2 ≥ Baseline |
+| **S-39** | `infer-ollama` (`OllamaError`, `Rng`/`Clock` aus `env`), danach `infer-candle` (`candle`-Feature, `ConfidenceCalibrator`, Newtype `ModelFingerprint`) | S-11R, S-38 | GL; `cargo tree -p contextra-infer-candle --no-default-features` ohne `candle-*` und ohne `rank` im Kern |
+| **S-50** | `ports` → `license` (Lizenz-Traits), `erasure` (Erasure-Familie), `testkit` (Conformance); Re-Exports bleiben (R9) | S-20R, S-24 | GL; `grep -rln 'FeatureRing\|LicenseGate' crates/contextra-{store,vector,text,graph,kvcache,rank,checkpoint,mvcc}` leer |
+| **S-51** | `types` → `erasure` (Erasure-Typen), `graph` (`PprConfig`, `PprAlgorithm`, `TlHfdParams`) | S-50, S-34 | GL, GE |
+| **S-60** | Regler: `adapt` nimmt die fehlenden Methoden auf (decay 5, homeostat 3, pid 5), dann `pub use` in `engine`/`db` | S-23R | GD (bitgleich) |
+| **S-61** | Chunker: Paritätstest in `engine` (`ingest` als Dev-Abhängigkeit), danach Adapter über `ingest::chunking` (`contextra::chunker::MarkdownChunker` API-stabil) | S-01R | GD; `mcp`-Tests unverändert |
+| **S-62R** | `router`: `ports_local.rs` entfernen, nachdem die drei `mcp`-Importe auf `contextra_ports` umgestellt sind; `Vfs`-Stelle auf lokale `&Path`-Funktion | S-01R | GL |
+| **S-63** | `cognition` invertieren (Brücke im Crate `db`, Feature `cognition`), danach `agent` invertieren | S-37, S-50 | GL; `cargo tree -p contextra-cognition -e normal` ohne `contextra-engine` |
+| **S-64** | `engine` (Lizenz → `license`, `extraction` → `exp-extraction`), `db`, `contextra` (Feature `license`; ohne Feature `OpenFastGate`-Semantik per Test), `mcp`, `py`, `testkit` | S-50, S-51, S-33 | GL; G-A1 ohne unbeabsichtigte Diffs |
+| **S-70** | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur bei grünem G-E1), `archive/`-Verschiebungen bestätigen | alle | alle Gates |
+| **S-70a** | **Nachprüfung B23:** Item-Diff `archive/contextra-crypto-proofs` ↔ `erasure` und Mutation-Score der Zieldateien in `erasure` ≥ Score der Quelldateien; bei Nichterfüllung Wiederherstellung hinter Feature `legacy-erasure` (nicht Default) | S-00R | G-C1 (Mutation G2/G3 ≥ Baseline) |
+| **S-80** | `contextra-vector-diskann` aus `vector/diskann/` | S-36 | GL, DiskANN-Tests (`required-features`) isoliert grün |
+| **S-81** | `contextra-graph-research` aus den Klasse-A/B-Experimenten | S-34 | GL, GD |
 
-- **`types`:** Bleibt: `error.rs` (`ContextraError`, 43 Varianten), `error_dto.rs`, `types/{budget,filter,importance,saos}.rs`, `types/domain/document.rs`, `types/domain/misc.rs` (abzüglich Auszüge), `schema.rs`, `RequestContext` aus `witness.rs`, `model_fingerprint.rs`, `retrieval_strategy.rs`. Geht: IDs/Refs/Tenant → `ids`; `tombstone.rs` → `mvcc`; `erasure.rs`, `SagaRecord`, `ScanMethod`, `ErasureId`, `GateId` → `erasure`; `PprConfig`/`PprAlgorithm`/`TlHfdParams` → `graph`. `lib.rs` Zeilen 20–28 (Verwenderliste) ersetzen durch generierten Verweis. Varianten `Sandbox*`, `Cluster`, `KvQuantization`, `KvDeleteModeConfig`, `HnswConnectivityDegraded`, `GraphRepairFailed` bleiben, **bis** alle lokalen Fehler existieren **und** G-E1 grün ist; erst dann entfernen (S-70), weil `#[non_exhaustive]` das Entfernen zu einer Verhaltensänderung für `Display`-Konsumenten macht.
-- **`ports`:** Bleibt: `storage`, `vector_index`, `text_index`, `graph_index`, `graph`, `embedding`, `reranker`, `query_rewriter`, `checkpoint`, `kv`, `kv_bridge_port`, `attention`, `lifecycle`, `observability`, `plugin`, `vfs`, `fs`, `scanner/*`. Geht: `clock`/`rng`/`id_gen`/`metrics`/`env` → `env` (Re-Export bleibt); `erasure*`, `gate`, `ledger`, `observer`, `report_signer`, `keys`, `barrier` → `erasure` (Re-Exports in `lib.rs:16–22,156–206` entfernen); `license.rs`, `policy.rs` → `license`; `conformance.rs` (278), `contract_tests.rs` (632) → `testkit` nach Überschneidungsprüfung mit `testkit/conformance/` (1.612 Z.); `EgressPolicy` aus `license.rs` nach `privacy` **nur wenn** `privacy` sie ohnehin braucht (Prüfung per `rg`), sonst in `license`.
-- **`router`:** `ports_local.rs` und die deprecated Re-Exports (`lib.rs:32–45`) entfernen, **nachdem** die drei `mcp`-Importe von `contextra_router::ports_local::{HybridSearchProvider, ContextPreparer, CommunityResolver}` auf `contextra_ports` umgestellt sind. `wire` optional hinter `subprocess-dispatch` (`dispatch.rs`, `transport.rs`); `ports::vfs`-Nutzung (eine Stelle) auf lokale `&Path`-Funktion; `RetrievalStrategy`-Abbildung nur in `arm_registry.rs`. Features: `exp-fc-ts`, `exp-routing-strategy`, `cloud-egress-guard`.
-- **`engine`:** Herauslösen: `chunker/` → dünner Adapter über `ingest::chunking` (S-61); `temporal_filter.rs` → `rank`; `decay_controller.rs` → `adapt` (S-60); `extraction/` → `exp-extraction` (Vergleich mit `graph/entity_extraction.rs`: Namens-/API-Diff erheben, **keine** Zusammenlegung); `merge_operator_adapter.rs` bleibt. Lizenz: `contextra_impl/lifecycle.rs:9–55`, `lib.rs:17,22,373,410` → `contextra-license`. `VectorDeleteMode` aus `vector`. Leere Features (`reranking`) per Audit.
-- **`db`:** `volatile_vault.rs` → `vault`; `pid_latency_controller.rs`, `homeostat.rs` → `pub use` aus `adapt` nach S-60; `multistep.rs` (442) bleibt. `experimental-diskann` zeigt auf `contextra-vector-diskann` als **echte optionale** Abhängigkeit (heute Dev-Abhängigkeit [V]). Neues Feature `cognition` (Brücke zu `cognition`, siehe unten).
-- **`contextra`:** Lizenz-Gating (`builder.rs:33–35,243–350`, `performance_profile.rs`, `collection_profile.rs:33,128`) hinter Feature `license`; ohne Feature baut die Fassade ohne Lizenzprüfung (Verhalten **ohne** Feature = `OpenFastGate`-Semantik, per Test belegt). `agent_memory.rs` bleibt. `query_rewriter.rs` bleibt (B16).
-- **`agent`:** Lokale Ports `ContextStore`, `ScratchpadStore`; Speicherbindung (`context.rs`, `clm_scratchpad.rs`, `tools/retrieve.rs`, `graph.rs`, Teile von `engine.rs`) → `compat/`; `router`-Kopplung hinter Feature `routing`. Kern-Closure: types, ports. Aus `db` genutzt: `Contextra::open_with_config`, `ContextraConfig`, `Collection`, `DistanceMetric`, `VolatileContextVault`, `VaultConfig`, `VaultChunk`, `SignalModality` [E] — diese bilden das Trait `ContextStore`.
-- **`cognition`:** Lokale Ports `DocumentSource`, `ConsolidationSink` (inkl. `CommitIntent`-Ersatztyp, falls der Port-Zuschnitt scheitert), `HyperedgeSink` (`graph_sink.rs` als Ausgangspunkt), `DecayPolicy`; `CognitionError` statt `ContextraError::{Internal, PolicyViolation, InvalidInput}` (~30 Stellen); engine-gebundene Dateien (`consolidation_executor.rs`, `context.rs`, `semantic_aggregation_facade.rs`) → Brücke **im Crate `db`** (Feature `cognition`), damit `cognition` kein `compat/`-Zielcrate `engine` braucht. Features `graph-connectivity-health`, `edge-reinforcement-learning` leiten danach nur an `graph` weiter. Löschen der `*_local.rs`-Umbenennungsdateien (G7).
+### 6.3 Reihenfolge-Zwang (Zyklenfreiheit \[A\])
 
-### 6.4 E3
+`ids` und `env` vor allem E1 (erfüllt). `mvcc` vor `vector` und `store`. `crypto`-Kern vor `store`. Der `crypto`-KV-Umzug erfolgt nach dem `crypto`-Kern und gemeinsam mit `kvcache`. Lizenz- und Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`. `cognition` erst nach der `engine`-Lizenzumstellung. Neue Crates (`vector-diskann`, `graph-research`) erst nach dem jeweiligen Kernschritt.
 
-- **`mcp`:** `prompt_injection/` → `prompt-guard` (Re-Export). `protocol.rs` bleibt (B16). `egress_*.rs` bleiben. `sandbox.rs` bleibt (`CryptoKey` im `crypto`-Kern).
-- **`py`:** Feature `docid-128 = ["contextra-ids/docid-128"]`; sonst unverändert. `cargo check`/`maturin` mit und ohne `pyo3` getrennt.
-- **`testkit`:** `conformance/{clock,rng,metrics}.rs` und `manual_clock.rs` → `env` (`test-utils`); `conformance/vfs.rs` und `fault_vfs.rs` **bleiben** (B08); `erasure-conformance` raus aus `default`, Suite → `erasure` (Feature `conformance`). `ports/conformance.rs`, `contract_tests.rs` hierher.
+### 6.4 Bindende Detailvorgaben je Crate (aus v2, weiterhin gültig)
 
----
-
-## 7. Umsetzungsreihenfolge
-
-Jeder Schritt = Commit-Paar (INV-3) mit den genannten Nachweisen. Nachweis-Kürzel: **GL** = G-L1…G-L4, **GF** = Golden, **GD** = Differenztest, **GE** = Fehlerabbildung, **GC** = Concurrency (§8). „Voraussetzung“ nennt nur harte Abhängigkeiten.
-
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback |
-|---|---|---|---|---|
-| **S-00** | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. |
-| **S-01** | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert |
-| **S-02** | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert |
-| **S-03** | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert |
-| **S-10** | `ids`: (A) Crate anlegen, Quellcode **kopieren** (mit `IdError`), `types` unverändert; Differenztest alt↔neu; (B) `types` → Re-Export + `From<IdError>`; (C) Aufrufstellen von `from_key` & Co. anpassen | S-02 | GF, GD, GE, GL | Revert C, B, A |
-| **S-11** | `env`: (A) Crate anlegen, Dateien aus `ports` kopieren; (B) `ports` → Re-Export; Konformitätssuite in `env` | S-02 | GF (Rng-Folgen), GD, GL | wie S-10 |
-| **S-12** | Feature-Hygiene (B14): `tools/feature_audit.py`, Defaults gemäß §3.1 für E0-/Test-Crates (`adapt`, `license`, `audit-export`, `testkit`, `crypto`, `graph`, `kvcache`, `rank`, `text`, `vector`), leere Features entfernen, `erasure` Features; Gate `error-domain` aktivieren | S-01 | `feature_audit` grün; `cargo hack check --each-feature -p <crate>` je Crate; `--workspace` grün | je Crate Revert |
-| **S-20** | `license`, `audit-export`: Brücken → `compat/` | S-12 | GL | Revert |
-| **S-21** | `prompt-guard`: (A) verschieben, (B) `file-audit`-Feature | S-01 | GL, Test `prompt_injection` unverändert grün | Revert |
-| **S-22** | `vault` aus `db`, baut auf `sys::vault` | S-01 | GL; `rg 'volatile_vault' crates --glob '!crates/contextra-vault/**'` nur Re-Exports | Revert |
-| **S-23** | `adapt`: Dubletten-Traits vereinigen (R7), `off_policy.rs`, Features, `sketched-bandit` | S-12 | GL; `rg 'trait (Clock\|Rng)' src` je 1 | Revert |
-| **S-24** | `erasure` Features + Typabgleich (die Typen-Übernahme aus `types`/`ports` folgt in S-50/S-51) | S-12 | `cargo check --no-default-features` + je Feature | Revert |
-| **S-30** | `mvcc`: Loom-Modell (B11) → (A) `tombstone.rs` verschieben → (B) auf `ids`/`env`/`MvccError`; Brücke | S-10, S-11 | GL, GF, GC, GD (Tombstone-Semantik), GE | Revert B, A |
-| **S-31** | `crypto` Kern: `TenantId`→`ids`; KV-Signaturen auf `[u8;32]` (eigener Commit); `default = []`; `MvccError`/`CryptoError`-Abbildung | S-10, S-11, S-12 | GL, GF (WAL-HMAC, MFKD, KV v2), GC, GE | Revert |
-| **S-32** | `text` (B04): `PostingStore`, Brücke (`wand.rs`, `scanner.rs`, `index_struct.rs`, `purge.rs`, `morph_index.rs`), `TextError`, Clock→`unix_ms` | S-10, S-11 | GL, GF (Postings), GD (ms), GE | Revert |
-| **S-33** | `rank` (+ `temporal.rs` aus `engine` als eigener Commit; Quelle verbleibt als `pub use`) | S-10, S-11 | GL, GD (Filterausgaben) | Revert |
-| **S-34** | `graph`: Brücke, `GraphError`, `default = ["std"]`, `PprConfig` & Co. aus `types` (zusammen mit S-51-Teil) | S-10, S-11, S-12 | GL, GF (bincode), GC (TSan), GE | Revert |
-| **S-35** | `checkpoint`: `SnapshotSource`, Dateinaht, `CheckpointError` | S-10, S-11 | GL, GF (Meta/Manifest) | Revert |
-| **S-36** | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert |
-| **S-37** | `store`: `StoreError`, `compat/` (`engine/`, `scanner/`), Imports → `ids`/`env`; `kv/` archivieren; `FeatureRing`-Entfernung **nach** S-50; zuletzt ID-Breite im Manifest (v2, §5.2) | S-30, S-31, S-10, S-11 | GL, GF, GC (Loom/TSan), Crash-/Recovery-Suite unverändert grün (INV-6), GE | Revert pro Teil |
-| **S-38** | **Paar:** `crypto`-KV-Teil → `kvcache` (`kv_cipher`, `kv_segment/*`, `kv_shredding`, `revocation_log`; Konstanten-Kopplung bis Vereinigung); `kvcache` Kern/Brücke/Features; `infer-candle/kv_bridge` auf `kvcache`; `mutants-guarantees.toml`, `loom-gate.yml`, `CODEOWNERS` im selben Commit | S-31, S-11 | GL, GF (KV-Segment), GC (Loom-Test `loom_kv_deferred_zeroize` am neuen Ort grün), Mutation-Score G2 ≥ Baseline | Revert als Paar |
-| **S-39** | `infer-ollama`, danach `infer-candle` (Feature `candle`, `ConfidenceCalibrator`, Newtype) | S-11, S-38 | GL; `cargo tree --no-default-features` ohne `candle-*` | Revert |
-| **S-50** | `ports` → `license` (Lizenz-Traits), `erasure` (Erasure-Familie), `testkit` (Conformance); Re-Exports bleiben (R9) | S-20, S-24 | GL; `rg 'FeatureRing\|LicenseGate' crates/contextra-{store,vector,text,graph,kvcache,rank,checkpoint,mvcc}` leer | Revert |
-| **S-51** | `types` → `erasure` (Erasure-Typen), `graph` (Ppr/TlHfd); `lib.rs`-Verwenderliste | S-50, S-34 | GL, GE | Revert |
-| **S-60** | Regler: `adapt` nimmt die fehlenden Methoden auf (decay 5, homeostat 3, pid 5) → GD (bitgleich) → `engine/db` `pub use` | S-23 | GD | Revert |
-| **S-61** | Chunker: Paritätstest in `engine` (`ingest` als Dev-Abhängigkeit) → `engine/chunker` als Adapter über `ingest::chunking` (`contextra::chunker::MarkdownChunker` API-stabil, `mcp/server_tools.rs:240`) | S-01 | GD (Chunk-Folge, Breadcrumbs); `mcp`-Tests unverändert | Revert |
-| **S-62** | `router`: `ports_local` weg (nach `mcp`-Umstellung), `wire` optional, `Vfs`-Stelle | S-01 | GL | Revert |
-| **S-63** | `cognition` invertieren (Brücke in `db`), danach `agent` invertieren | S-37, S-50 | GL (`rg 'contextra_engine' src --glob '!compat/**'` leer; `cargo tree -p contextra-cognition -e normal` ohne `contextra-engine`) | Revert |
-| **S-64** | `engine` (Lizenz → `license`, `extraction` → `exp-extraction`), `db`, `contextra` (Feature `license`), `mcp`, `py`, `testkit` | S-50, S-51, S-33 | GL; `cargo public-api` ohne unbeabsichtigte Diffs | Revert |
-| **S-70** | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert |
-| **S-80** | `contextra-vector-diskann` (aus `vector/diskann/`) | S-36 | GL, DiskANN-Tests (`required-features`) isoliert grün | Revert |
-| **S-81** | `contextra-graph-research` (aus Klasse A/B-Experimenten) | S-34 | GL, GD | Revert |
-
-Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
+| Crate | Vorgabe |
+| --- | --- |
+| `crypto` | Kern bleibt: `aead`, `dek`, `kdf`, `secret`, `error`, `anti_tamper`, `crypto.rs` (`KeyManager`), `wal_crypto`, `wal_completeness`; `audit_chain.rs` liegt noch im Crate \[V\] und folgt B23. `KeyManager::{derive_kv_key, derive_kv_key_scoped, cipher_for, cipher_for_scoped}` nehmen `[u8; 32]` statt `kv_cipher::ModelFingerprint`. `ed25519-dalek` nur, solange `ed25519_proof`-Code im Crate ist. |
+| `text` | Lokales Trait `PostingStore` enthält **genau** die in `src/` genutzten `StorageEngine`-Methoden (Erhebung per `grep`), keine Methode mehr. Brücke implementiert es für `StorageEngine`. `types.rs` und `contract.rs` werden `pub use` auf `ids`/`env`. Leere Features nach Audit streichen. |
+| `rank` | `DocId` → `ids`, `Clock` → `env`; `dibud` → `exp-dibud`, `fusion/resonance.rs` → `exp-resonance` mit Naht `fusion/ext.rs`; `drift` bleibt (keine Dublette, B16). |
+| `graph` | Brücke: `provider.rs`, `purger.rs`, `csr/graph_index/*`, alle Importe von `ports::{graph_index, graph}`. Lokale `DocId`/`TxId` → `ids`. Experimente Klasse A/B hinter `exp-*`, Klasse C (`hyperedge`, `path_rag`, `consistency_enforcement`) bleibt im Kern. Ab > 2.000 Zeilen Experimentcode: `graph-research` (S-81). |
+| `checkpoint` | `SnapshotSource` = genau die genutzten `StorageEngine`-Methoden; lokale schmale Dateisystemnaht (`hardlink_cloner.rs`) statt `ports::Vfs` (B08); `WorkflowState` lokal abbilden; nicht mit `mvcc` zusammenlegen. |
+| `vector` | Brücke: `hnsw/vector_index_impl.rs`, `diskann/vector_index_impl.rs`, `hnsw/purge.rs`, `hnsw/scanner.rs`, Teile von `error.rs` und `types.rs`. `mvcc` bleibt Kern-Abhängigkeit; eigener `VisibilityLog` ist Nicht-Ziel. Feature `simd` ersetzt `compute_distance` durch `contextra_simd::dispatch`, Skalarpfade bleiben als Orakel (B09). V-VETO: `PartialRebuildConfig` bleibt aus; der Wachtest muss existieren und grün sein. |
+| `store` | Eigener `StoreError` mit Abbildung der heute genutzten Varianten (`Storage`, `Io`, `WalCorruption`, `ChecksumMismatch`, `Transaction*`, `Conflict`, `WalTruncationDetected`, `CrossDeviceLink`). `lsm/config.rs`: `validate_against_features` und `FeatureRing` erst nach S-50 entfernen, `validate_durability` bleibt. `tenant_codec` → `ids::TenantId`. `io_seam`/`fsync` unverändert, `Vfs` per Brücke (B08). INV-6 strikt. |
+| `kvcache` | Brücke: `prefix_store.rs`, `adapters.rs` (inkl. `FeatureRing`), `KvCachePruner`/`KvCacheScanner`, `scratchpad_invalidation.rs`, Port-Teil von `service.rs`. `CacheDirective`/`StepId` einmal lokal. Features: `kv-encryption` ohne `legacy-erasure`, `exp-kivi`, `exp-content-addressed`; `kvcache-attention-eviction` streichen. |
+| `infer-ollama`, `infer-candle` | `ImportanceScore` lokal mit Skala 0..1 im Doc-Kommentar, `From` in `compat/`. Vorbedingung: `--no-default-features` baut (ungegatetes `pub use error::…` prüfen). `candle-core`, `candle-nn`, `candle-transformers`, `tokenizers`, `half` optional hinter `candle`. Vorbedingung: `grep -rn 'contextra_infer_candle::' crates` über alle Verbraucher, damit kein Symbol durch das Gaten verschwindet. |
+| `types`, `ports` | `types` behält `error`, `error_dto`, `budget`, `filter`, `importance`, `saos`, `document`, `misc` (abzüglich Auszug), `schema`, `RequestContext`, `model_fingerprint`, `retrieval_strategy`. Varianten `Sandbox*`, `Cluster`, `KvQuantization`, `KvDeleteModeConfig`, `HnswConnectivityDegraded`, `GraphRepairFailed` bleiben bis G-E1 grün ist. `ports` behält `storage`, `vector_index`, `text_index`, `graph_index`, `graph`, `embedding`, `reranker`, `query_rewriter`, `checkpoint`, `kv`, `kv_bridge_port`, `attention`, `lifecycle`, `observability`, `plugin`, `vfs`, `fs`, `scanner/*`; `Vfs`, `VfsFile`, `VfsOpenOptions`, `VerifiedVia` bleiben (B08). |
+| `router`, `engine`, `db`, `contextra`, `agent`, `cognition` | `router`: `RetrievalStrategy`-Abbildung nur in `arm_registry.rs`. `engine`: `extraction/` → `exp-extraction` ohne Zusammenlegung mit `graph/entity_extraction.rs`. `db`: Regler als `pub use` aus `adapt`; `multistep.rs` bleibt. `agent`: lokale Ports `ContextStore`, `ScratchpadStore`. `cognition`: lokale Ports `DocumentSource`, `ConsolidationSink`, `HyperedgeSink`, `DecayPolicy`, `CognitionError` statt `ContextraError`-Varianten; `*_local.rs`-Umbenennungsdateien löschen. |
+| E0-Crates | `sys`: `lib.rs:19` korrigieren. `ingest`: `fuzz_support.rs` hinter `fuzz`; Brücke mit `TryFrom` im 128-Bit-Modus. `license`: Inline-Brücken → `compat/`, `VectorDeleteMode` → `vector`. `audit-export`: `testkit.rs` hinter `test-utils`; Brücke `ProcessingRegistryEntry → AuditRecord` wird nicht gebaut. `infer-onnx`: `fakes` hinter `test-utils`. |
+| E3-Crates | `mcp`: `protocol.rs`, `egress_*.rs`, `sandbox.rs` bleiben. `py`: `docid-128 = ["contextra-ids/docid-128"]`, `maturin` mit und ohne `pyo3` getrennt prüfen. `testkit`: `conformance/vfs.rs` und `fault_vfs.rs` bleiben; `erasure-conformance` aus `default`, Suite nach `erasure` (Feature `conformance`). |
 
 ---
 
-## 8. Gates, CI, Governance
+## 7. Werkzeuge und Arbeitsumgebung (S-00R)
 
-### 8.1 G-L1 Layering (Ersatz für `gate_g1_layering.py`)
-
-`tools/gate_layering.py`, Exit-Code 0 = grün, 1 = Verstoß, 2 = Werkzeugfehler (kein „Bericht nicht leer“-Test).
-1. `cargo metadata --format-version 1 --locked --no-deps` und `cargo tree -p <crate> -e normal --no-default-features -f '{p}'` je Crate.
-2. Kern-Closure ⊆ `allowed_internal` (capabilities v3). Abweichung ⇒ Verstoß.
-3. Je Feature `f`: `cargo tree … --no-default-features --features f` ⊆ `feature_closure_allowed[f]`.
-4. Kein Zyklus; keine Kante E_n → E_m mit m > n (INV-8); keine Kante außerhalb `dev_allowed` auf `testkit`.
-5. Negativtest `tests/test_gate_layering_negative.py`: temporär eine verbotene Kante einfügen ⇒ Exit 1.
-
-### 8.2 G-L2 Null-Prüfungen (je Crate X mit Brücke)
-
-```bash
-# Kern frei von types/ports:
-rg -n 'contextra_(types|ports)' crates/contextra-X/src --glob '!compat/**' --glob '!tests/**'   # MUSS leer sein
-# Kern frei von testkit:
-rg -n 'contextra_testkit' crates/contextra-X/src --glob '!compat/**'                           # MUSS leer sein
-# Brücke nur hinter Feature:
-rg -n 'mod compat' crates/contextra-X/src/lib.rs                                                # MUSS cfg(feature = "workspace") tragen
-# Doc-Kommentare und #[cfg(test)] im Kern zählen ebenfalls (R2): kein Ausschluss von //-Zeilen.
-```
-Zusätzlich je Crate: `cargo check -p X --no-default-features` und `cargo hack check -p X --each-feature --no-dev-deps`.
-
-### 8.3 `capabilities.toml` Schema v3
-
-```toml
-[version]
-schema = "3"
-
-[crates.contextra-vector]
-group   = "retrieval"          # ersetzt klasse/ring
-level   = 1
-tier    = "beta"               # stable | beta | experimental | frozen
-path    = "crates/contextra-vector"
-unsafe_island = false
-allowed_internal = ["contextra-ids", "contextra-env", "contextra-mvcc"]   # Kern-Closure
-[crates.contextra-vector.feature_closure_allowed]
-mmap = ["contextra-sys"]
-simd = ["contextra-simd"]
-workspace = ["contextra-types", "contextra-ports"]
-dev_allowed = ["contextra-testkit"]
-test = "cargo test -p contextra-vector --locked"
-```
-Tier-Zuordnung (ersetzt K4 des Entwurfs): `durable-fs`, `simd` (bis zum Verwender), `graph`, `vector`-Experimente → `experimental`/`beta`; `erasure`, `license`, `audit-export`, `avv-generator` → `frozen`; Rest nach bisherigem Stand. Das Gate `capabilities-consistency` vergleicht Manifest ↔ Datei.
-
-### 8.4 Weitere Gates
-
-| Gate | Inhalt |
-|---|---|
-| **G-L3** | `cargo check --workspace --all-targets --locked` (PR) und `--features docid-128` (Matrix); `cargo hack` je Crate |
-| **G-L4** | `tools/isolation_proof.py`: Crate + vollständige interne Pfad-Closure in ein leeres temporäres Workspace kopieren, **keine** Abhängigkeit ausklammern, neues `Cargo.lock`, `cargo check` mit `--no-default-features`, Default und je Feature; Fehlschlag, wenn eine interne Abhängigkeit außerhalb von `allowed_internal` mitkopiert werden muss. Ersetzt die Aussagekraft von `export_crate.py` (klammert interne Abhängigkeiten aus [E]) |
-| **G-F1** | Golden-Korpus (§5.1) |
-| **G-F2** | `contextra.fbs.sha256` stimmt mit `contextra.fbs` (B15) |
-| **G-E1** | Fehlerabbildung (§5.3) |
-| **G-D1** | Differenztests (§5.4) |
-| **G-C1** | Loom/TSan/Mutation: Pfadfilter und Crate-Listen um `mvcc`, `kvcache`, `checkpoint`, `ids`, `env` erweitert; Mutation-Score der Garantien G1/G2/G3 (`mutants-guarantees.toml`) ≥ Baseline aus S-00 |
-| **G-A1** | `cargo public-api` auf der gepinnten, zu `rust-version` passenden Toolchain; erlaubte Differenzen = Re-Export-Pfade mit `#[deprecated]` |
-| **G-U1** | `unsafe-inventory`: `ids`, `env`, `prompt-guard`, `vault` (außer über `sys`) `#![forbid(unsafe_code)]`; `ratchet.toml` angepasst (ADR) |
-| **G-DOC1** | Doc-Lint: verbotene Zusicherungen („DSGVO-konform“, „revisionssicher“, „garantiert gelöscht“) in `*.rs`, `*.md`, Vorlagen von `avv-generator`/`audit-export`; Docs nennen keine Features, die es nicht mehr gibt |
-
-### 8.5 Abnahmematrix je Crate (Kurzform)
-
-Ein Crate gilt als **entnehmbar** (R6), wenn in dieser Reihenfolge grün: G-L2 (Null-Prüfungen), G-L1 (Kern- und Feature-Closure), G-L3 (`--no-default-features`, `--each-feature`), G-L4 (isolierter Export), danach G-F1/G-D1/G-E1/G-C1 für den betroffenen Schritt. „Entnehmbar“ ohne G-L4 ist nicht zulässig.
-
----
-
-## 9. Entscheidungsregister, Risiken, Nicht-Ziele
-
-### 9.1 Getroffene Entscheidungen (früher „du entscheidest“)
-
-| ID | Entscheidung |
-|---|---|
-| D-01 | Flaches Layout; Gruppe nur als Metadatum (B07) |
-| D-02 | `Vfs` bleibt in `ports`; `durable-fs` eigenständig (B08) |
-| D-03 | `ModelFingerprint`/`RetrievalStrategy` bleiben in `types` (B16) |
-| D-04 | `DistanceMetric`: gespiegelte Kopien statt Besitzerwechsel (B09) |
-| D-05 | `sketched-bandit` wird gestrichen; Features ohne Nutzung werden gestrichen (B14, B16) |
-| D-06 | `legacy-erasure`-Dateien in `crypto` bleiben bis Nachweis (B10) |
-| D-07 | `vault` baut auf `sys::vault`; `mcp::protocol` und `wire::jsonrpc` bleiben getrennt; `adapt::drift`/`rank::drift` und die beiden `query_rewriter` bleiben getrennt (B16) |
-| D-08 | Compliance-Crates bleiben kompilierbar in der Workspace-CI (nicht `archive/`), Tier `frozen` (K6 des Entwurfs bestätigt; `AGENTS.md` wird angepasst) |
-| D-09 | Verteilung per Git/Pfad, nicht crates.io (B15) |
-| D-10 | `wire/build.rs` unverändert; Prüfsumme in CI (B15) |
-| D-11 | Ebene-0-Crates behalten lokale Mini-Traits (R7/K8); E1+ nutzen `ids`/`env` |
-| D-12 | Mikro-Crate-Zerlegung (Schwester-Specs) ist Folgeprojekt F-1 |
-
-### 9.2 Restrisiken mit Abbruchkriterium
-
-| Risiko | Auslöser | Abbruchkriterium / Gegenmaßnahme |
-|---|---|---|
-| Ungebaut: Kompilierbarkeit mit `--no-default-features` ist für kein Crate belegt | S-00 | Schlägt der Build am Baseline-Stand fehl, wird zuerst dieser Zustand repariert (eigener Commit je Crate); erst danach beginnt der jeweilige Schritt |
-| `ids`-Umzug ändert Rückgabetypen (B12) | S-10 C | Mehr als ~20 nicht-mechanische Aufrufstellen ⇒ Rückfall: `types` behält `DocId::from_key` als freie Funktion `types::doc_id_from_key` plus Methode via Extension-Trait (Trait-Import nötig) — nur mit ADR |
-| Feature-Unification von `docid-128` | CI-Matrix | Jede Kombination, die nur mit dem Feature oder nur ohne baut, ist ein Fehler |
-| Format-/Recovery-Drift im `store` | S-37 | Crash-/Recovery-Suite oder GF rot ⇒ Schritt verwerfen, nicht reparieren |
-| Mutation-Score G2/G3 sinkt | S-38/S-70 | Schritt verwerfen oder Tests nachziehen, bis ≥ Baseline |
-| `cognition`-Port-Zuschnitt (`CommitIntent` aus `engine::transaction`, 1.652 Z. [E]) | S-63 | Port scheitert ⇒ `CommitIntent` als eigener Typ in `cognition`, Abbildung in `db`-Brücke |
-| `infer-ollama` baut nicht ohne Default | S-39 | Zuerst Gating reparieren (eigener Commit) |
-| Deprecated-Re-Exports sammeln sich | R9 | S-70 ist Pflichtschritt; `deprecated`-Zähler fällt monoton (Ratchet) |
-
-### 9.3 Nicht-Ziele (ausdrücklich nicht Teil dieser Spezifikation)
-
-Physische Regruppierung der Verzeichnisse; Mikro-Crate-Zerlegung von `store`/`vector`/`graph` (F-1); Verschieben von `Vfs`, `io_seam`, `store/fsync.rs`; Veröffentlichung auf crates.io; Änderung von Persistenzformaten (außer dem ID-Breitenfeld, §5.2); Änderung von FlatBuffers-Schemas oder `wire/build.rs`; Zusammenlegung der in B16 als „keine Dublette“ bewerteten Module; Brücke `privacy ↔ audit-export`; Änderung von Rangfolge-, Fusions- oder Durability-Semantik.
-
----
-
-## Anhang A — Messdaten (Quelle: Manifest-Scan, [V])
-
-**Eingehende interne Normal-Abhängigkeiten.** `types`: 24 Crates (mvcc, mcp, license*, testkit, infer-ollama*, checkpoint, contextra, router, text*, ports, py, db, engine, audit-export*, graph*, cognition, rank*, crypto, infer-candle, kvcache*, agent, vector*, store, simd*; * = optional). `ports`: 20 Crates (6 optional). **Ohne Verwender** (nur Manifest-Scan): `durable-fs`, `simd`, `ingest`, `kvcache`, `erasure`, `license`, `audit-export`, `avv-generator`, `agent`, `cognition`, `py`, `mcp`, `bench`, `testkit` (nur Dev-Kanten).
-
-**Hart abhängig von `types`+`ports`** (nach Ziel zu ersetzen): `mvcc`, `checkpoint`, `crypto`, `store`, `router`, `testkit`, `infer-candle`; nur `types`: `py`.
-
-**`vector`** hat `mvcc` und `sys` optional, `types`/`ports` optional (Default `ports-compat`) — die ungegateten Importe im Kern (B04) machen die Optionalität wirkungslos.
-
-**Default-Mitglieder (`cargo check` ohne `--workspace`)** enthalten nicht: `ingest`, `privacy`, `sandbox`, `infer-candle`, `py`, `bench`, `erasure`, `license`, `audit-export`, `avv-generator`.
-
-## Anhang B — Reproduktion der Prüfungen
-
-```bash
-# S-00 Baseline
-rustup toolchain install 1.89.0 && cargo metadata --format-version 1 --locked > baseline/metadata.json
-for c in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'); do
-  cargo tree -p "$c" -e normal --no-default-features -f '{p}' > "baseline/tree-$c.txt" 2>&1
-  cargo check -p "$c" --no-default-features > "baseline/check-$c.txt" 2>&1
-done
-# R2-Nullprüfung (Beispiel vector)
-rg -n 'contextra_(types|ports|mvcc|sys|crypto)' crates/contextra-vector/src --glob '!compat/**' --glob '!tests/**'
-# Zählung wie in B04 (Python-Skript tools/count_bridge_refs.py in S-00 einchecken)
-# Aufrufer von from_key (exakt, ohne Doppelzählung)
-rg -n --type rust '::from_key\(' crates | rg -v '/tests/'
-# Feature-Audit
-python3 tools/feature_audit.py --fail-on-unused
-# Isolationsnachweis
-python3 tools/isolation_proof.py --crate contextra-text --modes no-default,default,each-feature
-```
+| Werkzeug | Zweck | Stand \[V\] |
+| --- | --- | --- |
+| Rust `1.89.0`, `rustfmt`, `clippy` | Toolchain (`rust-toolchain.toml`) | festgelegt |
+| `cargo-hack` | `--each-feature`, `--no-dev-deps` (G-L3) | in der Analyseumgebung nicht vorhanden |
+| `ripgrep`, `jq` | Zählungen, Baseline-Skript | nicht vorhanden; alle Befehle in §8 sind auch mit `grep -rn` formuliert |
+| `cargo-public-api` | G-A1 | Toolchain-Konflikt (`nightly-2024-11-01` gegen `rust-version 1.89`) \[Ü\], nicht geprüft |
+| `tools/gate_layering.py` | G-L1 | vorhanden, braucht `cargo` |
+| `tools/isolation_proof.py` | G-L4 | vorhanden, braucht `cargo` |
+| `tools/feature_audit.py` | R10 | vorhanden, **laut**: 107 Meldungen in 37 Crates, enthält `default` und Weiterleitungs-Features |
+| `tools/count_bridge_refs.py` | Brückenzählung | vorhanden, zählt auch gegatete Treffer |
+| `tools/error_topology_mapper.py` | Basis für G-E1 | vorhanden |
+| `tools/gate_bridge_null.py` | G-L2 als Skript | **fehlt**, anzulegen in S-00R |
+| `tools/modularity_score.py` | Score nach §8.6 | **fehlt**, anzulegen in S-00R (Referenzimplementierung liegt dem Begleitbericht bei) |
+| `tools/golden_regen.sh`, `tests/golden/` | G-F1 | **fehlt** |
+| `tools/doc_lint.py` | G-DOC1 | **fehlt** |
