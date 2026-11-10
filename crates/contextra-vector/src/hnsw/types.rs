@@ -519,7 +519,6 @@ impl HnswIndex {
             tombstone_map.insert(id, deleted_guard.contains(id));
         }
 
-
         let regions = crate::partial_rebuild::should_trigger_partial_rebuild(
             &tracker,
             &tombstone_map,

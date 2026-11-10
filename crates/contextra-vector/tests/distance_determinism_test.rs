@@ -1,8 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Bit-Determinismus-Test für skalare Distanzen (INV-SIMD-DETERMINISM-1).
 
-use contextra_vector::distance::ScalarDistance;
 use contextra_vector::distance::contract::{DistanceFn, Metric};
+use contextra_vector::distance::ScalarDistance;
 
 #[test]
 fn test_distance_bit_determinism_repetitions() {

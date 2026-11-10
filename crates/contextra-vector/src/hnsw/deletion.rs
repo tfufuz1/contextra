@@ -1,4 +1,3 @@
-
 /// Trait for types convertible to [] for deletion APIs.
 pub trait IntoDocId {
     /// Converts the type into a [].
@@ -30,8 +29,8 @@ impl IntoDocId for &u64 {
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
 use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
-use zeroize::Zeroize;
 use std::collections::BTreeSet;
+use zeroize::Zeroize;
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex, VectorData};

@@ -228,7 +228,6 @@ async fn recall_at_1_vs_brute_force() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_hnsw_recall_at_10_target_10k_vectors() -> Result<(), Box<dyn Error>> {
     // Target per AUFTRAG P03:
@@ -244,8 +243,12 @@ async fn test_hnsw_recall_at_10_target_10k_vectors() -> Result<(), Box<dyn Error
         32,
         200,
         150,
-    ).await?;
-    println!("10k Vectors Cosine Average Recall@10 (M=32, ef_c=200, ef_s=150): {:.4}", avg_recall);
+    )
+    .await?;
+    println!(
+        "10k Vectors Cosine Average Recall@10 (M=32, ef_c=200, ef_s=150): {:.4}",
+        avg_recall
+    );
     assert!(
         avg_recall >= 0.95,
         "10k Vectors Recall@10 too low: {:.4} (expected >= 0.95)",

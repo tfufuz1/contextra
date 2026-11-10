@@ -1,7 +1,7 @@
 //! Clock implementation for HNSW vector index ensuring determinism (B11).
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use contextra_ports::Clock;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Deterministic monotonic counter clock for HNSW vector index.
 ///

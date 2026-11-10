@@ -119,7 +119,8 @@ async fn test_deletion_consistency_and_surviving_recall() -> Result<(), Box<dyn 
     for _ in 0..num_queries {
         let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
-        let oracle_top_k = brute_force_knn_filtered(&surviving_data, &query, k, DistanceMetric::Cosine);
+        let oracle_top_k =
+            brute_force_knn_filtered(&surviving_data, &query, k, DistanceMetric::Cosine);
         let oracle_set: HashSet<u64> = oracle_top_k.into_iter().collect();
 
         let results = index.search(&query, k).await?;
@@ -142,7 +143,10 @@ async fn test_deletion_consistency_and_surviving_recall() -> Result<(), Box<dyn 
     }
 
     let avg_recall_tombstoned = total_recall / num_queries as f64;
-    println!("Recall der Restmenge vor Rebuild: {:.4}", avg_recall_tombstoned);
+    println!(
+        "Recall der Restmenge vor Rebuild: {:.4}",
+        avg_recall_tombstoned
+    );
     assert!(
         avg_recall_tombstoned >= 0.95,
         "Recall nach Löschung vor Rebuild zu niedrig: {:.4} (erwartet >= 0.95)",
@@ -161,7 +165,8 @@ async fn test_deletion_consistency_and_surviving_recall() -> Result<(), Box<dyn 
     for _ in 0..num_queries {
         let query: Vec<f32> = (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect();
 
-        let oracle_top_k = brute_force_knn_filtered(&surviving_data, &query, k, DistanceMetric::Cosine);
+        let oracle_top_k =
+            brute_force_knn_filtered(&surviving_data, &query, k, DistanceMetric::Cosine);
         let oracle_set: HashSet<u64> = oracle_top_k.into_iter().collect();
 
         let results = index.search(&query, k).await?;
@@ -184,7 +189,10 @@ async fn test_deletion_consistency_and_surviving_recall() -> Result<(), Box<dyn 
     }
 
     let avg_recall_post_rebuild = total_recall_post_rebuild / num_queries as f64;
-    println!("Recall der Restmenge nach Rebuild: {:.4}", avg_recall_post_rebuild);
+    println!(
+        "Recall der Restmenge nach Rebuild: {:.4}",
+        avg_recall_post_rebuild
+    );
     assert!(
         avg_recall_post_rebuild >= 0.95,
         "Recall nach Rebuild zu niedrig: {:.4} (erwartet >= 0.95)",

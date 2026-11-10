@@ -402,8 +402,10 @@ mod tests {
             rabitq_distances.select_nth_unstable_by(top_k - 1, |a, b| {
                 a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
             });
-            let rabitq_top_k: std::collections::HashSet<usize> =
-                rabitq_distances[..top_k].iter().map(|&(idx, _)| idx).collect();
+            let rabitq_top_k: std::collections::HashSet<usize> = rabitq_distances[..top_k]
+                .iter()
+                .map(|&(idx, _)| idx)
+                .collect();
 
             let hits = gt_top_k.intersection(&rabitq_top_k).count();
             total_hits += hits;

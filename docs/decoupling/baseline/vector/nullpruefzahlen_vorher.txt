@@ -1,0 +1,9 @@
+=== Nullprüfzahlen Vorher ===
+Produktivcode:
+{"contextra_types": 125, "contextra_ports": 20, "contextra_mvcc": 9, "contextra_sys": 2}
+
+#[cfg(test)] in src/:
+{"contextra_types": 14, "contextra_ports": 4, "contextra_mvcc": 0, "contextra_sys": 0}
+
+tests/ / benches/:
+{"contextra_types": 28, "contextra_ports": 12, "contextra_mvcc": 0, "contextra_sys": 0}

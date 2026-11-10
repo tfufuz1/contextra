@@ -19,7 +19,8 @@ async fn test_campaign_hnsw_backoff_cooldown_exact_bounds() {
 
     let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(100));
     let clock = std::sync::Arc::new(contextra_vector::hnsw::MonotonicCounterClock::default());
-    let index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock.clone()).expect("valid index");
+    let index =
+        HnswIndex::try_new_with_rng_and_clock(config, rng, clock.clone()).expect("valid index");
 
     let tx = TxId::new(1);
     index

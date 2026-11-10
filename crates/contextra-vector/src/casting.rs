@@ -7,9 +7,8 @@ use contextra_types::{ContextraError, Result};
 /// Converts `usize` to `u32`, returning `ContextraError::invalid_input` if out of bounds.
 #[inline]
 pub fn to_u32(val: usize) -> Result<u32> {
-    u32::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("value exceeds u32 capacity limit")
-    })
+    u32::try_from(val)
+        .map_err(|_| ContextraError::invalid_input("value exceeds u32 capacity limit"))
 }
 
 /// Converts `u32` to `usize`. On supported architectures (32-bit and 64-bit), this is infallible.
@@ -21,25 +20,20 @@ pub fn u32_to_usize(val: u32) -> usize {
 /// Converts `u64` to `usize`, returning `ContextraError::invalid_input` if out of bounds.
 #[inline]
 pub fn u64_to_usize(val: u64) -> Result<usize> {
-    usize::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("u64 value exceeds pointer width")
-    })
+    usize::try_from(val)
+        .map_err(|_| ContextraError::invalid_input("u64 value exceeds pointer width"))
 }
 
 /// Converts `u64` to `u32`, returning `ContextraError::invalid_input` if out of bounds.
 #[inline]
 pub fn u64_to_u32(val: u64) -> Result<u32> {
-    u32::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("u64 value exceeds u32 bounds")
-    })
+    u32::try_from(val).map_err(|_| ContextraError::invalid_input("u64 value exceeds u32 bounds"))
 }
 
 /// Converts `usize` to `u8`, returning `ContextraError::invalid_input` if out of bounds.
 #[inline]
 pub fn to_u8(val: usize) -> Result<u8> {
-    u8::try_from(val).map_err(|_| {
-        ContextraError::invalid_input("value exceeds u8 capacity limit")
-    })
+    u8::try_from(val).map_err(|_| ContextraError::invalid_input("value exceeds u8 capacity limit"))
 }
 
 /// Converts `usize` to `u64`. Infallible on 32-bit and 64-bit platforms.

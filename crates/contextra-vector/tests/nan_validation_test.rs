@@ -1,8 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Strikte Validierung der NaN/Infinity-Abweisung an der Distanz-API-Grenze.
 
-use contextra_vector::distance::ScalarDistance;
 use contextra_vector::distance::contract::{DistanceFn, Metric};
+use contextra_vector::distance::ScalarDistance;
 
 #[test]
 fn test_nan_infinity_strict_rejection() {

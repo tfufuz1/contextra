@@ -12,8 +12,8 @@
 #[path = "contract.rs"]
 pub mod contract;
 
-use contract::{DistanceFn, Error as ContractError, Metric as ContractMetric};
 use contextra_types::{ContextraError, DistanceMetric, Result};
+use contract::{DistanceFn, Error as ContractError, Metric as ContractMetric};
 
 /// Raw integer sum components for u8 cosine similarity calculation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -374,10 +374,14 @@ impl ScalarDistance {
     /// Computes distance with strict validation of finiteness and dimension match.
     pub fn compute(&self, a: &[f32], b: &[f32]) -> core::result::Result<f32, ContractError> {
         if a.len() != b.len() {
-            return Err(ContractError::InvalidInput("Vektordimensionen stimmen nicht überein"));
+            return Err(ContractError::InvalidInput(
+                "Vektordimensionen stimmen nicht überein",
+            ));
         }
         if a.iter().any(|v| !v.is_finite()) || b.iter().any(|v| !v.is_finite()) {
-            return Err(ContractError::InvalidInput("Vektor enthält NaN oder Unendlich"));
+            return Err(ContractError::InvalidInput(
+                "Vektor enthält NaN oder Unendlich",
+            ));
         }
         match self.metric {
             ContractMetric::Cosine => {
@@ -441,7 +445,9 @@ impl<D: DistanceFn + 'static> DistanceKernel for InjectedDistanceKernel<D> {
         ScalarKernel::validate_slices(a, b)?;
         let d = self.distance_fn.distance(a, b);
         if d.is_nan() {
-            Err(ContextraError::invalid_input("Distance computation produced NaN"))
+            Err(ContextraError::invalid_input(
+                "Distance computation produced NaN",
+            ))
         } else {
             Ok(d)
         }
@@ -536,12 +542,42 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
 
 #[inline]
 pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
-    ScalarKernel.distance(metric, a, b)
+    #[cfg(feature = "simd")]
+    {
+        validate_vector(a)?;
+        validate_vector(b)?;
+        compute_distance_trusted(a, b, metric)
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        ScalarKernel.distance(metric, a, b)
+    }
 }
 
 #[inline]
 pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
-    ScalarKernel.distance_trusted(metric, a, b)
+    #[cfg(feature = "simd")]
+    {
+        let disp = contextra_simd::Dispatcher::auto();
+        match metric {
+            DistanceMetric::Cosine => disp
+                .cosine_distance(a, b)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+            DistanceMetric::Euclidean => disp
+                .euclidean_distance(a, b)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+            DistanceMetric::DotProduct => disp
+                .dot_product_distance(a, b)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+            _ => disp
+                .cosine_distance(a, b)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+        }
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        ScalarKernel.distance_trusted(metric, a, b)
+    }
 }
 
 #[inline]
@@ -550,22 +586,43 @@ pub fn compute_distance_f32_bytes_trusted(
     b_bytes: &[u8],
     metric: DistanceMetric,
 ) -> Result<f32> {
-    ScalarKernel.distance_f32_bytes_trusted(metric, a, b_bytes)
+    #[cfg(feature = "simd")]
+    {
+        let disp = contextra_simd::Dispatcher::auto();
+        match metric {
+            DistanceMetric::Cosine => disp
+                .cosine_distance_f32_bytes(a, b_bytes)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+            DistanceMetric::Euclidean => disp
+                .euclidean_distance_f32_bytes(a, b_bytes)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+            DistanceMetric::DotProduct => disp
+                .dot_product_distance_f32_bytes(a, b_bytes)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+            _ => disp
+                .cosine_distance_f32_bytes(a, b_bytes)
+                .map_err(|e| ContextraError::invalid_input(e.to_string())),
+        }
+    }
+    #[cfg(not(feature = "simd"))]
+    {
+        ScalarKernel.distance_f32_bytes_trusted(metric, a, b_bytes)
+    }
 }
 
 #[inline]
 pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32> {
-    ScalarKernel.cosine_distance(a, b)
+    compute_distance(a, b, DistanceMetric::Cosine)
 }
 
 #[inline]
 pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32> {
-    ScalarKernel.dot_product_distance(a, b)
+    compute_distance(a, b, DistanceMetric::DotProduct)
 }
 
 #[inline]
 pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
-    ScalarKernel.euclidean_distance(a, b)
+    compute_distance(a, b, DistanceMetric::Euclidean)
 }
 
 #[inline]

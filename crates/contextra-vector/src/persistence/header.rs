@@ -413,7 +413,6 @@ impl HnswHeader {
         })
     }
 
-
     /// Computes the cryptographic BLAKE3 checksum of the serialized header.
     pub fn checksum(&self) -> [u8; 32] {
         *blake3::hash(&self.to_bytes()).as_bytes()
@@ -454,7 +453,6 @@ impl HnswHeader {
         buf
     }
 }
-
 
 fn hex_fmt(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()

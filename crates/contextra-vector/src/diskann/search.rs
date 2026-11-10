@@ -11,7 +11,7 @@ use crate::distance::compute_distance_trusted;
 use contextra_ports::VectorIndex;
 use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, BTreeSet};
+use std::collections::{BTreeSet, BinaryHeap};
 
 impl DiskAnnIndex {
     pub(crate) fn get_dist_to_query(&self, query: &[f32], node_idx: u32) -> Result<f32> {

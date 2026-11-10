@@ -1181,7 +1181,10 @@ mod tests {
             .expect("index creation succeeds");
 
         // Initial rebuild sets last_rebuild_nanos
-        assert_eq!(index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire), 0);
+        assert_eq!(
+            index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire),
+            0
+        );
         index.inner.rebuild_sync().expect("rebuild succeeds");
         let first_rebuild_nanos = index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire);
         assert_eq!(first_rebuild_nanos, 10_000_000_000);
@@ -1192,7 +1195,10 @@ mod tests {
 
         // Advance clock past cooldown
         clock.advance_nanos(600_000_000); // 600ms > 500ms
-        index.inner.rebuild_sync().expect("second rebuild succeeds after clock advance");
+        index
+            .inner
+            .rebuild_sync()
+            .expect("second rebuild succeeds after clock advance");
         let second_rebuild_nanos = index.inner.cold.last_rebuild_nanos.load(Ordering::Acquire);
         assert_eq!(second_rebuild_nanos, 10_600_000_000);
     }
