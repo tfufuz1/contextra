@@ -4,7 +4,7 @@
 //! Rangfusion (mRRF). Es moduliert die Signalgewichte anhand der Differenz
 //! (Margin) zwischen dem erst- und zweitplatzierten Ergebnis eines kalibrierten Signals.
 
-use super::resonance::{apply_resonance_bonus, ResonanceConfig};
+use super::{apply_resonance_bonus, ResonanceConfig};
 use super::rrf::{format_fused_results_from_top_k, g, update_fused_entry_from_doc};
 use super::signal::{FusedEntry, MetadataMergePriority, SignalCalibrationContext, SignalKey};
 use super::types::SearchResult;
