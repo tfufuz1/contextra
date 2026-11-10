@@ -1,72 +1,45 @@
-# Implementierungsspezifikation & Arbeitsplan: `contextra-ingest`
+# contextra-ingest — Umsetzungsplan
 
-> **Ring:** 4 | **Klasse:** `R` (Rand / Extension) | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
-> **Architekturrolle:** Autarkes Dokumenten-Parsing, Text-Extraktion und semantisches Chunking (Paket B24)
-> **Spezifikationsbezug:** `docs/SPEC.md` §4, `PLAN.md`
+> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
 
----
+## 1. Vorbedingungen (global) [S]
 
-## 1. Architektonische Leitprinzipien & Baukasten-Vertrag
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
+| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
+| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
+| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
+| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
 
-Für `contextra-ingest` gelten im Rahmen der Transformation zum modularen Baukastensystem folgende verbindliche Richtlinien:
+S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
 
-1. **Modulare Autarkie & Isolation:** Der Crate funktioniert als eigenständiger, isolierter Baustein. Direkte Kopplungen an Fremd-Crates werden über wohldefinierte Schnittstellen oder generische Abstraktionen gelöst. Keine Abhängigkeit zu `contextra-engine`.
-2. **Entkopplung der Löschkette:** Sämtliche juristischen Begrifflichkeiten (DSGVO Art. 17), Nachweisketten, Deletion-Proofs und Saga-Orchestrierungen verbleiben exklusiv in `contextra-erasure`. Ingest besitzt keinen Lösch- oder DSGVO-Bezug.
-3. **Design by Contract (DbC) & Invarianten:** Alle Vorbedingungen, Nachbedingungen und Systeminvarianten werden strikt geprüft (Fail-Closed).
-4. **Zero Shared Mutable State:** Parser und Chunker sind synchron und zustandslos. Parallelität liegt beim Aufrufer.
-5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
+## 2. Schritte dieses Crates [S]
 
----
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-61 | Chunker: Paritätstest in `engine` (`ingest` als Dev-Abhängigkeit) → `engine/chunker` als Adapter über `ingest::chunking` (`contextra::chunker::MarkdownChunker` API-stabil, `mcp/server_tools.rs:240`) | S-01 | GD (Chunk-Folge, Breadcrumbs); `mcp`-Tests unverändert | Revert | ☐ offen |
 
-## 2. Modul- & Komponentenarchitektur
+## 3. Reihenfolge-Zwang [S]
 
-### 2.1 Interne Struktur & Verantwortung
+Keine direkte Reihenfolgeregel im Zyklen-Absatz von §7. Gilt die globale Reihenfolge (S-00 → S-01 → S-02 → S-03).
 
-| Komponente / Modul | Verantwortung & Schnittstellen |
-|---|---|
-| `chunking` | Autarkes semantisches, tokenbasiertes und hierarchisches Chunking (Prose, Paged, Tabular, Email, Structured) |
-| `formats` | Extraktion strukturierter und unstrukturierter Formate (PDF, DOCX, XLSX, ODF, HTML, XML, E-Mail, JSON etc.) |
-| `detect` | Sichere MIME- und Format-Erkennung mit Magie-Byte-Validierung |
-| `canonical` | Sanitization und Erzeugung der standardisierten kanonischen Zwischenform |
-| `safe` & `limits` | Nicht abschaltbare Schutzgrenzen gegen Zip-Bomben, Pufferüberläufe und Rekursion |
-| `pipeline` & `registry` | Composition Root für Extraktoren und Ingestion-Pipelines |
+## 4. Definition of Done [S]
 
-### 2.2 Abhängigkeitsmatrix & Schnittstellen
+- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
+- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
+- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
+- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
+- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
+- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types` (Ring 0)
-- **Verbotene Abhängigkeiten:** Höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
-- **Konsumierte / Implementierte Ports:** Reine zustandslose Ingestion-Engine ohne Persistenz-Ports.
+## 5. Offene Entscheidungen [S]
 
----
+Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
 
-## 3. Umgesetzte Arbeitspakete (Work Packages)
+## 6. Verweise
 
-### WP-ING-1: Vollständige Entkopplung von der Engine (Paket B24)
-- **Fokus / Betroffene Dateien:** `Cargo.toml, src/chunking/common.rs, src/chunking/fallback.rs, tests/chunk_prose_parity.rs, tests/contract_tests.rs`
-- **Problemstellung & Baukasten-Ziel:** Vollständige Auflösung der Abhängigkeit zu contextra-engine; Ingest agiert rein als autarke Datenvorbereitungs-Pipeline.
-- **Ergebnis:**
-  - `contextra-engine` aus `Cargo.toml` entfernt.
-  - Autarke `estimate_tokens` und `chunk_text_with_overlap` direkt in `chunking/common.rs`.
-  - `FallbackChunker` delegiert sauber an `ProseChunker`.
-  - Alle Unit- und Integrationstests sowie M2-Isolationsbeweis sind grün.
+- Spezifikation: `SPEC.md` (dieses Verzeichnis)
+- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
+- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
 
----
-
-## 4. Test-, Benchmark- & Qualitätssicherungsplan
-
-### 4.1 Unit-, Integration- & Conformance-Tests
-- **Unit-Tests:** 100% Testabdeckung für Kernfunktionen und Randfall-Behandlungen.
-- **Traceability:** Jeder Test annotiert die Spezifikationsanforderung (z. B. `/// SPEC: REQ-...`).
-
-### 4.2 Property-Based Testing & Fuzzing
-- Testen aller Invarianten unter zufälligen Eingaben (proptest).
-- Fuzzing aller Parser-, Deserialisierungs- und Eingabepfade unter `fuzz/`.
-
----
-
-## 5. Definition of Done (DoD) für diesen Baustein
-
-1. Alle deklarierten Arbeitspakete sind vollständig implementiert.
-2. `cargo check -p contextra-ingest`, `cargo test -p contextra-ingest` und `cargo clippy -p contextra-ingest` laufen fehlerfrei durch.
-3. Keine unzulässigen Querabhängigkeiten oder Lecks von Implementierungsdetails.
-4. Die Crate-README dokumentiert den autarken Einsatz in Drittprojekten mit einem Minimalbeispiel unter `examples/extract_and_chunk.rs`.
