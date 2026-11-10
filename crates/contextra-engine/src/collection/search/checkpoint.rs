@@ -7,7 +7,7 @@
 
 // FILE-CONTEXT
 // ZWECK: RAII CheckpointPinGuard und higher-order helper functions für Snapshot-Pinning während Suchoperationen.
-// INVARIANTEN: Snapshot-Pinning garantiert Isolation während gefilterter Suche.
+// INVARIANTEN: Snapshot-Pinning wahrt Isolation während gefilterter Suche.
 
 use contextra_ports::StorageEngine;
 use contextra_types::Result;

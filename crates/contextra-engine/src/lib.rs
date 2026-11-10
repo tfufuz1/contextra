@@ -1,12 +1,12 @@
 //! # Modul: lib.rs
 //!
-//! **Zweck:** Zentrale Facade und Orchestrierung der Contextra-Engine (Ring 2).
+//! **Zweck:** Zentrale Facade und Orchestrierung der Contextra-Engine.
 //!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! **Architektur:** Gehört zur Crate `contextra-engine`.
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
 // FILE-CONTEXT
-// ZWECK: Contextra Core Engine Orchestrator & Facade (Layer 3 - Engine).
+// ZWECK: Contextra Core Engine Orchestrator & Facade (Contextra Engine).
 // INVARIANTEN: Monoton steigende TxId-Allokation; Reparaturgarantie beim Öffnen (repair_on_open); Strikte Isolation von Namespaces.
 // NICHT-OFFENSICHTLICH: Lock-Hierarchie: collections (RwLock) -> kv_locks -> embedder (RwLock).
 
@@ -42,7 +42,7 @@ pub mod collection;
 pub mod decay_controller;
 #[cfg(not(loom))]
 pub mod export;
-#[cfg(feature = "entity-extraction")]
+#[cfg(any(feature = "exp-extraction", feature = "entity-extraction"))]
 #[cfg(not(loom))]
 pub mod extraction;
 #[cfg(not(loom))]
