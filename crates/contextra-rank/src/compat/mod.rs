@@ -3,7 +3,7 @@
 //! **Zweck:** Enthält alle Konvertierungen und Schnittstellenanbindungen an die
 //! Workspace-Crates `contextra_types` und `contextra_ports`.
 //!
-//! Dieses Modul wird ausschließlich über das Feature `types-compat` aktiviert.
+//! Dieses Modul wird ausschließlich über das Feature `workspace` aktiviert.
 //! Der Kern von `contextra-rank` ist vollständig unabhängig von diesen Crates.
 
 pub mod clock;

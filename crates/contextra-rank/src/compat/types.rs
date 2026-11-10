@@ -166,3 +166,67 @@ pub fn apply_temporal_validity_filter_with_ports_clock(
     let now_ms = clock.now_unix_nanos() / 1_000_000;
     crate::temporal::apply_temporal_validity_filter(results, current_tx, Some(now_ms))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_types_conformance_and_serde_equivalence() {
+        // DocId
+        let c_doc = contextra_types::DocId(42);
+        let l_doc: DocId = c_doc.into();
+        assert_eq!(l_doc.0, 42);
+        let back_doc: contextra_types::DocId = l_doc.into();
+        assert_eq!(back_doc.0, 42);
+
+        // TxId
+        let c_tx = contextra_types::TxId::new(99);
+        let l_tx: TxId = c_tx.into();
+        assert_eq!(l_tx.0, 99);
+        let back_tx: contextra_types::TxId = l_tx.into();
+        assert_eq!(back_tx.0, 99);
+
+        // FusionStrategy
+        for strat in [FusionStrategy::Rrf, FusionStrategy::ScoreNormalized] {
+            let c_strat: contextra_types::FusionStrategy = strat.into();
+            let l_strat: FusionStrategy = c_strat.into();
+            assert_eq!(l_strat, strat);
+        }
+
+        // SignalFailurePolicy
+        for pol in [SignalFailurePolicy::Fail, SignalFailurePolicy::Degrade] {
+            let c_pol: contextra_types::OnSignalFailure = pol.into();
+            let l_pol: SignalFailurePolicy = c_pol.into();
+            assert_eq!(l_pol, pol);
+        }
+
+        // SignalFusionStrategies
+        let l_sig_strat = SignalFusionStrategies {
+            vector: FusionStrategy::Rrf,
+            text: FusionStrategy::ScoreNormalized,
+            graph: FusionStrategy::Rrf,
+        };
+        let c_sig_strat: contextra_types::SignalFusionStrategies = l_sig_strat.into();
+        let back_sig_strat: SignalFusionStrategies = c_sig_strat.into();
+        assert_eq!(back_sig_strat, l_sig_strat);
+
+        // FusionWeights
+        let c_weights = contextra_types::FusionWeights::new(0.5, 0.3, 0.2).unwrap();
+        let l_weights: FusionWeights = c_weights.into();
+        assert_eq!(l_weights.vector, 0.5);
+        assert_eq!(l_weights.text, 0.3);
+        assert_eq!(l_weights.graph, 0.2);
+
+        // ConfigFingerprint
+        let c_fp = contextra_types::ConfigFingerprint::new(
+            "model-1",
+            "Q4_K_M",
+            "test-prompt-template",
+            0.7,
+        );
+        let expected_hash = c_fp.prompt_template_hash;
+        let l_fp: ConfigFingerprint = c_fp.into();
+        assert_eq!(l_fp.hash, expected_hash);
+    }
+}
