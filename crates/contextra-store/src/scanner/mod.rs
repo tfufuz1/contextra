@@ -82,9 +82,13 @@ impl StoreInspector {
             SstableScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
         let wal_scanner = WalScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
 
-        let target = contextra_ports::scanner::ScanTarget::Key(key.to_vec());
-        let ctx = contextra_types::RequestContext::new_root();
-        let technique = contextra_ports::scanner::ScanTechnique::DirectLookup;
+        let target_hash = *blake3::hash(key).as_bytes();
+        let target = contextra_ports::scanner::ScanTarget::new(String::from_utf8_lossy(key), target_hash);
+        let ctx = contextra_types::RequestContext::new(
+            contextra_types::TenantId::try_new(1).unwrap_or(contextra_types::TenantId::SYSTEM),
+            contextra_types::TxId::new(0),
+        );
+        let technique = contextra_ports::scanner::ScanTechnique::NeedleScan;
         let clock = contextra_ports::SystemClock::new();
 
         let in_mem = mem_scanner
@@ -92,21 +96,21 @@ impl StoreInspector {
             .map_err(|e| {
                 contextra_types::ContextraError::Storage(format!("Memtable scan error: {e:?}"))
             })?
-            .found();
+            .remaining() > 0;
 
         let in_sst = sst_scanner
             .scan(&ctx, target.clone(), technique.clone(), &clock)
             .map_err(|e| {
                 contextra_types::ContextraError::Storage(format!("SSTable scan error: {e:?}"))
             })?
-            .found();
+            .remaining() > 0;
 
         let in_wal = wal_scanner
             .scan(&ctx, target, technique, &clock)
             .map_err(|e| {
                 contextra_types::ContextraError::Storage(format!("WAL scan error: {e:?}"))
             })?
-            .found();
+            .remaining() > 0;
 
         Ok(ResidualInspectionReport {
             in_memtable: in_mem,

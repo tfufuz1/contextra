@@ -35,7 +35,7 @@
 | Ring | Ring 1 (Speicherkern) |
 | Klasse | Klasse B (Storage Bundle: `types`, `ports`, `mvcc`, `crypto`, `sys`, `store`) |
 | Abhängigkeiten (`Cargo.toml`) | `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-mvcc`, `contextra-crypto` |
-| Features | `default`, `inspect`, `block-cache-v2`, `memory-only-storage`, `docid-128`, `legacy-wal-key`, `fault-injection`, `test-hooks` |
+| Features | `default`, `inspect`, `block-cache-v2`, `memory-only-storage`, `docid-128`, `legacy-wal-key`, `fault-injection`, `test-hooks`, `sieve-cache` |
 | Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
 ---
@@ -44,7 +44,8 @@
 
 - **Keine Dev-Kanten auf höhere Ringe:** Frühere Dev-Kanten zu `contextra-graph`, `contextra-sandbox` und `contextra-vector` wurden vollständig entfernt (M6-Konformität).
 - **Dateisystem-I/O (Soll: Vfs-Port):** Derzeitige Datei-I/O verwendet `std::fs` (innerhalb blockierender Tasks via `spawn_blocking`) und `tokio::fs`. Die vollständige Migration auf den `Vfs`-Port (`contextra-ports`) ist für WP 4.4 geplant.
-- **Lösch- & Shredding-Relikte:** Historische Altlasten in `kv/segment.rs` und `kv/delete_mode.rs` sind als Deprecated Debt (DEBT-01) erfasst und werden sukzessive zurückgebaut.
+- **Archiviertes kv/:** `kv/` wurde unter ST6.4 nach `archive/contextra-store-kv` archiviert.
+- **Brücke compat/:** `engine/` und portgebundene `scanner/purge`-Anteile liegen unter `src/compat/` mit Quellkompatibilitaet an alten Pfaden.
 
 ---
 

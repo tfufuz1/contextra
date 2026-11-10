@@ -1048,3 +1048,8 @@ impl Wal {
         wal
     }
 }
+
+pub(crate) fn next_temp_counter() -> u64 {
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}

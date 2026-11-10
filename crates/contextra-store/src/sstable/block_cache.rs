@@ -133,6 +133,16 @@ impl BlockCacheBackend for SieveCacheBackend {
     fn len(&self) -> usize {
         self.state.read().map.len()
     }
+
+    #[inline]
+    fn current_bytes(&self) -> usize {
+        self.state.read().current_bytes
+    }
+
+    #[inline]
+    fn capacity_bytes(&self) -> usize {
+        self.state.read().capacity_bytes
+    }
 }
 
 pub trait BlockCacheBackend: Send + Sync {
@@ -231,16 +241,6 @@ impl BlockCacheBackend for LruBlockCacheBackend {
     #[inline]
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.state.read().cache.contains(key)
-    }
-
-    #[inline]
-    fn current_bytes(&self) -> usize {
-        self.state.read().current_bytes
-    }
-
-    #[inline]
-    fn capacity_bytes(&self) -> usize {
-        self.state.read().capacity_bytes
     }
 }
 
