@@ -37,6 +37,9 @@ pub mod error;
 pub mod kernels;
 pub mod metric;
 
+#[cfg(feature = "workspace")]
+pub mod compat;
+
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
     dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
