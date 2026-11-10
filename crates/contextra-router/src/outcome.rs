@@ -102,7 +102,7 @@ impl Default for DecisionIdGenerator {
 /// Tatsächliches Ergebnis einer getroffenen Routing-Entscheidung.
 ///
 /// Wird vom Agent-Orchestrator oder Evaluator NACH dem SLM-Aufruf an den Router zurückgemeldet.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RoutingOutcome {
     /// SLM hat die Anfrage vollständig und korrekt beantwortet.
     Success,

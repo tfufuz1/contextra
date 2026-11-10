@@ -15,6 +15,11 @@
 
 use super::*;
 
+/// Liest Kalibrierungsdaten lokal von einem Dateipfad (E2-Entkopplung von ports::vfs).
+fn read_calibration_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
+    std::fs::read(path).ok()
+}
+
 impl RouterEngine {
     /// Creates a new `RouterEngine` instance from decoupled ports.
     // ANCHOR[contextra-router:LCF-001]
@@ -43,7 +48,7 @@ impl RouterEngine {
         context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-        vfs: Option<Arc<dyn Vfs>>,
+        _vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Self {
         let mut calibration: BTreeMap<String, ProfileCalibrationState> = profiles
             .iter()
@@ -61,11 +66,7 @@ impl RouterEngine {
             .collect();
 
         if let Some(ref path) = calibration_store_path {
-            let bytes_opt = if let Some(ref v) = vfs {
-                v.read(path).ok()
-            } else {
-                std::fs::read(path).ok()
-            };
+            let bytes_opt = read_calibration_bytes(path);
             if let Some(bytes) = bytes_opt {
                 if let Ok(persisted) =
                     serde_json::from_slice::<BTreeMap<String, ProfileCalibrationState>>(&bytes)
@@ -90,7 +91,6 @@ impl RouterEngine {
             community_resolver,
             context_preparer,
             clock: Arc::new(SystemClock::new()),
-            vfs,
             state: ArcSwap::from(Arc::new(router_state)),
             pending_decisions: RwLock::new(BTreeMap::new()),
             decision_ids: DecisionIdGenerator::new(0),
@@ -104,8 +104,7 @@ impl RouterEngine {
     }
 
     /// Configures an injected Vfs implementation for virtualized/decoupled file I/O (M4).
-    pub fn with_vfs(mut self, vfs: Arc<dyn Vfs>) -> Self {
-        self.vfs = Some(vfs);
+    pub fn with_vfs(self, _vfs: Arc<dyn contextra_ports::vfs::Vfs>) -> Self {
         self
     }
 
@@ -167,7 +166,7 @@ impl RouterEngine {
         context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-        vfs: Option<Arc<dyn Vfs>>,
+        _vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Result<Self> {
         for p in &profiles {
             p.validate()?;
@@ -178,7 +177,7 @@ impl RouterEngine {
             context_preparer,
             profiles,
             calibration_store_path,
-            vfs,
+            _vfs,
         ))
     }
 

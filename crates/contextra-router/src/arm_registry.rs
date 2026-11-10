@@ -182,3 +182,57 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod diff_tests {
+    use super::*;
+
+    // ANCHOR[contextra-router:ARM-T04]
+    // Exhaustiver table-driven Differenztest aller RetrievalStrategy-Varianten (RT2.3).
+    #[test]
+    fn test_exhaustive_retrieval_strategy_mapping_table() {
+        let registry = ArmRegistry::default();
+        let test_cases = [
+            (0u32, RetrievalStrategy::Vector),
+            (1u32, RetrievalStrategy::Text),
+            (2u32, RetrievalStrategy::Graph),
+            (3u32, RetrievalStrategy::Hybrid),
+            (
+                4u32,
+                RetrievalStrategy::Global {
+                    max_community_nodes: None,
+                    min_community_size: None,
+                },
+            ),
+            (
+                4u32,
+                RetrievalStrategy::Global {
+                    max_community_nodes: Some(10),
+                    min_community_size: Some(2),
+                },
+            ),
+        ];
+
+        for (expected_arm, strategy) in test_cases {
+            let mapped_arm = registry.arm_for(strategy);
+            assert_eq!(
+                mapped_arm, expected_arm,
+                "Strategy {:?} did not map to expected arm {}",
+                strategy, expected_arm
+            );
+
+            let mapped_strategy = registry
+                .strategy_for(expected_arm)
+                .expect("valid arm index in test");
+            match strategy {
+                RetrievalStrategy::Global { .. } => {
+                    assert!(matches!(mapped_strategy, RetrievalStrategy::Global { .. }));
+                }
+                other => {
+                    assert_eq!(mapped_strategy, other);
+                }
+            }
+        }
+    }
+}

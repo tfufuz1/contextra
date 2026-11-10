@@ -22,6 +22,7 @@ use contextra_types::TokenBudget;
 
 // ANCHOR[contextra-router:TST-RTR-T01]
 // Test `test_router_engine_instance_decision_id_independence`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
+#[cfg(test)]
 #[tokio::test]
 async fn test_router_engine_instance_decision_id_independence() {
     let dir = tempfile::tempdir().unwrap();
@@ -61,6 +62,7 @@ async fn test_router_engine_instance_decision_id_independence() {
 
 // ANCHOR[contextra-router:TST-RTR-T02]
 // Test `test_calibration_stats_initial_state`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
+#[cfg(test)]
 #[tokio::test]
 async fn test_calibration_stats_initial_state(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -116,6 +118,7 @@ fn test_profile_calibration_state_reset() {
 
 // ANCHOR[contextra-router:TST-RTR-T04]
 // Test `test_reset_calibration_per_profile`: Prüft das erwartete Verhalten und Invarianten für tests für router-interne komponenten.
+#[cfg(test)]
 #[tokio::test]
 async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn std::error::Error>>
 {
