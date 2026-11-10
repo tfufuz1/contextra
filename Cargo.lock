@@ -1185,6 +1185,7 @@ name = "contextra-mvcc"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "bincode",
  "bytes",
  "contextra-ports",
  "contextra-testkit",
@@ -1194,7 +1195,9 @@ dependencies = [
  "parking_lot 0.12.5",
  "proptest",
  "serde",
+ "serde_json",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
 ]
 
