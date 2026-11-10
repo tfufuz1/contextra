@@ -296,11 +296,7 @@ impl Contextra {
     /// Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung.
     /// Führt die rein mechanische Löschung einer Collection und ihrer Daten durch.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn drop_collection(
-        &self,
-        name: &str,
-        tenant_id: TenantId,
-    ) -> Result<()> {
+    pub async fn drop_collection(&self, name: &str, tenant_id: TenantId) -> Result<()> {
         let cache_key = (tenant_id, name.to_string());
 
         // 1. Aus Cache entfernen
