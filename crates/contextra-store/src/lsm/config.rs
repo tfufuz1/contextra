@@ -133,6 +133,12 @@ pub struct LsmConfig {
     /// Optional Vfs instance for file operations.
     #[serde(skip)]
     pub vfs: Option<crate::io_seam::StoreIo>,
+    /// Injected clock port for deterministic execution timing (P28).
+    #[serde(skip, default = "default_clock")]
+    pub clock: std::sync::Arc<dyn contextra_ports::Clock>,
+    /// Injected source for cryptographic key and salt material (P28).
+    #[serde(skip, default = "default_key_source")]
+    pub key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
 }
 
 impl Default for LsmConfig {
@@ -149,6 +155,33 @@ impl Default for LsmConfig {
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
             vfs: None,
+            clock: default_clock(),
+            key_source: default_key_source(),
         }
+    }
+}
+
+fn default_clock() -> std::sync::Arc<dyn contextra_ports::Clock> {
+    std::sync::Arc::new(contextra_ports::SystemClock::new())
+}
+
+fn default_key_source() -> std::sync::Arc<dyn crate::key_source::KeyMaterialSource> {
+    std::sync::Arc::new(crate::key_source::OsKeyMaterialSource)
+}
+
+impl LsmConfig {
+    /// Attaches an injected clock port fluently to `LsmConfig`.
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn contextra_ports::Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Attaches an injected key material source fluently to `LsmConfig` (for deterministic testing).
+    pub fn with_key_source(
+        mut self,
+        key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
+    ) -> Self {
+        self.key_source = key_source;
+        self
     }
 }

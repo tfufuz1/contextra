@@ -28,6 +28,7 @@
 //!   `contextra-sys`, `contextra-mvcc`.
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 #![deny(dead_code)]
 #![allow(unexpected_cfgs)]
 #![deny(
@@ -54,7 +55,6 @@ pub mod compaction;
 pub mod engine;
 pub mod fsync;
 pub mod key_source;
-pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
