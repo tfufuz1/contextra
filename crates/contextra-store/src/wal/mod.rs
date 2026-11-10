@@ -388,7 +388,10 @@ impl std::fmt::Debug for WalConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WalConfig")
             .field("key_manager", &self.key_manager)
-            .field("allow_legacy_integrity_key_fallback", &self.allow_legacy_integrity_key_fallback)
+            .field(
+                "allow_legacy_integrity_key_fallback",
+                &self.allow_legacy_integrity_key_fallback,
+            )
             .field("min_wal_version", &self.min_wal_version)
             .field("flusher_config", &self.flusher_config)
             .field("id_gen", &self.id_gen.as_ref().map(|_| "Arc<dyn IdGen>"))
@@ -619,7 +622,8 @@ impl Wal {
         };
 
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
+            let uuid_bytes =
+                Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
@@ -679,7 +683,8 @@ impl Wal {
         // the filesystem path — renaming or moving the file cannot cause nonce-
         // reuse between two WAL instances sharing the same master key.
         let (derived_key_manager, fallback_integrity_key) = if let Some(km) = config.key_manager {
-            let uuid_bytes = Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
+            let uuid_bytes =
+                Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;
             (Some(Arc::new(km.derive_file_key(&uuid_bytes)?)), None)
         } else {
             let key = Self::load_or_create_integrity_key(&path).await?;
@@ -880,8 +885,10 @@ impl Wal {
 
     #[cfg(any(test, feature = "test-hooks"))]
     pub fn poison_for_test(&self) {
-        self.poisoned
-            .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.poison_state.store(
+            PoisonCause::FsyncFailed.to_u8(),
+            std::sync::atomic::Ordering::SeqCst,
+        );
     }
 
     #[cfg(any(test, feature = "test-hooks"))]
