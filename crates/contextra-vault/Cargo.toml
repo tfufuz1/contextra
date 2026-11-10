@@ -1,17 +1,24 @@
+[lints]
+workspace = true
+
 [package]
 name = "contextra-vault"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-publish = false
-description = "Flüchtiger Chunk-Tresor (aus contextra-db herausgelöst), baut auf contextra-sys::vault auf"
+description = "Contextra — Ephemeral in-memory context vault and memory locking"
 
 [dependencies]
-contextra-sys = { path = "../contextra-sys" }
+contextra-sys = { workspace = true }
+contextra-types = { workspace = true }
+zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [features]
 default = []
+workspace = []
 
-[lints]
-workspace = true
+[dev-dependencies]
+tempfile = { workspace = true }

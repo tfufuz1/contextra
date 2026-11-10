@@ -1240,6 +1240,11 @@ name = "contextra-prompt-guard"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -1433,6 +1438,11 @@ name = "contextra-vault"
 version = "0.1.0"
 dependencies = [
  "contextra-sys",
+ "contextra-types",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]

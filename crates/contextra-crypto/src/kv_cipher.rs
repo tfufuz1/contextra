@@ -6,7 +6,7 @@
 //! ## Invarianten
 //! - Tenant- und Model-Fingerprints fließen als Associated Data (AD) ein, um
 //!   mandantenübergreifende Vertauschungsangriffe zu verhindern.
-//! - Format-Versionierungs-Header garantiert Abwärtskompatibilität.
+//! - Format-Versionierungs-Header sichert Abwärtskompatibilität ab.
 //! - Nonce-Generierung schließt Kollisionen aus.
 
 // FILE-CONTEXT
