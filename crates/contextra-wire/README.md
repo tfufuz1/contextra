@@ -37,5 +37,14 @@ assert_eq!(buf.len(), 19);
 contextra-wire = { path = "../contextra-wire" }
 ```
 
+## Build-Skript & FlatBuffers-Regeneration (Entscheidung D-10)
+- In `build.rs` wird geprüft, ob die Schemadatei `../../schemas/contextra.fbs` existiert.
+- Da `cargo` Build-Skripte im Crate-Verzeichnis (`crates/contextra-wire`) ausführt, zeigt dieser Pfad auf `<Repo-Root>/schemas/contextra.fbs`. Dieser Pfad existiert im Repository nicht (das Schema liegt stattdessen unter `crates/contextra-wire/schemas/contextra.fbs`).
+- Befund per `ls`:
+  `ls -d crates/contextra-wire/../../schemas/contextra.fbs` liefert `No such file or directory`.
+- Befund per `cargo build -v`:
+  Das Build-Skript läuft durch, ohne Regeneration auszuführen, ohne `flatc` aufzurufen und ohne Fehler abzuliefern.
+- **Entscheidung (D-10):** `build.rs` bleibt unverändert. Die automatische Regeneration läuft nie, wodurch der fest eingecheckte Code in `src/contextra_generated.rs` deterministisch und unverändert benutzt wird. Dies verhindert unabsichtliche Verhaltensänderungen. Die Unversehrtheit des Schemas wird stattdessen über den SHA-256 Prüfsummentest (`G-F2`, `cargo test -p contextra-wire --test schema_checksum`) sichergestellt.
+
 ## Bekannte Grenzen
 - Größere Nachrichten übersteigen bei FlatBuffers und JSON-RPC konfigurierte Schutzgrenzen (`FlatBufferConfig`, `JsonRpcConfig`).

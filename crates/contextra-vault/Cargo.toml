@@ -1,0 +1,24 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-vault"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Contextra — Ephemeral in-memory context vault and memory locking"
+
+[dependencies]
+contextra-sys = { workspace = true }
+contextra-types = { workspace = true }
+zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = []
+workspace = []
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -1,3 +1,4 @@
+// Herkunft: contextra-mcp/src/prompt_injection/policy.rs @ HEAD 9305c5d048cc6a4143d4e7cbf114cd85a6fca34a
 use serde::{Deserialize, Serialize};
 
 /// Neutraler Standard-Platzhalter für als verdächtig erkannten Text im Strict/Escalate-Modus.
@@ -9,7 +10,7 @@ pub const DEFAULT_REDACTION_PLACEHOLDER: &str =
 /// **SICHERHEITSHINWEIS & HEURISTIK-LIMITATION**:
 /// Pattern-Matching und Normalisierung stellen ein Defense-in-Depth Heuristik-System dar.
 /// Es bietet **keine absolute Garantie** gegen neuartige oder komplexe Prompt-Injection-Angriffe.
-/// MCP-Clients müssen abgerufene Dokumenteninhalte weiterhin in isolierten Prompt-Kontexten
+/// Clients müssen abgerufene Dokumenteninhalte weiterhin in isolierten Prompt-Kontexten
 /// (z.B. `<untrusted_context>`) verarbeiten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -30,6 +31,8 @@ pub enum QuarantinePolicy {
 }
 
 impl QuarantinePolicy {
+    #[cfg(feature = "std")]
+    #[allow(clippy::disallowed_methods)]
     pub fn from_env() -> Self {
         if let Ok(val) = std::env::var("CONTEXTRA_MCP_QUARANTINE_POLICY") {
             match val.trim().to_lowercase().as_str() {
