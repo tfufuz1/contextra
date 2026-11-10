@@ -53,7 +53,8 @@ impl SnapshotPinner for Arc<contextra_mvcc::SnapshotRegistry> {
         Box::new(self.register(seq_no))
     }
 }
-use contextra_types::{ContextraError, Result};
+use crate::error::{CheckpointError, Result};
+use crate::snapshot_source::BoxFuture;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "mvcc")]
 use std::sync::Arc;
@@ -146,7 +147,7 @@ pub struct HardlinkCloneResult {
 ///
 /// # Windows NTFS Limit
 /// Unter Windows ist `CreateHardLink` NTFS-exklusiv und auf maximal **1023 Links** pro Datei limitiert.
-/// Bei Überschreitung oder dateisystemübergreifenden Links wird [`ContextraError::CrossDeviceLink`] gemeldet.
+/// Bei Überschreitung oder dateisystemübergreifenden Links wird [`CheckpointError::CrossDeviceLink`] gemeldet.
 pub trait CheckpointHardlinkCloner: Send + Sync {
     /// Klont alle für `seq_no` sichtbaren SSTable-Dateien im Quellverzeichnis ins Zielverzeichnis.
     ///
@@ -166,7 +167,7 @@ pub trait CheckpointHardlinkCloner: Send + Sync {
         source_dir: &'a Path,
         target_dir: &'a Path,
         snapshot_pinner: &'a (dyn SnapshotPinner + 'a),
-    ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>>;
+    ) -> BoxFuture<'a, Result<HardlinkCloneResult>>;
 }
 
 // ANCHOR[contextra-checkpoint:CLONE-003]
@@ -199,7 +200,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
         source_dir: &'a Path,
         target_dir: &'a Path,
         snapshot_pinner: &'a (dyn SnapshotPinner + 'a),
-    ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
+    ) -> BoxFuture<'a, Result<HardlinkCloneResult>> {
         Box::pin(async move {
             // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
             // NOTE: Der Guard wird über die gesamte Future gehalten, damit kein GC-Lauf SSTables löscht
@@ -208,14 +209,14 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
             // 2. Ensure target directory exists
             fs::create_dir_all(target_dir)
                 .await
-                .map_err(ContextraError::Io)?;
+                .map_err(CheckpointError::Io)?;
 
             // 3. Scan source directory for SSTable files (.sst)
-            let mut read_dir = fs::read_dir(source_dir).await.map_err(ContextraError::Io)?;
+            let mut read_dir = fs::read_dir(source_dir).await.map_err(CheckpointError::Io)?;
 
             let mut linked_files = Vec::new();
 
-            while let Some(entry) = read_dir.next_entry().await.map_err(ContextraError::Io)? {
+            while let Some(entry) = read_dir.next_entry().await.map_err(CheckpointError::Io)? {
                 let path = entry.path();
                 if path.is_file() {
                     let is_sst = path
@@ -227,7 +228,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                             .is_some_and(|f| f.to_string_lossy().contains(".sst"))
                     {
                         let file_name = path.file_name().ok_or_else(|| {
-                            ContextraError::invalid_input("Invalid file name in SST directory")
+                            CheckpointError::invalid_input("Invalid file name in SST directory")
                         })?;
                         let target_path = target_dir.join(file_name);
 
@@ -246,12 +247,12 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                             );
                             if let Err(copy_err) = fs::copy(&path, &target_path).await {
                                 if is_cross_device_error(&io_err) {
-                                    return Err(ContextraError::cross_device_link(
+                                    return Err(CheckpointError::cross_device_link(
                                         path.to_string_lossy(),
                                         target_path.to_string_lossy(),
                                     ));
                                 } else {
-                                    return Err(ContextraError::Io(copy_err));
+                                    return Err(CheckpointError::Io(copy_err));
                                 }
                             }
                         }

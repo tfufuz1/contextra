@@ -1,0 +1,12 @@
+{
+  "name": "golden_checkpoint_1",
+  "collection_id": "tenant_alpha_coll",
+  "seq_no": 42,
+  "tx_id": 1001,
+  "metadata": {
+    "description": "Baseline golden checkpoint",
+    "model_version": "v1.0.0"
+  },
+  "created_at": 1700000000000,
+  "id_width_bits": 64
+}

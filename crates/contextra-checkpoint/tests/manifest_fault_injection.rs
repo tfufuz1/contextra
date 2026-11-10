@@ -24,6 +24,7 @@ fn sample_meta() -> CheckpointMeta {
         tx_id: TxId::new(100),
         metadata: serde_json::json!({"step": 1}),
         created_at: 1000,
+        id_width_bits: contextra_checkpoint::CURRENT_ID_WIDTH_BITS,
     }
 }
 
