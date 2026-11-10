@@ -1,6 +1,6 @@
 //! Dokumente, Chunks, Vektor-Embeddings und Distanzmetriken.
 //!
-//! # Architektur-Rolle: Ring 0 (Vektormatrizen & Ähnlichkeitsberechnung)
+//! # Architektur-Rolle: Typen-Fundament (Vektormatrizen & Ähnlichkeitsberechnung)
 //!
 //! Dieses Modul implementiert:
 //! - `DistanceMetric`: Mathematische Metriken zur Vektor-Distanzberechnung (Kosinus, Euklidisch, Skalarprodukt)
