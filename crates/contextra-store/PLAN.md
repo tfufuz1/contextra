@@ -1,96 +1,45 @@
-# Implementierungsspezifikation & Arbeitsplan: `contextra-store`
+# contextra-store — Umsetzungsplan
 
-> **Ring:** 1 | **Klasse:** B (Storage Bundle) | **Code-Budget:** 13400 LOC | **Unsafe:** Streng verboten (`#![forbid(unsafe_code)]`)
-> **Architekturrolle:** Autarkes LSM-Storage Triebwerk, WAL Durability, Block-Cache, SSTable-Compaction und Scanner/Purger
-> **Spezifikationsbezug:** `docs/SPEC.md` §4, §5, `crates/contextra-store/SPEC.md`
+> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
 
----
+## 1. Vorbedingungen (global) [S]
 
-## 1. Architektonische Leitprinzipien & Baukasten-Vertrag
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
+| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
+| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
+| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
+| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
 
-Für `contextra-store` gelten im Rahmen der Transformation zum modularen Baukastensystem folgende verbindliche Richtlinien:
+S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
 
-1. **Modulare Einordnung in Klasse B:** Der Crate funktioniert als Kernbaustein des kohärenten Storage-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`). Externe Interaktion erfolgt primär über die Ports aus `contextra-ports`.
-2. **Entkopplung der Löschkette:** Sämtliche juristischen Begrifflichkeiten (DSGVO Art. 17), Nachweisketten, Deletion-Proofs und Saga-Orchestrierungen verbleiben exklusiv in `contextra-erasure`. Datenhaltende Module implementieren ausschließlich neutrale, funktionale Bereinigungs-Ports (`Purger`, `LayerScanner`).
-3. **Design by Contract (DbC) & Invarianten:** Alle Vorbedingungen, Nachbedingungen und Systeminvarianten (INV-STORE-1 bis INV-STORE-5) werden strikt geprüft (Fail-Closed).
-4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing (Flusher-Actor), atomare Sequenznummern und Lock-Handoff im Group-Commit abgesichert.
-5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
+## 2. Schritte dieses Crates [S]
 
----
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-37 | `store`: `StoreError`, `compat/` (`engine/`, `scanner/`), Imports → `ids`/`env`; `kv/` archivieren; `FeatureRing`-Entfernung **nach** S-50; zuletzt ID-Breite im Manifest (v2, §5.2) | S-30, S-31, S-10, S-11 | GL, GF, GC (Loom/TSan), Crash-/Recovery-Suite unverändert grün (INV-6), GE | Revert pro Teil | ☐ offen |
 
-## 2. Modul- & Komponentenarchitektur
+## 3. Reihenfolge-Zwang [S]
 
-### 2.1 Interne Struktur & Verantwortung (Tatsächliche Pfade)
+> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
 
-| Komponente / Modul | Tatsächlicher Dateipfad | Verantwortung & Schnittstellen |
-|---|---|---|
-| `lsm` | `src/lsm/` (`engine.rs`, `commit.rs`, `flush.rs`, `group_commit.rs`, `recovery.rs`, `scan.rs`, `ops/`) | LsmStorage Orchestrator, Commit, Recovery, Group-Commit |
-| `wal` | `src/wal/` (`encode.rs`, `flusher.rs`, `hmac.rs`, `io.rs`, `replay.rs`) | Write-Ahead Log mit Flusher-Actor, HMAC-Kette, Replay und Open-Heal |
-| `memtable` | `src/memtable.rs` | Nebenläufige geschardete BTreeMap mit Sequenznummern und Tombstones |
-| `sstable` | `src/sstable/` (`builder.rs`, `reader.rs`, `block_cache.rs`, `bloom.rs`, `stream.rs`, `block_search.rs`) | Block-basierte SSTables (V4 Standard), Bloom-Filter, Block-Cache |
-| `manifest` | `src/manifest/` (`core.rs`, `entry.rs`, `recovery.rs`, `rollover.rs`) | Transaktionales Manifest für SSTable-Generationen |
-| `compaction` | `src/compaction/` (`engine.rs`, `adaptive.rs`, `config.rs`, `merge_operator.rs`, `retention.rs`) | Tiered & Leveled Compaction, `MergeOperator`, Tombstone-Bereinigung |
-| `scanner` | `src/scanner/` (`mod.rs`, `memtable.rs`, `sstable.rs`, `wal.rs`, `purge.rs`) | Purger & LayerScanner Implementierung für externe Audit-Adapter |
-| `fsync` | `src/fsync.rs` | Zentralisierte, Fehler-propagierende Sync-Operationen (INV-FSYNC-1) |
-| `tenant_codec`| `src/tenant_codec.rs` | Mandanten-Präfixierung und Schlüssel-Isolation |
+## 4. Definition of Done [S]
 
-### 2.2 Abhängigkeitsmatrix & Schnittstellen
+- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
+- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
+- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
+- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
+- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
+- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports, contextra-mvcc, contextra-crypto, contextra-sys`
-- **Verbotene Abhängigkeiten:** Höhere Ringe (`contextra-engine`, `contextra-db`, `contextra-vector`, `contextra-graph`, `contextra-sandbox`).
-- **Konsumierte / Implementierte Ports:** Spezifiziert in `SPEC.md` und `AGENTS.md`.
+## 5. Offene Entscheidungen [S]
 
----
+Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
 
-## 3. Zerlegung in Arbeitspakete (Work Packages)
+## 6. Verweise
 
-### WP-STO-1: Bereinigung der Löschketten-Relikte
-- **Fokus / Betroffene Dateien:** `src/kv/mod.rs`, `src/kv/segment.rs`, `src/kv/delete_mode.rs`
-- **Problemstellung & Baukasten-Ziel:** Vollständiges Entfernen von Shredding-, DSGVO- und Deletion-Proof-Zitaten; Entflechtung der CompactionEngine.
-- **Status:** In Arbeit (DEBT-01).
+- Spezifikation: `SPEC.md` (dieses Verzeichnis)
+- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
+- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
 
-### WP-STO-2: Purger & LayerScanner Implementierung
-- **Fokus / Betroffene Dateien:** `src/scanner/purge.rs`, `src/scanner/mod.rs`
-- **Problemstellung & Baukasten-Ziel:** Implementierung der neutralen Ports für bereichsweise Purge-Kompaktion (`compact_range`) und Residual-Scans.
-- **Status:** Implementiert in `src/scanner/` (Commit `4043bb903`). Ziel für Welle 4 ist die Auslagerung in `contextra-erasure-adapters`.
-
-### WP-STO-3: WAL Durability & Commit-Abbruch-Sicherheit
-- **Fokus / Betroffene Dateien:** `src/wal/flusher.rs`, `src/wal/hmac.rs`, `src/wal/io.rs`
-- **Problemstellung & Baukasten-Ziel:** Synchrones HMAC-Rollback bei Timeout/Abbruch; Flusher prüft geschlossene Acks vor Disk-Sync; dauerhafte Vergiftung bei `fsync`-Fehlern.
-- **Status:** Abgeschlossen (Commits `08128447d`, `4abbae56a`).
-
-### WP-STO-4: Vfs-Port Umstellung
-- **Fokus / Betroffene Dateien:** `src/sstable/builder.rs`, `src/sstable/reader.rs`, `src/wal/io.rs`, `src/manifest/core.rs`
-- **Problemstellung & Baukasten-Ziel:** Vollständige Umstellung aller Dateioperationen auf `contextra_ports::Vfs`; In-Memory-Testbarkeit ohne Dateisystemabhängigkeit.
-- **Status:** Geplant für WP 4.4 / D4.
-
-### WP-STO-5: Write-Fencing & Lock-Handoff Invariante
-- **Fokus / Betroffene Dateien:** `src/lsm/group_commit.rs`, `src/lsm/engine.rs`
-- **Problemstellung & Baukasten-Ziel:** Lock-Handoff Invariante zur totalen Ordnung physischer WAL-Appends und Vermeidung von HMAC-Ketten-Races.
-- **Status:** Abgeschlossen (Commit `b635ff958`, dokumentiert in ADR-0XX-P0A).
-
----
-
-## 4. Test-, Benchmark- & Qualitätssicherungsplan
-
-### 4.1 Unit-, Integration- & Conformance-Tests
-- **Unit-Tests:** Umfassende Testabdeckung für Kernfunktionen und Randfall-Behandlungen in allen Modulen.
-- **Port-Konformität:** Validierung gegen die Prüfsuiten in `contextra-testkit`.
-- **Traceability:** Tests annotieren Spezifikationsanforderungen.
-
-### 4.2 Property-Based Testing & Fuzzing
-- Testen aller Invarianten unter zufälligen Eingaben (`tests/proptest_model_based.rs`, `tests/proptest_sstable_zero_copy_block_decode.rs`).
-- Fuzzing aller Parser-, Deserialisierungs- und Eingabepfade (`fuzz/fuzz_targets/`).
-
-### 4.3 Mutations- & Chaos-Testing
-- Chaos-Tests für Bitflips, Memory-Druck, Prozessabbrüche und Stromausfallsimulationen (`tests/chaos_*`).
-
----
-
-## 5. Definition of Done (DoD) für diesen Baustein
-
-1. Alle deklarierten Arbeitspakete sind vollständig implementiert oder als geplante Schritte sauber inventarisiert.
-2. `cargo check -p contextra-store`, `cargo test -p contextra-store` und `cargo clippy -p contextra-store` laufen fehlerfrei durch.
-3. Code-Budget von maximal 13400 LOC wird eingehalten.
-4. Keine unzulässigen Querabhängigkeiten zu höheren Ringen.
-5. Die Crate-README dokumentiert den Einsatz innerhalb des Storage-Bundles mit einem lauffähigen Minimalbeispiel.
