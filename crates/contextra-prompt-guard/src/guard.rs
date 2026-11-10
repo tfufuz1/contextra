@@ -1,6 +1,12 @@
+// Herkunft: contextra-mcp/src/prompt_injection/guard.rs @ HEAD 9305c5d048cc6a4143d4e7cbf114cd85a6fca34a
 use super::audit::{SecurityAuditLogger, SecurityAuditRecord};
-use super::policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
-use contextra_ports::{Clock, SystemClock};
+use super::clock::{Clock, SystemClock};
+#[cfg(feature = "file-audit")]
+use super::error::GuardError;
+#[cfg(feature = "file-audit")]
+use super::policy::PromptInjectionConfig;
+use super::policy::{QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
+#[cfg(feature = "file-audit")]
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
@@ -24,7 +30,7 @@ pub struct NormalizedPattern {
 /// - Unbekannte oder neuartige Formulierungen werden nicht erkannt.
 /// - Semantisch äquivalente, aber lexikalisch abweichende Phrasierungen können
 ///   den Filter umgehen.
-/// - MCP-Clients müssen abgerufene Dokumenteninhalte weiterhin in isolierten
+/// - Clients müssen abgerufene Dokumenteninhalte weiterhin in isolierten
 ///   Prompt-Kontexten mit expliziter Rollenabgrenzung verarbeiten.
 ///
 /// Für defense-in-depth wird die Kombination mit LLM-seitigem
@@ -183,14 +189,21 @@ impl PromptInjectionGuard {
         &self.audit_logger
     }
 
-    /// Lädt die Konfiguration aus einer externen JSON- oder TOML-Datei.
-    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, String> {
+    /// Lädt die Konfiguration aus einer externen JSON-Datei.
+    #[cfg(feature = "file-audit")]
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, GuardError> {
         let path = path.as_ref();
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Konfigurationsdatei konnte nicht gelesen werden: {e}"))?;
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            GuardError::Io(format!(
+                "Konfigurationsdatei konnte nicht gelesen werden: {e}"
+            ))
+        })?;
 
-        let config: PromptInjectionConfig = serde_json::from_str(&content)
-            .map_err(|e| format!("Fehler beim Parsen der Injection-Konfiguration: {e}"))?;
+        let config: PromptInjectionConfig = serde_json::from_str(&content).map_err(|e| {
+            GuardError::Serialization(format!(
+                "Fehler beim Parsen der Injection-Konfiguration: {e}"
+            ))
+        })?;
 
         let mut patterns = Self::default_patterns();
         for custom in config.custom_patterns {
@@ -215,6 +228,8 @@ impl PromptInjectionGuard {
     }
 
     /// Erstellt eine Instanz basierend auf Umgebungsvariablen.
+    #[cfg(feature = "file-audit")]
+    #[allow(clippy::disallowed_methods)]
     pub fn from_env() -> Self {
         let policy = QuarantinePolicy::from_env();
         let log_path = std::env::var("CONTEXTRA_MCP_SECURITY_LOG")
@@ -306,7 +321,7 @@ impl PromptInjectionGuard {
             '\u{0456}' => 'i', // і
             '\u{0457}' => 'i', // ї
             '\u{0455}' => 's', // ѕ
-            '\u{0458}' => 'j', // ј
+            '\u{0458}' => 'j', // j
             '\u{0501}' => 'd', // ԁ
             '\u{051B}' => 'q', // ԛ
             '\u{051D}' => 'w', // ԝ

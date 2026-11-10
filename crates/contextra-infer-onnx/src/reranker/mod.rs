@@ -168,11 +168,13 @@ pub enum CrossEncoderReranker {
     /// ONNX Runtime Engine.
     Onnx(OnnxReranker),
     /// Fake / Passthrough Engine für isolierten Betrieb ohne externe Abhängigkeiten.
+    #[cfg(any(test, feature = "test-utils"))]
     Fake(crate::fakes::FakeReranker),
 }
 
 impl CrossEncoderReranker {
     /// Erstellt einen Passthrough- / Fake-Reranker ohne externe Modell-Abhängigkeiten.
+    #[cfg(any(test, feature = "test-utils"))]
     #[must_use]
     pub fn passthrough() -> Self {
         Self::Fake(crate::fakes::FakeReranker::new())
@@ -191,6 +193,7 @@ impl Reranker for CrossEncoderReranker {
     fn score(&self, query: &str, docs: &[&str]) -> Result<Vec<f32>> {
         match self {
             Self::Onnx(r) => r.score(query, docs),
+            #[cfg(any(test, feature = "test-utils"))]
             Self::Fake(f) => f.score(query, docs),
         }
     }
