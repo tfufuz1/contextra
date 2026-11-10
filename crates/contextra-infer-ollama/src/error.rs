@@ -1,4 +1,4 @@
-//! Lokaler Fehlertyp und Traits für `contextra-infer-ollama` (B4- und B3-Konformität).
+//! Lokaler Fehlertyp und Kern-Traits für `contextra-infer-ollama`.
 
 use thiserror::Error;
 
@@ -172,6 +172,12 @@ impl LocalQueryRewriteOutput {
 }
 
 /// Lokale Bewertung von Wichtigkeit (entkoppelt von `contextra-types::ImportanceScore`).
+///
+/// # Skala
+/// Der Wert liegt im kontinuierlichen Intervall `[0.0, 1.0]`:
+/// - `0.0`: Völlig unwichtig / Rauschen / Verwerfbar.
+/// - `0.5`: Standard-Fallback bei unvollständigem oder unparsebarem LLM-Ergebnis.
+/// - `1.0`: Höchste Priorität / Essentielle Information / Dauerhaftes Behalten im Kontext.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]
 pub struct LocalImportanceScore(pub f32);
 

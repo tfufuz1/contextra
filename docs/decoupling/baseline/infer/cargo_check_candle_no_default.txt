@@ -1,0 +1,74 @@
+    Checking contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `thiserror`
+  --> crates/contextra-infer-candle/src/error.rs:10:17
+   |
+10 | #[derive(Debug, thiserror::Error)]
+   |                 ^^^^^^^^^ use of unresolved module or unlinked crate `thiserror`
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:14:7
+   |
+14 |     #[error("I/O error: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `from` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:15:10
+   |
+15 |     Io(#[from] std::io::Error),
+   |          ^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:18:7
+   |
+18 |     #[error("Model load error: {reason}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:25:7
+   |
+25 |     #[error("Tokenizer error: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:29:7
+   |
+29 |     #[error("Inference execution error: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:33:7
+   |
+33 |     #[error("Invalid parameter: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:37:7
+   |
+37 |     #[error("Resource limit exceeded: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:41:7
+   |
+41 |     #[error("Grounding policy violation: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:45:7
+   |
+45 |     #[error("Backend unavailable: {0}")]
+   |       ^^^^^
+
+error[E0277]: `error::Error` doesn't implement `std::fmt::Display`
+   --> crates/contextra-infer-candle/src/gguf_loader.rs:268:58
+    |
+268 |         reason: format!("Failed to read version from {}: {e}", path.display()),
+    |                                                          ^^^ `error::Error` cannot be formatted with the default formatter
+    |
+    = help: the trait `std::fmt::Display` is not implemented for `error::Error`
+    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+    = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `format` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0433.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `contextra-infer-candle` (lib) due to 11 previous errors

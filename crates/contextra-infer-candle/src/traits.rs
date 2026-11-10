@@ -70,3 +70,42 @@ pub trait KvStateSource: Send + Sync {
     /// Liest ein KV-Zustandssegment anhand des opaken Schlüssels.
     fn load_segment(&self, segment_id: &[u8]) -> Result<Option<Vec<u8>>>;
 }
+
+/// Lokaler Trait zur Konfidenz-Kalibrierung (entkoppelt von `contextra-rank`).
+pub trait ConfidenceCalibrator: Send + Sync {
+    /// Liefert die kalibrierte Wahrscheinlichkeit für einen Roh-Score in [0.0, 1.0].
+    fn calibrated_probability(&mut self, raw_score: f32) -> Option<f32>;
+
+    /// Zeichnet eine Beobachtung für die Kalibrierung auf.
+    fn record_outcome(&mut self, raw_score: f32, ground_truth: bool);
+
+    /// Liefert die Anzahl gesammelter Beobachtungen.
+    fn observation_count(&self) -> usize;
+
+    /// Setzt die Kalibrierung zurück (z.B. bei Schwellenwert- oder Modelländerung).
+    fn reset(&mut self);
+}
+
+/// Deterministische Null-Kalibrierung für autarken Betrieb ohne rank-Crate.
+#[derive(Debug, Default, Clone)]
+pub struct IdentityCalibrator {
+    count: usize,
+}
+
+impl ConfidenceCalibrator for IdentityCalibrator {
+    fn calibrated_probability(&mut self, raw_score: f32) -> Option<f32> {
+        Some(raw_score)
+    }
+
+    fn record_outcome(&mut self, _raw_score: f32, _ground_truth: bool) {
+        self.count = self.count.saturating_add(1);
+    }
+
+    fn observation_count(&self) -> usize {
+        self.count
+    }
+
+    fn reset(&mut self) {
+        self.count = 0;
+    }
+}
