@@ -33,13 +33,36 @@
 #![forbid(unsafe_code)]
 
 use crate::crypto::KeyManager;
-#[cfg(feature = "kv-encryption")]
 use crate::error::{CryptoError, Result};
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-pub use contextra_types::ModelFingerprint;
+/// Uniquely identifies a model weight file and its quantization tier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelFingerprint {
+    /// SHA-256 hash digest over model weight blob and quantization tier string.
+    pub hash: [u8; 32],
+    /// Model identifier or filename (e.g. "llama-3.2-3b-instruct").
+    pub model_id: String,
+    /// String representation of quantization tier (e.g. "Q4_K_M", "Q8_0", "F16").
+    pub quantization: String,
+}
+
+impl ModelFingerprint {
+    /// Creates a new `ModelFingerprint`.
+    pub fn new(
+        hash: [u8; 32],
+        model_id: impl Into<String>,
+        quantization: impl Into<String>,
+    ) -> Self {
+        Self {
+            hash,
+            model_id: model_id.into(),
+            quantization: quantization.into(),
+        }
+    }
+}
 
 /// Current serialized format version for [`EncryptedKvLayer`].
 /// Increment when the serialized layout changes in a breaking way.
@@ -70,25 +93,23 @@ pub struct EncryptedKvLayer {
 /// Abstract cipher trait for KV block encryption and seal/open operations.
 pub trait KvCipher: Send + Sync {
     /// Encrypts (seals) plaintext byte payload into authenticated ciphertext bytes.
-    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>>;
+    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>>;
     /// Decrypts (opens) authenticated ciphertext bytes back to plaintext byte payload.
-    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>>;
+    fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>>;
 }
 
 impl KvCipher for KeyManager {
-    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
-        let (ct, nonce) = self
-            .encrypt_auto_nonce(plaintext)
-            .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))?;
+    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        let (ct, nonce) = self.encrypt_auto_nonce(plaintext)?;
         let mut out = Vec::with_capacity(12 + ct.len());
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&ct);
         Ok(out)
     }
 
-    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+    fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
         if ciphertext.len() < 12 {
-            return Err(contextra_types::ContextraError::Crypto(
+            return Err(CryptoError::Crypto(
                 "Ciphertext too short for nonce payload".into(),
             ));
         }
@@ -96,11 +117,10 @@ impl KvCipher for KeyManager {
             ciphertext[..12]
                 .try_into()
                 .map_err(|e: std::array::TryFromSliceError| {
-                    contextra_types::ContextraError::ParseError(e.to_string())
+                    CryptoError::InvalidInput(e.to_string())
                 })?;
         let ct = &ciphertext[12..];
         self.decrypt_auto_nonce(ct, nonce)
-            .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))
     }
 }
 
@@ -193,11 +213,11 @@ impl KvSegmentCipher {
 
 #[cfg(feature = "kv-encryption")]
 impl KvCipher for KvSegmentCipher {
-    fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+    fn seal(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
         self.key_manager.seal(plaintext)
     }
 
-    fn open(&self, ciphertext: &[u8]) -> contextra_types::Result<Vec<u8>> {
+    fn open(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
         self.key_manager.open(ciphertext)
     }
 }

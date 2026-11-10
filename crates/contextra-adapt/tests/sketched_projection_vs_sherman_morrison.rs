@@ -1,4 +1,4 @@
-#![cfg(feature = "sketched-bandit")]
+#![cfg(feature = "bandit-routing")]
 //! # Vergleichstest: Sketched-Projection vs. exaktes Sherman-Morrison
 //!
 //! Validiert die statistische Rangkorrelation der UCB-Scores zwischen projiziertem und

@@ -260,7 +260,7 @@ impl KeyManager {
     /// Derives a sub-key for KV-cache segment encryption using raw 32-byte model fingerprint.
     pub fn derive_kv_key_bytes(
         &self,
-        tenant_id: contextra_types::TenantId,
+        tenant_id: contextra_ids::TenantId,
         fingerprint: &[u8; 32],
     ) -> Result<Self> {
         let mut info = Vec::with_capacity(b"contextra-kv-layer-v2:".len() + 8 + 32);
@@ -274,8 +274,8 @@ impl KeyManager {
     /// using raw 32-byte model fingerprint.
     pub fn derive_kv_key_scoped_bytes(
         &self,
-        scoped_fingerprint: contextra_types::TenantScoped<&[u8; 32]>,
-        expected_tenant_id: &contextra_types::TenantId,
+        scoped_fingerprint: contextra_ids::TenantScoped<&[u8; 32]>,
+        expected_tenant_id: &contextra_ids::TenantId,
     ) -> Result<Self> {
         let fingerprint = scoped_fingerprint
             .into_inner_checked(expected_tenant_id)
@@ -286,7 +286,7 @@ impl KeyManager {
     /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId` with raw 32-byte fingerprint.
     pub fn cipher_for_bytes(
         &self,
-        tenant_id: contextra_types::TenantId,
+        tenant_id: contextra_ids::TenantId,
         fingerprint: &[u8; 32],
     ) -> Result<Self> {
         self.derive_kv_key_bytes(tenant_id, fingerprint)
@@ -296,8 +296,8 @@ impl KeyManager {
     /// with raw 32-byte fingerprint.
     pub fn cipher_for_scoped_bytes<T>(
         &self,
-        scoped_key: contextra_types::TenantScoped<T>,
-        expected_tenant_id: &contextra_types::TenantId,
+        scoped_key: contextra_ids::TenantScoped<T>,
+        expected_tenant_id: &contextra_ids::TenantId,
         fingerprint: &[u8; 32],
     ) -> Result<Self> {
         let _unpacked = scoped_key
@@ -311,7 +311,7 @@ impl KeyManager {
     /// `CryptoError::KvFormatVersionMismatch` — never with a silent garbage-data result.
     pub fn derive_kv_key(
         &self,
-        tenant_id: contextra_types::TenantId,
+        tenant_id: contextra_ids::TenantId,
         model_fingerprint: &crate::kv_cipher::ModelFingerprint,
     ) -> Result<Self> {
         // S-2 FIX: Length-prefix each variable field before concatenation.
@@ -346,8 +346,8 @@ impl KeyManager {
     /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
     pub fn derive_kv_key_scoped(
         &self,
-        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
-        expected_tenant_id: &contextra_types::TenantId,
+        scoped_fingerprint: contextra_ids::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
+        expected_tenant_id: &contextra_ids::TenantId,
     ) -> Result<Self> {
         let fingerprint = scoped_fingerprint
             .into_inner_checked(expected_tenant_id)
@@ -356,7 +356,7 @@ impl KeyManager {
     }
 
     /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
-    pub fn cipher_for(&self, tenant_id: contextra_types::TenantId) -> Result<Self> {
+    pub fn cipher_for(&self, tenant_id: contextra_ids::TenantId) -> Result<Self> {
         let dummy_fp = crate::kv_cipher::ModelFingerprint {
             hash: [0u8; 32],
             model_id: "default_tenant_cipher".to_string(),
@@ -369,8 +369,8 @@ impl KeyManager {
     /// Unpacks `scoped_key` only if the bound `TenantId` matches `expected_tenant_id`.
     pub fn cipher_for_scoped<T>(
         &self,
-        scoped_key: contextra_types::TenantScoped<T>,
-        expected_tenant_id: &contextra_types::TenantId,
+        scoped_key: contextra_ids::TenantScoped<T>,
+        expected_tenant_id: &contextra_ids::TenantId,
     ) -> Result<Self> {
         let _unpacked = scoped_key
             .into_inner_checked(expected_tenant_id)
@@ -742,7 +742,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_length_prefix_prevents_collision() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_types::TenantId;
+        use contextra_ids::TenantId;
 
         // Setup: Zwei ModelFingerprint-Instanzen mit gleichem hash, aber unterschiedlicher
         // Aufteilung von model_id/quantization die ohne Längenpräfix kollidieren würden.
@@ -774,7 +774,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_same_fingerprint_produces_same_key() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_types::TenantId;
+        use contextra_ids::TenantId;
 
         // Determinismus-Test: Gleiche Eingaben → gleicher Key (HKDF ist deterministisch)
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
@@ -796,7 +796,7 @@ mod tests {
     #[test]
     fn test_derive_kv_key_scoped_enforces_tenant_isolation() -> Result<()> {
         use crate::kv_cipher::ModelFingerprint;
-        use contextra_types::{TenantId, TenantScoped};
+        use contextra_ids::{TenantId, TenantScoped};
 
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;
         let tenant_a =
@@ -983,7 +983,7 @@ mod tests {
 #[cfg(test)]
 mod tests_cr42_differential {
     use super::*;
-    use contextra_types::{TenantId, TenantScoped};
+    use contextra_ids::{TenantId, TenantScoped};
 
     #[test]
     fn test_derive_kv_key_bytes_deterministic_and_matches_reference() -> Result<()> {

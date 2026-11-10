@@ -106,6 +106,7 @@ pub use embedding::*;
 pub use graph::*;
 pub use graph_index::*;
 pub use id_gen::*;
+pub use key_material::KeyMaterialSource;
 pub use kv::*;
 pub use kv_bridge_port::*;
 pub use license::*;
@@ -120,11 +121,10 @@ pub use scanner::{
     LayerScanner, LayerWitness, PurgeStats, Purger, ScanSession, ScanTarget, ScanTechnique,
     WitnessLayer,
 };
-pub use storage::*;
+pub use storage::{StorageEngine, StorageStats, MAX_SCAN_MERGE_ACCUMULATOR};
 pub use text_index::*;
 pub use vector_index::*;
 pub use vfs::*;
-pub use key_material::KeyMaterialSource;
 
 /// Generic contract tests for port implementers.
 #[cfg(any(feature = "contract-tests", feature = "conformance"))]
@@ -174,6 +174,7 @@ mod dyn_safety {
         _assert_dyn_graph_mutation(None);
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
+        _assert_dyn_response_grounding_validator(None);
         _assert_dyn_clock(None);
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);

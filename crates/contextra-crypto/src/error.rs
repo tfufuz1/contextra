@@ -67,7 +67,7 @@ pub enum CryptoError {
     KeyRevoked(String),
 
     #[error("storage or I/O error: {0}")]
-    Storage(#[from] contextra_types::ContextraError),
+    Storage(String),
 }
 
 impl CryptoError {
@@ -78,53 +78,9 @@ impl CryptoError {
             reason: reason.into(),
         }
     }
-}
 
-// NOTE: From<CryptoError> for contextra_types::ContextraError is provided by crate::compat::error
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use contextra_types::ContextraError;
-
-    #[test]
-    fn test_from_crypto_error() {
-        let crypto_err = CryptoError::WalCorruption {
-            offset: 42,
-            reason: "bad hmac".to_string(),
-        };
-        let mf_err: ContextraError = crypto_err.into();
-        assert!(matches!(
-            mf_err,
-            ContextraError::WalCorruption {
-                offset: 42,
-                ref reason,
-                ..
-            } if reason == "bad hmac"
-        ));
-
-        let invalid_input = CryptoError::InvalidInput("bad key".to_string());
-        let mf_err_inv: ContextraError = invalid_input.into();
-        assert!(matches!(
-            mf_err_inv,
-            ContextraError::InvalidInput(ref msg) if msg == "bad key"
-        ));
-
-        let gen_crypto = CryptoError::Encryption("failed".to_string());
-        let mf_err_gen: ContextraError = gen_crypto.into();
-        assert!(matches!(
-            mf_err_gen,
-            ContextraError::Crypto(ref msg) if msg.contains("encryption failed")
-        ));
-
-        let version_mismatch = CryptoError::KvFormatVersionMismatch {
-            expected: 2,
-            found: 1,
-        };
-        let mf_err_version: ContextraError = version_mismatch.into();
-        assert!(matches!(
-            mf_err_version,
-            ContextraError::InvalidInput(ref msg) if msg.contains("expected 2, found 1")
-        ));
+    /// Helper to construct a `Storage` error.
+    pub fn storage(reason: impl Into<String>) -> Self {
+        Self::Storage(reason.into())
     }
 }
