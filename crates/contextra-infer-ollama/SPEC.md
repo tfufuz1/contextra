@@ -1,56 +1,119 @@
-# SPEC: `contextra-infer-ollama`
+# contextra-infer-ollama — Spezifikation
 
-> **Normative Baustein-Spezifikation (Klasse A, Ring 2)**
-> **Stand:** Welle 3 / SPEC v4.0
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
----
+**Pfad:** `crates/contextra-infer-ollama/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
-## 1. Zweck & Abgrenzung
+## 1. Zweck
 
-`contextra-infer-ollama` ist ein autarker REST/HTTP-Adapter für Ollama-Inferenzinstanzen. Er dient der Einbindung lokaler oder entfernter LLM- und Embedding-Modelle in RAG-Pipelines.
+Ollama-HTTP-Client, Circuit-Breaker und Query-Rewriter. *[S]*
 
-### Nicht-Ziele
-- Keine persistente Speicherung oder Indizierung von Vektoren (Aufgabe von `contextra-vector`).
-- Keine Transaktionskoordination (`TxId`, MVCC).
-- Keine Löschlogik oder DSGVO-Verwaltung (Aufgabe von `contextra-erasure`).
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
 
----
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | llm |
+| Ebene (Kern-Closure) | 1 |
+| Kern-Closure | env |
+| Default-Features | — |
+| Fehlertyp (R3) | `OllamaError` |
+| Brücke (hinter Feature `workspace`, §1.1) | `trait_impls`, `query_rewriter`, `From` |
 
-## 2. Architektonische Invarianten & Schnittstellen
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
 
-1. **Baustein-Eigenschaften B1–B12 (Klasse A):**
-   - 0 interne Abhängigkeiten im Core-Build (`default = []`).
-   - Ein typisiertes Fehler-Enum: `OllamaError` (`#[non_exhaustive]`).
-   - Keine Fremdfachlogik; Standardtypen und eigene Typen in der öffentlichen API.
-2. **Feature-Gates:**
-   - `http`: Aktiviert `reqwest`, `tokio`, `futures` sowie den asynchronen `OllamaClient` und `OllamaEmbedder`.
-   - `ports-compat`: Transitionales Adapter-Feature (Ablauf in Welle 6), das `contextra-ports` und `contextra-types` bindet (`EmbeddingProvider`, `LlmTextGenerator`, `QueryRewriter`).
-3. **Resilienz & Egress:**
-   - Alle Requests laufen über konfigurierbare Timeouts (Connect, Read, Request).
-   - Exponential Backoff mit Jitter für transiente 5xx- und Netzwerkfehler. Clientfehler 4xx werden niemals wiederholt.
-   - Circuit-Breaker schützt vor kaskadierenden Ausfällen und öffnet nach Schwellwertüberschreitung.
-   - Endpoint-Policy prüft Adressen vor dem Verbindungsaufbau (Standard: `LocalOnly`).
+## 3. Ist-Zustand (tools/)
 
----
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 5537 Zeilen in 19 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | types, ports |
+| Interne Dev-Abhängigkeiten (Ist) | keine |
+| Features (Ist, Anzahl) | 5 |
+| Default-Features (Ist) | keine |
+| `cfg(feature = …)`-Stellen in src/ | 104 |
+| `#[test]`-Vorkommen (grep, src + tests) | 51 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 0 (Tool 0; 0 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 0 / 0 / False |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 1 (Tool 1) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | OllamaError |
 
-## 3. Fehlermodell (`OllamaError`)
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
 
-- `InvalidInput(String)`: Validierungsfehler (leere Texte, überlange Eingaben).
-- `ModelNotFound(String)`: Modell nicht auf dem Ollama-Server installiert.
-- `Network(String)`: Verbindungsabbruch oder Verbindungsverweigerung.
-- `Timeout(String)`: Zeitüberschreitung bei Verbindung oder Datenübertragung.
-- `Server(String)`: HTTP 5xx Fehler des Ollama-Servers.
-- `Deserialization(String)`: Ungültige JSON-Antworten oder Schema-Abweichungen.
-- `EgressViolation(String)`: Verstoß gegen die Egress-Richtlinie.
-- `CircuitBreakerOpen`: Unterbrechung infolge offener Schutzschaltung.
-- `Internal(String)`: Unerwartete interne Zustände.
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
 
----
+## 4. Ist-vs-Ziel-Abgleich [V]
 
-## 4. Benchmarking & Performance
+- **Ist-Kanten, die das Ziel nicht vorsieht:** `types` (optional), `ports` (optional)
+- **Ziel-Kanten, die im Ist fehlen:** `env`
+- **Default-Features:** Ist = Ziel (leer).
 
-Criterion-Benchmarks messen deterministische Operationen ohne Server-Abhängigkeit:
-- RAG-Prompt-Generierung (`build_rag_prompt`)
-- XML-Escaping (`xml_escape`)
-- LLM-Antwort-Parsing (`parse_importance_score_response`)
-EOF
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
+
+- Keine zusätzlichen Abweichungen in dieser Prüfung festgestellt. Die Aussagen aus docs/SPEC.md sind nur dort übernommen, wo sie oben nicht widersprochen werden.
+
+## 6. Anforderungen
+
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
+
+`OllamaError` lokal; `ImportanceScore` lokal (Skala 0..1 im Doc-Kommentar festhalten, bevor sie lokal wird) mit `From` in `compat/`; `trait_impls.rs`, `query_rewriter.rs`, `ContextraError`-Konvertierung, die eine `embedding.rs`-Referenz → `compat/`; `Rng`/`Clock` aus `env`. Vorbedingung: Prüfen, dass `--no-default-features` überhaupt kompiliert (ungegatetes `pub use error::…` neben `cfg(client)`). `workspace` ersetzt `types-compat`/`ports-compat`.
+
+### 6.2 Brückenmuster [S]
+
+Die Brücke liegt ausschließlich in `src/compat/` hinter dem Feature `workspace`. Verbindliche Muster: docs/SPEC.md §4.3 (a–d). R2 gilt: `contextra_types`, `contextra_ports`, `contextra_testkit` dürfen im Kern nirgends vorkommen, auch nicht in Doc-Kommentaren oder `#[cfg(test)]`.
+
+### 6.3 Regeln für jeden Schritt [S]
+
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
+
+### 6.5 Fehlerabbildung [S]
+
+Eigener Fehlertyp: `OllamaError` (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+Keine Zeile aus dem Golden-Korpus (§5.1) bezieht sich auf dieses Crate.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**Determinismus (Produktion, bereinigt: 1; die ersten 15):** Tool-Gesamt 1.
+
+- `crates/contextra-infer-ollama/src/error.rs:135` — instant_now — `let now = std::time::Instant::now();`
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-infer-ollama/src/error.rs:8` — OllamaError
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B04 — Entkopplungsstand von `text` ist falsch eingeschätzt; Zählungen weichen ab**
+> **Entscheidung:** Zahlen sind Orientierung. Abnahme erfolgt ausschließlich über die Null-Prüfung G-L2 (§8.2) und den Build ohne Features, nie über Zählwerte. Aufwandsklasse `text`: mittel.
+
+**B16 — Einzelentscheidungen, die der Entwurf offen ließ**
+> `contextra/query_rewriter` vs. `infer-ollama/query_rewriter` — 1 gemeinsamer Name [V] — **Keine Dubletten**, keine Konsolidierung.
+
+## 10. Entscheidungen und Risiken [S]
+
+**Risiken (§9.2):**
+
+| `infer-ollama` baut nicht ohne Default | S-39 | Zuerst Gating reparieren (eigener Commit) |
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-infer-ollama --no-default-features --locked
+cargo hack check -p contextra-infer-ollama --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-infer-ollama --modes no-default,default,each-feature
+```
+
