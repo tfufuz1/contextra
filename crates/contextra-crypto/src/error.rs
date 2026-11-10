@@ -59,11 +59,6 @@ pub enum CryptoError {
         reason: String,
     },
 
-    #[error("invalid deletion proof signature")]
-    InvalidProofSignature,
-
-    #[error("unsupported deletion proof version for external verification: {0}")]
-    UnsupportedProofVersion(u8),
 
     #[error("WAL truncation detected: tail HMAC mismatch")]
     WalTruncationDetected,

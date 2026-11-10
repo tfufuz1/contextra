@@ -19,7 +19,6 @@ use contextra_crypto::{
     KeyManager,
 };
 use contextra_types::TenantId;
-use ed25519_dalek::{Signer, SigningKey, Verifier};
 use std::collections::HashSet;
 
 fn hex_decode(hex: &str) -> Vec<u8> {
@@ -33,31 +32,6 @@ fn hex_decode(hex: &str) -> Vec<u8> {
 // ============================================================================
 // HYPOTHESE 1: Known-Answer-Tests & Unabhängige Referenzvektoren (H1)
 // ============================================================================
-
-/// H1.1: Ed25519 (RFC 8032 Vector 1)
-/// Fundort der Vektoren: /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ed25519-dalek-2.2.0/tests/ed25519.rs:18
-#[test]
-fn test_h1_ed25519_rfc8032_vector() {
-    let secret_bytes =
-        hex_decode("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
-    let expected_pub =
-        hex_decode("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
-    let expected_sig = hex_decode(
-        "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
-    );
-
-    let secret_arr: [u8; 32] = secret_bytes.as_slice().try_into().unwrap();
-    let signing_key = SigningKey::from_bytes(&secret_arr);
-    let verifying_key = signing_key.verifying_key();
-
-    assert_eq!(verifying_key.to_bytes().as_slice(), expected_pub.as_slice());
-
-    let message = b"";
-    let sig = signing_key.sign(message);
-    assert_eq!(sig.to_bytes().as_slice(), expected_sig.as_slice());
-
-    assert!(verifying_key.verify(message, &sig).is_ok());
-}
 
 /// H1.2: AES-256-GCM-SIV (RFC 8452 Appendix C.2 Vector 1) über KeyManager
 /// Fundort der Vektoren: /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aes-gcm-siv-0.11.1/tests/aes256gcmsiv.rs:10

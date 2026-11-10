@@ -1,34 +1,12 @@
-#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `campaign_mut_j17.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_mut_j17`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Targeted killer test suite for contextra-crypto mutants (shard 1/4 campaign J-17).
-// ORAKEL: Independent math/spec assertions and explicit boundary inputs (R4).
-
 #![forbid(unsafe_code)]
 
 use contextra_crypto::kdf::{KDF_HEADER_MAGIC, KDF_HEADER_VERSION_1, KDF_ID_ARGON2ID};
-use contextra_crypto::kv_shredding::{GroupKek, RecordDek};
-use contextra_crypto::{
-    KdfHeader, KdfParams, KeyManager, KeyRegistry, KvCipher, KvSegmentCipher, SignatureVersion,
-    SubKey,
-};
-
-#[test]
-fn killer_test_signature_version_into_u8() {
-    // Kills mutant: <impl From<SignatureVersion> for u8>::from -> Default::default()
-    // Oracle: SignatureVersion enum discriminant values V1=1, V2=2, V3=3 defined in spec/code
-    let v1_u8: u8 = SignatureVersion::V1.into();
-    let v2_u8: u8 = SignatureVersion::V2.into();
-    let v3_u8: u8 = SignatureVersion::V3.into();
-
-    assert_eq!(v1_u8, 1, "SignatureVersion::V1 must convert to u8 value 1");
-    assert_eq!(v2_u8, 2, "SignatureVersion::V2 must convert to u8 value 2");
-    assert_eq!(v3_u8, 3, "SignatureVersion::V3 must convert to u8 value 3");
-}
+use contextra_crypto::{KdfHeader, KdfParams, KeyManager, KvCipher, KvSegmentCipher};
 
 #[test]
 fn killer_test_kdf_params_new_for_test() {
@@ -145,105 +123,4 @@ fn killer_test_kv_segment_cipher_kv_cipher_seal_open() {
         .open(&sealed)
         .expect("KvSegmentCipher open must succeed");
     assert_eq!(opened, plaintext);
-}
-
-#[test]
-fn killer_test_key_registry_get_wrapped_kek_and_dek() {
-    // Kills mutants in KeyRegistry::get_wrapped_kek & get_wrapped_dek
-    let km = KeyManager::try_new("registry-passphrase", b"registry-salt").unwrap();
-    let registry = KeyRegistry::new();
-    let group_id = 777;
-    let record_id = 888;
-
-    // Before group/record creation, get_wrapped_kek/dek return None
-    assert!(registry.get_wrapped_kek(group_id).is_none());
-    assert!(registry.get_wrapped_dek(group_id, record_id).is_none());
-
-    // Encrypt a record to populate registry
-    let payload = registry
-        .encrypt_record(&km, group_id, record_id, b"sample record")
-        .unwrap();
-
-    // Now get_wrapped_kek and get_wrapped_dek return Some((wrapped, nonce))
-    let kek_opt = registry.get_wrapped_kek(group_id);
-    assert!(kek_opt.is_some(), "Active group must return wrapped KEK");
-    let (wrapped_kek, _kek_nonce) = kek_opt.unwrap();
-    assert!(!wrapped_kek.is_empty());
-
-    let dek_opt = registry.get_wrapped_dek(group_id, record_id);
-    assert!(dek_opt.is_some(), "Active record must return wrapped DEK");
-    let (wrapped_dek, dek_nonce) = dek_opt.unwrap();
-    assert_eq!(wrapped_dek, payload.wrapped_dek);
-    assert_eq!(dek_nonce, payload.dek_nonce);
-
-    // After revoking record, get_wrapped_dek returns None, but get_wrapped_kek returns Some
-    assert!(registry.revoke_record(group_id, record_id));
-    assert!(
-        registry.get_wrapped_dek(group_id, record_id).is_none(),
-        "Revoked record wrapped DEK must be None"
-    );
-    assert!(
-        registry.get_wrapped_kek(group_id).is_some(),
-        "Unrevoked group wrapped KEK must remain Some"
-    );
-
-    // After revoking group, get_wrapped_kek returns None
-    assert!(registry.revoke_group(group_id).unwrap());
-    assert!(
-        registry.get_wrapped_kek(group_id).is_none(),
-        "Revoked group wrapped KEK must be None"
-    );
-}
-
-#[test]
-fn killer_test_key_registry_is_group_active_logic() {
-    // Kills mutant: replace && with || in KeyRegistry::is_group_active
-    let km = KeyManager::try_new("registry-passphrase", b"registry-salt").unwrap();
-    let registry = KeyRegistry::new();
-    let group_id = 999;
-
-    // 1. Group not in registry and not revoked -> active must be FALSE
-    assert!(
-        !registry.is_group_active(group_id),
-        "Unregistered group must not be active"
-    );
-
-    // 2. Group registered and active -> active must be TRUE
-    let _ = registry.get_or_derive(&km, group_id).unwrap();
-    assert!(
-        registry.is_group_active(group_id),
-        "Registered active group must be active"
-    );
-
-    // 3. Group revoked -> active must be FALSE
-    registry.revoke_group(group_id).unwrap();
-    assert!(
-        !registry.is_group_active(group_id),
-        "Revoked group must not be active"
-    );
-}
-
-#[test]
-fn killer_test_debug_redaction_for_subkeys() {
-    // Kills mutants replacing Debug fmt for SubKey, GroupKek, RecordDek with Ok(Default::default())
-    let subkey = SubKey([0x11; 32]);
-    let kek = GroupKek([0x22; 32]);
-    let dek = RecordDek([0x33; 32]);
-
-    let sk_debug = format!("{subkey:?}");
-    let kek_debug = format!("{kek:?}");
-    let dek_debug = format!("{dek:?}");
-
-    assert!(
-        sk_debug.contains("***REDACTED***"),
-        "SubKey Debug must contain ***REDACTED***"
-    );
-    assert!(
-        kek_debug.contains("***REDACTED***"),
-        "GroupKek Debug must contain ***REDACTED***"
-    );
-    assert!(
-        dek_debug.contains("***REDACTED***"),
-        "RecordDek Debug must contain ***REDACTED***"
-    );
 }

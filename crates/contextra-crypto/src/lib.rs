@@ -3,10 +3,11 @@
 // INVARIANTEN: Cryptographic primitives strictly isolated to this crate. All key operations zeroized on drop. Lock-free & I/O-free in src/.
 // NICHT-OFFENSICHTLICH: KeyManager uses AES-256-GCM-SIV with OsRng 8-byte random suffix + 4-byte prefix to prevent nonce-reuse key leakage.
 // HOTSPOTS: [1-25]
-// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
+// STAND: TS:2026-11-09
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![allow(clippy::indexing_slicing)]
 
 //! # Kryptographie-Kern für Contextra (Ring 0)
 //!
@@ -28,10 +29,7 @@
 //!    Argon2id für sichere Passphrasen-Verarbeitung.
 //! 3. **WAL-Integrität:** Kryptographische Integritätsketten mittels HMAC-SHA256 für
 //!    das Write-Ahead-Log (WAL).
-//! 4. **Kryptographische Attestationsbeweise:** Erstellung und Verifikation signierter
-//!    Attestationszertifikate (Ed25519, BLAKE3).
-//! 5. **KV-Segment-Verschlüsselung & Shredding:** Feingranulare Mandanten- und Segment-
-//!    Isolierung mit kryptographischem Shredding (Crypto-Erase).
+//! 4. **KV-Segment-Verschlüsselung:** Feingranulare Mandanten- und Segment-Isolierung.
 //!
 //! ## Invarianten
 //! - `#![forbid(unsafe_code)]`: Es gibt ausnahmslos keinen Unsafe-Code in dieser Crate.
@@ -45,34 +43,10 @@ pub mod anti_tamper;
 pub mod audit_chain;
 pub mod crypto;
 pub mod dek;
-#[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "Lösch- und Attestationslogik migriert nach contextra-erasure (SPEC §6.2)"
-)]
-pub mod deletion_proof;
-#[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "Ed25519 Proof Typen migrieren nach contextra-erasure (SPEC §6.2)"
-)]
-pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
 pub mod kv_cipher;
 pub mod kv_segment;
-#[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "KV-Shredding Logik migriert nach contextra-erasure (SPEC §6.2)"
-)]
-pub mod kv_shredding;
-#[cfg(feature = "legacy-erasure")]
-#[deprecated(
-    since = "0.1.0",
-    note = "RevocationLog migriert nach contextra-erasure (SPEC §6.2)"
-)]
-pub mod revocation_log;
 pub mod secret;
 pub mod wal_completeness;
 pub mod wal_crypto;
@@ -88,18 +62,9 @@ pub use audit_chain::{
 };
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
-#[cfg(feature = "legacy-erasure")]
-#[allow(deprecated)]
-pub use deletion_proof::{
-    CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    LayerCleanupProof, SigningKeyHandle,
-};
-#[cfg(feature = "legacy-erasure")]
-#[allow(deprecated)]
-pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-#[cfg(feature = "legacy-erasure")]
+#[cfg(feature = "kv-encryption")]
 pub use kv_cipher::KvSegmentCipher;
 pub use kv_cipher::{EncryptedKvLayer, KvCipher, ModelFingerprint};
 pub use kv_segment::{
@@ -110,12 +75,6 @@ pub use kv_segment::{
     store::TenantIsolatedKvStore,
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
-#[cfg(feature = "legacy-erasure")]
-#[allow(deprecated)]
-pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
-#[cfg(feature = "legacy-erasure")]
-#[allow(deprecated)]
-pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
 pub use wal_completeness::verify_wal_chain_completeness;
 #[cfg(feature = "cloud-egress-guard")]
 pub use wal_crypto::CloudEgressGuard;
