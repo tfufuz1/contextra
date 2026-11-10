@@ -29,7 +29,7 @@ use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
 use contextra_ports::BoxFuture;
-use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -782,6 +782,11 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
     }
 
     /// Liefert eine Referenz auf die Orphan-Registry.
+    /// Liefert eine Referenz auf die zugrundeliegende Speicher-Engine.
+    pub fn storage(&self) -> &Arc<S> {
+        &self.storage
+    }
+
     pub fn orphan_registry(&self) -> &Arc<InstanceOrphanRegistry> {
         &self.orphan_registry
     }
@@ -943,58 +948,6 @@ impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpo
 
     fn flush_orphan_registry<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.flush_orphan_registry().await })
-    }
-}
-
-impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
-    for PersistentCheckpointStore<S>
-{
-    type Meta = CheckpointMeta;
-
-    async fn create_named_checkpoint(
-        &self,
-        name: &str,
-        collection_id: &str,
-        seq_no: u64,
-        tx_id: TxId,
-        metadata: serde_json::Value,
-    ) -> Result<Self::Meta> {
-        self.create_checkpoint(name, collection_id, seq_no, tx_id, metadata)
-            .await
-    }
-
-    async fn restore_named_checkpoint(&self, name: &str) -> Result<Self::Meta> {
-        self.restore_checkpoint(name).await
-    }
-
-    async fn drop_named_checkpoint(&self, name: &str) -> Result<()> {
-        self.drop_checkpoint(name).await
-    }
-
-    async fn list_named_checkpoints(&self) -> Result<Vec<Self::Meta>> {
-        self.list_checkpoints().await
-    }
-}
-
-impl<S: contextra_ports::StorageEngine> contextra_ports::Checkpoint
-    for PersistentCheckpointStore<S>
-{
-    fn take_snapshot<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<WorkflowState>> {
-        Box::pin(async move {
-            let seq_no = self.storage.last_seq_no().await?;
-            Ok(WorkflowState {
-                tx,
-                graph_hash: *blake3::hash(format!("seq-{}", seq_no).as_bytes()).as_bytes(),
-            })
-        })
-    }
-
-    fn restore<'a>(&'a self, state: &'a WorkflowState) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            self.storage.rollback_to_tx(state.tx).await?;
-            self.list_checkpoints().await?;
-            Ok(())
-        })
     }
 }
 

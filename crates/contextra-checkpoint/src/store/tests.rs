@@ -1,3 +1,4 @@
+#![allow(clippy::duplicated_attributes)]
 //! # Unit-Tests für PersistentCheckpointStore
 //!
 //! Prüft Erstellung, Persistenz, Pinning, Drop-Semantik und Isolation von Checkpoints.
@@ -17,6 +18,7 @@ use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 
+#[cfg(test)]
 struct MockStorage {
     data: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
     pinned: Mutex<HashSet<u64>>,

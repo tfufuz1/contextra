@@ -28,7 +28,7 @@ use std::sync::Arc;
 /// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ADR-015).
 ///
 /// # Zweck
-/// Garantiert, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
+/// Stellt sicher, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
 /// automatisch entpinnt oder als verwaist registriert wird, um dauerhafte GC-Blockaden (LSM-Compaction)
 /// zu verhindern.
 ///
