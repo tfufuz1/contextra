@@ -1,58 +1,119 @@
-# SPEC: `contextra-sys` (Baustein-Spezifikation v4.1)
+# contextra-sys — Spezifikation
 
-> **Klasse:** A (Vollständig autarker Baustein nach SPEC §5.1, B1–B12)
-> **Ring:** Ring 0 (Unsafe-Insel)
-> **Status:** Stabil
-> **Geltung:** Verbindliche Verhaltens- und Schnittstellenspezifikation für Systemprimitive in Contextra.
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
----
+**Pfad:** `crates/contextra-sys/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
-## 1. Zweck und Rolle
-`contextra-sys` stellt systemnahe Betriebssystem-Primitive hinter einer **100 % sicheren Rust-Fassade** bereit:
-1. **Durability-Synchronisation:** Plattformangepasste Datei- und Verzeichnissynchronisation (`fdatasync`, `fsync`, macOS `F_FULLFSYNC`, Windows `FlushFileBuffers`) sowie typsicheres Handle-Poisoning via [`DurableFile`].
-2. **Speicherabbildung (`mmap` / `SealedMap`):** Schreibgeschützte Speicherabbildungen unveränderlicher Dateien mit strenger Längenvalidierung und Signalanomalie-Schutz.
-3. **RAM-Sperrung (`mlock`):** Schutz sensibler Speicherseiten vor Paging/Swapping auf persistenten Speicher inklusive `madvise(MADV_DONTDUMP)`.
-4. **Tresor-Speicherverwaltung (`vault`):** RAII-verwaltete gesperrte Regionen ([`LockedRegions`]), geschützte Allokationen ([`VaultBuffer`]) und volatile Speicherlöschung (`write_volatile` + Compiler-Fence `SeqCst`).
-5. **Prozess-Ressourcenlimits (`posix`):** Abfrage und Erhöhung von Dateideskriptorlimits (`rlimit`) und Deskriptorumleitung (`dup2`).
-6. **Zugriffsbeschränkung (`acl_win32`):** POSIX `0600`-Modus und UID-Besitzprüfung unter Unix; DACL-Erstellung ohne Vererbung unter Win32.
-7. **Typisiertes Fehlermodell (`error`):** Strukturierte Fehlerklassifikation via [`Error`] (`thiserror`, `#[non_exhaustive]`) mit maschinenlesbarem OS-Errno (`SyncFailed(i32)`, `MemoryLockFailed`).
+## 1. Zweck
 
----
+Plattformnahe Primitive (mmap, mlock, Durability-Hilfen) und gesperrter Speicher (`sys::vault`). *[S]*
 
-## 2. Invarianten
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
 
-| Invariante | Beschreibung | Durchsetzung |
-|---|---|---|
-| **INV-SYS-FSYNC-1** | Durability-Fehler dürfen niemals verschluckt oder still wiederholt werden (nur `EINTR` wird wiederholt). Tritt ein Flush-Fehler auf, wird das Handle permanent vergiftet und jeder nachfolgende Flush- oder Schreibversuch schlägt fehl. | `durable_flush_file`, `durable_flush_dir`, `write_all_durable`, `DurableFile` |
-| **INV-SYS-MEMLOCK-1** | Über `VaultBuffer` allozierte Puffer werden mit `mlock` gesperrt, per `MADV_DONTDUMP` vom Core-Dump ausgenommen, beim Drop mit einem nicht wegoptimierbaren Zeroize überschrieben (`write_volatile` + Fence) und erst danach `munlock`/freigegeben. Scheitert `mlock`, schlägt die Allokation fail-closed fehl. | `mlock.rs`, `vault.rs`, `VaultBuffer` |
-| **INV-IO-1** | `mmap` darf nur auf verifizierten, unveränderlichen Dateien ausgeführt werden. Mutationen während bestehender Mappings sind unzulässig. | `SealedFile::new_verified`, `SealedMap` |
-| **INV-ENCRYPT-REST-2** | Zero-Copy-`mmap` erfordert volumenlokale Speicherung und verifizierte Integrität. | `mmap_readonly`, `SealedFile` |
-| **INV-HEAP-ZERO-1** | Sensible Puffer werden vor der Freigabe mit flüchtigen Schreibzugriffen (`write_volatile`) und Compiler-Fence genullt, um Compiler-Elimination (Dead-Store Elimination) auszuschließen. | `LockedRegions::zeroize_slice`, `VaultBuffer::drop` |
-| **INV-PLATFORM-1** | Fehlende Plattformunterstützung führt niemals zu stillschweigendem Erfolg. Plattformspezifische Operationen deklarieren deterministisches Verhalten oder typisierte Fehler (`MemLockPolicy::FailClosed`, `Error::Unsupported`). | `mlock.rs`, `acl_win32.rs`, `durability.rs` |
-| **INV-SAFE-FACADE** | Sämtliche öffentlichen Funktionen und Typen bieten eine sichere API ohne Vorbedingung für `unsafe`-Blöcke. Jedes interne `unsafe` ist mit `// SAFETY:` annotiert. | `#![deny(unsafe_op_in_unsafe_fn)]`, Clippy-Gates |
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | foundation |
+| Ebene (Kern-Closure) | 0 |
+| Kern-Closure | — |
+| Default-Features | — |
+| Fehlertyp (R3) | `SysError` (besteht) |
+| Brücke (hinter Feature `workspace`, §1.1) | — |
 
----
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
 
-## 3. Fehlermodell und Typen
-- Fehler werden primär als [`Error`] (`thiserror`, `#[non_exhaustive]`) bzw. [`Result<T>`] mit verlustfreier Konvertierung nach `std::io::Error` zurückgegeben.
-- Keine Typen aus fremden `contextra-*`-Crates in öffentlichen Schnittstellen (B3).
-- Panic-Freiheit (B9): Keine Panics, Unwraps oder Expects in Produktionspfaden. Mutex-Poisoning existiert im Crate nicht (keine internen Locks).
+## 3. Ist-Zustand (tools/)
 
----
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 1581 Zeilen in 9 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | keine |
+| Interne Dev-Abhängigkeiten (Ist) | keine |
+| Features (Ist, Anzahl) | 0 |
+| Default-Features (Ist) | keine |
+| `cfg(feature = …)`-Stellen in src/ | 0 |
+| `#[test]`-Vorkommen (grep, src + tests) | 41 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 0 (Tool 0; 0 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 22 / 0 / True |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 0 (Tool 0) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | Error |
 
-## 4. Nebenläufigkeit & Prozessgarantien
-- Keine globalen statischen Zustände außer atomaren OS-Syscalls und Test-Fault-Injection.
-- Alle Datei- und Flush-Operationen sind synchron und blockierend. In asynchronen Tokio-Umgebungen müssen sie in `tokio::task::spawn_blocking` ausgeführt werden.
-- `ensure_fd_limit` und `set_fd_limit` manipulieren den prozessweiten Zustand und dürfen nur im System-Start/Composition-Root aufgerufen werden.
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
 
----
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
 
-## 5. Plattform-Matrix
+## 4. Ist-vs-Ziel-Abgleich [V]
 
-| Primitiv | Linux | macOS | Windows | Fallback |
-|---|---|---|---|---|
-| `durable_flush_file` / `DurableFile` | `fdatasync` / `fsync` | `fcntl(F_FULLFSYNC)` / `fsync` | `FlushFileBuffers` | `Error::Unsupported` |
-| `durable_flush_dir` | `open(O_DIRECTORY)` + `fsync` | `open(O_RDONLY)` + `fsync` | Best Effort (`Ok(())`) | `ErrorKind::Unsupported` |
-| `mem_lock` / `VaultBuffer` | `libc::mlock` + `MADV_DONTDUMP` | `libc::mlock` + `MADV_ZERO_WIRED_PAGES` | `VirtualLock` | `MemLockPolicy::FailClosed` |
-| `mmap_readonly` | `memmap2::Mmap` | `memmap2::Mmap` | `memmap2::Mmap` | `memmap2::Mmap` |
-| `ACL / Permissions` | `chmod 0600` + `getuid()` | `chmod 0600` + `getuid()` | DACL via `SetNamedSecurityInfoW` | Best Effort / No-Op |
+- **Ist-Kanten, die das Ziel nicht vorsieht:** keine
+- **Ziel-Kanten, die im Ist fehlen:** keine
+- **Default-Features:** Ist = Ziel (leer).
+
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
+
+- Unsafe-Audit: 22 Vorkommen, als Insel klassifiziert. Dateien: `mmap.rs`, `mlock.rs`, `posix.rs`, `acl_win32.rs`, `vault.rs`, `durability.rs`. Das Crate hat kein `forbid(unsafe_code)`.
+
+## 6. Anforderungen
+
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
+
+unverändert; `lib.rs:19` korrigieren (behauptet `durable-fs` baue darauf auf; beleglos). `vault.rs` bleibt (B16). Tier beta.
+
+### 6.3 Regeln für jeden Schritt [S]
+
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
+
+### 6.5 Fehlerabbildung [S]
+
+Eigener Fehlertyp: `SysError` (besteht) (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+Keine Zeile aus dem Golden-Korpus (§5.1) bezieht sich auf dieses Crate.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**unsafe-Dateien (6):**
+
+- `crates/contextra-sys/src/vault.rs`
+- `crates/contextra-sys/src/acl_win32.rs`
+- `crates/contextra-sys/src/posix.rs`
+- `crates/contextra-sys/src/mmap.rs`
+- `crates/contextra-sys/src/mlock.rs`
+- `crates/contextra-sys/src/durability.rs`
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-sys/src/error.rs:17` — Error
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B08 — `Vfs` kann nicht verschoben werden, ohne den Fehlertyp zu ändern**
+> **Entscheidung:** `Vfs`, `VfsFile`, `VfsOpenOptions`, `VerifiedVia` bleiben in `ports`. `durable-fs` bleibt eigenständig (E0, Tier experimental, kein Verwender). Die Plan-Schritte „`io_seam`/`fsync.rs` nach `durable-fs`“ und „`sys-flush`“ entfallen (Nicht-Ziel). Verbraucher mit Dateisystembedarf (`store`, `checkpoint`) halten eine **crate-lokale** schmale Naht (siehe §6), die Brücke bindet an `ports::Vfs`.
+
+**B16 — Einzelentscheidungen, die der Entwurf offen ließ**
+> `contextra-vault` vs. `sys/vault.rs` — Öffentliche Namen gemeinsam: 3; `sys::vault` = gesperrter Speicher (`allocate`, `as_slice`, `is_locked`), `db::volatile_vault` = Chunk-Tresor (`ingest`, `commit`, `SignalModality`) [V] — **Aufbauend, nicht ersetzend:** `contextra-vault` (E1, Kern-Closure …
+
+## 10. Entscheidungen und Risiken [S]
+
+**Entscheidungen (§9.1):**
+
+| D-07 | `vault` baut auf `sys::vault`; `mcp::protocol` und `wire::jsonrpc` bleiben getrennt; `adapt::drift`/`rank::drift` und die beiden `query_rewriter` bleiben getrennt (B16) |
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-sys --no-default-features --locked
+cargo hack check -p contextra-sys --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-sys --modes no-default,default,each-feature
+```

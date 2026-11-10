@@ -1,83 +1,113 @@
-# Spezifikation: `contextra-audit-export`
+# contextra-audit-export — Spezifikation
 
-**Version:** 1.0 (SPEC v4.0, Welle 1)
-**Rolle:** Autarkes Export-Werkzeug für Verarbeitungsverzeichnisse (DSGVO Art. 30) und BSI IT-Grundschutz / TR-02102 Zuordnungstabellen
-**Baustein-Klasse:** Klasse A (Ring Extension / Autarker Baustein)
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
----
+**Pfad:** `crates/contextra-audit-export/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
-## 1. Zweck und Abgrenzung
+## 1. Zweck
 
-### Zweck
-`contextra-audit-export` liest neutrale Verarbeitungs- und Audit-Datensätze und transformiert diese deterministisch in typsichere, standardkonforme Exportformate:
-- **JSON** (strukturiert, maschinenlesbar, deterministisch nach Mandant und Zweck sortiert)
-- **Markdown** (tabellarisch formatiert mit striktem Tabellen- und Zeichen-Escaping)
-- **CSV** (RFC 4180 konform mit robustem Field-Quoting)
-- **BSI-Mapping** (kryptographische Zuordnungstabelle nach BSI TR-02102 und BSI IT-Grundschutz CON.1, CON.2, CON.6, OPS.1.1.5)
+Audit-Export (CSV, Markdown, BSI-Mapping). *[S]*
 
-### Strikte Abgrenzung (§6)
-- **Keine Löschlogik:** `contextra-audit-export` erzeugt Verzeichnis- und Audit-Berichte.
-- **Keine Löschkette, kein Löschbeweis, keine Saga:** Das Crate enthält weder `Purger`, `LayerScanner`, `WitnessLayer` noch Saga- oder Deletion-Proof-Verifikationslogik. Alle Lösch- und Beweisabläufe verbleiben ausschließlich im Kern `contextra-erasure`.
-- **Keine Rechtsberatung:** Die generierten Berichte und Zuordnungstabellen stellen technische Hilfsmittel dar und begründen keine formale Zertifizierung oder Rechtsberatung.
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
 
----
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | compliance |
+| Ebene (Kern-Closure) | 0 |
+| Kern-Closure | — |
+| Default-Features | `std` |
+| Fehlertyp (R3) | besteht |
+| Brücke (hinter Feature `workspace`, §1.1) | `types`-`From` |
 
-## 2. Invarianten
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
 
-| ID | Invariante | Beschreibung |
-|---|---|---|
-| **INV-LOG-1** | Keine Nutzinhalte in Fehlermeldungen | Fehler enthalten ausschließlich Feldnamen oder Zähler, niemals sensible Nutzdaten, Passwörter oder Klartext-Payloads. |
-| **INV-CLAIMS-1** | Ehrlichkeit und belegte Aussagen | Externe Zusicherungen enthalten keine unbewiesenen Garantien ("garantiert 100%"). Die BSI-Zuordnung weist explizit aus, dass keine formale Zertifizierung vorliegt. |
-| **INV-EXPORT-DET-1** | Deterministische Sortierung | Exporte werden strikt nach `(tenant_id, processing_purpose, controller_name)` sortiert. Listenfelder werden lexikographisch stabil sortiert. |
-| **INV-ZERO-PANIC** | Zero-Panic in Produktionscode | Alle Parsing-, Formatierungs- und Validierungspfade geben typisierte `Result<T, AuditExportError>` zurück. Keine Panics oder unbegrenztes Unwrapping. |
+## 3. Ist-Zustand (tools/)
 
----
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 768 Zeilen in 7 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | types |
+| Interne Dev-Abhängigkeiten (Ist) | keine |
+| Features (Ist, Anzahl) | 3 |
+| Default-Features (Ist) | std, types-compat |
+| `cfg(feature = …)`-Stellen in src/ | 2 |
+| `#[test]`-Vorkommen (grep, src + tests) | 37 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 0 (Tool 0; 0 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 0 / 0 / False |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 0 (Tool 0) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | AuditExportError |
 
-## 3. Schnittstellen & Datentypen
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
 
-### `TenantId` (Baustein-Eigener Typ / B3)
-Autarker 64-Bit Newtype (`TenantId(pub u64)`):
-- `TenantId::try_new(id)`: Verhindert `0` (reserviert für `TenantId::SYSTEM`).
-- `TenantId::from_raw(id)`: Direkte Konstruktion.
-- Feature `types-compat`: Bietet bidirektionale `From`-Konvertierungen zu `contextra_types::TenantId`.
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
 
-### `ProcessingRegisterEntry`
-Enthält alle gemäß Art. 30 Abs. 1 DSGVO vorgeschriebenen Pflichtangaben:
-- `controller_contact`: Verantwortlicher, Vertreter, DSB
-- `processing_purpose`: Verarbeitungszweck
-- `data_subject_categories`: Kategorien betroffener Personen
-- `data_categories`: Kategorien personenbezogener Daten
-- `recipient_categories`: Empfängerkategorien
-- `third_country_transfers`: Drittlandübermittlungen und Garantien (Art. 30 Abs. 1 lit. e)
-- `retention_periods`: Löschfristen (Art. 30 Abs. 1 lit. f)
-- `technical_organizational_measures`: TOMs (Art. 32 / Art. 30 Abs. 1 lit. g)
-- `legal_basis`: Rechtsgrundlage (z. B. Art. 6 Abs. 1 lit. b)
-- `egress_events`: Referenzen auf Egress-Gate-Ereignisse
-- `deletion_proofs`: Referenzen auf kryptographische Nachweise
+## 4. Ist-vs-Ziel-Abgleich [V]
 
-### Hauptfunktionen
-```rust
-pub fn render_register_json(entries: &[ProcessingRegisterEntry]) -> Result<String, AuditExportError>;
-pub fn render_register_markdown(entries: &[ProcessingRegisterEntry], export_date: &str) -> Result<String, AuditExportError>;
-pub fn render_register_csv(entries: &[ProcessingRegisterEntry]) -> Result<String, AuditExportError>;
-pub fn bsi_mapping_table() -> Vec<BsiMappingEntry>;
-pub fn render_bsi_mapping_markdown(entries: &[BsiMappingEntry]) -> String;
+- **Ist-Kanten, die das Ziel nicht vorsieht:** `types` (optional)
+- **Ziel-Kanten, die im Ist fehlen:** keine
+- **Default-Features weichen ab:** Ist `std, types-compat` → Ziel `std`.
+
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
+
+- Keine zusätzlichen Abweichungen in dieser Prüfung festgestellt. Die Aussagen aus docs/SPEC.md sind nur dort übernommen, wo sie oben nicht widersprochen werden.
+
+## 6. Anforderungen
+
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
+
+`default = ["std"]`; Brücke `lib.rs:106–118` → `compat/`; `testkit.rs` hinter `test-utils`. Die Brücke `ProcessingRegistryEntry → AuditRecord` (Feature `privacy`) wird **nicht** gebaut (Nicht-Ziel).
+
+### 6.2 Brückenmuster [S]
+
+Die Brücke liegt ausschließlich in `src/compat/` hinter dem Feature `workspace`. Verbindliche Muster: docs/SPEC.md §4.3 (a–d). R2 gilt: `contextra_types`, `contextra_ports`, `contextra_testkit` dürfen im Kern nirgends vorkommen, auch nicht in Doc-Kommentaren oder `#[cfg(test)]`.
+
+### 6.3 Regeln für jeden Schritt [S]
+
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
+
+### 6.5 Fehlerabbildung [S]
+
+Eigener Fehlertyp: besteht (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+Keine Zeile aus dem Golden-Korpus (§5.1) bezieht sich auf dieses Crate.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-audit-export/src/error.rs:8` — AuditExportError
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B02 — Die `Clock`-/`Rng`-Kopien sind nicht kompatibel (Teil 2, G1 ist unvollständig)**
+> **Entscheidung:** - `env::Clock` = `ports::Clock` (Nanosekunden, `monotonic_nanos`, `Send+Sync+'static`). `env::Rng` = `ports::Rng` mit `&self` (siehe §4.2). - Millisekunden-Verbraucher (`text`, `graph`, `vector/contract.rs`) benutzen `env::Clock` und `env::unix_ms(&dyn Clock) -> u64` = `now_unix_nanos() / 1_000_000` (Abrunden). Persistierte ms-Zeitstempel MÜSSEN im Differenztest (§5.4) bitgleich zu `now_unix_ms` der alten Implementierung bei identischer Quelle sein. - `&mut self`-Verbraucher `text`/`graph`/`vector` wechseln auf `&self`-`env::Rng`. Das ist für alle heutigen Aufrufstellen ein Superset (Mutex/Atomic innerhalb `SeededRng`). Der Umstieg ist ein **Umbau-Commit** (INV-3 B). - E0-Crates (`adapt`, `privacy`, `license`, `erasure`, `ingest`, `audit-export`) behalten ihre lokalen Traits (R7/K8). Ihre Brücke bindet per Blanket-Impl **von `env` auf lokal** (Richtung `&self → &mut …
+
+**B14 — Defaults und leere Features (Teil 2, G5/G6) — bestätigt, plus Ergänzungen**
+> **Entscheidung:** Zieldefaults §3.1. Da `default-members` diese Crates auslässt, genügt „wöchentlich `cargo check`“ nicht als Kompilierbarkeitsgarantie; CI führt bei **jedem** PR `cargo check --workspace --all-targets --locked` aus (S-01). Ein Feature ohne `cfg(feature = "x")` im Quelltext **und** ohne Weiterleitung in einem anderen Manifest wird entfernt; geprüft vom neuen `tools/feature_audit.py` (S-12).
+
+## 10. Entscheidungen und Risiken [S]
+
+Keine Einträge in §9.1 oder §9.2.
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-audit-export --no-default-features --locked
+cargo hack check -p contextra-audit-export --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-audit-export --modes no-default,default,each-feature
 ```
 
----
-
-## 4. Fehlermodell (`AuditExportError`)
-
-Einziger `thiserror`-Fehlertyp des Bausteins (B4), mit `#[non_exhaustive]` annotiert:
-- `Serialization(serde_json::Error)`: JSON-Formatierungsfehler
-- `MissingField { field: String }`: Fehlende gesetzliche Pflichtangabe nach Art. 30 DSGVO
-- `SourceCollection(String)`: Fehler beim Laden von Datensätzen aus einer Quelle
-- `InvalidTenant(String)`: Ungültiger Mandant (z. B. 0)
-- `CsvExport(String)`: Formatierungsfehler im CSV-Export
-
----
-
-## 5. Nebenläufigkeit & Speichergarantien
-- Vollkommen thread-safe (`Send + Sync` für alle Typen).
-- Rein funktionale Transformationen ohne persistente Locks oder globale Stati.
-- Big-O Laufzeit: $O(N \log N)$ Sortierung, $O(N)$ Serialisierung bei $N$ Datensätzen.
