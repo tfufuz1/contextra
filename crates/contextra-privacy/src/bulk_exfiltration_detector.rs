@@ -12,7 +12,7 @@
 //! - **Zero-Panic-Doctrine**: Kein `.unwrap()` oder `.expect()` im Produktionscode.
 //! - **Fail-Closed**: Bei Zeitanomalien (z. B. nicht-monotonen Zeitsprüngen in die Vergangenheit) wird sofort blockiert.
 //! - **Thread-Sicherheit**: Nebenläufiger, lock-armer Zugriff über `scc::HashMap` mit feingranularen Mutexen pro Sitzung.
-//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port aus `contextra-ports` (INV-EGRESS-AUDIT-1, Regel 3).
+//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
 
 use crate::types::{Clock, SystemClock};
 use parking_lot::Mutex;
