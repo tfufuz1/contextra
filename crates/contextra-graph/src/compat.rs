@@ -13,3 +13,6 @@ pub mod purger;
 
 #[cfg(feature = "ports-compat")]
 pub mod graph_index;
+
+#[cfg(feature = "ports-compat")]
+pub mod collection_mutation;

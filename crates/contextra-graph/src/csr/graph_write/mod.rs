@@ -15,8 +15,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use crate::consistency_enforcement::ConsistencyEnforcer;
-use crate::error::GraphMutationError;
-use contextra_ports::{GraphCollectionMutation, StorageEngine};
+#[cfg(feature = "ports-compat")]
+use contextra_ports::StorageEngine;
 use contextra_types::{DocId, EntityId};
 
 use super::inner::{GraphInner, InnerWriteGuard, MemoryEstimate};
@@ -27,6 +27,7 @@ pub struct CsrGraph {
     pub config: CsrGraphConfig,
     pub inner: Arc<ArcSwap<GraphInner>>,
     pub write_state: Arc<Mutex<GraphInner>>,
+    #[cfg(feature = "ports-compat")]
     pub storage: Option<Arc<dyn StorageEngine>>,
     pub last_tx_id: AtomicU64,
     pub consistency_enforcer: Option<RwLock<ConsistencyEnforcer>>,
@@ -47,6 +48,7 @@ impl CsrGraph {
             config,
             inner: Arc::new(ArcSwap::from(initial.clone())),
             write_state: Arc::new(Mutex::new((*initial).clone())),
+            #[cfg(feature = "ports-compat")]
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: None,
@@ -56,11 +58,13 @@ impl CsrGraph {
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-004]
+    #[cfg(feature = "ports-compat")]
     pub fn with_storage(storage: Arc<dyn StorageEngine>) -> Self {
         Self::with_config_and_storage(CsrGraphConfig::default(), storage)
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-005]
+    #[cfg(feature = "ports-compat")]
     pub fn with_config_and_storage(
         config: CsrGraphConfig,
         storage: Arc<dyn StorageEngine>,
@@ -85,6 +89,7 @@ impl CsrGraph {
             config: CsrGraphConfig::default(),
             inner: Arc::new(ArcSwap::from(initial.clone())),
             write_state: Arc::new(Mutex::new((*initial).clone())),
+            #[cfg(feature = "ports-compat")]
             storage: None,
             last_tx_id: AtomicU64::new(0),
             consistency_enforcer: Some(RwLock::new(ConsistencyEnforcer::new(
@@ -131,11 +136,13 @@ impl CsrGraph {
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-008]
+    #[cfg(feature = "ports-compat")]
     pub fn set_storage(&mut self, storage: Arc<dyn StorageEngine>) {
         self.storage = Some(storage);
     }
 
     // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-009]
+    #[cfg(feature = "ports-compat")]
     pub fn storage(&self) -> Option<Arc<dyn StorageEngine>> {
         self.storage.clone()
     }
