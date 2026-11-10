@@ -18,13 +18,15 @@ default = []
 std = []
 serde = ["dep:serde", "dep:serde_json"]
 tracing = ["dep:tracing"]
-inspect = []
-experimental = []
 download = ["dep:reqwest"]
 reranking = ["onnx"]
 onnx = ["dep:ort", "dep:tokenizers", "dep:ndarray", "dep:sha2"]
+test-utils = []
+workspace = ["dep:contextra-ports", "dep:contextra-types"]
 
 [dependencies]
+contextra-ports = { path = "../contextra-ports", optional = true }
+contextra-types = { path = "../contextra-types", optional = true }
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
 blake3 = { workspace = true }
@@ -59,6 +61,19 @@ tokio = { workspace = true, features = ["full"] }
 criterion = { workspace = true }
 proptest = "1.4"
 
+[[test]]
+name = "batch_equiv"
+required-features = ["test-utils"]
+
+[[test]]
+name = "adversarial"
+required-features = ["test-utils"]
+
 [[bench]]
 name = "infer_bench"
 harness = false
+required-features = ["test-utils"]
+
+[[example]]
+name = "fake_reranker"
+required-features = ["test-utils"]

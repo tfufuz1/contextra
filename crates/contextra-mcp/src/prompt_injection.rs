@@ -1,9 +1,11 @@
 // FILE-CONTEXT
-// STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
+// STAND:       2026-11-10T10:00:00Z
 // ZWECK:       Prompt-Injection-Erkennung & Quarantäne-System für MCP-Server
-// INVARIANTEN: Standardmäßig werden verdächtige Texte redigiert (strict); Audit-Logs in escalate-Mode sind isoliert vom Vektor-Index.
+// INVARIANTEN: Re-Export aus contextra-prompt-guard; Standardmäßig werden verdächtige Texte redigiert (strict); Audit-Logs in escalate-Mode sind isoliert vom Vektor-Index.
 
 //! # LÜCKENANALYSE & DEFENSE-IN-DEPTH ARCHITEKTUR
+//!
+//! Re-Export der Typen aus `contextra-prompt-guard`.
 //!
 //! ## System-Charakterisierung & Erkennungsgrenzen:
 //! Der Prompt-Injection-Guard bietet eine **signatur-/phrasenbasierte Erkennung bekannter Angriffsmuster**
@@ -45,13 +47,24 @@
 //! Dieser Prompt-Injection-Guard ergänzt die Sandbox als Inhaltsfilter auf Transport- / DTO-Ebene,
 //! **ersetzt sie jedoch ausdrücklich nicht**.
 
-mod audit;
-mod guard;
-mod policy;
+pub use contextra_prompt_guard::{
+    audit::{SecurityAuditLogger, SecurityAuditRecord},
+    clock::{Clock, SystemClock},
+    error::GuardError,
+    guard::{NormalizedPattern, PromptInjectionGuard},
+    policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER},
+};
 
-#[cfg(test)]
-mod tests;
+pub mod audit {
+    pub use contextra_prompt_guard::audit::{SecurityAuditLogger, SecurityAuditRecord};
+}
 
-pub use audit::{SecurityAuditLogger, SecurityAuditRecord};
-pub use guard::{NormalizedPattern, PromptInjectionGuard};
-pub use policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
+pub mod guard {
+    pub use contextra_prompt_guard::guard::{NormalizedPattern, PromptInjectionGuard};
+}
+
+pub mod policy {
+    pub use contextra_prompt_guard::policy::{
+        PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER,
+    };
+}

@@ -1,5 +1,8 @@
+// Herkunft: contextra-mcp/src/prompt_injection/audit.rs @ HEAD 9305c5d048cc6a4143d4e7cbf114cd85a6fca34a
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "file-audit")]
 use std::fs::OpenOptions;
+#[cfg(feature = "file-audit")]
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -18,6 +21,7 @@ pub struct SecurityAuditRecord {
 /// Separater Audit-Logger für Sicherheitsvorfälle (vollständig isoliert vom Vektor-Index).
 #[derive(Clone, Debug, Default)]
 pub struct SecurityAuditLogger {
+    #[allow(dead_code)]
     file_path: Option<PathBuf>,
     in_memory_records: Arc<Mutex<Vec<SecurityAuditRecord>>>,
 }
@@ -46,7 +50,8 @@ impl SecurityAuditLogger {
             "Security Audit: Prompt injection attempt detected and escalated"
         );
 
-        // 3. Datei-Sicherheits-Log schreiben, falls konfiguriert
+        // 3. Datei-Sicherheits-Log schreiben, falls konfiguriert (nur mit Feature file-audit)
+        #[cfg(feature = "file-audit")]
         if let Some(path) = &self.file_path {
             if let Ok(json_line) = serde_json::to_string(&record) {
                 if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
