@@ -457,7 +457,7 @@ impl LsmStorage {
 
         let salt_path = config.path.join("SALT");
         if !salt_path.exists() {
-            let buf = crate::lsm::recovery::generate_crypto_salt();
+            let buf = crate::lsm::recovery::generate_crypto_salt()?;
             crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;
         }
 

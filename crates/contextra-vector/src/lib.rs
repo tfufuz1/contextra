@@ -38,8 +38,7 @@
 )]
 pub mod casting;
 
-#[allow(dead_code)]
-mod contract;
+pub mod contract;
 pub mod error;
 pub mod types;
 
@@ -61,9 +60,22 @@ pub mod quantize_rabitq;
 
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
+pub use contract::{
+    BlockTransform, Clock as ContractClock, DistanceFn, Error as ContractError, ExternalId,
+    Index as ContractIndex, Maintain as ContractMaintain, Metric as ContractMetric,
+    Result as ContractResult, Rng as ContractRng, ScoredPoint,
+};
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
-#[cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock))]
+#[cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::await_holding_lock
+    )
+)]
 #[allow(deprecated)]
 pub use hnsw::{
     hnsw_purger, hnsw_scanner, HnswConfig, HnswIndex, HnswPurger, HnswScanner, RebuildStatus,

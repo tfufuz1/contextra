@@ -1,6 +1,11 @@
 //! # WAL Replay & Wiederherstellung (Ring 1)
 //!
 //! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
+//!
+//! ## Invarianten
+//! - **INV-WAL-REPLAY-1:** Idempotentes Streaming-Replay: Zweimaliges Abspielen erzeugt identischen Zustand.
+//! - **INV-WAL-REPLAY-2:** Fail-Closed bei Mittel-Beschädigung: Beschädigungen in der Mitte des WAL lösen hard `ContextraError::Corrupt` aus.
+//! - **INV-WAL-REPLAY-3:** Clean Torn Write Tail Cutoff: Unvollständige Schreibabbrüche am Dateiende werden deterministisch abgeschnitten.
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
@@ -245,7 +250,7 @@ impl Wal {
         }
     }
 
-        #[allow(deprecated)]
+    #[allow(deprecated)]
     fn verify_entry_snapshot(
         &self,
         snapshot: &WalEntrySnapshot,
@@ -326,8 +331,8 @@ impl Wal {
             return Ok(version);
         }
 
-                let integrity_key = self.get_integrity_key()?;
-                let mut verifier = IntegrityVerifier::new(&integrity_key);
+        let integrity_key = self.get_integrity_key()?;
+        let mut verifier = IntegrityVerifier::new(&integrity_key);
         let mut using_legacy_key = false;
 
         // Detect version from header
@@ -426,7 +431,7 @@ impl Wal {
             let chunk_start_pos = pos;
             pos += (4 + len) as u64;
 
-                        {
+            {
                 if matches!(version, WalVersion::V2 | WalVersion::V3) && self.key_manager.is_some()
                 {
                     let km = match self.key_manager.as_ref() {
@@ -672,8 +677,6 @@ impl Wal {
                     }
                 }
             }
-
-
         }
 
         Ok(version)

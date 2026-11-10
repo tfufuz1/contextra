@@ -178,41 +178,11 @@ impl<State> fmt::Debug for Scanner<State> {
     }
 }
 
-/// Cryptographic or structural witness produced after verifying deletion residue.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LayerWitness {
-    /// Digest or commitment over the verified non-presence.
-    witness_hash: [u8; 32],
-}
-
-impl LayerWitness {
-    /// Creates an empty/zeroed witness.
-    pub const fn empty() -> Self {
-        Self {
-            witness_hash: [0u8; 32],
-        }
-    }
-
-    /// Creates a witness from a hash.
-    pub const fn from_hash(witness_hash: [u8; 32]) -> Self {
-        Self { witness_hash }
-    }
-
-    /// Returns the witness digest.
-    pub fn witness_hash(&self) -> &[u8; 32] {
-        &self.witness_hash
-    }
-}
-
-impl fmt::Debug for LayerWitness {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "LayerWitness {{ witness_hash: {:02x?} }}",
-            self.witness_hash
-        )
-    }
-}
+// NOTE: Normative Konsolidierung nach Soll §3 / Prinzip 8:
+// Für das Konzept `LayerWitness` gibt es genau eine Wahrheit im Crate:
+// `crate::scanner::LayerWitness` (SPEC §12.7.4, INV-WITNESS-MINT-1).
+// Historische Definition wurde nach docs/handoff/PORTS-1/erasure_ports_legacy.rs archiviert.
+pub use crate::scanner::LayerWitness;
 
 /// Key coverage capability of a layer (SPEC §8.2, D-69).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

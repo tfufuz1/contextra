@@ -15,7 +15,7 @@
 //!
 //! ## Ring-Zugehörigkeit & Abhängigkeiten
 //! - **Ring 4 (Fassade)**: Greift als Composition Root auf Teilsysteme wie `contextra-db` (Ring 3),
-//!   `contextra-types`, `contextra-ports` und optional `contextra-license` zu.
+//!   `contextra-types` und `contextra-ports` zu.
 //! - **Keine zyklischen Abhängigkeiten**: Höhere Ringe hängen von niederen Ringen ab, nie umgekehrt.
 //! - **Eingebunden von**: `contextra-mcp` (Model Context Protocol Adapter für LLM-Agenten).
 //!

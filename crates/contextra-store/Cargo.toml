@@ -15,6 +15,7 @@ ring = "1"
 [features]
 default = []
 test-hooks = []
+inspect = []
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
@@ -48,7 +49,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
-contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }

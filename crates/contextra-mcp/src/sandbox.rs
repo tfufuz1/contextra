@@ -42,10 +42,10 @@ pub struct ToolDefinition {
 /// | `contextra_explain` | `DatabaseRead` | Retrieval explanation and provenance breakdown |
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-/// | `contextra_delete` | `DatabaseWrite` | Delete document without measured proof |
-/// | `contextra_forget` | `DatabaseWrite` | Delete document or drop collection with verified drop receipt |
+/// | `contextra_delete` | `DatabaseWrite` | Delete document |
+/// | `contextra_forget` | `DatabaseWrite` | Delete document (Alias for contextra_delete) |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
-/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue verified drop receipt |
+/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -92,15 +92,14 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_forget",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a document (unverified) or drop an entire collection (with verified drop receipt export).",
+        description: "Delete a document without verification receipt (Alias for contextra_delete).",
         input_schema: || json!({
             "type": "object",
             "properties": {
-                "collection": { "type": "string" },
                 "id":         { "type": "string" },
-                "confirm":    { "type": "boolean" }
+                "collection": { "type": "string", "default": "default" }
             },
-            "required": ["collection", "confirm"]
+            "required": ["id"]
         }),
     },
     ToolDefinition {
@@ -144,7 +143,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_delete",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a single document without measured deletion proof.",
+        description: "Delete a single document.",
         input_schema: || json!({
             "type": "object",
             "properties": {
@@ -170,7 +169,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_drop_collection",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete an entire collection and issue a verified collection-wide cryptographic drop receipt.",
+        description: "Delete an entire collection.",
         input_schema: || json!({
             "type": "object",
             "properties": {

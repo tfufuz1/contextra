@@ -1,9 +1,9 @@
 //! Property Test for VETO-F10: Partition isolation across distinct namespaces
 
+use bytes::Bytes;
 use contextra_kvcache::prefix_store::NamespacePrefixStore;
 use contextra_kvcache::radix::KvReusePolicy;
 use contextra_ports::kv::KvBlock;
-use bytes::Bytes;
 use proptest::prelude::*;
 
 proptest! {

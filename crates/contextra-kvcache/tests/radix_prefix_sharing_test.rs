@@ -14,7 +14,10 @@ fn test_inv_kv_prefix_1_shared_physical_segments() {
     assert_eq!(ref1.current_refs(), 1);
 
     let ref2 = tree.insert(&prefix, 888).unwrap();
-    assert_eq!(ref2.segment_id, seg_id, "INV-KV-PREFIX-1: Identical prefix MUST share segment");
+    assert_eq!(
+        ref2.segment_id, seg_id,
+        "INV-KV-PREFIX-1: Identical prefix MUST share segment"
+    );
     assert_eq!(ref1.current_refs(), 2);
     assert_eq!(ref2.current_refs(), 2);
 

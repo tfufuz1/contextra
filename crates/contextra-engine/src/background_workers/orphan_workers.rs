@@ -20,6 +20,14 @@ use std::time::Duration;
 /// to avoid starving foreground operations.
 pub const MAX_ORPHANS_PER_TICK: usize = 100;
 
+/// Performs a single synchronous step of orphan transaction reaping.
+pub fn reap_orphans_step<T: Clone + Send + Sync + 'static>(
+    buffer: &TxBuffer<T>,
+    limit: usize,
+) -> Vec<T> {
+    buffer.reap_orphans_bounded(limit)
+}
+
 /// Starts a background task to periodically clean up orphan transactions and manage HNSW rebuilds with exponential backoff.
 pub fn start_orphan_cleanup_worker_with_config<
     T: Clone + Send + Sync + 'static,
@@ -52,7 +60,7 @@ pub fn start_orphan_cleanup_worker_with_config<
                 _ = ticker.tick() => {
                     let buf = buffer.clone();
                     let expired = tokio::task::spawn_blocking(move || {
-                        buf.reap_orphans_bounded(MAX_ORPHANS_PER_TICK)
+                        reap_orphans_step(&buf, MAX_ORPHANS_PER_TICK)
                     })
                     .await
                     .unwrap_or_default();

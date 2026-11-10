@@ -479,6 +479,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.graph_index.clone()
     }
 
+    /// Returns the abstract graph index port for this collection (M3 Trait-Decoupling).
+    pub fn graph_port(&self) -> Arc<dyn contextra_ports::GraphIndex> {
+        self.graph_index.clone()
+    }
+
+    /// Returns a clone of the configured embedder engine, if set.
+    pub fn embedder(&self) -> Option<Arc<dyn TextEmbeddingEngine>> {
+        self.embedder.read().clone()
+    }
+
     /// Sets the text embedder for this collection (consuming version).
     #[tracing::instrument(level = "trace", skip(self, embedder))]
     pub fn with_embedder(self, embedder: Arc<dyn TextEmbeddingEngine>) -> Self {

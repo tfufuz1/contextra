@@ -6,18 +6,18 @@ name = "contextra-vector"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 description = "HNSW vector index with SIMD distance computation for Contextra"
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
 
 [dependencies]
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
 contextra-mvcc = { workspace = true, optional = true }
-contextra-simd = { workspace = true, optional = true }
-contextra-sys = { workspace = true }
+contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
 ahash = { workspace = true }
 parking_lot = { workspace = true }
@@ -31,10 +31,22 @@ thiserror = { workspace = true }
 blake3 = { workspace = true }
 
 [features]
-default = ["ports-compat", "simd"]
-ports-compat = ["dep:contextra-ports", "dep:contextra-types", "dep:contextra-mvcc", "dep:contextra-simd"]
-simd = ["dep:contextra-simd"]
-docid-128 = ["contextra-types/docid-128"]
+default = ["std", "ports-compat"]
+std = []
+serde = []
+tracing = []
+inspect = []
+experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
+mmap = []
+diskann = ["experimental-diskann"]
+quantize-rabitq = ["experimental-rabitq"]
+ports-compat = [
+    "dep:contextra-ports",
+    "dep:contextra-types",
+    "dep:contextra-mvcc",
+    "dep:contextra-sys",
+]
+docid-128 = []
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []

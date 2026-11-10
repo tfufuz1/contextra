@@ -28,7 +28,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 regex = "1.13"
-quick-xml = "0.41"
 thiserror = { workspace = true }
 
 # HTTP stack dependencies
@@ -38,6 +37,7 @@ futures = { version = "0.3", optional = true }
 futures-util = { version = "0.3", optional = true }
 
 [dev-dependencies]
+quick-xml = "0.41"
 proptest = "1.4"
 tracing-test = "0.2"
 criterion = { workspace = true }
