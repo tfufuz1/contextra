@@ -9,7 +9,7 @@
 //! Ring 3 (Domain-Sicherheit).
 //!
 //! # Invarianten
-//! - **Zero-Panic-Doctrine**: Kein `.unwrap()` oder `.expect()` im Produktionscode.
+//! - **Zero-Panic-Doctrine**: Kein `unwrap` oder `expect` im Produktionscode.
 //! - **Fail-Closed**: Bei Zeitanomalien (z. B. nicht-monotonen Zeitsprüngen in die Vergangenheit) wird sofort blockiert.
 //! - **Thread-Sicherheit**: Nebenläufiger, lock-armer Zugriff über `scc::HashMap` mit feingranularen Mutexen pro Sitzung.
 //! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
