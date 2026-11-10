@@ -13,13 +13,13 @@ Gemäß verbindlicher Vorgabe im Auftrag:
 > *Schlägt eines der ersten drei fehl, ist das Fundament-Paket P0 nicht gemergt: Brich ab, schreibe nur docs/handoff/VEC-6.md mit dem Blocker und ändere keinen Code.*
 
 ### 1.1 Start-Gate Prüfprotokoll
-- `test -d crates/contextra-ids && test -d crates/contextra-env` → **FEHLGESCHLAGEN** (Exit Code 1: Weder `crates/contextra-ids` noch `crates/contextra-env` existieren im aktuellen Repository-Zustand).
+- `test -d crates/contextra-ids && test -d crates/contextra-env` → **ERFOLGREICH** (Verzeichnisse existieren, enthalten jedoch nur Spezifikationsdokumente `PLAN.md` / `SPEC.md`, keine Cargo-Crates mit Quellcode).
 - `grep -q 'contextra_ids' crates/contextra-types/src/lib.rs` → **FEHLGESCHLAGEN** (Exit Code 1: `contextra_ids` ist in `contextra-types` noch nicht integriert/re-exportiert).
 - `grep -q 'contextra_env' crates/contextra-ports/src/lib.rs` → **FEHLGESCHLAGEN** (Exit Code 1: `contextra_env` ist in `contextra-ports` noch nicht integriert/re-exportiert).
 - `cargo check -p contextra-vector --all-targets` → **ERFOLGREICH** (0 Fehler, 15 Deprecation-Warnungen für `HnswConnectivityDegraded`/`GraphRepairFailed`/`HnswDeletionError`).
 
 ### 1.2 Blocker
-Das Fundament-Paket **P0** (Erstellung von `contextra-ids` und `contextra-env` sowie Integration in `contextra-types` und `contextra-ports`, entsprechend SPEC-v2 S-10 und S-11) ist im aktuellen Branch/HEAD noch nicht gemergt. Da `contextra-vector` in VEC-6 auf die Typen aus `contextra-ids` (`DocId`) und `contextra-env` (`Clock`, `Rng`, `MetricsSink`) umgestellt werden soll, ist P0 eine zwingende Vorbedingung.
+Das Fundament-Paket **P0** (Erstellung und funktionale Bereitstellung von `contextra-ids` und `contextra-env` sowie Integration in `contextra-types` und `contextra-ports`, entsprechend SPEC-v2 S-10 und S-11) ist im aktuellen Branch/HEAD noch nicht vollständig implementiert und gemergt. Da `contextra-vector` in VEC-6 auf die Typen aus `contextra-ids` (`DocId`) und `contextra-env` (`Clock`, `Rng`, `MetricsSink`) umgestellt werden soll, ist P0 eine zwingende Vorbedingung.
 
 Gemäß den Vorgaben des Auftrags wurde der Vorgang sofort abgebrochen und **keinerlei Code geändert**.
 
@@ -45,8 +45,8 @@ Gemäß den Vorgaben des Auftrags wurde der Vorgang sofort abgebrochen und **kei
 ## 3. Koordinationsanforderungen
 
 1. **Fundament-Paket P0 mergen**:
-   - Bereitstellung des Crates `crates/contextra-ids` (mit `DocId`, `TenantId`, etc.).
-   - Bereitstellung des Crates `crates/contextra-env` (mit `Clock`, `Rng`, `MetricsSink`, etc.).
+   - Vollständige Bereitstellung des Rust-Crates `crates/contextra-ids` (mit `Cargo.toml`, `src/lib.rs`, `DocId`, `TenantId`, etc.).
+   - Vollständige Bereitstellung des Rust-Crates `crates/contextra-env` (mit `Cargo.toml`, `src/lib.rs`, `Clock`, `Rng`, `MetricsSink`, etc.).
    - Re-Export von `contextra_ids` in `crates/contextra-types/src/lib.rs`.
    - Re-Export von `contextra_env` in `crates/contextra-ports/src/lib.rs`.
 2. Nach dem Merge von P0 kann der Auftrag VEC-6 (`jules/vec-6-decouple`) erneut gestartet werden und die Start-Gates 1 bis 3 erfolgreich passieren.
