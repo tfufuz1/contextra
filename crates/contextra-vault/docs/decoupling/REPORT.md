@@ -39,3 +39,10 @@
     - `crates/contextra-agent/src/engine/tests.rs:225` (`VaultConfig`)
     - `crates/contextra-agent/tests/clm_scratchpad_reset_flow.rs:21` (`VaultConfig`)
     - `crates/contextra-db/tests/docid_128_consolidation.rs:7` (`SignalModality, VaultChunk`)
+
+## 6. Upstream CI Status (Out-of-Scope)
+Die CI-Workflows auf fremden Crates scheitern an bereits auf `origin/main` vorliegenden Problemen:
+- **Production Unwrap Counter Gate:** Der Zähler auf `origin/main` liegt bei 1309 (Basiswert in `.github/unwrap_baseline.txt` war 1197). `contextra-vault` enthält 0 unwraps im Produktionscode.
+- **Cargo Deny Check:** Advisories zu externen Abhängigkeiten (`lopdf`, `lru`, `number_prefix`, `tokio`, `zip`), die in fremden Crates (`contextra-store`, `contextra-crypto`, `candle-core`, `indicatif`) verankert sind.
+- **Format Check & Compile Check:** Kompilier- und Formatierungsfehler in `contextra-store` (`duplicate definitions with name current_bytes/capacity_bytes`, `cannot move out of builder.file`, etc.) und `contextra-vector`.
+Gemäß Regel R1 (Eigentum und Disjunktheit) sowie R10 verbleiben diese fremden Fehler unberührt und sind durch die jeweiligen Crate-Aufträge zu beheben.
