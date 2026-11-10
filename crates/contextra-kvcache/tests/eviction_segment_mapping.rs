@@ -1,3 +1,11 @@
+#![allow(
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 //! # Tests für Segment-zu-Anfrage-Zuordnung bei der Verdrängung
 //!
 //! ANCHOR[contextra-kvcache:TEST-EVICT-MAP-001]

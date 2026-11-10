@@ -17,7 +17,6 @@
 
 ---
 
-
 > **Klasse:** A (Stand-alone Baukasten) · Reifegrad `beta` · Unsafe: nein (`#![forbid(unsafe_code)]`) · Rolle: Verschlüsselter KV-Prefix-Cache für LLM-Zustände (Radix, Eviction, KIVI-Quantisierung).
 > Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches.
 
@@ -28,7 +27,7 @@
 | Standalone-Build | `cargo build -p contextra-kvcache --no-default-features --locked` |
 | Contextra-Abhängigkeiten **Ist** (Cargo) | keine (transitional: `contextra-types`, `contextra-ports`, `contextra-crypto` hinter optionalen Features) |
 | Contextra-Abhängigkeiten **Soll** (SPEC §5) | keine |
-| Features | `kv-encryption`, `kivi-quantization`, `content-addressed-kv-cache`, `kvcache-attention-eviction`, `kvcache-kivi-quant`, `ports-compat`, `crypto-compat` |
+| Features | `kv-encryption`, `kivi-quantization`, `content-addressed-kv-cache`, `kvcache-kivi-quant`, `exp-kivi`, `exp-content-addressed`, `ports-compat`, `crypto-compat` |
 | Lints | `#![forbid(unsafe_code)]` |
 
 ## 2. Abhängigkeiten & Schulden
@@ -41,11 +40,11 @@
 
 | Pfad | Verantwortung |
 |---|---|
-| `types.rs`, `error.rs`, `cipher.rs` | Lokale Domaintypen, typisierte Fehler (`KvCacheError`), `SegmentCipher`-Trait |
-| `store.rs`, `service.rs`, `prefix_store.rs`, `adapters.rs` | Cache-Dienst, Port-Adapter `KvPrefixStore` |
-| `radix.rs`, `segment.rs`, `eviction_worker.rs` | Radix-Baum, Segmente, Eviction |
-| `quantize_kivi.rs`, `attention_score.rs`, `scratchpad_invalidation.rs` | Quantisierung, Aufmerksamkeits-Score, Invalidierung |
-| `compat.rs` | Übergangs-Konvertierungen für `ports-compat` und `crypto-compat` |
+| `types.rs`, `error.rs`, `cipher.rs` | Lokale Domaintypen (`CacheDirective`, `StepId`), typisierte Fehler (`KvCacheError`), `SegmentCipher`-Trait |
+| `store.rs`, `service.rs` | In-Memory LRU-Cache, Fassadendienst |
+| `radix.rs`, `segment.rs`, `eviction_worker.rs` | Radix-Baum, Segmente, Bounded SegmentPool, Eviction-Worker |
+| `quantize_kivi.rs`, `attention_score.rs` | KIVI-Quantisierung, Aufmerksamkeits-Score |
+| `compat/` | Brücke für port-gebundene Adapter (`prefix_store.rs`, `adapters.rs`, `scanner.rs`, `scratchpad_invalidation.rs`) |
 
 ## 4. Verträge & Invarianten
 
@@ -74,7 +73,6 @@
 
 ```bash
 cargo test -p contextra-kvcache
-cargo test -p contextra-kvcache --no-default-features
 cargo clippy -p contextra-kvcache --all-targets -- -D warnings
 cargo bench -p contextra-kvcache --no-run
 ```
