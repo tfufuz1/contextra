@@ -13,6 +13,11 @@ on:
       - "crates/contextra-crypto/tests/loom_kv_deferred_zeroize.rs"
       - "crates/contextra-vector/src/**"
       - "crates/contextra-vector/tests/loom_quantizer_race_test.rs"
+      - "crates/contextra-mvcc/**"
+      - "crates/contextra-kvcache/**"
+      - "crates/contextra-checkpoint/**"
+      - "crates/contextra-ids/**"
+      - "crates/contextra-env/**"
 
 env:
   CARGO_TERM_COLOR: always
