@@ -5,24 +5,9 @@
 use crate::error::Result;
 use std::time::Duration;
 
-/// Trait für deterministische Zeitabfragen ohne globale Zeitgeber.
-pub trait Clock: Send + Sync {
-    /// Liefert die aktuelle Epochenzeit in Unix-Nanosekunden.
-    fn now_unix_nanos(&self) -> u64;
-    /// Liefert einen monoton steigenden Nanosekunden-Zähler.
-    fn monotonic_nanos(&self) -> u64;
-}
-
-/// Trait für deterministische Pseudozufallszahlen.
-pub trait Rng: Send + Sync {
-    /// Liefert die nächste vorzeichenlose 64-Bit-Ganzzahl.
-    fn next_u64(&mut self) -> u64;
-    /// Liefert eine Fließkommazahl im halboffenen Intervall `[0.0, 1.0)`.
-    fn next_f64(&mut self) -> f64 {
-        let v = (self.next_u64() >> 11) as f64;
-        v / ((1u64 << 53) as f64)
-    }
-}
+// Re-exportierte konsolidierte Traits (SPEC v4.0 §6.1 / S-23 / R7 / B02)
+pub use crate::clock::Clock;
+pub use crate::rng::Rng;
 
 /// Trait für Regler mit Anti-Windup und Stellgrößenbegrenzung.
 pub trait AdaptiveController: Send + Sync {

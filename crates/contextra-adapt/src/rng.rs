@@ -3,14 +3,20 @@
 //! SplitMix64-Generator für reproduzierbare Randomisierung ohne globale Zustände.
 
 /// Trait für Pseudozufallsgeneratoren in Bandit- und Sampling-Algorithmen.
-pub trait Rng {
+pub trait Rng: Send + Sync {
     /// Generiert die nächste vorzeichenlose 64-Bit-Ganzzahl.
     fn next_u64(&mut self) -> u64;
 
-    /// Generiert eine Fließkommazahl im halboffenen Intervall `[0, 1)`.
+    /// Generiert eine 32-Bit-Fließkommazahl im halboffenen Intervall `[0, 1)`.
     fn next_f32(&mut self) -> f32 {
         let v = (self.next_u64() >> 40) as f32;
         v / 16777216.0
+    }
+
+    /// Generiert eine 64-Bit-Fließkommazahl im halboffenen Intervall `[0.0, 1.0)`.
+    fn next_f64(&mut self) -> f64 {
+        let v = (self.next_u64() >> 11) as f64;
+        v / ((1u64 << 53) as f64)
     }
 }
 
