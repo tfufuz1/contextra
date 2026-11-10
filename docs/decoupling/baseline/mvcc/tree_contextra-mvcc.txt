@@ -1,0 +1,78 @@
+contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+├── ahash v0.8.12
+│   ├── cfg-if v1.0.4
+│   ├── getrandom v0.3.4
+│   ├── once_cell v1.21.4
+│   ├── serde v1.0.229
+│   └── zerocopy v0.8.56
+│   [build-dependencies]
+│   └── version_check v0.9.5
+├── bytes v1.12.1
+├── contextra-ports v0.1.0 (/app/crates/contextra-ports)
+│   ├── ahash v0.8.12 (*)
+│   ├── blake3 v1.8.7
+│   │   [build-dependencies]
+│   ├── bytes v1.12.1
+│   ├── contextra-types v0.1.0 (/app/crates/contextra-types)
+│   ├── futures-util v0.3.34
+│   ├── serde v1.0.229 (*)
+│   ├── serde_json v1.0.151
+│   └── thiserror v2.0.20
+├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+├── parking_lot v0.12.5
+│   ├── lock_api v0.4.14
+│   └── parking_lot_core v0.9.12
+├── serde v1.0.229 (*)
+├── thiserror v2.0.20 (*)
+└── tracing v0.1.44
+    ├── pin-project-lite v0.2.17
+    ├── tracing-attributes v0.1.31 (proc-macro)
+    └── tracing-core v0.1.36
+[dev-dependencies]
+├── contextra-testkit v0.1.0 (/app/crates/contextra-testkit)
+│   ├── bytes v1.12.1
+│   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   ├── parking_lot v0.12.5 (*)
+│   └── tracing v0.1.44 (*)
+├── criterion v0.5.1
+│   ├── anes v0.1.6
+│   ├── cast v0.3.0
+│   ├── ciborium v0.2.2
+│   ├── clap v4.6.6
+│   ├── criterion-plot v0.5.0
+│   ├── futures v0.3.34
+│   ├── is-terminal v0.4.17
+│   ├── itertools v0.10.5
+│   ├── num-traits v0.2.19
+│   │   [build-dependencies]
+│   ├── once_cell v1.21.4
+│   ├── oorandom v11.1.5
+│   ├── plotters v0.3.7
+│   ├── rayon v1.12.0
+│   ├── regex v1.13.1
+│   ├── serde v1.0.229 (*)
+│   ├── serde_derive v1.0.229 (proc-macro)
+│   ├── serde_json v1.0.151 (*)
+│   ├── tinytemplate v1.2.1
+│   ├── tokio v1.53.1
+│   └── walkdir v2.5.0
+├── loom v0.7.2
+│   ├── cfg-if v1.0.4
+│   ├── generator v0.8.9
+│   │   [build-dependencies]
+│   ├── scoped-tls v1.0.1
+│   ├── tracing v0.1.44 (*)
+│   └── tracing-subscriber v0.3.23
+└── proptest v1.11.0
+    ├── bit-set v0.8.0
+    ├── bit-vec v0.8.0
+    ├── bitflags v2.13.1
+    ├── num-traits v0.2.19 (*)
+    ├── rand v0.9.5
+    ├── rand_chacha v0.9.0
+    ├── rand_xorshift v0.4.0
+    ├── regex-syntax v0.8.11
+    ├── rusty-fork v0.3.1
+    ├── tempfile v3.27.0
+    └── unarray v0.1.4

@@ -1,0 +1,179 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running unittests src/lib.rs (target/debug/deps/contextra_mvcc-66ddc318c3851e6d)
+seq_log::tests::test_seq_log_entry_is_visible_o1: test
+seq_log::tests::test_sequence_log_changes_since: test
+seq_log::tests::test_sequence_log_compact: test
+seq_log::tests::test_sequence_log_edge_cases: test
+seq_log::tests::test_sequence_log_insert_delete_visibility: test
+seq_log::tests::test_sequence_log_pin_ttl_and_expiration: test
+seq_log::tests::test_sequence_log_pin_ttl_custom_duration: test
+seq_log::tests::test_sequence_log_pinning_and_retention: test
+seq_log::tests::test_sequence_log_reinsert_after_delete: test
+seq_log::tests::test_sequence_log_tombstones_and_updates_follow_same_law: test
+seq_log::tests::test_sequence_log_zero_panic_time_arithmetic: test
+snapshot::tests::test_double_registration_and_sequential_drop: test
+snapshot::tests::test_min_read_snapshot_and_min_for_compaction_and_tenant_revoke: test
+snapshot::tests::test_multiple_snapshots_min_calc: test
+snapshot::tests::test_pin_unpin: test
+snapshot::tests::test_prop_snapshot_pin_unpin_interleaving: test
+snapshot::tests::test_prop_snapshot_register_unregister_stress: test
+snapshot::tests::test_prop_snapshot_registry_min_active: test
+snapshot::tests::test_ref_counting: test
+snapshot::tests::test_seq_no_tombstone_masking: test
+snapshot::tests::test_snapshot_panic_free_safety: test
+snapshot::tests::test_snapshot_registry_basic: test
+snapshot::tests::test_snapshot_registry_reap_expired_pins: test
+snapshot::tests::test_snapshot_registry_try_register_capacity_limit: test
+snapshot::tests::test_tenant_isolation_revocation_guarantee: test
+snapshot::tests::test_unpin_unknown_seq_no_does_not_panic: test
+ssi::tests::test_read_set_basic: test
+ssi::tests::test_validator_batch_commit_keys: test
+ssi::tests::test_validator_conflict_detected: test
+ssi::tests::test_validator_no_conflict: test
+ssi::tests::test_validator_with_sequence_log: test
+tx_buffer::tests::test_concurrent_stage_no_data_loss: test
+tx_buffer::tests::test_has_tx_concurrent: test
+tx_buffer::tests::test_index_op_helpers: test
+tx_buffer::tests::test_is_key_staged_for_tx_semantics: test
+tx_buffer::tests::test_prop_tx_buffer_isolation: test
+tx_buffer::tests::test_prop_tx_buffer_partial_discard_isolation: test
+tx_buffer::tests::test_prop_tx_buffer_reap_is_complete: test
+tx_buffer::tests::test_prop_tx_buffer_stage_drain_stage_lifecycle: test
+tx_buffer::tests::test_tx_buffer_config: test
+tx_buffer::tests::test_tx_buffer_discard: test
+tx_buffer::tests::test_tx_buffer_read_set_tracking: test
+tx_buffer::tests::test_tx_buffer_reap_orphans: test
+tx_buffer::tests::test_tx_buffer_reap_orphans_bounded_capping: test
+tx_buffer::tests::test_tx_buffer_reap_orphans_deterministic_time_injection: test
+tx_buffer::tests::test_tx_buffer_stage_many_and_max_ops_constant: test
+tx_buffer::tests::test_tx_buffer_stage_many_exceeds_capacity: test
+tx_buffer::tests::test_tx_buffer_validate_pending_ops: test
+tx_buffer::tests::test_tx_buffer_zero_shards_defaults_to_one: test
+tx_buffer::tests::test_txbuffer_default_config_allows_normal_workload: test
+tx_buffer::tests::test_txbuffer_respects_max_ops_limit: test
+
+51 tests, 0 benchmarks
+     Running tests/audit_regression_tests.rs (target/debug/deps/audit_regression_tests-a960cf766f604877)
+test_forget_from_restores_earlier_commit_history: test
+test_tombstone_bit_masking_in_read_set_and_validator: test
+test_tombstone_bit_masking_in_seq_log: test
+test_tombstone_bit_masking_in_tx_buffer: test
+
+4 tests, 0 benchmarks
+     Running tests/b16_reproduction.rs (target/debug/deps/b16_reproduction-89486f284491cbf0)
+test_b16_coarsening_prevents_false_negatives: test
+test_b16_reproduction_capacity_total_outage_resolved: test
+test_fail_closed_snapshot_pruned_still_enforced_after_coarsening: test
+test_long_lived_snapshot_pin_blocker_alarm: test
+
+4 tests, 0 benchmarks
+     Running tests/campaign_cov_ssi_coarsening.rs (target/debug/deps/campaign_cov_ssi_coarsening-6b5fa6e8c279f607)
+test_ssi_coarsening_trigger_and_diagnose_pruning_blocker: test
+
+1 test, 0 benchmarks
+     Running tests/campaign_cov_tx_buffer_reap.rs (target/debug/deps/campaign_cov_tx_buffer_reap-f346c619a9d4ad67)
+test_tx_buffer_reap_orphans_bounded_exact_capping_and_time_injection: test
+
+1 test, 0 benchmarks
+     Running tests/campaign_j42_ssi.rs (target/debug/deps/campaign_j42_ssi-020f3419ae724032)
+test_campaign_j42_ssi_counter_factual_mutation_check: test
+test_campaign_j42_ssi_write_skew_oracle_verification: test
+
+2 tests, 0 benchmarks
+     Running tests/history_anomaly_checker.rs (target/debug/deps/history_anomaly_checker-54bb2caea2bc382a)
+test_brute_force_serializability_of_ssi_admitted_histories: test
+test_elle_checker_detects_write_skew_cycle: test
+test_sentinel_boundary_values_and_tombstone_bit: test
+test_ssi_fekete_read_only_anomaly_detection: test
+test_ssi_prevents_on_call_doctor_write_skew: test
+
+5 tests, 0 benchmarks
+     Running tests/isolation_tests.rs (target/debug/deps/isolation_tests-f745d922c5a8197a)
+test_isolation_handcrafted_read_your_own_writes_lifecycle: test
+test_isolation_handcrafted_snapshot_never_sees_future_commits: test
+test_isolation_handcrafted_write_conflict_detection_and_disjoint_reads: test
+test_isolation_longest_active_pin_diagnostics_manual_clock: test
+test_isolation_lost_update_atomic_validate_and_record: test
+test_isolation_lost_update_concurrent_counter_increment: test
+test_isolation_multithreaded_snapshot_registry_concurrency: test
+test_isolation_multithreaded_ssi_validator_concurrent_commits: test
+test_isolation_multithreaded_tx_buffer_sharded_concurrency: test
+test_isolation_phantom_read_multiple_range_prefixes: test
+test_isolation_phantom_read_prefix_match_conflicts: test
+test_isolation_phantom_read_unrelated_prefix_succeeds: test
+test_isolation_pin_expiration_sequence_log_manual_clock: test
+test_isolation_pin_expiration_snapshot_registry_manual_clock: test
+test_isolation_read_only_snapshot_empty_read_set_always_valid: test
+test_isolation_read_only_snapshot_never_aborted_by_writes: test
+test_isolation_read_set_min_snapshot_seq_tracking: test
+test_isolation_seq_log_boundary_seq_numbers: test
+test_isolation_seq_log_compaction_retains_active_versions: test
+test_isolation_seq_log_tombstone_bit_masking: test
+test_isolation_snapshot_registry_out_of_order_guard_drop: test
+test_isolation_snapshot_registry_ref_counting_same_seq: test
+test_isolation_ssi_validator_with_sequence_log_conflict: test
+test_isolation_tx_buffer_bounded_ops_limit: test
+test_isolation_tx_buffer_orphan_reaping_manual_clock: test
+test_isolation_tx_buffer_tx_staged_bytes_budget: test
+test_isolation_write_skew_classic_bank_account: test
+test_isolation_write_skew_non_overlapping_read_sets_succeed: test
+test_isolation_write_skew_overlapping_reads_disjoint_writes: test
+
+29 tests, 0 benchmarks
+     Running tests/loom_snapshot_registry.rs (target/debug/deps/loom_snapshot_registry-7cd016083e51e9cd)
+normal_tests::test_concurrent_snapshot_registry_stress: test
+
+1 test, 0 benchmarks
+     Running tests/ssi_coarsening_proptest.rs (target/debug/deps/ssi_coarsening_proptest-ac5cfe5efcd2d0d2)
+prop_ssi_coarsening_zero_false_negatives: test
+
+1 test, 0 benchmarks
+     Running tests/ssi_determinism_proptest.rs (target/debug/deps/ssi_determinism_proptest-8989d972c592d39b)
+prop_ssi_validation_is_100_percent_deterministic: test
+
+1 test, 0 benchmarks
+     Running tests/ssi_forget_and_bounds.rs (target/debug/deps/ssi_forget_and_bounds-d95a6594258afba6)
+committed_writes_bounded: test
+forget_from_removes_keys_of_failed_batch: test
+phantom_prefix_conflict: test
+
+3 tests, 0 benchmarks
+     Running tests/ssi_hardening.rs (target/debug/deps/ssi_hardening-31f8897788397abb)
+prop_prune_equivalence_above_watermark: test
+test_fail_closed_validation: test
+test_min_read_snapshot_across_shards: test
+test_prune_through_mechanics: test
+test_try_register_read_limit_and_updates: test
+test_validate_and_record_atomicity: test
+
+6 tests, 0 benchmarks
+     Running tests/ssi_metrics_observability.rs (target/debug/deps/ssi_metrics_observability-ebbb5997121a7c45)
+test_ssi_metrics_observability_hot_swap_consistency: test
+test_ssi_metrics_observability_long_pin_duration: test
+test_ssi_metrics_observability_threshold_and_coarsening: test
+
+3 tests, 0 benchmarks
+     Running tests/ssi_sentinel_guard_tests.rs (target/debug/deps/ssi_sentinel_guard_tests-290baa22d69a04bc)
+test_ssi_prune_through_rejects_sentinel_and_tombstone: test
+
+1 test, 0 benchmarks
+     Running tests/ssi_write_skew.rs (target/debug/deps/ssi_write_skew-fcd3d9f8743a918b)
+test_classic_write_skew_conflict_detected: test
+test_disjoint_read_write_sets_succeed: test
+test_storage_independent_anti_dependency_cycle_detection: test
+
+3 tests, 0 benchmarks
+     Running tests/tx_buffer_byte_budget.rs (target/debug/deps/tx_buffer_byte_budget-678e18efa707ff0c)
+tx_buffer_byte_budget_exceeded: test
+tx_buffer_byte_budget_freed_on_drain_discard_reap: test
+
+2 tests, 0 benchmarks
+     Running tests/visibility_proptest.rs (target/debug/deps/visibility_proptest-9e1a4721f41871ee)
+prop_mvcc_visibility_explicit_boundary_cases: test
+prop_mvcc_visibility_matches_reference_10k: test
+
+2 tests, 0 benchmarks
+   Doc-tests contextra_mvcc
+crates/contextra-mvcc/src/lib.rs - (line 54): test
+
+1 test, 0 benchmarks

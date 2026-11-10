@@ -1,0 +1,497 @@
+   Compiling ppv-lite86 v0.2.21
+   Compiling futures-util v0.3.34
+   Compiling bytemuck v1.25.2
+   Compiling byteorder v1.5.0
+   Compiling contextra-sys v0.1.0 (/app/crates/contextra-sys)
+   Compiling roaring v0.10.12
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.8.8
+   Compiling zeroize v1.9.0
+   Compiling criterion v0.5.1
+   Compiling proptest v1.11.0
+   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)
+   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+   Compiling contextra-vector v0.1.0 (/app/crates/contextra-vector)
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:73:50
+   |
+73 |                 contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio }
+   |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:76:50
+   |
+76 |                 contextra_types::ContextraError::GraphRepairFailed(
+   |                                                  ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::HnswDeletionError::VerificationFailed`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/error.rs:77:57
+   |
+77 |                     contextra_types::HnswDeletionError::VerificationFailed {
+   |                                                         ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:97:46
+   |
+97 |             contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio } => {
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/error.rs:100:46
+    |
+100 |             contextra_types::ContextraError::GraphRepairFailed(e) => {
+    |                                              ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated enum `contextra_types::HnswDeletionError`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/hnsw/deletion.rs:32:46
+   |
+32 | use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
+   |                                              ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/hnsw/deletion.rs:83:48
+   |
+83 |                     return Err(ContextraError::GraphRepairFailed(
+   |                                                ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::HnswDeletionError::NodeNotFound`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/hnsw/deletion.rs:84:44
+   |
+84 |                         HnswDeletionError::NodeNotFound(doc_id),
+   |                                            ^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/hnsw/deletion.rs:98:40
+   |
+98 |             return Err(ContextraError::GraphRepairFailed(
+   |                                        ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::HnswDeletionError::NodeNotFound`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/hnsw/deletion.rs:99:36
+   |
+99 |                 HnswDeletionError::NodeNotFound(doc_id),
+   |                                    ^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/hnsw/core_search.rs:339:56
+    |
+339 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/hnsw/core_search.rs:726:56
+    |
+726 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:139:56
+    |
+139 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_types::ContextraError::HnswConnectivityDegraded::deleted_ratio`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:97:73
+   |
+97 |             contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio } => {
+   |                                                                         ^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_types::ContextraError::GraphRepairFailed::0`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/error.rs:100:64
+    |
+100 |             contextra_types::ContextraError::GraphRepairFailed(e) => {
+    |                                                                ^
+
+warning: `contextra-vector` (lib) generated 15 warnings
+warning: `contextra-vector` (lib test) generated 15 warnings (15 duplicates)
+warning: variable does not need to be mutable
+  --> crates/contextra-vector/tests/connectivity_regression.rs:94:9
+   |
+94 |     let mut index = HnswIndex::try_new(config).expect("index");
+   |         ----^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: `contextra-vector` (test "connectivity_regression") generated 1 warning (run `cargo fix --test "connectivity_regression"` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 42.53s
+     Running unittests src/lib.rs (target/debug/deps/contextra_vector-ae846a6ffc7a5ed5)
+compute_pool::tests::test_compute_pool_basic: test
+compute_pool::tests::test_compute_pool_concurrency_ceiling: test
+compute_pool::tests::test_compute_pool_panic_resilience: test
+distance::tests::test_compute_distance_f32_bytes_equivalence: test
+distance::tests::test_distances_match_scalar: test
+distance::tests::test_public_compute_distance_api_sanity: test
+distance::tests::test_scalar_distance_contract: test
+distance::tests::test_scalar_distance_nan_rejection: test
+hnsw::arena::tests::test_backlink_table_operations: test
+hnsw::arena::tests::test_hnsw_arena_allocation_and_retrieval: test
+hnsw::arena::tests::test_hnsw_arena_slot_reuse_capacity_guard: test
+hnsw::core_rebuild::tests::test_core_rebuild_last_rebuild_nanos_field_backoff: test
+hnsw::core_rebuild::tests::test_core_rebuild_no_direct_time_and_deterministic_with_same_seed: test
+hnsw::sq8_bias::tests::test_sq8_bias_calibration: test
+hnsw::tests::test_compact_seq_log: test
+hnsw::tests::test_delete: test
+hnsw::tests::test_hnsw_config_builder_and_validation: test
+hnsw::tests::test_hnsw_klasse_a_index_and_maintain_trait: test
+hnsw::tests::test_hnsw_rebuild_exponential_backoff_and_alarm: test
+hnsw::tests::test_hnsw_rebuild_metrics_duration: test
+hnsw::tests::test_hnsw_topology_and_search_determinism: test
+hnsw::tests::test_insert_and_search: test
+hnsw::tests::test_invalid_config_error: test
+hnsw::tests::test_try_new_invalid_config_fails_immediately: test
+partial_rebuild::tests::test_partial_rebuild_empty_traversals_and_zero_tombstones: test
+partial_rebuild::tests::test_partial_rebuild_nan_inf_safety: test
+partial_rebuild::tests::test_partial_rebuild_no_trigger_below_min_global_ratio: test
+partial_rebuild::tests::test_partial_rebuild_ring_buffer_eviction: test
+partial_rebuild::tests::test_partial_rebuild_tracker_records_traversals: test
+partial_rebuild::tests::test_partial_rebuild_trigger_on_local_oversaturation: test
+partial_rebuild::tests::test_partial_rebuild_zero_window_size: test
+partial_rebuild::tests::test_should_trigger_partial_rebuild_nan_ratio: test
+persistence::tests::test_get_connections_rejects_absurd_length_field: test
+persistence::tests::test_get_connections_rejects_out_of_bounds_offset: test
+persistence::tests::test_get_vector_rejects_out_of_bounds_offset: test
+persistence::tests::test_hnsw_header_roundtrip_and_errors: test
+persistence::tests::test_hnsw_header_version_and_checksum_verification: test
+persistence::tests::test_mmap_index_boundary_checks: test
+persistence::tests::test_mmap_index_error_paths: test
+persistence::tests::test_mmap_open_async: test
+persistence::tests::test_node_record_roundtrip_and_errors: test
+persistence::tests::test_open_rejects_invalid_magic: test
+persistence::tests::test_open_rejects_truncated_header: test
+persistence::tests::test_open_rejects_unsupported_version: test
+persistence::tests::test_v1_legacy_migration_load_degraded_fallback: test
+persistence::tests::test_v2_save_load_roundtrip_preserves_per_dim_calibration: test
+quantize::quantize_validation_tests::test_drift_ratio_accumulation_and_pure_calculate_vector_drift: test
+quantize::quantize_validation_tests::test_sq8_theoretical_error_bound_property: test
+quantize::quantize_validation_tests::test_try_train_with_infinity_returns_invalid_input: test
+quantize::quantize_validation_tests::test_try_train_with_nan_returns_invalid_input: test
+quantize::tests::test_asymmetric_symmetric_distance_metrics: test
+quantize::tests::test_check_drift: test
+quantize::tests::test_corrupted_quantizer_returns_err_no_panic: test
+quantize::tests::test_dist_dimension_mismatch_returns_error: test
+quantize::tests::test_per_dim_better_recall_than_global: test
+quantize::tests::test_percentile_clipping_in_try_train: test
+quantize::tests::test_percentile_clipping_outlier_recall_improvement: test
+quantize::tests::test_prop_per_dim_mse_le_global_mse: test
+quantize::tests::test_quantize_clamping_and_drift_counting: test
+quantize::tests::test_quantize_dequantize_roundtrip: test
+quantize::tests::test_quantized_search_no_panic: test
+quantize::tests::test_quantizer_try_train_guards: test
+quantize::tests::test_serde_roundtrip: test
+quantize::tests::test_train_empty_batch: test
+
+64 tests, 0 benchmarks
+     Running tests/acorn_hnsw_differential.rs (target/debug/deps/acorn_hnsw_differential-b226205702b319f8)
+test_candidate_storage_vec_structure_assertion: test
+test_differential_acorn_hnsw_vs_naive_reference: test
+test_high_selectivity_beam_starvation_regression: test
+test_zero_cross_contamination_invariant: test
+
+4 tests, 0 benchmarks
+     Running tests/acorn_naive_recall.rs (target/debug/deps/acorn_naive_recall-7c2d909a56a8951f)
+test_gamma_edge_budget_edge_cases: test
+test_gamma_edge_budget_monotonicity: test
+test_naive_reference_top_k_with_equality_predicate: test
+
+3 tests, 0 benchmarks
+     Running tests/acorn_selectivity_edge_cases_test.rs (target/debug/deps/acorn_selectivity_edge_cases_test-4c123decebaf6716)
+test_acorn_selectivity_zero_and_one_and_oracle: test
+
+1 test, 0 benchmarks
+     Running tests/adaptive_ef_recall.rs (target/debug/deps/adaptive_ef_recall-ed83845d18f6a505)
+test_adaptive_ef_deleted_nodes_never_returned: test
+test_adaptive_ef_determinism: test
+test_adaptive_ef_difficult_queries_grows_to_max_ef: test
+test_adaptive_ef_easy_queries_early_exit_and_recall: test
+test_adaptive_ef_invalid_policy_errors: test
+
+5 tests, 0 benchmarks
+     Running tests/campaign_hnsw_backoff.rs (target/debug/deps/campaign_hnsw_backoff-9ed532d673a23406)
+test_campaign_hnsw_backoff_cooldown_exact_bounds: test
+
+1 test, 0 benchmarks
+     Running tests/campaign_j23_vector_index.rs (target/debug/deps/campaign_j23_vector_index-0650b07cd898e6f2)
+test_h10_mvcc_commit_rollback_visibility: test
+test_h1_docid_u128_hnsw_collision_safety: test
+test_h3_adaptive_ef_duplicate_vector_stability: test
+test_h3_adaptive_ef_max_ef_termination: test
+test_h4_twophase_rebuild_concurrency_and_determinism: test
+test_h5_arena_node_reuse_churn_no_ghost_pointers: test
+test_h6_partial_rebuild_tombstone_only_pruning: test
+test_h7_recall_suite_gaussian_clustered_adversarial: test
+test_h8_acorn_filtered_selectivity_sweeps: test
+test_h9_limits_dimension_mismatch_and_nan: test
+
+10 tests, 0 benchmarks
+     Running tests/campaign_j24_test.rs (target/debug/deps/campaign_j24_test-fdb4f9f61e7a3ddc)
+test_h10_vector_candidate_stream_top_k_streaming: test
+test_h1_counter_test_dequantize_failure: test
+test_h1_sq8_degenerate_data_and_error_bounds: test
+test_h2_quantization_drift_and_sq8_bias: test
+test_h3_counter_test_orthogonal_matrix_failure: test
+test_h4_simd_dispatch_and_numerical_audit: test
+test_h5_ram_vs_mmap_mixed_precision_top_k: test
+test_h6_counter_test_header_magic_failure: test
+test_h6_hnsw_persistence_corruption_and_bounds: test
+test_h9_compute_pool_saturation_and_panic_safety: test
+
+10 tests, 0 benchmarks
+     Running tests/campaign_j41_vector.rs (target/debug/deps/campaign_j41_vector-655b73d32229de4b)
+test_j41_docid_u128_truncation_oracle: test
+test_j41_neighbor_count_u8_truncation_oracle: test
+
+2 tests, 0 benchmarks
+     Running tests/connectivity_regression.rs (target/debug/deps/connectivity_regression-f312665d2da402b1)
+test_50_percent_deletion_recall_regression: test
+test_bfs_layer0_reachability_property: test
+test_edge_cases_entry_point_and_hub_deletion: test
+test_inv_hnsw_slot_1_no_slot_reuse_before_rebuild: test
+
+4 tests, 0 benchmarks
+     Running tests/deleted_nodes_lock_contention.rs (target/debug/deps/deleted_nodes_lock_contention-6900b38fc373a255)
+proof_deleted_nodes_lock_hoisted_before_loop: test
+proof_no_deadlock_concurrent_delete_search: test
+proof_search_throughput_not_degraded_by_deletes: test
+
+3 tests, 0 benchmarks
+     Running tests/deletion_consistency_recall_test.rs (target/debug/deps/deletion_consistency_recall_test-15e8f9b853ab6a99)
+test_deletion_consistency_and_surviving_recall: test
+
+1 test, 0 benchmarks
+     Running tests/deletion_ghost_pointer_proptest.rs (target/debug/deps/deletion_ghost_pointer_proptest-f83b6d9e7474da1e)
+prop_ghost_free_deletion_removes_all_pointers: test
+
+1 test, 0 benchmarks
+     Running tests/deletion_zeroize_test.rs (target/debug/deps/deletion_zeroize_test-6038741d99d63b59)
+test_inv_vec_zeroize_1_slot_nulling_on_deletion: test
+
+1 test, 0 benchmarks
+     Running tests/determinism_test.rs (target/debug/deps/determinism_test-ecd711c11111152e)
+test_hnsw_determinism_default_try_new_reproducible: test
+test_hnsw_determinism_different_seeds_produce_different_layers: test
+test_hnsw_determinism_explicit_rng_same_topology: test
+
+3 tests, 0 benchmarks
+     Running tests/differential_testing.rs (target/debug/deps/differential_testing-1b5099508cd12fa6)
+test_differential_quantization_sq8_10000_queries: test
+
+1 test, 0 benchmarks
+     Running tests/diskann_docid128_tombstones.rs (target/debug/deps/diskann_docid128_tombstones-e1879f684c811765)
+0 tests, 0 benchmarks
+     Running tests/diskann_search_filtered.rs (target/debug/deps/diskann_search_filtered-5948f8ae40033a80)
+0 tests, 0 benchmarks
+     Running tests/distance_determinism.rs (target/debug/deps/distance_determinism-61b9cb8717cefdf0)
+test_cosine_determinism: test
+test_dot_product_determinism: test
+test_euclidean_determinism: test
+
+3 tests, 0 benchmarks
+     Running tests/distance_determinism_test.rs (target/debug/deps/distance_determinism_test-7c44bfc81c07ba61)
+test_distance_bit_determinism_repetitions: test
+
+1 test, 0 benchmarks
+     Running tests/docid_128_hnsw.rs (target/debug/deps/docid_128_hnsw-4ad4aa2199be67d4)
+test_docid_128_hnsw_basic_roundtrip: test
+test_docid_format_mismatch_detection: test
+
+2 tests, 0 benchmarks
+     Running tests/filtered_selectivity_recall.rs (target/debug/deps/filtered_selectivity_recall-e40bb363effb0689)
+test_filtered_search_selectivity_recall: test
+
+1 test, 0 benchmarks
+     Running tests/golden_distance_oracle.rs (target/debug/deps/golden_distance_oracle-080e8cc3ad9f8898)
+test_bytes_kernel_equivalence_golden_table: test
+test_fault_and_edge_cases: test
+test_scalar_kernel_golden_table_values: test
+
+3 tests, 0 benchmarks
+     Running tests/hnsw_edge_cases.rs (target/debug/deps/hnsw_edge_cases-111706647b2af769)
+test_concurrent_insert_during_search: test
+test_deleted_node_not_returned_in_results: test
+test_duplicate_vectors_tie_breaking: test
+test_ef_construction_boundary: test
+test_empty_index_search_returns_empty: test
+test_max_elements_boundary: test
+test_nan_in_embeddings_rejected: test
+test_search_with_k_greater_than_index_size: test
+test_single_element_index_returns_that_element: test
+test_zero_vector_cosine: test
+
+10 tests, 0 benchmarks
+     Running tests/hnsw_layer_determinism.rs (target/debug/deps/hnsw_layer_determinism-22939c9731a678da)
+test_hnsw_layer_determinism_different_seeds_different_layer_sequences: test
+test_hnsw_layer_determinism_same_seed_same_results: test
+test_hnsw_layer_distribution_m16: test
+
+3 tests, 0 benchmarks
+     Running tests/hnsw_rebuild_connectivity_test.rs (target/debug/deps/hnsw_rebuild_connectivity_test-53edad20e5cbe0ca)
+test_inv_vec_connectivity_1_reachable_after_compact: test
+
+1 test, 0 benchmarks
+     Running tests/hnsw_rebuild_search_consistency.rs (target/debug/deps/hnsw_rebuild_search_consistency-9d90c67c07a59fc5)
+test_hnsw_rebuild_snapshot_consistency_during_concurrent_search: test
+
+1 test, 0 benchmarks
+     Running tests/hnsw_scanner_purge_test.rs (target/debug/deps/hnsw_scanner_purge_test-ca2f3051a21d7df1)
+test_hard_purge_entry_point_and_last_node: test
+test_hard_purge_recall_and_search_safety: test
+test_persisted_file_byte_needle: test
+test_sabotaged_purge_detected_by_scanner: test
+test_tombstone_vs_hard_purge: test
+
+5 tests, 0 benchmarks
+     Running tests/hnsw_seed_determinism.rs (target/debug/deps/hnsw_seed_determinism-300aa9ace824a3a6)
+test_hnsw_seed_determinism_different_seeds_different_layouts: test
+test_hnsw_seed_determinism_identical_indices: test
+test_hnsw_seed_determinism_rebuild_reproducibility: test
+
+3 tests, 0 benchmarks
+     Running tests/hnsw_snapshot_delete_test.rs (target/debug/deps/hnsw_snapshot_delete_test-9b749d7549ff89ff)
+test_search_at_includes_node_deleted_after_snapshot: test
+test_search_at_self_reference_not_deleted_before_snapshot: test
+
+2 tests, 0 benchmarks
+     Running tests/k02_snapshot_rebuild_determinism.rs (target/debug/deps/k02_snapshot_rebuild_determinism-293593673455d57c)
+test_k02_snapshot_rebuild_determinism: test
+
+1 test, 0 benchmarks
+     Running tests/loom_quantizer_race_test.rs (target/debug/deps/loom_quantizer_race_test-aaa845bba31ee5ab)
+normal_tests::test_sq8_parallel_insert_no_corruption: test
+normal_tests::test_sync_insert_search_rebuild_swap_model: test
+normal_tests::test_sync_remove_search_visibility_model: test
+normal_tests::test_sync_snapshot_pin_compact_seq_log_model: test
+
+4 tests, 0 benchmarks
+     Running tests/loom_quantizer_test.rs (target/debug/deps/loom_quantizer_test-f079653c8958f47f)
+test_quantizer_concurrent_sharing: test
+
+1 test, 0 benchmarks
+     Running tests/mmap_malformed_data_test.rs (target/debug/deps/mmap_malformed_data_test-8c3a42dc8640ac09)
+test_mmap_connection_len_overflow_returns_err: test
+test_mmap_open_empty_file_returns_error: test
+test_mmap_open_exact_file_sizes_no_panic: test
+test_mmap_open_huge_node_count_no_panic: test
+test_mmap_open_truncated_file_returns_error: test
+test_mmap_open_wrong_magic_returns_error: test
+test_try_from_bytes_empty_slice_returns_error: test
+test_try_from_bytes_truncated_header_returns_error: test
+test_try_from_bytes_wrong_magic_returns_error: test
+test_try_from_bytes_wrong_version_returns_error: test
+
+10 tests, 0 benchmarks
+     Running tests/nan_validation_policy.rs (target/debug/deps/nan_validation_policy-dad08d1eabab9457)
+proof_compute_distance_trusted_never_scans_nan: test
+proof_nan_in_query_rejected_at_search: test
+proof_nan_rejected_at_insert: test
+proof_valid_insert_after_nan_rejection: test
+proof_validate_vector_covers_all_positions: test
+
+5 tests, 0 benchmarks
+     Running tests/nan_validation_test.rs (target/debug/deps/nan_validation_test-dcf1a76a7ebfb692)
+test_nan_infinity_strict_rejection: test
+
+1 test, 0 benchmarks
+     Running tests/partial_rebuild_recall.rs (target/debug/deps/partial_rebuild_recall-9bbdfd9f860baa15)
+test_partial_rebuild_recall_regression: test
+
+1 test, 0 benchmarks
+     Running tests/partial_rebuild_recall_regression.rs (target/debug/deps/partial_rebuild_recall_regression-b41462f3b3ef386c)
+0 tests, 0 benchmarks
+     Running tests/partial_rebuild_veto_f02_guard.rs (target/debug/deps/partial_rebuild_veto_f02_guard-706d8693d4b70b09)
+test_partial_rebuild_feature_gate_guard: test
+test_veto_f02_guard_partial_rebuild_tombstone_pruning: test
+
+2 tests, 0 benchmarks
+     Running tests/persistence_mutation_matrix_test.rs (target/debug/deps/persistence_mutation_matrix_test-60707cef48b77c4a)
+test_persistence_header_mutation_matrix: test
+
+1 test, 0 benchmarks
+     Running tests/poisoning.rs (target/debug/deps/poisoning-c35e86911e60ce23)
+test_inf_poisoning_prevention: test
+test_nan_poisoning_prevention: test
+test_neg_inf_poisoning_prevention: test
+test_search_rejects_infinite_query_vector: test
+test_search_rejects_nan_query_vector: test
+
+5 tests, 0 benchmarks
+     Running tests/proptest_distance_quantize.rs (target/debug/deps/proptest_distance_quantize-d160d5350135c5ce)
+prop_cosine_self_distance_is_zero: test
+prop_dimension_mismatch_returns_err: test
+prop_euclidean_non_negative: test
+prop_sq8_quantize_dequantize_roundtrip: test
+test_compute_distance_with_extreme_values_no_panic: test
+test_cosine_zero_vector_is_handled: test
+
+6 tests, 0 benchmarks
+     Running tests/quantizer_encapsulation_regression.rs (target/debug/deps/quantizer_encapsulation_regression-e0e9cc10d6101c37)
+test_quantizer_encapsulation_prevents_field_mutation: test
+
+1 test, 0 benchmarks
+     Running tests/rabitq_calibration_recall.rs (target/debug/deps/rabitq_calibration_recall-ea89c05f27a0f57c)
+0 tests, 0 benchmarks
+     Running tests/rabitq_recall_calibration.rs (target/debug/deps/rabitq_recall_calibration-003c8566898aebfb)
+0 tests, 0 benchmarks
+     Running tests/rabitq_recall_calibration_test.rs (target/debug/deps/rabitq_recall_calibration_test-e94d681bb7f5eab2)
+0 tests, 0 benchmarks
+     Running tests/ram_reduction.rs (target/debug/deps/ram_reduction-d7afbd474810890b)
+test_ram_reduction_4x: test
+
+1 test, 0 benchmarks
+     Running tests/recalibration.rs (target/debug/deps/recalibration-f8c3aa5fc8502770)
+test_quantizer_recalibration: test
+
+1 test, 0 benchmarks
+     Running tests/recall.rs (target/debug/deps/recall-78e125cdac0d0e9e)
+test_recall_at_10_above_95: test
+
+1 test, 0 benchmarks
+     Running tests/recall_vs_brute_force.rs (target/debug/deps/recall_vs_brute_force-e1ff10ce06810d2b)
+recall_at_10_vs_brute_force_cosine: test
+recall_at_10_vs_brute_force_dot_product: test
+recall_at_10_vs_brute_force_euclidean: test
+recall_at_1_vs_brute_force: test
+test_hnsw_recall_at_10_target_10k_vectors: test
+
+5 tests, 0 benchmarks
+     Running tests/reconstruction_attack_test.rs (target/debug/deps/reconstruction_attack_test-aaa2e507822dfd7d)
+test_reconstruction_attack_search_quality_baseline: test
+
+1 test, 0 benchmarks
+     Running tests/rollback.rs (target/debug/deps/rollback-0ee3200ac482fb41)
+test_hnsw_rollback_to_tx_removes_nodes: test
+
+1 test, 0 benchmarks
+     Running tests/simd_numerical_audit.rs (target/debug/deps/simd_numerical_audit-456aca92d72bbb9c)
+prop_simd_vs_f64_parity_random_vectors: test
+test_extreme_and_special_values: test
+test_simd_vs_scalar_vs_f64_all_metrics: test
+
+3 tests, 0 benchmarks
+     Running tests/sq8_bias_calibration.rs (target/debug/deps/sq8_bias_calibration-f912dd7378ce21b6)
+test_sq8_bias_calibration_and_persistence: test
+
+1 test, 0 benchmarks
+     Running tests/sq8_error_bound_proptest.rs (target/debug/deps/sq8_error_bound_proptest-ff1126438184b42e)
+test_sq8_reconstruction_error_bound_proptest: test
+
+1 test, 0 benchmarks
+     Running tests/sq8_rerank_recall.rs (target/debug/deps/sq8_rerank_recall-bf3cb9e951b7952f)
+test_sq8_rerank_recall_measurement: test
+
+1 test, 0 benchmarks
+     Running tests/vector_candidate_stream.rs (target/debug/deps/vector_candidate_stream-92e8d695d362a7ea)
+test_determinism_identical_streams: test
+test_empty_index: test
+test_first_batch_lazy: test
+test_full_exhaustion_200_vectors: test
+test_seq_no_snapshot: test
+test_with_batch_size_zero: test
+
+6 tests, 0 benchmarks
+   Doc-tests contextra_vector
+0 tests, 0 benchmarks
