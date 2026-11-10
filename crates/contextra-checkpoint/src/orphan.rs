@@ -16,8 +16,9 @@
 //! 4. Beim nächsten Store-Start oder Recovery-Lauf (`recover_orphaned_pins`) werden die verwaisten Pins entpinnt.
 
 use crate::meta::StateCheckpoint;
-use contextra_ports::SystemClock;
-use contextra_types::{Result, TxId};
+use contextra_env::{Clock, SystemClock};
+use crate::error::Result;
+use contextra_ids::TxId;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -94,8 +95,8 @@ fn default_data_dir() -> std::path::PathBuf {
 /// Liest einen Millisekunden-Zeitstempel deterministisch über die übergebene Clock-Port-Instanz.
 ///
 /// # Parameter
-/// - `clock`: Referenz auf eine Implementierung des [`contextra_ports::Clock`]-Traits.
-pub fn monotonic_timestamp_ms_with(clock: &dyn contextra_ports::Clock) -> u64 {
+/// - `clock`: Referenz auf eine Implementierung des [`Clock`]-Traits.
+pub fn monotonic_timestamp_ms_with(clock: &dyn Clock) -> u64 {
     // NOTE: Zeit und Zufall dürfen gemäß Regel 3 / INV-CHECKPOINT-DETERMINISM-1 nur über Ports fließen
     clock.now_unix_nanos() / 1_000_000
 }
@@ -108,7 +109,7 @@ pub fn monotonic_timestamp_ms() -> u64 {
 }
 
 /// Crate-interner Helfer zum Lesen der aktuellen Zeit in Millisekunden über einen Clock-Port.
-pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
+pub(crate) fn clock_timestamp_ms(clock: &dyn Clock) -> u64 {
     monotonic_timestamp_ms_with(clock)
 }
 
@@ -176,7 +177,7 @@ impl OrphanRegistry {
     /// 2. Für jeden Pin `storage.unpin_checkpoint` aufrufen.
     /// 3. Bei Erfolg den Pin aus der inneren Registry entfernen.
     /// 4. Liste der erfolgreich wiederhergestellten Pins zurückgeben.
-    pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
+    pub async fn recover_and_clean<S: crate::snapshot_source::SnapshotSource>(
         &self,
         storage: &S,
     ) -> Result<Vec<PinId>> {
@@ -252,13 +253,12 @@ impl OrphanState {
     }
 
     /// Schreibt den Zustand über die Vfs-Schnittstelle crash-konsistent (`write_atomic`).
-    pub fn persist_vfs(&self, vfs: &dyn contextra_ports::Vfs) -> std::io::Result<()> {
+    pub fn persist_vfs(&self, vfs: &dyn crate::vfs::CheckpointVfs) -> std::io::Result<()> {
         if self.persist_path.as_os_str().is_empty() {
             return Ok(());
         }
         let data = serde_json::to_vec_pretty(self)?;
         vfs.write_atomic(&self.persist_path, &data)
-            .map_err(|e| std::io::Error::other(e.to_string()))
     }
 
     /// Lädt den Zustand synchron von der Festplatte oder liefert einen leeren Zustand bei Fehlern.
@@ -276,7 +276,7 @@ impl OrphanState {
     }
 
     /// Lädt den Zustand über die Vfs-Schnittstelle.
-    pub fn load_vfs(vfs: &dyn contextra_ports::Vfs, path: &std::path::Path) -> Self {
+    pub fn load_vfs(vfs: &dyn crate::vfs::CheckpointVfs, path: &std::path::Path) -> Self {
         if !path.as_os_str().is_empty() {
             if let Ok(data) = vfs.read(path) {
                 if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
@@ -303,8 +303,8 @@ pub struct InstanceOrphanRegistry {
     checkpoints: Mutex<Vec<StateCheckpoint>>,
     persist_path: std::path::PathBuf,
     is_dirty: AtomicBool,
-    clock: Arc<dyn contextra_ports::Clock>,
-    vfs: Option<Arc<dyn contextra_ports::Vfs>>,
+    clock: Arc<dyn Clock>,
+    vfs: Option<Arc<dyn crate::vfs::CheckpointVfs>>,
 }
 
 impl std::fmt::Debug for InstanceOrphanRegistry {
@@ -335,42 +335,42 @@ impl InstanceOrphanRegistry {
     /// Erzeugt eine neue instanzgebundene Registry über den VFS-Port.
     pub fn new_with_vfs(
         persist_path: impl Into<std::path::PathBuf>,
-        vfs: Arc<dyn contextra_ports::Vfs>,
+        vfs: Arc<dyn crate::vfs::CheckpointVfs>,
     ) -> Self {
         let path = persist_path.into();
         Self::load_vfs_internal(&path, vfs)
     }
 
     /// Konfiguriert die Registry mit einer spezifischen Clock-Implementierung.
-    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
 
     /// Konfiguriert die Registry mit einer VFS-Implementierung.
-    pub fn with_vfs(mut self, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+    pub fn with_vfs(mut self, vfs: Arc<dyn crate::vfs::CheckpointVfs>) -> Self {
         self.vfs = Some(vfs);
         self
     }
 
     /// Setzt die Clock-Implementierung nachträglich.
-    pub fn set_clock(&mut self, clock: Arc<dyn contextra_ports::Clock>) {
+    pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
         self.clock = clock;
     }
 
     /// Liefert eine Referenz auf den injizierten Clock-Port.
-    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
     /// Liefert eine Referenz auf das injizierte VFS (falls vorhanden).
-    pub fn vfs(&self) -> Option<&Arc<dyn contextra_ports::Vfs>> {
+    pub fn vfs(&self) -> Option<&Arc<dyn crate::vfs::CheckpointVfs>> {
         self.vfs.as_ref()
     }
 
     /// Lädt den Zustand synchron von der Festplatte.
     pub fn load_sync(path: &std::path::Path) -> Self {
-        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
         if !path.as_os_str().is_empty() {
             if let Ok(data) = std::fs::read(path) {
                 if let Ok(state) = serde_json::from_slice::<OrphanState>(&data) {
@@ -395,8 +395,8 @@ impl InstanceOrphanRegistry {
         }
     }
 
-    fn load_vfs_internal(path: &std::path::Path, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
-        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+    fn load_vfs_internal(path: &std::path::Path, vfs: Arc<dyn crate::vfs::CheckpointVfs>) -> Self {
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
         let state = OrphanState::load_vfs(vfs.as_ref(), path);
         Self {
             pins: Mutex::new(state.pinned_seq_nos),
@@ -439,7 +439,7 @@ impl InstanceOrphanRegistry {
             let seq_no = orphan.seq_no;
             lock.push(orphan);
             drop(lock);
-            // NOTE: Ordering::Release garantiert, dass der Vector-Eintrag vor dem Dirty-Flag sichtbar ist
+            // NOTE: Ordering::Release stellt sicher, dass der Vector-Eintrag vor dem Dirty-Flag sichtbar ist
             self.is_dirty.store(true, Ordering::Release);
             tracing::debug!(
                 seq = seq_no,
@@ -749,11 +749,21 @@ mod tests {
         assert!(state.persist_sync().is_ok());
     }
 
-    // Prüft, dass die Orphan-Registry über ein injiziertes Vfs (FaultVfs) sauber lädt und speichert.
+    struct MockVfs(parking_lot::Mutex<std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>>);
+    impl crate::vfs::CheckpointVfs for MockVfs {
+        fn write_atomic(&self, path: &std::path::Path, data: &[u8]) -> std::io::Result<()> {
+            self.0.lock().insert(path.to_path_buf(), data.to_vec());
+            Ok(())
+        }
+        fn read(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
+            self.0.lock().get(path).cloned().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "not found"))
+        }
+    }
+
+    // Prüft, dass die Orphan-Registry über ein injiziertes Vfs sauber lädt und speichert.
     #[test]
     fn test_instance_orphan_registry_with_vfs() {
-        use contextra_testkit::FaultVfs;
-        let vfs = Arc::new(FaultVfs::new());
+        let vfs = Arc::new(MockVfs(parking_lot::Mutex::new(std::collections::BTreeMap::new())));
         let path = std::path::PathBuf::from("/test/orphans.json");
 
         let reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs.clone());

@@ -3,7 +3,7 @@
 //! Dieses Modul enthält Unit-Tests für `PinGuard` und `CheckpointGuard`.
 
 use super::*;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+use crate::snapshot_source::{BoxFuture, SnapshotSource};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 
@@ -23,7 +23,7 @@ impl MockStorage {
     }
 }
 
-impl StorageEngine for MockStorage {
+impl SnapshotSource for MockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
@@ -189,12 +189,12 @@ async fn test_rollback_blocking_in_async_context_returns_error() {
         res.is_err(),
         "rollback_blocking called from async context must return error immediately to prevent deadlock"
     );
-    if let Err(ContextraError::Internal(msg)) = res {
+    if let Err(CheckpointError::Internal(msg)) = res {
         assert!(msg.contains("active async Tokio runtime context"));
         assert!(msg.contains("rollback().await"));
     } else {
         panic!(
-            "Expected ContextraError::Internal error message instructing to use rollback().await"
+            "Expected CheckpointError::Internal error message instructing to use rollback().await"
         );
     }
 }
@@ -271,7 +271,7 @@ async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
     };
     assert!(matches!(
         consumed_guard.checkpoint(),
-        Err(ContextraError::Internal(_))
+        Err(CheckpointError::Internal(_))
     ));
 
     let consumed_guard2 = CheckpointGuard::<MockStorage> {
@@ -284,7 +284,7 @@ async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
     };
     assert!(matches!(
         consumed_guard2.commit(),
-        Err(ContextraError::Internal(_))
+        Err(CheckpointError::Internal(_))
     ));
 
     let consumed_guard3 = CheckpointGuard::<MockStorage> {
@@ -296,5 +296,5 @@ async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
         clock: Arc::new(SystemClock::new()),
     };
     let res = consumed_guard3.rollback().await;
-    assert!(matches!(res, Err(ContextraError::Internal(_))));
+    assert!(matches!(res, Err(CheckpointError::Internal(_))));
 }

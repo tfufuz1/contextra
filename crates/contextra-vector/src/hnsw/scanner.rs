@@ -3,6 +3,8 @@
 // INVARIANTEN: Scanner vertraut Tombstones nie — prüft tatsächliche Vektorbytes (f32/u8), Arena-Nachbarlisten, Freelisten & mmap.
 // NICHT-OFFENSICHTLICH: Positivkontrolle validiert, dass scan_index_content die Canary-Einheiten in der Session aufzeichnet.
 
+#![cfg(feature = "ports-compat")]
+
 use std::sync::Arc;
 
 use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};

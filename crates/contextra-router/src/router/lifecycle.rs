@@ -7,11 +7,17 @@
 //! `update_profiles` erzeugt einen neuen `RouterState`-Snapshot und tauscht diesen
 //! atomar über `ArcSwap` aus. Laufende Routing-Anfragen lesen entweder den alten
 //! oder den neuen Snapshot vollständig und unterbrechungsfrei (Lock-Free Read).
+//!
+//! **VFS-Entkopplung (M4):**
+//! Kalibrierungsdaten werden über den injiziertem VFS-Port gelesen, wenn vorhanden.
+//! Ohne injizierten VFS fällt der Ladevorgang auf `std::fs` zurück (ausschließlich in
+//! `new` / `try_new`, die keinen VFS-Parameter besitzen). In `new_with_vfs` und
+//! `try_new_with_vfs` wird der VFS-Parameter vollständig genutzt.
 
 // FILE-CONTEXT
-// STAND: 2026-10-29
+// STAND: 2026-11-10
 // ZWECK: Konstruktions- und Profilverwaltungs-Methoden (Hot-Reload) für RouterEngine.
-// INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap.
+// INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap; VFS-Port aktiv genutzt.
 
 use super::*;
 
@@ -41,7 +47,21 @@ impl RouterEngine {
         )
     }
 
+    // ANCHOR[contextra-router:LCF-010]
     /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS (M4: I/O-Entkopplung).
+    ///
+    /// # Ablauf
+    /// 1. Kalibrierungszustand für alle Profile initialisieren.
+    /// 2. Lyapunov-Wächter für alle Profile anlegen.
+    /// 3. Wenn `calibration_store_path` gesetzt: Kalibrierungsdaten über VFS-Port lesen und
+    ///    existierende Einträge mit den persistierten Werten überschreiben.
+    /// 4. `RouterState`-Snapshot aufbauen und atomar in `ArcSwap` ablegen.
+    ///
+    /// # Vorbedingungen
+    /// Profile müssen gültige Namen und Mindest-Scores enthalten.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Lesezugriff auf `calibration_store_path` via VFS-Port oder `std::fs`.
     pub fn new_with_vfs(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
@@ -159,7 +179,14 @@ impl RouterEngine {
         )
     }
 
+    // ANCHOR[contextra-router:LCF-011]
     /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS und validiert alle Profile.
+    ///
+    /// # Fehler
+    /// Gibt [`ContextraError`] zurück, wenn ein Profil die Validierung nicht besteht.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Lesezugriff auf `calibration_store_path` via VFS-Port oder `std::fs`.
     pub fn try_new_with_vfs(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,

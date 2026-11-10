@@ -1,0 +1,154 @@
+guard::tests::checkpoint_guard_CASE_commit_moves_ownership: test
+guard::tests::checkpoint_guard_CASE_rollback_consumed_returns_err: test
+guard::tests::checkpoint_guard_CASE_uncommitted_guard_holds_state: test
+guard::tests::test_checkpoint_guard_for_agent_step: test
+guard::tests::test_checkpoint_metrics_commit_duration: test
+guard::tests::test_checkpoint_metrics_drop_rollback_duration: test
+guard::tests::test_orphan_registry_persists_across_drop: test
+guard::tests::test_rollback_blocking_in_async_context_returns_error: test
+guard::tests::test_rollback_blocking_in_sync_context: test
+manifest::tests::test_checkpoint_manifest_CASE_tampered_manifest_fails_verify: test
+manifest::tests::test_checkpoint_manifest_CASE_whitespace_component_rejected: test
+manifest::tests::test_manifest_creation_invalid_meta_name: test
+manifest::tests::test_manifest_validation_blank_component: test
+manifest::tests::test_prop_manifest_roundtrip: test
+meta::tests::checkpoint_meta_CASE_serialization_roundtrip: test
+meta::tests::into_workflow_state_CASE_valid_conversion: test
+meta::tests::state_checkpoint_CASE_serialization_roundtrip: test
+meta::tests::state_checkpoint_deserializes_legacy_json_without_namespace: test
+meta::tests::test_validate_identifier_boundary_oversized_257: test
+meta::tests::test_validate_identifier_empty_or_whitespace: test
+orphan::tests::prop_monotonic_timestamp_ms_increases_or_equals: test
+orphan::tests::test_deprecated_global_orphan_path_warns: test
+orphan::tests::test_instance_orphan_registry_clear_nonexistent: test
+orphan::tests::test_instance_orphan_registry_drain_pins_and_checkpoints: test
+orphan::tests::test_instance_orphan_registry_empty_path_persistence_noop: test
+orphan::tests::test_instance_orphan_registry_with_vfs: test
+orphan::tests::test_two_instance_registries_independent: test
+orphan::tests::timestamp_ms_is_monotonic: test
+store::tests::test_allocate_tx_CASE_parity_with_deprecated_next_tx: test
+store::tests::test_auto_rollback_tracking_and_await: test
+store::tests::test_checkpoint_creation_rollback_on_failure: test
+store::tests::test_checkpoint_guard_commit_prevents_rollback: test
+store::tests::test_checkpoint_guard_dropped_outside_tokio_runtime: test
+store::tests::test_checkpoint_guard_rollback_on_drop: test
+store::tests::test_checkpoint_not_found_returns_err: test
+store::tests::test_concurrent_checkpoint_creation_is_safe: test
+store::tests::test_concurrent_checkpoint_index_atomicity: test
+store::tests::test_create_and_load: test
+store::tests::test_create_checkpoint_CASE_exact_max_len_256: test
+store::tests::test_create_checkpoint_CASE_unicode_and_multibyte_name: test
+store::tests::test_drop_checkpoint_CASE_nonexistent_returns_ok: test
+store::tests::test_drop_checkpoint_uses_unique_tx_and_unpins: test
+store::tests::test_get_orphaned_checkpoints_for_namespace: test
+store::tests::test_input_validation_empty_and_oversized_names: test
+store::tests::test_list_checkpoints_CASE_corrupted_storage_data_propagates_err: test
+store::tests::test_list_checkpoints_cache_matches_storage: test
+store::tests::test_list_checkpoints_empty_initially: test
+store::tests::test_list_named_checkpoints_after_reopen: test
+store::tests::test_multi_instance_orphan_isolation: test
+store::tests::test_name_uniqueness: test
+store::tests::test_next_tx_overflow_returns_err: test
+store::tests::test_orphan_recovery_on_startup: test
+store::tests::test_panic_unwind_triggers_orphan_registration_and_recovery: test
+store::tests::test_pin_before_unpin_invariant_on_failure: test
+store::tests::test_pin_guard_unpins_checkpoint_on_storage_write_failure: test
+store::tests::test_restore_checkpoint_CASE_not_found_returns_err: test
+store::tests::test_store_skipped_rollback_count_and_checkpoint_counter: test
+store::tests::test_store_traits_roundtrip_coverage: test
+
+58 tests, 0 benchmarks
+test_cache_hit_and_miss_reloading: test
+test_concurrent_stress_read_write: test
+test_pinning_and_gc_exclusion_lifecycle: test
+
+3 tests, 0 benchmarks
+test_a_stores_with_same_clock_produce_identical_timestamps: test
+test_b_clock_backward_jump_preserves_monotonicity: test
+test_c_unfinalized_guard_drop_records_orphan_with_test_clock: test
+test_d_default_constructors_smoke_test_with_system_clock: test
+test_e_pin_guard_with_clock_determinism: test
+
+5 tests, 0 benchmarks
+crash_during_checkpoint_deletion_leaves_clean_state: test
+systematic_crash_at_every_checkpoint_io_point: test
+
+2 tests, 0 benchmarks
+test_agent_step_with_clock_determinism: test
+test_checkpoint_store_clock_determinism: test
+
+2 tests, 0 benchmarks
+test_concurrent_checkpoint_creation_same_name: test
+test_concurrent_drop_checkpoints: test
+
+2 tests, 0 benchmarks
+test_crash_recovery_corrupted_manifest_skipped_during_recovery: test
+test_crash_recovery_dropped_guard_with_newer_tx_skipped_by_open_and_recover: test
+test_crash_recovery_hardlink_clone_fallback_to_copy_on_fault: test
+test_crash_recovery_open_and_recover_clean_state_when_no_orphans: test
+test_crash_recovery_open_and_recover_drains_orphaned_pins: test
+test_crash_recovery_open_and_recover_handles_mixed_orphans: test
+test_crash_recovery_open_and_recover_rolls_back_orphaned_checkpoints: test
+test_crash_recovery_step_1_pin_failure_leaves_clean_state: test
+test_crash_recovery_step_2_put_failure_cleans_up_pinned_seq: test
+test_crash_recovery_step_3_commit_failure_rolls_back_and_unpins: test
+test_crash_recovery_txid_monotonicity_and_counter_hwm: test
+test_tenant_isolation_checkpoints_never_visible_across_namespaces: test
+test_tenant_isolation_drop_checkpoint_same_name_does_not_affect_other_tenant: test
+test_tenant_isolation_get_checkpoint_cross_tenant_returns_none: test
+test_tenant_isolation_orphan_recovery_isolated_by_namespace: test
+test_tenant_isolation_restore_checkpoint_never_affects_other_tenant: test
+
+16 tests, 0 benchmarks
+test_identifier_input_boundary_validation: test
+test_restore_nonexistent_checkpoint_returns_not_found: test
+test_storage_commit_failure_handling: test
+test_storage_put_failure_handling: test
+
+4 tests, 0 benchmarks
+test_checkpoint_guard_drop_latency_sub_millisecond: test
+test_concurrent_50_parallel_guard_drops_no_worker_blocking: test
+test_drop_no_syscall_on_worker: test
+test_for_agent_step_e2e_cycle: test
+test_guard_dropped_outside_tokio_runtime_persists_orphan_and_recovers_on_startup: test
+test_guard_exit_path_a_normal_commit_drop: test
+test_guard_exit_path_b_uncommitted_drop_triggers_rollback: test
+test_guard_exit_path_c_panic_unwind_triggers_rollback: test
+test_guard_exit_path_d_explicit_rollback_and_drop_idempotent: test
+test_guard_exit_path_e_nested_guards_lifo_resolution: test
+test_guard_uncommitted_drop_with_newer_committed_tx_preserves_newer_tx: test
+test_pin_guard_drop_latency_sub_millisecond: test
+
+12 tests, 0 benchmarks
+prop_guard_random_lifecycle_sequences: test
+prop_manifest_checksum_integrity: test
+
+2 tests, 0 benchmarks
+test_cross_device_link_error_handling: test
+test_snapshot_registry_compaction_gc_exclusion_during_cloning: test
+test_successful_hardlink_clone_and_inode_identity: test
+
+3 tests, 0 benchmarks
+test_checkpoint_id_gen_determinism: test
+
+1 test, 0 benchmarks
+test_manifest_crash_between_writes: test
+test_manifest_empty_components_valid: test
+test_manifest_partial_write_rejected: test
+test_manifest_roundtrip_json_stable: test
+test_manifest_tampered_checksum_rejected: test
+
+5 tests, 0 benchmarks
+test_concurrent_pinning_lifecycle_isolation: test
+test_concurrent_raii_guard_unwind_isolation: test
+test_concurrent_two_session_rollback_race_stress_100_iterations: test
+test_concurrent_two_session_time_travel_isolation: test
+test_time_travel_sequence_byte_exact_recovery: test
+
+5 tests, 0 benchmarks
+test_crash_recovery_reconstructs_highest_txid_when_meta_missing_or_corrupt: test
+test_txid_monotonicity_across_process_restart: test
+test_txid_regression_collision_check_returns_hard_error: test
+
+3 tests, 0 benchmarks
+0 tests, 0 benchmarks

@@ -1,0 +1,25 @@
+=== DATEISYSTEM ZUGRIFFE ===
+crates/contextra-checkpoint/src/guard.rs:660:    fn test_rollback_blocking_in_sync_context() {
+crates/contextra-checkpoint/src/guard.rs:680:    async fn test_rollback_blocking_in_async_context_returns_error() {
+crates/contextra-checkpoint/src/orphan.rs:245:    /// Schreibt den Zustand synchron als formatierte JSON-Datei auf die Festplatte (ggf. über Vfs).
+crates/contextra-checkpoint/src/orphan.rs:251:        std::fs::write(&self.persist_path, data)
+crates/contextra-checkpoint/src/orphan.rs:254:    /// Schreibt den Zustand über die Vfs-Schnittstelle crash-konsistent (`write_atomic`).
+crates/contextra-checkpoint/src/orphan.rs:255:    pub fn persist_vfs(&self, vfs: &dyn contextra_ports::Vfs) -> std::io::Result<()> {
+crates/contextra-checkpoint/src/orphan.rs:266:        if let Ok(data) = std::fs::read(path) {
+crates/contextra-checkpoint/src/orphan.rs:278:    /// Lädt den Zustand über die Vfs-Schnittstelle.
+crates/contextra-checkpoint/src/orphan.rs:279:    pub fn load_vfs(vfs: &dyn contextra_ports::Vfs, path: &std::path::Path) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:307:    vfs: Option<Arc<dyn contextra_ports::Vfs>>,
+crates/contextra-checkpoint/src/orphan.rs:338:        vfs: Arc<dyn contextra_ports::Vfs>,
+crates/contextra-checkpoint/src/orphan.rs:351:    pub fn with_vfs(mut self, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:367:    pub fn vfs(&self) -> Option<&Arc<dyn contextra_ports::Vfs>> {
+crates/contextra-checkpoint/src/orphan.rs:375:            if let Ok(data) = std::fs::read(path) {
+crates/contextra-checkpoint/src/orphan.rs:398:    fn load_vfs_internal(path: &std::path::Path, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:411:    /// Persistiert den aktuellen Zustand synchron auf die Festplatte (bevorzugt über Vfs).
+crates/contextra-checkpoint/src/orphan.rs:425:            std::fs::write(&self.persist_path, data)
+crates/contextra-checkpoint/src/orphan.rs:752:    // Prüft, dass die Orphan-Registry über ein injiziertes Vfs (FaultVfs) sauber lädt und speichert.
+crates/contextra-checkpoint/src/orphan.rs:755:        use contextra_testkit::FaultVfs;
+crates/contextra-checkpoint/src/orphan.rs:756:        let vfs = Arc::new(FaultVfs::new());
+crates/contextra-checkpoint/src/hardlink_cloner.rs:87:    pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(
+crates/contextra-checkpoint/src/hardlink_cloner.rs:240:                        if let Err(io_err) = fs::hard_link(&path, &target_path).await {
+crates/contextra-checkpoint/src/guard/tests.rs:152:fn test_rollback_blocking_in_sync_context() {
+crates/contextra-checkpoint/src/guard/tests.rs:172:async fn test_rollback_blocking_in_async_context_returns_error() {

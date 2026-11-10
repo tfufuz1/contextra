@@ -9,10 +9,10 @@ use std::collections::{HashMap, VecDeque};
 use contextra_ports::BoxFuture;
 use contextra_types::{EntityId, Result, TxId};
 
-use super::super::graph_write::CsrGraph;
-use super::super::inner::GraphInner;
-use super::super::types::{InternalIndex, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES, SCORE_DECAY};
-use super::super::visibility::is_edge_visible_bitemporal;
+use crate::csr::graph_write::CsrGraph;
+use crate::csr::inner::GraphInner;
+use crate::csr::types::{InternalIndex, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES, SCORE_DECAY};
+use crate::csr::visibility::is_edge_visible_bitemporal;
 
 pub(crate) fn traverse_at_bitemporal_impl<'a>(
     graph: &'a CsrGraph,

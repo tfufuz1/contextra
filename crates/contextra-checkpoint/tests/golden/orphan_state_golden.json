@@ -1,0 +1,16 @@
+{
+  "checkpoints": [
+    {
+      "tx_id": 888,
+      "timestamp_ms": 1700000000200,
+      "namespace": "test_ns"
+    }
+  ],
+  "pinned_seq_nos": [
+    {
+      "seq_no": 555,
+      "timestamp_ms": 1700000000100
+    }
+  ],
+  "persist_path": "/tmp/orphans.json"
+}
