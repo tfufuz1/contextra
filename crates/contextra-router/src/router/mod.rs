@@ -1,7 +1,8 @@
 // FILE-CONTEXT
-// STAND: 2026-10-29
+// STAND: 2026-11-10
 // ZWECK: Haupt-Routing-Engine für Hybrid-Search-Kontext auf SLM-Profile.
 // INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload, NaN-Safety bei Distanz-Eingaben.
+// HOTSPOTS: 59-90 (BanditExploration), 161-220 (RouterEngine Struct)
 // SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
 //! # Haupt-Routing-Engine für Kontext-Zuweisung an SLM-Profile
@@ -15,6 +16,9 @@
 //! - Verwaltet den Systemzustand über einen atomaren Snapshot [`ArcSwap<RouterState>`] für lock-freie Lesezugriffe beim Routing.
 //! - Modifikationen (wie Neukalibrierungen oder Profil-Updates) erfolgen serialisiert über ein `parking_lot::RwLock`.
 //! - Erkennt Konzeptdrift über adaptive Ljapunow-Wächter ([`LyapunovDriftWatcher`]).
+//! - [`BanditExploration`]: Zufall wird über injiziertem `contextra_adapt::Rng`-Port erzeugt —
+//!   hartcodierter SplitMix64-State wurde durch eine via `parking_lot::Mutex` geschützte
+//!   Port-Implementierung ersetzt (WP-R03).
 //!
 //! **Abhängigkeiten:**
 //! - Upstream: `contextra_types`, `contextra_ports`, `contextra_adapt`, `arc_swap`, `parking_lot`.
@@ -24,6 +28,7 @@ use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
+use contextra_adapt::Rng;
 use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
