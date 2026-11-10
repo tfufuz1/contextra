@@ -1,3 +1,27 @@
+
+/// Trait for types convertible to [] for deletion APIs.
+pub trait IntoDocId {
+    /// Converts the type into a [].
+    fn into_doc_id(self) -> DocId;
+}
+
+impl IntoDocId for DocId {
+    fn into_doc_id(self) -> DocId {
+        self
+    }
+}
+
+impl IntoDocId for u64 {
+    fn into_doc_id(self) -> DocId {
+        DocId::new(self.into())
+    }
+}
+
+impl IntoDocId for &u64 {
+    fn into_doc_id(self) -> DocId {
+        DocId::new((*self).into())
+    }
+}
 // FILE-CONTEXT
 // ZWECK: Synchronous ghost-free node deletion with budgeted neighborhood repair and zeroization for HNSW graph.
 // INVARIANTEN: INV-VEC-CONNECTIVITY-1: Graph connectivity is preserved post deletion via neighborhood repair.
@@ -6,6 +30,7 @@
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
 use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
+use zeroize::Zeroize;
 use std::collections::BTreeSet;
 
 use super::batch::SearchContext;
@@ -307,8 +332,8 @@ impl HnswIndex {
     /// Returns `Ok(true)` if the document was found and removed, or `Ok(false)` if
     /// it was not found or already deleted.
     #[allow(deprecated)]
-    pub fn remove(&mut self, id: &u64) -> Result<bool> {
-        let doc_id = DocId::new(*id);
+    pub fn remove_with_repair<D: IntoDocId>(&mut self, id: D) -> Result<bool> {
+        let doc_id = id.into_doc_id();
         match self.remove_with_graph_repair(doc_id) {
             Ok(_) => Ok(true),
             Err(ContextraError::GraphRepairFailed(HnswDeletionError::NodeNotFound(_))) => Ok(false),
@@ -401,7 +426,8 @@ impl HnswIndex {
     /// Markiert den Knoten deterministisch als gelöscht, nullt den Vektorspeicher im Slot
     /// und entfernt die ID aus der Dokumentenzuordnung.
     /// Gibt `Ok(true)` zurück, falls das Dokument existierte, andernfalls `Ok(false)`.
-    pub fn remove(&self, doc_id: DocId) -> Result<bool> {
+    pub fn remove<D: IntoDocId>(&self, doc_id: D) -> Result<bool> {
+        let doc_id = doc_id.into_doc_id();
         let _write_lock = self.inner.hot.write_mutex.lock();
         let doc_map = self.inner.hot.doc_to_node.read();
         let target_idx_opt = doc_map.get(&doc_id.inner()).copied();
