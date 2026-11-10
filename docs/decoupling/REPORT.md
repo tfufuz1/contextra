@@ -56,3 +56,9 @@
 ## 5. Übergaben an Z
 - Die Konsumenten von `contextra-sys` (`contextra-store`, `contextra-vector`) sind in `docs/decoupling/sys_api_consumers.md` dokumentiert.
 - Bei der künftigen Implementierung von `contextra-vault` (S-22) wird direkt auf `contextra_sys::vault` (`LockedRegions`, `VaultBuffer`) aufgebaut (D-07, B16).
+- **Workspace CI / Fremdfehler außerhalb BESITZ:**
+  - `unwrap-gate`: Scheitert an Anstieg des Zählers (1197 -> 1309) in fremden Workspace-Crates (z. B. `contextra-store`, `contextra-vector`, `contextra-crypto`), die im Parent-Commit eingeführt wurden. In `crates/contextra-sys/src/` gibt es genau 0 Vorkommen von `unwrap`/`expect`.
+  - `cargo deny`: Scheitert an RustSec-Advisories fremder Abhängigkeiten (`lopdf`, `lru`, `tokio`, `zip`), die nicht von `contextra-sys` genutzt werden.
+  - `cargo fmt`: Scheitert an unformatiertem Code in `crates/contextra-store/tests/` und `crates/contextra-vector/`.
+  - `cargo check`: Scheitert an Kompilierfehlern in `crates/contextra-store/src/sstable/block_cache.rs` und `builder.rs`.
+  - Gemäß R1 (Eigentum und Disjunktheit) dürfen diese Fremddateien nicht im sys-Auftrag berührt werden.
