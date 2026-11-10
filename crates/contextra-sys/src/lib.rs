@@ -15,11 +15,10 @@
 //! - **Abhängigkeiten (ausgehend):** Keine internen Workspace-Abhängigkeiten. Externe Crates: `libc` (POSIX),
 //!   `windows-sys` (Win32), `memmap2`, `thiserror`, `tracing`.
 //! - **Eingehende Abhängigkeiten (wer nutzt contextra-sys):**
-//!   - `contextra-db` (Transaktions- und Datenbankverwaltung)
-//!   - `contextra-durable-fs` (Dauerhafte Dateisystem-Abstraktionen)
-//!   - `contextra-engine` (Such- und Indexierungs-Engine)
+//!   - `contextra-db` (Transaktions- und Datenbankverwaltung; künftige Vault-Nutzung)
 //!   - `contextra-store` (LSM-Speicher und WAL = Write-Ahead-Log)
 //!   - `contextra-vector` (Vektorindex und DiskANN-Speicherabbildung)
+//!   - Hinweis: `contextra-durable-fs` ist unabhängig von `contextra-sys` (autarke Dateisystem-Abstraktion).
 //!
 //! ## Kernkomponenten
 //! 1. [`acl_win32`]: Plattformspezifische Zugriffsbeschränkungen (DACL unter Windows, chmod `0600` und UID-Prüfung unter Unix).

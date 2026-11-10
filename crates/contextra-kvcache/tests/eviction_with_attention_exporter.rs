@@ -1,3 +1,11 @@
+#![allow(
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 //! # Tests für die Verdrängung mit AttentionExporter
 //!
 //! ANCHOR[contextra-kvcache:TEST-ATTN-EXP-001]

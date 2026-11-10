@@ -1,0 +1,101 @@
+[
+  {
+    "tenant_id": 42,
+    "controller_contact": {
+      "controller_name": "Musterfirma GmbH",
+      "controller_contact": "Datenschutzbeauftragter, Hauptstraße 1, 10115 Berlin, dsb@musterfirma.de",
+      "representative_contact": "Max Mustermann, Geschäftsführung",
+      "dpo_contact": "Dr. Anna Schmidt, dsb@musterfirma.de"
+    },
+    "processing_purpose": "Dokumenten-Graph-Relationierung",
+    "data_subject_categories": [
+      "Kunden"
+    ],
+    "data_categories": [
+      "Entitäten",
+      "Metadaten"
+    ],
+    "recipient_categories": [
+      "Interne Fachabteilung"
+    ],
+    "third_country_transfers": [],
+    "retention_periods": [
+      {
+        "data_category": "Entitäten & Metadaten",
+        "retention_period": "Löschung bei Mandantenkündigung"
+      }
+    ],
+    "technical_organizational_measures": [
+      "Integritätssicherung via SHA-256 / HMAC",
+      "Rollenbasierte Zugriffskontrolle (RBAC)"
+    ],
+    "legal_basis": "Art. 6 Abs. 1 lit. f DSGVO",
+    "egress_events": [],
+    "deletion_proofs": [
+      {
+        "proof_id": "del-proof-202",
+        "scope": "entity_id:54321",
+        "timestamp_nanos": 1700000080000000000,
+        "verified": true
+      }
+    ],
+    "generated_at": 1700000100000000000
+  },
+  {
+    "tenant_id": 42,
+    "controller_contact": {
+      "controller_name": "Musterfirma GmbH",
+      "controller_contact": "Datenschutzbeauftragter, Hauptstraße 1, 10115 Berlin, dsb@musterfirma.de",
+      "representative_contact": "Max Mustermann, Geschäftsführung",
+      "dpo_contact": "Dr. Anna Schmidt, dsb@musterfirma.de"
+    },
+    "processing_purpose": "Kontextsensitive Vektorsuche",
+    "data_subject_categories": [
+      "Kunden",
+      "Mitarbeiter"
+    ],
+    "data_categories": [
+      "Protokolldaten",
+      "Search Queries"
+    ],
+    "recipient_categories": [
+      "Auftragsverarbeiter",
+      "Interne IT"
+    ],
+    "third_country_transfers": [
+      {
+        "destination_country": "Keine (Verarbeitung im EWR)",
+        "safeguard_guarantee": "Nicht zutreffend (EWR-Hosting)"
+      }
+    ],
+    "retention_periods": [
+      {
+        "data_category": "Search Queries & Protokolle",
+        "retention_period": "30 Tage nach Abwicklung, danach automatische Löschung"
+      }
+    ],
+    "technical_organizational_measures": [
+      "Kryptographischer Löschnachweis (Ed25519 Signatur)",
+      "Mandantentrennung & Zugriffskontrolle",
+      "Verschlüsselung at rest (AES-256-GCM-SIV)"
+    ],
+    "legal_basis": "Art. 6 Abs. 1 lit. b DSGVO",
+    "egress_events": [
+      {
+        "event_id": "egress-evt-101",
+        "destination": "https://llm.provider.example/v1/embeddings",
+        "timestamp_nanos": 1700000000000000000,
+        "detail": "Outbound query embedding vector calculation"
+      }
+    ],
+    "deletion_proofs": [
+      {
+        "proof_id": "del-proof-201",
+        "scope": "doc_id:98765",
+        "timestamp_nanos": 1700000050000000000,
+        "verified": true
+      }
+    ],
+    "generated_at": 1700000100000000000
+  }
+]

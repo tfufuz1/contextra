@@ -1,0 +1,939 @@
+warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/lib.rs:71:18
+   |
+71 |     delete_mode::KvDeleteMode,
+   |                  ^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `kv_segment::manager::KvSegmentManager`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/lib.rs:73:32
+   |
+73 |     manager::{KvSegmentConfig, KvSegmentManager, KvSegmentPayload},
+   |                                ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/lib.rs:74:14
+   |
+74 |     segment::KvSegment,
+   |              ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/lib.rs:75:12
+   |
+75 |     store::TenantIsolatedKvStore,
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+ --> crates/contextra-crypto/src/kv_segment/mod.rs:7:22
+  |
+7 | pub use delete_mode::KvDeleteMode;
+  |                      ^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::manager::KvSegmentManager`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+ --> crates/contextra-crypto/src/kv_segment/mod.rs:9:36
+  |
+9 | pub use manager::{KvSegmentConfig, KvSegmentManager, KvSegmentPayload};
+  |                                    ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/mod.rs:10:19
+   |
+10 | pub use segment::{KvSegment, CURRENT_KV_KEY_DERIVATION_VERSION};
+   |                   ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/mod.rs:11:16
+   |
+11 | pub use store::TenantIsolatedKvStore;
+   |                ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/delete_mode.rs:27:18
+   |
+27 | impl Default for KvDeleteMode {
+   |                  ^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/eviction_worker.rs:26:19
+   |
+26 | use super::store::TenantIsolatedKvStore;
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/eviction_worker.rs:103:31
+    |
+103 | pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
+    |                               ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/eviction_worker.rs:47:29
+   |
+47 |     pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self {
+   |                             ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:14:37
+   |
+14 | use crate::kv_segment::delete_mode::KvDeleteMode;
+   |                                     ^^^^^^^^^^^^
+
+warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:21:22
+   |
+21 |     pub delete_mode: KvDeleteMode,
+   |                      ^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::manager::KvSegmentManager`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:48:6
+   |
+48 | impl KvSegmentManager {
+   |      ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:61:34
+   |
+61 |     pub fn delete_mode(&self) -> KvDeleteMode {
+   |                                  ^^^^^^^^^^^^
+
+warning: use of deprecated unit variant `kv_segment::delete_mode::KvDeleteMode::CryptoShred`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:72:27
+   |
+72 |             KvDeleteMode::CryptoShred => {
+   |                           ^^^^^^^^^^^
+
+warning: use of deprecated unit variant `kv_segment::delete_mode::KvDeleteMode::TombstoneOnly`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:89:27
+   |
+89 |             KvDeleteMode::TombstoneOnly => Ok(KvSegmentPayload {
+   |                           ^^^^^^^^^^^^^
+
+warning: use of deprecated unit variant `kv_segment::delete_mode::KvDeleteMode::CryptoShred`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/manager.rs:101:27
+    |
+101 |             KvDeleteMode::CryptoShred => {
+    |                           ^^^^^^^^^^^
+
+warning: use of deprecated unit variant `kv_segment::delete_mode::KvDeleteMode::TombstoneOnly`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/manager.rs:124:27
+    |
+124 |             KvDeleteMode::TombstoneOnly => {
+    |                           ^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:49:12
+   |
+49 | pub struct KvSegment {
+   |            ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:72:6
+   |
+72 | impl KvSegment {
+   |      ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:204:26
+    |
+204 | impl std::fmt::Debug for KvSegment {
+    |                          ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:23:21
+   |
+23 | use super::segment::KvSegment;
+   |                     ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:32:26
+   |
+32 |     cache: LruCache<u64, KvSegment>,
+   |                          ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:135:6
+    |
+135 | impl TenantIsolatedKvStore {
+    |      ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::store::TenantIsolatedKvStore`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:525:18
+    |
+525 | impl Default for TenantIsolatedKvStore {
+    |                  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:47:53
+   |
+47 |     fn insert_returning_evicted(&mut self, segment: KvSegment) -> Option<KvSegment> {
+   |                                                     ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:47:74
+   |
+47 |     fn insert_returning_evicted(&mut self, segment: KvSegment) -> Option<KvSegment> {
+   |                                                                          ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:65:63
+   |
+65 |     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&mut KvSegment> {
+   |                                                               ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:70:45
+   |
+70 |     fn remove(&mut self, id: u64) -> Option<KvSegment> {
+   |                                             ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:77:37
+   |
+77 |     fn pop_lru(&mut self) -> Option<KvSegment> {
+   |                                     ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:187:61
+    |
+187 |     pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
+    |                                                             ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:224:28
+    |
+224 |         let _deferred: Vec<KvSegment> = {
+    |                            ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:272:23
+    |
+272 |         let segment = KvSegment::new_encrypted(
+    |                       ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:437:48
+    |
+437 |                     let mut deferred_drop: Vec<KvSegment> = Vec::new();
+    |                                                ^^^^^^^^^
+
+warning: use of deprecated struct `kv_segment::segment::KvSegment`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:511:35
+    |
+511 |         let mut all_segments: Vec<KvSegment> = Vec::new();
+    |                                   ^^^^^^^^^
+
+warning: use of deprecated unit variant `kv_segment::delete_mode::KvDeleteMode::CryptoShred`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/delete_mode.rs:29:15
+   |
+29 |         Self::CryptoShred
+   |               ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::config`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:55:13
+   |
+55 |             config,
+   |             ^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::master_key`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:56:13
+   |
+56 |             master_key,
+   |             ^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::config`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:62:9
+   |
+62 |         self.config.delete_mode
+   |         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::config`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:71:15
+   |
+71 |         match self.config.delete_mode {
+   |               ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::master_key`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/manager.rs:73:34
+   |
+73 |                 let master_key = self.master_key.as_ref().ok_or_else(|| {
+   |                                  ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::config`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/manager.rs:100:15
+    |
+100 |         match self.config.delete_mode {
+    |               ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::manager::KvSegmentManager::master_key`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/manager.rs:108:34
+    |
+108 |                 let master_key = self.master_key.as_ref().ok_or_else(|| {
+    |                                  ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::tenant_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:51:9
+   |
+51 |     pub tenant_id: TenantId,
+   |         ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:53:9
+   |
+53 |     pub segment_id: u64,
+   |         ^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:58:9
+   |
+58 |     pub key_derivation_version: u8,
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:60:9
+   |
+60 |     pub encrypted: bool,
+   |         ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::model_fingerprint`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:63:9
+   |
+63 |     pub model_fingerprint: Option<ModelFingerprint>,
+   |         ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::rope_offset`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:65:9
+   |
+65 |     pub rope_offset: Option<usize>,
+   |         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:67:5
+   |
+67 |     data: Vec<u8>,
+   |     ^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted_payload`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:69:5
+   |
+69 |     encrypted_payload: Option<EncryptedSegmentPayload>,
+   |     ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::tenant_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:76:13
+   |
+76 |             tenant_id,
+   |             ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:77:13
+   |
+77 |             segment_id,
+   |             ^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:78:13
+   |
+78 |             key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:79:13
+   |
+79 |             encrypted: false,
+   |             ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::model_fingerprint`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:81:13
+   |
+81 |             model_fingerprint: None,
+   |             ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::rope_offset`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:82:13
+   |
+82 |             rope_offset: None,
+   |             ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:83:13
+   |
+83 |             data,
+   |             ^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted_payload`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:85:13
+   |
+85 |             encrypted_payload: None,
+   |             ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::tenant_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:98:13
+   |
+98 |             tenant_id,
+   |             ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/segment.rs:99:13
+   |
+99 |             segment_id,
+   |             ^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:100:13
+    |
+100 |             key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:101:13
+    |
+101 |             encrypted: false,
+    |             ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::model_fingerprint`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:103:13
+    |
+103 |             model_fingerprint,
+    |             ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::rope_offset`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:104:13
+    |
+104 |             rope_offset,
+    |             ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:105:13
+    |
+105 |             data,
+    |             ^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted_payload`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:107:13
+    |
+107 |             encrypted_payload: None,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::tenant_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:131:13
+    |
+131 |             tenant_id,
+    |             ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:132:13
+    |
+132 |             segment_id,
+    |             ^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:133:13
+    |
+133 |             key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:134:13
+    |
+134 |             encrypted: true,
+    |             ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::model_fingerprint`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:135:13
+    |
+135 |             model_fingerprint: Some(model_fingerprint),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::rope_offset`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:136:13
+    |
+136 |             rope_offset,
+    |             ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:137:13
+    |
+137 |             data: ciphertext_copy,
+    |             ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted_payload`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:138:13
+    |
+138 | /             encrypted_payload: Some(EncryptedSegmentPayload {
+139 | |                 layer: encrypted_layer,
+140 | |             }),
+    | |______________^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:148:13
+    |
+148 |         if !self.encrypted {
+    |             ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:149:23
+    |
+149 |             return Ok(self.data.clone());
+    |                       ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:152:12
+    |
+152 |         if self.key_derivation_version > CURRENT_KV_KEY_DERIVATION_VERSION {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:155:17
+    |
+155 |                 self.key_derivation_version
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted_payload`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:159:33
+    |
+159 |         if let Some(payload) = &self.encrypted_payload {
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:162:17
+    |
+162 |                 self.segment_id,
+    |                 ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::key_derivation_version`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:163:17
+    |
+163 |                 self.key_derivation_version,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::model_fingerprint`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:165:19
+    |
+165 |         } else if self.model_fingerprint.is_some() {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::encrypted_payload`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:180:33
+    |
+180 |         if let Some(payload) = &self.encrypted_payload {
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:185:9
+    |
+185 |         self.data.clone()
+    |         ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:190:10
+    |
+190 |         &self.data
+    |          ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:195:9
+    |
+195 |         self.data.len()
+    |         ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:200:9
+    |
+200 |         self.data.is_empty()
+    |         ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::tenant_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:207:34
+    |
+207 |             .field("tenant_id", &self.tenant_id)
+    |                                  ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:208:35
+    |
+208 |             .field("segment_id", &self.segment_id)
+    |                                   ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::data`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/segment.rs:209:33
+    |
+209 |             .field("data_len", &self.data.len())
+    |                                 ^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+  --> crates/contextra-crypto/src/kv_segment/store.rs:48:18
+   |
+48 |         let id = segment.segment_id;
+   |                  ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:157:13
+    |
+157 |             shards,
+    |             ^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shard_count`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:158:13
+    |
+158 |             shard_count,
+    |             ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::global_shard_offset`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:159:13
+    |
+159 |             global_shard_offset: AtomicUsize::new(0),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::eviction_round_offsets`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:160:13
+    |
+160 |             eviction_round_offsets: offsets,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::segment_capacity`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:161:13
+    |
+161 | /             segment_capacity: NonZeroUsize::new(Self::DEFAULT_SEGMENT_CAPACITY_PER_TENANT)
+162 | |                 .unwrap_or(NonZeroUsize::MIN),
+    | |_____________________________________________^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::spill_handler`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:163:13
+    |
+163 |             spill_handler: RwLock::new(None),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::segment_capacity`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:170:9
+    |
+170 |         store.segment_capacity =
+    |         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::spill_handler`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:177:10
+    |
+177 |         *self.spill_handler.write() = Some(handler);
+    |          ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shard_count`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:183:38
+    |
+183 |         (tenant.inner() as usize) & (self.shard_count - 1)
+    |                                      ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::segment_capacity`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:189:24
+    |
+189 |         let capacity = self.segment_capacity;
+    |                        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:191:29
+    |
+191 |             let mut shard = self.shards[idx].lock.write();
+    |                             ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::spill_handler`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:199:31
+    |
+199 |             let handler_opt = self.spill_handler.read().clone();
+    |                               ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:201:33
+    |
+201 |                 handler(tenant, ev.segment_id, ev.to_spill_bytes());
+    |                                 ^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:225:29
+    |
+225 |             let mut shard = self.shards[idx].lock.write();
+    |                             ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:254:9
+    |
+254 |         self.shards[idx]
+    |         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:288:9
+    |
+288 |         self.shards[idx]
+    |         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:305:25
+    |
+305 |         let mut shard = self.shards[idx].lock.write();
+    |                         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:318:9
+    |
+318 |         self.shards[idx]
+    |         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::global_shard_offset`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:424:17
+    |
+424 |                 self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shard_count`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:424:76
+    |
+424 |                 self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
+    |                                                                            ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shard_count`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:431:33
+    |
+431 |                 for s_idx in 0..self.shard_count {
+    |                                 ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shard_count`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:436:61
+    |
+436 |                     let shard_idx = (start_shard + s_idx) % self.shard_count;
+    |                                                             ^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:443:41
+    |
+443 |                         let mut shard = self.shards[shard_idx].lock.write();
+    |                                         ^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::eviction_round_offsets`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:448:46
+    |
+448 | ...                   let offset = self.eviction_round_offsets[shard_idx]
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:467:62
+    |
+467 | ...                   segment_id = evicted.segment_id,
+    |                                    ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::spill_handler`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:483:39
+    |
+483 |                     let handler_opt = self.spill_handler.read().clone();
+    |                                       ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::tenant_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:486:37
+    |
+486 | ...                   handler(ev.tenant_id, ev.segment_id, ev.to_spill_bytes());
+    |                               ^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::segment::KvSegment::segment_id`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:486:51
+    |
+486 | ...                   handler(ev.tenant_id, ev.segment_id, ev.to_spill_bytes());
+    |                                             ^^^^^^^^^^^^^
+
+warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shards`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
+   --> crates/contextra-crypto/src/kv_segment/store.rs:512:22
+    |
+512 |         for shard in self.shards.iter() {
+    |                      ^^^^^^^^^^^
+
+   Compiling contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
+warning: `contextra-crypto` (lib) generated 123 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 02s
+     Running unittests src/lib.rs (target/debug/deps/contextra_infer_candle-bc85b13ba2c7a8e6)
+
+running 41 tests
+test attention_exporter::tests::test_export_attention_weights_internal ... ok
+test embedding::tests::test_bert_embed_model_load_nonexistent_weights_returns_io_error ... ok
+test embedding::tests::test_from_dir_nonexistent ... ok
+test embedding::tests::test_embed_zero_concurrency_limit_clamped_to_one ... ok
+test embedding::tests::test_from_dir_valid_temp_dir ... ok
+test embedding::tests::test_candle_embed_client_provider_and_engine ... ok
+test embedding_provider::tests::test_embed_batch_internal ... ok
+test gasp::tests::test_case_a_fully_supported_response_high_score_no_abstention ... ok
+test gasp::tests::test_case_b_hallucinated_number_low_score_triggers_abstention ... ok
+test embedding_provider::tests::test_verify_embedding_provider_in_current_thread_runtime ... ok
+test gasp::tests::test_case_c_empty_context_zero_shot_defined_explicit_error ... ok
+test gasp::tests::test_config_fingerprint_invalidation_resets_calibrator ... ok
+test gasp::tests::test_exact_word_match ... ok
+test gasp::tests::test_gasp_multibyte_german_and_emoji_word_boundary_matching ... ok
+test gasp::tests::test_exact_number_match ... ok
+test gasp::tests::test_gasp_nan_score_protection ... ok
+test gasp::tests::test_gasp_whitespace_or_punctuation_only_response_handling ... ok
+test gasp::tests::test_number_boundary_no_false_positive ... ok
+test gasp::tests::test_score_grounding_trait ... ok
+test gasp::tests::test_refresh_config_invalidates_calibration_on_fingerprint_change ... ok
+test embedding_provider::tests::test_verify_embedding_provider_valid ... ok
+test gasp::tests::test_validate_grounding_does_not_increment_observation_count ... ok
+test gguf_loader::tests::test_parse_gguf_metadata_invalid_header_bytes_returns_model_load_error ... ok
+test gasp::tests::test_word_boundary_no_false_positive ... ok
+test gguf_loader::tests::test_parse_gguf_metadata_nonexistent_path_returns_io_error ... ok
+test inference::tests::test_candle_llm_client_generate ... ok
+test inference::tests::test_candle_llm_client_generate_stream ... ok
+test inference::tests::test_inference_configurable_concurrency_limit ... ok
+test inference::tests::test_inference_backpressure_single_permit_awaits ... ok
+test inference::tests::test_inference_zero_concurrency_limit_clamped_to_one ... ok
+test inference::tests::test_inference_timeout_cancellation_releases_no_permit_leak ... ok
+test inference::tests::test_llm_from_dir_empty_tokenizer ... ok
+test inference::tests::test_llm_from_dir_missing_gguf ... ok
+test inference::tests::test_llm_from_dir_missing_tokenizer ... ok
+test inference::tests::test_llm_from_dir_nonexistent ... ok
+test model_registry::tests::test_candle_quantization_from_str ... ok
+test model_registry::tests::test_compute_fingerprint_differs_by_quantization ... ok
+test model_registry::tests::test_compute_fingerprint_nonexistent_file_returns_err ... ok
+test gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration ... FAILED
+test inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration ... FAILED
+test inference::tests::test_llm_from_dir_corrupt_gguf ... ok
+
+failures:
+
+---- gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration stdout ----
+
+thread 'gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration' panicked at crates/contextra-infer-candle/src/gasp.rs:593:9:
+assertion `left == right` failed: observation_count must be reset to 0 after set_threshold
+  left: 1
+ right: 0
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:75:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:427:23
+   3: core::panicking::assert_failed
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:387:5
+   4: contextra_infer_candle::gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration::{{closure}}
+             at ./src/gasp.rs:593:9
+   5: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
+   6: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
+   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:70
+   8: tokio::task::coop::with_budget
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:167:5
+   9: tokio::task::coop::budget
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:133:5
+  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:25
+  11: tokio::runtime::scheduler::current_thread::Context::enter
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:488:19
+  12: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:829:44
+  13: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:68
+  14: tokio::runtime::context::scoped::Scoped<T>::set
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/scoped.rs:40:9
+  15: tokio::runtime::context::set_scheduler::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:38
+  16: std::thread::local::LocalKey<T>::try_with
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:315:12
+  17: std::thread::local::LocalKey<T>::with
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:279:20
+  18: tokio::runtime::context::set_scheduler
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:17
+  19: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:27
+  20: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:817:24
+  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:218:33
+  22: tokio::runtime::context::runtime::enter_runtime
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/runtime.rs:65:16
+  23: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:206:9
+  24: tokio::runtime::runtime::Runtime::block_on_inner
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:374:52
+  25: tokio::runtime::runtime::Runtime::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:343:18
+  26: contextra_infer_candle::gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration
+             at ./src/gasp.rs:597:10
+  27: contextra_infer_candle::gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration::{{closure}}
+             at ./src/gasp.rs:564:82
+  28: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+  29: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration stdout ----
+
+thread 'inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration' panicked at crates/contextra-infer-candle/src/inference/tests.rs:584:5:
+assertion `left == right` failed: validator observation_count must be reset to 0 after client.swap_model
+  left: 1
+ right: 0
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:75:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:427:23
+   3: core::panicking::assert_failed
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:387:5
+   4: contextra_infer_candle::inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration::{{closure}}
+             at ./src/inference/tests.rs:584:5
+   5: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
+   6: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
+   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:70
+   8: tokio::task::coop::with_budget
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:167:5
+   9: tokio::task::coop::budget
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:133:5
+  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:25
+  11: tokio::runtime::scheduler::current_thread::Context::enter
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:488:19
+  12: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:829:44
+  13: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:68
+  14: tokio::runtime::context::scoped::Scoped<T>::set
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/scoped.rs:40:9
+  15: tokio::runtime::context::set_scheduler::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:38
+  16: std::thread::local::LocalKey<T>::try_with
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:315:12
+  17: std::thread::local::LocalKey<T>::with
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:279:20
+  18: tokio::runtime::context::set_scheduler
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:17
+  19: tokio::runtime::scheduler::current_thread::CoreGuard::enter
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:27
+  20: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:817:24
+  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:218:33
+  22: tokio::runtime::context::runtime::enter_runtime
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/runtime.rs:65:16
+  23: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:206:9
+  24: tokio::runtime::runtime::Runtime::block_on_inner
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:374:52
+  25: tokio::runtime::runtime::Runtime::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:343:18
+  26: contextra_infer_candle::inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration
+             at ./src/inference/tests.rs:588:6
+  27: contextra_infer_candle::inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration::{{closure}}
+             at ./src/inference/tests.rs:510:79
+  28: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+  29: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration
+    inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration
+
+test result: FAILED. 39 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+
+error: test failed, to rerun pass `-p contextra-infer-candle --lib`

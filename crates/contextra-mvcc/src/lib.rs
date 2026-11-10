@@ -77,15 +77,19 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub use crate::mvcc_error::{MvccError, Result as MvccResult};
 pub use contextra_types::{
     error::{self, ContextraError, Result},
     tombstone::{SeqBitTombstone, TombstoneSemanticsCheck},
     types::{self, DocId, TenantId, TxId, TOMBSTONE_BIT},
 };
 
+pub mod compat;
+pub mod mvcc_error;
 pub mod seq_log;
 pub mod snapshot;
 pub mod ssi;
+pub mod tombstone;
 pub mod tx_buffer;
 
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};

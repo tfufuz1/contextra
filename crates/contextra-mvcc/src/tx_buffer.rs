@@ -34,7 +34,7 @@
 
 // INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
 
-use crate::error::{ContextraError, Result};
+use crate::mvcc_error::{MvccError, Result};
 use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
@@ -414,7 +414,7 @@ impl<T: Clone> TxBuffer<T> {
     /// Verhindert unbegrenztes Speicherwachstum bei massiven Lese-Scans.
     ///
     /// ### Fehlerfälle:
-    /// Gibt `Err(ContextraError::LimitExceeded)` zurück, falls das ReadSet bereits `max_keys` erreicht hat
+    /// Gibt `Err(MvccError::LimitExceeded)` zurück, falls das ReadSet bereits `max_keys` erreicht hat
     /// und ein bisher unbekannter Schlüssel hinzugefügt werden soll.
     pub fn try_register_read(
         &self,
@@ -427,13 +427,13 @@ impl<T: Clone> TxBuffer<T> {
         let shard_lock = self
             .shards
             .get(shard_idx)
-            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
+            .ok_or_else(|| MvccError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
         let rs = shard.read_sets.entry(tx).or_default();
 
         let k = key.into();
         if rs.get(&k).is_none() && rs.len() >= max_keys {
-            return Err(ContextraError::limit_exceeded(
+            return Err(MvccError::limit_exceeded(
                 max_keys,
                 format!("Read set size limit exceeded for transaction {tx}"),
             ));
@@ -504,12 +504,12 @@ impl<T: Clone> TxBuffer<T> {
         let shard_lock = self
             .shards
             .get(shard_idx)
-            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
+            .ok_or_else(|| MvccError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
 
         let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
         if curr_tx_bytes + op_bytes > self.config.max_tx_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Transaction {tx} staging budget exceeded: {} + {op_bytes} > {}",
                 curr_tx_bytes, self.config.max_tx_staged_bytes
             )));
@@ -517,7 +517,7 @@ impl<T: Clone> TxBuffer<T> {
 
         let curr_global = self.global_staged_bytes.load(Ordering::Relaxed);
         if curr_global + op_bytes > self.config.max_total_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Global staging budget exceeded: {curr_global} + {op_bytes} > {}",
                 self.config.max_total_staged_bytes
             )));
@@ -531,7 +531,7 @@ impl<T: Clone> TxBuffer<T> {
             .or_insert_with(|| (Vec::with_capacity(16), now_nanos));
 
         if entry.0.len() >= max_ops {
-            return Err(ContextraError::Transaction(format!(
+            return Err(MvccError::Transaction(format!(
                 "Transaction {} exceeded max staging capacity ({} ops)",
                 tx, max_ops
             )));
@@ -556,12 +556,12 @@ impl<T: Clone> TxBuffer<T> {
         let shard_lock = self
             .shards
             .get(shard_idx)
-            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
+            .ok_or_else(|| MvccError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
 
         let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
         if curr_tx_bytes + total_op_bytes > self.config.max_tx_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Transaction {tx} staging budget exceeded: {} + {total_op_bytes} > {}",
                 curr_tx_bytes, self.config.max_tx_staged_bytes
             )));
@@ -569,7 +569,7 @@ impl<T: Clone> TxBuffer<T> {
 
         let curr_global = self.global_staged_bytes.load(Ordering::Relaxed);
         if curr_global + total_op_bytes > self.config.max_total_staged_bytes {
-            return Err(ContextraError::Storage(format!(
+            return Err(MvccError::Storage(format!(
                 "Global staging budget exceeded: {curr_global} + {total_op_bytes} > {}",
                 self.config.max_total_staged_bytes
             )));
@@ -583,7 +583,7 @@ impl<T: Clone> TxBuffer<T> {
             .or_insert_with(|| (Vec::new(), now_nanos));
 
         if entry.0.len() + ops_vec.len() > max_ops {
-            return Err(ContextraError::Transaction(format!(
+            return Err(MvccError::Transaction(format!(
                 "Transaction {} exceeded max staging capacity ({} ops)",
                 tx, max_ops
             )));
@@ -606,7 +606,7 @@ impl<T: Clone> TxBuffer<T> {
             let shard = shard_lock.read();
             if let Some((ops, _)) = shard.ops.get(&tx) {
                 if ops.is_empty() {
-                    return Err(ContextraError::Transaction(format!(
+                    return Err(MvccError::Transaction(format!(
                         "Transaction {} was registered but has no pending operations",
                         tx
                     )));
@@ -934,7 +934,7 @@ mod tests {
                 data: "overflow".to_string(),
             },
         );
-        assert!(matches!(result, Err(ContextraError::Transaction(_))));
+        assert!(matches!(result, Err(MvccError::Transaction(_))));
     }
 
     // Prüft, dass die Standardkonfiguration normale Lastprofile mit hunderten Operationen problemlos zulässt.
@@ -1007,7 +1007,7 @@ mod tests {
         ];
 
         let res = buffer.stage_many(tx, ops);
-        assert!(matches!(res, Err(ContextraError::Transaction(_))));
+        assert!(matches!(res, Err(MvccError::Transaction(_))));
     }
 
     // Prüft die Begrenzung der Anzahl abgeräumter verwaister Transaktionen über reap_orphans_bounded.

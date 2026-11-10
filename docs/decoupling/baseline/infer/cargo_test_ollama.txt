@@ -1,0 +1,73 @@
+   Compiling contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.15s
+     Running unittests src/lib.rs (target/debug/deps/contextra_infer_ollama-9a1907463772a0f4)
+
+running 22 tests
+test context_prefixer::tests::test_truncate_chars_german_umlauts ... ok
+test context_prefixer::tests::test_truncate_chars_exact_limit ... ok
+test context_prefixer::tests::test_compute_max_prefix_chars ... ok
+test context_prefixer::tests::test_truncate_chars_over_limit ... ok
+test context_prefixer::tests::test_truncate_chars_short_string ... ok
+test context_prefixer::tests::test_truncate_chars_unicode_boundary ... ok
+test context_prefixer::tests::test_truncate_chars_unicode_no_premature_truncation ... ok
+test context_prefixer::tests::test_truncate_chars_zero_and_boundary ... ok
+test context_prefixer::tests::test_truncate_prefix_empty_and_whitespace ... ok
+test context_prefixer::tests::test_truncate_prefix_char_boundary_off_by_one ... ok
+test context_prefixer::tests::test_truncate_prefix_token_boundary_off_by_one ... ok
+test context_prefixer::tests::test_truncate_prefix_word_boundary ... ok
+test importance::tests::test_importance_assessment_serde_backward_compatibility ... ok
+test importance::tests::test_parsed_0_5_score_returns_parsed_confidence ... ok
+test importance::tests::test_score_importance_regex_get ... ok
+test importance::tests::test_unparseable_response_logs_warning_with_raw_text ... ok
+test importance::tests::test_unparseable_response_returns_unparseable_confidence ... ok
+test importance::tests::test_score_importance_regex_parsing_edge_cases ... ok
+test model_info::tests::test_model_info_deserializes_correctly ... ok
+test model_info::tests::test_known_dimension_nomic ... ok
+test importance::tests::test_prop_score_importance_arbitrary_garbage_never_panics ... ok
+test importance::tests::test_prop_score_importance_parse_formats ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/campaign_stub_ollama.rs (target/debug/deps/campaign_stub_ollama-163505f188866eaa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fake_server_tests.rs (target/debug/deps/fake_server_tests-cb7a23220498c694)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/golden_test.rs (target/debug/deps/golden_test-14d07d7326556780)
+
+running 6 tests
+test regen_golden ... ignored
+test test_golden_manifest_and_backward_compatibility ... ok
+test test_golden_error_display_invariants ... ok
+test test_golden_rag_prompt_construction ... ok
+test test_golden_bitflip_and_truncation_robustness ... ok
+test test_golden_importance_score_parsing ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/property_backoff_tests.rs (target/debug/deps/property_backoff_tests-0d2bad0cf939b6a4)
+
+running 1 test
+test test_exponential_backoff_monotonic_and_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/query_rewriter_tests.rs (target/debug/deps/query_rewriter_tests-bd9bdda6ef1b81c4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests contextra_infer_ollama
+
+running 1 test
+test crates/contextra-infer-ollama/src/context_prefixer.rs - context_prefixer::ContextPrefixEngine (line 51) ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s

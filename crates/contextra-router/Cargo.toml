@@ -12,15 +12,18 @@ ring = "3"
 
 [features]
 default = []
+subprocess-dispatch = ["dep:contextra-wire"]
 bandit-routing = ["egress-sherman-morrison"]
 cloud-egress-guard = []
 egress-sherman-morrison = []
 flow-corrected-thompson = ["contextra-adapt/flow-corrected-thompson"]
+exp-fc-ts = ["flow-corrected-thompson"]
+exp-routing-strategy = ["bandit-routing"]
 
 [dependencies]
 shlex = "1"
 contextra-types = { workspace = true }
-contextra-wire = { workspace = true }
+contextra-wire = { workspace = true, optional = true }
 contextra-ports = { workspace = true }
 contextra-adapt = { workspace = true }
 arc-swap = "1"

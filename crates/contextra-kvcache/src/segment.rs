@@ -143,12 +143,13 @@ impl ShreddableSegmentKey {
             .map_err(|e| ContextraError::Crypto(e.to_string()))
     }
 
-    /// Crypto-Shredding: Vernichtet den Schlüssel unwiderruflich im Speicher.
+    /// Crypto-Shredding: Überschreibt den Schlüssel im Speicher mit Nullen.
     ///
     /// # Ablauf
     /// 1. Schreibsperre anfordern.
     /// 2. `Option::take()` entnimmt die Instanz.
     /// 3. `emergency_wipe()` überschreibt das Schlüsselmaterial im RAM mit Nullen (Zeroize).
+    ///
     /// Alle mit diesem Schlüssel verschlüsselten Daten werden dauerhaft unlesbar.
     pub fn shred(&self) {
         if let Some(mut km) = self.key_manager.write().take() {
@@ -226,6 +227,9 @@ pub struct EncryptedSegmentPayload {
     /// Gespeicherte Schlüsselableitungsversion zum Zeitpunkt der Verschlüsselung.
     #[zeroize(skip)]
     pub key_derivation_version: u8,
+    /// Gebundene segment_id zur Authenticated Additional Data (AAD) Verifikation.
+    #[zeroize(skip)]
+    pub bound_segment_id: Option<u64>,
 }
 
 // ANCHOR[contextra-kvcache:SEG-006]
@@ -363,8 +367,10 @@ impl KvSegment {
 
         // 3. Dequantization SECOND
         match &self.content {
-            KvSegmentContent::KiviQuantized(block) => kivi_dequantize(&decompressed, &block.meta),
-            KvSegmentContent::Raw(_) => KvTensorView::from_bytes(&decompressed),
+            KvSegmentContent::KiviQuantized(block) => {
+                kivi_dequantize(&decompressed, &block.meta).map_err(Into::into)
+            }
+            KvSegmentContent::Raw(_) => KvTensorView::from_bytes(&decompressed).map_err(Into::into),
         }
     }
 
@@ -401,6 +407,7 @@ impl KvSegment {
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
                 key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
+                bound_segment_id: Some(segment_id),
             }),
         })
     }
@@ -440,6 +447,14 @@ impl KvSegment {
                     "Key derivation version mismatch: segment key_derivation_version is {}, payload key_derivation_version is {}",
                     self.key_derivation_version, payload.key_derivation_version
                 )));
+            }
+            if let Some(expected_seg_id) = payload.bound_segment_id {
+                if expected_seg_id != self.segment_id {
+                    return Err(CryptoError::Crypto(format!(
+                        "AAD verification failed: segment_id mismatch (expected {}, got {})",
+                        expected_seg_id, self.segment_id
+                    )));
+                }
             }
             cipher.decrypt_with_version(
                 &payload.layer,
@@ -612,6 +627,7 @@ mod tests {
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
                 key_derivation_version: 0,
+                bound_segment_id: Some(1),
             }),
         };
 
@@ -666,3 +682,171 @@ mod tests {
 
 /// Neutraler Segmentschlüssel (Klasse A Baustein).
 pub type SegmentKey = ShreddableSegmentKey;
+
+/// Configuration for the bounded segment pool.
+#[derive(Debug, Clone, Copy)]
+pub struct SegmentPoolConfig {
+    /// Size of each fixed block in bytes.
+    pub block_size: usize,
+    /// Maximum number of blocks the pool can allocate.
+    pub max_blocks: usize,
+}
+
+/// Generational handle to an allocated segment in the pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SegmentHandle {
+    slot_index: usize,
+    generation: u64,
+}
+
+impl SegmentHandle {
+    /// Returns the slot index of this handle.
+    pub const fn slot_index(&self) -> usize {
+        self.slot_index
+    }
+
+    /// Returns the generation counter of this handle.
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+}
+
+struct SegmentSlot {
+    generation: u64,
+    allocated: bool,
+    namespace: u64,
+    data: Vec<u8>,
+    actual_len: usize,
+}
+
+/// Bounded segment pool providing generational safety, use-after-free & double-free prevention,
+/// zeroization on deallocation, and fragmentation metrics tracking.
+pub struct SegmentPool {
+    config: SegmentPoolConfig,
+    slots: parking_lot::RwLock<Vec<SegmentSlot>>,
+}
+
+impl SegmentPool {
+    /// Creates a new `SegmentPool` with the given configuration.
+    pub fn new(config: SegmentPoolConfig) -> Self {
+        let mut slots = Vec::with_capacity(config.max_blocks);
+        for _ in 0..config.max_blocks {
+            slots.push(SegmentSlot {
+                generation: 0,
+                allocated: false,
+                namespace: 0,
+                data: vec![0u8; config.block_size],
+                actual_len: 0,
+            });
+        }
+        Self {
+            config,
+            slots: parking_lot::RwLock::new(slots),
+        }
+    }
+
+    /// Allocates a segment block within the given namespace, storing the payload data.
+    pub fn allocate(
+        &self,
+        namespace: u64,
+        data: &[u8],
+    ) -> Result<SegmentHandle, crate::error::KvCacheError> {
+        if data.len() > self.config.block_size {
+            return Err(crate::error::KvCacheError::BudgetExceeded(
+                "Payload exceeds pool block_size".into(),
+            ));
+        }
+
+        let mut slots = self.slots.write();
+        for (idx, slot) in slots.iter_mut().enumerate() {
+            if !slot.allocated {
+                slot.allocated = true;
+                slot.namespace = namespace;
+                slot.actual_len = data.len();
+                slot.data[..data.len()].copy_from_slice(data);
+                return Ok(SegmentHandle {
+                    slot_index: idx,
+                    generation: slot.generation,
+                });
+            }
+        }
+
+        Err(crate::error::KvCacheError::BudgetExceeded(
+            "SegmentPool capacity exceeded".into(),
+        ))
+    }
+
+    /// Deallocates the segment slot indicated by handle, zeroizing payload memory and bumping generation.
+    pub fn deallocate(
+        &self,
+        namespace: u64,
+        handle: SegmentHandle,
+    ) -> Result<(), crate::error::KvCacheError> {
+        let mut slots = self.slots.write();
+        if handle.slot_index >= slots.len() {
+            return Err(crate::error::KvCacheError::SegmentNotFound(
+                handle.slot_index as u64,
+            ));
+        }
+        let slot = &mut slots[handle.slot_index];
+        if !slot.allocated || slot.generation != handle.generation || slot.namespace != namespace {
+            return Err(crate::error::KvCacheError::InvalidSegment(
+                "Invalid segment handle, double-free or generational mismatch".into(),
+            ));
+        }
+
+        slot.data.as_mut_slice().zeroize();
+        slot.allocated = false;
+        slot.actual_len = 0;
+        slot.generation = slot.generation.wrapping_add(1);
+        Ok(())
+    }
+
+    /// Reads payload data from an active handle.
+    pub fn read(
+        &self,
+        namespace: u64,
+        handle: SegmentHandle,
+    ) -> Result<Vec<u8>, crate::error::KvCacheError> {
+        let slots = self.slots.read();
+        if handle.slot_index >= slots.len() {
+            return Err(crate::error::KvCacheError::SegmentNotFound(
+                handle.slot_index as u64,
+            ));
+        }
+        let slot = &slots[handle.slot_index];
+        if !slot.allocated || slot.generation != handle.generation || slot.namespace != namespace {
+            return Err(crate::error::KvCacheError::InvalidSegment(
+                "Invalid handle or use-after-free".into(),
+            ));
+        }
+        Ok(slot.data[..slot.actual_len].to_vec())
+    }
+
+    /// Returns the total count of currently allocated blocks.
+    pub fn allocated_blocks(&self) -> usize {
+        self.slots.read().iter().filter(|s| s.allocated).count()
+    }
+
+    /// Returns the sum of actual bytes stored across allocated blocks.
+    pub fn allocated_bytes(&self) -> usize {
+        self.slots
+            .read()
+            .iter()
+            .filter(|s| s.allocated)
+            .map(|s| s.actual_len)
+            .sum()
+    }
+
+    /// Returns the fragmentation ratio: 1.0 - (allocated_bytes / capacity_of_allocated_blocks).
+    /// If 0 blocks are allocated, returns 0.0.
+    pub fn fragmentation_ratio(&self) -> f64 {
+        let blocks = self.allocated_blocks();
+        if blocks == 0 {
+            return 0.0;
+        }
+        let allocated_cap = (blocks * self.config.block_size) as f64;
+        let used_bytes = self.allocated_bytes() as f64;
+        (allocated_cap - used_bytes) / allocated_cap
+    }
+}

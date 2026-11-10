@@ -37,9 +37,12 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "types-compat")]
+pub mod compat;
 pub mod contract;
 pub mod error;
 pub mod memory_index;
+pub mod storage;
 pub mod traits;
 pub mod types;
 
@@ -47,6 +50,7 @@ pub use contract::{Clock, DocKey, Epoch, Error as ContractError, Result as Contr
 
 pub use error::{Result as LocalResult, TextError};
 pub use memory_index::{CompactStats, MemoryTextIndex};
+pub use storage::PostingStore;
 pub use traits::{Index, Maintain};
 pub use types::{DocId as LocalDocId, TextHit, MAX_SEARCH_K as LOCAL_MAX_SEARCH_K};
 
@@ -76,129 +80,17 @@ pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
 pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
 #[cfg(feature = "types-compat")]
-use contextra_ports::{TextIndex, TextIndexStats};
 #[cfg(feature = "types-compat")]
-use contextra_types::{DocId, Result, ScoredDocument, TxId};
-
-// ANCHOR[contextra-text:LIB-001]
-/// Berechnet Begriffsgewichte und wendet die Standard-BM25-Relevanzbewertung an.
-///
-/// `Bm25Scorer` fungiert als primäre Integrationsfassade für den Port [`TextIndex`].
-/// Alle Operationen (Suche, Einfügen, Löschen, Transaktions-Commit/-Rollback) werden
-/// direkt an den internen [`InvertedIndex`] delegiert.
-///
-/// # Generische Parameter
-/// - `S`: Implementierung von [`contextra_ports::StorageEngine`], über welche
-///   Posting-Listen und Dokument-Längen persistent abgelegt werden.
-#[cfg(feature = "types-compat")]
-#[deprecated(
-    since = "0.1.0",
-    note = "Ports-Anbindung gehört in contextra-erasure-adapters / contextra-ports Adapter"
-)]
-pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
-    index: InvertedIndex<S>,
-}
-
-#[cfg(feature = "types-compat")]
-impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
-    // ANCHOR[contextra-text:LIB-002]
-    /// Erzeugt eine neue `Bm25Scorer`-Instanz über der angegebenen Speicher-Engine.
-    ///
-    /// # Ablauf
-    /// 1. Übernahme der Referenz auf die `StorageEngine`.
-    /// 2. Initialisierung des internen [`InvertedIndex`] mit dem Namensraum-Präfix.
-    ///
-    /// # Parameter
-    /// - `storage`: Referenzgezählter Zeiger ([`std::sync::Arc`]) auf den Speicher-Port.
-    /// - `namespace`: Präfix zur Mandanten- und Tabellen-Isolation der Schlüssel.
-    pub fn new(storage: std::sync::Arc<S>, namespace: &str) -> Self {
-        Self {
-            index: InvertedIndex::new(storage, namespace),
-        }
-    }
-}
-
-#[cfg(feature = "types-compat")]
-impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
-    // ANCHOR[contextra-text:LIB-003]
-    /// Führt eine Volltextsuche anhand der Query aus und liefert bis zu `k` Treffer.
-    ///
-    /// # Ablauf
-    /// 1. Tokenisierung der Anfrage mit dem Standard-Tokenizer.
-    /// 2. Ermittlung der Kandidaten und Bewertung per BM25.
-    /// 3. Sortierung nach Relevanzwert (absteigend) und DocId (aufsteigend bei Gleichstand).
-    async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
-        self.index.search(query, k).await
-    }
-
-    // ANCHOR[contextra-text:LIB-004]
-    /// Führt eine Volltextsuche zu einem bestimmten MVCC-Sequenznummer-Snapshot aus.
-    ///
-    /// Snapshot-Isolation wird garantiert, indem nur Einträge berücksichtigt werden,
-    /// deren Sequenznummer kleiner oder gleich `seq_no` ist.
-    async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
-        self.index.search_at(query, k, seq_no).await
-    }
-
-    // ANCHOR[contextra-text:LIB-005]
-    /// Fügt ein Dokument unter der Transaktions-ID `tx` in den Index ein.
-    ///
-    /// # Ablauf
-    /// 1. Tokenisierung und Ermittlung von Termfrequenzen und Dokumentlänge.
-    /// 2. Vorbereitung der Änderungen im Transaktions-Staging-Puffer.
-    async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
-        self.index.insert(tx, id, text).await
-    }
-
-    // ANCHOR[contextra-text:LIB-006]
-    /// Markiert ein Dokument unter der Transaktions-ID `tx` als gelöscht (Tombstone).
-    async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
-        self.index.delete(tx, id).await
-    }
-
-    // ANCHOR[contextra-text:LIB-007]
-    /// Schreibt alle für Transaktion `tx` vorgemerkten Änderungen dauerhaft in die Storage-Engine.
-    async fn commit(&self, tx: TxId) -> Result<()> {
-        self.index.commit(tx).await
-    }
-
-    // ANCHOR[contextra-text:LIB-008]
-    /// Verwirft alle für die Transaktion `tx` im Speicher gepufferten Änderungen.
-    async fn rollback(&self, tx: TxId) -> Result<()> {
-        self.index.rollback(tx).await
-    }
-
-    // ANCHOR[contextra-text:LIB-009]
-    /// Führt einen Rollback aller Transaktionen bis einschließlich `tx_id` aus.
-    async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
-        self.index.rollback_to_tx(tx_id).await
-    }
-
-    // ANCHOR[contextra-text:LIB-010]
-    /// Liefert die höchste im Index registrierte Transaktions-ID.
-    async fn last_tx_id(&self) -> Result<TxId> {
-        self.index.last_tx_id().await
-    }
-
-    // ANCHOR[contextra-text:LIB-011]
-    /// Liefert die Gesamtzahl aktiver Dokumente im Index.
-    async fn len(&self) -> usize {
-        self.index.len().await
-    }
-
-    // ANCHOR[contextra-text:LIB-012]
-    /// Liefert statistische Kennzahlen über den Textindex (z. B. Dokumentenanzahl, Terme).
-    async fn stats(&self) -> Result<TextIndexStats> {
-        self.index.stats().await
-    }
-}
+pub use crate::compat::scorer::Bm25Scorer;
 
 #[cfg(test)]
 #[cfg(feature = "types-compat")]
 mod tests {
     use super::*;
     use contextra_ports::BoxFuture;
+    use contextra_ports::TextIndex;
     use contextra_ports::{StorageEngine, StorageStats};
+    use contextra_types::{DocId, Result, TxId};
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -266,7 +158,7 @@ mod tests {
             key: &'a [u8],
             _seq: u64,
         ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-            Box::pin(async move { self.get(key).await })
+            Box::pin(async move { StorageEngine::get(self, key).await })
         }
 
         fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
@@ -329,7 +221,7 @@ mod tests {
             prefix: &'a [u8],
             _seq_no: u64,
         ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move { self.scan_prefix(prefix).await })
+            Box::pin(async move { StorageEngine::scan_prefix(self, prefix).await })
         }
     }
 

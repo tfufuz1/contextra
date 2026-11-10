@@ -1,6 +1,9 @@
 #![deny(dead_code)]
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "ports-compat")]
+pub mod compat;
+
 pub mod client;
 pub mod context_prefixer;
 #[cfg(feature = "client")]

@@ -49,9 +49,26 @@ impl StepId {
         Self(id)
     }
 
+    /// Gibt den inneren raw `u64`-Wert zurück.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+
     /// Gibt den numerischen Wert zurück.
     pub const fn as_u64(&self) -> u64 {
         self.0
+    }
+}
+
+impl std::fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StepId({})", self.0)
+    }
+}
+
+impl From<u64> for StepId {
+    fn from(id: u64) -> Self {
+        Self(id)
     }
 }
 
@@ -99,17 +116,26 @@ impl ModelFingerprint {
 }
 
 /// Cache-Direktive für granulare Lebenszyklus-Steuerung.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CacheDirective {
-    /// Automatische Verdrängung (Standard LRU / Attention-basiert).
-    Auto,
     /// Block soll dauerhaft oder für eine bestimmte TTL im Cache gepinnt bleiben.
     Pin {
-        /// Optionale Time-to-Live in Millisekunden.
-        ttl_ms: Option<u64>,
+        /// Optionale maximale Dauer für die Pinning-Gültigkeit.
+        ttl: Option<std::time::Duration>,
     },
-    /// Block nach Inferenzschritt sofort freigeben.
-    ReleaseAfterStep,
     /// Niemals im Speicher cachen (sofort verwerfen).
     NeverCache,
+    /// Automatische Verdrängung (Standard LRU / Attention-basiert).
+    Auto,
+    /// Transientes Schritt-Segment, das nach Abschluss des Schritts freigegeben wird.
+    ReleaseAfterStep {
+        /// Schritt-ID nach dessen Abschluss dieses Segment freigegeben wird.
+        step_id: StepId,
+    },
+}
+
+impl Default for CacheDirective {
+    fn default() -> Self {
+        Self::Auto
+    }
 }

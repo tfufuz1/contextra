@@ -35,5 +35,7 @@ pub use core::{read_response_bytes, read_response_text, OllamaClient};
 #[cfg(feature = "client")]
 pub use errors::*;
 #[cfg(feature = "client")]
-pub use policy::{EgressAuditSink, EndpointPolicy, NoopEgressAuditSink, PayloadGate, PermissivePayloadGate};
+pub use policy::{
+    EgressAuditSink, EndpointPolicy, NoopEgressAuditSink, PayloadGate, PermissivePayloadGate,
+};
 pub use validation::*;

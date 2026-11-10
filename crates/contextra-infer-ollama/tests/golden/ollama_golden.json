@@ -1,0 +1,23 @@
+{
+  "errors": [
+    "invalid input: bad arg",
+    "model not found: llama3",
+    "network error: connection refused",
+    "timeout: 30s elapsed",
+    "server error: 500 internal",
+    "deserialization error: corrupted json",
+    "egress policy violation: blocked ip",
+    "circuit breaker open: requests throttled",
+    "internal error: unexpected state"
+  ],
+  "importance": [],
+  "rag_prompt": {
+    "system": "test"
+  },
+  "request": {
+    "model": "nomic-embed-text"
+  },
+  "response": {
+    "model": "nomic-embed-text"
+  }
+}

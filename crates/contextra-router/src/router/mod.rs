@@ -25,7 +25,6 @@ use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
 use contextra_ports::clock::{Clock, SystemClock};
-use contextra_ports::vfs::Vfs;
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
     HybridSearchProvider,
@@ -156,7 +155,6 @@ pub struct RouterEngine {
     pub(crate) community_resolver: Arc<dyn CommunityResolver>,
     pub(crate) context_preparer: Arc<dyn ContextPreparer>,
     pub(crate) clock: Arc<dyn Clock>,
-    pub(crate) vfs: Option<Arc<dyn Vfs>>,
     pub(crate) state: ArcSwap<RouterState>,
     pub(crate) pending_decisions: RwLock<BTreeMap<DecisionId, (String, u64)>>,
     pub(crate) decision_ids: DecisionIdGenerator,
