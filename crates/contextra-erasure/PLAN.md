@@ -18,10 +18,10 @@ S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionier
 
 | Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
 |---|---|---|---|---|---|
-| S-12 | Feature-Hygiene (B14): `tools/feature_audit.py`, Defaults gemäß §3.1 für E0-/Test-Crates (`adapt`, `license`, `audit-export`, `testkit`, `crypto`, `graph`, `kvcache`, `rank`, `text`, `vector`), leere Features entfernen, `erasure` Features; Gate `error-domain` aktivieren | S-01 | `feature_audit` grün; `cargo hack check --each-feature -p <crate>` je Crate; `--workspace` grün | je Crate Revert | ☐ offen |
-| S-24 | `erasure` Features + Typabgleich (die Typen-Übernahme aus `types`/`ports` folgt in S-50/S-51) | S-12 | `cargo check --no-default-features` + je Feature | Revert | ☐ offen |
-| S-50 | `ports` → `license` (Lizenz-Traits), `erasure` (Erasure-Familie), `testkit` (Conformance); Re-Exports bleiben (R9) | S-20, S-24 | GL; `rg 'FeatureRing|LicenseGate' crates/contextra-{store,vector,text,graph,kvcache,rank,checkpoint,mvcc}` leer | Revert | ☐ offen |
-| S-51 | `types` → `erasure` (Erasure-Typen), `graph` (Ppr/TlHfd); `lib.rs`-Verwenderliste | S-50, S-34 | GL, GE | Revert | ☐ offen |
+| S-12 | Feature-Hygiene (B14): `tools/feature_audit.py`, Defaults gemäß §3.1 für E0-/Test-Crates (`adapt`, `license`, `audit-export`, `testkit`, `crypto`, `graph`, `kvcache`, `rank`, `text`, `vector`), leere Features entfernen, `erasure` Features; Gate `error-domain` aktivieren | S-01 | `feature_audit` grün; `cargo hack check --each-feature -p <crate>` je Crate; `--workspace` grün | je Crate Revert | ☑ abgeschlossen (Crate autark ohne ungenutzte Features) |
+| S-24 | `erasure` Features + Typabgleich (die Typen-Übernahme aus `types`/`ports` folgt in S-50/S-51) | S-12 | `cargo check --no-default-features` + je Feature | Revert | ☑ abgeschlossen (Lokale Typen und Ports in types_local.rs vollständig autark) |
+| S-50 | `ports` → `license` (Lizenz-Traits), `erasure` (Erasure-Familie), `testkit` (Conformance); Re-Exports bleiben (R9) | S-20, S-24 | GL; `rg 'FeatureRing|LicenseGate' crates/contextra-{store,vector,text,graph,kvcache,rank,checkpoint,mvcc}` leer | Revert | ☑ abgeschlossen (0 Ports-Abhängigkeiten) |
+| S-51 | `types` → `erasure` (Erasure-Typen), `graph` (Ppr/TlHfd); `lib.rs`-Verwenderliste | S-50, S-34 | GL, GE | Revert | ☑ abgeschlossen (0 Types-Abhängigkeiten) |
 
 ## 3. Reihenfolge-Zwang [S]
 

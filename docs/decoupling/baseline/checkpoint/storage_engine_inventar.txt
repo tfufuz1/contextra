@@ -1,0 +1,111 @@
+=== STORAGE ENGINE INVENTAR ===
+crates/contextra-checkpoint/src/lib.rs:22://! `PersistentCheckpointStore` delegiert Persistenz an ein [`contextra_ports::StorageEngine`]-Objekt
+crates/contextra-checkpoint/src/orphan.rs:176:    /// 2. Für jeden Pin `storage.unpin_checkpoint` aufrufen.
+crates/contextra-checkpoint/src/orphan.rs:179:    pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
+crates/contextra-checkpoint/src/orphan.rs:188:            if let Err(e) = storage.unpin_checkpoint(pin_id).await {
+crates/contextra-checkpoint/src/guard.rs:8://! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`contextra_ports::StorageEngine`]).
+crates/contextra-checkpoint/src/guard.rs:41:pub struct PinGuard<S: contextra_ports::StorageEngine> {
+crates/contextra-checkpoint/src/guard.rs:48:impl<S: contextra_ports::StorageEngine> PinGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:69:    /// 1. `storage.pin_checkpoint(seq_no)` asynchron ausführen.
+crates/contextra-checkpoint/src/guard.rs:81:        storage.pin_checkpoint(seq_no).await?;
+crates/contextra-checkpoint/src/guard.rs:106:    /// 2. `storage.unpin_checkpoint(seq_no)` ausführen.
+crates/contextra-checkpoint/src/guard.rs:110:            self.storage.unpin_checkpoint(seq_no).await?;
+crates/contextra-checkpoint/src/guard.rs:119:impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:152:pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
+crates/contextra-checkpoint/src/guard.rs:163:impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:371:    /// 3. Prüfen, ob `storage.last_tx_id() > cp.tx_id` ist (Serialisierungsbarriere).
+crates/contextra-checkpoint/src/guard.rs:372:    /// 4. `storage.rollback_to_tx(cp.tx_id)` aufrufen.
+crates/contextra-checkpoint/src/guard.rs:388:            let last_tx = self.storage.last_tx_id().await?;
+crates/contextra-checkpoint/src/guard.rs:397:            let res = self.storage.rollback_to_tx(cp.tx_id).await;
+crates/contextra-checkpoint/src/guard.rs:454:            let last_tx = self.storage.last_tx_id().await?;
+crates/contextra-checkpoint/src/guard.rs:462:            self.storage.rollback_to_tx(cp.tx_id).await
+crates/contextra-checkpoint/src/guard.rs:467:impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:514:    use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/src/guard.rs:534:    impl StorageEngine for MockStorage {
+crates/contextra-checkpoint/src/guard.rs:640:            PinGuard::pin(storage.clone(), seq_no, registry.clone())
+crates/contextra-checkpoint/src/guard.rs:667:        let guard = CheckpointGuard::new(cp, storage.clone(), "test");
+crates/contextra-checkpoint/src/guard.rs:674:        let rolled_back = storage.rolled_back_tx.lock().clone();
+crates/contextra-checkpoint/src/guard.rs:714:        let guard = CheckpointGuard::for_agent_step(storage.clone(), TxId::new(55))
+crates/contextra-checkpoint/src/guard/tests.rs:6:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/src/guard/tests.rs:26:impl StorageEngine for MockStorage {
+crates/contextra-checkpoint/src/guard/tests.rs:132:        PinGuard::pin(storage.clone(), seq_no, registry.clone())
+crates/contextra-checkpoint/src/guard/tests.rs:159:    let guard = CheckpointGuard::new(cp, storage.clone(), "test");
+crates/contextra-checkpoint/src/guard/tests.rs:166:    let rolled_back = storage.rolled_back_tx.lock().clone();
+crates/contextra-checkpoint/src/guard/tests.rs:206:    let guard = CheckpointGuard::for_agent_step(storage.clone(), TxId::new(55))
+crates/contextra-checkpoint/src/store.rs:7://! und synchronisiert diese mit der physischen Speicher-Engine ([`contextra_ports::StorageEngine`]).
+crates/contextra-checkpoint/src/store.rs:143:async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
+crates/contextra-checkpoint/src/store.rs:148:    let entries = storage.scan_prefix(prefix.as_bytes()).await?;
+crates/contextra-checkpoint/src/store.rs:169:    if let Ok(last_tx) = storage.last_tx_id().await {
+crates/contextra-checkpoint/src/store.rs:177:    let persisted_val: Option<u64> = match storage.get(counter_key.as_bytes()).await {
+crates/contextra-checkpoint/src/store.rs:203:async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
+crates/contextra-checkpoint/src/store.rs:215:    storage.put(tx, key.as_bytes(), &bytes).await?;
+crates/contextra-checkpoint/src/store.rs:216:    storage.commit(tx).await?;
+crates/contextra-checkpoint/src/store.rs:217:    storage.flush().await?;
+crates/contextra-checkpoint/src/store.rs:230:/// - `StorageEngine`-Zugriffe nutzen atomare Transaktionen via `TxId`
+crates/contextra-checkpoint/src/store.rs:232:pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
+crates/contextra-checkpoint/src/store.rs:258:impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
+crates/contextra-checkpoint/src/store.rs:346:        let storage_clone = storage.clone();
+crates/contextra-checkpoint/src/store.rs:545:                if let Err(e) = self.storage.unpin_checkpoint(old.seq_no).await {
+crates/contextra-checkpoint/src/store.rs:622:            if let Err(e) = self.storage.delete(unique_tx, key.as_bytes()).await {
+crates/contextra-checkpoint/src/store.rs:623:                if let Err(rb_err) = self.storage.rollback(unique_tx).await {
+crates/contextra-checkpoint/src/store.rs:628:            if let Err(e) = self.storage.commit(unique_tx).await {
+crates/contextra-checkpoint/src/store.rs:629:                if let Err(rb_err) = self.storage.rollback(unique_tx).await {
+crates/contextra-checkpoint/src/store.rs:636:            if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {
+crates/contextra-checkpoint/src/store.rs:657:        if let Err(e) = self.storage.put(tx, key.as_bytes(), &value).await {
+crates/contextra-checkpoint/src/store.rs:658:            if let Err(rb_err) = self.storage.rollback(tx).await {
+crates/contextra-checkpoint/src/store.rs:663:        if let Err(e) = self.storage.commit(tx).await {
+crates/contextra-checkpoint/src/store.rs:664:            if let Err(rb_err) = self.storage.rollback(tx).await {
+crates/contextra-checkpoint/src/store.rs:684:        match self.storage.get(key.as_bytes()).await? {
+crates/contextra-checkpoint/src/store.rs:712:        let entries: Vec<(Vec<u8>, Vec<u8>)> = self.storage.scan_prefix(prefix.as_bytes()).await?;
+crates/contextra-checkpoint/src/store.rs:765:        let last_tx = self.storage.last_tx_id().await?;
+crates/contextra-checkpoint/src/store.rs:776:        self.storage.rollback_to_tx(meta.tx_id).await?;
+crates/contextra-checkpoint/src/store.rs:837:    /// 2. Für jeden Pin `storage.unpin_checkpoint` aufrufen.
+crates/contextra-checkpoint/src/store.rs:844:            if let Err(e) = self.storage.unpin_checkpoint(orphan.seq_no).await {
+crates/contextra-checkpoint/src/store.rs:862:    /// 4. Wenn zulässig, `storage.rollback_to_tx(cp.tx_id)` ausführen.
+crates/contextra-checkpoint/src/store.rs:869:        let last_tx = self.storage.last_tx_id().await?;
+crates/contextra-checkpoint/src/store.rs:873:                if let Err(e) = self.storage.rollback_to_tx(cp.tx_id).await {
+crates/contextra-checkpoint/src/store.rs:909:impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
+crates/contextra-checkpoint/src/store.rs:949:impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
+crates/contextra-checkpoint/src/store.rs:979:impl<S: contextra_ports::StorageEngine> contextra_ports::Checkpoint
+crates/contextra-checkpoint/src/store.rs:984:            let seq_no = self.storage.last_seq_no().await?;
+crates/contextra-checkpoint/src/store.rs:994:            self.storage.rollback_to_tx(state.tx).await?;
+crates/contextra-checkpoint/src/store/tests.rs:16:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/src/store/tests.rs:38:impl StorageEngine for MockStorage {
+crates/contextra-checkpoint/src/store/tests.rs:156:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:168:    assert!(!storage.pinned.lock().contains(&1));
+crates/contextra-checkpoint/src/store/tests.rs:169:    assert!(storage.pinned.lock().contains(&2));
+crates/contextra-checkpoint/src/store/tests.rs:177:    *storage.fail_on_put.lock() = Some(cp_key.to_vec());
+crates/contextra-checkpoint/src/store/tests.rs:179:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:187:    assert!(!storage.pinned.lock().contains(&seq_no));
+crates/contextra-checkpoint/src/store/tests.rs:194:    let store = PersistentCheckpointStore::new(storage.clone(), "test_orphan_recovery").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:198:    storage.pin_checkpoint(seq_no).await.unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:204:    assert!(storage.pinned.lock().contains(&seq_no));
+crates/contextra-checkpoint/src/store/tests.rs:212:        !storage.pinned.lock().contains(&seq_no),
+crates/contextra-checkpoint/src/store/tests.rs:253:    let store = PersistentCheckpointStore::new(storage.clone(), "test_pinguard").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:257:    *storage.fail_on_put.lock() = Some(cp_key.to_vec());
+crates/contextra-checkpoint/src/store/tests.rs:279:        !storage.pinned.lock().contains(&seq_no),
+crates/contextra-checkpoint/src/store/tests.rs:288:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:296:    assert!(storage.pinned.lock().contains(&1));
+crates/contextra-checkpoint/src/store/tests.rs:300:    *storage.fail_on_put.lock() = Some(cp_key.to_vec());
+crates/contextra-checkpoint/src/store/tests.rs:311:        storage.pinned.lock().contains(&1),
+crates/contextra-checkpoint/src/store/tests.rs:317:        !storage.pinned.lock().contains(&2),
+crates/contextra-checkpoint/src/store/tests.rs:368:        let rolled_back = storage.rolled_back_tx.lock().clone();
+crates/contextra-checkpoint/src/store/tests.rs:378:        PersistentCheckpointStore::new(storage.clone(), "test_guard_rollback_on_drop").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:389:    let rolled_back = storage.rolled_back_tx.lock().clone();
+crates/contextra-checkpoint/src/store/tests.rs:397:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:405:        storage.rolled_back_tx.lock().is_empty(),
+crates/contextra-checkpoint/src/store/tests.rs:438:        let store1 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:461:    let store2 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:474:    let store1 = Arc::new(PersistentCheckpointStore::new(storage.clone(), "test").unwrap());
+crates/contextra-checkpoint/src/store/tests.rs:491:    let store2 = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:563:    let store = PersistentCheckpointStore::new(storage.clone(), "test_auto_rollback").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:574:    let rolled_back = storage.rolled_back_tx.lock().clone();
+crates/contextra-checkpoint/src/store/tests.rs:583:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:590:    assert!(storage.pinned.lock().contains(&42));
+crates/contextra-checkpoint/src/store/tests.rs:596:        !storage.pinned.lock().contains(&42),
+crates/contextra-checkpoint/src/store/tests.rs:677:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:711:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:731:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:756:    let store = PersistentCheckpointStore::new(storage.clone(), "test").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:773:    let store_a = PersistentCheckpointStore::new(storage.clone(), "ns_a").unwrap();
+crates/contextra-checkpoint/src/store/tests.rs:774:    let store_b = PersistentCheckpointStore::new(storage.clone(), "ns_b").unwrap();

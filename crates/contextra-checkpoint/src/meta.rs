@@ -29,8 +29,8 @@ use serde::{Deserialize, Serialize};
 /// Validiert Bezeichner-Strings (z. B. Checkpoint-Namen, Collection-IDs) gegen leere Eingaben und Längenbeschränkungen.
 ///
 /// # Zweck
-/// Verhindert ungültige oder schädliche Pfade/Schlüssel in der Speicher-Engine und garantiert
-/// wohldefinierte Namensräume.
+/// Verhindert ungültige oder schädliche Pfade/Schlüssel in der Speicher-Engine und sichert
+/// wohldefinierte Namensräume ab.
 ///
 /// # Ablauf von `validate_identifier`:
 /// 1. Prüfen, ob der getrimmte Wert leer oder reines Whitespace ist -> Fehler `InvalidInput`.

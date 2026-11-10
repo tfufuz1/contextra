@@ -28,40 +28,26 @@
 //! über Piggyback-Flushes (z.B. bei commit/rollback/unpin) sowie explizite Lifecycle-Flushes (`shutdown()`, `close()`).
 //!
 //! ## Einbindung & Abhängigkeiten
-//! - **Abhängigkeiten (normal):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `bytes`, `tokio`, `tracing`, `serde`, `serde_json`, `parking_lot`, `blake3`, `futures-executor`, `dirs`.
-//! - **Abhängigkeiten (dev):** `contextra-testkit`, `contextra-store`, `tempfile`, `proptest`, `criterion`.
+//! - **Abhängigkeiten (normal):** `contextra-types`, `contextra-ports`, `bytes`, `tokio`, `tracing`, `serde`, `serde_json`, `parking_lot`, `blake3`, `thiserror`.
+//! - **Abhängigkeiten (dev):** `contextra-testkit`, `tempfile`, `proptest`, `criterion`.
 //! - **Wird eingebunden von:** `contextra-agent`, `contextra-db`, `contextra-engine`.
 
 #![forbid(unsafe_code)]
 
-// FILE-CONTEXT
-// STAND:       2026-09-15T15:09:43Z (SESSION: 2e382e86)
-// ZWECK:       RAII CheckpointGuard + persistente Snapshot-Verwaltung (Re-Exports)
-// INVARIANTEN: All public items must be re-exported from lib.rs for zero-breakage external imports.
-// SIEHE AUCH:  ADR-011
-// REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH
-// REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH
-
-// ANCHOR[contextra-checkpoint:MOD-001]
-// NOTE: Die Aufteilung in Untermodule kapselt Guards, Cloner, Manifest, Metadaten, Orphan-Reaping und Store.
-#[cfg(feature = "workspace")]
 pub mod compat;
-pub mod error;
-pub mod snapshot_source;
-pub mod vfs;
-
+mod error;
+mod fs_seam;
 mod guard;
 mod hardlink_cloner;
 mod manifest;
 mod meta;
 mod orphan;
+mod source;
 mod store;
 
 // Öffentliche Re-Exports für bequemen Zugriff von außen ohne tiefe Pfade
-pub use error::{CheckpointError, Result};
-pub use snapshot_source::{BoxFuture, SnapshotSource};
-pub use vfs::CheckpointVfs;
-pub use meta::WorkflowState;
+pub use error::{CheckpointError, CheckpointResult};
+pub use fs_seam::{FsSeam, StdFsSeam};
 pub use guard::{CheckpointGuard, PinGuard};
 pub use hardlink_cloner::{
     CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult, SnapshotPinner,
@@ -76,4 +62,5 @@ pub use orphan::{
     pending_rollback_count, register_orphaned_checkpoint, register_pinned_seq_no_orphan,
     InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
+pub use source::{LocalBoxFuture, SnapshotSource};
 pub use store::{CheckpointRegistry, PersistentCheckpointStore};

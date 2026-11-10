@@ -80,9 +80,9 @@ pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
     )
 )]
 #[allow(deprecated)]
-pub use hnsw::{
-    hnsw_purger, hnsw_scanner, HnswConfig, HnswIndex, HnswPurger, HnswScanner, RebuildStatus,
-};
+#[cfg(feature = "ports-compat")]
+pub use hnsw::{hnsw_purger, hnsw_scanner, HnswPurger, HnswScanner};
+pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
 pub use persistence::{HnswHeader, MmapIndex};
 pub use quantize::ScalarQuantizer;
 #[cfg(feature = "experimental-rabitq")]

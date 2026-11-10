@@ -15,6 +15,6 @@ pub mod compat;
 
 pub use error::VaultError;
 pub use vault::{
-    CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
-    VaultDocId, VaultTenantId, VaultTxId, VolatileContextVault, VolatileDrainReceipt,
+    CommitReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig, VaultDocId,
+    VaultTenantId, VaultTxId, VolatileContextVault, VolatileDrainReceipt, *,
 };

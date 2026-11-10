@@ -168,7 +168,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     /// Returns the number of vectors in the index.
     ///
     /// # Fehler
-    /// Keine; garantiert panikfrei.
+    /// Keine; panikfrei.
     /// # Crash
     /// Reiner Statusabruf aus Header oder RAM-Zustand.
     fn len(&self) -> impl Future<Output = usize> + Send;
@@ -194,7 +194,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     /// Returns true if the index requires a background rebuild (e.g. due to tombstone accumulation).
     ///
     /// # Fehler
-    /// Keine; garantiert panikfrei.
+    /// Keine; panikfrei.
     /// # Crash
     /// Reiner Statusabruf ohne Mutation.
     fn is_rebuild_required(&self) -> bool {

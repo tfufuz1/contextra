@@ -1,6 +1,6 @@
 //! Kanonische `ModelFingerprint`-Definition für Contextra.
 //!
-//! # Zweck & Architektur-Rolle: Ring 0
+//! # Zweck & Architektur-Rolle: Typen-Fundament
 //!
 //! Ein Modell-Fingerabdruck sichert die Konsistenz zwischen Vektordatenbank und Inferenz-Engine ab.
 //! Wenn Vektoren mit einem Modell (z. B. Embedding-Modell oder SLM) generiert wurden, muss
@@ -8,14 +8,14 @@
 //! dasselbe Modell und dieselbe Quantisierungsstufe (z. B. Q4_K_M, Q8_0) verwendet wird.
 
 // FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z
+// STAND: 2026-11-10T00:00:00Z
 // ZWECK: Canonical ModelFingerprint type definition shared across workspace crates.
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
 //! Canonical `ModelFingerprint` definition for Contextra.
 //!
 //! # Architektur-Rolle
-//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
+//! Typen-Fundament (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
 //!
 //! # Zweck
 //! Eindeutige kryptografische Identifikation von Modellgewichten und Quantisierungsstufen.

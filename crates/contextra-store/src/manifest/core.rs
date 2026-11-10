@@ -9,7 +9,8 @@
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult};
+use contextra_types::Result;
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -43,7 +44,7 @@ impl std::fmt::Debug for Manifest {
 
 impl Manifest {
     /// Opens or creates an append-only Manifest file at `path`.
-    pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
+    pub async fn open(path: impl AsRef<Path>) -> StoreResult<Self> {
         Self::open_with_dir_lock(path, None).await
     }
 
@@ -51,7 +52,7 @@ impl Manifest {
     pub(crate) async fn open_with_dir_lock(
         path: impl AsRef<Path>,
         dir_lock: Option<DirLock>,
-    ) -> Result<Self> {
+    ) -> StoreResult<Self> {
         let path = path.as_ref().to_path_buf();
         let (mut file, is_new) = match tokio::fs::OpenOptions::new()
             .create_new(true)
@@ -69,12 +70,12 @@ impl Manifest {
                     .open(&path)
                     .await
                     .map_err(|e| {
-                        ContextraError::Storage(format!("Failed to open MANIFEST: {}", e))
+                        StoreError::Storage(format!("Failed to open MANIFEST: {}", e))
                     })?;
                 (file, false)
             }
             Err(e) => {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to create MANIFEST: {}",
                     e
                 )));
@@ -86,16 +87,16 @@ impl Manifest {
             header.extend_from_slice(MANIFEST_HEADER_MAGIC);
             header.push(CURRENT_MANIFEST_VERSION);
             file.write_all(&header).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to write MANIFEST header: {}", e))
+                StoreError::Storage(format!("Failed to write MANIFEST header: {}", e))
             })?;
             file.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!(
+                StoreError::Storage(format!(
                     "MANIFEST file fsync failed for {}: {}",
                     path.display(),
                     e
                 ))
             })?;
-            crate::util::fsync_parent_dir(&path).await?;
+            crate::util::fsync_parent_dir(&path).await.map_err(|e| StoreError::Storage(e.to_string()))?;
         }
 
         Ok(Self {
@@ -113,14 +114,14 @@ impl Manifest {
     }
 
     /// Appends a new entry to the manifest and performs flush + fsync.
-    pub async fn append(&self, entry: &ManifestEntry) -> Result<()> {
+    pub async fn append(&self, entry: &ManifestEntry) -> StoreResult<()> {
         self.append_batch(std::slice::from_ref(entry)).await
     }
 
     /// Appends multiple entries to the manifest in a single atomic batch with flush + fsync.
-    pub async fn append_batch(&self, entries: &[ManifestEntry]) -> Result<()> {
+    pub async fn append_batch(&self, entries: &[ManifestEntry]) -> StoreResult<()> {
         if self.is_poisoned() {
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "Manifest handle for {} is poisoned due to a previous fsync failure (INV-FSYNC-1)",
                 self.path.display()
             )));
@@ -136,14 +137,14 @@ impl Manifest {
 
         let mut file = self.file.lock().await;
         if let Err(e) = file.write_all(&batch_bytes).await {
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "MANIFEST write failed for {}: {}",
                 self.path.display(),
                 e
             )));
         }
         if let Err(e) = file.flush().await {
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "MANIFEST flush failed for {}: {}",
                 self.path.display(),
                 e
@@ -151,7 +152,7 @@ impl Manifest {
         }
         if let Err(e) = file.sync_all().await {
             self.is_poisoned.store(true, Ordering::SeqCst);
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "MANIFEST fsync failed for {}: {} (handle poisoned, INV-FSYNC-1)",
                 self.path.display(),
                 e
@@ -166,7 +167,7 @@ impl Manifest {
     /// Tail-truncation (an incomplete frame at EOF caused by interrupted write / power cut) is recovered
     /// safely by returning valid entries read up to the point of truncation.
     /// Mid-file corruption or CRC mismatches on complete frames return `Err`.
-    pub async fn load(path: &Path) -> Result<Vec<ManifestEntry>> {
+    pub async fn load(path: &Path) -> StoreResult<Vec<ManifestEntry>> {
         if !tokio::fs::try_exists(path).await.unwrap_or(false) {
             return Ok(Vec::new());
         }
@@ -175,7 +176,7 @@ impl Manifest {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(e) => {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to open MANIFEST for reading: {}",
                     e
                 )))
@@ -185,7 +186,7 @@ impl Manifest {
         let file_size = file
             .metadata()
             .await
-            .map_err(|e| ContextraError::Storage(e.to_string()))?
+            .map_err(|e| StoreError::Storage(e.to_string()))?
             .len();
 
         let mut reader = tokio::io::BufReader::new(&mut file);
@@ -198,7 +199,7 @@ impl Manifest {
                 if &header[0..4] == MANIFEST_HEADER_MAGIC {
                     let version = header[4];
                     if version > CURRENT_MANIFEST_VERSION {
-                        return Err(ContextraError::Storage(format!(
+                        return Err(StoreError::Storage(format!(
                             "Unsupported MANIFEST format version: {}",
                             version
                         )));
@@ -210,7 +211,7 @@ impl Manifest {
                         .seek(tokio::io::SeekFrom::Start(0))
                         .await
                         .map_err(|e| {
-                            ContextraError::Storage(format!("Failed to seek MANIFEST: {}", e))
+                            StoreError::Storage(format!("Failed to seek MANIFEST: {}", e))
                         })?;
                 }
             }
@@ -232,7 +233,7 @@ impl Manifest {
                     break;
                 }
                 Err(e) => {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         pos, e
                     )));
@@ -241,7 +242,7 @@ impl Manifest {
 
             let len = u32::from_le_bytes(len_bytes) as usize;
             if len < 5 || len > MAX_MANIFEST_ENTRY_SIZE as usize {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "MANIFEST entry length ({}) invalid or exceeds max size ({}) at offset {}",
                     len, MAX_MANIFEST_ENTRY_SIZE, pos
                 )));
@@ -253,7 +254,7 @@ impl Manifest {
             if pos <= file_size {
                 let mut entry_raw = vec![0u8; len];
                 if let Err(e) = reader.read_exact(&mut entry_raw).await {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST read error at offset {}: {}",
                         entry_pos, e
                     )));
@@ -262,7 +263,7 @@ impl Manifest {
                 match ManifestEntry::from_bytes(&entry_raw) {
                     Ok(entry) => entries.push(entry),
                     Err(e) => {
-                        return Err(ContextraError::Storage(format!(
+                        return Err(StoreError::Storage(format!(
                             "MANIFEST entry corruption at offset {}: {}",
                             entry_pos, e
                         )));
@@ -272,7 +273,7 @@ impl Manifest {
                 let avail = (file_size - (entry_pos + 4)) as usize;
                 let mut partial_raw = vec![0u8; avail];
                 if let Err(e) = reader.read_exact(&mut partial_raw).await {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST read error for partial payload at offset {}: {}",
                         entry_pos, e
                     )));
@@ -285,7 +286,7 @@ impl Manifest {
                     );
                     break;
                 } else {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "MANIFEST mid-file corruption at offset {}: invalid frame length {} or corrupt frame structure (possible SSTable resurrection risk)",
                         entry_pos, len
                     )));

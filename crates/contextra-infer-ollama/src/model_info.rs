@@ -85,10 +85,9 @@ impl OllamaClient {
             )));
         }
 
-        let parsed: ShowResponse = response
-            .json()
-            .await
-            .map_err(|e| OllamaError::Deserialization(format!("Invalid Ollama show response: {e}")))?;
+        let parsed: ShowResponse = response.json().await.map_err(|e| {
+            OllamaError::Deserialization(format!("Invalid Ollama show response: {e}"))
+        })?;
 
         let (param_size, quant_level) = match parsed.details {
             Some(d) => (d.parameter_size, d.quantization_level),
@@ -125,11 +124,11 @@ pub fn known_dimension(model: &str) -> Option<usize> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
-    #[cfg(feature = "client")]
-    use crate::OllamaClient;
     use super::*;
     #[cfg(feature = "client")]
     use crate::error::OllamaError;
+    #[cfg(feature = "client")]
+    use crate::OllamaClient;
     #[cfg(feature = "client")]
     use crate::OllamaClient;
 
@@ -190,7 +189,6 @@ mod tests {
         let err = result.unwrap_err();
         match err {
             OllamaError::Network(e) => {
-
                 assert!(e
                     .to_string()
                     .contains("Ensure Ollama is running (`ollama serve`)"));

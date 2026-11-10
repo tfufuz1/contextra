@@ -42,6 +42,10 @@
 
 | Pfad | Verantwortung |
 |---|---|
+| `source.rs` | Lokales `SnapshotSource`-Trait (13 Methoden zur Speicher-Engine) |
+| `fs_seam.rs` | Lokale `FsSeam`-Dateinaht statt harter `ports::Vfs`-Kopplung |
+| `error.rs` | `CheckpointError` und `CheckpointResult` |
+| `compat/` | Kompatibilitätsbrücke (`error.rs`: From/Into ContextraError, `ports_impl.rs`: CheckpointCoordinator/Checkpoint) |
 | `guard.rs` | `CheckpointGuard<S>`: commit/rollback, Drop registriert Orphan |
 | `store.rs` | `PersistentCheckpointStore`: create/restore/drop, `allocate_tx`, Snapshot-Pinning |
 | `manifest.rs`, `meta.rs` | signiertes/geprüftes Manifest, Metadaten |

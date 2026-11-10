@@ -12,7 +12,7 @@
     clippy::panic
 )]
 
-use crate::bandit::{BanditImplementation, BanditProfileState};
+use contextra_adapt::{BanditImplementation, BanditProfileState};
 
 /// Einfacher deterministischer PRNG (Xorshift32) für reproduzierbare Test-Kontexte über feste Seeds.
 struct SimpleRng {

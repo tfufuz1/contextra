@@ -1,6 +1,6 @@
 //! Schema-Versionierungsstrukturen und Hilfsfunktionen für SSTable- und WAL-Manifest-Übergänge (ADR-082).
 //!
-//! # Zweck & Architektur-Rolle: Ring 0
+//! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
 //!
 //! Dieses Modul definiert Typen zur Identifikation und Aushandlung von Datenformatversionen
 //! in persistenten Manifesten von SSTable (Sorted String Table) und WAL (Write-Ahead-Log).

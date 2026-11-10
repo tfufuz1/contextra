@@ -28,7 +28,7 @@
 | Standalone-Build | `cargo build -p contextra-infer-ollama --no-default-features --locked` |
 | Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
 | Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types` |
-| Features | keine |
+| Features | `client`, `http`, `types-compat`, `ports-compat` |
 | Lints | `#![forbid(unsafe_code)]` |
 
 ## 2. Abhängigkeiten & Schulden

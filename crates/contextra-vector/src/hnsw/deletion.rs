@@ -1,4 +1,3 @@
-
 /// Trait for types convertible to [] for deletion APIs.
 pub trait IntoDocId {
     /// Converts the type into a [].
@@ -30,8 +29,8 @@ impl IntoDocId for &u64 {
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
 use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
-use zeroize::Zeroize;
 use std::collections::BTreeSet;
+use zeroize::Zeroize;
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex, VectorData};
@@ -82,7 +81,7 @@ impl GhostFreeVectorIndex for HnswIndex {
                 None => {
                     return Err(ContextraError::GraphRepairFailed(
                         HnswDeletionError::NodeNotFound(doc_id),
-                    ))
+                    ));
                 }
             }
         };
@@ -421,9 +420,9 @@ impl HnswIndex {
 }
 
 impl HnswIndex {
-    /// O(1) Tombstone-Löschung gemäß VETO-F02 und INV-VEC-ZEROIZE-1.
+    /// O(1) Tombstone-Markierung gemäß VETO-F02 und INV-VEC-ZEROIZE-1.
     ///
-    /// Markiert den Knoten deterministisch als gelöscht, nullt den Vektorspeicher im Slot
+    /// Markiert den Knoten deterministisch als inaktiv, nullt den Vektorspeicher im Slot
     /// und entfernt die ID aus der Dokumentenzuordnung.
     /// Gibt `Ok(true)` zurück, falls das Dokument existierte, andernfalls `Ok(false)`.
     pub fn remove<D: IntoDocId>(&self, doc_id: D) -> Result<bool> {

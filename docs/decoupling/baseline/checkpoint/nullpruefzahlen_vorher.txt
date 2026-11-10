@@ -1,0 +1,116 @@
+=== NULLPRÜFZAHLEN VORHER ===
+--- Prod Code (src/ ohne #[cfg(test)]) ---
+crates/contextra-checkpoint/src/meta.rs:14:use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+crates/contextra-checkpoint/src/lib.rs:13://! Es stellt den Trait [`contextra_ports::CheckpointCoordinator`], die Registry [`PersistentCheckpointStore`]
+crates/contextra-checkpoint/src/lib.rs:22://! `PersistentCheckpointStore` delegiert Persistenz an ein [`contextra_ports::StorageEngine`]-Objekt
+crates/contextra-checkpoint/src/orphan.rs:19:use contextra_ports::SystemClock;
+crates/contextra-checkpoint/src/orphan.rs:20:use contextra_types::{Result, TxId};
+crates/contextra-checkpoint/src/orphan.rs:97:/// - `clock`: Referenz auf eine Implementierung des [`contextra_ports::Clock`]-Traits.
+crates/contextra-checkpoint/src/orphan.rs:98:pub fn monotonic_timestamp_ms_with(clock: &dyn contextra_ports::Clock) -> u64 {
+crates/contextra-checkpoint/src/orphan.rs:111:pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
+crates/contextra-checkpoint/src/orphan.rs:179:    pub async fn recover_and_clean<S: contextra_ports::StorageEngine>(
+crates/contextra-checkpoint/src/orphan.rs:255:    pub fn persist_vfs(&self, vfs: &dyn contextra_ports::Vfs) -> std::io::Result<()> {
+crates/contextra-checkpoint/src/orphan.rs:279:    pub fn load_vfs(vfs: &dyn contextra_ports::Vfs, path: &std::path::Path) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:306:    clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/orphan.rs:307:    vfs: Option<Arc<dyn contextra_ports::Vfs>>,
+crates/contextra-checkpoint/src/orphan.rs:338:        vfs: Arc<dyn contextra_ports::Vfs>,
+crates/contextra-checkpoint/src/orphan.rs:345:    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:351:    pub fn with_vfs(mut self, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:357:    pub fn set_clock(&mut self, clock: Arc<dyn contextra_ports::Clock>) {
+crates/contextra-checkpoint/src/orphan.rs:362:    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+crates/contextra-checkpoint/src/orphan.rs:367:    pub fn vfs(&self) -> Option<&Arc<dyn contextra_ports::Vfs>> {
+crates/contextra-checkpoint/src/orphan.rs:373:        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+crates/contextra-checkpoint/src/orphan.rs:398:    fn load_vfs_internal(path: &std::path::Path, vfs: Arc<dyn contextra_ports::Vfs>) -> Self {
+crates/contextra-checkpoint/src/orphan.rs:399:        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+crates/contextra-checkpoint/src/orphan.rs:755:        use contextra_testkit::FaultVfs;
+crates/contextra-checkpoint/src/manifest.rs:13:use contextra_types::{ContextraError, Result};
+crates/contextra-checkpoint/src/manifest.rs:107:    use contextra_types::TxId;
+crates/contextra-checkpoint/src/store.rs:7://! und synchronisiert diese mit der physischen Speicher-Engine ([`contextra_ports::StorageEngine`]).
+crates/contextra-checkpoint/src/store.rs:31:use contextra_ports::BoxFuture;
+crates/contextra-checkpoint/src/store.rs:32:use contextra_types::{ContextraError, Result, TxId, WorkflowState};
+crates/contextra-checkpoint/src/store.rs:44:pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
+crates/contextra-checkpoint/src/store.rs:143:async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
+crates/contextra-checkpoint/src/store.rs:203:async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
+crates/contextra-checkpoint/src/store.rs:232:pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
+crates/contextra-checkpoint/src/store.rs:253:    clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/store.rs:255:    metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+crates/contextra-checkpoint/src/store.rs:258:impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
+crates/contextra-checkpoint/src/store.rs:452:    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+crates/contextra-checkpoint/src/store.rs:461:    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+crates/contextra-checkpoint/src/store.rs:466:    pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
+crates/contextra-checkpoint/src/store.rs:471:    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+crates/contextra-checkpoint/src/store.rs:909:impl<S: contextra_ports::StorageEngine> CheckpointRegistry for PersistentCheckpointStore<S> {
+crates/contextra-checkpoint/src/store.rs:949:impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
+crates/contextra-checkpoint/src/store.rs:979:impl<S: contextra_ports::StorageEngine> contextra_ports::Checkpoint
+crates/contextra-checkpoint/src/guard.rs:8://! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`contextra_ports::StorageEngine`]).
+crates/contextra-checkpoint/src/guard.rs:22:use contextra_ports::SystemClock;
+crates/contextra-checkpoint/src/guard.rs:23:use contextra_types::{ContextraError, Result, TxId};
+crates/contextra-checkpoint/src/guard.rs:41:pub struct PinGuard<S: contextra_ports::StorageEngine> {
+crates/contextra-checkpoint/src/guard.rs:45:    clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/guard.rs:48:impl<S: contextra_ports::StorageEngine> PinGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:78:        clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/guard.rs:91:    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+crates/contextra-checkpoint/src/guard.rs:119:impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:152:pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
+crates/contextra-checkpoint/src/guard.rs:158:    pub(crate) clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/guard.rs:159:    pub(crate) metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+crates/contextra-checkpoint/src/guard.rs:163:impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:166:        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+crates/contextra-checkpoint/src/guard.rs:175:        clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/guard.rs:236:        clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/guard.rs:252:    pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+crates/contextra-checkpoint/src/guard.rs:260:        sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
+crates/contextra-checkpoint/src/guard.rs:267:    pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
+crates/contextra-checkpoint/src/guard.rs:302:        clock: Arc<dyn contextra_ports::Clock>,
+crates/contextra-checkpoint/src/guard.rs:467:impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
+crates/contextra-checkpoint/src/guard.rs:514:    use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/src/guard.rs:771:        let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
+crates/contextra-checkpoint/src/guard.rs:820:        use contextra_testkit::{MetricEvent, TestMetricsSink};
+crates/contextra-checkpoint/src/guard.rs:831:            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+crates/contextra-checkpoint/src/guard.rs:855:        use contextra_testkit::{MetricEvent, TestMetricsSink};
+crates/contextra-checkpoint/src/guard.rs:866:            .with_metrics_sink(metrics.clone() as Arc<dyn contextra_ports::MetricsSink>);
+crates/contextra-checkpoint/src/hardlink_cloner.rs:56:use contextra_types::{ContextraError, Result};
+crates/contextra-checkpoint/src/hardlink_cloner.rs:169:    ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>>;
+crates/contextra-checkpoint/src/hardlink_cloner.rs:202:    ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
+--- Tests in src/ ---
+crates/contextra-checkpoint/src/store/tests.rs:16:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/src/store/tests.rs:413:    use contextra_ports::CheckpointCoordinator;
+crates/contextra-checkpoint/src/store/tests.rs:424:    use contextra_ports::CheckpointCoordinator;
+crates/contextra-checkpoint/src/store/tests.rs:435:    use contextra_ports::CheckpointCoordinator;
+crates/contextra-checkpoint/src/store/tests.rs:472:    use contextra_ports::CheckpointCoordinator;
+crates/contextra-checkpoint/src/store/tests.rs:502:    use contextra_ports::CheckpointCoordinator;
+crates/contextra-checkpoint/src/store/tests.rs:900:    use contextra_ports::{Checkpoint, CheckpointCoordinator};
+crates/contextra-checkpoint/src/guard/tests.rs:6:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+--- tests/ Verzeichnis ---
+crates/contextra-checkpoint/tests/cache_concurrency_pinning.rs:23:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/cache_concurrency_pinning.rs:24:use contextra_types::{Result, TxId};
+crates/contextra-checkpoint/tests/manifest_fault_injection.rs:17:use contextra_types::TxId;
+crates/contextra-checkpoint/tests/checkpoint_clock_determinism.rs:17:use contextra_testkit::{InMemoryStorageEngine, ManualClock};
+crates/contextra-checkpoint/tests/checkpoint_clock_determinism.rs:18:use contextra_types::TxId;
+crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs:17:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs:18:use contextra_testkit::InMemoryStorageEngine;
+crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs:19:use contextra_types::{ContextraError, Result, TxId};
+crates/contextra-checkpoint/tests/concurrency.rs:17:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/concurrency.rs:18:use contextra_types::{Result, TxId};
+crates/contextra-checkpoint/tests/guard_exit_paths.rs:17:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/guard_exit_paths.rs:18:use contextra_types::{ContextraError, Result, TxId};
+crates/contextra-checkpoint/tests/crash_recovery_and_tenant_isolation.rs:22:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/crash_recovery_and_tenant_isolation.rs:23:use contextra_types::{ContextraError, Result, TxId};
+crates/contextra-checkpoint/tests/hardlink_cloner_tests.rs:17:use contextra_types::ContextraError;
+crates/contextra-checkpoint/tests/hardlink_cloner_tests.rs:50:async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types::Result<()> {
+crates/contextra-checkpoint/tests/hardlink_cloner_tests.rs:106:async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> {
+crates/contextra-checkpoint/tests/hardlink_cloner_tests.rs:151:) -> contextra_types::Result<()> {
+crates/contextra-checkpoint/tests/error_paths_and_boundaries.rs:17:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/error_paths_and_boundaries.rs:18:use contextra_types::{ContextraError, Result, TxId};
+crates/contextra-checkpoint/tests/id_gen_determinism_test.rs:16:use contextra_ports::{IdGen, SequentialIdGen};
+crates/contextra-checkpoint/tests/time_travel_correctness.rs:18:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/time_travel_correctness.rs:19:use contextra_types::{Result, TxId};
+crates/contextra-checkpoint/tests/time_travel_correctness.rs:696:                return Err(contextra_types::ContextraError::Internal(format!(
+crates/contextra-checkpoint/tests/time_travel_correctness.rs:701:                return Err(contextra_types::ContextraError::Internal(format!(
+crates/contextra-checkpoint/tests/time_travel_correctness.rs:706:            Ok::<(), contextra_types::ContextraError>(())
+crates/contextra-checkpoint/tests/clock_determinism.rs:17:use contextra_testkit::{InMemoryStorageEngine, ManualClock};
+crates/contextra-checkpoint/tests/clock_determinism.rs:18:use contextra_types::TxId;
+crates/contextra-checkpoint/tests/txid_monotonicity_and_recovery.rs:17:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/txid_monotonicity_and_recovery.rs:18:use contextra_types::{ContextraError, Result, TxId};
+crates/contextra-checkpoint/tests/guard_proptest.rs:18:use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
+crates/contextra-checkpoint/tests/guard_proptest.rs:19:use contextra_types::{Result, TxId};

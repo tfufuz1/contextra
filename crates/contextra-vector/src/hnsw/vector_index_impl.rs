@@ -9,6 +9,7 @@ use super::config::validate_vector;
 use super::sq8_bias::Sq8Bias;
 use super::types::{HnswIndex, HnswNode, SnapshotPinGuard, VectorData};
 
+#[cfg(feature = "ports-compat")]
 impl VectorIndex for HnswIndex {
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
         if let Some(ref err) = self.inner.cold.validation_error {

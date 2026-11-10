@@ -4,7 +4,7 @@
 //!
 //! Implementiert die lineare Score-Kombination nach Min-Max-Normalisierung.
 
-use super::resonance::{apply_resonance_bonus, ResonanceConfig};
+use super::{apply_resonance_bonus, ResonanceConfig};
 use super::rrf::{
     format_fused_results_from_top_k, update_fused_entry_from_doc,
     weighted_reciprocal_rank_fusion_with_options,
@@ -194,13 +194,3 @@ pub fn weights_to_signal_factors(
     }
 }
 
-#[cfg(feature = "types-compat")]
-/// Converts optional contextra_types::FusionWeights.
-pub fn weights_to_signal_factors_types_compat(
-    weights: Option<&contextra_types::FusionWeights>,
-) -> (f32, f32, f32) {
-    match weights {
-        Some(w) => (w.vector(), w.text(), w.graph()),
-        None => (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0),
-    }
-}

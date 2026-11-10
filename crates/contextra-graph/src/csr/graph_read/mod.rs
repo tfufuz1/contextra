@@ -7,8 +7,11 @@ pub mod communities;
 pub mod pagerank;
 pub mod path_rag;
 
+#[cfg(feature = "ports-compat")]
 use crate::GraphIndexExt;
-use contextra_types::{EntityId, Result, TxId};
+#[cfg(feature = "ports-compat")]
+use contextra_types::TxId;
+use contextra_types::{EntityId, Result};
 
 use super::graph_write::CsrGraph;
 
@@ -160,6 +163,7 @@ impl CsrGraph {
             + inner.staged_edges.values().map(|v| v.len()).sum::<usize>()
     }
 
+    #[cfg(feature = "ports-compat")]
     pub async fn remove_entity(&self, tx: TxId, entity: EntityId) -> Result<()> {
         GraphIndexExt::remove_entity(self, tx, entity).await
     }

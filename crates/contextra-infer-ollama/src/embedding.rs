@@ -6,11 +6,11 @@
 // HOTSPOTS: embed, embed_batch
 
 use crate::client::{OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL};
+use crate::error::{OllamaError, Result};
 use crate::model_info::known_dimension;
 use crate::traits::{BoxFuture as LocalBoxFuture, Embedder};
 #[cfg(feature = "ports-compat")]
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
-use crate::error::{OllamaError, Result};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -130,7 +130,10 @@ impl Embedder for OllamaEmbedder {
         }
     }
 
-    fn embed_batch<'a>(&'a self, texts: &'a [&'a str]) -> LocalBoxFuture<'a, Result<Vec<Vec<f32>>>> {
+    fn embed_batch<'a>(
+        &'a self,
+        texts: &'a [&'a str],
+    ) -> LocalBoxFuture<'a, Result<Vec<Vec<f32>>>> {
         Box::pin(async move {
             if texts.is_empty() {
                 return Ok(Vec::new());
@@ -245,7 +248,9 @@ mod tests {
             expected_dimension: None,
             observed_dimension: Arc::new(Mutex::new(None)),
         };
-        let result = EmbeddingProvider::embed_batch(&embedder, &[]).await.unwrap();
+        let result = EmbeddingProvider::embed_batch(&embedder, &[])
+            .await
+            .unwrap();
         assert!(result.is_empty());
     }
 
@@ -386,7 +391,9 @@ mod tests {
         let single = EmbeddingProvider::embed(&embedder, "hello").await.unwrap();
         assert_eq!(single, vec![0.1, 0.2]);
 
-        let batch = EmbeddingProvider::embed_batch(&embedder, &["hello", "world"]).await.unwrap();
+        let batch = EmbeddingProvider::embed_batch(&embedder, &["hello", "world"])
+            .await
+            .unwrap();
         assert_eq!(batch, vec![vec![0.1, 0.2], vec![0.3, 0.4]]);
     }
 
@@ -399,10 +406,14 @@ mod tests {
             ..Default::default()
         };
         let dead_embedder = OllamaEmbedder::with_config(dead_config);
-        let single_err = EmbeddingProvider::embed(&dead_embedder, "hello").await.unwrap_err();
+        let single_err = EmbeddingProvider::embed(&dead_embedder, "hello")
+            .await
+            .unwrap_err();
         assert!(matches!(single_err, EmbeddingError::ComputationFailed(_)));
 
-        let batch_err = EmbeddingProvider::embed_batch(&dead_embedder, &["hello"]).await.unwrap_err();
+        let batch_err = EmbeddingProvider::embed_batch(&dead_embedder, &["hello"])
+            .await
+            .unwrap_err();
         assert!(matches!(batch_err, EmbeddingError::ComputationFailed(_)));
 
         // Test batch dimension mismatch
@@ -427,15 +438,14 @@ mod tests {
 
         let embedder_mismatch =
             OllamaEmbedder::new(server_url, "test-model").with_expected_dimension(4);
-        let batch_dim_err = EmbeddingProvider::embed_batch(&embedder_mismatch, &["hello"]).await.unwrap_err();
+        let batch_dim_err = EmbeddingProvider::embed_batch(&embedder_mismatch, &["hello"])
+            .await
+            .unwrap_err();
         match batch_dim_err {
             PortsEmbeddingError::ComputationFailed(msg) => {
                 assert!(msg.contains("Ollama returned embedding of dimension 2 but expected 4"));
             }
-            _ => panic!(
-                "Expected OllamaError::Internal, got {:?}",
-                batch_dim_err
-            ),
+            _ => panic!("Expected OllamaError::Internal, got {:?}", batch_dim_err),
         }
     }
 }

@@ -415,7 +415,7 @@ async fn test_route_populates_drift_status_after_sufficient_data(
 
     #[cfg(feature = "bandit-routing")]
     {
-        profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
+        profile.bandit_state = Some(contextra_adapt::BanditProfileState::cold_start(4, 0.5));
     }
 
     let router = create_test_router(collection, vec![profile], None);
@@ -436,8 +436,8 @@ async fn test_route_populates_drift_status_after_sufficient_data(
     assert!(
         matches!(
             status,
-            crate::lyapunov::LyapunovResult::Stable { .. }
-                | crate::lyapunov::LyapunovResult::DriftDetected { .. }
+            contextra_adapt::LyapunovResult::Stable { .. }
+                | contextra_adapt::LyapunovResult::DriftDetected { .. }
         ),
         "Expected Stable or DriftDetected, got {:?}",
         status

@@ -31,7 +31,10 @@ pub trait AsyncEmbedder: Send + Sync {
     fn embed_async<'a>(&'a self, text: &'a str) -> BoxFuture<'a, Result<Vec<f32>>>;
 
     /// Erzeugt Embeddings für einen Batch asynchron.
-    fn embed_batch_async<'a>(&'a self, texts: &'a [&'a str]) -> BoxFuture<'a, Result<Vec<Vec<f32>>>>;
+    fn embed_batch_async<'a>(
+        &'a self,
+        texts: &'a [&'a str],
+    ) -> BoxFuture<'a, Result<Vec<Vec<f32>>>>;
 }
 
 /// Lokaler Trait für LLM-Textgeneratoren.
