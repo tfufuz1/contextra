@@ -1,126 +1,48 @@
-# Implementierungsspezifikation & Arbeitsplan: `contextra-erasure`
+# contextra-erasure — Umsetzungsplan
 
-> **Ring:** 3 | **Klasse:** `K` | **Code-Budget:** 7500 LOC | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
-> **Architekturrolle:** Zentraler modularer Löschkern: Saga-Orchestrierung, FileVault, ReadGate, Audit-Ledger und Deletion-Reports
-> **Spezifikationsbezug:** `docs/SPEC.md` §4, `PLAN.md`
+> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
 
----
+## 1. Vorbedingungen (global) [S]
 
-## 1. Architektonische Leitprinzipien & Baukasten-Vertrag
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
+| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
+| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
+| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
+| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
 
-Für `contextra-erasure` gelten im Rahmen der Transformation zum modularen Baukastensystem folgende verbindliche Richtlinien:
+S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
 
-1. **Modulare Autarkie & Isolation:** Der Crate funktioniert als eigenständiger, isolierter Baustein. Direkte Kopplungen an Fremd-Crates werden über wohldefinierte Schnittstellen in `contextra-ports` oder generische Abstraktionen gelöst.
-2. **Entkopplung der Löschkette:** Sämtliche juristischen Begrifflichkeiten (DSGVO Art. 17), Nachweisketten, Deletion-Proofs und Saga-Orchestrierungen verbleiben exklusiv in `contextra-erasure`. Datenhaltende Module implementieren ausschließlich neutrale, funktionale Bereinigungs-Ports (`Purger`, `LayerScanner`).
-3. **Design by Contract (DbC) & Invarianten:** Alle Vorbedingungen, Nachbedingungen und Systeminvarianten werden strikt geprüft (Fail-Closed).
-4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
-5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
+## 2. Schritte dieses Crates [S]
 
----
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-12 | Feature-Hygiene (B14): `tools/feature_audit.py`, Defaults gemäß §3.1 für E0-/Test-Crates (`adapt`, `license`, `audit-export`, `testkit`, `crypto`, `graph`, `kvcache`, `rank`, `text`, `vector`), leere Features entfernen, `erasure` Features; Gate `error-domain` aktivieren | S-01 | `feature_audit` grün; `cargo hack check --each-feature -p <crate>` je Crate; `--workspace` grün | je Crate Revert | ☐ offen |
+| S-24 | `erasure` Features + Typabgleich (die Typen-Übernahme aus `types`/`ports` folgt in S-50/S-51) | S-12 | `cargo check --no-default-features` + je Feature | Revert | ☐ offen |
+| S-50 | `ports` → `license` (Lizenz-Traits), `erasure` (Erasure-Familie), `testkit` (Conformance); Re-Exports bleiben (R9) | S-20, S-24 | GL; `rg 'FeatureRing|LicenseGate' crates/contextra-{store,vector,text,graph,kvcache,rank,checkpoint,mvcc}` leer | Revert | ☐ offen |
+| S-51 | `types` → `erasure` (Erasure-Typen), `graph` (Ppr/TlHfd); `lib.rs`-Verwenderliste | S-50, S-34 | GL, GE | Revert | ☐ offen |
 
-## 2. Modul- & Komponentenarchitektur
+## 3. Reihenfolge-Zwang [S]
 
-### 2.1 Interne Struktur & Verantwortung
+Keine direkte Reihenfolgeregel im Zyklen-Absatz von §7. Gilt die globale Reihenfolge (S-00 → S-01 → S-02 → S-03).
 
-| Komponente / Modul | Verantwortung & Schnittstellen |
-|---|---|
-| `saga` | ErasureCore und DeletionSaga Zustandsmaschine |
-| `vault` | FileVault: 16 Shards, 80-Byte Slots, physisches Zeroing von DEKs |
-| `gate` | ReadGate und GateLog: RCU-basierte Lesesperren (ErasedSet) |
-| `ledger` | ErasureLedger: Revisionssicheres Append-Only Logbuch |
-| `journal` | Crash-resistentes WAL-Journal für unvollendete Sagas |
-| `purge` | PurgeWindow: Sequenzielle Orchestrierung der Bereinigung über Purger-Ports (a-g) |
-| `measure` | Restdaten-Messung (LayerScanner), Canary-Prüfung, LayerWitness |
-| `report` | DeletionReport: Ed25519-signierte Zertifikate und DSGVO-Nachweisführung |
-| `restore` | RestoreGuard: Schutz gegen unbemerktes Wiederherstellen aus Alt-Backups |
+## 4. Definition of Done [S]
 
-### 2.2 Abhängigkeitsmatrix & Schnittstellen
+- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
+- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
+- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
+- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
+- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
+- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports, contextra-crypto`
-- **Verbotene Abhängigkeiten:** Höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
-- **Konsumierte / Implementierte Ports:** Spezifiziert in `AGENTS.md` und `docs/SPEC.md`.
+## 5. Offene Entscheidungen [S]
 
----
+Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
 
-## 3. Zerlegung in Arbeitspakete (Work Packages)
+## 6. Verweise
 
-### WP-ERA-1: Autarke Port-Anbindung
-- **Fokus / Betroffene Dateien:** `src/backend.rs, src/purge.rs`
-- **Problemstellung & Baukasten-Ziel:** Steuerung von Datenhaltern ausschließlich über Purger und LayerScanner aus contextra-ports ohne Crate-Querabhängigkeiten.
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+- Spezifikation: `SPEC.md` (dieses Verzeichnis)
+- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
+- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
 
-### WP-ERA-2: FileVault Härtung & Poison-Semantik
-- **Fokus / Betroffene Dateien:** `src/vault.rs, src/vault/`
-- **Problemstellung & Baukasten-Ziel:** 80-Byte Slots, 2-Phasen-Vernichtung (Zeroing + Sync + Readback-Check); dauerhafte Poison-Vergiftung bei I/O-Fehlern (D-55).
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
-
-### WP-ERA-3: Saga-Zustandsmaschine & Cancel-Safety
-- **Fokus / Betroffene Dateien:** `src/saga.rs, src/saga/`
-- **Problemstellung & Baukasten-Ziel:** Strikte Abfolge (Requested -> Gated -> KeyDestroyed -> Purging -> Measured -> Completed); Entkopplung mutatinger Operationen via tokio::spawn (ER-24).
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
-
-### WP-ERA-4: Ed25519-Signierte Deletion-Reports V5
-- **Fokus / Betroffene Dateien:** `src/report.rs, src/report/`
-- **Problemstellung & Baukasten-Ziel:** Kanonische JSON-Serialisierung (MFDR), kryptografische Signatur und Einbettung aller LayerWitnesses.
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
-
-### WP-ERA-5: RestoreGuard & ErasedSet-Mirror
-- **Fokus / Betroffene Dateien:** `src/restore.rs, src/restore/`
-- **Problemstellung & Baukasten-Ziel:** Lückenloser Schutz vor Re-Import gelöschter Schlüssel aus alten Snapshots.
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
-
----
-
-## 4. Test-, Benchmark- & Qualitätssicherungsplan
-
-### 4.1 Unit-, Integration- & Conformance-Tests
-- **Unit-Tests:** 100% Testabdeckung für Kernfunktionen und Randfall-Behandlungen.
-- **Port-Konformität:** Validierung gegen die Prüfsuiten in `contextra-testkit`.
-- **Traceability:** Jeder Test annotiert die Spezifikationsanforderung (z. B. `/// SPEC: REQ-...`).
-
-### 4.2 Property-Based Testing & Fuzzing
-- Testen aller Invarianten unter zufälligen Eingaben (proptest).
-- Fuzzing aller Parser-, Deserialisierungs- und Eingabepfade.
-
-### 4.3 Mutations-Testing (Sabotage-Checks)
-- Mutanten-Injektion zur Verifikation der Testgüte (Ziel: Mutation-Score >= 85%).
-
----
-
-## 5. Definition of Done (DoD) für diesen Baustein
-
-1. Alle deklarierten Arbeitspakete sind vollständig implementiert.
-2. `cargo check -p contextra-erasure`, `cargo test -p contextra-erasure` und `cargo clippy -p contextra-erasure` laufen fehlerfrei durch.
-3. Code-Budget von maximal 7500 LOC wird strikt eingehalten.
-4. Keine unzulässigen Querabhängigkeiten oder Lecks von Implementierungsdetails.
-5. Die Crate-README dokumentiert den autarken Einsatz in Drittprojekten mit einem Minimalbeispiel.
