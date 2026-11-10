@@ -159,6 +159,19 @@ impl RouterEngine {
         self
     }
 
+    #[cfg(feature = "bandit-routing")]
+    /// Builder-Methode zur Konfiguration der Bandit-Exploration mit injiziertem Rng-Port (WP-R03).
+    pub fn with_bandit_rng(
+        mut self,
+        strategy: RoutingStrategy,
+        epsilon: f32,
+        rng: Box<dyn contextra_adapt::Rng + Send>,
+    ) -> Self {
+        self.routing_strategy = strategy;
+        self.bandit_exploration = BanditExploration::with_rng(epsilon, rng);
+        self
+    }
+
     /// Validates all profiles and creates a new `RouterEngine` instance.
     // ANCHOR[contextra-router:LCF-005]
     /// Erzeugt eine neue `RouterEngine` und validiert alle übergebenen Profile.
