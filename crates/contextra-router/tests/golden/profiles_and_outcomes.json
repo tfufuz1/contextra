@@ -1,0 +1,59 @@
+{
+  "profiles": [
+    {
+      "name": "mock-fast",
+      "mcp_endpoint": "bin/mock-fast",
+      "domain_communities": [
+        1,
+        2
+      ],
+      "token_budget": {
+        "limit": 2048,
+        "strategy": {
+          "Exact": 2048
+        },
+        "reserved": 128,
+        "consumed": 0
+      },
+      "min_relevance_score": 0.6,
+      "resource_cost_estimate": 0.0,
+      "fingerprint": null
+    },
+    {
+      "name": "mock-accurate",
+      "mcp_endpoint": "bin/mock-accurate",
+      "domain_communities": [
+        3
+      ],
+      "token_budget": {
+        "limit": 8192,
+        "strategy": {
+          "Exact": 8192
+        },
+        "reserved": 256,
+        "consumed": 0
+      },
+      "min_relevance_score": 0.85,
+      "resource_cost_estimate": 0.0,
+      "fingerprint": null
+    }
+  ],
+  "outcomes": [
+    "Success",
+    {
+      "Rejected": {
+        "reason": "Token budget exceeded"
+      }
+    },
+    {
+      "Escalated": {
+        "escalated_to": "mock-accurate"
+      }
+    }
+  ],
+  "decision_ids": [
+    1,
+    2,
+    100
+  ]
+}

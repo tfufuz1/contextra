@@ -1,3 +1,5 @@
+#![cfg(all(feature = "async", feature = "signing"))]
+
 //! Spezifikationstests für Abschlussreihenfolge und Ledger (§11.8, D-37, D-74, D-126).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

@@ -1,3 +1,5 @@
+#![cfg(all(feature = "signing", feature = "vault"))]
+
 //! # Integrationstest: `shredding_envelope_test.rs`
 //!
 //! Validiert die kryptographische Unumkehrbarkeit des KV-Shreddings,

@@ -21,7 +21,8 @@
 //! - **`ContentAddressedKvStore`**: Erweiterter Store mit BLAKE3-Content-Hashing und optionaler
 //!   semantischer Ähnlichkeitssuche (unter Feature `content-addressed-kv-cache`).
 
-use contextra_types::{ContextraError, TenantId};
+use crate::error::{KvCacheError, Result};
+use contextra_types::TenantId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -210,13 +211,13 @@ impl PrefixRadixTree {
     /// Fügt eine Token-Sequenz mit assoziierter KV-Block-ID ein.
     ///
     /// # Ablauf
-    /// 1. Prüfen, ob die Sequenz nicht leer ist (leere Sequenzen erzeugen [`ContextraError::InvalidInput`]).
+    /// 1. Prüfen, ob die Sequenz nicht leer ist (leere Sequenzen erzeugen [`KvCacheError::InvalidInput`]).
     /// 2. Rekursiv durch Kindknoten traversieren und LCP berechnen.
     /// 3. Falls ein partieller LCP existiert, Knoten aufspalten (Node Split).
     /// 4. Block-ID am Endknoten setzen und Gesamtzähler inkrementieren.
-    pub fn insert(&mut self, tokens: &[u32], block_id: u64) -> Result<(), ContextraError> {
+    pub fn insert(&mut self, tokens: &[u32], block_id: u64) -> Result<()> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot insert empty token sequence into PrefixRadixTree".to_string(),
             ));
         }
@@ -514,7 +515,7 @@ mod tests {
         assert_eq!(
             hits,
             10_000,
-            "Expected 100% hit rate across 10,000 inserted keys, got hit rate {:.2}%",
+            "Expected full hit rate across 10,000 inserted keys, got hit rate {:.2}%",
             hit_rate * 100.0
         );
     }
@@ -566,7 +567,7 @@ mod tests {
     fn test_content_addressed_kv_store_lookup_cascade() {
         struct MockEmbedder;
         impl SemanticEmbedder for MockEmbedder {
-            fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>, ContextraError> {
+            fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>> {
                 // Return simple normalized embedding based on sum of tokens
                 let sum: f32 = tokens.iter().map(|&t| t as f32).sum();
                 Ok(vec![sum / 100.0, 1.0])
@@ -686,7 +687,7 @@ pub enum KvLookupResult {
 /// Trait für semantische Embedding-Generierung auf KV-Cache-Keys.
 pub trait SemanticEmbedder: Send + Sync {
     /// Erzeugt ein Embedding für eine Token-Sequenz.
-    fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>, ContextraError>;
+    fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>>;
 }
 
 #[cfg(feature = "content-addressed-kv-cache")]
@@ -775,14 +776,9 @@ impl ContentAddressedKvStore {
     /// 2. In den mandantenspezifischen `position_index` (PrefixRadixTree) einfügen.
     /// 3. BLAKE3-Hash berechnen und in den `content_index` unter `(tenant, hash)` einfügen.
     /// 4. Optional semantisches Embedding berechnen und registrieren.
-    pub fn insert(
-        &mut self,
-        tenant: TenantId,
-        tokens: &[u32],
-        segment_id: u64,
-    ) -> Result<(), ContextraError> {
+    pub fn insert(&mut self, tenant: TenantId, tokens: &[u32], segment_id: u64) -> Result<()> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot insert empty token sequence into ContentAddressedKvStore".to_string(),
             ));
         }
@@ -1020,13 +1016,9 @@ impl NamespaceRadixTree {
     }
 
     /// Fügt eine Token-Sequenz ein.
-    pub fn insert(
-        &mut self,
-        tokens: &[u32],
-        segment_id: u64,
-    ) -> Result<SharedSegmentRef, ContextraError> {
+    pub fn insert(&mut self, tokens: &[u32], segment_id: u64) -> Result<SharedSegmentRef> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(KvCacheError::InvalidInput(
                 "Cannot insert empty token sequence".to_string(),
             ));
         }

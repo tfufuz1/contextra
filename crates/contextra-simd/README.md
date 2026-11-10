@@ -10,7 +10,7 @@ Normativitätsklasse: **Klasse A (Autarker Baustein)** · Ring 0 Unsafe-Insel (`
 ## Baustein-Profil
 - **Klasse:** A (Keine internen Pflicht-Dependencies; Standard- und Crate-eigene Typen).
 - **Externe Dependencies:** `bytemuck`, `thiserror`. Optional: `serde`, `tracing`.
-- **Transitional-Features:** `types-compat` (stellt `From`-Impls zu `contextra-types` für Workspace-Kompatibilität bereit).
+- **Features:** `workspace` (Brücke zu `contextra-types` in `src/compat/`), `types-compat` (Alias auf `workspace`), `serde`, `tracing`, `simd-avx512`.
 - **MSRV:** 1.89.0
 - **Lizenz:** MIT OR Apache-2.0
 

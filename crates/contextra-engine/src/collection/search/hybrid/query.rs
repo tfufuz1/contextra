@@ -556,7 +556,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         fused_results.truncate(supersedes_pool_size);
 
         if !query.include_superseded {
-            let mut superseded_targets = std::collections::HashSet::new();
+            let mut superseded_targets = std::collections::BTreeSet::new();
             for res in &fused_results {
                 if let Ok(doc_id) = DocId::from_key(&res.id) {
                     let links = self.get_links(doc_id).await?;

@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Tests für Erase-Observer und Plattenreserve (SPEC §11.4, D-118, T-OBS-1..3, T-CRASH-3).
 
 use contextra_erasure::purge::reserve::{check_disk_reserve, ReserveCheck};

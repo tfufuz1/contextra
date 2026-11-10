@@ -1,4 +1,10 @@
 [crates.contextra-sys]
-klasse = "A"
-may_depend_on = []          # Soll nach Abschluss dieses Auftrags (interne Crates, nur Namen)
-transitional = []           # Features/Kanten mit internen Deps, Entfernung in Welle 6
+group = "foundation"
+level = 0
+tier = "beta"
+path = "crates/contextra-sys"
+unsafe_island = true
+allowed_internal = []
+[crates.contextra-sys.feature_closure_allowed]
+dev_allowed = []
+test = "cargo test -p contextra-sys --locked"

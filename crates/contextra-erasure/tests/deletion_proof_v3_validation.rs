@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! # Integrationstest: `deletion_proof_v3_validation.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_v3_validation`.

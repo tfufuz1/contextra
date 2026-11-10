@@ -4,6 +4,7 @@ workspace = true
 
 
 [package]
+autobenches = false
 name = "contextra-crypto"
 version.workspace = true
 edition.workspace = true

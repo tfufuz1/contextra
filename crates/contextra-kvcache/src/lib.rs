@@ -1,4 +1,12 @@
 #![forbid(unsafe_code)]
+#![allow(
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 //! # Contextra KV-Cache (Ring 1)
 //!
@@ -37,7 +45,11 @@
 //! 9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung.
 
 pub mod cipher;
+#[cfg(feature = "ports-compat")]
 pub mod compat;
+
+#[cfg(feature = "ports-compat")]
+pub use compat::{adapters, prefix_store, scratchpad_invalidation};
 pub mod error;
 pub mod types;
 
@@ -48,14 +60,11 @@ pub use types::{
     RequestId as KvRequestId, StepId as KvStepId, TenantId as KvTenantId,
 };
 
-pub mod adapters;
 pub mod attention_score;
 pub mod eviction_worker;
-pub mod prefix_store;
 #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 pub mod quantize_kivi;
 pub mod radix;
-pub mod scratchpad_invalidation;
 pub mod segment;
 pub mod service;
 pub mod store;

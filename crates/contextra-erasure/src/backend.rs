@@ -5,7 +5,12 @@
 
 use crate::error::ErasureError;
 use crate::types_local::{LayerId, PurgeCx, PurgeOutcome};
+#[cfg(feature = "async")]
 use futures_util::future::BoxFuture;
+
+#[cfg(not(feature = "async"))]
+/// Type-Alias für gepinnte ge-boxte Futures ohne Tokio/Futures-Util.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 use std::fmt::Debug;
 
 /// Generisches Storage-Backend für modulare Datenzugriffe im Löschkern.

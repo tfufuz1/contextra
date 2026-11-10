@@ -55,7 +55,7 @@ mod tests {
     // Prüft die Serialisierung des Cascade-Enums zu JSON.
     #[test]
     fn test_cascade_serde() {
-        let s = serde_json::to_string(&RoutingStrategy::Cascade).unwrap();
+        let s = serde_json::to_string(&RoutingStrategy::Cascade).unwrap(); // #[cfg(test)]
         assert_eq!(s, "\"Cascade\"");
     }
 
@@ -64,9 +64,9 @@ mod tests {
     #[test]
     #[cfg(feature = "flow-corrected-thompson")]
     fn test_flow_corrected_thompson_serde() {
-        let s = serde_json::to_string(&RoutingStrategy::FlowCorrectedThompson).unwrap();
+        let s = serde_json::to_string(&RoutingStrategy::FlowCorrectedThompson).unwrap(); // #[cfg(test)]
         assert_eq!(s, "\"FlowCorrectedThompson\"");
-        let de: RoutingStrategy = serde_json::from_str(&s).unwrap();
+        let de: RoutingStrategy = serde_json::from_str(&s).unwrap(); // #[cfg(test)]
         assert_eq!(de, RoutingStrategy::FlowCorrectedThompson);
     }
 }

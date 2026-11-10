@@ -6,7 +6,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_mvcc::{ContextraError, SequenceLogSsiValidator, SsiValidator, TxBuffer, TxId};
+use contextra_mvcc::{MvccError, SequenceLogSsiValidator, SsiValidator, TxBuffer, TxId};
 
 // Prüft die Erkennung und Abweisung des klassischen Write-Skews bei überkreuzten Lese- und Schreibzugriffen.
 #[test]
@@ -52,13 +52,13 @@ fn test_classic_write_skew_conflict_detected() {
     );
 
     match validation_res {
-        Err(ContextraError::Conflict(msg)) => {
+        Err(MvccError::Conflict(msg)) => {
             assert!(
                 msg.contains("account_b") || msg.contains("15") || msg.contains("modified"),
                 "Conflict message must detail key mutation: {msg}"
             );
         }
-        res => panic!("Expected ContextraError::Conflict, got: {res:?}"),
+        res => panic!("Expected MvccError::Conflict, got: {res:?}"),
     }
 }
 
@@ -147,12 +147,12 @@ fn test_storage_independent_anti_dependency_cycle_detection() {
         "Tx2 muss deterministisch abgewiesen werden, um Write-Skew zu verhindern"
     );
     match res2 {
-        Err(ContextraError::Conflict(msg)) => {
+        Err(MvccError::Conflict(msg)) => {
             assert!(
                 msg.contains("bank:acc_a") || msg.contains("modified"),
                 "Konfliktmeldung muss den kollidierenden Schlüssel anzeigen: {msg}"
             );
         }
-        other => panic!("Erwartete ContextraError::Conflict, erhalten: {other:?}"),
+        other => panic!("Erwartete MvccError::Conflict, erhalten: {other:?}"),
     }
 }

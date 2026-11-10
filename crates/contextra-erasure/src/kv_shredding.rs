@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 
 use crate::error::ErasureError;
+#[cfg(feature = "signing")]
 use crate::revocation_log::{RevocationLog, RevocationTarget};
 use aes_gcm_siv::{
     aead::{Aead, KeyInit},
@@ -25,7 +26,9 @@ use aes_gcm_siv::{
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, RwLock};
+#[cfg(feature = "signing")]
+use std::sync::Arc;
+use std::sync::RwLock;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Standardgröße einer Shredding-Schlüsselgruppe (Anzahl Records je KEK).
@@ -138,6 +141,7 @@ pub struct KeyRegistry {
     #[allow(dead_code)]
     revoked_subkeys: RwLock<BTreeSet<String>>,
     revoked_records: RwLock<BTreeSet<String>>,
+    #[cfg(feature = "signing")]
     revocation_log: Option<Arc<RevocationLog>>,
     master_kek: [u8; 32],
 }
@@ -160,12 +164,14 @@ impl KeyRegistry {
             revoked_groups: RwLock::new(BTreeSet::new()),
             revoked_subkeys: RwLock::new(BTreeSet::new()),
             revoked_records: RwLock::new(BTreeSet::new()),
+            #[cfg(feature = "signing")]
             revocation_log: None,
             master_kek,
         }
     }
 
     /// Bindet ein `RevocationLog` an und synchronisiert bereits protokollierte Widerrufe.
+    #[cfg(feature = "signing")]
     pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
         if let Ok(mut revoked_guard) = self.revoked_groups.write() {
             if let Ok(mut groups_guard) = self.groups.write() {
@@ -229,6 +235,7 @@ impl KeyRegistry {
 
     /// Prüft ob eine Gruppe widerrufen ist.
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
+        #[cfg(feature = "signing")]
         if let Some(ref log) = self.revocation_log {
             if log.is_revoked(&RevocationTarget::Group(group_id)) {
                 return true;
@@ -299,6 +306,7 @@ impl KeyRegistry {
             return Ok(());
         }
 
+        #[cfg(feature = "signing")]
         if let Some(ref log) = self.revocation_log {
             log.append(RevocationTarget::Group(group_id))?;
         }
@@ -384,6 +392,7 @@ impl KeyRegistry {
                 wrapped.zeroize();
             }
         }
+        #[cfg(feature = "signing")]
         if let Some(ref log) = self.revocation_log {
             log.append(RevocationTarget::Record(record_id.to_string()))?;
         }
@@ -413,12 +422,16 @@ impl KeyRegistry {
             Ok(guard) => guard,
             Err(poison) => poison.into_inner(),
         };
-        !lock.contains(record_id)
-            && !self
-                .revocation_log
-                .as_ref()
-                .map(|log| log.is_revoked(&RevocationTarget::Record(record_id.to_string())))
-                .unwrap_or(false)
+        #[cfg(feature = "signing")]
+        let log_revoked = self
+            .revocation_log
+            .as_ref()
+            .map(|log| log.is_revoked(&RevocationTarget::Record(record_id.to_string())))
+            .unwrap_or(false);
+        #[cfg(not(feature = "signing"))]
+        let log_revoked = false;
+
+        !lock.contains(record_id) && !log_revoked
     }
 
     /// Verschlüsselt einen Datensatz mittels Envelope Encryption.

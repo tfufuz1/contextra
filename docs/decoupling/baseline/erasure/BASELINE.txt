@@ -1,0 +1,9 @@
+=== CARGO CHECK CONTEXTRA-ERASURE ===
+OK
+
+=== CARGO CHECK WORKSPACE ALL-TARGETS LOCKED ===
+FAILED (Baseline state in contextra-store, contextra-vector, contextra-graph)
+See error logs in docs/decoupling/baseline/erasure/workspace_check_baseline.txt
+
+=== CARGO TEST CONTEXTRA-ERASURE ===
+OK (All unit tests and integration tests pass)

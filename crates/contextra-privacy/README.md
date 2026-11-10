@@ -8,7 +8,7 @@ Autarker Baustein (**Klasse A**, SPEC v4.0 Welle 1) für Cloud-Egress-Sicherheit
 - **Eigene & Standardtypen (B3):** Alle Schnittstellen basieren auf Standardtypen oder crate-eigenen Typen (`Clock`, `TenantId`, `TenantScoped`, `EgressPolicy`, `EgressDecision`, `EntityMatch`).
 - **Typisierte Fehler (B4):** Hauptfehlertyp `EgressError` / `Error` (`thiserror`, `#[non_exhaustive]`) mit Standard-Varianten (`InvalidInput`, `CapacityExceeded`, `Io`, `StateConflict`, `Corrupt`).
 - **Autarker Export (B5):** Vollständig lauffähig außerhalb des Workspace-Repos via `tools/export_crate.py` und `tools/isolation_proof.py`.
-- **Feature-Minimalismus (B6):** Standard-Features sind minimal (`default = ["std"]`, `serde`, `tracing`, `inspect`, `experimental`).
+- **Feature-Minimalismus (B6):** Standard-Features sind minimal (`default = ["std"]`, `serde`, `tracing`).
 - **Keine Fremdfachlogik (B7):** Reine Maskierung und Egress-Sicherheit; keine Löschketten-, Saga- oder Shredding-Logik (gehört exklusiv in `contextra-erasure`).
 - **Zero-Panic & Sicherheit (B9, B10):** `#![forbid(unsafe_code)]`, striktes Fail-Closed, null Panics auf beliebigen UTF-8-Grenzen.
 - **P28-Determinismus (B11):** Zeitmessung über den `Clock`-Port; interne HashMaps nutzen deterministische BLAKE3-Hasher (`DeterministicBuildHasher`).

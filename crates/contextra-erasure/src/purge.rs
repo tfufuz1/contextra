@@ -10,7 +10,9 @@ pub mod window;
 pub use cx::PurgeCx;
 pub use order::{LayerPurgeOrder, PurgePriority};
 pub use reserve::{check_disk_reserve, ReserveCheck};
-pub use window::{run_core_window, run_window, WindowOutcome};
+#[cfg(feature = "async")]
+pub use window::run_core_window;
+pub use window::{run_window, WindowOutcome};
 
 pub use crate::types_local::{
     ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind,

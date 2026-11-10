@@ -10,7 +10,7 @@ use contextra_mvcc::seq_log::{SeqLogEntry, SequenceLog};
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_mvcc::types::{TxId, TOMBSTONE_BIT};
-use contextra_mvcc::ContextraError;
+use contextra_mvcc::MvccError;
 
 // Prüft, dass forget_from nach einem Rollback vorherige Commit-Versionen desselben Schlüssels korrekt wiederherstellt.
 #[test]
@@ -33,7 +33,7 @@ fn test_forget_from_restores_earlier_commit_history() {
 
     let res = validator.validate(tx, &read_set);
     assert!(
-        matches!(res, Err(ContextraError::Conflict(_))),
+        matches!(res, Err(MvccError::Conflict(_))),
         "Expected conflict for snapshot_seq 8 against restored commit at seq 10, got {:?}",
         res
     );
@@ -62,7 +62,7 @@ fn test_tombstone_bit_masking_in_read_set_and_validator() {
 
     let res = validator.validate(tx, &read_set);
     assert!(
-        matches!(res, Err(ContextraError::Conflict(_))),
+        matches!(res, Err(MvccError::Conflict(_))),
         "Expected conflict for commit_seq 11 > snapshot_seq 10, got {:?}",
         res
     );

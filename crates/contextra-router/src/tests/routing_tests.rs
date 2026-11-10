@@ -14,6 +14,7 @@
     clippy::disallowed_types,
     deprecated
 )]
+#[cfg(feature = "subprocess-dispatch")]
 mod dispatch;
 mod engine_part1;
 mod engine_part2;

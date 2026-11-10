@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! # Integrationstest: `ed25519_proof_external_verify.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `ed25519_proof_external_verify`.

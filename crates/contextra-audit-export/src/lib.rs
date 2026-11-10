@@ -11,6 +11,7 @@ pub mod bsi_mapping;
 pub mod csv_template;
 pub mod error;
 pub mod markdown_template;
+#[cfg(any(feature = "test-utils", test))]
 pub mod testkit;
 
 pub use bsi_mapping::{bsi_mapping_table, render_bsi_mapping_markdown, BsiMappingEntry};
@@ -25,7 +26,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Implements standard traits and conversions to standard primitive types (`u64`).
 /// When compiled with feature `types-compat`, transparent conversions to/from
-/// `contextra_types::TenantId` are provided.
+/// Conversions to workspace TenantId are provided in compat/.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
@@ -100,22 +101,6 @@ impl TryFrom<u64> for TenantId {
     #[inline]
     fn try_from(id: u64) -> Result<Self, Self::Error> {
         Self::try_new(id)
-    }
-}
-
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::TenantId> for TenantId {
-    #[inline]
-    fn from(t: contextra_types::TenantId) -> Self {
-        Self(t.as_u64())
-    }
-}
-
-#[cfg(feature = "types-compat")]
-impl From<TenantId> for contextra_types::TenantId {
-    #[inline]
-    fn from(t: TenantId) -> Self {
-        contextra_types::TenantId(t.0)
     }
 }
 
@@ -384,3 +369,6 @@ pub fn render_register_json(
 
     serde_json::to_string_pretty(&sorted_entries).map_err(AuditExportError::from)
 }
+
+#[cfg(any(feature = "workspace", feature = "types-compat"))]
+pub mod compat;

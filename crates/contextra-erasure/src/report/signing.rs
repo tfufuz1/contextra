@@ -11,7 +11,12 @@ use crate::types_local::{
     ReportSignature, ReportSigner as ReportSignerPort, SignerError, SignerId,
 };
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+#[cfg(feature = "async")]
 use futures_util::future::BoxFuture;
+
+#[cfg(not(feature = "async"))]
+/// Type-Alias für BoxFuture ohne tokio/futures-util.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::path::Path;

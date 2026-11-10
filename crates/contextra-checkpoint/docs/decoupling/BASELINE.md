@@ -1,0 +1,25 @@
+# Baseline: contextra-checkpoint
+
+- **Datum:** 2026-11-10
+- **Commit:** 9305c5d04
+- **Rust Toolchain:** 1.89.0 (rust-toolchain.toml: 1.89.0)
+- **Status `cargo check -p contextra-checkpoint --no-default-features`:** GRÜN
+- **Status `cargo test -p contextra-checkpoint`:** GRÜN
+  - Unit Tests (`src/lib.rs`): 58 passed, 0 failed
+  - Integration Tests:
+    - `cache_concurrency_pinning`: 3 passed
+    - `checkpoint_clock_determinism`: 5 passed
+    - `checkpoint_systematic_crash`: 2 passed
+    - `clock_determinism`: 2 passed
+    - `concurrency`: 2 passed
+    - `crash_recovery_and_tenant_isolation`: 16 passed
+    - `error_paths_and_boundaries`: 4 passed
+    - `guard_exit_paths`: 12 passed
+    - `guard_proptest`: 2 passed
+    - `hardlink_cloner_tests`: 3 passed
+    - `id_gen_determinism_test`: 1 passed
+    - `manifest_fault_injection`: 5 passed
+    - `time_travel_correctness`: 5 passed
+    - `txid_monotonicity_and_recovery`: 3 passed
+    - Doc-tests: 0
+  - Gesamt: 121 Tests, alle bestanden (0 fehlgeschlagen, 0 ignoriert).

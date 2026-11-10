@@ -4,7 +4,12 @@
 //! Schlüsselverwaltung und Messungen, sodass `contextra-erasure` vollkommen autark
 //! und isoliert als Ring-3-Löschkern funktioniert.
 
+#[cfg(feature = "async")]
 use futures_util::future::BoxFuture;
+
+#[cfg(not(feature = "async"))]
+/// Type-Alias für gepinnte ge-boxte Futures ohne Tokio/Futures-Util.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;

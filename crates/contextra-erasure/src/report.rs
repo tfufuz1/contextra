@@ -5,6 +5,7 @@
 pub mod build;
 pub mod canonical;
 pub mod risk;
+#[cfg(feature = "signing")]
 pub mod signing;
 
 pub use build::{
@@ -20,4 +21,5 @@ pub use risk::{
     evaluate_residual_risks, evaluate_residual_risks_with_context, ResidualRiskContext,
     ResidualRiskEntry, ResidualRiskId,
 };
+#[cfg(feature = "signing")]
 pub use signing::{base64url_encode, DerivedReportSigner, ReportSigner, SignedReport};

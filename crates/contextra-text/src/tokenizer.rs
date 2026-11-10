@@ -15,10 +15,7 @@
 //! URLs und E-Mail-Adressen werden über reguläre Ausdrücke geschützt, damit sie
 //! nicht fälschlich an Interpunktionszeichen aufgespalten werden.
 
-#[cfg(not(feature = "types-compat"))]
-use crate::error::{Result, TextError as ContextraError};
-#[cfg(feature = "types-compat")]
-use contextra_types::{ContextraError, Result};
+use crate::error::{Result, TextError};
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -33,11 +30,10 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 /// Kompiliert ein reguläres Muster für geschützte Token mit Fail-Closed-Fehlerbehandlung.
 ///
 /// # Fehler
-/// Gibt [`ContextraError::Text`] zurück, falls der reguläre Ausdruck syntaktisch ungültig ist.
+/// Gibt [`TextError::Text`] zurück, falls der reguläre Ausdruck syntaktisch ungültig ist.
 pub fn compile_protected_regex(pattern: &str) -> Result<Regex> {
-    Regex::new(pattern).map_err(|e| {
-        ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}"))
-    })
+    Regex::new(pattern)
+        .map_err(|e| TextError::Text(format!("Invalid protected regex pattern '{pattern}': {e}")))
 }
 
 // ANCHOR[contextra-text:TOK-002]
@@ -49,7 +45,7 @@ pub fn get_protected_regex() -> Result<&'static Regex> {
     });
     match res {
         Ok(re) => Ok(re),
-        Err(msg) => Err(ContextraError::Text(format!(
+        Err(msg) => Err(TextError::Text(format!(
             "Protected regex initialization failed: {msg}"
         ))),
     }
@@ -441,7 +437,7 @@ pub trait TokenFilter: Send + Sync {
 // ANCHOR[contextra-text:TOK-018]
 /// Trait für vollständige Textanalyse-Pipelines (`Tokenizer -> Filter* -> Stemmer`).
 ///
-/// Garantiert den identischen Ergebnisvertrag für Dokumenten-Indexierung und Abfrage.
+/// Definiert den identischen Ergebnisvertrag für Dokumenten-Indexierung und Abfrage.
 pub trait Analyzer: Send + Sync {
     /// Analysiert den gegebenen Text und liefert eine strukturierte Token-Sequenz.
     fn analyze(&self, text: &str) -> Result<Vec<Token>>;
@@ -808,14 +804,14 @@ mod tests {
             "Invalid regex pattern must return an Err, got: {:?}",
             res
         );
-        if let Err(ContextraError::Text(msg)) = res {
+        if let Err(TextError::Text(msg)) = res {
             assert!(
                 msg.contains("Invalid protected regex pattern"),
                 "Expected invalid regex message, got: {}",
                 msg
             );
         } else {
-            unreachable!("Expected ContextraError::Text");
+            unreachable!("Expected TextError::Text");
         }
     }
 
@@ -978,10 +974,7 @@ mod tests {
         let tokens1 = pipeline.analyze(text).expect("analyze succeeds");
         let tokens2 = pipeline.analyze(text).expect("analyze succeeds");
 
-        assert_eq!(
-            tokens1, tokens2,
-            "Analyzer pipeline must be 100% deterministic"
-        );
+        assert_eq!(tokens1, tokens2, "Analyzer pipeline must be deterministic");
         for t in &tokens1 {
             assert!(text.is_char_boundary(t.start_offset));
             assert!(text.is_char_boundary(t.end_offset));
