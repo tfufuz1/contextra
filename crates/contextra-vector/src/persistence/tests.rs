@@ -479,3 +479,17 @@ fn test_get_connections_rejects_absurd_length_field() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn test_hnsw_header_version_and_checksum_verification() {
+    let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 1000, 5, 84, 256, 42);
+    assert_eq!(header.version(), 2);
+    let checksum = header.checksum();
+    assert_ne!(checksum, [0u8; 32]);
+
+    assert!(header.verify_checksum(&checksum).is_ok());
+
+    let mut bad_checksum = checksum;
+    bad_checksum[0] ^= 0xFF;
+    assert!(header.verify_checksum(&bad_checksum).is_err());
+}

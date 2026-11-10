@@ -413,6 +413,25 @@ impl HnswHeader {
         })
     }
 
+
+    /// Computes the cryptographic BLAKE3 checksum of the serialized header.
+    pub fn checksum(&self) -> [u8; 32] {
+        *blake3::hash(&self.to_bytes()).as_bytes()
+    }
+
+    /// Verifies that the serialized bytes match the expected BLAKE3 checksum.
+    pub fn verify_checksum(&self, expected: &[u8; 32]) -> Result<()> {
+        let computed = self.checksum();
+        if &computed != expected {
+            return Err(ContextraError::Storage(format!(
+                "HnswHeader checksum mismatch: expected {}, got {}",
+                hex_fmt(expected),
+                hex_fmt(&computed)
+            )));
+        }
+        Ok(())
+    }
+
     pub fn to_bytes(&self) -> [u8; Self::SIZE] {
         let mut buf = [0u8; Self::SIZE];
         buf[0..4].copy_from_slice(&self.magic.to_le_bytes());
@@ -434,4 +453,9 @@ impl HnswHeader {
         buf[80..84].copy_from_slice(&self.sq8_bias_variance.to_le_bytes());
         buf
     }
+}
+
+
+fn hex_fmt(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }

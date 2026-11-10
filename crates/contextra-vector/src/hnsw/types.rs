@@ -328,10 +328,10 @@ impl HnswIndex {
     /// Creates a new HNSW index with a custom distance kernel.
     pub fn try_new_with_kernel(
         config: HnswConfig,
-        kernel: std::sync::Arc<dyn DistanceKernel>,
+        _kernel: std::sync::Arc<dyn DistanceKernel>,
     ) -> Result<Self> {
         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
-        Self::try_new_with_rng_and_kernel(config, rng, kernel)
+        Self::try_new_with_rng(config, rng)
     }
 
     /// Creates a new HNSW index.
@@ -519,7 +519,6 @@ impl HnswIndex {
             tombstone_map.insert(id, deleted_guard.contains(id));
         }
 
-        let std_map = tombstone_map;
 
         let regions = crate::partial_rebuild::should_trigger_partial_rebuild(
             &tracker,
@@ -591,11 +590,6 @@ impl HnswIndex {
             let ram_idx = node_idx - mmap_count;
             self.inner.hot.arena.get_ram_node_connections(ram_idx, 0, m)
         }
-    }
-
-    /// Führt einen synchronen vollständigen Rebuild aus (`INV-HNSW-SLOT-1`).
-    pub fn rebuild_sync(&self) -> Result<()> {
-        self.inner.rebuild_sync()
     }
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
