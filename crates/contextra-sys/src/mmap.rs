@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Read-only memory mapping facade over memmap2 (Ring 0 / SPEC §10.1 / INV-IO-1 / INV-ENCRYPT-REST-2)
 // INVARIANTEN: Zero panic; typed error propagation; read-only mapping; bounded bounds checks
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
@@ -25,14 +24,12 @@ use std::io;
 
 use crate::error::{Error, Result};
 
-// ANCHOR[contextra-sys:MMAP-READONLY-001]
 /// Erstellt eine unveränderliche Nur-Lese-Speicherabbildung (Read-Only Memory Map) für eine geöffnete Datei.
 pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
     // SAFETY: `file` ist ein gültiger, geöffneter Read-Only-Dateideskriptor. Die Read-Only-Abbildung verhindert Data Races im Rust-Adressraum. Seitenfehler (Page Faults) werden transparent vom Betriebssystemkernel behandelt.
     unsafe { memmap2::Mmap::map(file) }
 }
 
-// ANCHOR[contextra-sys:MMAP-TYPINVARIANT-001]
 /// Typzustands-Marker: Zeigt an, dass eine Datei vollständig versiegelt, unveränderlich
 /// und prüfsummenverifiziert ist (gemäß INV-IO-1 und INV-ENCRYPT-REST-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +85,6 @@ impl SealedFile<SealedReadOnly> {
     }
 }
 
-// ANCHOR[contextra-sys:MMAP-SEALED-MAP-001]
 /// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien (INV-IO-1).
 #[derive(Debug)]
 pub struct SealedMap {
@@ -153,7 +149,6 @@ impl AsRef<[u8]> for SealedMap {
     }
 }
 
-// ANCHOR[contextra-sys:MMAP-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;

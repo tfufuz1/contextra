@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / SPEC §10.1 / INV-SYS-FSYNC-1)
 // INVARIANTEN: Zero panic; typed error propagation; fail-closed on unsupported targets; EINTR retry only; Handle-Poisoning on sync failure
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1 (INV-SYS-FSYNC-1)
@@ -55,7 +54,6 @@ pub(crate) mod fault_injection {
     }
 }
 
-// ANCHOR[contextra-sys:DUR-FLUSH-FILE-RAW-001]
 /// Führt den rohen Betriebssystem-Sync-Syscall auf einem Dateideskriptor aus.
 ///
 /// # Invariante (INV-SYS-FSYNC-1)
@@ -158,13 +156,11 @@ fn raw_os_sync_file(_file: &File, _metadata_changed: bool) -> Result<()> {
     ))
 }
 
-// ANCHOR[contextra-sys:DUR-FLUSH-FILE-001]
 /// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Garantien der Zielplattform.
 pub fn durable_flush_file(file: &File, metadata_changed: bool) -> IoResult<()> {
     raw_os_sync_file(file, metadata_changed).map_err(Into::into)
 }
 
-// ANCHOR[contextra-sys:DUR-FLUSH-DIR-001]
 /// Flasht den Verzeichniseintrag (übergeordnetes Verzeichnis) einer neu erstellten oder umbenannten Datei.
 pub fn durable_flush_dir(path: &Path) -> IoResult<()> {
     #[cfg(unix)]
@@ -189,7 +185,6 @@ pub fn durable_flush_dir(path: &Path) -> IoResult<()> {
     }
 }
 
-// ANCHOR[contextra-sys:DUR-WRITE-ALL-001]
 /// Schreibt die gesamten Bytes aus `buf` zuverlässig in `file`, unter robuster Behandlung partieller Schreibvorgänge und Signal-Unterbrechungen.
 pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
     while !buf.is_empty() {
@@ -212,7 +207,6 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-sys:DUR-DURABLE-FILE-001]
 /// Ein sicherer RAII-Wrapper um [`std::fs::File`], der die Invariante **INV-SYS-FSYNC-1** erzwingt:
 /// Sobald ein `fsync`/`fdatasync` oder Flush-Aufruf fehlschlägt, wird das Handle permanent vergiftet (`is_poisoned() == true`).
 /// Alle nachfolgenden Schreib- und Synchronisationsaufrufe auf dieser Instanz schlagen sofort mit [`Error::HandlePoisoned`] fehl.
@@ -282,7 +276,6 @@ impl DurableFile {
     }
 }
 
-// ANCHOR[contextra-sys:DUR-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,7 +408,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[contextra-sys:INV-SYS-FSYNC-1-TEST-001]
     /// Prüft INV-SYS-FSYNC-1: Ein fehlgeschlagener Flush vergiftet das Handle unwiderruflich.
     #[test]
     fn test_inv_sys_fsync_1_poisoning() -> Result<()> {
