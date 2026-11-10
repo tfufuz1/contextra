@@ -14,11 +14,16 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat", "experimental-rank"]
+default = ["std", "types-compat", "exp-dibud", "exp-resonance", "experimental-rank"]
 std = []
 types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-dibud = []
-experimental-rank = ["dibud"]
+
+# Experimente
+dibud = ["exp-dibud"]
+exp-dibud = []
+exp-resonance = []
+experimental-all = ["exp-dibud", "exp-resonance"]
+experimental-rank = ["experimental-all"]
 
 [dependencies]
 contextra-types = { workspace = true, optional = true }

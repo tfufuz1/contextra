@@ -1,0 +1,173 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running unittests src/lib.rs (target/debug/deps/contextra_rank-e61c8ff8d6fb4cd6)
+calibration::isotonic::tests::test_isotonic_calibrator_deterministic_clock: test
+explain::tests::test_empty_provenance_record: test
+explain::tests::test_four_signals_exact_contributions: test
+explain::tests::test_signal_kind_golden_serde_and_display: test
+explain::tests::test_single_signal_record: test
+explain::tests::test_sorting_descending_by_contribution_share: test
+explain::tests::test_to_human_readable_de: test
+fusion::provenance::tests::test_provenance_builder_explain_human_readable_deterministic: test
+metrics::tests::test_mean_reciprocal_rank: test
+metrics::tests::test_metrics_empty_inputs_safety: test
+metrics::tests::test_ndcg_at_k_inverted_ranking: test
+metrics::tests::test_ndcg_at_k_perfect_ranking: test
+metrics::tests::test_precision_and_recall_at_k: test
+metrics::tests::test_reciprocal_rank_basic: test
+
+14 tests, 0 benchmarks
+     Running tests/calibration_deep_tests.rs (target/debug/deps/calibration_deep_tests-2e111ac24f894d1d)
+prop_platt_scaler_bounded_output: test
+test_isotonic_duplicate_raw_score_pooling: test
+test_isotonic_ece_calculation: test
+test_isotonic_invalidation_invariant_inv_cal2: test
+test_isotonic_nan_and_extreme_inputs: test
+test_isotonic_pava_block_merging_fluctuating_sequence: test
+test_isotonic_pava_monotonicity_and_bounds: test
+test_isotonic_warmup_invariant_inv_cal1: test
+test_platt_scaler_defaults_and_identity: test
+test_platt_scaler_fit_behavior: test
+test_platt_scaler_gradient_clipping_and_extreme_logits: test
+test_platt_scaler_invalidation: test
+test_platt_scaler_nan_logit_fallback: test
+
+13 tests, 0 benchmarks
+     Running tests/calibration_drift_property_tests.rs (target/debug/deps/calibration_drift_property_tests-4d422d0a84f4a112)
+prop_drift_detector_stationary_no_false_alarms: test
+prop_isotonic_pava_monotonicity: test
+prop_platt_scaling_range_bounded: test
+test_conformal_coverage_empirical_guarantee_synthetic: test
+test_platt_scaler_fit_properties_range: test
+
+5 tests, 0 benchmarks
+     Running tests/calibration_migration_snapshot_test.rs (target/debug/deps/calibration_migration_snapshot_test-2b97c0048b87e4a7)
+test_isotonic_migration_snapshot: test
+test_platt_scaler_migration_snapshot: test
+
+2 tests, 0 benchmarks
+     Running tests/calibration_stress_and_fault_tests.rs (target/debug/deps/calibration_stress_and_fault_tests-fcf3c13fabe900bf)
+prop_isotonic_ece_non_negative_and_bounded: test
+test_isotonic_fifo_eviction_and_force_rebuild: test
+test_platt_scaler_extreme_finite_logits_monotonicity: test
+
+3 tests, 0 benchmarks
+     Running tests/conformal_tests.rs (target/debug/deps/conformal_tests-6b59f38ea38492dd)
+test_conformal_marginal_coverage_guarantee: test
+test_conformal_strict_determinism: test
+test_conformal_threshold_clamping_and_invalidation: test
+test_conformal_zero_panic_invalid_inputs: test
+
+4 tests, 0 benchmarks
+     Running tests/dibud_equivalence.rs (target/debug/deps/dibud_equivalence-b77b16a1138a7c88)
+test_dibud_limited_budget_prefix_property: test
+test_dibud_unlimited_budget_equivalence_200_fixtures: test
+
+2 tests, 0 benchmarks
+     Running tests/dibud_requires_streaming_channels.rs (target/debug/deps/dibud_requires_streaming_channels-058f3b332347efeb)
+test_dibud_budget_one_no_panic: test
+test_dibud_channel_exhaustion_all_certified: test
+test_dibud_lazy_streaming_infinite_iterators_ak17: test
+test_dibud_provenance_recording: test
+test_dibud_std_async_driver_minimal_executor: test
+
+5 tests, 0 benchmarks
+     Running tests/fusion_deep_property_tests.rs (target/debug/deps/fusion_deep_property_tests-7f1a147820a38db7)
+prop_global_fusion_strategy_community_cap: test
+prop_mrrf_weights_renormalized: test
+prop_score_normalized_minmax_clamping: test
+test_hybrid_strategies_rrf_and_score_normalized_mix: test
+test_provenance_builder_synthesized_from_records: test
+test_resonance_config_boosting_behavior: test
+
+6 tests, 0 benchmarks
+     Running tests/global_fusion_community_aware.rs (target/debug/deps/global_fusion_community_aware-2051f9ae064009dd)
+test_global_fusion_community_aware_rrf: test
+test_global_fusion_empty_community_index_degrades_gracefully: test
+test_global_fusion_max_community_nodes_cap: test
+
+3 tests, 0 benchmarks
+     Running tests/global_shadow_mode_discrepancy.rs (target/debug/deps/global_shadow_mode_discrepancy-5c98e216cdeb3552)
+test_global_shadow_mode_discrepancy_logging: test
+
+1 test, 0 benchmarks
+     Running tests/isotonic_mutation_hardening_test.rs (target/debug/deps/isotonic_mutation_hardening_test-6bcd5399e918badb)
+prop_pava_monotonicity_holds_for_arbitrary_unordered_input: test
+test_ece_bin_boundary_exact_edge_values: test
+test_pava_duplicate_raw_score_deterministic_pooling: test
+test_pava_empty_calibrator_returns_none_not_panic: test
+test_pava_single_observation_edge_case: test
+
+5 tests, 0 benchmarks
+     Running tests/nan_inf_safety_tests.rs (target/debug/deps/nan_inf_safety_tests-fab1f94095fb1381)
+test_conformal_calibrator_nan_inf_safety: test
+test_drift_detector_nan_inf_safety: test
+test_fusion_nan_doc_scores: test
+test_g_function_nan_inf_safety: test
+test_isotonic_calibrator_nan_inf_safety: test
+test_modulate_weights_nan_beta: test
+test_platt_scaler_nan_inf_safety: test
+test_provenance_builder_nan_inf_safety: test
+test_resonance_config_nan_inf_safety: test
+
+9 tests, 0 benchmarks
+     Running tests/rank_invariants.rs (target/debug/deps/rank_invariants-0ff765d70d7219dd)
+prop_inv_rank_monotonic_1: test
+prop_rrf_commutativity: test
+test_conformal_empirical_coverage_guarantee: test
+test_dibud_streaming_vs_batch_equivalence: test
+test_inv_rank_determinism_1: test
+test_inv_rank_monotonic_1: test
+test_rrf_commutativity: test
+
+7 tests, 0 benchmarks
+     Running tests/rank_tests.rs (target/debug/deps/rank_tests-fc1e78b64614e2e8)
+tests::test_bounded_top_k: test
+tests::test_drift_detector: test
+tests::test_g_function_standalone_properties: test
+tests::test_isotonic_calibrator_warmup: test
+tests::test_isotonic_p8_invalidation: test
+tests::test_mrrf_determinism_baseline: test
+tests::test_mrrf_margin_modulation_relative_weight_effect: test
+tests::test_platt_scaler_fit_and_predict: test
+tests::test_rrf_dual_signal_higher_than_single_signal: test
+tests::test_rrf_k_zero_boundary: test
+
+10 tests, 0 benchmarks
+     Running tests/rrf_golden_tests.rs (target/debug/deps/rrf_golden_tests-7ff7693fd2f6fb2e)
+test_golden_duplicate_ids_within_single_list: test
+test_golden_empty_inputs: test
+test_golden_missing_id_in_one_list: test
+test_golden_three_lists: test
+test_golden_tie_break_ascending_id: test
+test_golden_two_lists: test
+test_golden_weights_zero_and_one: test
+
+7 tests, 0 benchmarks
+     Running tests/rrf_property_tests.rs (target/debug/deps/rrf_property_tests-cae783498f0801b6)
+prop_rrf_duplicate_ids_in_single_list: test
+prop_rrf_empty_lists_return_empty: test
+prop_rrf_k_boundary_values: test
+prop_rrf_monotonicity_single_list: test
+prop_rrf_permutation_invariance: test
+prop_weighted_rrf_permutation_invariance_arbitrary_docs: test
+prop_weighted_rrf_tie_break_ascending_id: test
+test_prop_rrf_tie_breaker_stability_deterministic: test
+
+8 tests, 0 benchmarks
+     Running tests/rrf_reference.rs (target/debug/deps/rrf_reference-90fce74fd0807f55)
+rrf_known_values: test
+rrf_with_disjoint_lists: test
+rrf_with_three_lists: test
+test_differential_rrf_fuse_vs_weighted_rrf: test
+
+4 tests, 0 benchmarks
+     Running tests/score_normalized_fallback.rs (target/debug/deps/score_normalized_fallback-6e5592d803907c17)
+test_score_normalized_fallback_constant_scores: test
+test_score_normalized_fallback_empty_signal_list: test
+test_score_normalized_fallback_non_finite_scores: test
+
+3 tests, 0 benchmarks
+   Doc-tests contextra_rank
+crates/contextra-rank/src/lib.rs - (line 31): test
+
+1 test, 0 benchmarks

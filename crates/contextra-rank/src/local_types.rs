@@ -49,19 +49,7 @@ impl From<DocId> for u64 {
     }
 }
 
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::DocId> for DocId {
-    fn from(id: contextra_types::DocId) -> Self {
-        DocId(id.0)
-    }
-}
 
-#[cfg(feature = "types-compat")]
-impl From<DocId> for contextra_types::DocId {
-    fn from(id: DocId) -> Self {
-        contextra_types::DocId(id.0)
-    }
-}
 
 /// Konfigurations-Fingerprint zur Validierung und Cache-Invalidierung.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -107,14 +95,6 @@ impl ConfigFingerprint {
     }
 }
 
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::ConfigFingerprint> for ConfigFingerprint {
-    fn from(fp: contextra_types::ConfigFingerprint) -> Self {
-        ConfigFingerprint {
-            hash: fp.prompt_template_hash,
-        }
-    }
-}
 
 /// Fusionsstrategie für hybride Suchen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -127,25 +107,7 @@ pub enum FusionStrategy {
     ScoreNormalized,
 }
 
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::FusionStrategy> for FusionStrategy {
-    fn from(s: contextra_types::FusionStrategy) -> Self {
-        match s {
-            contextra_types::FusionStrategy::Rrf => FusionStrategy::Rrf,
-            contextra_types::FusionStrategy::ScoreNormalized => FusionStrategy::ScoreNormalized,
-        }
-    }
-}
 
-#[cfg(feature = "types-compat")]
-impl From<FusionStrategy> for contextra_types::FusionStrategy {
-    fn from(s: FusionStrategy) -> Self {
-        match s {
-            FusionStrategy::Rrf => contextra_types::FusionStrategy::Rrf,
-            FusionStrategy::ScoreNormalized => contextra_types::FusionStrategy::ScoreNormalized,
-        }
-    }
-}
 
 /// Richtlinie bei Signal-Fehlern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -158,25 +120,7 @@ pub enum SignalFailurePolicy {
     Degrade,
 }
 
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::OnSignalFailure> for SignalFailurePolicy {
-    fn from(p: contextra_types::OnSignalFailure) -> Self {
-        match p {
-            contextra_types::OnSignalFailure::Fail => SignalFailurePolicy::Fail,
-            contextra_types::OnSignalFailure::Degrade => SignalFailurePolicy::Degrade,
-        }
-    }
-}
 
-#[cfg(feature = "types-compat")]
-impl From<SignalFailurePolicy> for contextra_types::OnSignalFailure {
-    fn from(p: SignalFailurePolicy) -> Self {
-        match p {
-            SignalFailurePolicy::Fail => contextra_types::OnSignalFailure::Fail,
-            SignalFailurePolicy::Degrade => contextra_types::OnSignalFailure::Degrade,
-        }
-    }
-}
 
 /// Signal-Fusionsstrategien pro Kanal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -211,27 +155,7 @@ impl From<FusionStrategy> for SignalFusionStrategies {
     }
 }
 
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::SignalFusionStrategies> for SignalFusionStrategies {
-    fn from(s: contextra_types::SignalFusionStrategies) -> Self {
-        SignalFusionStrategies {
-            vector: s.vector.into(),
-            text: s.text.into(),
-            graph: s.graph.into(),
-        }
-    }
-}
 
-#[cfg(feature = "types-compat")]
-impl From<SignalFusionStrategies> for contextra_types::SignalFusionStrategies {
-    fn from(s: SignalFusionStrategies) -> Self {
-        contextra_types::SignalFusionStrategies {
-            vector: s.vector.into(),
-            text: s.text.into(),
-            graph: s.graph.into(),
-        }
-    }
-}
 
 /// Fusionsgewichte für die Normalisierung.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -257,14 +181,31 @@ impl Default for FusionWeights {
     }
 }
 
-#[cfg(feature = "types-compat")]
-impl From<contextra_types::FusionWeights> for FusionWeights {
-    fn from(w: contextra_types::FusionWeights) -> Self {
-        FusionWeights {
-            vector: w.vector(),
-            text: w.text(),
-            graph: w.graph(),
-            metadata: 0.0,
-        }
+
+/// Transaktions-Identität für zeitliche und MVCC-Gültigkeit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+pub struct TxId(pub u64);
+
+impl TxId {
+    /// Erzeugt eine neue `TxId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Gibt die rohe u64-Zahl zurück.
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for TxId {
+    fn from(val: u64) -> Self {
+        TxId(val)
+    }
+}
+
+impl From<TxId> for u64 {
+    fn from(id: TxId) -> Self {
+        id.0
     }
 }

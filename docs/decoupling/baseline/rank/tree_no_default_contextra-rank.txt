@@ -1,0 +1,41 @@
+contextra-rank v0.1.0 (/app/crates/contextra-rank)
+├── ahash v0.8.12
+│   ├── cfg-if v1.0.4
+│   ├── getrandom v0.3.4
+│   │   ├── cfg-if v1.0.4
+│   │   └── libc v0.2.189
+│   ├── once_cell v1.21.4
+│   ├── serde v1.0.229
+│   │   ├── serde_core v1.0.229
+│   │   └── serde_derive v1.0.229 (proc-macro)
+│   │       ├── proc-macro2 v1.0.107
+│   │       │   └── unicode-ident v1.0.24
+│   │       ├── quote v1.0.47
+│   │       │   └── proc-macro2 v1.0.107 (*)
+│   │       └── syn v3.0.4
+│   │           ├── proc-macro2 v1.0.107 (*)
+│   │           ├── quote v1.0.47 (*)
+│   │           └── unicode-ident v1.0.24
+│   └── zerocopy v0.8.56
+├── serde v1.0.229 (*)
+├── serde_json v1.0.151
+│   ├── itoa v1.0.18
+│   ├── memchr v2.8.3
+│   ├── serde_core v1.0.229
+│   └── zmij v1.0.23
+├── thiserror v2.0.20
+│   └── thiserror-impl v2.0.20 (proc-macro)
+│       ├── proc-macro2 v1.0.107 (*)
+│       ├── quote v1.0.47 (*)
+│       └── syn v3.0.4 (*)
+└── tracing v0.1.44
+    ├── pin-project-lite v0.2.17
+    ├── tracing-attributes v0.1.31 (proc-macro)
+    │   ├── proc-macro2 v1.0.107 (*)
+    │   ├── quote v1.0.47 (*)
+    │   └── syn v2.0.119
+    │       ├── proc-macro2 v1.0.107 (*)
+    │       ├── quote v1.0.47 (*)
+    │       └── unicode-ident v1.0.24
+    └── tracing-core v0.1.36
+        └── once_cell v1.21.4

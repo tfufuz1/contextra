@@ -1,0 +1,14 @@
+    Checking regex-automata v0.4.18
+    Checking tracing v0.1.44
+   Compiling flatbuffers v24.12.23
+    Checking bitflags v1.3.2
+   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)
+    Checking tokio v1.53.1
+    Checking contextra-adapt v0.1.0 (/app/crates/contextra-adapt)
+    Checking shlex v1.3.0
+    Checking matchers v0.2.0
+    Checking regex v1.13.1
+    Checking tracing-subscriber v0.3.23
+    Checking criterion v0.5.1
+    Checking contextra-router v0.1.0 (/app/crates/contextra-router)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.52s

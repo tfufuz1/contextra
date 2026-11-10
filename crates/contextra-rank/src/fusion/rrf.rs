@@ -17,7 +17,7 @@
 
 use super::normalized::score_normalized_fusion_with_options;
 use super::provenance::ProvenanceBuilder;
-use super::resonance::{apply_resonance_bonus, ResonanceConfig};
+use super::{apply_resonance_bonus, ResonanceConfig};
 use super::signal::{
     FusedEntry, MetadataMergePriority, SignalKey, SignalKind,
 };
