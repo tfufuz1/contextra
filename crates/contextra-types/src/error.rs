@@ -510,6 +510,7 @@ impl From<std::array::TryFromSliceError> for ContextraError {
     }
 }
 
+
 impl From<contextra_ids::IdError> for ContextraError {
     fn from(err: contextra_ids::IdError) -> Self {
         match err {
