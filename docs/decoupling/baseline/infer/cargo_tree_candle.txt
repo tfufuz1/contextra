@@ -398,7 +398,6 @@ contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
 │       └── smallvec v1.15.2
 ├── serde v1.0.229 (*)
 ├── sha2 v0.10.9 (*)
-├── thiserror v2.0.20 (*)
 ├── tokenizers v0.21.4
 │   ├── ahash v0.8.12 (*)
 │   ├── aho-corasick v1.1.5 (*)

@@ -270,7 +270,7 @@ impl HnswIndex {
                     config,
                     validation_error: None,
                     tx_buffer: super::staging::VectorTxBuffer::new(
-                        16,
+                        10_000,
                         std::time::Duration::from_secs(60),
                     ),
                     quantizer: RwLock::new(None),
@@ -372,7 +372,7 @@ impl HnswIndex {
                     config,
                     validation_error,
                     tx_buffer: super::staging::VectorTxBuffer::new(
-                        16,
+                        10_000,
                         std::time::Duration::from_secs(60),
                     ),
                     quantizer: RwLock::new(None),

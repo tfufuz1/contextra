@@ -1,0 +1,12 @@
+[crates.contextra-agent]
+group = "agentic"
+level = 2
+tier = "beta"
+path = "crates/contextra-agent"
+unsafe_island = false
+allowed_internal = ["contextra-types", "contextra-ports", "contextra-db", "contextra-checkpoint", "contextra-router"]
+feature_closure_allowed = ["contextra-db", "contextra-graph", "contextra-checkpoint", "contextra-router"]
+dev_allowed = ["contextra-testkit", "contextra-store", "contextra-vector", "contextra-text", "contextra-graph"]
+klasse = "A"
+may_depend_on = ["contextra-types", "contextra-ports", "contextra-db", "contextra-checkpoint", "contextra-router"]
+transitional = ["storage-bindings", "workspace"]

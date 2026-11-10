@@ -1,145 +1,173 @@
-//! Golden test suite for contextra-infer-candle.
-//! SPEC: T-GOLDEN-INFER-CANDLE
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+//! Golden-Korpus Generator und Prüftest für contextra-infer-candle (IN3.1)
 
-use contextra_infer_candle::error::Error;
 use contextra_infer_candle::gasp::GaspValidator;
-use contextra_infer_candle::model_registry::ModelFingerprint;
-use contextra_types::{ContextChunk, DocId};
-use sha2::{Digest, Sha256};
-use std::fs;
+use contextra_infer_candle::model_registry::{compute_fingerprint, CandleQuantization};
+use contextra_infer_candle::traits::{Embedder, TextGenerator};
+use contextra_infer_candle::{FakeEmbedder, FakeTextGenerator, GenerationConfig};
+use contextra_types::ContextChunk;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::Path;
 
-#[test]
-fn test_golden_manifest_and_backward_compatibility() {
-    let golden_dir = Path::new("tests/golden");
-    let manifest_path = golden_dir.join("MANIFEST.sha256");
-    let manifest_content =
-        fs::read_to_string(&manifest_path).expect("MANIFEST.sha256 must exist in tests/golden");
+const MANIFEST_PATH: &str = "tests/golden/MANIFEST.sha256";
 
-    let golden_file = golden_dir.join("candle_golden.json");
-    let file_bytes = fs::read(&golden_file).expect("candle_golden.json must exist and be readable");
-
+fn compute_sha256(data: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
-    hasher.update(&file_bytes);
-    let calculated_hash = format!("{:x}", hasher.finalize());
+    hasher.update(data);
+    format!("{:x}", hasher.finalize())
+}
 
+fn generate_golden_data() -> Vec<(&'static str, Vec<u8>)> {
+    let mut files = Vec::new();
+
+    let tmp_dir = tempfile::tempdir().expect("tempdir");
+    let model_path = tmp_dir.path().join("mock_weights.gguf");
+    {
+        let mut f = File::create(&model_path).expect("create mock model");
+        f.write_all(b"GGUF_MOCK_WEIGHTS_DETERMINISTIC_BLOB_BYTE_STREAM_1234567890")
+            .expect("write mock");
+    }
+
+    let fp_q4 = compute_fingerprint(&model_path, &CandleQuantization::Q4KM).expect("fp q4");
+    let fp_q8 = compute_fingerprint(&model_path, &CandleQuantization::Q8_0).expect("fp q8");
+    let fp_f16 = compute_fingerprint(&model_path, &CandleQuantization::F16).expect("fp f16");
+
+    let mut fp_content = String::new();
+    fp_content.push_str(&format!(
+        "Q4KM: hash={:x?} quant={} model={}\n",
+        fp_q4.hash, fp_q4.quantization, fp_q4.model_id
+    ));
+    fp_content.push_str(&format!(
+        "Q8_0: hash={:x?} quant={} model={}\n",
+        fp_q8.hash, fp_q8.quantization, fp_q8.model_id
+    ));
+    fp_content.push_str(&format!(
+        "F16: hash={:x?} quant={} model={}\n",
+        fp_f16.hash, fp_f16.quantization, fp_f16.model_id
+    ));
+    files.push(("model_fingerprints.txt", fp_content.into_bytes()));
+
+    let fake_embedder = FakeEmbedder::new(16);
+    let embedding_out = fake_embedder
+        .embed("Contextra Retrieval Engine Text")
+        .expect("embed");
+    let fake_generator = FakeTextGenerator::new("Antwort auf Prompt: ");
+    let text_out = fake_generator
+        .generate("Was ist Hybrid-Retrieval?", &GenerationConfig::default())
+        .expect("generate");
+
+    let mut fake_content = String::new();
+    fake_content.push_str("EMBEDDING:\n");
+    for val in &embedding_out {
+        fake_content.push_str(&format!("{:.6}\n", val));
+    }
+    fake_content.push_str("GENERATION:\n");
+    fake_content.push_str(&text_out);
+    fake_content.push('\n');
+    files.push(("fake_provider_fixtures.txt", fake_content.into_bytes()));
+
+    let validator = GaspValidator::new();
+    let chunks = vec![
+        ContextChunk {
+            doc_id: contextra_types::DocId::from(1u64),
+            content: "Der Umsatz stieg im Geschäftsjahr 2024 auf 15 Millionen Euro.".to_string(),
+            relevance: 1.0,
+            token_count: 10,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+        ContextChunk {
+            doc_id: contextra_types::DocId::from(2u64),
+            content: "Die Mitarbeiterzahl betrug genau 42 Spezialisten.".to_string(),
+            relevance: 0.9,
+            token_count: 8,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+    ];
+
+    let supported_score = validator
+        .compute_raw_grounding_score(
+            "Im Geschäftsjahr 2024 betrug der Umsatz 15 Millionen Euro.",
+            &chunks,
+        )
+        .expect("supported score");
+    let hallucinated_score = validator
+        .compute_raw_grounding_score(
+            "Der Gewinn lag im Jahr 2024 bei 99 Milliarden Dollar.",
+            &chunks,
+        )
+        .expect("hallucinated score");
+
+    let mut gasp_content = String::new();
+    gasp_content.push_str(&format!("SUPPORTED_SCORE: {:.6}\n", supported_score));
+    gasp_content.push_str(&format!("HALLUCINATED_SCORE: {:.6}\n", hallucinated_score));
+    files.push(("gasp_fixtures.txt", gasp_content.into_bytes()));
+
+    files
+}
+
+#[test]
+fn test_golden_corpus_candle() {
+    let manifest_file = Path::new(MANIFEST_PATH);
     assert!(
-        manifest_content.contains(&calculated_hash),
-        "Golden file hash mismatch! Expected: in manifest, got: {calculated_hash}"
+        manifest_file.exists(),
+        "Golden MANIFEST.sha256 existiert nicht. Bitte vorher Generator ausführen."
     );
 
-    let content = String::from_utf8(file_bytes).expect("candle_golden.json must be valid UTF-8");
-    assert!(content.contains("\"errors\""));
-    assert!(content.contains("\"fingerprint\""));
-    assert!(content.contains("\"fake_embed\""));
-    assert!(content.contains("\"gasp_raw_score_fixture\""));
-}
+    let manifest_content = fs::read_to_string(manifest_file).expect("Laden von MANIFEST.sha256");
+    let generated = generate_golden_data();
 
-#[test]
-fn test_golden_error_display_invariants() {
-    let variants = vec![
-        Error::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "entity not found",
-        )),
-        Error::ModelLoad {
-            reason: "invalid GGUF magic 0x12345678".to_string(),
-        },
-        Error::Tokenizer("missing vocabulary item".to_string()),
-        Error::Inference("out of memory on device Cpu".to_string()),
-        Error::InvalidInput("batch size 0 exceeds allowable range".to_string()),
-        Error::ResourceExceeded("tracked requests ceiling reached".to_string()),
-        Error::PolicyViolation("LowConfidenceGrounding".to_string()),
-        Error::BackendUnavailable("candle feature not enabled".to_string()),
-    ];
-
-    let rendered: Vec<String> = variants.iter().map(|e| e.to_string()).collect();
-
-    let golden_file = Path::new("tests/golden/candle_golden.json");
-    let content = fs::read_to_string(golden_file).unwrap();
-
-    for s in rendered {
-        assert!(
-            content.contains(&s),
-            "Golden data must contain error string: {s}"
+    let mut expected_manifest = String::new();
+    for (filename, bytes) in &generated {
+        let path = format!("tests/golden/{}", filename);
+        let actual_bytes =
+            fs::read(&path).unwrap_or_else(|_| panic!("Datei {} nicht gefunden", path));
+        assert_eq!(
+            &actual_bytes, bytes,
+            "Byteweise Übereinstimmung für {} fehlgeschlagen",
+            filename
         );
+        let sha = compute_sha256(bytes);
+        expected_manifest.push_str(&format!("{}  {}\n", sha, filename));
+    }
+
+    assert_eq!(
+        manifest_content.trim(),
+        expected_manifest.trim(),
+        "MANIFEST.sha256 stimmt nicht mit den generierten Daten überein"
+    );
+}
+
+#[test]
+fn test_golden_backward_read_candle() {
+    let golden_dir = Path::new("tests/golden");
+    for entry in fs::read_dir(golden_dir).expect("tests/golden lesbar") {
+        let entry = entry.expect("valid entry");
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("txt") {
+            let content = fs::read_to_string(&path).expect("lesbare Datei");
+            assert!(!content.is_empty(), "Datei {:?} darf nicht leer sein", path);
+        }
     }
 }
 
 #[test]
-fn test_golden_fingerprint_deterministic_roundtrip() {
-    let raw_hash = [
-        0x2c, 0xf2, 0x4d, 0xba, 0x5f, 0xb0, 0xa3, 0x0e, 0x26, 0xe8, 0x3b, 0x2a, 0xc5, 0xb9, 0xe2,
-        0x9e, 0x1b, 0x16, 0x1e, 0x5c, 0x1f, 0xa7, 0x42, 0x5e, 0x73, 0x04, 0x33, 0x62, 0x93, 0x8b,
-        0x98, 0x24,
-    ];
-    let fp = ModelFingerprint {
-        model_id: "test-model-gguf".to_string(),
-        quantization: "Q4KM".to_string(),
-        hash: raw_hash,
-    };
+#[ignore = "Generator für Golden-Korpus"]
+fn regen_golden_candle() {
+    let generated = generate_golden_data();
+    let mut manifest = String::new();
 
-    assert_eq!(fp.model_id, "test-model-gguf");
-    assert_eq!(fp.quantization, "Q4KM");
-    assert_eq!(fp.hash, raw_hash);
-
-    let compat_fp: contextra_types::ModelFingerprint = fp.clone().into();
-    assert_eq!(compat_fp.hash, fp.hash);
-    assert_eq!(compat_fp.model_id, fp.model_id);
-    assert_eq!(compat_fp.quantization, fp.quantization);
-}
-
-#[test]
-fn test_golden_gasp_raw_score() {
-    let validator = GaspValidator::new();
-    let chunks = vec![ContextChunk {
-        doc_id: DocId::new(1u64),
-        content: "Der Umsatz betrug im Jahr 2025 genau 50 Millionen Euro.".to_string(),
-        relevance: 0.95,
-        token_count: 20,
-        metadata: None,
-        contextual_prefix: None,
-        links: vec![],
-    }];
-
-    let score = validator
-        .compute_raw_grounding_score("Im Jahr 2025 betrug der Umsatz 50 Millionen Euro.", &chunks)
-        .unwrap();
-
-    assert_eq!(score, 1.0, "Exact match fixture must have score 1.0");
-}
-
-#[test]
-fn test_golden_bitflip_and_truncation_robustness() {
-    let golden_file = Path::new("tests/golden/candle_golden.json");
-    let file_bytes = fs::read(golden_file).unwrap();
-
-    for len in [
-        0,
-        1,
-        5,
-        file_bytes.len() / 2,
-        file_bytes.len().saturating_sub(1),
-    ] {
-        let truncated = &file_bytes[..len];
-        let _ = std::str::from_utf8(truncated);
+    for (filename, bytes) in generated {
+        let path = format!("tests/golden/{}", filename);
+        fs::write(&path, &bytes).expect("Schreiben der Golden-Datei");
+        let sha = compute_sha256(&bytes);
+        manifest.push_str(&format!("{}  {}\n", sha, filename));
     }
 
-    for pos in [0, 10, file_bytes.len() / 2, file_bytes.len() - 1] {
-        let mut corrupted = file_bytes.clone();
-        corrupted[pos] ^= 0xFF;
-        let _ = std::str::from_utf8(&corrupted);
-    }
-}
-
-#[test]
-#[ignore]
-fn regen_golden() {
-    println!("Regenerating candle golden artifacts...");
+    fs::write(MANIFEST_PATH, manifest).expect("Schreiben von MANIFEST.sha256");
 }

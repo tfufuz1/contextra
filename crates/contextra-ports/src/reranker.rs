@@ -15,7 +15,7 @@ pub trait Reranker: Send + Sync {
     /// Records implicit feedback or outcome labels for calibration.
     ///
     /// # Fehler
-    /// Keine; garantiert panikfrei und nicht-blockierend.
+    /// Keine; panikfrei und nicht-blockierend.
     /// # Crash
     /// Reiner flüchtiger RAM-Zustand oder No-Op; keine Seiteneffekte.
     fn record_implicit_feedback(&self, _results: &[RerankResult], _implicit_relevant_k: usize) {}

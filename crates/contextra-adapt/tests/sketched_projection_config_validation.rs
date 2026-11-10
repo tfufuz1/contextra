@@ -1,4 +1,4 @@
-#![cfg(feature = "sketched-bandit")]
+#![cfg(feature = "bandit-routing")]
 //! # Konfigurationsvalidierung für Sketched-Bandits
 //!
 //! Testet die Dimensionsvalidierung und Grenzen der Rademacher-Projektionsmatrix.

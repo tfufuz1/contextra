@@ -94,7 +94,7 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
 /// Post-Hoc-Halluzinations-Validator (GASP / TPA-Pattern).
 pub struct GaspValidator {
     config: GaspConfig,
-    calibrator: Mutex<Box<dyn crate::calibrator::ConfidenceCalibrator>>,
+    calibrator: Mutex<Box<dyn crate::traits::ConfidenceCalibrator>>,
 }
 
 impl GaspValidator {
@@ -105,38 +105,16 @@ impl GaspValidator {
 
     /// Erstellt einen `GaspValidator` mit angegebener Konfiguration.
     pub fn with_config(config: GaspConfig) -> Self {
-        #[cfg(feature = "candle")]
-        {
-            let mut cal = contextra_rank::IsotonicCalibrator::new(
+        let adapter = Box::new(
+            crate::compat::calibrator::RankIsotonicCalibratorAdapter::new(
                 config.warmup_required,
                 config.max_observations,
-            );
-            cal.invalidate_on_config_change(config.fingerprint.clone());
-            Self {
-                config,
-                calibrator: Mutex::new(Box::new(cal)),
-            }
-        }
-        #[cfg(not(feature = "candle"))]
-        {
-            let mut cal = crate::calibrator::IdentityCalibrator::default();
-            cal.invalidate_on_config_change(config.fingerprint.clone());
-            Self {
-                config,
-                calibrator: Mutex::new(Box::new(cal)),
-            }
-        }
-    }
-
-    /// Erstellt einen `GaspValidator` mit einem benutzerdefinierten Kalibrator.
-    pub fn with_calibrator(
-        config: GaspConfig,
-        mut calibrator: Box<dyn crate::calibrator::ConfidenceCalibrator>,
-    ) -> Self {
-        calibrator.invalidate_on_config_change(config.fingerprint.clone());
+                config.fingerprint.clone(),
+            ),
+        );
         Self {
             config,
-            calibrator: Mutex::new(calibrator),
+            calibrator: Mutex::new(adapter),
         }
     }
 
@@ -145,7 +123,10 @@ impl GaspValidator {
         let mut new_config = self.config.clone();
         new_config.threshold = threshold;
         new_config.fingerprint = new_config.fingerprint.with_threshold(threshold);
-        self.refresh_config(new_config);
+        if let Ok(mut cal) = self.calibrator.lock() {
+            cal.reset();
+        }
+        self.config = new_config;
     }
 
     /// Zeichnet ein externes Ground-Truth-Signal (z. B. aus Nutzer-Feedback oder
@@ -172,7 +153,9 @@ impl GaspValidator {
     /// die Kalibrierung, falls sich der `ConfigFingerprint` geändert hat (INV-CAL-2).
     pub fn refresh_config(&mut self, config: GaspConfig) {
         if let Ok(mut cal) = self.calibrator.lock() {
-            cal.invalidate_on_config_change(config.fingerprint.clone());
+            if self.config.fingerprint != config.fingerprint {
+                cal.reset();
+            }
         }
         self.config = config;
     }

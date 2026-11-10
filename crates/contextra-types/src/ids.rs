@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub use contextra_ids::*;
 
 /// 16-Byte Lösch-Identifikator (SPEC 7.4, TY-09).
+// MIGRATION(S-70): ErasureId gehört in die Erasure-Familie (contextra-erasure)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
@@ -37,6 +38,7 @@ impl fmt::Debug for ErasureId {
 }
 
 /// 16-Byte Gate-Kennung für ReadGate-Einträge (SPEC F.9).
+// MIGRATION(S-70): GateId gehört in die Erasure-Familie (contextra-erasure)
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",

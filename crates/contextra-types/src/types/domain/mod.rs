@@ -1,6 +1,6 @@
 //! Domänentypen für Contextra.
 //!
-//! # Architektur-Rolle: Ring 0 (Kanonische Domänenmodelle)
+//! # Architektur-Rolle: Typen-Fundament (Kanonische Domänenmodelle)
 //!
 //! Enthält die zentralen Domänen-Modelle wie `DocId`, `TxId`, `TenantId`, `Embedding` und `WorkflowState`.
 //! Diese Typen sind die "Lingua Franca" zwischen allen Crates im Workspace.

@@ -1,0 +1,17 @@
+[crates.contextra-engine]
+klasse = "C"
+may_depend_on = [
+    "contextra-ports",
+    "contextra-types",
+    "contextra-mvcc",
+    "contextra-checkpoint",
+    "contextra-store",
+    "contextra-vector",
+    "contextra-text",
+    "contextra-graph",
+    "contextra-rank",
+    "contextra-adapt",
+    "contextra-infer-onnx",
+    "contextra-sandbox",
+]
+transitional = []

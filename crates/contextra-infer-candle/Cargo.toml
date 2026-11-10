@@ -24,6 +24,7 @@ futures-util = "0.3"
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 bincode = { workspace = true, optional = true }
 half = { version = "2.4", optional = true }
 contextra-types = { workspace = true }
@@ -45,12 +46,18 @@ required-features = ["kv-bridge"]
 
 [features]
 default = ["candle"]
-candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers", "dep:half"]
+candle = [
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:candle-transformers",
+    "dep:tokenizers",
+    "dep:half"
+]
 kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
 kv-stage-b = ["dep:bincode"]
 exp-kv-stage-b = ["kv-stage-b"]
 exp-gasp = []
-cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+cuda = ["candle-core?/cuda", "candle-nn?/cuda", "candle-transformers?/cuda"]
 test-utils = []
 
 [target.'cfg(target_os = "macos")'.dependencies]

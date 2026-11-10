@@ -3,6 +3,7 @@
 //!
 //! # Deprecated
 //! Alle Löschdomänen-Typen in diesem Modul sind als deprecated markiert und nach `contextra-erasure` migriert.
+// MIGRATION(S-70): Löschdomänen-Typen aus erasure.rs gehören nach contextra-erasure
 
 use core::fmt;
 use core::time::Duration;

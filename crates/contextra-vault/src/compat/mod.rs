@@ -54,12 +54,8 @@ impl From<TenantId> for VaultTenantId {
 impl From<VaultError> for ContextraError {
     fn from(err: VaultError) -> Self {
         match err {
-            VaultError::CapacityExceeded { .. } => {
-                ContextraError::PolicyViolation(err.to_string())
-            }
-            VaultError::AlreadyConsumed => {
-                ContextraError::InvalidInput(err.to_string())
-            }
+            VaultError::CapacityExceeded { .. } => ContextraError::PolicyViolation(err.to_string()),
+            VaultError::AlreadyConsumed => ContextraError::InvalidInput(err.to_string()),
         }
     }
 }

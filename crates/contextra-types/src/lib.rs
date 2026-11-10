@@ -1,10 +1,10 @@
 #![deny(dead_code)]
 //! `Contextra` Types — Kanonische Domänenmodelle, Identifikatoren, Budgets, Filter und Fehlertypen.
 //!
-//! # Architektur-Rolle: Ring 0 (Typen-Kern)
+//! # Architektur-Rolle: Gruppe contracts (Ebene 2, Typen-Fundament)
 //!
 //! Dieses Crate definiert das fundamentale Typfundament für das gesamte Contextra-System.
-//! Gemäß der Ring-0-Architektur (reiner Rechenkern):
+//! Gemäß der Baukasten-Architektur (reiner Rechenkern):
 //! - Keine asynchronen Laufzeiten (kein `tokio`).
 //! - Keine direkten I/O- oder Dateisystemabhängigkeiten.
 //! - Kein `unsafe` (`#![forbid(unsafe_code)]`).
@@ -12,20 +12,15 @@
 //!
 //! # Einbindung im Workspace
 //!
-//! `contextra-types` ist ein fundamentales Ring-0-Workspace-Mitglied.
+//! `contextra-types` ist das zentrale Vertrags- und Typenpaket.
 //!
 //! **Abhängigkeiten (ausgehend):**
 //! - Reines Rust mit Basis-Bibliotheken: `serde`, `serde_json`, `bincode`, `ahash`, `blake3`, `sha2`, `bytes`, `thiserror`.
-//! - Keine Abhängigkeiten zu anderen Contextra-Crates.
+//! - Interne Abhängigkeiten: `contextra-ids`.
 //!
-//! **Wird eingebunden von (eingehend, 30 Crates):**
-//! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-agreement-generator`,
-//!   `contextra-checkpoint`, `contextra-cognition`, `contextra-crypto`, `contextra-db`,
-//!   `contextra-engine`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`,
-//!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`,
-//!   `contextra-mvcc`, `contextra-ports`, `contextra-privacy`, `contextra-py`, `contextra-rank`,
-//!   `contextra-router`, `contextra-simd`, `contextra-store`, `contextra-testkit`, `contextra-text`,
-//!   `contextra-vector`.
+//! **Einbindung im Workspace (eingehend):**
+//! - Siehe `capabilities.toml` (Gruppe `contracts`, Ebene 2); dient als typisiertes Fundament
+//!   für Speicher-, Abfrage- und Integrationsbausteine im Gesamtsystem.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
