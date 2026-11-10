@@ -1,0 +1,65 @@
+contextra-vector v0.1.0 (/app/crates/contextra-vector)
+├── ahash v0.8.12
+│   ├── cfg-if v1.0.4
+│   ├── getrandom v0.3.4
+│   │   ├── cfg-if v1.0.4
+│   │   └── libc v0.2.189
+│   ├── once_cell v1.21.4
+│   ├── serde v1.0.229
+│   │   ├── serde_core v1.0.229
+│   │   └── serde_derive v1.0.229 (proc-macro)
+│   │       ├── proc-macro2 v1.0.107
+│   │       │   └── unicode-ident v1.0.24
+│   │       ├── quote v1.0.47
+│   │       │   └── proc-macro2 v1.0.107 (*)
+│   │       └── syn v3.0.4
+│   │           ├── proc-macro2 v1.0.107 (*)
+│   │           ├── quote v1.0.47 (*)
+│   │           └── unicode-ident v1.0.24
+│   └── zerocopy v0.8.56
+├── blake3 v1.8.7
+│   ├── arrayvec v0.7.8
+│   ├── cfg-if v1.0.4
+│   ├── constant_time_eq v0.4.2
+│   └── cpufeatures v0.3.1
+├── memmap2 v0.9.11
+│   └── libc v0.2.189
+├── parking_lot v0.12.5
+│   ├── lock_api v0.4.14
+│   │   └── scopeguard v1.2.0
+│   └── parking_lot_core v0.9.12
+│       ├── cfg-if v1.0.4
+│       ├── libc v0.2.189
+│       └── smallvec v1.15.2
+├── rand v0.8.8
+│   ├── libc v0.2.189
+│   ├── rand_chacha v0.3.1
+│   │   ├── ppv-lite86 v0.2.21
+│   │   │   └── zerocopy v0.8.56
+│   │   └── rand_core v0.6.4
+│   │       └── getrandom v0.2.17
+│   │           ├── cfg-if v1.0.4
+│   │           └── libc v0.2.189
+│   └── rand_core v0.6.4 (*)
+├── roaring v0.10.12
+│   ├── bytemuck v1.25.2
+│   └── byteorder v1.5.0
+├── serde v1.0.229 (*)
+├── subtle v2.6.1
+├── thiserror v2.0.20
+│   └── thiserror-impl v2.0.20 (proc-macro)
+│       ├── proc-macro2 v1.0.107 (*)
+│       ├── quote v1.0.47 (*)
+│       └── syn v3.0.4 (*)
+├── tracing v0.1.44
+│   ├── pin-project-lite v0.2.17
+│   ├── tracing-attributes v0.1.31 (proc-macro)
+│   │   ├── proc-macro2 v1.0.107 (*)
+│   │   ├── quote v1.0.47 (*)
+│   │   └── syn v2.0.119
+│   │       ├── proc-macro2 v1.0.107 (*)
+│   │       ├── quote v1.0.47 (*)
+│   │       └── unicode-ident v1.0.24
+│   └── tracing-core v0.1.36
+│       └── once_cell v1.21.4
+└── zeroize v1.9.0

@@ -1,0 +1,5 @@
+    Checking contextra-ports v0.1.0 (/app/crates/contextra-ports)
+    Checking criterion v0.5.1
+    Checking contextra-testkit v0.1.0 (/app/crates/contextra-testkit)
+    Checking contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.47s

@@ -1,0 +1,5 @@
+   Compiling simsimd v6.5.16
+    Checking ciborium v0.2.2
+    Checking contextra-simd v0.1.0 (/app/crates/contextra-simd)
+    Checking criterion v0.5.1
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.88s

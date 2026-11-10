@@ -1,0 +1,225 @@
+error::tests::contextra_error_display_no_panic: test
+error::tests::test_capability_unsupported_helper: test
+error::tests::test_checksum_mismatch_fields_not_transposed: test
+error::tests::test_cross_device_link_display_and_helper: test
+error::tests::test_dto_with_details_override: test
+error::tests::test_error_constructor_helpers: test
+error::tests::test_error_display_all_variants: test
+error::tests::test_from_conversions: test
+error::tests::test_from_try_from_slice_error: test
+error::tests::test_hnsw_connectivity_degraded_preserves_ratio: test
+error::tests::test_invalid_input_helper: test
+error::tests::test_io_error_message_preserved: test
+error::tests::test_is_occ_conflict: test
+error::tests::test_json_error_message_preserved: test
+error::tests::test_memory_budget_exceeded_fields_not_transposed: test
+error::tests::test_model_load_and_orphaned_vector_display: test
+error::tests::test_pin_budget_exceeded_display_and_helper: test
+error::tests::test_result_alias: test
+error::tests::test_step_id_and_cache_directive: test
+error::tests::test_transaction_timeout_fields_not_transposed: test
+error::tests::test_wal_corruption_fields_not_transposed: test
+error_dto::tests::test_dto_constructors_and_display: test
+error_dto::tests::test_dto_details_serialization: test
+error_dto::tests::test_dto_exhaustive_match_coverage: test
+model_fingerprint::tests::test_model_fingerprint_new_and_serde: test
+retrieval_strategy::tests::test_retrieval_strategy_display: test
+retrieval_strategy::tests::test_retrieval_strategy_serde_roundtrip: test
+schema::tests::test_doc_id_width_bytes_len: test
+schema::tests::test_manifest_schema_version_roundtrip: test
+tombstone::tests::test_edge_case_already_tombstoned_seq: test
+tombstone::tests::test_flags_tombstone_detection: test
+tombstone::tests::test_negative_cases: test
+tombstone::tests::test_roundtrip_property: test
+types::budget::tests::test_budget_exceeded: test
+types::budget::tests::test_capacity_threshold: test
+types::budget::tests::test_concurrent_consumption: test
+types::budget::tests::test_consume_memory_overflow_prevention: test
+types::budget::tests::test_release_memory_underflow_safety: test
+types::budget::tests::test_reservation_concurrent_double_spend: test
+types::budget::tests::test_reservation_drop_refund: test
+types::budget::tests::test_reservation_over_budget_leaves_consumed_unchanged: test
+types::budget::tests::test_reservation_successful_settle: test
+types::budget::tests::test_resource_tracker_basic: test
+types::budget::tests::test_token_budget_edge_cases: test
+types::budget::tests::test_token_budget_for_model: test
+types::budget::tests::test_token_budget_strategies: test
+types::domain::tests::doc_tests::test_core_distance_dimension_mismatch: test
+types::domain::tests::doc_tests::test_distance_metric_dimension_mismatch: test
+types::domain::tests::doc_tests::test_distance_metrics_empty_and_single_element: test
+types::domain::tests::doc_tests::test_distance_metrics_f32: test
+types::domain::tests::doc_tests::test_distance_metrics_u8: test
+types::domain::tests::doc_tests::test_distance_metrics_u8_overflow: test
+types::domain::tests::doc_tests::test_embedding_norm_and_normalize: test
+types::domain::tests::doc_tests::test_embedding_normalize_edge_cases: test
+types::domain::tests::doc_tests::test_u8_and_f32_distance_metrics_ranking_and_value_parity: test
+types::domain::tests::ids_tests::doc_id_from_empty_returns_err: test
+types::domain::tests::ids_tests::doc_id_valid_key_is_ok: test
+types::domain::tests::ids_tests::prop_tx_id_overflow_isolation: test
+types::domain::tests::ids_tests::prop_tx_id_range_isolation: test
+types::domain::tests::ids_tests::test_doc_id_and_entity_id_unicode_keys: test
+types::domain::tests::ids_tests::test_doc_id_determinism: test
+types::domain::tests::ids_tests::test_doc_id_from_key_collisions_and_distribution: test
+types::domain::tests::ids_tests::test_doc_id_from_key_no_panic: test
+types::domain::tests::ids_tests::test_doc_id_multibyte_unicode_keys: test
+types::domain::tests::ids_tests::test_entity_id_from_key_empty_err: test
+types::domain::tests::ids_tests::test_entity_id_methods: test
+types::domain::tests::ids_tests::test_tenant_and_collection_id: test
+types::domain::tests::ids_tests::test_tenant_id_collections_btreemap: test
+types::domain::tests::ids_tests::test_tenant_id_defaults_and_constants: test
+types::domain::tests::ids_tests::test_tenant_id_hardening: test
+types::domain::tests::ids_tests::test_tenant_id_serde_roundtrip: test
+types::domain::tests::ids_tests::test_tenant_id_system_constant: test
+types::domain::tests::ids_tests::test_tenant_id_system_reserved: test
+types::domain::tests::ids_tests::test_tenant_id_try_from_boundary_and_display: test
+types::domain::tests::ids_tests::test_tenant_id_valid: test
+types::domain::tests::ids_tests::test_tx_id_internal: test
+types::domain::tests::ids_tests::test_tx_id_invalid_sentinel_and_conversion_boundary: test
+types::domain::tests::ids_tests::test_tx_id_is_valid_origin: test
+types::domain::tests::ids_tests::test_tx_id_range_boundary_exhaustion_simulation: test
+types::domain::tests::ids_tests::test_tx_id_ranges_and_internal_boundary_checks: test
+types::domain::tests::ids_tests::test_tx_id_system_range_wraparound_safety: test
+types::domain::tests::ids_tests::tx_id_ordering_is_consistent: test
+types::domain::tests::misc_tests::test_edge_try_new_invalid_inputs: test
+types::domain::tests::misc_tests::test_entity_and_edge: test
+types::domain::tests::misc_tests::test_entity_and_edge_try_new_validation: test
+types::domain::tests::misc_tests::test_entity_try_new_invalid_inputs: test
+types::domain::tests::misc_tests::test_expiry_metadata_key_constant: test
+types::domain::tests::misc_tests::test_memory_type_defaults_and_serde: test
+types::domain::tests::misc_tests::test_serialization_roundtrips: test
+types::domain::tests::misc_tests::test_workflow_state_hex_serde_roundtrip: test
+types::filter::tests::test_filter_evaluate_null_and_empty_meta: test
+types::filter::tests::test_filter_expr_evaluate_all_operators: test
+types::filter::tests::test_filter_serialization: test
+types::filter::tests::test_filter_variants: test
+types::filter::tests::test_nested_filter_expression: test
+types::importance::tests::test_decay_factor_exponential: test
+types::importance::tests::test_decay_factor_none: test
+types::importance::tests::test_decay_factor_out_of_order_tx: test
+types::importance::tests::test_decay_factor_step_floor: test
+types::importance::tests::test_decay_factor_wall_clock_exponential: test
+types::importance::tests::test_importance_score_clamping_and_nan: test
+types::importance::tests::test_memory_importance_effective_score: test
+types::saos::tests::prop_fusion_weights_never_panics: test
+types::saos::tests::test_combined_text_empty_prefix_returns_content: test
+types::saos::tests::test_combined_text_with_prefix: test
+types::saos::tests::test_combined_text_without_prefix_returns_content: test
+types::saos::tests::test_combined_token_count_with_prefix: test
+types::saos::tests::test_context_window_serialization: test
+types::saos::tests::test_fusion_weights_default_is_balanced: test
+types::saos::tests::test_fusion_weights_invalid_sum: test
+types::saos::tests::test_fusion_weights_nan: test
+types::saos::tests::test_fusion_weights_negative_or_infinite: test
+types::saos::tests::test_fusion_weights_valid: test
+types::saos::tests::test_hybrid_query_builder_all_options: test
+types::saos::tests::test_hybrid_query_builder_custom_weights: test
+types::saos::tests::test_hybrid_query_builder_default_uses_balanced_weights: test
+types::saos::tests::test_hybrid_query_builder_defaults: test
+types::saos::tests::test_hybrid_query_builder_happy_path: test
+types::saos::tests::test_serde_backward_compat_no_prefix_field: test
+types::saos::tests::test_token_budget_edge_cases: test
+
+120 tests, 0 benchmarks
+test_doc_id_canonical_bit_decomposition_oracle: test
+test_tenant_id_system_reservation_oracle: test
+test_tx_id_monotonicity_oracle: test
+
+3 tests, 0 benchmarks
+prop_distance_metric_symmetry_and_non_negativity: test
+prop_embedding_normalize_is_idempotent: test
+test_cosine_distance_identical_and_opposite_vectors: test
+test_distance_metrics_non_finite_inputs_rejected: test
+test_dot_product_distance_properties: test
+test_embedding_normalization_invariants: test
+test_euclidean_distance_properties: test
+
+7 tests, 0 benchmarks
+prop_tenant_scoped_isolation: test
+prop_tombstone_bit_invariants: test
+test_request_context_creation_and_fields: test
+test_saga_record_and_scan_methods: test
+test_tenant_scoped_wrapper_and_checked_extraction: test
+test_tombstone_bit_manipulations_and_semantics: test
+
+6 tests, 0 benchmarks
+test_error_dto_display_and_formatting: test
+test_error_dto_new_and_with_details: test
+test_hnsw_deletion_error_variants: test
+test_manifest_schema_version_and_doc_id_width_properties: test
+
+4 tests, 0 benchmarks
+test_filter_equality_and_inequality_operators: test
+test_filter_logical_combinators_and_not: test
+test_filter_null_and_missing_field_evaluations: test
+test_filter_numeric_comparisons: test
+test_filter_set_and_contains_operators: test
+
+5 tests, 0 benchmarks
+test_doc_id_wire_golden_bytes: test
+test_tenant_id_wire_golden_bytes: test
+test_tx_id_wire_golden_bytes: test
+
+3 tests, 0 benchmarks
+test_decay_function_exponential_variant: test
+test_decay_function_none_variant: test
+test_decay_function_step_floor_variant: test
+test_decay_function_wallclock_exponential: test
+test_importance_score_clamping_boundary_cases: test
+test_memory_importance_effective_score_decay: test
+
+6 tests, 0 benchmarks
+prop_config_fingerprint_bit_exact_floats: test
+prop_model_fingerprint_serde_roundtrip: test
+test_cache_directive_variants_and_serde: test
+test_config_fingerprint_builder_and_extractors: test
+test_model_fingerprint_hash_uniqueness_and_equality: test
+test_resource_tracker_and_budget_backpressure: test
+test_retrieval_strategy_variants_and_display: test
+test_token_budget_reservations_and_concurrent_drops: test
+
+8 tests, 0 benchmarks
+prop_collection_id_invariants: test
+prop_doc_id_from_key_properties: test
+prop_entity_id_from_key_properties: test
+prop_importance_score_clamping: test
+prop_token_budget_consumption: test
+prop_tx_id_ordering_and_display: test
+test_all_error_variant_constructors_and_helpers: test
+test_context_chunk_text_and_token_methods: test
+test_edge_construction_and_builder_chain: test
+test_entity_construction_and_validation: test
+test_memory_type_helpers: test
+test_query_rewrite_output_methods: test
+test_retrieval_strategy_and_step_id: test
+test_schema_versions_and_doc_id_width: test
+
+14 tests, 0 benchmarks
+test_bincode_binary_payload_sizes: test
+test_entity_and_edge_attribute_maps: test
+test_exhaustive_serde_json_strings_and_bytes: test
+test_serde_complex_nested_structures: test
+test_serde_invalid_json_payloads_rejected: test
+test_workflow_state_hex_serialization: test
+
+6 tests, 0 benchmarks
+test_into_inner_checked_matching_tenant: test
+test_into_inner_checked_mismatched_tenant_does_not_leak_value: test
+test_map_preserves_tenant_id: test
+test_tenant_scoped_new_and_tenant_id_getter: test
+
+4 tests, 0 benchmarks
+0 tests, 0 benchmarks
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running unittests src/lib.rs (target/debug/deps/contextra_types-78749c7047817e41)
+     Running tests/campaign_r4_r10_oracle.rs (target/debug/deps/campaign_r4_r10_oracle-c77ba36a2d6418f1)
+     Running tests/distance_metrics_and_embeddings_suite.rs (target/debug/deps/distance_metrics_and_embeddings_suite-49b3f9dae6dec91c)
+     Running tests/error_and_witness_suite.rs (target/debug/deps/error_and_witness_suite-25dca0640b7cafb8)
+     Running tests/error_dto_and_schema_suite.rs (target/debug/deps/error_dto_and_schema_suite-424a0d06fa9a678b)
+     Running tests/filter_expressions_suite.rs (target/debug/deps/filter_expressions_suite-2d965e7d658dd0d0)
+     Running tests/golden_bytes_suite.rs (target/debug/deps/golden_bytes_suite-44add9c4f43b908e)
+     Running tests/importance_decay_suite.rs (target/debug/deps/importance_decay_suite-b5d7d2af15314ebd)
+     Running tests/model_fingerprint_and_schema_suite.rs (target/debug/deps/model_fingerprint_and_schema_suite-feb66766441df43a)
+     Running tests/newtype_invariants_suite.rs (target/debug/deps/newtype_invariants_suite-51de0b54dc4dea01)
+     Running tests/serde_roundtrips_suite.rs (target/debug/deps/serde_roundtrips_suite-440fbe44e7c1ebd2)
+     Running tests/tenant_scope_isolation.rs (target/debug/deps/tenant_scope_isolation-43d0daae65074b34)
+   Doc-tests contextra_types

@@ -1,0 +1,2 @@
+   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.26s

@@ -1,0 +1,2 @@
+    Checking contextra-simd v0.1.0 (/app/crates/contextra-simd)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.73s

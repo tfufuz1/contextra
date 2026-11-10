@@ -1,0 +1,4 @@
+    Checking criterion v0.5.1
+    Checking contextra-testkit v0.1.0 (/app/crates/contextra-testkit)
+    Checking contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.80s

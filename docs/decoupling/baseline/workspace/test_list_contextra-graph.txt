@@ -1,0 +1,530 @@
+arc_slice::tests::test_arc_slice_basic: test
+cascade::tests::test_cascade_invalidate_hyperedges_atomic_role_bindings: test
+cascade::tests::test_cascade_invalidate_hyperedges_high_fanout: test
+cascade::tests::test_cascade_invalidate_hyperedges_idempotency: test
+cascade::tests::test_cascade_invalidate_hyperedges_mixed_docs: test
+cascade::tests::test_cascade_invalidate_hyperedges_nonexistent_doc: test
+cascade::tests::test_cascade_invalidate_hyperedges_normal: test
+cascade::tests::test_cascade_invalidation_is_idempotent: test
+cascade::tests::test_cascade_invalidation_max_wal_seq: test
+cascade::tests::test_cascade_invalidation_multiple_edges_same_doc: test
+cascade::tests::test_cascade_invalidation_nonexistent_doc_returns_zero_count: test
+cascade::tests::test_cascade_invalidation_tombstones_edges_of_superseded_doc: test
+cascade::tests::test_pathrag_sufficiency_excludes_cascaded_tombstones: test
+cascade::tests::test_sweep_orphans_sweeps_degenerated_hyperedges: test
+cascade::tests::test_verify_deletion_completeness_cycle_termination: test
+cascade::tests::test_verify_deletion_completeness_multilevel_chain: test
+community::tests::test_community_detection_determinism: test
+community::tests::test_community_detection_disconnected_clusters: test
+community::tests::test_community_detection_non_convergence_logs_warning_and_returns_best_effort: test
+community::tests::test_community_detection_with_star_expansion_hyperedges: test
+community::tests::test_detect_communities_CASE_empty_graph: test
+community::tests::test_detect_communities_CASE_single_node: test
+community::tests::test_hyperedges_included_flag_default_is_false: test
+community::tests::test_hyperedges_included_flag_passthrough_from_config_to_assignment: test
+community::tests::test_hyperedges_included_serde_backwards_compatibility: test
+community::tests::test_leiden_vs_lpa_well_connected_communities_comparison: test
+community::tests::test_prop_community_detection_every_node_assigned: test
+community::tests::test_prop_community_detection_never_panics: test
+community::tests::test_serialization_roundtrip_CASE_community_config_and_assignment: test
+community::tests::test_star_expansion_iterator_and_community_detection: test
+community::tests::test_star_expansion_iterator_iteration: test
+consistency_enforcement::tests::test_active_patterns_and_suggest_tombstones: test
+consistency_enforcement::tests::test_check_before_insert: test
+consistency_enforcement::tests::test_conflict_pattern_and_edge_assertion_serde_roundtrip: test
+consistency_enforcement::tests::test_consistency_enforcer_bincode_serde_roundtrip: test
+consistency_enforcement::tests::test_detect_contradiction_delegate: test
+consistency_enforcement::tests::test_edge_assertion_empty_object_repr: test
+consistency_enforcement::tests::test_exact_predicate_conflict_detector: test
+consistency_enforcement::tests::test_first_contradiction: test
+consistency_enforcement::tests::test_get_pattern_nonexistent: test
+consistency_enforcement::tests::test_independent_pattern_hash_counting_no_cross_contamination: test
+consistency_enforcement::tests::test_three_repeated_contradictions_suppresses_pattern: test
+consistency_enforcement::tests::test_zero_threshold_suppresses_immediately: test
+csr::tests::basic_tests::test_add_edge_rollback_no_index_growth: test
+csr::tests::basic_tests::test_compact_entities_without_edges_syncs_offsets: test
+csr::tests::basic_tests::test_compaction_excludes_uncommitted_edges: test
+csr::tests::basic_tests::test_csr_delta_buffer_uncompacted_traversal: test
+csr::tests::basic_tests::test_csr_graph_bfs_score_decay: test
+csr::tests::basic_tests::test_csr_graph_compact_layout: test
+csr::tests::basic_tests::test_csr_graph_cycle_handling: test
+csr::tests::basic_tests::test_csr_graph_max_hop_enforcement: test
+csr::tests::basic_tests::test_csr_graph_stats_accuracy: test
+csr::tests::basic_tests::test_get_communities_batch_api: test
+csr::tests::basic_tests::test_graph_operation_sequence_txid_determinism: test
+csr::tests::basic_tests::test_graph_rollback_isolation: test
+csr::tests::basic_tests::test_graph_transaction_isolation: test
+csr::tests::basic_tests::test_invalid_edge_weights_rejected: test
+csr::tests::basic_tests::test_neighbors_api: test
+csr::tests::basic_tests::test_neighbors_hub_node_dedup: test
+csr::tests::basic_tests::test_sentinel_representation_no_value_cases: test
+csr::tests::basic_tests::test_sentinel_txid_zero_debug_assert_panics: test
+csr::tests::basic_tests::test_suspicious_txid_does_not_silently_overwrite: test
+csr::tests::basic_tests::test_wallclock_txid_debug_assert_panics: test
+csr::tests::bitemporal_tests::test_entity_multiple_hyperedges: test
+csr::tests::bitemporal_tests::test_hyperedge_doc_and_entity_rcu_atomicity: test
+csr::tests::bitemporal_tests::test_hyperedge_insertion_and_lookup: test
+csr::tests::bitemporal_tests::test_hyperedge_memory_estimation: test
+csr::tests::bitemporal_tests::test_hyperedge_multiple_participants: test
+csr::tests::bitemporal_tests::test_hyperedge_nonexistent_entity: test
+csr::tests::bitemporal_tests::test_hyperedge_rcu_concurrent_compaction_consistency: test
+csr::tests::bitemporal_tests::test_ppr_read_contract_stub: test
+csr::tests::bitemporal_tests::test_rcu_concurrent_readers_never_block_during_compaction: test
+csr::tests::bitemporal_tests::test_rcu_snapshot_isolation_no_torn_reads: test
+csr::tests::bitemporal_tests::test_source_doc_id_provenance_and_compact_isolation: test
+csr::tests::graph_index_tests::test_bitemporal_independent_axis_evaluation: test
+csr::tests::graph_index_tests::test_bitemporal_regression_pure_tx_time_unchanged: test
+csr::tests::graph_index_tests::test_consistency_enforcer_contradiction_suppression: test
+csr::tests::graph_index_tests::test_csr_is_entity_deleted_returns_false_for_live_entity: test
+csr::tests::graph_index_tests::test_default_csr_graph_no_consistency_check: test
+csr::tests::graph_index_tests::test_hub_node_1m_neighbors_bfs_capped: test
+csr::tests::graph_index_tests::test_insert_entity_direct_and_edge_direct_CASE_and_boundaries: test
+csr::tests::graph_index_tests::test_load_from_storage_CASE_legacy_f32_weight_and_invalid_key: test
+csr::tests::graph_index_tests::test_pagerank_CASE_empty_graph_and_isolated_node: test
+csr::tests::graph_index_tests::test_persist_entity_edge_delete_persistence_CASE_direct_calls: test
+csr::tests::graph_index_tests::test_prop_csr_offset_array_structural_consistency: test
+csr::tests::graph_index_tests::test_serialization_roundtrip_CASE_persisted_edge_payload: test
+csr::tests::graph_index_tests::test_set_storage_and_with_config_and_storage_CASE_initialization: test
+csr::tests::graph_index_tests::test_traverse_CASE_exceeds_max_hops_returns_invalid_input: test
+csr::tests::graph_index_tests::test_traverse_at_time_CASE_saturating_max_hops: test
+csr::tests::graph_index_tests::test_traverse_max_hops_exceeded_emits_warning: test
+csr::tests::mutation_sequence_tests::test_csr_mutation_sequence_equivalence: test
+csr::tests::persistence_tests::test_add_bidirectional: test
+csr::tests::persistence_tests::test_compact_async_CASE_dirty_and_clean_states: test
+csr::tests::persistence_tests::test_concurrent_add_edge: test
+csr::tests::persistence_tests::test_csr_graph_traverse_at_filtering: test
+csr::tests::persistence_tests::test_graph_edges_survive_storage_roundtrip: test
+csr::tests::persistence_tests::test_last_tx_id_tracking: test
+csr::tests::persistence_tests::test_multi_traverse_keeps_highest_score_per_entity: test
+csr::tests::persistence_tests::test_node_budgeted_cyclic_traversal_termination: test
+csr::tests::persistence_tests::test_pagerank_linear_chain: test
+csr::tests::persistence_tests::test_prop_add_edge_rollback_no_index_growth: test
+csr::tests::persistence_tests::test_prop_csr_graph_traverse_at_consistency: test
+csr::tests::persistence_tests::test_prop_edge_visible_monotone: test
+csr::tests::persistence_tests::test_prop_traverse_at_time_never_panics: test
+csr::tests::persistence_tests::test_remove_edge_uncompacted_and_compacted: test
+csr::tests::persistence_tests::test_staged_edges_invisible_to_concurrent_readers: test
+csr::tests::persistence_tests::test_traverse_at_time_exact_boundary_off_by_one: test
+csr::tests::persistence_tests::test_traverse_at_time_unbounded_validity: test
+csr::tests::persistence_tests::test_traverse_handles_cycles_without_infinite_loop: test
+hyperedge::tests::test_concurrent_consolidation_nodes_guard_deadlock_freedom: test
+hyperedge::tests::test_consolidation_nodes_guard_try_acquire: test
+hyperedge::tests::test_hyperedge_bincode_serialization_roundtrip: test
+hyperedge::tests::test_hyperedge_id_methods_and_traits: test
+hyperedge::tests::test_hyperedge_legacy_deserialization_fallback: test
+hyperedge::tests::test_hyperedge_prefix_constants: test
+hyperedge::tests::test_role_id_methods_and_traits: test
+hyperedge::tests::test_role_interner_basic_operations: test
+hyperedge::tests::test_role_interner_concurrent_access: test
+hyperedge::tests::test_sort_dedup_entities_canonical_order: test
+hyperedge::tests::test_validation_insufficient_participants: test
+hyperedge::tests::test_validation_invalid_weights: test
+hyperedge::tests::test_validation_valid_participants: test
+hyperedge::tests::test_with_child_edge_ids_sorting_dedup_and_self_removal: test
+path_rag::tests::test_default_sufficiency_threshold_meets_minimum_bound: test
+path_rag::tests::test_find_all_paths_multi_hop: test
+path_rag::tests::test_find_path_direct_edge: test
+path_rag::tests::test_find_path_multi_hop: test
+path_rag::tests::test_find_path_same_node: test
+path_rag::tests::test_find_path_unreachable_returns_none: test
+path_rag::tests::test_find_path_zero_max_hops: test
+path_rag::tests::test_forward_push_ppr_binary_graph: test
+path_rag::tests::test_forward_push_ppr_empty_seeds: test
+path_rag::tests::test_forward_push_ppr_hyperedge_expansion_and_decay: test
+path_rag::tests::test_forward_push_ppr_self_participant_filtered: test
+path_rag::tests::test_fusion_and_signalkind_non_modification_contract: test
+path_rag::tests::test_hyperedge_expansion_disabled_by_default: test
+path_rag::tests::test_hyperedge_expansion_enabled_finds_path_via_hyperedge_only: test
+path_rag::tests::test_hyperedge_weight_discount_applied_correctly: test
+path_rag::tests::test_path_rag_engine_with_real_csr_graph_hyperedges: test
+path_rag::tests::test_ppr_params_defaults: test
+path_rag::tests::test_rrf_signal_filters_by_sufficiency: test
+path_rag::tests::test_self_referencing_hyperedge_no_infinite_loop: test
+path_rag::tests::test_sufficiency_gate_filters_low_confidence: test
+path_rag::tests::test_sufficiency_gate_filters_low_confidence_virtual_neighbors: test
+path_rag::tests::test_to_rrf_signal_empty_paths: test
+ppr::cost::tests::test_cost_estimation_sparse_vs_dense: test
+ppr::cost::tests::test_estimate_ppr_cost_tie_break_prefers_forward_push: test
+ppr::cost::tests::test_fallback_when_stats_none: test
+ppr::cost::tests::test_ppr_cost_calibrator: test
+ppr::shadow_hook::tests::test_log_tl_hfd_vs_baseline_discrepancy_mae_calculation: test
+ppr::tests::algo_tests::test_auto_ppr_cost_model_crossover_boundary: test
+ppr::tests::algo_tests::test_auto_ppr_cost_model_dense_graph_selects_power_iteration: test
+ppr::tests::algo_tests::test_auto_ppr_cost_model_few_seeds_large_graph_selects_forward_push: test
+ppr::tests::algo_tests::test_auto_ppr_cost_model_few_seeds_small_graph_selects_forward_push: test
+ppr::tests::algo_tests::test_ppr_analytical_5_node_ring: test
+ppr::tests::algo_tests::test_ppr_bit_identical_determinism: test
+ppr::tests::algo_tests::test_ppr_context_reuse_when_graph_grows: test
+ppr::tests::algo_tests::test_ppr_dangling_node_mass_conservation: test
+ppr::tests::algo_tests::test_ppr_duplicate_multi_edges_deterministic: test
+ppr::tests::algo_tests::test_ppr_exact_score_tie_breaking_by_entity_id: test
+ppr::tests::algo_tests::test_ppr_handles_sink_node_correctly: test
+ppr::tests::algo_tests::test_ppr_hyperedge_expansion_dense_and_forward_push: test
+ppr::tests::algo_tests::test_ppr_isolated_nodes_handling: test
+ppr::tests::algo_tests::test_ppr_per_iteration_mass_conservation_dangling_and_isolated: test
+ppr::tests::algo_tests::test_ppr_self_loop_handling: test
+ppr::tests::algo_tests::test_ppr_shadow_mode_tl_hfd_parity: test
+ppr::tests::algo_tests::test_ppr_single_node_no_edges: test
+ppr::tests::algo_tests::test_ppr_tl_hfd_dispatch_valid: test
+ppr::tests::algo_tests::test_ppr_tl_hfd_invalid_params_fallback: test
+ppr::tests::algo_tests::test_prop_ppr_rank_mass_conservation: test
+ppr::tests::context_tests::test_compact_async_numerical_equivalence: test
+ppr::tests::context_tests::test_deleted_view_methods: test
+ppr::tests::context_tests::test_deleted_view_tombstone_filtering_all_entry_points: test
+ppr::tests::context_tests::test_forward_push_100_runs_bit_identical_determinism: test
+ppr::tests::context_tests::test_forward_push_performance_benchmark_vs_dense: test
+ppr::tests::context_tests::test_forward_push_vs_dense_numerical_equivalence_and_shadow_mode: test
+ppr::tests::context_tests::test_out_weight_sums_incremental_equivalence: test
+ppr::tests::context_tests::test_ppr_ignores_deleted_entities: test
+ppr::tests::context_tests::test_ppr_non_convergence_logs_warning_and_returns_best_effort: test
+ppr::tests::context_tests::test_ppr_pathological_max_iterations_ceiling: test
+ppr::tests::context_tests::test_ppr_phantom_node_no_rank_mass: test
+ppr::tests::context_tests::test_ppr_tl_hfd_and_shadow_mode_context_dispatch: test
+ppr::tests::context_tests::test_ppr_warn_on_non_convergence_suppressible: test
+ppr::tests::golden_tests::test_golden_ppr_chain_star_clusters_sinks: test
+ppr::tests::golden_tests::test_ppr_edge_cases_handling: test
+provenance::tests::test_doc_edge_index_duplicate_records: test
+provenance::tests::test_doc_edge_index_nonexistent_doc: test
+provenance::tests::test_doc_edge_index_record_and_retrieve: test
+provenance::tests::test_edge_provenance_serde_roundtrip: test
+provenance::tests::test_record_provenance: test
+provenance::tests::test_record_provenance_empty_docs: test
+purger::tests::test_graph_purger_empty_target: test
+purger::tests::test_graph_purger_existing_edges: test
+session_dag::tests::test_append_step_CASE_oversized_prompt_returns_invalid_input: test
+session_dag::tests::test_append_step_concurrent_atomicity: test
+session_dag::tests::test_append_step_sequential: test
+session_dag::tests::test_children_of_CASE_leaf_node_returns_empty: test
+session_dag::tests::test_dag_root_creation: test
+session_dag::tests::test_get_node_CASE_existent_and_nonexistent: test
+session_dag::tests::test_invalid_parent_branching_fails: test
+session_dag::tests::test_linear_append: test
+session_dag::tests::test_load_CASE_corrupt_data_returns_serialization_error: test
+session_dag::tests::test_load_CASE_non_existent_namespace_returns_not_found: test
+session_dag::tests::test_new_CASE_empty_and_unicode_strings: test
+session_dag::tests::test_path_to_head_depth_limit: test
+session_dag::tests::test_path_to_head_detects_cycle: test
+session_dag::tests::test_serialization_roundtrip_CASE_agent_state_node_and_dag_edge: test
+session_dag::tests::test_session_dag_branch_from_arbitrary_node: test
+session_dag::tests::test_session_dag_survives_restart: test
+session_dag::tests::test_set_active_head: test
+session_dag::tests::test_set_active_head_invalid_node_returns_error: test
+tl_hfd::lovasz::tests::test_lovasz_extension_basic: test
+tl_hfd::lovasz::tests::test_lovasz_extension_equal_x: test
+tl_hfd::lovasz::tests::test_lovasz_tie_breaker: test
+tl_hfd::lovasz::tests::test_truncation: test
+tl_hfd::params::tests::test_default_params_valid: test
+tl_hfd::params::tests::test_invalid_params: test
+tl_hfd::tests::test_thresholded_local_hfd_diagnostic_path: test
+
+218 tests, 0 benchmarks
+test_path_rag_engine_with_mock_double: test
+
+1 test, 0 benchmarks
+0 tests, 0 benchmarks
+0 tests, 0 benchmarks
+0 tests, 0 benchmarks
+0 tests, 0 benchmarks
+0 tests, 0 benchmarks
+test_community_hyperedges_included_flag_effect: test
+
+1 test, 0 benchmarks
+test_add_edge_median_latency_10k_nodes_100k_edges: test
+test_csr_delta_buffer_incremental_benchmark: test
+
+2 tests, 0 benchmarks
+bench_amortized_1m_edge_inserts: test
+bench_single_compaction_scaling: test
+
+2 tests, 0 benchmarks
+test_ppr_graph_1_single_dangling_node: test
+test_ppr_graph_2_extreme_90_percent_dangling_nodes: test
+test_ppr_graph_3_group_of_dangling_nodes: test
+
+3 tests, 0 benchmarks
+0 tests, 0 benchmarks
+test_path_rag_to_rrf_signal_docid_conversion_and_sorting: test
+
+1 test, 0 benchmarks
+test_measure_entity_extraction_gold_standard: test
+
+1 test, 0 benchmarks
+test_empty_and_whitespace_and_punctuation_only_input: test
+test_extraction_determinism_repeated_runs: test
+test_strict_confidence_boundary_precision: test
+test_unicode_umlauts_accents_emojis_and_multilingual: test
+test_very_long_input_stress_and_bounded_execution: test
+
+5 tests, 0 benchmarks
+test_confidence_filtering: test
+test_ingest_extracted_relations_to_graph: test
+test_rule_based_entity_extractor_sample_cases: test
+
+3 tests, 0 benchmarks
+test_golden_hyperedge_id_serde_bincode_compatibility: test
+test_golden_role_binding_serde_bincode_compatibility: test
+test_golden_role_id_serde_bincode_compatibility: test
+
+3 tests, 0 benchmarks
+test_csr_graph_collection_mutation_via_dyn_trait: test
+
+1 test, 0 benchmarks
+test_bit_flip_fuzz_simulation_on_serialized_payloads: test
+test_load_from_storage_handles_corrupt_edge_key: test
+test_load_from_storage_handles_corrupt_entity_bincode: test
+test_load_from_storage_handles_truncated_and_legacy_edge_payloads: test
+
+4 tests, 0 benchmarks
+test_hub_node_bfs_scaling_benchmark: test
+
+1 test, 0 benchmarks
+test_hyperedge_cascade_crash_recovery: test
+
+1 test, 0 benchmarks
+test_hyperedge_cascade_fanout_limit_and_termination: test
+
+1 test, 0 benchmarks
+test_hyperedge_cascade_queue_persistence_and_drain: test
+
+1 test, 0 benchmarks
+test_hyperedge_compact_race: test
+
+1 test, 0 benchmarks
+test_capacity_based_memory_budgeting: test
+test_hyperedge_role_bindings_payload_sharing: test
+
+2 tests, 0 benchmarks
+test_hyperedge_payload_sharing_arc_ptr_eq: test
+
+1 test, 0 benchmarks
+test_hyperedge_persistence_survives_restart: test
+
+1 test, 0 benchmarks
+test_co_occurrence_counting_is_deterministic_on_input_permutation: test
+test_combinations_below_min_co_occurrence_filtered_out: test
+test_combinations_exceeding_max_relate_participants_discarded_not_truncated: test
+test_mock_llm_rejection_results_in_accepted_false_without_error: test
+test_validate_candidates_exceeding_budget_returns_err: test
+
+5 tests, 0 benchmarks
+test_validate_candidates_llm_budget_guard: test
+test_validate_candidates_llm_rejection: test
+test_validate_candidates_llm_success: test
+
+3 tests, 0 benchmarks
+prop_candidates_participants_bounds: test
+prop_idempotency_of_candidate_computation: test
+prop_output_candidates_are_canonically_sorted: test
+test_determinism_under_all_permutations: test
+test_duplicate_entities_and_self_references_in_same_document: test
+test_empty_input_returns_no_candidates: test
+test_error_variants_and_conversions: test
+test_exact_boundary_max_relate_participants_64_included: test
+test_exact_boundary_max_relate_participants_plus_one_65_discarded: test
+test_single_participant_is_discarded: test
+test_unknown_or_sparse_node_ids: test
+test_validate_candidates_llm_response_parsing_variants: test
+test_validate_candidates_with_llm_budget_zero_and_exceeded: test
+
+13 tests, 0 benchmarks
+test_bitemporal_graph_time_travel_integration: test
+test_graph_integration_pipeline: test
+test_temporal_graph_time_travel: test
+
+3 tests, 0 benchmarks
+test_compact_async_resource_tracker_budget_exhaustion: test
+
+1 test, 0 benchmarks
+test_leanrag_cascade_conservative_multidoc_superedge: test
+test_leanrag_cascade_cycle_termination: test
+test_leanrag_cascade_fanout_limit_and_background_queue: test
+test_leanrag_cascade_recursive_through_superedges: test
+test_leanrag_cascade_topological_ancestor_before_child_order: test
+test_leanrag_legacy_bincode_deserialization: test
+
+6 tests, 0 benchmarks
+test_batch_commit_single_rcu_publish_and_atomic_rollback: test
+
+1 test, 0 benchmarks
+leiden_is_deterministic_with_fixed_seed: test
+leiden_on_karate_club_matches_reference: test
+
+2 tests, 0 benchmarks
+test_path_rag_at_concurrent_mutations_isolation: test
+test_path_rag_at_deleted_edge_visibility: test
+test_path_rag_at_deterministic_ordering: test
+test_path_rag_at_edge_visibility_by_seq: test
+test_path_rag_at_hub_entity_budget: test
+test_path_rag_at_latest_seq_matches_latest_state: test
+test_path_rag_at_unknown_anchor_returns_empty: test
+test_path_rag_at_via_graph_index_trait_snapshot_isolation: test
+
+8 tests, 0 benchmarks
+edges_survive_restart: test
+test_graph_survives_reload: test
+test_graph_survives_restart: test
+
+3 tests, 0 benchmarks
+test_ppr_alloc_reduction_100k_nodes: test
+
+1 test, 0 benchmarks
+test_chain_graph_batches_and_ordering: test
+test_determinism_across_multiple_streams: test
+test_empty_seeds_exhausted_immediately: test
+test_exclude_seeds_option: test
+test_next_batch_docs_skips_unresolvable_entities: test
+test_snapshot_behavior_isolated_from_subsequent_mutations: test
+test_unsupported_ppr_capability_propagated: test
+
+7 tests, 0 benchmarks
+test_ppr_cost_model_fallback_when_stats_missing: test
+test_ppr_cost_model_forward_push_cost_monotonicity: test
+test_ppr_cost_model_selection_sparse_vs_dense: test
+test_ppr_cost_model_tie_break: test
+
+4 tests, 0 benchmarks
+test_ppr_differential_against_power_iteration_fixed_seeds: test
+test_ppr_hand_calculated_diamond_4_nodes: test
+
+2 tests, 0 benchmarks
+test_ppr_snapshot_isolation_algorithms_parity: test
+test_ppr_snapshot_isolation_empty_seeds_and_determinism: test
+test_ppr_snapshot_isolation_hyperedge_visibility: test
+test_ppr_snapshot_isolation_matches_live_at_latest_seq: test
+test_ppr_snapshot_isolation_temporal_visibility: test
+test_ppr_snapshot_isolation_tombstone_and_validity_range: test
+
+6 tests, 0 benchmarks
+test_ppr_strategy_top_k_equivalence_and_tie_breaking: test
+
+1 test, 0 benchmarks
+prop_1_adjacency_after_compact_has_no_tombstones: test
+prop_2_edge_weights_non_negative: test
+prop_3_source_doc_ids_not_none_after_compact: test
+prop_4_compact_is_idempotent: test
+prop_5_node_count_monotonically_non_decreasing: test
+
+5 tests, 0 benchmarks
+prop_tl_hfd_diffusion_matches_bruteforce_reference_small_graph: test
+prop_tl_hfd_diffusion_objective_is_monotonically_non_increasing: test
+test_regression_max_hyperedge_sort_size_cutoff_in_full_diffusion: test
+
+3 tests, 0 benchmarks
+prop_lovasz_extension_is_nonnegative: test
+prop_lovasz_extension_matches_bruteforce_reference: test
+prop_lovasz_extension_max_min_are_distinct_or_none: test
+prop_truncate_participants_preserves_min_and_top_k: test
+prop_truncate_participants_result_length_bounded: test
+test_audit_f3_regression_15_node_hypergraph_truncation_cutoff: test
+
+6 tests, 0 benchmarks
+test_in_memory_graph_provider_community_detection: test
+test_in_memory_graph_provider_hyperedges: test
+test_in_memory_graph_provider_pagerank: test
+test_in_memory_graph_provider_path_rag: test
+
+4 tests, 0 benchmarks
+proof_source_doc_ids_consistent_after_multiple_compacts: test
+proof_source_doc_ids_empty_before_first_compact: test
+proof_source_doc_ids_set_after_compact: test
+
+3 tests, 0 benchmarks
+test_star_expansion_equals_clique_schur_complement: test
+
+1 test, 0 benchmarks
+stress_session_dag_deadlock_freedom: test
+test_nodes_guard_compile_time_guarantee_documented: test
+
+2 tests, 0 benchmarks
+test_characterize_document_supersession_edge_cascade: test
+test_characterize_hyperedge_supersession_cascade: test
+
+2 tests, 0 benchmarks
+test_custom_gate_trait_implementation: test
+test_default_flip_gate_threshold_constants: test
+test_tl_hfd_default_flip_gate_table: test
+
+3 tests, 0 benchmarks
+test_determinism_20_runs_and_seed_permutations: test
+test_locality_bounded_visited_set: test
+test_p24_boundary_large_hyperedge: test
+test_parameter_validation_and_no_panic: test
+test_shadow_mode_discrepancy_reported: test
+test_shadow_mode_parity_2_cluster_graph: test
+test_symmetric_graph_tie_breaker_order: test
+
+7 tests, 0 benchmarks
+crates/contextra-graph/src/session_dag.rs - session_dag::NodesGuard (line 25): test
+
+1 test, 0 benchmarks
+warning: use of deprecated function `purger::graph_purger`: Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden
+   --> crates/contextra-graph/src/lib.rs:116:18
+    |
+116 | pub use purger::{graph_purger, GraphPurger};
+    |                  ^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `purger::GraphPurger`: Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden
+   --> crates/contextra-graph/src/lib.rs:116:32
+    |
+116 | pub use purger::{graph_purger, GraphPurger};
+    |                                ^^^^^^^^^^^
+
+warning: `contextra-graph` (lib) generated 2 warnings
+warning: `contextra-graph` (lib test) generated 2 warnings (2 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.37s
+     Running unittests src/lib.rs (target/debug/deps/contextra_graph-2677e3902325c15a)
+     Running tests/algorithm_test_doubles.rs (target/debug/deps/algorithm_test_doubles-a944385522294467)
+     Running tests/apprh_determinism_permutation.rs (target/debug/deps/apprh_determinism_permutation-dd57427fe3a657ae)
+     Running tests/apprh_gate_monitor.rs (target/debug/deps/apprh_gate_monitor-922e11bd800bb9d8)
+     Running tests/apprh_selector_shadow_to_production.rs (target/debug/deps/apprh_selector_shadow_to_production-b76c1a72e23d3fbe)
+     Running tests/apprh_tests.rs (target/debug/deps/apprh_tests-ef22270132ec2ee3)
+     Running tests/budgeted_k_path_hub_entity.rs (target/debug/deps/budgeted_k_path_hub_entity-2557d3d2828f97f0)
+     Running tests/community_hyperedges_included_flag.rs (target/debug/deps/community_hyperedges_included_flag-f52c17292f5753c5)
+     Running tests/csr_benchmark.rs (target/debug/deps/csr_benchmark-484c2843bc8c9ca2)
+     Running tests/csr_complexity_bench.rs (target/debug/deps/csr_complexity_bench-d1ba4330e4e502e2)
+     Running tests/dangling_nodes_audit_test.rs (target/debug/deps/dangling_nodes_audit_test-6263781209122b16)
+     Running tests/diffusion_shadow_gate_thresholds.rs (target/debug/deps/diffusion_shadow_gate_thresholds-ce161cfefbc9327c)
+     Running tests/docid_128_path_rag.rs (target/debug/deps/docid_128_path_rag-02fe9a2f6ecde0cf)
+     Running tests/entity_extraction_benchmark.rs (target/debug/deps/entity_extraction_benchmark-808017c6889d41e5)
+     Running tests/entity_extraction_edge_cases.rs (target/debug/deps/entity_extraction_edge_cases-e65aecbd3d5b064f)
+     Running tests/entity_extraction_tests.rs (target/debug/deps/entity_extraction_tests-272b49a5e8b010bf)
+     Running tests/golden_ports_type_compatibility.rs (target/debug/deps/golden_ports_type_compatibility-ef048997b457144b)
+     Running tests/graph_collection_mutation_trait_test.rs (target/debug/deps/graph_collection_mutation_trait_test-9d0bfe6693258898)
+     Running tests/graph_persist_robustness.rs (target/debug/deps/graph_persist_robustness-bf7b408b2a58f4d0)
+     Running tests/hub_node_benchmark.rs (target/debug/deps/hub_node_benchmark-95972d9487662a42)
+     Running tests/hyperedge_cascade_crash_recovery.rs (target/debug/deps/hyperedge_cascade_crash_recovery-1d5ec2af5e52f8c8)
+     Running tests/hyperedge_cascade_fanout.rs (target/debug/deps/hyperedge_cascade_fanout-93ecde921b9ba3a8)
+     Running tests/hyperedge_cascade_queue_persistence.rs (target/debug/deps/hyperedge_cascade_queue_persistence-5b4b60579396bcd3)
+     Running tests/hyperedge_compact_race.rs (target/debug/deps/hyperedge_compact_race-b704c0223af8417c)
+     Running tests/hyperedge_memory_budget.rs (target/debug/deps/hyperedge_memory_budget-e7734dba138d9344)
+     Running tests/hyperedge_payload_sharing.rs (target/debug/deps/hyperedge_payload_sharing-06daa1a305d2e65a)
+     Running tests/hyperedge_persistence_survives_restart.rs (target/debug/deps/hyperedge_persistence_survives_restart-8b1979d9d315bf95)
+     Running tests/hyperedge_suggest.rs (target/debug/deps/hyperedge_suggest-f6df981bb8739f21)
+     Running tests/hyperedge_suggest_llm_test.rs (target/debug/deps/hyperedge_suggest_llm_test-679b2bfb623950d5)
+     Running tests/hyperedge_suggest_tests.rs (target/debug/deps/hyperedge_suggest_tests-3d29220f514b9fab)
+     Running tests/integration_graph.rs (target/debug/deps/integration_graph-621dcc4eb4d7eb14)
+     Running tests/ip08_resource_tracker_test.rs (target/debug/deps/ip08_resource_tracker_test-44342de701237b7c)
+     Running tests/leanrag_cascade_through_superedge.rs (target/debug/deps/leanrag_cascade_through_superedge-356b3f458ea7b1bc)
+     Running tests/leanrag_graph_sink_batch_commit.rs (target/debug/deps/leanrag_graph_sink_batch_commit-0a38867bf157a029)
+     Running tests/leiden_reference_validation.rs (target/debug/deps/leiden_reference_validation-f43c142acde04623)
+     Running tests/path_rag_at_snapshot.rs (target/debug/deps/path_rag_at_snapshot-5da115936042ef88)
+     Running tests/persistence_test.rs (target/debug/deps/persistence_test-d5f6ae529643b6f9)
+     Running tests/ppr_alloc_test.rs (target/debug/deps/ppr_alloc_test-19b62bc1bc3105cc)
+     Running tests/ppr_candidate_stream.rs (target/debug/deps/ppr_candidate_stream-2337454d0bef158e)
+     Running tests/ppr_cost_model_selection.rs (target/debug/deps/ppr_cost_model_selection-158627881a91f430)
+     Running tests/ppr_reference_validation.rs (target/debug/deps/ppr_reference_validation-9688568c78af8c30)
+     Running tests/ppr_snapshot_isolation.rs (target/debug/deps/ppr_snapshot_isolation-ca2d66ef59dfbb0f)
+     Running tests/ppr_strategy_equivalence.rs (target/debug/deps/ppr_strategy_equivalence-99dcd44cf228678c)
+     Running tests/proptest_csr_invariants.rs (target/debug/deps/proptest_csr_invariants-2a70ee9a5a219796)
+     Running tests/proptest_tl_hfd_diffusion.rs (target/debug/deps/proptest_tl_hfd_diffusion-022fd4409af262fc)
+     Running tests/proptest_tl_hfd_lovasz.rs (target/debug/deps/proptest_tl_hfd_lovasz-3acf0bd864e8b66d)
+     Running tests/provider_tests.rs (target/debug/deps/provider_tests-534ac86adb6ba6cb)
+     Running tests/source_doc_ids_populated.rs (target/debug/deps/source_doc_ids_populated-64a2987a3aaabfcd)
+     Running tests/star_expansion_equals_clique.rs (target/debug/deps/star_expansion_equals_clique-562935d1c3cd9335)
+     Running tests/stress_dag.rs (target/debug/deps/stress_dag-4229a3f472f2a678)
+     Running tests/supersession_characterization_tests.rs (target/debug/deps/supersession_characterization_tests-d10ef0ca815c66ac)
+     Running tests/tl_hfd_default_flip_gate.rs (target/debug/deps/tl_hfd_default_flip_gate-8cd8560b69377a92)
+     Running tests/tlhfd_shadow_mode_parity.rs (target/debug/deps/tlhfd_shadow_mode_parity-cc9218f45e65f68a)
+   Doc-tests contextra_graph

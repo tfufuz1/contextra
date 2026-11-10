@@ -1,0 +1,2 @@
+    Checking contextra-ports v0.1.0 (/app/crates/contextra-ports)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.75s

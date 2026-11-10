@@ -1,0 +1,29 @@
+    Checking futures-sink v0.3.34
+    Checking contextra-types v0.1.0 (/app/crates/contextra-types)
+    Checking ppv-lite86 v0.2.21
+    Checking futures-channel v0.3.34
+    Checking futures-util v0.3.34
+    Checking rand_chacha v0.9.0
+    Checking proptest v1.11.0
+    Checking futures-executor v0.3.34
+    Checking contextra-ports v0.1.0 (/app/crates/contextra-ports)
+    Checking futures v0.3.34
+    Checking criterion v0.5.1
+    Checking contextra-graph v0.1.0 (/app/crates/contextra-graph)
+warning: use of deprecated function `purger::graph_purger`: Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden
+   --> crates/contextra-graph/src/lib.rs:116:18
+    |
+116 | pub use purger::{graph_purger, GraphPurger};
+    |                  ^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `purger::GraphPurger`: Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden
+   --> crates/contextra-graph/src/lib.rs:116:32
+    |
+116 | pub use purger::{graph_purger, GraphPurger};
+    |                                ^^^^^^^^^^^
+
+warning: `contextra-graph` (lib) generated 2 warnings
+warning: `contextra-graph` (lib test) generated 2 warnings (2 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.48s

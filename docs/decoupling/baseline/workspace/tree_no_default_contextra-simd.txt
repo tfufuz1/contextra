@@ -1,0 +1,12 @@
+contextra-simd v0.1.0 (/app/crates/contextra-simd)
+├── bytemuck v1.25.2
+└── thiserror v2.0.20
+    └── thiserror-impl v2.0.20 (proc-macro)
+        ├── proc-macro2 v1.0.107
+        │   └── unicode-ident v1.0.24
+        ├── quote v1.0.47
+        │   └── proc-macro2 v1.0.107 (*)
+        └── syn v3.0.4
+            ├── proc-macro2 v1.0.107 (*)
+            ├── quote v1.0.47 (*)
+            └── unicode-ident v1.0.24

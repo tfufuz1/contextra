@@ -1,0 +1,4 @@
+   Compiling flatbuffers v24.12.23
+   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)
+    Checking bitflags v1.3.2
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.45s

@@ -1,0 +1,2 @@
+    Checking contextra-types v0.1.0 (/app/crates/contextra-types)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.87s

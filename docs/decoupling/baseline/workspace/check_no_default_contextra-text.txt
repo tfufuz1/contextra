@@ -1,0 +1,14 @@
+    Checking futures-executor v0.3.34
+    Checking futures v0.3.34
+    Checking criterion v0.5.1
+    Checking contextra-text v0.1.0 (/app/crates/contextra-text)
+warning: unused import: `Maintain`
+  --> crates/contextra-text/tests/fault_injection_limits_test.rs:12:37
+   |
+12 | use contextra_text::traits::{Index, Maintain};
+   |                                     ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `contextra-text` (test "fault_injection_limits_test") generated 1 warning (run `cargo fix --test "fault_injection_limits_test"` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.91s

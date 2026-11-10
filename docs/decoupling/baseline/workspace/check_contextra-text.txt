@@ -1,0 +1,278 @@
+    Checking regex-automata v0.4.18
+    Checking tracing-core v0.1.36
+    Checking tracing v0.1.44
+    Checking regex v1.13.1
+    Checking criterion v0.5.1
+    Checking contextra-text v0.1.0 (/app/crates/contextra-text)
+warning: use of deprecated struct `contextra_text::Bm25Scorer`: Ports-Anbindung gehört in contextra-erasure-adapters / contextra-ports Adapter
+ --> crates/contextra-text/tests/text_search_at_wrappers.rs:6:38
+  |
+6 | use contextra_text::{BM25MorphIndex, Bm25Scorer};
+  |                                      ^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `contextra_text::Bm25Scorer`: Ports-Anbindung gehört in contextra-erasure-adapters / contextra-ports Adapter
+   --> crates/contextra-text/tests/text_search_at_wrappers.rs:208:18
+    |
+208 |     let scorer = Bm25Scorer::new(storage.clone(), "scorer_ns");
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::Bm25Scorer`: Ports-Anbindung gehört in contextra-erasure-adapters / contextra-ports Adapter
+   --> crates/contextra-text/tests/text_search_at_wrappers.rs:307:18
+    |
+307 |     let scorer = Bm25Scorer::new(storage.clone(), "edge_scorer");
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated function `contextra_text::text_purger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+ --> crates/contextra-text/tests/text_scanner_purger_tests.rs:7:22
+  |
+7 | use contextra_text::{text_purger, InvertedIndex, TextPurger, TextScanner};
+  |                      ^^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+ --> crates/contextra-text/tests/text_scanner_purger_tests.rs:7:50
+  |
+7 | use contextra_text::{text_purger, InvertedIndex, TextPurger, TextScanner};
+  |                                                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextScanner`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+ --> crates/contextra-text/tests/text_scanner_purger_tests.rs:7:62
+  |
+7 | use contextra_text::{text_purger, InvertedIndex, TextPurger, TextScanner};
+  |                                                              ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextScanner`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:143:19
+    |
+143 |     let scanner = TextScanner::new_with_target(index.clone(), target.clone());
+    |                   ^^^^^^^^^^^
+
+warning: use of deprecated function `contextra_text::text_purger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:175:18
+    |
+175 |     let purger = text_purger(index1.clone());
+    |                  ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextScanner`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:184:19
+    |
+184 |     let scanner = TextScanner::new_with_target(index1.clone(), target.clone());
+    |                   ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:243:18
+    |
+243 |     let purger = TextPurger::new(index.clone());
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:269:18
+    |
+269 |     let purger = TextPurger::new(index.clone());
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:312:18
+    |
+312 |     let purger = TextPurger::new(index);
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextScanner`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:336:19
+    |
+336 |     let scanner = TextScanner::new_with_target(index, ScanTarget::new("doc:500", [0xCC; 32]));
+    |                   ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextScanner`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/text_scanner_purger_tests.rs:362:19
+    |
+362 |     let scanner = TextScanner::new_with_target(index, target.clone());
+    |                   ^^^^^^^^^^^
+
+warning: `contextra-text` (test "text_search_at_wrappers") generated 3 warnings
+warning: `contextra-text` (test "text_scanner_purger_tests") generated 11 warnings
+warning: unused import: `Maintain`
+  --> crates/contextra-text/tests/fault_injection_limits_test.rs:12:37
+   |
+12 | use contextra_text::traits::{Index, Maintain};
+   |                                     ^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `contextra-text` (test "fault_injection_limits_test") generated 1 warning (run `cargo fix --test "fault_injection_limits_test"` to apply 1 suggestion)
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+ --> crates/contextra-text/tests/purge_error_injection_tests.rs:8:37
+  |
+8 | use contextra_text::{InvertedIndex, TextPurger};
+  |                                     ^^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:170:18
+    |
+170 |     let purger = TextPurger::new(index);
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:202:18
+    |
+202 |     let purger = TextPurger::new(index);
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:244:18
+    |
+244 |     let purger = TextPurger::new(index);
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+  --> crates/contextra-text/tests/index_purge_proptests.rs:12:37
+   |
+12 | use contextra_text::{InvertedIndex, TextPurger};
+   |                                     ^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:221:18
+    |
+221 |     let purger = TextPurger::new(index.clone());
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:246:18
+    |
+246 |     let purger = TextPurger::new(index.clone());
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::PurgeReport`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:328:14
+    |
+328 |     let r1 = PurgeReport::new();
+    |              ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::PurgeReport`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:329:14
+    |
+329 |     let r2 = PurgeReport::default();
+    |              ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::PurgeReport`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:327:25
+    |
+327 |     use contextra_text::PurgeReport;
+    |                         ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::PurgeReport`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:343:17
+    |
+343 |     let mut r = PurgeReport::new();
+    |                 ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::PurgeReport`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:342:25
+    |
+342 |     use contextra_text::PurgeReport;
+    |                         ^^^^^^^^^^^
+
+warning: use of deprecated struct `contextra_text::TextPurger`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:415:18
+    |
+415 |     let purger = TextPurger::new(index.clone());
+    |                  ^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_failed`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:174:16
+    |
+174 |     assert_eq!(report.units_failed, 0);
+    |                ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::errors`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:175:13
+    |
+175 |     assert!(report.errors.is_empty());
+    |             ^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_failed`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:206:13
+    |
+206 |     assert!(report.units_failed > 0);
+    |             ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::errors`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:207:13
+    |
+207 |       assert!(report
+    |  _____________^
+208 | |         .errors
+    | |_______________^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_failed`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:248:13
+    |
+248 |     assert!(report.units_failed > 0);
+    |             ^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::errors`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/purge_error_injection_tests.rs:249:13
+    |
+249 |       assert!(report
+    |  _____________^
+250 | |         .errors
+    | |_______________^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_purged`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:332:16
+    |
+332 |     assert_eq!(r1.units_purged, 0);
+    |                ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_failed`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:333:16
+    |
+333 |     assert_eq!(r1.units_failed, 0);
+    |                ^^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::bytes_freed`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:334:16
+    |
+334 |     assert_eq!(r1.bytes_freed, 0);
+    |                ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::errors`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:335:13
+    |
+335 |     assert!(r1.errors.is_empty());
+    |             ^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_purged`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:344:5
+    |
+344 |     r.units_purged = 5;
+    |     ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_failed`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:345:5
+    |
+345 |     r.units_failed = 2;
+    |     ^^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::errors`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:346:5
+    |
+346 |     r.errors.push("Failed to delete key plb:test".into());
+    |     ^^^^^^^^
+
+warning: use of deprecated field `contextra_text::PurgeReport::units_purged`: Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)
+   --> crates/contextra-text/tests/index_purge_proptests.rs:418:13
+    |
+418 |     assert!(report.units_purged > 0);
+    |             ^^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-text` (test "purge_error_injection_tests") generated 10 warnings
+warning: `contextra-text` (test "index_purge_proptests") generated 17 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.44s

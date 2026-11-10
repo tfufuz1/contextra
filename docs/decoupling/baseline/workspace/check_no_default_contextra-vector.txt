@@ -1,0 +1,1220 @@
+    Checking contextra-vector v0.1.0 (/app/crates/contextra-vector)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/purge.rs:9:5
+  |
+9 | use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/casting.rs:5:5
+  |
+5 | use contextra_types::{ContextraError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/hnsw/purge.rs:10:5
+   |
+10 | use contextra_types::{DocId, RequestContext, Result};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/core_insert.rs:4:5
+  |
+4 | use contextra_types::{ContextraError, DocId, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/core_rebuild.rs:5:5
+  |
+5 | use contextra_types::{ContextraError, DocId, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/core_search.rs:7:5
+  |
+7 | use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-vector/src/candidate_stream.rs:6:5
+  |
+6 | use contextra_ports::VectorIndex;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/candidate_stream.rs:7:5
+  |
+7 | use contextra_types::{DocId, Result, ScoredDocument, MAX_SEARCH_K};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/distance.rs:16:5
+   |
+16 | use contextra_types::{ContextraError, DistanceMetric, Result};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/adaptive_ef.rs:6:5
+  |
+6 | use contextra_types::{ContextraError, DocId, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/arena.rs:7:5
+  |
+7 | use contextra_types::{ContextraError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/clock.rs:4:5
+  |
+4 | use contextra_ports::Clock;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/scanner.rs:8:5
+  |
+8 | use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/deletion.rs:8:5
+  |
+8 | use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/scanner.rs:9:5
+  |
+9 | use contextra_types::{DocId, RequestContext, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/hnsw/acorn_filtered.rs:11:5
+   |
+11 | use contextra_types::DocId;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/batch.rs:4:5
+  |
+4 | use contextra_types::DocId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/config.rs:1:5
+  |
+1 | use contextra_types::{ContextraError, DistanceMetric, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/staging.rs:5:5
+  |
+5 | use contextra_types::{DocId, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/types.rs:5:5
+  |
+5 | use contextra_types::{ContextraError, DocId, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:4:5
+  |
+4 | use contextra_ports::{VectorIndex, VectorIndexStats};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:5:5
+  |
+5 | use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/persistence/header.rs:6:5
+  |
+6 | use contextra_types::{ContextraError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/persistence/mmap.rs:8:5
+  |
+8 | use contextra_types::{ContextraError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/persistence/node.rs:5:5
+  |
+5 | use contextra_types::{ContextraError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/quantize/mod.rs:19:5
+   |
+19 | use contextra_types::DistanceMetric;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/acorn/naive_reference.rs:7:5
+  |
+7 | use contextra_types::{DistanceMetric, DocId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/acorn/mod.rs:11:5
+   |
+11 | use contextra_types::DocId;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+   --> crates/contextra-vector/src/distance.rs:619:9
+    |
+619 |     use contextra_types::DistanceMetric;
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/hnsw/sq8_bias.rs:92:9
+   |
+92 |     use contextra_types::DistanceMetric;
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+    --> crates/contextra-vector/src/hnsw/core_rebuild.rs:1093:9
+     |
+1093 |     use contextra_ports::{Clock, SeededRng};
+     |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+     |
+     = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/tests.rs:3:5
+  |
+3 | use contextra_ports::MetricsSink;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/tests.rs:4:5
+  |
+4 | use contextra_ports::Rng;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-vector/src/hnsw/tests.rs:5:5
+  |
+5 | use contextra_ports::VectorIndex;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/hnsw/tests.rs:6:5
+  |
+6 | use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-vector/src/persistence/tests.rs:6:5
+  |
+6 | use contextra_types::{ContextraError, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-vector/src/persistence/tests.rs:56:9
+   |
+56 |     use contextra_ports::VectorIndex;
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/persistence/tests.rs:57:9
+   |
+57 |     use contextra_types::{DistanceMetric, DocId, TxId};
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-vector/src/persistence/tests.rs:93:9
+   |
+93 |     use contextra_ports::VectorIndex;
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-vector/src/persistence/tests.rs:94:9
+   |
+94 |     use contextra_types::{DistanceMetric, DocId, TxId};
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+   --> crates/contextra-vector/src/persistence/tests.rs:270:9
+    |
+270 |     use contextra_ports::VectorIndex;
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+   --> crates/contextra-vector/src/persistence/tests.rs:271:9
+    |
+271 |     use contextra_types::{DocId, TxId};
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+   --> crates/contextra-vector/src/quantize/tests.rs:171:9
+    |
+171 |     use contextra_ports::{Rng, SeededRng};
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_insert.rs:461:28
+    |
+461 |                 return Err(contextra_types::ContextraError::Conflict(
+    |                            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_insert.rs:509:28
+    |
+509 |                 return Err(contextra_types::ContextraError::Conflict(
+    |                            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:107:25
+    |
+107 |                         contextra_types::ContextraError::Index("Quantizer not trained".into())
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:135:21
+    |
+135 |                     contextra_types::ContextraError::Index("Quantizer not trained".into())
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:164:25
+    |
+164 |                         contextra_types::ContextraError::Index("Quantizer not trained".into())
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:867:17
+    |
+867 |                 contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
+    |                 ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+    |
+    = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:908:17
+    |
+908 |                 contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
+    |                 ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+    |
+    = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:339:23
+    |
+339 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:388:25
+    |
+388 |                         contextra_types::ContextraError::Index("Quantizer not trained".into())
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:726:23
+    |
+726 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+  --> crates/contextra-vector/src/hnsw/staging.rs:29:20
+   |
+29 |             inner: contextra_mvcc::TxBuffer::new_with_config(capacity, timeout),
+   |                    ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+   |
+   = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+  --> crates/contextra-vector/src/hnsw/staging.rs:39:21
+   |
+39 |                     contextra_mvcc::IndexOp::Insert {
+   |                     ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+   |
+   = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+  --> crates/contextra-vector/src/hnsw/staging.rs:47:32
+   |
+47 |                     .stage(tx, contextra_mvcc::IndexOp::Delete { doc_id, data: None })?;
+   |                                ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+   |
+   = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+  --> crates/contextra-vector/src/hnsw/staging.rs:59:17
+   |
+59 |                 contextra_mvcc::IndexOp::Insert { doc_id, data } => Some(VectorStagingOp::Insert {
+   |                 ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+   |
+   = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+  --> crates/contextra-vector/src/hnsw/staging.rs:63:17
+   |
+63 |                 contextra_mvcc::IndexOp::Delete { doc_id, .. } => {
+   |                 ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+   |
+   = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+   --> crates/contextra-vector/src/hnsw/types.rs:279:42
+    |
+279 |                     seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
+    |                                          ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+    |
+    = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+   --> crates/contextra-vector/src/hnsw/types.rs:381:42
+    |
+381 |                     seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
+    |                                          ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+    |
+    = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:139:23
+    |
+139 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/quantize/mod.rs:85:24
+   |
+85 |             return Err(contextra_types::ContextraError::invalid_input(
+   |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/quantize/mod.rs:96:24
+   |
+96 |             return Err(contextra_types::ContextraError::invalid_input(format!(
+   |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:103:28
+    |
+103 |                 return Err(contextra_types::ContextraError::invalid_input(format!(
+    |                            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:110:32
+    |
+110 |                     return Err(contextra_types::ContextraError::invalid_input(
+    |                                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:316:24
+    |
+316 |             return Err(contextra_types::ContextraError::invalid_input(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:322:24
+    |
+322 |             return Err(contextra_types::ContextraError::invalid_input(format!(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:332:17
+    |
+332 |                 contextra_types::ContextraError::invalid_input("Quantizer mins index out of bounds")
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:335:17
+    |
+335 |                 contextra_types::ContextraError::invalid_input(
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:364:17
+    |
+364 |                 contextra_types::ContextraError::invalid_input("Quantizer mins index out of bounds")
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:367:17
+    |
+367 |                 contextra_types::ContextraError::invalid_input(
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:372:17
+    |
+372 |                 contextra_types::ContextraError::invalid_input(
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:387:24
+    |
+387 |             return Err(contextra_types::ContextraError::invalid_input(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:393:24
+    |
+393 |             return Err(contextra_types::ContextraError::invalid_input(format!(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:403:17
+    |
+403 |                 contextra_types::ContextraError::invalid_input(
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:408:17
+    |
+408 |                 contextra_types::ContextraError::invalid_input("Quantizer mins index out of bounds")
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:425:24
+    |
+425 |             return Err(contextra_types::ContextraError::invalid_input(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:467:28
+    |
+467 |                 return Err(contextra_types::ContextraError::invalid_input(
+    |                            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:484:24
+    |
+484 |             return Err(contextra_types::ContextraError::invalid_input(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:515:28
+    |
+515 |                 return Err(contextra_types::ContextraError::invalid_input(
+    |                            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:324:39
+    |
+324 |         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+    |                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this struct
+    |
+1   + use crate::types::SeededRng;
+    |
+help: if you import `SeededRng`, refer to it directly
+    |
+324 -         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+324 +         let rng = std::sync::Arc::new(SeededRng::new(DEFAULT_LAYER_SEED));
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:333:39
+    |
+333 |         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+    |                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this struct
+    |
+1   + use crate::types::SeededRng;
+    |
+help: if you import `SeededRng`, refer to it directly
+    |
+333 -         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+333 +         let rng = std::sync::Arc::new(SeededRng::new(DEFAULT_LAYER_SEED));
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:346:33
+    |
+346 |             std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+    |                                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this struct
+    |
+1   + use crate::types::SeededRng;
+    |
+help: if you import `SeededRng`, refer to it directly
+    |
+346 -             std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+346 +             std::sync::Arc::new(SeededRng::new(DEFAULT_LAYER_SEED));
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/hnsw/sq8_bias.rs:44:17
+   |
+44 |         metric: contextra_types::DistanceMetric,
+   |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_insert.rs:444:41
+    |
+444 |     pub fn check_connectivity(&self) -> contextra_types::Result<()> {
+    |                                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-vector/src/hnsw/core_rebuild.rs:37:22
+   |
+37 |         _clock: &dyn contextra_ports::Clock,
+   |                      ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-vector/src/hnsw/core_rebuild.rs:57:59
+   |
+57 |     pub fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {
+   |                                                           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-vector/src/hnsw/core_rebuild.rs:69:21
+   |
+69 |         clock: &dyn contextra_ports::Clock,
+   |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:516:50
+    |
+516 |     pub fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+    |                                                  ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:525:55
+    |
+525 |     pub fn rebuild_sync_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+    |                                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:191:16
+    |
+191 |         if k > contextra_types::MAX_SEARCH_K {
+    |                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:195:17
+    |
+195 |                 contextra_types::MAX_SEARCH_K
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:486:16
+    |
+486 |         if k > contextra_types::MAX_SEARCH_K {
+    |                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/core_search.rs:489:17
+    |
+489 |                 contextra_types::MAX_SEARCH_K
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+  --> crates/contextra-vector/src/hnsw/staging.rs:22:12
+   |
+22 |     inner: contextra_mvcc::TxBuffer<Vec<f32>>,
+   |            ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+   |
+   = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/hnsw/staging.rs:34:59
+   |
+34 |     pub fn stage(&self, tx: TxId, op: VectorStagingOp) -> contextra_types::Result<()> {
+   |                                                           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:128:54
+    |
+128 |     pub fn metrics_sink(&self) -> std::sync::Arc<dyn contextra_ports::MetricsSink> {
+    |                                                      ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:133:61
+    |
+133 |     pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
+    |                                                             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:138:47
+    |
+138 |     pub fn clock(&self) -> std::sync::Arc<dyn contextra_ports::Clock> {
+    |                                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:143:55
+    |
+143 |     pub fn set_clock(&self, clock: std::sync::Arc<dyn contextra_ports::Clock>) {
+    |                                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_mvcc`
+   --> crates/contextra-vector/src/hnsw/types.rs:203:25
+    |
+203 |     pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
+    |                         ^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_mvcc`
+    |
+    = help: if you wanted to use a crate named `contextra_mvcc`, use `cargo add contextra_mvcc` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:208:33
+    |
+208 |     pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    |                                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:209:42
+    |
+209 |     pub clock: RwLock<std::sync::Arc<dyn contextra_ports::Clock>>,
+    |                                          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:210:49
+    |
+210 |     pub metrics_sink: RwLock<std::sync::Arc<dyn contextra_ports::MetricsSink>>,
+    |                                                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:241:33
+    |
+241 |         rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    |                                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:242:35
+    |
+242 |         clock: std::sync::Arc<dyn contextra_ports::Clock>,
+    |                                   ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:287:25
+    |
+287 |                         contextra_ports::NoopMetricsSink,
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:313:33
+    |
+313 |         rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    |                                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:345:37
+    |
+345 |         let rng: std::sync::Arc<dyn contextra_ports::Rng> =
+    |                                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:347:39
+    |
+347 |         let clock: std::sync::Arc<dyn contextra_ports::Clock> =
+    |                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:389:25
+    |
+389 |                         contextra_ports::NoopMetricsSink,
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:434:54
+    |
+434 |     pub fn metrics_sink(&self) -> std::sync::Arc<dyn contextra_ports::MetricsSink> {
+    |                                                      ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:439:61
+    |
+439 |     pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
+    |                                                             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:444:61
+    |
+444 |     pub fn with_metrics_sink(self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) -> Self {
+    |                                                             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:450:55
+    |
+450 |     pub fn set_clock(&self, clock: std::sync::Arc<dyn contextra_ports::Clock>) {
+    |                                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:455:55
+    |
+455 |     pub fn with_clock(self, clock: std::sync::Arc<dyn contextra_ports::Clock>) -> Self {
+    |                                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/hnsw/types.rs:481:41
+    |
+481 |     pub fn check_connectivity(&self) -> contextra_types::Result<()> {
+    |                                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:637:47
+    |
+637 |     pub fn clock(&self) -> std::sync::Arc<dyn contextra_ports::Clock> {
+    |                                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/types.rs:648:21
+    |
+648 |         clock: &dyn contextra_ports::Clock,
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:40:16
+   |
+40 |         if k > contextra_types::MAX_SEARCH_K {
+   |                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:44:17
+   |
+44 |                 contextra_types::MAX_SEARCH_K
+   |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_sys`
+  --> crates/contextra-vector/src/persistence/mmap.rs:24:20
+   |
+24 |         let mmap = contextra_sys::mmap_readonly(&file)
+   |                    ^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_sys`
+   |
+   = help: if you wanted to use a crate named `contextra_sys`, use `cargo add contextra_sys` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/quantize/mod.rs:72:61
+   |
+72 |     pub fn try_train(batch: &[&[f32]], dimension: usize) -> contextra_types::Result<Self> {
+   |                                                             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/quantize/mod.rs:83:10
+   |
+83 |     ) -> contextra_types::Result<Self> {
+   |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:311:47
+    |
+311 |     pub fn quantize(&self, vector: &[f32]) -> contextra_types::Result<Vec<u8>> {
+    |                                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:385:48
+    |
+385 |     pub fn dequantize(&self, vector: &[u8]) -> contextra_types::Result<Vec<f32>> {
+    |                                                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:423:10
+    |
+423 |     ) -> contextra_types::Result<f32> {
+    |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:482:10
+    |
+482 |     ) -> contextra_types::Result<f32> {
+    |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+Some errors have detailed explanations: E0432, E0433.
+For more information about an error, try `rustc --explain E0432`.
+error: could not compile `contextra-vector` (lib) due to 113 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/quantize/tests.rs:71:13
+   |
+71 |         Err(contextra_types::ContextraError::InvalidInput(_))
+   |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/quantize/tests.rs:88:13
+   |
+88 |         Err(contextra_types::ContextraError::InvalidInput(_))
+   |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/tests.rs:105:13
+    |
+105 |         Err(contextra_types::ContextraError::InvalidInput(_))
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/tests.rs:113:13
+    |
+113 |         Err(contextra_types::ContextraError::InvalidInput(_))
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/tests.rs:120:13
+    |
+120 |         Err(contextra_types::ContextraError::InvalidInput(_))
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/tests.rs:127:13
+    |
+127 |         Err(contextra_types::ContextraError::InvalidInput(_))
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-vector/src/hnsw/tests.rs:37:36
+   |
+37 |     let rng1 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+   |                                    ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this struct
+   |
+2  + use crate::types::SeededRng;
+   |
+help: if you import `SeededRng`, refer to it directly
+   |
+37 -     let rng1 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+37 +     let rng1 = std::sync::Arc::new(SeededRng::new(seed));
+   |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-vector/src/hnsw/tests.rs:38:36
+   |
+38 |     let rng2 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+   |                                    ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this struct
+   |
+2  + use crate::types::SeededRng;
+   |
+help: if you import `SeededRng`, refer to it directly
+   |
+38 -     let rng2 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+38 +     let rng2 = std::sync::Arc::new(SeededRng::new(seed));
+   |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-vector/src/hnsw/tests.rs:43:14
+   |
+43 |     let sm = contextra_ports::SeededRng::new(1001);
+   |              ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this struct
+   |
+2  + use crate::types::SeededRng;
+   |
+help: if you import `SeededRng`, refer to it directly
+   |
+43 -     let sm = contextra_ports::SeededRng::new(1001);
+43 +     let sm = SeededRng::new(1001);
+   |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+    --> crates/contextra-vector/src/hnsw/core_rebuild.rs:1132:30
+     |
+1132 |             let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(seed));
+     |                              ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+     |
+     = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+    --> crates/contextra-vector/src/hnsw/core_rebuild.rs:1182:26
+     |
+1182 |         let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(42));
+     |                          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+     |
+     = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-vector/src/hnsw/tests.rs:239:6
+    |
+239 | impl contextra_ports::MetricsSink for TestMetricsSink {
+    |      ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/persistence/tests.rs:54:47
+   |
+54 | async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
+   |                                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-vector/src/persistence/tests.rs:91:36
+   |
+91 | async fn test_mmap_open_async() -> contextra_types::Result<()> {
+   |                                    ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/tests.rs:481:51
+    |
+481 | fn test_quantize_clamping_and_drift_counting() -> contextra_types::Result<()> {
+    |                                                   ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:562:75
+    |
+562 |     fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_types::Result<()>
+    |                                                                           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-vector/src/quantize/mod.rs:593:55
+    |
+593 |     fn test_sq8_theoretical_error_bound_property() -> contextra_types::Result<()> {
+    |                                                       ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error: could not compile `contextra-vector` (lib test) due to 145 previous errors

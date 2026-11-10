@@ -1,0 +1,250 @@
+   Compiling contextra-vector v0.1.0 (/app/crates/contextra-vector)
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:73:50
+   |
+73 |                 contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio }
+   |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:76:50
+   |
+76 |                 contextra_types::ContextraError::GraphRepairFailed(
+   |                                                  ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::HnswDeletionError::VerificationFailed`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/error.rs:77:57
+   |
+77 |                     contextra_types::HnswDeletionError::VerificationFailed {
+   |                                                         ^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:97:46
+   |
+97 |             contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio } => {
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/error.rs:100:46
+    |
+100 |             contextra_types::ContextraError::GraphRepairFailed(e) => {
+    |                                              ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated enum `contextra_types::HnswDeletionError`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+ --> crates/contextra-vector/src/hnsw/deletion.rs:8:46
+  |
+8 | use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
+  |                                              ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/hnsw/deletion.rs:58:48
+   |
+58 |                     return Err(ContextraError::GraphRepairFailed(
+   |                                                ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::HnswDeletionError::NodeNotFound`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/hnsw/deletion.rs:59:44
+   |
+59 |                         HnswDeletionError::NodeNotFound(doc_id),
+   |                                            ^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::ContextraError::GraphRepairFailed`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/hnsw/deletion.rs:73:40
+   |
+73 |             return Err(ContextraError::GraphRepairFailed(
+   |                                        ^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated tuple variant `contextra_types::HnswDeletionError::NodeNotFound`: Löschfehler gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)
+  --> crates/contextra-vector/src/hnsw/deletion.rs:74:36
+   |
+74 |                 HnswDeletionError::NodeNotFound(doc_id),
+   |                                    ^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/hnsw/core_search.rs:339:56
+    |
+339 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/hnsw/core_search.rs:726:56
+    |
+726 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated variant `contextra_types::ContextraError::HnswConnectivityDegraded`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/hnsw/vector_index_impl.rs:139:56
+    |
+139 |             let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0592]: duplicate definitions with name `remove`
+   --> crates/contextra-vector/src/hnsw/deletion.rs:310:5
+    |
+310 |     pub fn remove(&mut self, id: &u64) -> Result<bool> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate definitions for `remove`
+...
+404 |     pub fn remove(&self, doc_id: DocId) -> Result<bool> {
+    |     --------------------------------------------------- other definition for `remove`
+
+error[E0592]: duplicate definitions with name `rebuild_sync`
+   --> crates/contextra-vector/src/hnsw/types.rs:597:5
+    |
+493 |     pub fn rebuild_sync(&self) -> Result<()> {
+    |     ---------------------------------------- other definition for `rebuild_sync`
+...
+597 |     pub fn rebuild_sync(&self) -> Result<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ duplicate definitions for `rebuild_sync`
+
+warning: use of deprecated field `contextra_types::ContextraError::HnswConnectivityDegraded::deleted_ratio`: Indexspezifische Fehler gehören in das Crate contextra-vector
+  --> crates/contextra-vector/src/error.rs:97:73
+   |
+97 |             contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio } => {
+   |                                                                         ^^^^^^^^^^^^^
+
+warning: use of deprecated field `contextra_types::ContextraError::GraphRepairFailed::0`: Indexspezifische Fehler gehören in das Crate contextra-vector
+   --> crates/contextra-vector/src/error.rs:100:64
+    |
+100 |             contextra_types::ContextraError::GraphRepairFailed(e) => {
+    |                                                                ^
+
+error[E0599]: no method named `zeroize` found for mutable reference `&mut [f32]` in the current scope
+   --> crates/contextra-vector/src/hnsw/deletion.rs:271:42
+    |
+271 |                         v.as_mut_slice().zeroize();
+    |                                          ^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Zeroize` which provides `zeroize` is implemented but not in scope; perhaps you want to import it
+    |
+8   + use zeroize::Zeroize;
+    |
+help: there is a method `zero` with a similar name
+    |
+271 -                         v.as_mut_slice().zeroize();
+271 +                         v.as_mut_slice().zero();
+    |
+
+error[E0599]: no method named `zeroize` found for mutable reference `&mut [u8]` in the current scope
+   --> crates/contextra-vector/src/hnsw/deletion.rs:275:42
+    |
+275 |                         v.as_mut_slice().zeroize();
+    |                                          ^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Zeroize` which provides `zeroize` is implemented but not in scope; perhaps you want to import it
+    |
+8   + use zeroize::Zeroize;
+    |
+help: there is a method `zero` with a similar name
+    |
+275 -                         v.as_mut_slice().zeroize();
+275 +                         v.as_mut_slice().zero();
+    |
+
+error[E0609]: no field `kernel` on type `HnswColdCore`
+  --> crates/contextra-vector/src/hnsw/core_rebuild.rs:97:22
+   |
+97 |                     .kernel
+   |                      ^^^^^^ unknown field
+   |
+   = note: available fields are: `config`, `validation_error`, `tx_buffer`, `quantizer`, `sq8_bias` ... and 11 others
+
+error[E0609]: no field `kernel` on type `HnswColdCore`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:144:23
+    |
+144 |             self.cold.kernel.distance_f32_bytes_trusted(
+    |                       ^^^^^^ unknown field
+    |
+    = note: available fields are: `config`, `validation_error`, `tx_buffer`, `quantizer`, `sq8_bias` ... and 11 others
+
+error[E0609]: no field `kernel` on type `HnswColdCore`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:156:22
+    |
+156 |                     .kernel
+    |                      ^^^^^^ unknown field
+    |
+    = note: available fields are: `config`, `validation_error`, `tx_buffer`, `quantizer`, `sq8_bias` ... and 11 others
+
+error[E0599]: no function or associated item named `try_new_with_rng_and_kernel` found for struct `GenericHnswIndex` in the current scope
+   --> crates/contextra-vector/src/hnsw/types.rs:334:15
+    |
+91  | pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
+    | ------------------------------------------------------------- function or associated item `try_new_with_rng_and_kernel` not found for this struct
+...
+334 |         Self::try_new_with_rng_and_kernel(config, rng, kernel)
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ function or associated item not found in `GenericHnswIndex`
+    |
+note: if you're trying to build a new `GenericHnswIndex` consider using one of the following associated functions:
+      GenericHnswIndex::try_new_with_rng_and_clock
+      GenericHnswIndex::try_new_with_rng
+      GenericHnswIndex::try_new
+      GenericHnswIndex::try_new_with_kernel
+      GenericHnswIndex::new
+   --> crates/contextra-vector/src/hnsw/types.rs:239:5
+    |
+239 | /     pub fn try_new_with_rng_and_clock(
+240 | |         config: HnswConfig,
+241 | |         rng: std::sync::Arc<dyn contextra_ports::Rng>,
+242 | |         clock: std::sync::Arc<dyn contextra_ports::Clock>,
+243 | |     ) -> Result<Self> {
+    | |_____________________^
+...
+311 | /     pub fn try_new_with_rng(
+312 | |         config: HnswConfig,
+313 | |         rng: std::sync::Arc<dyn contextra_ports::Rng>,
+314 | |     ) -> Result<Self> {
+    | |_____________________^
+...
+323 |       pub fn try_new(config: HnswConfig) -> Result<Self> {
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+329 | /     pub fn try_new_with_kernel(
+330 | |         config: HnswConfig,
+331 | |         kernel: std::sync::Arc<dyn DistanceKernel>,
+332 | |     ) -> Result<Self> {
+    | |_____________________^
+...
+341 |       pub fn new(config: HnswConfig) -> Self {
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: there is an associated function `try_new_with_kernel` with a similar name
+   --> crates/contextra-vector/src/hnsw/types.rs:329:5
+    |
+329 | /     pub fn try_new_with_kernel(
+330 | |         config: HnswConfig,
+331 | |         kernel: std::sync::Arc<dyn DistanceKernel>,
+332 | |     ) -> Result<Self> {
+    | |_____________________^
+
+error[E0609]: no field `kernel` on type `HnswColdCore`
+  --> crates/contextra-vector/src/hnsw/core_rebuild.rs:97:22
+   |
+97 |                     .kernel
+   |                      ^^^^^^ unknown field
+   |
+   = note: available fields are: `config`, `validation_error`, `tx_buffer`, `quantizer`, `sq8_bias` ... and 13 others
+
+error[E0609]: no field `kernel` on type `HnswColdCore`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:144:23
+    |
+144 |             self.cold.kernel.distance_f32_bytes_trusted(
+    |                       ^^^^^^ unknown field
+    |
+    = note: available fields are: `config`, `validation_error`, `tx_buffer`, `quantizer`, `sq8_bias` ... and 13 others
+
+error[E0609]: no field `kernel` on type `HnswColdCore`
+   --> crates/contextra-vector/src/hnsw/core_rebuild.rs:156:22
+    |
+156 |                     .kernel
+    |                      ^^^^^^ unknown field
+    |
+    = note: available fields are: `config`, `validation_error`, `tx_buffer`, `quantizer`, `sq8_bias` ... and 13 others
+
+Some errors have detailed explanations: E0592, E0599, E0609.
+For more information about an error, try `rustc --explain E0592`.
+warning: `contextra-vector` (lib) generated 15 warnings
+error: could not compile `contextra-vector` (lib) due to 8 previous errors; 15 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `contextra-vector` (lib test) generated 15 warnings (15 duplicates)
+error: could not compile `contextra-vector` (lib test) due to 8 previous errors; 15 warnings emitted

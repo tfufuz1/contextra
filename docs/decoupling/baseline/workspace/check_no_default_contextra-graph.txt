@@ -1,0 +1,875 @@
+    Checking futures-util v0.3.34
+    Checking contextra-graph v0.1.0 (/app/crates/contextra-graph)
+error[E0432]: unresolved import `crate::session_dag`
+  --> crates/contextra-graph/src/consistency_enforcement.rs:19:12
+   |
+19 | use crate::session_dag::NodeIdx;
+   |            ^^^^^^^^^^^ could not find `session_dag` in the crate root
+   |
+note: found an item that was configured out
+  --> crates/contextra-graph/src/lib.rs:58:9
+   |
+58 | pub mod session_dag;
+   |         ^^^^^^^^^^^
+note: the item is gated behind the `experimental-graph` feature
+  --> crates/contextra-graph/src/lib.rs:57:7
+   |
+57 | #[cfg(feature = "experimental-graph")]
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-graph/src/csr/graph_index/mutations.rs:11:5
+   |
+11 | use contextra_ports::{BoxFuture, GraphIndex};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/graph_index/mutations.rs:12:5
+   |
+12 | use contextra_types::{ContextraError, Entity, EntityId, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-graph/src/csr/graph_index/mod.rs:12:5
+   |
+12 | use contextra_ports::{BoxFuture, GraphIndex, GraphIndexStats};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/graph_index/mod.rs:13:5
+   |
+13 | use contextra_types::{ContextraError, Entity, EntityId, PprConfig, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-graph/src/csr/graph_persist.rs:13:5
+   |
+13 | use contextra_ports::StorageEngine;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/graph_persist.rs:14:5
+   |
+14 | use contextra_types::{ContextraError, Entity, EntityId, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_read/communities.rs:8:5
+  |
+8 | use contextra_types::{EntityId, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_read/pagerank.rs:8:5
+  |
+8 | use contextra_types::EntityId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_read/path_rag.rs:8:5
+  |
+8 | use contextra_types::{EntityId, Result, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/graph_read/mod.rs:11:5
+   |
+11 | use contextra_types::{EntityId, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_write/edge_mutation.rs:9:5
+  |
+9 | use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_write/entity.rs:8:5
+  |
+8 | use contextra_types::{Entity, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_write/hyperedge.rs:8:5
+  |
+8 | use contextra_types::{DocId, EntityId, Result, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-graph/src/csr/graph_write/tombstone.rs:7:5
+  |
+7 | use contextra_ports::GraphIndex;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/graph_write/tombstone.rs:8:5
+  |
+8 | use contextra_types::{EntityId, Result, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-graph/src/csr/graph_write/mod.rs:19:5
+   |
+19 | use contextra_ports::{GraphCollectionMutation, StorageEngine};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/graph_write/mod.rs:20:5
+   |
+20 | use contextra_types::{DocId, EntityId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/inner/compaction.rs:6:5
+  |
+6 | use contextra_types::{DocId, EntityId, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/path_graph.rs:9:5
+  |
+9 | use contextra_types::EntityId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/visibility.rs:6:5
+  |
+6 | use contextra_types::TxId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/path_rag/snapshot.rs:12:5
+   |
+12 | use contextra_types::{EntityId, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/ppr/dense.rs:9:5
+  |
+9 | use contextra_types::{EntityId, PprConfig};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/ppr/forward_push.rs:10:5
+   |
+10 | use contextra_types::{EntityId, PprConfig};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/ppr/snapshot.rs:11:5
+   |
+11 | use contextra_types::{EntityId, PprConfig, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/ppr/mod.rs:18:5
+   |
+18 | use contextra_types::{EntityId, PprAlgorithm, PprConfig};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+  --> crates/contextra-graph/src/ppr_stream.rs:13:5
+   |
+13 | use contextra_ports::GraphIndex;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-graph/src/purger.rs:15:5
+   |
+15 | use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/ppr_stream.rs:14:5
+   |
+14 | use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/purger.rs:16:5
+   |
+16 | use contextra_types::{DocId, RequestContext, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/tl_hfd/lovasz.rs:3:5
+  |
+3 | use contextra_types::EntityId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/tl_hfd/mod.rs:21:5
+   |
+21 | use contextra_types::EntityId;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/cascade.rs:13:5
+   |
+13 | use contextra_types::{DocId, EntityId, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/community.rs:22:5
+   |
+22 | use contextra_types::{EntityId, Result};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/consistency_enforcement.rs:20:5
+   |
+20 | use contextra_types::{EntityId, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-graph/src/csr/graph_index/traversal.rs:9:5
+  |
+9 | use contextra_ports::BoxFuture;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/graph_index/traversal.rs:10:5
+   |
+10 | use contextra_types::{EntityId, Result, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/inner/estimate.rs:9:5
+  |
+9 | use contextra_types::{DocId, Entity, EntityId, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/csr/inner/mod.rs:14:5
+   |
+14 | use contextra_types::{DocId, Entity, EntityId, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/csr/types.rs:6:5
+  |
+6 | use contextra_types::{DocId, EntityId, ResourceTracker, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/entity_extraction.rs:22:5
+   |
+22 | use contextra_types::{DocId, Entity, EntityId, Result};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-graph/src/hyperedge.rs:39:9
+   |
+39 | pub use contextra_ports::graph::{HyperEdgeId, RoleBinding, RoleId};
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/hyperedge.rs:9:5
+  |
+9 | use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_ports`
+ --> crates/contextra-graph/src/hyperedge_suggest.rs:7:5
+  |
+7 | use contextra_ports::LlmTextGenerator;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+  |
+  = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/hyperedge_suggest.rs:8:5
+  |
+8 | use contextra_types::{DocId, EntityId};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/path_rag/mod.rs:24:5
+   |
+24 | use contextra_types::DocId;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/path_rag/mod.rs:25:9
+   |
+25 | pub use contextra_types::EntityId;
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/ppr/cost.rs:3:5
+  |
+3 | use contextra_types::{PprAlgorithm, PprConfig};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/ppr/shadow_hook.rs:4:5
+  |
+4 | use contextra_types::EntityId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+  --> crates/contextra-graph/src/provenance.rs:14:5
+   |
+14 | use contextra_types::{DocId, TxId};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/provider.rs:5:5
+  |
+5 | use contextra_types::{EntityId, Result};
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/tl_hfd/diffusion.rs:8:5
+  |
+8 | use contextra_types::EntityId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0432]: unresolved import `contextra_types`
+ --> crates/contextra-graph/src/tl_hfd/shadow.rs:8:5
+  |
+8 | use contextra_types::EntityId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+  |
+  = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/cascade.rs:396:24
+    |
+396 |             return Err(contextra_types::ContextraError::InvalidInput(format!(
+    |                        ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/cascade.rs:416:36
+    |
+416 |                         return Err(contextra_types::ContextraError::InvalidInput(format!(
+    |                                    ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_index/mod.rs:232:31
+    |
+232 |             self.add_edge(tx, contextra_types::Edge::new(from, to, label))
+    |                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_index/mod.rs:234:31
+    |
+234 |             self.add_edge(tx, contextra_types::Edge::new(to, from, label))
+    |                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_persist.rs:226:53
+    |
+226 | ...                   if link.relation == contextra_types::LinkRelation::Supersedes {
+    |                                           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:109:9
+    |
+109 |         contextra_ports::GraphIndex::personalized_page_rank_at(self, seed_nodes, config, seq_no)
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:117:9
+    |
+117 |         contextra_ports::GraphIndex::rollback_to_tx(self, tx_id)
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:217:25
+    |
+217 |         participants: &[contextra_ports::graph::RoleBinding],
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:220:9
+    |
+220 |         contextra_ports::graph::HyperEdgeId,
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:221:9
+    |
+221 |         contextra_ports::graph::GraphMutationError,
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:270:25
+    |
+270 |                         contextra_ports::graph::HyperEdgeId::new(id),
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:275:12
+    |
+275 |         Ok(contextra_ports::graph::HyperEdgeId::new(
+    |            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/entity_extraction.rs:309:32
+    |
+309 |                     return Err(contextra_types::ContextraError::Internal(format!(
+    |                                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/ppr_stream.rs:154:25
+    |
+154 |             None => Err(contextra_types::ContextraError::Internal(
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-graph/src/tl_hfd/error.rs:20:9
+   |
+20 |         contextra_types::ContextraError::InvalidInput(err.to_string())
+   |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:245:21
+    |
+245 |                     contextra_ports::graph::GraphMutationError::LockAcquisitionTimeout(msg)
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+245 -                     contextra_ports::graph::GraphMutationError::LockAcquisitionTimeout(msg)
+245 +                     GraphMutationError::LockAcquisitionTimeout(msg)
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:248:21
+    |
+248 |                     contextra_ports::graph::GraphMutationError::RoleBindingInvalid(msg)
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+248 -                     contextra_ports::graph::GraphMutationError::RoleBindingInvalid(msg)
+248 +                     GraphMutationError::RoleBindingInvalid(msg)
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:251:21
+    |
+251 |                     contextra_ports::graph::GraphMutationError::EpochReclamationPending(epoch)
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+251 -                     contextra_ports::graph::GraphMutationError::EpochReclamationPending(epoch)
+251 +                     GraphMutationError::EpochReclamationPending(epoch)
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:254:21
+    |
+254 |                     contextra_ports::graph::GraphMutationError::InsufficientParticipants {
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+254 -                     contextra_ports::graph::GraphMutationError::InsufficientParticipants {
+254 +                     GraphMutationError::InsufficientParticipants {
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:260:21
+    |
+260 |                     contextra_ports::graph::GraphMutationError::HyperedgeNotFound(id)
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+260 -                     contextra_ports::graph::GraphMutationError::HyperedgeNotFound(id)
+260 +                     GraphMutationError::HyperedgeNotFound(id)
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:263:21
+    |
+263 |                     contextra_ports::graph::GraphMutationError::InvalidWeight { weight, reason }
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+263 -                     contextra_ports::graph::GraphMutationError::InvalidWeight { weight, reason }
+263 +                     GraphMutationError::InvalidWeight { weight, reason }
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:266:21
+    |
+266 |                     contextra_ports::graph::GraphMutationError::Internal(msg)
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+266 -                     contextra_ports::graph::GraphMutationError::Internal(msg)
+266 +                     GraphMutationError::Internal(msg)
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:269:21
+    |
+269 |                     contextra_ports::graph::GraphMutationError::DuplicateHyperEdgeId(
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+help: consider importing this enum through its public re-export
+    |
+11  + use crate::GraphMutationError;
+    |
+help: if you import `GraphMutationError`, refer to it directly
+    |
+269 -                     contextra_ports::graph::GraphMutationError::DuplicateHyperEdgeId(
+269 +                     GraphMutationError::DuplicateHyperEdgeId(
+    |
+
+warning: unused import: `Ordering`
+  --> crates/contextra-graph/src/test_doubles.rs:12:36
+   |
+12 | use std::sync::atomic::{AtomicU64, Ordering};
+   |                                    ^^^^^^^^
+   |
+help: if this is a test module, consider adding a `#[cfg(test)]` to the containing module
+  --> crates/contextra-graph/src/lib.rs:59:1
+   |
+59 | pub mod test_doubles;
+   | ^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: use of deprecated function `purger::graph_purger`: Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden
+   --> crates/contextra-graph/src/lib.rs:116:18
+    |
+116 | pub use purger::{graph_purger, GraphPurger};
+    |                  ^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated struct `purger::GraphPurger`: Entscheidung D-E1: Löschschnittstellen werden nach contextra-erasure-spi migriert; neutrale Wartungs-API verwenden
+   --> crates/contextra-graph/src/lib.rs:116:32
+    |
+116 | pub use purger::{graph_purger, GraphPurger};
+    |                                ^^^^^^^^^^^
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_index/mutations.rs:111:11
+    |
+111 |     edge: contextra_types::Edge,
+    |           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_index/mod.rs:100:47
+    |
+100 |     fn add_edge<'a>(&'a self, tx: TxId, edge: contextra_types::Edge) -> BoxFuture<'a, Result<()>> {
+    |                                               ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_persist.rs:222:73
+    |
+222 |                         if let Ok(links) = serde_json::from_value::<Vec<contextra_types::MemoryLink>>(
+    |                                                                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_read/pagerank.rs:116:18
+    |
+116 |         config: &contextra_types::PprConfig,
+    |                  ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+  --> crates/contextra-graph/src/csr/graph_read/path_rag.rs:17:10
+   |
+17 |     ) -> contextra_ports::BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+   |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+   |
+   = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:102:26
+    |
+102 |         seed_nodes: &'a [contextra_types::EntityId],
+    |                          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:103:21
+    |
+103 |         config: &'a contextra_types::PprConfig,
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:105:10
+    |
+105 |     ) -> contextra_ports::BoxFuture<
+    |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:107:9
+    |
+107 |         contextra_types::Result<Vec<(contextra_types::EntityId, f32)>>,
+    |         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:107:38
+    |
+107 |         contextra_types::Result<Vec<(contextra_types::EntityId, f32)>>,
+    |                                      ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:115:16
+    |
+115 |         tx_id: contextra_types::TxId,
+    |                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:116:10
+    |
+116 |     ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+    |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/csr/graph_write/mod.rs:116:41
+    |
+116 |     ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
+    |                                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/ppr/mod.rs:141:14
+    |
+141 |     params: &contextra_types::TlHfdParams,
+    |              ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+  --> crates/contextra-graph/src/tl_hfd/error.rs:18:27
+   |
+18 | impl From<TlHfdError> for contextra_types::ContextraError {
+   |                           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+   |
+   = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/lib.rs:132:26
+    |
+132 | pub trait GraphIndexExt: contextra_ports::GraphIndex {
+    |                          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/lib.rs:136:13
+    |
+136 |         tx: contextra_types::TxId,
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_ports`
+   --> crates/contextra-graph/src/lib.rs:138:10
+    |
+138 |     ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>>;
+    |          ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_ports`
+    |
+    = help: if you wanted to use a crate named `contextra_ports`, use `cargo add contextra_ports` to add it to your `Cargo.toml`
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_types`
+   --> crates/contextra-graph/src/lib.rs:138:41
+    |
+138 |     ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>>;
+    |                                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_types`
+    |
+    = help: if you wanted to use a crate named `contextra_types`, use `cargo add contextra_types` to add it to your `Cargo.toml`
+
+Some errors have detailed explanations: E0432, E0433.
+For more information about an error, try `rustc --explain E0432`.
+warning: `contextra-graph` (lib) generated 3 warnings
+error: could not compile `contextra-graph` (lib) due to 95 previous errors; 3 warnings emitted
+warning: build failed, waiting for other jobs to finish...

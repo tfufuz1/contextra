@@ -1,0 +1,88 @@
+crates/contextra-cognition/src/consolidation_executor.rs:648:                if let Ok(doc_id) = DocId::from_key(&stored.id) {
+crates/contextra-cognition/src/semantic_aggregation_facade.rs:82:            if let Ok(doc_id) = DocId::from_key(&stored.id) {
+crates/contextra-cognition/src/context.rs:565:        let expected_doc_id = DocId::from_key(valid_key).unwrap(); // unwrap
+crates/contextra-cognition/src/context_compaction/tests.rs:440:    let src_doc_id = DocId::from_key(src_id_str)?;
+crates/contextra-cognition/src/context_compaction/tests.rs:450:    let target_doc_id = DocId::from_key(target_str_id)?;
+crates/contextra-cognition/src/context_compaction/tests.rs:604:    let d1 = DocId::from_key("source_1")?;
+crates/contextra-cognition/src/context_compaction/tests.rs:605:    let d2 = DocId::from_key("source_2")?;
+crates/contextra-cognition/src/context_compaction/tests.rs:606:    let target_id = DocId::from_key("summary_12")?;
+crates/contextra-mvcc/benches/mvcc_bench.rs:66:    let doc_id = DocId::from_key("bench_doc").expect("valid doc id");
+crates/contextra-cognition/src/context_compaction/compactor.rs:73:        DocId::from_key(&format!("contextra:consolidated:{key}")).unwrap_or_else(|_| {
+crates/contextra-mvcc/src/seq_log.rs:498:        let doc = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:531:        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:532:        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // expect #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:566:        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:587:        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:588:        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // expect #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:615:        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:633:        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:634:        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:700:        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+crates/contextra-mvcc/src/seq_log.rs:815:        let doc1 = DocId::from_key("doc_tombstone_test").expect("valid doc id");
+crates/contextra-mvcc/src/ssi.rs:1086:        if let Ok(doc_id) = DocId::from_key(s) {
+crates/contextra-mvcc/src/ssi.rs:1191:        let doc_id = DocId::from_key(doc_key).expect("valid doc_id"); // #[cfg(test)]
+crates/contextra-types/src/types/domain/ids.rs:349:        DocId::from_key(key).map(|d| Self(d.inner()))
+crates/contextra-types/src/types/domain/ids.rs:362:        DocId::from_key(key).map(|d| Self(d.as_u64()))
+crates/contextra-cognition/src/maintenance_scheduler.rs:251:                            if let Ok(doc_id) = DocId::from_key(&stored.id) {
+crates/contextra-types/examples/standalone.rs:22:    let doc_id = DocId::from_key("user_profile_alice")?;
+crates/contextra-engine/src/export.rs:272:                contextra_types::DocId::from_key("mem-1").unwrap(),
+crates/contextra-engine/src/export.rs:273:                contextra_types::DocId::from_key("mem-2").unwrap(),
+crates/contextra-engine/src/export.rs:324:            .get_links(contextra_types::DocId::from_key("mem-1").unwrap())
+crates/contextra-engine/src/export.rs:330:            contextra_types::DocId::from_key("mem-2").unwrap()
+crates/contextra-mcp/src/server_tools.rs:243:                let doc_id = DocId::from_key(id).map_err(|e| {
+crates/contextra-engine/src/collection/relate.rs:31:        let from_id = contextra_types::EntityId::from_key(from)?;
+crates/contextra-engine/src/collection/relate.rs:32:        let to_id = contextra_types::EntityId::from_key(to)?;
+crates/contextra-engine/src/collection/relate.rs:61:        let dummy_doc_id = DocId::from_key(from)?;
+crates/contextra-engine/src/collection/relate.rs:71:            let doc_id = DocId::from_key(src_str)?;
+crates/contextra-engine/src/collection/relate.rs:130:            let entity_id = contextra_types::EntityId::from_key(doc_id_str)?;
+crates/contextra-engine/src/collection/relate.rs:131:            let role_doc_id = contextra_types::DocId::from_key(role_str)?;
+crates/contextra-engine/src/collection/relate.rs:158:            Some(s) => Some(DocId::from_key(s)?),
+crates/contextra-engine/src/collection/relate.rs:266:        let e1 = contextra_types::EntityId::from_key("doc-1").expect("entity_id");
+crates/contextra-engine/src/collection/mod.rs:607:            let doc_id = DocId::from_key(&stored.id)?;
+crates/contextra-rank/src/fusion/types.rs:38:        let doc_id = contextra_types::DocId::from_key(&r.id).map_err(|e| {
+crates/contextra-engine/src/collection/crud/delete.rs:44:        let doc_id = DocId::from_key(id)?;
+crates/contextra-engine/src/collection/crud/delete.rs:61:        if let Ok(eid) = EntityId::from_key(id) {
+crates/contextra-engine/src/collection/crud/update.rs:64:        let doc_id = DocId::from_key(id)?;
+crates/contextra-engine/src/collection/crud/update.rs:111:        if let Ok(eid) = EntityId::from_key(id) {
+crates/contextra-engine/src/collection/crud/insert.rs:315:        let doc_id = DocId::from_key(id)?;
+crates/contextra-engine/src/collection/crud/insert.rs:362:        if let Ok(eid) = EntityId::from_key(id) {
+crates/contextra-engine/src/collection/query_builder/builder.rs:287:            if let Ok(eid) = EntityId::from_key(start_node) {
+crates/contextra-engine/src/collection/query_builder/builder_exec.rs:166:                if let Ok(doc_id) = DocId::from_key(&res.id) {
+crates/contextra-engine/src/collection/maintenance.rs:319:                                    if let Ok(eid) = EntityId::from_key(&stored.id) {
+crates/contextra-engine/src/collection/maintenance.rs:419:            let doc_id = DocId::from_key(&stored.id)?;
+crates/contextra-engine/src/collection/maintenance.rs:699:        let doc_id_typed = DocId::from_key(doc_id)?;
+crates/contextra-engine/src/collection/maintenance.rs:931:                        if let Ok(eid) = EntityId::from_key(&stored.id) {
+crates/contextra-engine/src/collection/search/hybrid/mod.rs:171:                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
+crates/contextra-engine/src/collection/search/hybrid/mod.rs:310:            .map(|res| contextra_types::EntityId::from_key(&res.id).ok())
+crates/contextra-engine/src/collection/search/hybrid/query.rs:425:                    contextra_types::EntityId::from_key(start_node).ok()
+crates/contextra-engine/src/collection/search/hybrid/query.rs:436:                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
+crates/contextra-engine/src/collection/search/hybrid/query.rs:561:                if let Ok(doc_id) = DocId::from_key(&res.id) {
+crates/contextra-engine/src/collection/search/hybrid/query.rs:572:                    if let Ok(doc_id) = DocId::from_key(&res.id) {
+crates/contextra-engine/src/collection/search/filtered.rs:114:                matched.insert(DocId::from_key(&id)?);
+crates/contextra-engine/src/collection/search/filtered.rs:167:            if let Ok(doc_id) = DocId::from_key(&id_str) {
+crates/contextra-vector/src/hnsw/purge.rs:71:                .or_else(|_| DocId::from_key(&target.target_id));
+crates/contextra-agent/src/audit.rs:154:    let doc_id = contextra_types::DocId::from_key(key).map_err(|err| {
+crates/contextra-agent/src/audit.rs:474:        let doc_id = contextra_types::DocId::from_key(key)?;
+crates/contextra-db/src/multistep.rs:367:                        .filter_map(|e| contextra_types::EntityId::from_key(e).ok())
+crates/contextra-graph/src/cascade.rs:450:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:451:        let doc_b = DocId::from_key("doc-b").unwrap();
+crates/contextra-graph/src/cascade.rs:515:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:560:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:606:        let doc_unknown = DocId::from_key("doc-unknown").unwrap();
+crates/contextra-graph/src/cascade.rs:621:        let doc_a = DocId::from_key("doc-max-seq").unwrap();
+crates/contextra-graph/src/cascade.rs:660:        let doc_multi = DocId::from_key("doc-multi").unwrap();
+crates/contextra-graph/src/cascade.rs:698:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:730:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:771:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:802:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:847:        let doc_unknown = DocId::from_key("doc-unknown").unwrap();
+crates/contextra-graph/src/cascade.rs:861:        let doc_a = DocId::from_key("doc-a").unwrap();
+crates/contextra-graph/src/cascade.rs:862:        let doc_b = DocId::from_key("doc-b").unwrap();
+crates/contextra-graph/src/cascade.rs:977:        let doc_to_delete = DocId::from_key("doc-delete-me").unwrap();
+crates/contextra-graph/src/cascade.rs:1050:        let doc_to_delete = DocId::from_key("doc-cycle-test").unwrap();
+crates/contextra-graph/src/purger.rs:53:            .or_else(|_| DocId::from_key(&target.target_id));
+crates/contextra-graph/src/entity_extraction.rs:264:        let source_id = EntityId::from_key(&rel.source)?;
+crates/contextra-graph/src/entity_extraction.rs:265:        let target_id = EntityId::from_key(&rel.target)?;
+crates/contextra-py/src/kv_links.rs:217:        let from_doc_id = DocId::from_key(&from_str).map_err(contextra_err)?;
+crates/contextra-py/src/kv_links.rs:218:        let to_doc_id = DocId::from_key(&to_str).map_err(contextra_err)?;
+crates/contextra-py/src/kv_links.rs:242:        let doc_id = DocId::from_key(&id_str).map_err(contextra_err)?;

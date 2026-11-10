@@ -1,0 +1,9 @@
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+    Checking serde_json v1.0.151
+    Checking ahash v0.8.12
+    Checking ciborium v0.2.2
+    Checking tinytemplate v1.2.1
+    Checking contextra-rank v0.1.0 (/app/crates/contextra-rank)
+    Checking criterion v0.5.1
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.94s
