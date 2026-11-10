@@ -105,7 +105,13 @@ impl FileVault {
     /// Berechnet die Anfangskapazität je Shard nach SPEC D-111 Abs. 7:
     /// `nextpow2(planned_docs * 1.3 / 16 / 0.5).max(1024)`
     pub fn initial_shard_capacity(planned_docs: usize) -> usize {
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
         let val = ((planned_docs as f64) * 1.3) / 16.0 / 0.5;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let p2 = (val as usize).next_power_of_two();
         p2.max(1024)
     }

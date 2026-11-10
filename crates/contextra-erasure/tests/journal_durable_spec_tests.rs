@@ -6,7 +6,10 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    unused_imports,
+    dead_code,
+    clippy::cast_possible_truncation
 )]
 
 use contextra_erasure::journal::appendlog::DurableJournal;

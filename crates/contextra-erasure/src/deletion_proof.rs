@@ -28,8 +28,7 @@ use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
 pub type CryptoError = crate::error::ErasureError;
 use crate::error::ErasureError;
 use crate::types_local::{
-    CollectionId, DocId, ScanTechnique,
-    ScanWitness as LayerWitness, TenantId, TxId, WitnessLayer,
+    CollectionId, DocId, ScanTechnique, ScanWitness as LayerWitness, TenantId, TxId, WitnessLayer,
 };
 /// Typalias für Result.
 pub type Result<T> = std::result::Result<T, crate::error::ErasureError>;
@@ -116,7 +115,8 @@ pub struct GraphRepairAttestation {
 pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     for key in deleted_keys {
-        hasher.update(&(key.len() as u32).to_le_bytes());
+        let len = u32::try_from(key.len()).unwrap_or(u32::MAX);
+        hasher.update(&len.to_le_bytes());
         hasher.update(key);
     }
     *hasher.finalize().as_bytes()
@@ -551,7 +551,7 @@ impl DeletionProof {
 
         let mut covered_layers = Vec::new();
         let mut measurements = Vec::new();
-        let mut seen_layers = std::collections::HashSet::new();
+        let mut seen_layers = std::collections::BTreeSet::new();
 
         for w in witnesses {
             // Check for remaining > 0 -> Err
@@ -577,15 +577,12 @@ impl DeletionProof {
             }
 
             // Check technique == ScanTechnique::NotMeasured / LogicalView for physical storage layers -> Err
-            match w.technique() {
-                ScanTechnique::NotMeasured(reason) => {
-                    return Err(ErasureError::Internal(format!(
-                        "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
-                        w.layer(),
-                        reason
-                    )));
-                }
-                _ => {}
+            if let ScanTechnique::NotMeasured(reason) = w.technique() {
+                return Err(ErasureError::Internal(format!(
+                    "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
+                    w.layer(),
+                    reason
+                )));
             }
 
             let witness_layer = w.witness_layer().clone();
@@ -902,11 +899,7 @@ impl DeletionProof {
             ));
         }
 
-        let timestamp = if attested_at >= 0 {
-            attested_at as u64
-        } else {
-            0u64
-        };
+        let timestamp = u64::try_from(attested_at).unwrap_or(0);
 
         let proof_stub = Self {
             signature_version: SignatureVersion::V3.as_u8(),
@@ -1282,7 +1275,13 @@ fn compute_hmac_sha256(key: &[u8], data_parts: &[&[u8]]) -> Result<[u8; 32]> {
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
+#[allow(
+    deprecated,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod tests {
     use crate::types_local::SystemClock;
 

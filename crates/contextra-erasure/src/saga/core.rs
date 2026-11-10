@@ -38,7 +38,7 @@ use crate::types_local::{
 use crate::types_local::{EraseTarget, ErasureLayer, LayerId, LayerScope, PurgeCx};
 use crate::types_local::{ErasureEvent, ErasureObserver, ObservedPhase, TargetKind};
 use crate::types_local::{ErasureId, Timestamp};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{oneshot, RwLock};
@@ -89,7 +89,7 @@ pub struct ErasureDeps {
     /// Schichten (Storage, Text, Vektor).
     pub layers: Vec<Arc<dyn ErasureLayer>>,
     /// Feste Prioritäten der Schichten.
-    pub layer_priorities: HashMap<[u8; 16], PurgePriority>,
+    pub layer_priorities: BTreeMap<[u8; 16], PurgePriority>,
     /// Commit-Barriere für Gate-Gruppen-Commit.
     pub commit_barrier: Arc<dyn CommitBarrier>,
     /// Purge-Barriere für exklusiven Purge gegen Kompaktion.
@@ -139,6 +139,27 @@ struct ActiveEntry {
     gated_seq: u64,
 }
 
+struct PurgeVerifyParams<'a> {
+    erasure_id: ErasureId,
+    target: &'a EraseTarget,
+    attestation: &'a RetentionAttestation,
+    gated_seq: u64,
+    scopes: Vec<(LayerId, LayerScope)>,
+    deps: Arc<ErasureDeps>,
+    cfg: &'a ErasureConfig,
+    active_sagas: Arc<RwLock<BTreeMap<ErasureId, ActiveEntry>>>,
+    open_keys: Arc<RwLock<BTreeMap<[u8; 32], ErasureId>>>,
+    open_key: [u8; 32],
+}
+
+type PurgeCandidate = (
+    ErasureId,
+    EraseTarget,
+    RetentionAttestation,
+    u64,
+    Vec<(LayerId, LayerScope)>,
+);
+
 impl ErasureCore {
     /// Hilfsfunktion zur Ermittlung des aktuellen Zeitstempels in Millisekunden.
     fn now_millis(clock: &dyn Clock) -> u64 {
@@ -169,8 +190,8 @@ impl ErasureCore {
 pub struct ErasureCore {
     cfg: ErasureConfig,
     deps: Arc<ErasureDeps>,
-    active_sagas: Arc<RwLock<HashMap<ErasureId, ActiveEntry>>>,
-    open_keys: Arc<RwLock<HashMap<[u8; 32], ErasureId>>>,
+    active_sagas: Arc<RwLock<BTreeMap<ErasureId, ActiveEntry>>>,
+    open_keys: Arc<RwLock<BTreeMap<[u8; 32], ErasureId>>>,
 }
 
 impl ErasureCore {
@@ -179,8 +200,8 @@ impl ErasureCore {
         Self {
             cfg,
             deps: Arc::new(deps),
-            active_sagas: Arc::new(RwLock::new(HashMap::new())),
-            open_keys: Arc::new(RwLock::new(HashMap::new())),
+            active_sagas: Arc::new(RwLock::new(BTreeMap::new())),
+            open_keys: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
@@ -264,38 +285,36 @@ impl ErasureCore {
         let target_bytes = Self::canonical_target_bytes(&req.target);
         let open_key = derive_open_key(&self.cfg.k_idx, &target_bytes, mode_byte);
 
-        {
-            let keys = self.open_keys.read().await;
-            if let Some(existing_id) = keys.get(&open_key) {
-                let map = self.active_sagas.read().await;
-                if let Some(entry) = map.get(existing_id) {
-                    let status = match entry.saga.state() {
-                        SagaState::Requested => ErasureStatus::Requested,
-                        SagaState::Gated => ErasureStatus::Gated,
-                        SagaState::KeyDestroyed => ErasureStatus::KeyDestroyed,
-                        SagaState::Purging => ErasureStatus::Purging,
-                        SagaState::Verifying => ErasureStatus::Verifying,
-                        SagaState::Completed => ErasureStatus::Completed,
-                        SagaState::Restricted => ErasureStatus::Restricted,
-                        SagaState::Lifted => ErasureStatus::Lifted,
-                        SagaState::Pending => ErasureStatus::Pending {
-                            phase: Phase::Purge,
-                            reason: entry
-                                .saga
-                                .pending_reason()
-                                .cloned()
-                                .unwrap_or(PendingReason::Io),
-                        },
-                        SagaState::Refused => {
-                            ErasureStatus::Refused(RefusalReason::RetentionObligation)
-                        }
-                    };
-                    return Ok(EraseReceipt {
-                        id: *existing_id,
-                        status,
-                        gated_at: Timestamp(Self::now_millis(self.deps.clock.as_ref())),
-                    });
-                }
+        let existing_id_opt = { self.open_keys.read().await.get(&open_key).copied() };
+        if let Some(existing_id) = existing_id_opt {
+            let entry_opt = { self.active_sagas.read().await.get(&existing_id).cloned() };
+            if let Some(entry) = entry_opt {
+                let status = match entry.saga.state() {
+                    SagaState::Requested => ErasureStatus::Requested,
+                    SagaState::Gated => ErasureStatus::Gated,
+                    SagaState::KeyDestroyed => ErasureStatus::KeyDestroyed,
+                    SagaState::Purging => ErasureStatus::Purging,
+                    SagaState::Verifying => ErasureStatus::Verifying,
+                    SagaState::Completed => ErasureStatus::Completed,
+                    SagaState::Restricted => ErasureStatus::Restricted,
+                    SagaState::Lifted => ErasureStatus::Lifted,
+                    SagaState::Pending => ErasureStatus::Pending {
+                        phase: Phase::Purge,
+                        reason: entry
+                            .saga
+                            .pending_reason()
+                            .cloned()
+                            .unwrap_or(PendingReason::Io),
+                    },
+                    SagaState::Refused => {
+                        ErasureStatus::Refused(RefusalReason::RetentionObligation)
+                    }
+                };
+                return Ok(EraseReceipt {
+                    id: existing_id,
+                    status,
+                    gated_at: Timestamp(Self::now_millis(self.deps.clock.as_ref())),
+                });
             }
         }
 
@@ -327,8 +346,8 @@ impl ErasureCore {
         req: EraseExecutionRequest,
         deps: Arc<ErasureDeps>,
         cfg: ErasureConfig,
-        active_sagas: Arc<RwLock<HashMap<ErasureId, ActiveEntry>>>,
-        open_keys: Arc<RwLock<HashMap<[u8; 32], ErasureId>>>,
+        active_sagas: Arc<RwLock<BTreeMap<ErasureId, ActiveEntry>>>,
+        open_keys: Arc<RwLock<BTreeMap<[u8; 32], ErasureId>>>,
         open_key: [u8; 32],
     ) -> Result<EraseReceipt, ErasureError> {
         let erasure_id = req.erasure_id;
@@ -408,7 +427,7 @@ impl ErasureCore {
                 Ok(s) => s,
                 Err(_err) => {
                     let reason = PendingReason::LayerFailed(TypesLayerId(layer.id().0));
-                    saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+                    saga.transition_with_reason(SagaState::Pending, Some(reason))?;
                     deps.journal
                         .append_state(erasure_id, SagaState::Pending, Some(&reason))
                         .await?;
@@ -454,7 +473,7 @@ impl ErasureCore {
             if let Some((_, scope)) = scopes.iter().find(|(id, _)| *id == layer.id()) {
                 if let Err(_err) = layer.on_gate(scope).await {
                     let reason = PendingReason::LayerFailed(TypesLayerId(layer.id().0));
-                    saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+                    saga.transition_with_reason(SagaState::Pending, Some(reason))?;
                     deps.journal
                         .append_state(erasure_id, SagaState::Pending, Some(&reason))
                         .await?;
@@ -488,7 +507,7 @@ impl ErasureCore {
         let absent = deps.vault.verify_key_absent(&req.target).await?;
         if !absent {
             let reason = PendingReason::Io;
-            saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+            saga.transition_with_reason(SagaState::Pending, Some(reason))?;
             deps.journal
                 .append_state(erasure_id, SagaState::Pending, Some(&reason))
                 .await?;
@@ -544,18 +563,18 @@ impl ErasureCore {
 
         // Falls Timing::Now gewählt ist, Purge direkt ausführen, ansonsten übernimmt der Hintergrundläufer
         if req.timing == Timing::Now {
-            let purge_res = Self::execute_purge_and_verify(
+            let purge_res = Self::execute_purge_and_verify(PurgeVerifyParams {
                 erasure_id,
-                &req.target,
-                &req.attestation,
+                target: &req.target,
+                attestation: &req.attestation,
                 gated_seq,
                 scopes,
-                Arc::clone(&deps),
-                &cfg,
-                Arc::clone(&active_sagas),
-                Arc::clone(&open_keys),
+                deps: Arc::clone(&deps),
+                cfg: &cfg,
+                active_sagas: Arc::clone(&active_sagas),
+                open_keys: Arc::clone(&open_keys),
                 open_key,
-            )
+            })
             .await;
 
             if let Ok(status) = purge_res {
@@ -577,20 +596,26 @@ impl ErasureCore {
 
     /// Führt die Schritte 5 (Purge) und 6 (Messung & Abschluss) durch.
     async fn execute_purge_and_verify(
-        erasure_id: ErasureId,
-        target: &EraseTarget,
-        attestation: &RetentionAttestation,
-        gated_seq: u64,
-        scopes: Vec<(LayerId, LayerScope)>,
-        deps: Arc<ErasureDeps>,
-        cfg: &ErasureConfig,
-        active_sagas: Arc<RwLock<HashMap<ErasureId, ActiveEntry>>>,
-        open_keys: Arc<RwLock<HashMap<[u8; 32], ErasureId>>>,
-        open_key: [u8; 32],
+        params: PurgeVerifyParams<'_>,
     ) -> Result<ErasureStatus, ErasureError> {
+        let PurgeVerifyParams {
+            erasure_id,
+            target,
+            attestation,
+            gated_seq,
+            scopes,
+            deps,
+            cfg,
+            active_sagas,
+            open_keys,
+            open_key,
+        } = params;
+
         let mut saga = {
-            let map = active_sagas.read().await;
-            map.get(&erasure_id)
+            active_sagas
+                .read()
+                .await
+                .get(&erasure_id)
                 .map(|e| e.saga.clone())
                 .unwrap_or_else(|| EraseSaga::with_id(erasure_id))
         };
@@ -603,7 +628,7 @@ impl ErasureCore {
         let reserve = check_disk_reserve(cfg.min_free_bytes, 0)?;
         if let ReserveCheck::Insufficient { .. } = reserve {
             let reason = PendingReason::DiskReserve;
-            saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+            saga.transition_with_reason(SagaState::Pending, Some(reason))?;
             deps.journal
                 .append_state(erasure_id, SagaState::Pending, Some(&reason))
                 .await?;
@@ -641,13 +666,13 @@ impl ErasureCore {
                 .unwrap_or(PurgePriority::SLOT_CLEANUP)
         });
 
-        let purge_cx = PurgeCx::new(cfg.erase_sla.as_millis() as u64);
+        let purge_cx = PurgeCx::new(u64::try_from(cfg.erase_sla.as_millis()).unwrap_or(u64::MAX));
 
         for layer in &sorted_layers {
             if let Some((_, scope)) = scopes.iter().find(|(id, _)| *id == layer.id()) {
                 if let Err(_err) = layer.purge(scope, &purge_cx).await {
                     let reason = PendingReason::LayerFailed(TypesLayerId(layer.id().0));
-                    saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+                    saga.transition_with_reason(SagaState::Pending, Some(reason))?;
                     deps.journal
                         .append_state(erasure_id, SagaState::Pending, Some(&reason))
                         .await?;
@@ -682,7 +707,7 @@ impl ErasureCore {
                 Ok(w) => witnesses.push(w),
                 Err(ErasureError::Residue(_)) | Err(ErasureError::Corrupt) => {
                     let reason = PendingReason::WitnessMissing;
-                    saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+                    saga.transition_with_reason(SagaState::Pending, Some(reason))?;
                     deps.journal
                         .append_state(erasure_id, SagaState::Pending, Some(&reason))
                         .await?;
@@ -759,15 +784,11 @@ impl ErasureCore {
     ) -> Result<crate::purge::window::WindowOutcome, ErasureError> {
         let mut outcome = crate::purge::window::WindowOutcome::empty();
 
-        let candidates: Vec<(
-            ErasureId,
-            EraseTarget,
-            RetentionAttestation,
-            u64,
-            Vec<(LayerId, LayerScope)>,
-        )> = {
-            let map = self.active_sagas.read().await;
-            map.iter()
+        let candidates: Vec<PurgeCandidate> = {
+            self.active_sagas
+                .read()
+                .await
+                .iter()
                 .filter(|(_, entry)| {
                     entry.saga.state() == SagaState::KeyDestroyed
                         || entry.saga.state() == SagaState::Purging
@@ -789,18 +810,18 @@ impl ErasureCore {
             let target_bytes = Self::canonical_target_bytes(&target);
             let open_key = derive_open_key(&self.cfg.k_idx, &target_bytes, mode_byte);
 
-            let res = Self::execute_purge_and_verify(
-                id,
-                &target,
-                &attestation,
+            let res = Self::execute_purge_and_verify(PurgeVerifyParams {
+                erasure_id: id,
+                target: &target,
+                attestation: &attestation,
                 gated_seq,
                 scopes,
-                Arc::clone(&self.deps),
-                &self.cfg,
-                Arc::clone(&self.active_sagas),
-                Arc::clone(&self.open_keys),
+                deps: Arc::clone(&self.deps),
+                cfg: &self.cfg,
+                active_sagas: Arc::clone(&self.active_sagas),
+                open_keys: Arc::clone(&self.open_keys),
                 open_key,
-            )
+            })
             .await;
 
             match res {
@@ -861,8 +882,8 @@ impl ErasureCore {
 
     /// Fragt den Status einer Löschung ab.
     pub async fn status(&self, id: ErasureId) -> Result<ErasureCoreStatus, ErasureError> {
-        let map = self.active_sagas.read().await;
-        if let Some(entry) = map.get(&id) {
+        let entry_opt = { self.active_sagas.read().await.get(&id).cloned() };
+        if let Some(entry) = entry_opt {
             let status = match entry.saga.state() {
                 SagaState::Requested => ErasureStatus::Requested,
                 SagaState::Gated => ErasureStatus::Gated,

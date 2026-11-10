@@ -475,6 +475,7 @@ impl DurableVaultShard {
     /// 1. Schreibt in EINEM 64-Byte-Schreibvorgang das Grabstein-Abbild (tombstone_image)
     /// 2. sync_data
     /// 3. read_verified Verifikation: Bytes 0 und 2..56 sind 0, Byte 1 ist 0x02, MAC ist gültig.
+    ///
     /// Bei Fehler: Shard irreversibel poisoned (D-55, I-10).
     pub fn destroy(
         &mut self,

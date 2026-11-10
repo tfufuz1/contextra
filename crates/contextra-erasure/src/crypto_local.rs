@@ -56,22 +56,37 @@ pub struct AncestorSalts {
 }
 
 /// Führt HKDF-Expand gemäß RFC 5869 auf Basis von HMAC-SHA256 durch.
-pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<(), ()> {
+/// Fehler bei HKDF-Operationen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum HkdfError {
+    /// Ausgabe-Puffer ueberschreitet die RFC 5869 Grenze (255 * Hash-Laenge).
+    #[error("output length too large")]
+    OutputTooLarge,
+    /// Ungueltiger Schluessel fuer HMAC.
+    #[error("invalid key")]
+    InvalidKey,
+    /// Zaehlerueberlauf.
+    #[error("counter overflow")]
+    CounterOverflow,
+}
+
+/// Fuehrt HKDF-Expand gemaess RFC 5869 auf Basis von HMAC-SHA256 durch.
+pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<(), HkdfError> {
     let hash_len = 32;
     if out.len() > 255 * hash_len {
-        return Err(());
+        return Err(HkdfError::OutputTooLarge);
     }
-    let n = (out.len() + hash_len - 1) / hash_len;
+    let n = out.len().div_ceil(hash_len);
     let mut t = Vec::with_capacity(hash_len);
     let mut offset = 0;
 
     for i in 1..=n {
-        let mut mac = HmacSha256::new_from_slice(prk).map_err(|_| ())?;
+        let mut mac = HmacSha256::new_from_slice(prk).map_err(|_| HkdfError::InvalidKey)?;
         if i > 1 {
             mac.update(&t);
         }
         mac.update(info);
-        let i_byte = u8::try_from(i).map_err(|_| ())?;
+        let i_byte = u8::try_from(i).map_err(|_| HkdfError::CounterOverflow)?;
         mac.update(&[i_byte]);
         t = mac.finalize().into_bytes().to_vec();
 
@@ -90,14 +105,14 @@ pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<(), ()> {
 pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: [u8; 16]) -> Dek {
     let mut hasher = Sha256::new();
     hasher.update(b"ctx/dek-salt/v2");
-    hasher.update(&a.t);
-    hasher.update(&a.c);
+    hasher.update(a.t);
+    hasher.update(a.c);
     if let Some(s) = a.s {
-        hasher.update(&s);
+        hasher.update(s);
     } else {
-        hasher.update(&[0u8; 32]);
+        hasher.update([0u8; 32]);
     }
-    hasher.update(&a.d);
+    hasher.update(a.d);
     let salt: [u8; 32] = hasher.finalize().into();
 
     let mut info = Vec::with_capacity(12 + 32 + 16);
@@ -124,10 +139,10 @@ pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> 
     // Deterministische oder ephemere Nonce generieren
     let mut nonce_hasher = Sha256::new();
     nonce_hasher.update(dek.0.as_bytes());
-    nonce_hasher.update(&doc);
+    nonce_hasher.update(doc);
     nonce_hasher.update(key_bytes);
     let len_bytes = (plain.len() as u64).to_be_bytes();
-    nonce_hasher.update(&len_bytes);
+    nonce_hasher.update(len_bytes);
     let hash: [u8; 32] = nonce_hasher.finalize().into();
     if let (Some(dest), Some(src)) = (nonce.get_mut(..), hash.get(0..12)) {
         dest.copy_from_slice(src);
@@ -239,7 +254,7 @@ pub fn open_record(
     nonce_hasher.update(doc_bytes);
     nonce_hasher.update(key_bytes);
     let len_bytes = (ciphertext.len() as u64).to_be_bytes();
-    nonce_hasher.update(&len_bytes);
+    nonce_hasher.update(len_bytes);
     let hash: [u8; 32] = nonce_hasher.finalize().into();
 
     let mut xof = blake3::Hasher::new_keyed(&hash).finalize_xof();

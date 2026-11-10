@@ -114,8 +114,6 @@ pub fn verify_deletion_proof_v3(
     proof_payload: &[u8],
     signature_bytes: &[u8; 64],
 ) -> Result<(), DeletionProofError> {
-
-
     let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(verifying_key_bytes)
         .map_err(|e| DeletionProofError::InvalidVerifyingKey(e.to_string()))?;
 
