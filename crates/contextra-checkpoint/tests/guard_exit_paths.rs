@@ -15,7 +15,7 @@
 
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_types::{Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -357,10 +357,10 @@ async fn test_guard_uncommitted_drop_with_newer_committed_tx_preserves_newer_tx(
         res.is_err(),
         "Explicit rollback must fail serialization barrier check when newer tx exists"
     );
-    if let Err(ContextraError::Transaction(msg)) = res {
+    if let Err(contextra_checkpoint::CheckpointError::Transaction(msg)) = res {
         assert!(msg.contains("Serialization barrier violation"));
     } else {
-        panic!("Expected ContextraError::Transaction serialization barrier error");
+        panic!("Expected contextra_checkpoint::CheckpointError::Transaction serialization barrier error");
     }
 }
 
