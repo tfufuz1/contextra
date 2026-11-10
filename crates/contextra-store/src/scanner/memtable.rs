@@ -29,7 +29,7 @@ use std::sync::Arc;
 /// Speicher-Engine. Kann daher mit isolierten Test-Daten instanziiert werden.
 pub struct MemtableScanner {
     view: StoreScanView,
-    runtime: ScannerRuntime,
+    _runtime: ScannerRuntime,
 }
 
 impl MemtableScanner {
@@ -40,7 +40,10 @@ impl MemtableScanner {
 
     /// Erzeugt einen neuen `MemtableScanner` aus einer [`StoreScanView`] mit expliziter Runtime.
     pub fn with_runtime(view: StoreScanView, runtime: ScannerRuntime) -> Self {
-        Self { view, runtime }
+        Self {
+            view,
+            _runtime: runtime,
+        }
     }
 
     /// Erzeugt einen `MemtableScanner` aus einem `Arc<LsmStorage>` (Kompatibilitätspfad).

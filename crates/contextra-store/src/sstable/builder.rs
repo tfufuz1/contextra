@@ -335,7 +335,8 @@ impl SstableBuilder {
         })?;
         let mut written = 0;
         while written < buf.len() {
-            let res = file.write_at(&buf[written..], offset.saturating_add(written as u64));
+            let res = file
+                .write_at(&buf[written..], offset.saturating_add(written as u64));
             match res {
                 Ok(0) => {
                     self.poisoned = true;
@@ -555,26 +556,26 @@ impl SstableBuilder {
         self.offset += 54;
 
         // 1. sync_all on written handle
-        let file = self.file.take().ok_or_else(|| {
+        let file_handle = self.file.take().ok_or_else(|| {
             ContextraError::Storage("SstableBuilder file already closed".into())
         })?;
-
-        if let Err(e) = file.sync_all() {
+        if let Err(e) = file_handle.sync_all() {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
             return Err(ContextraError::Io(e));
         }
 
-        let file_size = match file.len() {
+        let file_size = match file_handle.len() {
             Ok(s) => s,
             Err(e) => {
                 self.poisoned = true;
                 let _ = self.vfs.remove_file(&self.tmp_path);
                 return Err(ContextraError::Io(e));
             }
+        };
 
         // Drop file handle before renaming (critical on Windows)
-        drop(file);
+        drop(file_handle);
 
         // 2. Atomic rename from tmp_path to path
         if let Err(e) = self.vfs.rename(&self.tmp_path, &self.path) {

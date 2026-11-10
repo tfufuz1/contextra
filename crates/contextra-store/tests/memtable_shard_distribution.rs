@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-09-28T00:00:00Z
 // ZWECK: Integrationstests für MemTable Systempräfix-Hash-Sharding und Scans.
-// INVARIANTEN: Systempräfix-Schlüssel verteilen sich gleichmäßig über Shards; Scans stimmen 100% mit BTreeMap überein.
+// INVARIANTEN: Systempräfix-Schlüssel verteilen sich gleichmäßig über Shards; Scans stimmen vollständig mit BTreeMap überein.
 
 #![allow(
     clippy::unwrap_used,

@@ -391,4 +391,21 @@ mod tests {
             let _ = h.await;
         }
     }
+
+    struct DummyPressureSignal;
+    impl SystemPressureSignal for DummyPressureSignal {
+        fn current_pressure(&self) -> PressureLevel {
+            PressureLevel::Normal
+        }
+        fn advise_reduction_ratio(&self) -> f32 {
+            0.0
+        }
+    }
+
+    #[test]
+    fn test_system_pressure_signal_contract() {
+        let sig = DummyPressureSignal;
+        assert_eq!(sig.current_pressure(), PressureLevel::Normal);
+        assert_eq!(sig.advise_reduction_ratio(), 0.0);
+    }
 }
