@@ -1,86 +1,115 @@
-# SPEC: `contextra-sandbox` (Ring 2, Klasse A)
+# contextra-sandbox — Spezifikation
 
-> **Normativer Status:** Verbindliche Spezifikation gemäß SPEC v4.0 §2, §3, §4, §5.1 (Klasse A Baustein).
-> **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` im gesamten Produktions- und Testcode.
-> **Ring-Zugehörigkeit:** Ring 2 (WASM Execution Boundary & Isolation Sandbox).
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
----
+**Pfad:** `crates/contextra-sandbox/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
-## 1. Zweck & Abgrenzung
+## 1. Zweck
 
-`contextra-sandbox` stellt eine isolierte, eng begrenzte WASM-Ausführungsumgebung für die `CodeExecution`-Permission sowie für LSM-Tree-Filter- und Merge-Operatoren bereit.
+Sandbox-Ausführung und Zustandsmaschine für Freigaben. *[S]*
 
-### Ziele
-- **Deterministische CPU-Drosselung:** Fuel-Metering verhindert Endlosschleifen (INV-SBX-1).
-- **Strikte Speichergrenzen:** WASM-Speicher und Tabellengröße werden durch `wasmtime::ResourceLimiter` drosselbar begrenzt (INV-SBX-2).
-- **Least-Privilege-Sicherheit:** Deny-by-default für Dateisystem-, Netzwerk-, PRNG- und Cloud-Egress-Zugriffe.
-- **Fail-Closed-Fehlerbehandlung:** Alle Grenzüberschreitungen und Traps enden in typisierten Fehlern (`SandboxError`), ohne Prozessabbrüche oder Panics.
-- **Vollständige Entkopplung:** 0 interne Abhängigkeiten; `wasmtime`, `tokio` und `anyhow` liegen strikt hinter dem optionalen Feature `wasm` (B6).
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
 
-### Nicht-Ziele
-- Kein allgemeiner WASM-Compiler (nur Ausführung vorab kompilierter `.wasm`-Binaries).
-- Keine Löschketten-, Saga- oder Deletion-Proof-Logik (§6).
-- Kein permanenter Dateisystem-Zustand.
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | safety |
+| Ebene (Kern-Closure) | 0 |
+| Kern-Closure | — |
+| Default-Features | — |
+| Fehlertyp (R3) | besteht |
+| Brücke (hinter Feature `workspace`, §1.1) | — |
 
----
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
 
-## 2. Invarianten (DbC)
+## 3. Ist-Zustand (tools/)
 
-### INV-SBX-1: Deterministische Fuel-Drosselung & CPU-Budget
-Jede WASM-Ausführung erfolgt mit einem konfigurierten Fuel-Budget (`max_fuel`).
-- Wenn das Fuel-Budget vor Abschluss der Ausführung erschöpft ist, bricht die Runtime garantiert mit `SandboxError::FuelExhausted { consumed }` ab.
-- Wall-Clock-Timeout (`max_wall_clock_ms`) dient als orthogonales Sicherheitsnetz gegen I/O- oder Thread-Hangs und terminiert mit `SandboxError::Timeout`.
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 1984 Zeilen in 14 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | keine |
+| Interne Dev-Abhängigkeiten (Ist) | keine |
+| Features (Ist, Anzahl) | 2 |
+| Default-Features (Ist) | keine |
+| `cfg(feature = …)`-Stellen in src/ | 5 |
+| `#[test]`-Vorkommen (grep, src + tests) | 14 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 0 (Tool 10; 10 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 0 / 0 / False |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 2 (Tool 4) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | SandboxError, ApprovalTransitionError |
 
-### INV-SBX-2: Strikte Speichergrenzen & Memory Growth
-WASM-Memory- und Tabellenwachstum werden über den `SandboxState`-Ressourcenbegrenzer kontrolliert.
-- Allokationen über `max_memory_pages` (64 KB pro Page) oder `max_table_entries` werden durch `memory_growing` bzw. `table_growing` abgewiesen (`Ok(false)`).
-- Jeder Versuch, das Limit zu überschreiten, resultiert in einem kontrollierten Fehler ohne Panics oder unkontrollierte OOMs des Host-Prozesses.
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
 
-### INV-SBX-3: Capability-Whitelisting (Deny-by-default)
-WASM-Gäste besitzen standardmäßig:
-- Keinen Zugriff auf das Host-Dateisystem (`allow_filesystem = false`).
-- Keinen Zugriff auf Host-Netzwerk-Sockets (`allow_network = false`).
-- Keinen Zugriff auf die Host-Uhr (`allow_clock = false`).
-- Keinen Zugriff auf unkontrollierte Entropie (`random_seed = None`).
-- Keinen Zugriff auf Cloud-Egress (`allow_cloud_egress = false`).
-Verletzungen führen zu `SandboxError::CapabilityViolation`.
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
 
-### INV-WASM-DET-1: Multi-Architektur-Determinismus
-Gleiches WASM-Modul, gleiche Eingabebytes und gleicher Fuel-Wert führen über x86-64 und AArch64 hinweg zu bit-identischer Ausgabe (`stdout`) und exakt identischem Fuel-Verbrauch.
+## 4. Ist-vs-Ziel-Abgleich [V]
 
-### INV-OUTPUT-ZEROIZE: ZeroizeOnDrop für sensible Daten
-Die `stdout`-Ausgabe (`WasmOutput.stdout`) implementiert `ZeroizeOnDrop` und wird beim Verlassen des Gültigkeitsbereichs im Speicher genullt (P9).
+- **Ist-Kanten, die das Ziel nicht vorsieht:** keine
+- **Ziel-Kanten, die im Ist fehlen:** keine
+- **Default-Features:** Ist = Ziel (leer).
 
----
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
 
-## 3. Sicherheits- und Vulnerabilitäts-Audit
+- Keine zusätzlichen Abweichungen in dieser Prüfung festgestellt. Die Aussagen aus docs/SPEC.md sind nur dort übernommen, wo sie oben nicht widersprochen werden.
 
-### RUSTSEC-2026-0269 (Wasmtime Trailing Slash Symlink Escape)
-- **Status:** Geprüft und abgesichert.
-- **Hintergrund:** In Wasmtime vor `36.0.14` führten Trailing Slashes bei Symlink-Auflösungen zu potenziellen Filesystem-Escapes.
-- **Auflösung:** `contextra-sandbox` verwendet Wasmtime Version `36.0.19` (gepatcht ab `36.0.14`), womit die Schwachstelle behoben ist.
-- **Regressionstest:** `test_abuse_filesystem_trailing_slash_symlink_escape_blocked` in `tests/abuse_test_matrix.rs` stellt sicher, dass Pfadmanipulationen mit Trailing Slashes fail-closed abgewiesen werden.
+## 6. Anforderungen
 
----
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
 
-## 4. Fehlermodell (`SandboxError`)
+keine Änderung; Doku-Hinweis, dass `mcp/sandbox.rs` ein anderes Ding ist.
 
-Alle Fehlermöglichkeiten sind im typisierten Enum `SandboxError` (`#[non_exhaustive]`) zusammengefasst:
-- `Timeout { timeout_ms }`: Wall-Clock-Timeout überschritten.
-- `MemoryExceeded { pages, max_pages }`: Speicherobergrenze erreicht.
-- `FuelExhausted { consumed }`: CPU-Fuel-Budget aufgebraucht.
-- `CapabilityViolation { capability }`: Unerlaubter Zugriff auf unberechtigte Subsysteme.
-- `WasmTrap(String)`: WASM-Trap (z. B. Division durch 0, unreachable).
-- `InvalidModule(String)`: Ungültiges WASM-Binary oder Größenüberschreitung.
-- `OutputLimitExceeded { stream, limit }`: Stdout/Stderr-Pufferüberlauf.
-- `InputTooLarge { len, limit }`: Stdin-Eingabelimit überschritten.
-- `ProcessExit { code }`: Nicht-Null-Beendigung von `proc_exit`.
-- `Runtime(String)`: Interner Wasmtime-Initialisierungs- oder Ausführungsfehler.
+### 6.3 Regeln für jeden Schritt [S]
 
----
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
 
-## 5. Nebenläufigkeits- & Zustandsmodell
+### 6.5 Fehlerabbildung [S]
 
-- **Kein Shared State:** Jede Ausführung erhält einen frischen `Store` und eine isolierte Instanz.
-- **Wait-Free:** Keine Sperren über `.await`-Pfade (`await_holding_lock = deny`).
-- **Thread-Safety:** `WasmExecutor` ist `Send + Sync` und kann nebenläufig für unabhängige Ausführungen genutzt werden.
+Eigener Fehlertyp: besteht (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+Keine Zeile aus dem Golden-Korpus (§5.1) bezieht sich auf dieses Crate.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**zero-panic (Produktion, bereinigt: 0; die ersten 15):** Tool-Gesamt 10, davon 10 in Testdateien (`tests.rs` unter `#[cfg(test)]`, Tool-Fehlklassifikation).
+
+
+**Determinismus (Produktion, bereinigt: 2; die ersten 15):** Tool-Gesamt 4.
+
+- `crates/contextra-sandbox/src/executor/mod.rs:89` — instant_now — `let deadline = tokio::time::Instant::now() + effective_timeout;`
+- `crates/contextra-sandbox/src/executor/mod.rs:121` — instant_now — `start_instant: tokio::time::Instant::now(),`
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-sandbox/src/error.rs:8` — SandboxError
+- `crates/contextra-sandbox/src/approval.rs:61` — ApprovalTransitionError
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B14 — Defaults und leere Features (Teil 2, G5/G6) — bestätigt, plus Ergänzungen**
+> **Entscheidung:** Zieldefaults §3.1. Da `default-members` diese Crates auslässt, genügt „wöchentlich `cargo check`“ nicht als Kompilierbarkeitsgarantie; CI führt bei **jedem** PR `cargo check --workspace --all-targets --locked` aus (S-01). Ein Feature ohne `cfg(feature = "x")` im Quelltext **und** ohne Weiterleitung in einem anderen Manifest wird entfernt; geprüft vom neuen `tools/feature_audit.py` (S-12).
+
+## 10. Entscheidungen und Risiken [S]
+
+Keine Einträge in §9.1 oder §9.2.
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-sandbox --no-default-features --locked
+cargo hack check -p contextra-sandbox --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-sandbox --modes no-default,default,each-feature
+```
+
