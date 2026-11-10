@@ -1,0 +1,112 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running unittests src/lib.rs (target/debug/deps/contextra_license-fe8a5d93f1c1aef9)
+0 tests, 0 benchmarks
+     Running tests/check_ring_order.rs (target/debug/deps/check_ring_order-b525cc0fd6fea517)
+test_order_step_1_fast_ring_bypass: test
+test_order_step_2_missing_activation: test
+test_order_step_3_hash_mismatch_before_signature_check: test
+test_order_step_4_signature_check_before_expiration: test
+test_order_step_5_expiration_before_ring_level_check: test
+test_order_step_6_ring_mismatch: test
+test_order_step_7_success: test
+test_ring_semantics_compliance_does_not_unlock_sovereign_and_open_fast_gate: test
+
+8 tests, 0 benchmarks
+     Running tests/clock_expiration_boundary.rs (target/debug/deps/clock_expiration_boundary-2b9a0a6c1ca38d5f)
+test_clock_drift_and_skew_tolerance: test
+test_expiration_exact_boundary_conditions: test
+test_system_clock_rollback_behavior: test
+
+3 tests, 0 benchmarks
+     Running tests/crypto_hygiene_payload.rs (target/debug/deps/crypto_hygiene_payload-f68907c0eaa569ba)
+test_canonical_serialization_rejects_trailing_garbage: test
+test_constant_time_eq_32_matching: test
+test_constant_time_eq_32_mismatch_all_bytes: test
+test_constant_time_eq_32_mismatch_single_byte: test
+test_custom_max_payload_bytes_limit: test
+test_payload_exceeding_max_bytes_fails: test
+
+6 tests, 0 benchmarks
+     Running tests/error_no_information_leak.rs (target/debug/deps/error_no_information_leak-017cc28352c040de)
+test_not_activated_error_formatting_contains_no_hashes_or_local_ids: test
+
+1 test, 0 benchmarks
+     Running tests/installation_binding.rs (target/debug/deps/installation_binding-bddfd83641fe8acd)
+test_expired_after_expiration_time: test
+test_fast_ring_always_allowed_across_all_states: test
+test_flipped_bit_in_payload_fails_construction: test
+test_legacy_payload_bytes_without_installation_id_hash: test
+test_mismatched_installation_id_returns_not_activated: test
+test_payload_with_hash_gate_without_local_id_returns_not_activated: test
+
+6 tests, 0 benchmarks
+     Running tests/installation_binding_isolation.rs (target/debug/deps/installation_binding_isolation-93f09ff9d86949d9)
+test_copied_activation_to_foreign_host_fails: test
+test_derive_local_installation_id_hash_stability: test
+test_installation_mismatch_step_error_conversion_leaks_no_raw_hash: test
+
+3 tests, 0 benchmarks
+     Running tests/key_rotation.rs (target/debug/deps/key_rotation-2319da5d77c94676)
+test_invalid_signature_error_contains_no_key_details: test
+test_signed_payload_from_key_a_rejected_by_key_b: test
+test_structural_absence_of_key_id_in_tokens: test
+test_successful_key_swap_procedure: test
+test_tampered_signature_rejected: test
+test_token_from_key_a_rejected_by_key_b: test
+
+6 tests, 0 benchmarks
+     Running tests/legacy_payload_compat.rs (target/debug/deps/legacy_payload_compat-a469bf1035ab1862)
+test_corrupted_new_payload_not_accepted_as_legacy: test
+test_legacy_payload_rejected_without_flag: test
+test_legacy_payload_roundtrip_deserialization_with_flag: test
+test_new_payload_roundtrip_deserialization: test
+
+4 tests, 0 benchmarks
+     Running tests/license_gate_default.rs (target/debug/deps/license_gate_default-d4a31f8661b17f9f)
+test_open_fast_gate_denies_compliance_ring: test
+test_open_fast_gate_denies_sovereign_ring: test
+test_open_fast_gate_permits_fast_ring: test
+
+3 tests, 0 benchmarks
+     Running tests/negative_matrix_and_from_activation.rs (target/debug/deps/negative_matrix_and_from_activation-3d6b9085d91770e2)
+test_from_activation_constructor_uses_system_clock: test
+test_negative_10_missing_activation_or_payload_gate: test
+test_negative_1_manipulated_signature_rejected: test
+test_negative_2_wrong_verifying_key_rejected: test
+test_negative_3_expired_activation_rejected: test
+test_negative_4_wrong_ring_product_id_rejected: test
+test_negative_5_wrong_installation_id_rejected: test
+test_negative_6_truncated_payload_bytes_rejected: test
+test_negative_7_empty_payload_bytes_rejected: test
+test_negative_8_legacy_payload_without_flag_rejected: test
+test_negative_9_legacy_payload_with_flag_permitted: test
+
+11 tests, 0 benchmarks
+     Running tests/signature_covers_all_fields.rs (target/debug/deps/signature_covers_all_fields-b4e984ad1bc67dba)
+test_signature_covers_expires_at_unix: test
+test_signature_covers_installation_id_hash: test
+test_signature_covers_ring: test
+
+3 tests, 0 benchmarks
+     Running tests/signed_activation_7_steps.rs (target/debug/deps/signed_activation_7_steps-dca341469043250a)
+test_step_1_fast_ring_without_any_activation_is_ok: test
+test_step_2_missing_activation_returns_not_activated: test
+test_step_3_mismatched_installation_id_returns_not_activated_before_signature_check: test
+test_step_4_tampered_signature_returns_invalid_signature: test
+test_step_5_expired_activation_returns_expired: test
+test_step_6_insufficient_activated_ring_returns_not_activated: test
+test_step_7_fully_valid_activation_returns_ok: test
+
+7 tests, 0 benchmarks
+     Running tests/signed_gate.rs (target/debug/deps/signed_gate-8035c0540748efa2)
+test_expired_license: test
+test_inv_license_2_fast_ring_always_allowed: test
+test_invalid_signature_rejected: test
+test_invariant_non_destructive_degradation: test
+test_valid_signature_allowed_ring_sovereign: test
+test_valid_signature_missing_ring_compliance: test
+test_verify_ring_inherent_method: test
+
+7 tests, 0 benchmarks
+   Doc-tests contextra_license
+0 tests, 0 benchmarks

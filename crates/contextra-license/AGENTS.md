@@ -40,7 +40,7 @@
 
 | Pfad | Verantwortung |
 |---|---|
-| `lib.rs`, `signed_gate.rs` | `SignedLicenseGate` |
+| `lib.rs`, `signed_gate.rs`, `types.rs`, `compat/` | `SignedLicenseGate`, Kern-Typen, Workspace-Kompatibilitäts-Brücken (`compat::ports`, `compat::types`) |
 
 ## 4. Verträge & Invarianten
 
