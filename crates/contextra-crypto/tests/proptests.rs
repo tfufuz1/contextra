@@ -1,4 +1,3 @@
-#![cfg(feature = "legacy-erasure")]
 //! # Integrationstest: `proptests.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `proptests`.

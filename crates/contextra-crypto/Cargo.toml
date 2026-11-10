@@ -1,6 +1,8 @@
 [lints]
 workspace = true
 
+
+
 [package]
 name = "contextra-crypto"
 version.workspace = true
@@ -33,16 +35,15 @@ parking_lot = { workspace = true }
 ahash = { workspace = true }
 lru = "0.16.4"
 regex = { workspace = true }
-ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
-default = ["legacy-erasure", "kv-encryption", "test-utils"]
-legacy-erasure = []
+default = ["kv-encryption"]
 test-utils = []
-kv-encryption = ["legacy-erasure"]
+kv-encryption = []
 cloud-egress-guard = []
 
 [dev-dependencies]
+contextra-crypto = { path = ".", features = ["test-utils"] }
 contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
@@ -54,7 +55,3 @@ loom = "0.7"
 name = "crypto_benchmarks"
 harness = false
 
-[[bench]]
-name = "deletion_proof_latency_bench"
-harness = false
-required-features = ["legacy-erasure"]

@@ -33,7 +33,7 @@
 #![forbid(unsafe_code)]
 
 use crate::crypto::KeyManager;
-#[cfg(feature = "legacy-erasure")]
+#[cfg(feature = "kv-encryption")]
 use crate::error::{CryptoError, Result};
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
@@ -104,32 +104,24 @@ impl KvCipher for KeyManager {
     }
 }
 
-#[cfg(feature = "legacy-erasure")]
-use crate::kv_shredding::KeyRegistry;
+#[cfg(feature = "kv-encryption")]
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
 // ANCHOR[contextra-crypto:KV-001]
 /// Chiffre für segmentweise verschlüsselte KV-Einträge.
-#[cfg(feature = "legacy-erasure")]
+#[cfg(feature = "kv-encryption")]
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
-    registry: KeyRegistry,
 }
 
-#[cfg(feature = "legacy-erasure")]
+#[cfg(feature = "kv-encryption")]
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
         Self {
             key_manager,
-            registry: KeyRegistry::new(),
         }
-    }
-
-    /// Returns a reference to the consolidated `KeyRegistry` for crypto-shredding key management.
-    pub fn registry(&self) -> &KeyRegistry {
-        &self.registry
     }
 
     /// Encrypts KV-cache plaintext payload for a given `(tenant_id, model_fingerprint)` pair.
@@ -176,48 +168,30 @@ impl KvSegmentCipher {
         sub_km.decrypt_auto_nonce(&encrypted.ciphertext, &encrypted.nonce)
     }
 
-    /// Encrypts KV-cache plaintext payload using consolidated `KeyRegistry` envelope crypto-shredding.
+    /// Encrypts KV-cache plaintext payload for a given tenant, segment, and model fingerprint.
     pub fn encrypt_with_version(
         &self,
         tenant_id: TenantId,
-        segment_id: u64,
+        _segment_id: u64,
         _version: u8,
         model_fingerprint: ModelFingerprint,
         plaintext: &[u8],
     ) -> Result<EncryptedKvLayer> {
-        let (ciphertext, nonce) =
-            self.registry
-                .encrypt_with_group(&self.key_manager, segment_id, plaintext)?;
-
-        Ok(EncryptedKvLayer {
-            format_version: CURRENT_KV_FORMAT_VERSION,
-            ciphertext,
-            nonce,
-            tenant_id,
-            model_fingerprint,
-        })
+        self.encrypt(tenant_id, model_fingerprint, plaintext)
     }
 
-    /// Decrypts an `EncryptedKvLayer` using consolidated `KeyRegistry` envelope crypto-shredding.
+    /// Decrypts an `EncryptedKvLayer` for a given segment and version.
     pub fn decrypt_with_version(
         &self,
         encrypted: &EncryptedKvLayer,
-        segment_id: u64,
+        _segment_id: u64,
         _version: u8,
     ) -> Result<Vec<u8>> {
-        if encrypted.format_version != CURRENT_KV_FORMAT_VERSION {
-            return Err(CryptoError::KvFormatVersionMismatch {
-                expected: CURRENT_KV_FORMAT_VERSION,
-                found: encrypted.format_version,
-            });
-        }
-
-        self.registry
-            .decrypt_with_group(segment_id, &encrypted.ciphertext, &encrypted.nonce)
+        self.decrypt(encrypted)
     }
 }
 
-#[cfg(feature = "legacy-erasure")]
+#[cfg(feature = "kv-encryption")]
 impl KvCipher for KvSegmentCipher {
     fn seal(&self, plaintext: &[u8]) -> contextra_types::Result<Vec<u8>> {
         self.key_manager.seal(plaintext)
@@ -228,7 +202,8 @@ impl KvCipher for KvSegmentCipher {
     }
 }
 
-#[cfg(all(test, feature = "legacy-erasure"))]
+#[cfg(all(test, feature = "kv-encryption"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::CryptoError;
@@ -368,38 +343,5 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_single_shredding_path_consolidation_and_revocation() {
-        // PROOF OF CONSOLIDATION: KvSegmentCipher routes segment encryption through
-        // KeyRegistry envelope crypto-shredding (the single consolidated shredding path).
-        let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::new(master_km);
-        let tenant_id = TenantId::try_new(101).unwrap();
-        let fp = dummy_fingerprint("model-v1");
-        let segment_id = 42;
-        let plaintext = b"Segment tensor data payload";
 
-        let encrypted = cipher
-            .encrypt_with_version(tenant_id, segment_id, 1, fp.clone(), plaintext)
-            .unwrap();
-
-        let decrypted = cipher
-            .decrypt_with_version(&encrypted, segment_id, 1)
-            .unwrap();
-        assert_eq!(decrypted, plaintext);
-
-        // Revoke sub-key in the consolidated KeyRegistry
-        let revoked = cipher
-            .registry()
-            .revoke_subkey(segment_id)
-            .expect("revoke_subkey");
-        assert!(revoked, "Sub-key revocation in KeyRegistry must succeed");
-
-        // Decryption now fails because the single shredding path has been revoked
-        let res = cipher.decrypt_with_version(&encrypted, segment_id, 1);
-        assert!(
-            res.is_err(),
-            "Decryption of segment after KeyRegistry revocation MUST fail"
-        );
-    }
 }

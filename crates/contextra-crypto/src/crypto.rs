@@ -334,18 +334,6 @@ impl KeyManager {
         Ok(key)
     }
 
-    /// Derives a deletion proof signing key for cryptographic deletion verification.
-    #[deprecated(note = "Use contextra-erasure for deletion proofs and attestation signing")]
-    pub fn derive_deletion_proof_key(&self) -> Result<[u8; 32]> {
-        let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
-            .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
-        let mut key = [0u8; 32];
-        hk.expand(b"deletion-proof", &mut key).map_err(|e| {
-            CryptoError::Crypto(format!("HKDF deletion proof key expansion failed: {}", e))
-        })?;
-        Ok(key)
-    }
-
     /// Internal accessor for instance-bound cached AES-256-GCM-SIV cipher.
     fn cipher(&self) -> Result<&Aes256GcmSiv> {
         if let Some(c) = self.cipher_cache.get() {
@@ -421,6 +409,7 @@ impl KeyManager {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -508,16 +497,6 @@ mod tests {
 
         // Ensure key is zero after wipe
         assert_eq!(km.inspect_key_bytes_for_test(), &[0u8; 32]);
-    }
-
-    #[test]
-    fn test_derive_deletion_proof_key() {
-        let km = KeyManager::try_new("passphrase", b"salt").unwrap();
-        let deletion_key = km.derive_deletion_proof_key().unwrap();
-        assert_ne!(deletion_key, [0u8; 32]);
-
-        let integrity_key = km.integrity_key().unwrap();
-        assert_ne!(deletion_key, integrity_key);
     }
 
     #[test]

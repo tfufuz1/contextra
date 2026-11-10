@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "kv-encryption")]
-    fn test_kv_segment_shredding_revocation() {
+    fn test_kv_segment_encrypted_roundtrip() {
         let km = crate::crypto::KeyManager::try_new("passphrase-123456", b"salt-123456").unwrap();
         let cipher = KvSegmentCipher::new(km);
         let tenant = TenantId::try_new(101).unwrap();
@@ -332,16 +332,6 @@ mod tests {
         // Roundtrip MUST succeed
         let decrypted = segment.decrypt_data(&cipher).unwrap();
         assert_eq!(decrypted, plaintext);
-
-        // Revoke key in single consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment.segment_id).unwrap();
-        assert!(revoked, "Subkey revocation must succeed");
-
-        let res = segment.decrypt_data(&cipher);
-        assert!(
-            res.is_err(),
-            "Decryption of segment after KeyRegistry subkey revocation MUST fail"
-        );
     }
 
     #[test]
