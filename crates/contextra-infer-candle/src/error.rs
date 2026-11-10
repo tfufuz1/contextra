@@ -1,7 +1,7 @@
 //! Kanonische Fehlerarchitektur für `contextra-infer-candle`.
 //!
 //! # Invarianten
-//! - Autarker Klasse-A Baustein: Genau ein primärer Fehlertyp [`Error`].
+//! - Autarker Klasse-A Baustein: Genau ein primärer Fehlertyp [`CandleError`].
 //! - Zero-Panic: Alle Fehlerbedingungen werden typisiert zurückgegeben.
 
 // ANCHOR[contextra-infer-candle:ERROR-001]
@@ -9,7 +9,7 @@
 /// Primärer Fehlertyp für Inferenz- und Modellierungsoperationen.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum Error {
+pub enum CandleError {
     /// E/A-Fehler beim Zugriff auf Modelldateien oder Tensordaten.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -46,5 +46,8 @@ pub enum Error {
     BackendUnavailable(String),
 }
 
+/// Typ-Alias zur Abwärtskompatibilität innerhalb des Crates und für externe Aufrufer.
+pub type Error = CandleError;
+
 /// Kanonischer Result-Typ für `contextra-infer-candle`.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, CandleError>;

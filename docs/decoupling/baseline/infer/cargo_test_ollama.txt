@@ -1,0 +1,159 @@
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling libc v0.2.189
+   Compiling syn v2.0.119
+   Compiling once_cell v1.21.4
+   Compiling pin-project-lite v0.2.17
+   Compiling regex-syntax v0.8.11
+   Compiling aho-corasick v1.1.5
+   Compiling smallvec v1.15.2
+   Compiling serde_core v1.0.229
+   Compiling regex-automata v0.4.18
+   Compiling num-traits v0.2.19
+   Compiling getrandom v0.3.4
+   Compiling crossbeam-utils v0.8.22
+   Compiling tracing-core v0.1.36
+   Compiling scopeguard v1.2.0
+   Compiling lock_api v0.4.14
+   Compiling serde v1.0.229
+   Compiling crossbeam-epoch v0.9.20
+   Compiling rand_core v0.9.5
+   Compiling zmij v1.0.23
+   Compiling parking_lot_core v0.9.12
+   Compiling zerocopy-derive v0.8.56
+   Compiling tracing-attributes v0.1.31
+   Compiling linux-raw-sys v0.12.1
+   Compiling either v1.18.0
+   Compiling itoa v1.0.18
+   Compiling futures-sink v0.3.34
+   Compiling bitflags v2.13.1
+   Compiling futures-core v0.3.34
+   Compiling rustix v1.1.4
+   Compiling tracing v0.1.44
+   Compiling serde_json v1.0.151
+   Compiling zerocopy v0.8.56
+   Compiling parking_lot v0.12.5
+   Compiling crossbeam-deque v0.8.7
+   Compiling getrandom v0.4.3
+   Compiling errno v0.3.14
+   Compiling clap_lex v1.1.0
+   Compiling ciborium-io v0.2.2
+   Compiling lazy_static v1.5.0
+   Compiling futures-task v0.3.34
+   Compiling anstyle v1.0.14
+   Compiling log v0.4.34
+   Compiling plotters-backend v0.3.7
+   Compiling fastrand v2.5.0
+   Compiling plotters-svg v0.3.7
+   Compiling tempfile v3.27.0
+   Compiling tracing-log v0.2.0
+   Compiling clap_builder v4.6.6
+   Compiling futures-util v0.3.34
+   Compiling sharded-slab v0.1.7
+   Compiling signal-hook-registry v1.4.8
+   Compiling rayon-core v1.13.0
+   Compiling half v2.7.1
+   Compiling ciborium-ll v0.2.2
+   Compiling ppv-lite86 v0.2.21
+   Compiling futures-channel v0.3.34
+   Compiling regex v1.13.1
+   Compiling matchers v0.2.0
+   Compiling itertools v0.10.5
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling wait-timeout v0.2.1
+   Compiling thread_local v1.1.10
+   Compiling nu-ansi-term v0.50.3
+   Compiling fnv v1.0.7
+   Compiling bytes v1.12.1
+   Compiling same-file v1.0.6
+   Compiling quick-error v1.2.3
+   Compiling bit-vec v0.8.0
+   Compiling futures-io v0.3.34
+   Compiling cast v0.3.0
+   Compiling bit-set v0.8.0
+   Compiling criterion-plot v0.5.0
+   Compiling futures v0.3.34
+   Compiling rusty-fork v0.3.1
+   Compiling tokio v1.53.1
+   Compiling walkdir v2.5.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling thiserror v2.0.20
+   Compiling rand_chacha v0.9.0
+   Compiling ciborium v0.2.2
+   Compiling clap v4.6.6
+   Compiling rayon v1.12.0
+   Compiling plotters v0.3.7
+   Compiling tinytemplate v1.2.1
+   Compiling tracing-test-macro v0.2.6
+   Compiling rand v0.9.5
+   Compiling rand_xorshift v0.4.0
+   Compiling is-terminal v0.4.17
+   Compiling unarray v0.1.4
+   Compiling anes v0.1.6
+   Compiling oorandom v11.1.5
+   Compiling quick-xml v0.41.0
+   Compiling tracing-test v0.2.6
+   Compiling proptest v1.11.0
+   Compiling contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)
+   Compiling criterion v0.5.1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 28.52s
+     Running unittests src/lib.rs (target/debug/deps/contextra_infer_ollama-5450f29a32108039)
+
+running 22 tests
+test context_prefixer::tests::test_compute_max_prefix_chars ... ok
+test context_prefixer::tests::test_truncate_chars_over_limit ... ok
+test context_prefixer::tests::test_truncate_chars_exact_limit ... ok
+test context_prefixer::tests::test_truncate_chars_german_umlauts ... ok
+test context_prefixer::tests::test_truncate_chars_short_string ... ok
+test context_prefixer::tests::test_truncate_chars_unicode_no_premature_truncation ... ok
+test context_prefixer::tests::test_truncate_chars_unicode_boundary ... ok
+test context_prefixer::tests::test_truncate_chars_zero_and_boundary ... ok
+test context_prefixer::tests::test_truncate_prefix_empty_and_whitespace ... ok
+test context_prefixer::tests::test_truncate_prefix_char_boundary_off_by_one ... ok
+test context_prefixer::tests::test_truncate_prefix_token_boundary_off_by_one ... ok
+test context_prefixer::tests::test_truncate_prefix_word_boundary ... ok
+test importance::tests::test_importance_assessment_serde_backward_compatibility ... ok
+test importance::tests::test_parsed_0_5_score_returns_parsed_confidence ... ok
+test importance::tests::test_score_importance_regex_get ... ok
+test importance::tests::test_score_importance_regex_parsing_edge_cases ... ok
+test importance::tests::test_unparseable_response_logs_warning_with_raw_text ... ok
+test model_info::tests::test_known_dimension_nomic ... ok
+test model_info::tests::test_model_info_deserializes_correctly ... ok
+test importance::tests::test_unparseable_response_returns_unparseable_confidence ... ok
+test importance::tests::test_prop_score_importance_arbitrary_garbage_never_panics ... ok
+test importance::tests::test_prop_score_importance_parse_formats ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/campaign_stub_ollama.rs (target/debug/deps/campaign_stub_ollama-9b9d03d5194c8051)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fake_server_tests.rs (target/debug/deps/fake_server_tests-279cdd8ff33b58ea)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/property_backoff_tests.rs (target/debug/deps/property_backoff_tests-ec1af325e5ea1a3d)
+
+running 1 test
+test test_exponential_backoff_monotonic_and_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/query_rewriter_tests.rs (target/debug/deps/query_rewriter_tests-057230e2b3424b57)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests contextra_infer_ollama
+
+running 1 test
+test crates/contextra-infer-ollama/src/context_prefixer.rs - context_prefixer::ContextPrefixEngine (line 51) ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -2,9 +2,11 @@
 #![forbid(unsafe_code)]
 
 pub mod client;
+#[cfg(feature = "ports-compat")]
+pub mod compat;
 pub mod context_prefixer;
 #[cfg(feature = "client")]
-mod embedding;
+pub mod embedding;
 pub mod error;
 pub mod importance;
 pub mod model_info;

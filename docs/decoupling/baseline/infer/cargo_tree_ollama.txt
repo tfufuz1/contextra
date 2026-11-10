@@ -1,0 +1,192 @@
+contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)
+├── parking_lot v0.12.5
+│   ├── lock_api v0.4.14
+│   │   └── scopeguard v1.2.0
+│   └── parking_lot_core v0.9.12
+│       ├── cfg-if v1.0.4
+│       ├── libc v0.2.189
+│       └── smallvec v1.15.2
+├── regex v1.13.1
+│   ├── aho-corasick v1.1.5
+│   │   └── memchr v2.8.3
+│   ├── memchr v2.8.3
+│   ├── regex-automata v0.4.18
+│   │   ├── aho-corasick v1.1.5 (*)
+│   │   ├── memchr v2.8.3
+│   │   └── regex-syntax v0.8.11
+│   └── regex-syntax v0.8.11
+├── serde v1.0.229
+│   ├── serde_core v1.0.229
+│   └── serde_derive v1.0.229 (proc-macro)
+│       ├── proc-macro2 v1.0.107
+│       │   └── unicode-ident v1.0.24
+│       ├── quote v1.0.47
+│       │   └── proc-macro2 v1.0.107 (*)
+│       └── syn v3.0.4
+│           ├── proc-macro2 v1.0.107 (*)
+│           ├── quote v1.0.47 (*)
+│           └── unicode-ident v1.0.24
+├── serde_json v1.0.151
+│   ├── itoa v1.0.18
+│   ├── memchr v2.8.3
+│   ├── serde_core v1.0.229
+│   └── zmij v1.0.23
+├── thiserror v2.0.20
+│   └── thiserror-impl v2.0.20 (proc-macro)
+│       ├── proc-macro2 v1.0.107 (*)
+│       ├── quote v1.0.47 (*)
+│       └── syn v3.0.4 (*)
+└── tracing v0.1.44
+    ├── pin-project-lite v0.2.17
+    ├── tracing-attributes v0.1.31 (proc-macro)
+    │   ├── proc-macro2 v1.0.107 (*)
+    │   ├── quote v1.0.47 (*)
+    │   └── syn v2.0.119
+    │       ├── proc-macro2 v1.0.107 (*)
+    │       ├── quote v1.0.47 (*)
+    │       └── unicode-ident v1.0.24
+    └── tracing-core v0.1.36
+        └── once_cell v1.21.4
+[dev-dependencies]
+├── criterion v0.5.1
+│   ├── anes v0.1.6
+│   ├── cast v0.3.0
+│   ├── ciborium v0.2.2
+│   │   ├── ciborium-io v0.2.2
+│   │   ├── ciborium-ll v0.2.2
+│   │   │   ├── ciborium-io v0.2.2
+│   │   │   └── half v2.7.1
+│   │   │       ├── cfg-if v1.0.4
+│   │   │       └── zerocopy v0.8.56
+│   │   │           └── zerocopy-derive v0.8.56 (proc-macro)
+│   │   │               ├── proc-macro2 v1.0.107 (*)
+│   │   │               ├── quote v1.0.47 (*)
+│   │   │               └── syn v2.0.119 (*)
+│   │   └── serde v1.0.229 (*)
+│   ├── clap v4.6.6
+│   │   └── clap_builder v4.6.6
+│   │       ├── anstyle v1.0.14
+│   │       └── clap_lex v1.1.0
+│   ├── criterion-plot v0.5.0
+│   │   ├── cast v0.3.0
+│   │   └── itertools v0.10.5
+│   │       └── either v1.18.0
+│   ├── futures v0.3.34
+│   │   ├── futures-channel v0.3.34
+│   │   │   ├── futures-core v0.3.34
+│   │   │   └── futures-sink v0.3.34
+│   │   ├── futures-core v0.3.34
+│   │   ├── futures-io v0.3.34
+│   │   ├── futures-sink v0.3.34
+│   │   ├── futures-task v0.3.34
+│   │   └── futures-util v0.3.34
+│   │       ├── futures-core v0.3.34
+│   │       ├── futures-sink v0.3.34
+│   │       ├── futures-task v0.3.34
+│   │       └── pin-project-lite v0.2.17
+│   ├── is-terminal v0.4.17
+│   │   └── libc v0.2.189
+│   ├── itertools v0.10.5 (*)
+│   ├── num-traits v0.2.19
+│   │   [build-dependencies]
+│   │   └── autocfg v1.5.1
+│   ├── once_cell v1.21.4
+│   ├── oorandom v11.1.5
+│   ├── plotters v0.3.7
+│   │   ├── num-traits v0.2.19 (*)
+│   │   ├── plotters-backend v0.3.7
+│   │   └── plotters-svg v0.3.7
+│   │       └── plotters-backend v0.3.7
+│   ├── rayon v1.12.0
+│   │   ├── either v1.18.0
+│   │   └── rayon-core v1.13.0
+│   │       ├── crossbeam-deque v0.8.7
+│   │       │   ├── crossbeam-epoch v0.9.20
+│   │       │   │   └── crossbeam-utils v0.8.22
+│   │       │   └── crossbeam-utils v0.8.22
+│   │       └── crossbeam-utils v0.8.22
+│   ├── regex v1.13.1 (*)
+│   ├── serde v1.0.229 (*)
+│   ├── serde_derive v1.0.229 (proc-macro) (*)
+│   ├── serde_json v1.0.151 (*)
+│   ├── tinytemplate v1.2.1
+│   │   ├── serde v1.0.229 (*)
+│   │   └── serde_json v1.0.151 (*)
+│   ├── tokio v1.53.1
+│   │   ├── bytes v1.12.1
+│   │   ├── libc v0.2.189
+│   │   ├── mio v1.2.2
+│   │   │   └── libc v0.2.189
+│   │   ├── parking_lot v0.12.5 (*)
+│   │   ├── pin-project-lite v0.2.17
+│   │   ├── signal-hook-registry v1.4.8
+│   │   │   ├── errno v0.3.14
+│   │   │   │   └── libc v0.2.189
+│   │   │   └── libc v0.2.189
+│   │   ├── socket2 v0.6.5
+│   │   │   └── libc v0.2.189
+│   │   └── tokio-macros v2.7.2 (proc-macro)
+│   │       ├── proc-macro2 v1.0.107 (*)
+│   │       ├── quote v1.0.47 (*)
+│   │       └── syn v3.0.4 (*)
+│   └── walkdir v2.5.0
+│       └── same-file v1.0.6
+├── proptest v1.11.0
+│   ├── bit-set v0.8.0
+│   │   └── bit-vec v0.8.0
+│   ├── bit-vec v0.8.0
+│   ├── bitflags v2.13.1
+│   ├── num-traits v0.2.19 (*)
+│   ├── rand v0.9.5
+│   │   └── rand_core v0.9.5
+│   │       └── getrandom v0.3.4
+│   │           ├── cfg-if v1.0.4
+│   │           └── libc v0.2.189
+│   ├── rand_chacha v0.9.0
+│   │   ├── ppv-lite86 v0.2.21
+│   │   │   └── zerocopy v0.8.56 (*)
+│   │   └── rand_core v0.9.5 (*)
+│   ├── rand_xorshift v0.4.0
+│   │   └── rand_core v0.9.5 (*)
+│   ├── regex-syntax v0.8.11
+│   ├── rusty-fork v0.3.1
+│   │   ├── fnv v1.0.7
+│   │   ├── quick-error v1.2.3
+│   │   ├── tempfile v3.27.0
+│   │   │   ├── fastrand v2.5.0
+│   │   │   ├── getrandom v0.4.3
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   └── libc v0.2.189
+│   │   │   ├── once_cell v1.21.4
+│   │   │   └── rustix v1.1.4
+│   │   │       ├── bitflags v2.13.1
+│   │   │       └── linux-raw-sys v0.12.1
+│   │   └── wait-timeout v0.2.1
+│   │       └── libc v0.2.189
+│   ├── tempfile v3.27.0 (*)
+│   └── unarray v0.1.4
+├── quick-xml v0.41.0
+│   └── memchr v2.8.3
+├── tokio v1.53.1 (*)
+└── tracing-test v0.2.6
+    ├── tracing-core v0.1.36 (*)
+    ├── tracing-subscriber v0.3.23
+    │   ├── matchers v0.2.0
+    │   │   └── regex-automata v0.4.18 (*)
+    │   ├── nu-ansi-term v0.50.3
+    │   ├── once_cell v1.21.4
+    │   ├── regex-automata v0.4.18 (*)
+    │   ├── sharded-slab v0.1.7
+    │   │   └── lazy_static v1.5.0
+    │   ├── smallvec v1.15.2
+    │   ├── thread_local v1.1.10
+    │   │   └── cfg-if v1.0.4
+    │   ├── tracing v0.1.44 (*)
+    │   ├── tracing-core v0.1.36 (*)
+    │   └── tracing-log v0.2.0
+    │       ├── log v0.4.34
+    │       ├── once_cell v1.21.4
+    │       └── tracing-core v0.1.36 (*)
+    └── tracing-test-macro v0.2.6 (proc-macro)
+        ├── quote v1.0.47 (*)
+        └── syn v2.0.119 (*)

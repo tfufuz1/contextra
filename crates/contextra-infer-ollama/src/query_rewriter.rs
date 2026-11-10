@@ -59,8 +59,10 @@ pub struct OllamaQueryRewriter {
 impl OllamaQueryRewriter {
     /// Erstellt einen neuen `OllamaQueryRewriter` mit dem angegebenen Client und der Konfiguration.
     #[cfg(feature = "client")]
-    pub fn new(#[cfg(feature = "client")]
-    client: OllamaClient, config: OllamaQueryRewriterConfig) -> Self {
+    pub fn new(
+        #[cfg(feature = "client")] client: OllamaClient,
+        config: OllamaQueryRewriterConfig,
+    ) -> Self {
         Self { client, config }
     }
 

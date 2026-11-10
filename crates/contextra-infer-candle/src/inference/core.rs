@@ -329,6 +329,7 @@ impl CandleLlmClient {
                 0.0,
             )
             .with_threshold(new_config.threshold);
+            val.set_threshold(new_config.threshold);
             val.refresh_config(new_config);
         }
 

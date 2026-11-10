@@ -1,0 +1,18 @@
+DISPLAY: invalid input: Invalid input field
+DEBUG: InvalidInput("Invalid input field")
+DISPLAY: model not found: nomic-embed-text
+DEBUG: ModelNotFound("nomic-embed-text")
+DISPLAY: network error: connection refused: 127.0.0.1:11434
+DEBUG: Network("connection refused: 127.0.0.1:11434")
+DISPLAY: timeout: request timed out after 30s
+DEBUG: Timeout("request timed out after 30s")
+DISPLAY: server error: Ollama 500 internal server error
+DEBUG: Server("Ollama 500 internal server error")
+DISPLAY: deserialization error: invalid JSON payload
+DEBUG: Deserialization("invalid JSON payload")
+DISPLAY: egress policy violation: Egress blocked by policy
+DEBUG: EgressViolation("Egress blocked by policy")
+DISPLAY: circuit breaker open: requests throttled
+DEBUG: CircuitBreakerOpen
+DISPLAY: internal error: Unexpected engine failure
+DEBUG: Internal("Unexpected engine failure")
