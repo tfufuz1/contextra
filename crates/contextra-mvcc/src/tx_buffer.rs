@@ -38,7 +38,7 @@ use crate::mvcc_error::{MvccError, Result};
 use crate::ssi::ReadSet;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, SystemClock};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};

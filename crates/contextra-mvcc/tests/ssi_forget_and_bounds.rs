@@ -8,7 +8,7 @@
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::MvccError;
-use contextra_types::TxId;
+use contextra_ids::TxId;
 
 // Prüft, dass forget_from alle Schreibregistrierungen eines abgebrochenen Batches ab einer Sequenznummer entfernt.
 #[test]

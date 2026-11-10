@@ -21,7 +21,7 @@ use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig};
 use contextra_mvcc::MvccError;
 use contextra_mvcc::SsiValidator;
 use contextra_testkit::ManualClock;
-use contextra_types::{DocId, TxId, TOMBSTONE_BIT};
+use contextra_ids::{DocId, TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use std::sync::Barrier;

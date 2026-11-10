@@ -7,7 +7,7 @@
 
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig, STAGING_ENTRY_OVERHEAD_BYTES};
 use contextra_mvcc::MvccError;
-use contextra_types::{DocId, TxId};
+use contextra_ids::{DocId, TxId};
 use std::time::Duration;
 
 // Prüft, dass das Überschreiten des Byte-Budgets einer Transaktion mit einem Fehler abgewiesen wird.
