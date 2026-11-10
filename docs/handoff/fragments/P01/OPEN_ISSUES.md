@@ -10,3 +10,9 @@
 3. **Status Start-Check (Regel 12):**
    - `docs/handoff/fragments/P00/BUILD_LADDER.md` war im Repository nicht vorhanden.
    - `contextra-store` baute vor Arbeitsbeginn sauber mit Ausnahme von kürzlich gemergten internen Seams (`pub mod kv` Reste und LsmConfig-Parameter-Drift), die synchronisiert wurden.
+
+4. **CI-Checks `context-gates`, `check` und `proof-tests` (Upstream-Fremdfehler auf origin/main):**
+   - `check`: Scheitert an `cargo xtask shell-commit-audit --fail-on-count=0` mit `package(s) xtask not found in workspace`.
+   - `context-gates`: Scheitert an 41 vorbestehenden Verstößen in `tools/gate_dependencies.py`, die im gesamten Workspace existieren (darunter die historische Dev-Kante `contextra-testkit`).
+   - `proof-tests`: Scheitert an vorbestehendem `error: unexpected cfg condition value: serde` in `crates/contextra-crypto/src/secret.rs:94:7`.
+   - Gemäß Regel 2 (Besitzprinzip) und Regel 5 (Fremdfehler) verbleiben diese Punkte als vorbestehende Infrastruktur-/Nachbar-Crate-Themen unberührt.
