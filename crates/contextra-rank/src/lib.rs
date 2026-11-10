@@ -40,7 +40,7 @@
 //! // doc_1: 1/(60+1) + 1/(60+2) = 1/61 + 1/62 ≈ 0.032522475
 //! // doc_2: 1/(60+2) + 1/(60+1) = 1/62 + 1/61 ≈ 0.032522475
 //! // Tie-Break: "doc_1" < "doc_2" (lexikografisch aufsteigend)
-//! let fused = rrf_fuse(&[text, vector], 60).unwrap();
+//! let fused = rrf_fuse(&[text, vector], 60).unwrap_or_default();
 //! assert_eq!(fused.len(), 2);
 //! assert_eq!(fused[0].id, "doc_1");
 //! assert_eq!(fused[1].id, "doc_2");
