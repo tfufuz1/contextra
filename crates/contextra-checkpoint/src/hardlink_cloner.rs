@@ -124,7 +124,7 @@ mod fs {
 /// - `source_seq_no`: Die gepinnte und geklonte Quell-Sequenznummer.
 /// - `linked_files`: Liste der im Zielverzeichnis erzeugten Pfade.
 /// - `wal_tail_offset`: Offset im Write-Ahead-Log, ab dem der geklonte Zustand neue Mutationen akzeptiert.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HardlinkCloneResult {
     /// Die gepinnte und geklonte Quell-Sequenznummer.
     pub source_seq_no: u64,

@@ -1,68 +1,68 @@
-//! Crate-lokaler Fehlertyp für `contextra-checkpoint`.
+//! # Lokaler Fehlertyp für contextra-checkpoint
+//!
+//! Bildet alle Fehlerfälle der Checkpoint-Registry und RAII-Guards typisiert ab,
+//! ohne harte Kopplung an `contextra_types::ContextraError`.
 
 use thiserror::Error;
 
-/// Crate-lokaler Fehlertyp für das Checkpoint-Subsystem.
+/// Typalias für Resultate mit [`CheckpointError`].
+pub type CheckpointResult<T> = std::result::Result<T, CheckpointError>;
+
+/// Fehlerzustände im Checkpoint-Subsystem.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CheckpointError {
-    /// Interner Logikfehler.
-    #[error("Internal error: {0}")]
-    Internal(String),
-
-    /// Ungültige Eingabeparameter.
+    /// Ungültige Eingabeparameter (z. B. leere Namen oder Grenzwertüberschreitungen).
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    /// Angefragter Checkpoint existiert nicht.
-    #[error("Checkpoint not found")]
-    CheckpointNotFound,
-
-    /// Transaktionsfehler oder Konflikt.
-    #[error("Transaction error: {0}")]
-    Transaction(String),
-
-    /// Serialisierungs- oder Deserialisierungsfehler.
+    /// Serialisierungs- oder Deserialisierungsfehler (JSON/BLAKE3).
     #[error("Serialization error: {0}")]
     Serialization(String),
 
-    /// Fehler beim Hardlinken über Dateisystemgrenzen hinweg.
+    /// Fehler während Transaktions-Rollback, -Commit oder Monotonie-Verletzungen.
+    #[error("Transaction error: {0}")]
+    Transaction(String),
+
+    /// Der angeforderte Checkpoint existiert nicht.
+    #[error("Checkpoint not found")]
+    CheckpointNotFound,
+
+    /// Cross-Device Link Fehler beim Hardlinking über Mount-Punkte hinweg.
     #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
     CrossDeviceLink {
-        /// Pfad der Quelldatei.
         source_path: String,
-        /// Pfad der Zieldatei.
         target_path: String,
     },
 
-    /// Standard I/O-Fehler.
-    #[error("I/O error: {0}")]
+    /// I/O-Fehler beim Dateizugriff.
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// Mismatch der ID-Breite im Header/Manifest (SPEC §5.2).
-    #[error("ID width mismatch: stored {stored} bits, build expects {build} bits")]
-    IdWidthMismatch {
-        /// Im Format gespeicherte ID-Breite in Bits.
-        stored: u16,
-        /// Vom aktuellen Build erwartete ID-Breite in Bits.
-        build: u16,
-    },
+    /// Interner System- oder Synchronisationsfehler.
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl CheckpointError {
-    /// Hilfsfunktion zur Konstruktion von `InvalidInput`.
+    /// Erzeugt einen `InvalidInput`-Fehler.
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
 
-    /// Hilfsfunktion zur Konstruktion von `CrossDeviceLink`.
-    pub fn cross_device_link(source_path: impl Into<String>, target_path: impl Into<String>) -> Self {
+    /// Erzeugt einen `Internal`-Fehler.
+    pub fn internal(msg: impl Into<String>) -> Self {
+        Self::Internal(msg.into())
+    }
+
+    /// Erzeugt einen `CrossDeviceLink`-Fehler.
+    pub fn cross_device_link(
+        source_path: impl Into<String>,
+        target_path: impl Into<String>,
+    ) -> Self {
         Self::CrossDeviceLink {
             source_path: source_path.into(),
             target_path: target_path.into(),
         }
     }
 }
-
-/// Lokales Result-Alias für `contextra-checkpoint`.
-pub type Result<T> = std::result::Result<T, CheckpointError>;
