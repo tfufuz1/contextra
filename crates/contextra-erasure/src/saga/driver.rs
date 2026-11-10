@@ -118,7 +118,7 @@ impl SagaDriver {
                 if id != saga.erasure_id() {
                     return Err(ErasureError::Internal("erasure id mismatch".into()));
                 }
-                saga.transition_with_reason(SagaState::Pending, Some(reason.clone()))?;
+                saga.transition_with_reason(SagaState::Pending, Some(reason))?;
                 Ok(StepOutcome::Pending(reason))
             }
             SagaEvent::Complete(id) => {

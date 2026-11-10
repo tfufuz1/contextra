@@ -1,6 +1,12 @@
 //! Spezifikationstests für Messung und Zeugenerzeugung (T-RAW-1..6, T-CLASS-1, D-72, D-113, I-19).
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    unused_imports,
+    dead_code
+)]
 
 use contextra_erasure::measure::field::{scan_mk1_structures, scan_mk2_raw, scan_mk3_keys};
 use contextra_erasure::measure::positive_control::run_positive_control;

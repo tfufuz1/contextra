@@ -124,7 +124,7 @@ fn test_t_class_1_lattice_independent_eval() {
     assert!(report.classes.contains_key("P"));
 
     // Fehlende Schicht wird als "nicht erfasst" ausgewiesen (P17)
-    for (_layer, status) in &report.key_coverage {
+    for status in report.key_coverage.values() {
         assert!(
             status == "full"
                 || status == "unlinked"

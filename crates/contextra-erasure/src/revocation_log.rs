@@ -329,6 +329,12 @@ impl std::fmt::Debug for RevocationLog {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
     use crate::types_local::{Clock, SystemClock, Vfs};
@@ -427,7 +433,6 @@ mod tests {
     fn test_revocation_log_persistence_roundtrip() {
         let mut rng = OsRng;
         let signing_key = SigningKey::generate(&mut rng);
-        let verifying_key = signing_key.verifying_key();
         let verifying_key = signing_key.verifying_key();
         let vfs: Arc<dyn Vfs> = Arc::new(TestMemVfs::default());
         let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());

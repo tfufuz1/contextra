@@ -1713,7 +1713,7 @@ impl SagaRecord {
 }
 
 /// Identifikator für die physische Storage-Schicht.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum WitnessLayer {
     /// LSM Memtable
     LsmMemtable,

@@ -120,6 +120,7 @@ fn base64url_decode(input: &str) -> Result<[u8; 64], ErasureError> {
         bits = bits.saturating_add(6);
         if bits >= 8 {
             bits = bits.saturating_sub(8);
+            #[allow(clippy::cast_possible_truncation)]
             out.push((buf >> bits) as u8);
             buf &= (1 << bits) - 1;
         }

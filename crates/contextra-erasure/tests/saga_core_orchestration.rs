@@ -36,7 +36,7 @@ use contextra_erasure::types_local::{
 use contextra_erasure::types_local::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError};
 use contextra_erasure::types_local::{ErasureId, Timestamp};
 use futures_util::future::BoxFuture;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -76,9 +76,9 @@ impl SagaJournal for MockJournal {
     fn recover_open_sagas<'a>(&'a self) -> BoxFuture<'a, Result<Vec<EraseSaga>, ErasureError>> {
         Box::pin(async move {
             let guard = self.states.lock().unwrap();
-            let mut map: HashMap<ErasureId, (SagaState, Option<PendingReason>)> = HashMap::new();
+            let mut map: BTreeMap<ErasureId, (SagaState, Option<PendingReason>)> = BTreeMap::new();
             for (id, state, reason) in guard.iter() {
-                map.insert(*id, (*state, reason.clone()));
+                map.insert(*id, (*state, *reason));
             }
             let mut list = Vec::new();
             for (id, (state, reason)) in map {
@@ -144,8 +144,7 @@ impl SagaVault for MockVault {
     ) -> BoxFuture<'a, Result<(), ErasureError>> {
         Box::pin(async move {
             if self.fail_destroy.load(Ordering::SeqCst) {
-                return Err(ErasureError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(ErasureError::Io(std::io::Error::other(
                     "vault destroy failure",
                 )));
             }
@@ -343,7 +342,7 @@ fn build_test_core() -> (
     let gate = Arc::new(MockGate::default());
     let vault = Arc::new(MockVault::default());
     let measure = Arc::new(MockMeasure::default());
-    let report = Arc::new(MockReport::default());
+    let report = Arc::new(MockReport);
     let ledger = Arc::new(MockLedger::default());
     let snapshots = Arc::new(MockSnapshotRevoker::default());
     let observer = Arc::new(MockObserver::default());
@@ -359,7 +358,7 @@ fn build_test_core() -> (
         fail_purge: AtomicBool::new(false),
     });
 
-    let mut priorities = HashMap::new();
+    let mut priorities = BTreeMap::new();
     priorities.insert([1u8; 16], PurgePriority::TEXT_REWRITE);
     priorities.insert([2u8; 16], PurgePriority::SSTABLE_REWRITE);
 

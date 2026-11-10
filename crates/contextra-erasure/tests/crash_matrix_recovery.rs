@@ -27,7 +27,7 @@ use contextra_erasure::types_local::{
 };
 use contextra_erasure::types_local::{EraseTarget, LayerId, LayerWitness};
 use futures_util::future::BoxFuture;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
@@ -217,7 +217,7 @@ async fn t_crash_1_fm_matrix_recovery_step_progression() {
         ledger: Arc::new(DummyLedger),
         snapshots: Arc::new(DummySnapshotRevoker),
         layers: vec![],
-        layer_priorities: HashMap::new(),
+        layer_priorities: BTreeMap::new(),
         commit_barrier: Arc::new(DummyCommitBarrier),
         purge_barrier: Arc::new(DummyPurgeBarrier),
         clock: Arc::new(DummyClock),
