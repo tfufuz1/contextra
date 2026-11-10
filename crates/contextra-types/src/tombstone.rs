@@ -1,6 +1,6 @@
 //! Trait und Referenzimplementierung für Tombstone-Semantikprüfung in Sequenzprotokollen und Indizes.
 //!
-//! # Zweck & Architektur-Rolle: Ring 0
+//! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
 //!
 //! In Multi-Version Concurrency Control (MVCC) und sequentiellen/append-only Speichern werden Datensätze
 //! bei Invalidierung nicht physisch überschrieben, sondern mit einem Tombstone-Marker
