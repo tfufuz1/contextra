@@ -6,7 +6,8 @@
 //! vollständig freigegeben wird.
 
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig, STAGING_ENTRY_OVERHEAD_BYTES};
-use contextra_types::{ContextraError, DocId, TxId};
+use contextra_mvcc::MvccError;
+use contextra_types::{DocId, TxId};
 use std::time::Duration;
 
 // Prüft, dass das Überschreiten des Byte-Budgets einer Transaktion mit einem Fehler abgewiesen wird.
@@ -43,7 +44,7 @@ fn tx_buffer_byte_budget_exceeded() {
         },
     );
 
-    assert!(matches!(res2, Err(ContextraError::Storage(_))));
+    assert!(matches!(res2, Err(MvccError::Storage(_))));
 }
 
 // Prüft, dass der reservierte Byte-Speicher bei drain, discard und orphan reaping wieder freigegeben wird.

@@ -8,7 +8,7 @@
 //! Der Garbage-Collector (LSM Compaction) darf Tombstones und ältere Datenversionen erst dann
 //! physisch von der Festplatte entfernen, wenn kein aktiver Leser mehr existiert,
 //! dessen Snapshot-Sequenznummer vor oder bei dieser Änderung liegt.
-//! Solange ein [`SnapshotGuard`] existiert, garantiert die Registry, dass `min_active_seqno`
+//! Solange ein [`SnapshotGuard`] existiert, stellt die Registry sicher, dass `min_active_seqno`
 //! nicht über dessen `seq_no` ansteigt.
 //!
 //! ## Synchronisations- und Speicherarchitektur
@@ -30,7 +30,7 @@
 // INVARIANTE: Solange SnapshotGuard lebt → keine Tombstone-GC für seq >= guard.seq_no.
 // RAII-PATTERN: Drop deregistriert automatisch. unwrap_or(u64::MAX) ist KORREKT.
 
-use crate::error::{ContextraError, Result};
+use crate::mvcc_error::{MvccError, Result};
 use crate::types::{TenantId, TOMBSTONE_BIT};
 use contextra_ports::{Clock, SystemClock};
 use parking_lot::Mutex;
@@ -157,7 +157,7 @@ impl SnapshotRegistry {
 
     /// Versucht, einen Lese-Snapshot zu registrieren.
     ///
-    /// Im Gegensatz zu `register` schlägt diese Methode fail-closed mit `ContextraError::LimitExceeded` fehl,
+    /// Im Gegensatz zu `register` schlägt diese Methode fail-closed mit `MvccError::LimitExceeded` fehl,
     /// wenn die konfigurierte Maximalanzahl aktiver Snapshots (`max_active_snapshots`) erreicht ist.
     pub fn try_register(self: &Arc<Self>, seq_no: u64) -> Result<SnapshotGuard> {
         let now_nanos = self.clock.monotonic_nanos();
@@ -191,7 +191,7 @@ impl SnapshotRegistry {
 
         let total_active: usize = active.values().map(|v| v.len()).sum();
         if total_active >= self.config.max_active_snapshots {
-            return Err(ContextraError::limit_exceeded(
+            return Err(MvccError::limit_exceeded(
                 self.config.max_active_snapshots,
                 format!(
                     "Snapshot registry capacity exceeded ({} active snapshots >= max {})",
@@ -789,7 +789,7 @@ mod tests {
 
         // Third snapshot must fail closed with LimitExceeded
         let res3 = registry.try_register(30);
-        assert!(matches!(res3, Err(ContextraError::LimitExceeded { .. })));
+        assert!(matches!(res3, Err(MvccError::LimitExceeded { .. })));
 
         drop(g1);
         assert_eq!(registry.oldest_active_snapshot(), Some(20));

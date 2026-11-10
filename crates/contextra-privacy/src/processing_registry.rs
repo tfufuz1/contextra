@@ -11,7 +11,7 @@
 //! Dieses Modul modelliert und generiert ein Verzeichnis von Verarbeitungstätigkeiten.
 //!
 //! ### Kanonischer Mandanten-Typ:
-//! Dieses Modul nutzt ausschließlich den kanonischen Domain-Typ [`contextra_types::TenantId`] (`u64`) zur
+//! Dieses Modul nutzt ausschließlich den kanonischen Domain-Typ [`crate::types::TenantId`] (`u64`) zur
 //! Gewährleistung von systemweiter Mandantentrennung und Isolation.
 //!
 //! ### Migrationspfad für bestehende Register (Legacy String-TenantId):

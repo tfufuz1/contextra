@@ -44,6 +44,9 @@
 | `snapshot.rs` | `SnapshotRegistry`, `SnapshotGuard`: Pinning, Read-Isolation |
 | `ssi.rs` | `ReadSet`, `SsiValidator`, `SequenceLogSsiValidator`, `PruningBlockerInfo` |
 | `tx_buffer.rs` | `TxBuffer<T>` (sharded Staging, Timeout/Orphan-Reaper), `IndexOp<T>` |
+| `tombstone.rs` | `TombstoneSemanticsCheck`, `SeqBitTombstone`: Tombstone-Bit 63 und Marker |
+| `mvcc_error.rs` | `MvccError`: Stark typisierter, lokaler Fehlertyp für MVCC |
+| `compat/` | `error.rs`: Kompatibilitätsbrücke `From<MvccError> for ContextraError` |
 
 ## 4. Verträge & Invarianten
 
