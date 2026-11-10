@@ -18,8 +18,6 @@ default = ["std"]
 std = []
 serde = []
 tracing = []
-inspect = []
-experimental = []
 
 [dependencies]
 thiserror = { workspace = true }

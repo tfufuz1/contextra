@@ -871,6 +871,7 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
+ "contextra-cognition",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",
@@ -878,6 +879,7 @@ dependencies = [
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
+ "contextra-vault",
  "contextra-vector",
  "criterion",
  "parking_lot 0.12.5",
@@ -1063,6 +1065,8 @@ name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-ports",
+ "contextra-types",
  "criterion",
  "ndarray 0.15.6",
  "ort",
@@ -1155,6 +1159,7 @@ dependencies = [
  "contextra-infer-onnx",
  "contextra-ports",
  "contextra-privacy",
+ "contextra-prompt-guard",
  "contextra-rank",
  "contextra-router",
  "contextra-types",

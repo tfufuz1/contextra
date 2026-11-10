@@ -25,6 +25,7 @@ contextra-wire = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-privacy = { workspace = true }
+contextra-prompt-guard = { path = "../contextra-prompt-guard", features = ["file-audit"] }
 contextra-router = { workspace = true }
 contextra-infer-candle = { workspace = true, optional = true }
 contextra-infer-ollama = { workspace = true, optional = true }

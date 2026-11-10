@@ -73,6 +73,11 @@
 #![warn(missing_docs)]
 #![allow(async_fn_in_trait)]
 
+pub mod compat;
+pub mod error;
+pub mod ports;
+pub use error::AgentError;
+
 pub mod audit;
 pub mod budget;
 pub mod clm_scratchpad;

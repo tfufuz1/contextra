@@ -19,21 +19,3 @@ pub type Result<T> = core::result::Result<T, SimdError>;
 
 /// Typ-Alias `Error` für B4-Konformität (genau ein primärer Fehlertyp `Error`).
 pub type Error = SimdError;
-
-#[cfg(feature = "types-compat")]
-impl From<SimdError> for contextra_types::ContextraError {
-    fn from(err: SimdError) -> Self {
-        match err {
-            SimdError::InvalidInput(msg) => contextra_types::ContextraError::invalid_input(msg),
-            SimdError::DimensionMismatch { left, right } => {
-                contextra_types::ContextraError::invalid_input(format!(
-                    "dimension mismatch: left={}, right={}",
-                    left, right
-                ))
-            }
-            SimdError::UnsupportedMetric => {
-                contextra_types::ContextraError::invalid_input("unsupported metric")
-            }
-        }
-    }
-}
