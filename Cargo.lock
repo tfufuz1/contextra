@@ -1094,6 +1094,7 @@ dependencies = [
  "blake3",
  "calamine",
  "cfb",
+ "contextra-types",
  "criterion",
  "csv",
  "encoding_rs",

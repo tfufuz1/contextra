@@ -364,5 +364,6 @@ fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {
     }
 
     // Fuzz support muss für beliebige Bytes panikfrei sein
+    #[cfg(feature = "fuzz")]
     contextra_ingest::fuzz_support::run(FormatId::Txt, b"random noise 12345");
 }

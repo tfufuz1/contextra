@@ -38,9 +38,13 @@ all-formats = [
     "fmt-email",
     "fmt-structured",
 ]
+fuzz = []
+workspace = ["dep:contextra-types"]
+types-compat = ["workspace"]
 
 [dependencies]
 # Workspace crates (keine internen Dependencies - Klasse A Baustein)
+contextra-types = { workspace = true, optional = true }
 
 # Always dependencies
 serde = { workspace = true }
