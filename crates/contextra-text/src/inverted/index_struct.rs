@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
+use crate::storage::PostingStore;
+use contextra_ports::{TextIndex, TextIndexStats};
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
 // ANCHOR[contextra-text:INV-008]
 /// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
@@ -15,7 +16,7 @@ use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_S
 /// 2. `staged_stats` (`parking_lot::Mutex`): Kurzlebiger Spinlock für ungecommittete Transaktionsänderungen im RAM.
 ///
 /// **Regel**: `commit_lock` muss IMMER vor `staged_stats` akquiriert werden. Niemals synchrone Sperren über `.await`-Punkte halten!
-pub struct InvertedIndex<S: StorageEngine> {
+pub struct InvertedIndex<S: PostingStore> {
     storage: Arc<S>,
     prefix: Vec<u8>,
     tokenizer: Arc<dyn Tokenizer>,
@@ -28,7 +29,7 @@ pub struct InvertedIndex<S: StorageEngine> {
     pub(crate) resident_index: Arc<ResidentPostingIndex>,
 }
 
-impl<S: StorageEngine> Clone for InvertedIndex<S> {
+impl<S: PostingStore> Clone for InvertedIndex<S> {
     fn clone(&self) -> Self {
         Self {
             storage: self.storage.clone(),
@@ -45,7 +46,7 @@ impl<S: StorageEngine> Clone for InvertedIndex<S> {
     }
 }
 
-impl<S: StorageEngine> InvertedIndex<S> {
+impl<S: PostingStore> InvertedIndex<S> {
     // ANCHOR[contextra-text:INV-009]
     /// Maximale Textgröße pro Dokument (10 MiB) zur Begrenzung von Speicherverbrauch und DoS-Schutz.
     pub const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
@@ -590,7 +591,10 @@ impl<S: StorageEngine> InvertedIndex<S> {
         };
         let meta_key = self.key("meta:stats");
 
-        self.storage.put(tx, &meta_key, &meta_bytes).await
+        self.storage
+            .put(tx, &meta_key, &meta_bytes)
+            .await
+            .map_err(Into::into)
     }
 
     // ANCHOR[contextra-text:INV-019]
@@ -669,7 +673,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
     }
 }
 
-impl<S: StorageEngine> TextIndex for InvertedIndex<S> {
+impl<S: PostingStore + 'static> TextIndex for InvertedIndex<S> {
     async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
         let results = self.search_bm25(query, k, None).await?;
         Ok(results
@@ -700,20 +704,20 @@ impl<S: StorageEngine> TextIndex for InvertedIndex<S> {
 
     async fn commit(&self, tx: TxId) -> Result<()> {
         self.commit_stats(tx).await?;
-        self.storage.commit(tx).await
+        self.storage.commit(tx).await.map_err(Into::into)
     }
 
     async fn rollback(&self, tx: TxId) -> Result<()> {
         self.rollback_stats(tx).await?;
-        self.storage.rollback(tx).await
+        self.storage.rollback(tx).await.map_err(Into::into)
     }
 
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
-        self.storage.rollback_to_tx(tx_id).await
+        self.storage.rollback_to_tx(tx_id).await.map_err(Into::into)
     }
 
     async fn last_tx_id(&self) -> Result<TxId> {
-        self.storage.last_tx_id().await
+        self.storage.last_tx_id().await.map_err(Into::into)
     }
 
     async fn len(&self) -> usize {

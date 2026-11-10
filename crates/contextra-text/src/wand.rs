@@ -15,7 +15,7 @@
 
 use crate::bm25::score_term;
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
-use contextra_ports::StorageEngine;
+use crate::storage::PostingStore;
 use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
 use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
@@ -259,7 +259,7 @@ pub struct WandSearchResult {
 ///    d) Andernfalls Cursors zur Pivot-DocId vorspringen lassen (Skip).
 // ADR-0015: Block-Max WAND query search signature requires storage, index, and query parameters.
 #[allow(clippy::too_many_arguments)]
-pub async fn block_max_wand_search<S: StorageEngine>(
+pub async fn block_max_wand_search<S: PostingStore>(
     storage: &S,
     terms: &[String],
     resident_index: &crate::posting_list::ResidentPostingIndex,
@@ -624,6 +624,7 @@ mod tests {
     use super::*;
     use crate::inverted::InvertedIndex;
     use contextra_ports::BoxFuture;
+    use contextra_ports::StorageEngine;
     use parking_lot::RwLock;
 
     type MockStoreMap = RwLock<BTreeMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
@@ -646,7 +647,7 @@ mod tests {
 
     impl StorageEngine for MockStorage {
         fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-            Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
+            Box::pin(async move { StorageEngine::get_at_seq(self, key, u64::MAX).await })
         }
         fn put<'a>(
             &'a self,
@@ -786,7 +787,7 @@ mod tests {
             &'a self,
             prefix: &'a [u8],
         ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move { self.scan_prefix_at(prefix, u64::MAX).await })
+            Box::pin(async move { StorageEngine::scan_prefix_at(self, prefix, u64::MAX).await })
         }
         fn scan_prefix_at<'a>(
             &'a self,
@@ -835,7 +836,7 @@ mod tests {
             index.upsert_document(tx, doc_id, &text).await?;
         }
         index.commit_stats(tx).await?;
-        storage.commit(tx).await?;
+        StorageEngine::commit(storage.as_ref(), tx).await?;
 
         // 1. Equivalence Test: WAND search results vs full scan expectations
         let k = 5;

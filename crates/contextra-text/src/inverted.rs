@@ -7,28 +7,15 @@
 // STAND: TS:2026-09-10T19:25:46Z (SESSION: c844907e)
 
 //! LSM-backed Inverted Index.
-// CONSTRAINT: Inverted Index Key-Gen & Cache
-// TARGET: < 20µs für upsert_document
-// AKTUELL: ~18.6 µs (nach Optimierung)
-// VORHER: 24.6 µs → NACHHER: 18.6 µs (~24% gain)
-// BOTTLENECK: Heap-Allokationen (format!, Vec::new)
-// OPTIMIERUNG: itoa::Buffer + Vec::with_capacity + doc_len_cache
-
-//! Persistenter, LSM-basierter invertierter Volltextindex mit MVCC-Snapshot-Isolation.
-//!
-//! # Ring-Zuordnung
-//! Ring 0 (Kern).
-//!
-//! # Funktionsweise
-//! Verwaltet Dokumente, Posting-Listen, Vorwärtsindex und BM25-Statistiken über dem
-//! [`contextra_ports::StorageEngine`]-Port. Unterstützt Transaktionen (Staging, Commit, Rollback),
-//! physische Bereinigung (Purge) und Verifikations-Scans.
 
 mod index_struct;
-mod morph_index;
-pub mod purge;
-pub mod scanner;
-mod types;
+// MIGRATION(S-70): morph_index moved to compat/
+pub use crate::compat::morph_index;
+// MIGRATION(S-70): purge moved to compat/
+pub use crate::compat::purge;
+// MIGRATION(S-70): scanner moved to compat/
+pub use crate::compat::scanner;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests;
