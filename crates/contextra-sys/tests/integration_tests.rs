@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Comprehensive integration tests for contextra-sys public API and invariants (SPEC §10.1 / INV-SYS-FSYNC-1 / INV-SYS-MEMLOCK-1).
 // INVARIANTEN: Zero panic in test harness; verify cross-module contracts and invariants.
 
