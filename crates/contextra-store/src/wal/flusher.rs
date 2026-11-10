@@ -361,11 +361,12 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
-                            let cause = if write_err.to_string().contains("FAIL_APPEND_PARTIAL_ONCE") {
-                                PoisonCause::TornWrite
-                            } else {
-                                PoisonCause::WriteFailed
-                            };
+                            let cause =
+                                if write_err.to_string().contains("FAIL_APPEND_PARTIAL_ONCE") {
+                                    PoisonCause::TornWrite
+                                } else {
+                                    PoisonCause::WriteFailed
+                                };
                             let _ = poison_state.compare_exchange(
                                 0,
                                 cause.to_u8(),
