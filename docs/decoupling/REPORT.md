@@ -62,3 +62,7 @@
   - `cargo fmt`: Scheitert an unformatiertem Code in `crates/contextra-store/tests/` und `crates/contextra-vector/`.
   - `cargo check`: Scheitert an Kompilierfehlern in `crates/contextra-store/src/sstable/block_cache.rs` und `builder.rs`.
   - Gemäß R1 (Eigentum und Disjunktheit) dürfen diese Fremddateien nicht im sys-Auftrag berührt werden.
+
+### CI-Analyse der Fehlschläge auf PR-Ebene
+- **Production Unwrap Counter Gate:** Der Zähler `grep -r '\.unwrap()\|\.expect(' crates/` stieg workspace-weit von 1197 auf 1309. In `crates/contextra-sys/src/` gibt es genau 0 Vorkommen (weder unwrap noch expect). Die 112 zusätzlichen unwraps stammen aus kürzlich in `origin/main` gemergten oder übergeordneten Commits anderer Crates (`contextra-store`, `contextra-crypto`, `contextra-vector`). Gemäß Regel R1 und BESITZ-Grenzen darf `.github/unwrap_baseline.txt` nicht im Rahmen dieses Auftrags manipuliert werden.
+- **Cargo Deny / Format / Compile Checks:** Alle gemeldeten Fehler betreffen ausschließlich fremde Crates (`contextra-store`, `contextra-vector`, `contextra-ingest`, `contextra-crypto`). `contextra-sys` ist formatkonform, frei von unberechtigten Unsafe- oder Panik-Stellen und baut lokal autark grün.
