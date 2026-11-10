@@ -1,4 +1,7 @@
-//! Central module for file and directory synchronization operations.
+//! Central module for file and directory synchronization operations (SPEC §3.5, INV-FSYNC-1).
+//!
+//! Enforces synchronous durability via fsync on files and parent directories.
+//! Fsync errors are fatal, never silently retried, and trigger handle poisoning.
 
 use contextra_types::{ContextraError, Result};
 use std::path::Path;

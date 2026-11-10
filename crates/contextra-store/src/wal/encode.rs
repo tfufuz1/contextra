@@ -1,6 +1,12 @@
 //! # WAL-Frame-Kodierung (Ring 1)
 //!
-//! Kodiert und dekodiert WAL-Eintraege mit Laengenfeldern, Sequenznummern und Prüfsummen.
+//! Kodiert und dekodiert WAL-Einträge mit Längenfeldern, Sequenznummern, Prüfsummen (CRC32C)
+//! und kryptografischer HMAC-Verkettung (SPEC §3.5, §12.1).
+//!
+//! ## Invarianten
+//! - **INV-WAL-FRAME-1:** Bounded entry length: Jeder Record validiert key_len und val_len strikt gegen Maximallimits.
+//! - **INV-WAL-CRC-1:** Jedes Frame trägt eine CRC32C-Prüfsumme über den Nutzdaten-Payload.
+//! - **INV-WAL-HMAC-1:** Sequenzielle Hash-Kette bindet vorherigen HMAC (`prev_hmac`), Sequenznummer und Operation.
 
 use contextra_crypto::wal_crypto::WalHmac;
 use contextra_types::{ContextraError, Result, TxId};
