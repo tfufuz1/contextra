@@ -88,3 +88,9 @@ pub fn apply_resonance_bonus(
 
     results
 }
+
+impl crate::fusion::ext::ResonanceModifier for ResonanceConfig {
+    fn modify_results(&self, results: Vec<crate::fusion::SearchResult>, valid_signal_count: usize) -> Vec<crate::fusion::SearchResult> {
+        apply_resonance_bonus(results, valid_signal_count, self)
+    }
+}

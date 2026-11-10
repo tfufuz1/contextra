@@ -1,0 +1,154 @@
+   Compiling regex-automata v0.4.18
+   Compiling tracing v0.1.44
+   Compiling bitflags v1.3.2
+   Compiling tokio v1.53.1
+   Compiling flatbuffers v24.12.23
+   Compiling contextra-adapt v0.1.0 (/app/crates/contextra-adapt)
+   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)
+   Compiling shlex v1.3.0
+   Compiling matchers v0.2.0
+   Compiling regex v1.13.1
+   Compiling tracing-subscriber v0.3.23
+   Compiling criterion v0.5.1
+   Compiling contextra-router v0.1.0 (/app/crates/contextra-router)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.83s
+     Running unittests src/lib.rs (target/debug/deps/contextra_router-6a3080460e288397)
+arm_registry::tests::test_arm_registry_bijection: test
+arm_registry::tests::test_arm_registry_determinism: test
+arm_registry::tests::test_arm_registry_out_of_range: test
+dispatch::tests::test_dispatch_to_slm_invalid_endpoint_fails_gracefully: test
+dispatch::tests::test_split_endpoint_empty_fails: test
+dispatch::tests::test_split_endpoint_no_shell_injection: test
+dispatch::tests::test_split_endpoint_quoted_spaces: test
+dispatch::tests::test_split_endpoint_simple: test
+dispatch::tests::test_split_endpoint_unclosed_quote_fails: test
+dispatch::tests::test_split_endpoint_with_args: test
+outcome::tests::test_decision_id_generator_concurrency: test
+outcome::tests::test_decision_id_generator_instance_independence: test
+ports_local::tests::test_ports_local_reexports: test
+profile::tests::test_deserialize_legacy_json_array: test
+profile::tests::test_domain_communities_contains_is_o1: test
+profile::tests::test_profile_calibration_state_conformal_recalibrate: test
+profile::tests::test_profile_calibrator_coverage_guarantee: test
+profile::tests::test_profile_calibrator_invariants: test
+router::tests::test_calibration_stats_initial_state: test
+router::tests::test_profile_calibration_state_reset: test
+router::tests::test_reset_calibration_per_profile: test
+router::tests::test_router_engine_instance_decision_id_independence: test
+tests::tests::id_gen_determinism_test::test_router_id_gen_determinism: test
+tests::tests::misc_tests::part1::test_calibrated_threshold_convergence: test
+tests::tests::misc_tests::part1::test_calibration_failsafe_on_unknown_quantization: test
+tests::tests::misc_tests::part1::test_calibration_invalidation_on_prompt_template_hash_change: test
+tests::tests::misc_tests::part1::test_calibration_invalidation_on_quantization_change: test
+tests::tests::misc_tests::part1::test_calibration_invalidation_on_temperature_change: test
+tests::tests::misc_tests::part1::test_cascade_determinism: test
+tests::tests::misc_tests::part1::test_cascade_fallthrough: test
+tests::tests::misc_tests::part1::test_cascade_hit: test
+tests::tests::misc_tests::part1::test_conformal_calibrator_default_and_reset_window: test
+tests::tests::misc_tests::part1::test_nan_all_chunks_fallback_and_tracing_error: test
+tests::tests::misc_tests::part1::test_nan_routing_determinism_repeats: test
+tests::tests::misc_tests::part1::test_nan_single_chunk_ignored_in_max_score: test
+tests::tests::misc_tests::part1::test_profile_calibration_state_default_and_average_confidence: test
+tests::tests::misc_tests::part1::test_prop_routing_decision_profile_in_input: test
+tests::tests::misc_tests::part1::test_prop_slm_profile_equality: test
+tests::tests::misc_tests::part1::test_prop_slm_profile_serde: test
+tests::tests::misc_tests::part1::test_slm_profile_validation: test
+tests::tests::misc_tests::part1::test_slm_profile_validation_extended: test
+tests::tests::misc_tests::part2::test_cascade_confidence_uses_conformal_alpha: test
+tests::tests::misc_tests::part2::test_cascade_non_conformity_score_not_zero: test
+tests::tests::misc_tests::part2::test_confidence_metrics_serde: test
+tests::tests::misc_tests::part2::test_conformal_calibrator_empirical_rate_and_reset: test
+tests::tests::misc_tests::part2::test_decision_id_and_routing_outcome_methods: test
+tests::tests::misc_tests::part2::test_lyapunov_drift_status_integration: test
+tests::tests::misc_tests::part2::test_lyapunov_observe_score_and_analyze_drift_detection: test
+tests::tests::misc_tests::part2::test_lyapunov_uncovered_branch_paths: test
+tests::tests::misc_tests::part2::test_lyapunov_update_empty_scores_or_uninitialized_baseline: test
+tests::tests::misc_tests::part2::test_overall_drift_status_aggregation: test
+tests::tests::misc_tests::part2::test_pending_decisions_evicted_after_ttl: test
+tests::tests::misc_tests::part2::test_pending_decisions_max_capacity_enforced: test
+tests::tests::misc_tests::part2::test_profile_calibration_state_edge_cases: test
+tests::tests::misc_tests::part2::test_quantization_level_default_and_try_new: test
+tests::tests::misc_tests::part2::test_record_outcome_trains_calibration: test
+tests::tests::misc_tests::part2::test_record_outcome_unknown_id_returns_false: test
+tests::tests::misc_tests::part2::test_serde_helpers_sorted_u64_set: test
+tests::tests::misc_tests::part2::test_slm_profile_estimated_cost_fallback: test
+tests::tests::misc_tests::part2::test_slm_profile_nan_and_negative_validation_bounds: test
+tests::tests::routing_tests::dispatch::test_dispatch_additional_error_and_format_paths: test
+tests::tests::routing_tests::dispatch::test_dispatch_empty_endpoint_err: test
+tests::tests::routing_tests::dispatch::test_dispatch_error_paths: test
+tests::tests::routing_tests::dispatch::test_dispatch_invalid_json_response: test
+tests::tests::routing_tests::dispatch::test_dispatch_to_slm_mock_server_receives_trimmed_context_only: test
+tests::tests::routing_tests::engine_part1::test_route_1_and_50_profiles: test
+tests::tests::routing_tests::engine_part1::test_route_determinism_and_tie_breaking: test
+tests::tests::routing_tests::engine_part1::test_route_deterministic_community_assignment: test
+tests::tests::routing_tests::engine_part1::test_route_empty_profiles_err: test
+tests::tests::routing_tests::engine_part1::test_route_empty_search_results_err: test
+tests::tests::routing_tests::engine_part1::test_route_fallback_error_on_low_relevance: test
+tests::tests::routing_tests::engine_part1::test_route_hot_reload_atomic_snapshot_determinism: test
+tests::tests::routing_tests::engine_part1::test_route_hot_reload_concurrent_safety: test
+tests::tests::routing_tests::engine_part1::test_route_threshold_boundaries: test
+tests::tests::routing_tests::engine_part1::test_route_unparseable_entity_id: test
+tests::tests::routing_tests::engine_part1::test_router_engine_instantiation_with_mock_storage: test
+tests::tests::routing_tests::engine_part1::test_router_engine_profiles_accessor: test
+tests::tests::routing_tests::engine_part1::test_select_profile_from_chunks_empty_chunks: test
+tests::tests::routing_tests::engine_part1::test_select_profile_max_score_meets_threshold_when_aggregated_does_not: test
+tests::tests::routing_tests::engine_part2::test_parallel_route_conformal_calibration_monotonic_convergence: test
+tests::tests::routing_tests::engine_part2::test_route_invalid_search_result_skips_chunk: test
+tests::tests::routing_tests::engine_part2::test_route_non_finite_query_embedding_err: test
+tests::tests::routing_tests::engine_part2::test_route_populates_drift_status_after_sufficient_data: test
+tests::tests::routing_tests::engine_part2::test_route_with_missing_community_or_corrupt_result: test
+tests::tests::routing_tests::engine_part2::test_router_engine_additional_coverage_paths: test
+tests::tests::routing_tests::engine_part2::test_router_engine_drift_status_and_baseline_helpers: test
+tests::tests::routing_tests::engine_part2::test_router_engine_persisted_calibration_loading: test
+tests::tests::routing_tests::engine_part2::test_router_engine_reset_all_calibration: test
+tests::tests::routing_tests::engine_part2::test_router_engine_try_new_and_try_update_profiles_error_paths: test
+tests::tests::routing_tests::engine_part2::test_router_engine_try_new_and_try_update_profiles_validation_error: test
+tests::tests::routing_tests::engine_part2::test_router_uses_cheapest_profile_during_warmup: test
+tests::tests::routing_tests::engine_part2::test_select_profile_cascade_error_branches_and_fallback: test
+tests::tests::routing_tests::engine_part2::test_select_profile_from_chunks_empty_chunks_and_unmatched_community: test
+
+93 tests, 0 benchmarks
+     Running tests/arm_registry_five_arms.rs (target/debug/deps/arm_registry_five_arms-53c964e14fdc7474)
+test_arm_registry_five_arms_bijection: test
+test_arm_registry_five_arms_custom_global_variant: test
+test_arm_registry_five_arms_out_of_range: test
+
+3 tests, 0 benchmarks
+     Running tests/bandit_latency.rs (target/debug/deps/bandit_latency-d81b359a287c40c7)
+0 tests, 0 benchmarks
+     Running tests/fc_ts_dispatch_test.rs (target/debug/deps/fc_ts_dispatch_test-dda71f66b4e229e9)
+0 tests, 0 benchmarks
+     Running tests/ips_requires_propensity.rs (target/debug/deps/ips_requires_propensity-407e783cbe8eb8bf)
+test_propensity_lower_bound_clamping_and_discard: test
+test_valid_propensity_accepted: test
+
+2 tests, 0 benchmarks
+     Running tests/regret_monotonicity.rs (target/debug/deps/regret_monotonicity-836bb4858f127c0c)
+0 tests, 0 benchmarks
+     Running tests/router_audit_and_isolation_tests.rs (target/debug/deps/router_audit_and_isolation_tests-86bf8df274e5af1a)
+test_arm_registry_and_stats_tenant_isolation: test
+test_clock_based_ttl_eviction_public_api: test
+test_cold_start_fallback_default_route: test
+test_confidence_metrics_warmup_period: test
+test_decision_id_generator_monotonicity: test
+test_fixed_seed_routing_reproducibility: test
+test_lyapunov_drift_status_summary_empty: test
+test_lyapunov_drift_status_summary_unconfigured: test
+test_profile_calibration_state_fingerprint_invalidation: test
+test_profile_calibrator_update_monotonic: test
+test_quantization_level_default_and_variants: test
+test_record_outcome_idempotency: test
+test_reset_all_calibration_resets_every_profile: test
+test_restart_resumption_with_initial_decision_id: test
+test_router_engine_try_update_profiles_validation_error: test
+test_router_engine_update_profiles_hot_reload: test
+test_routing_outcome_non_conformity_scores: test
+test_set_lyapunov_baseline_existing_and_nonexisting: test
+test_slm_profile_estimated_cost_fallback: test
+test_transport_error_propagation_typed: test
+
+20 tests, 0 benchmarks
+     Running tests/router_bandit_dispatch.rs (target/debug/deps/router_bandit_dispatch-8aa8f980f819968a)
+0 tests, 0 benchmarks
+   Doc-tests contextra_router
+0 tests, 0 benchmarks

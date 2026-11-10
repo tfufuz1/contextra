@@ -280,7 +280,7 @@ impl Wal {
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                crate::lsm::recovery::next_temp_file_counter()
+                crate::wal::next_temp_counter()
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -395,7 +395,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            crate::lsm::recovery::next_temp_file_counter()
+            crate::wal::next_temp_counter()
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -491,7 +491,7 @@ impl Wal {
                 }
                 b
             } else {
-                let counter = crate::lsm::recovery::next_temp_file_counter();
+                let counter = crate::wal::next_temp_counter();
                 let pid = std::process::id() as u64;
                 let mut b = [0u8; 16];
                 if let Some(chunk1) = b.get_mut(..8) {
@@ -511,7 +511,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                crate::lsm::recovery::next_temp_file_counter()
+                crate::wal::next_temp_counter()
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));

@@ -85,6 +85,7 @@ pub fn parse_gguf_metadata_with_checksum(
 
     #[cfg(feature = "candle")]
     {
+        let _ = parsed_meta;
         file.seek(SeekFrom::Start(0)).map_err(Error::Io)?;
         let content = candle_core::quantized::gguf_file::Content::read(&mut file).map_err(|e| {
             Error::ModelLoad {

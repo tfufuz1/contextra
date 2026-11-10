@@ -26,9 +26,9 @@
 | Aspekt | Wert |
 |---|---|
 | Standalone-Build | `cargo build -p contextra-router --no-default-features --locked` |
-| Contextra-Abhängigkeiten **Ist** (Cargo) | `adapt`, `ports`, `types`, `wire` |
+| Contextra-Abhängigkeiten **Ist** (Cargo) | `adapt`, `ports`, `types`, `wire` (optional hinter `subprocess-dispatch`) |
 | Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types`, `wire`, `adapt` |
-| Features | `bandit-routing`, `flow-corrected-thompson`, `egress-sherman-morrison`, `cloud-egress-guard` |
+| Features | `subprocess-dispatch`, `bandit-routing`, `flow-corrected-thompson`, `egress-sherman-morrison`, `cloud-egress-guard`, `exp-fc-ts`, `exp-routing-strategy` |
 | Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
 ## 2. Abhängigkeiten & Schulden
@@ -43,7 +43,7 @@
 |---|---|
 | `router/` (`dispatch_core`, `lifecycle`, `outcomes`) | `RouterEngine`, Lebenszyklus, Conformal Calibration, Drift-Watcher |
 | `profile.rs`, `arm_registry.rs`, `routing_strategy.rs` | Modellprofile, Arm-Mapping, Kaskaden- & Bandit-Strategien |
-| `dispatch.rs`, `fc_ts_dispatch.rs`, `transport.rs`, `outcome.rs` | JSON-RPC Dispatch, Flow-Corrected Thompson Sampling, Transport, Outcomes |
+| `dispatch.rs`, `fc_ts_dispatch.rs`, `transport.rs`, `outcome.rs` | JSON-RPC Dispatch (hinter `subprocess-dispatch`), Flow-Corrected Thompson Sampling, Transport, Outcomes |
 
 ## 4. Verträge & Invarianten
 
@@ -161,3 +161,7 @@ Gehe **jede** Rust-Datei unter `crates/contextra-router` durch (`find crates/con
 - Intra-Doc-Links `[`Typ`]` nur auf existierende, erreichbare Items; spitze Klammern im Text (`Vec<u8>`) in Backticks setzen, sonst „unclosed HTML tag“.
 - `// SAFETY:` ohne Leerzeile und ohne dazwischenliegende Zeilen direkt über dem unsafe-Ausdruck.
 - Doc-Beispiele müssen gegen die tatsächliche Signatur kompilieren; im Zweifel `no_run`/`ignore` mit Grund.
+
+## 10. Architektur-Hinweis zu ports_local.rs
+
+Die Datei `src/ports_local.rs` und die Re-Exports in `src/lib.rs` verbleiben vorerst unverändert für Rückwärtskompatibilität externer Verbraucher (`contextra-mcp`), bis diese im Integrationspaket (S-64) migriert werden.

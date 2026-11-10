@@ -59,6 +59,18 @@ sync-docs:
     # nix develop -c cargo xtask sync-docs || cargo xtask sync-docs
     @echo "xtask existiert nicht, siehe BUILD_LADDER"
 
+# Gate G-L1: Layering Enforcement (SPEC §8.1)
+gate-layering *ARGS:
+    python3 tools/gate_layering.py {{ARGS}}
+
+# Gate G-L4: Isolation Proof (SPEC §8.4)
+isolation CRATE:
+    python3 tools/isolation_proof.py -c {{CRATE}}
+
+# Feature Audit: ungenutzte Features prüfen (SPEC §8.3 / B14)
+feature-audit *ARGS:
+    python3 tools/feature_audit.py {{ARGS}}
+
 # Check + test a single crate
 crate CRATE:
     cargo check -p {{CRATE}} && cargo test -p {{CRATE}} --locked

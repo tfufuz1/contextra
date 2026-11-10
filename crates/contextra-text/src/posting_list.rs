@@ -18,12 +18,11 @@
 //! Block-Max-Zusammenfassungen (à 64 Einträge) zur Beschleunigung des WAND-Algorithmus.
 //! Aktualisierungen erfolgen über RCU (Read-Copy-Update) für sperrenfreie Lesezugriffe.
 
-#[cfg(not(feature = "types-compat"))]
-use crate::error::TextError as ContextraError;
+use crate::error::TextError;
 #[cfg(not(feature = "types-compat"))]
 use crate::types::DocId;
 #[cfg(feature = "types-compat")]
-use contextra_types::{ContextraError, DocId};
+use contextra_types::DocId;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -209,7 +208,7 @@ impl PostingList {
 
     // ANCHOR[contextra-text:POST-014]
     /// Kodiert die Posting-Liste in das kompakte Binärformat mit Delta-Varint-Kompression.
-    pub fn encode_compact(&self) -> Result<Vec<u8>, ContextraError> {
+    pub fn encode_compact(&self) -> Result<Vec<u8>, TextError> {
         let mut buf = Vec::with_capacity(4 + 8 + self.postings.len() * 8);
         buf.extend_from_slice(POSTING_LIST_V2_MAGIC);
         encode_varint(self.postings.len() as u64, &mut buf);
@@ -218,7 +217,7 @@ impl PostingList {
         for p in &self.postings {
             let p_doc_raw = p.doc_id as u64;
             let delta = p_doc_raw.checked_sub(prev_doc_id).ok_or_else(|| {
-                ContextraError::Storage("Unsorted or overflow doc_id in posting list".to_string())
+                TextError::Storage("Unsorted or overflow doc_id in posting list".to_string())
             })?;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
@@ -235,21 +234,21 @@ impl PostingList {
     /// # Defensives Verhalten
     /// Weist unvollständige, abgeschnittene, überlange, nicht-monotone oder überlaufende Daten
     /// strikt ab und liefert einen Fehler statt Panics oder Endlosschleifen.
-    pub fn decode_compact(bytes: &[u8]) -> Result<Self, ContextraError> {
+    pub fn decode_compact(bytes: &[u8]) -> Result<Self, TextError> {
         if bytes.starts_with(POSTING_LIST_V2_MAGIC) {
             let mut offset = POSTING_LIST_V2_MAGIC.len();
             let count_u64 = decode_varint(bytes, &mut offset)?;
             let count = usize::try_from(count_u64).map_err(|_| {
-                ContextraError::Storage("Posting list count exceeds usize capacity".to_string())
+                TextError::Storage("Posting list count exceeds usize capacity".to_string())
             })?;
             if count > 100_000_000 {
-                return Err(ContextraError::Storage(format!(
+                return Err(TextError::Storage(format!(
                     "Oversized posting list count: {count}",
                 )));
             }
             let remaining_bytes = bytes.len().saturating_sub(offset);
             if count > remaining_bytes {
-                return Err(ContextraError::Storage(
+                return Err(TextError::Storage(
                     "Declared posting count exceeds available byte buffer".to_string(),
                 ));
             }
@@ -264,19 +263,18 @@ impl PostingList {
                 let doc_len_u64 = decode_varint(bytes, &mut offset)?;
 
                 if !is_first && delta == 0 {
-                    return Err(ContextraError::Storage(
+                    return Err(TextError::Storage(
                         "Non-monotonic delta: subsequent doc_id delta must be > 0".to_string(),
                     ));
                 }
 
                 let doc_id = prev_doc_id.checked_add(delta).ok_or_else(|| {
-                    ContextraError::Storage("DocId overflow during delta decoding".to_string())
+                    TextError::Storage("DocId overflow during delta decoding".to_string())
                 })?;
                 let tf: u32 = u32::try_from(tf_u64)
-                    .map_err(|_| ContextraError::Storage("TF overflow in varint".to_string()))?;
-                let doc_len: u32 = u32::try_from(doc_len_u64).map_err(|_| {
-                    ContextraError::Storage("DocLen overflow in varint".to_string())
-                })?;
+                    .map_err(|_| TextError::Storage("TF overflow in varint".to_string()))?;
+                let doc_len: u32 = u32::try_from(doc_len_u64)
+                    .map_err(|_| TextError::Storage("DocLen overflow in varint".to_string()))?;
 
                 postings.push(Posting {
                     doc_id: doc_id as DocIdRaw,
@@ -288,7 +286,7 @@ impl PostingList {
             }
 
             if offset != bytes.len() {
-                return Err(ContextraError::Storage(format!(
+                return Err(TextError::Storage(format!(
                     "Extra trailing bytes after posting list decoding: {} remaining",
                     bytes.len().saturating_sub(offset)
                 )));
@@ -299,7 +297,7 @@ impl PostingList {
         } else {
             // Legacy V1 bincode fallback
             bincode::deserialize::<PostingList>(bytes)
-                .map_err(|e| ContextraError::Storage(format!("bincode legacy decode error: {}", e)))
+                .map_err(|e| TextError::Storage(format!("bincode legacy decode error: {}", e)))
         }
     }
 }
@@ -313,7 +311,7 @@ fn encode_varint(mut val: u64, buf: &mut Vec<u8>) {
     buf.push((val & 0x7f) as u8);
 }
 
-fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError> {
+fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, TextError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     while *offset < bytes.len() {
@@ -325,7 +323,7 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError
 
         let payload = (byte & 0x7f) as u64;
         if shift > 63 || (shift == 63 && payload > 1) {
-            return Err(ContextraError::Storage(
+            return Err(TextError::Storage(
                 "Varint overflow beyond 64-bit".to_string(),
             ));
         }
@@ -333,7 +331,7 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError
         result = match result.checked_add(payload << shift) {
             Some(res) => res,
             None => {
-                return Err(ContextraError::Storage(
+                return Err(TextError::Storage(
                     "Varint result integer overflow".to_string(),
                 ))
             }
@@ -344,10 +342,10 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError
         }
         shift = shift.saturating_add(7);
         if shift >= 64 {
-            return Err(ContextraError::Storage("Varint overflow".to_string()));
+            return Err(TextError::Storage("Varint overflow".to_string()));
         }
     }
-    Err(ContextraError::Storage(
+    Err(TextError::Storage(
         "Unexpected EOF while decoding varint".to_string(),
     ))
 }

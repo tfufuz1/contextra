@@ -9,10 +9,10 @@
 //! Ring 3 (Domain-Sicherheit).
 //!
 //! # Invarianten
-//! - **Zero-Panic-Doctrine**: Kein `.unwrap()` oder `.expect()` im Produktionscode.
+//! - **Zero-Panic-Doctrine**: Kein `unwrap` oder `expect` im Produktionscode.
 //! - **Fail-Closed**: Bei Zeitanomalien (z. B. nicht-monotonen Zeitsprüngen in die Vergangenheit) wird sofort blockiert.
 //! - **Thread-Sicherheit**: Nebenläufiger, lock-armer Zugriff über `scc::HashMap` mit feingranularen Mutexen pro Sitzung.
-//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port aus `contextra-ports` (INV-EGRESS-AUDIT-1, Regel 3).
+//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
 
 use crate::types::{Clock, SystemClock};
 use parking_lot::Mutex;
@@ -433,5 +433,23 @@ mod tests {
         let outcome = detector.record_and_check_at_nanos(session, 100, 50_000);
 
         assert!(matches!(outcome, BulkExfiltrationOutcome::Block { .. }));
+    }
+
+    // ANCHOR[contextra-privacy:TEST-BED-007]
+    // Prüft Deterministischen Hasher und BuildHasher explizit (finish & build_hasher).
+    #[test]
+    fn test_deterministic_hasher_and_build_hasher() {
+        let build_hasher = DeterministicBuildHasher;
+        let mut hasher1 = build_hasher.build_hasher();
+        let mut hasher2 = build_hasher.build_hasher();
+
+        hasher1.write(b"deterministic-payload-test");
+        hasher2.write(b"deterministic-payload-test");
+
+        let h1 = hasher1.finish();
+        let h2 = hasher2.finish();
+
+        assert_eq!(h1, h2, "DeterministicBlake3Hasher must yield identical hashes for identical inputs");
+        assert_ne!(h1, 0, "Hash state should not be 0 for non-empty input");
     }
 }

@@ -27,12 +27,12 @@
 // NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock sichert den atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
 // SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
 
-use crate::error::{ContextraError, Result};
+use crate::mvcc_error::{MvccError, Result};
 use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, MetricsSink, SystemClock};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;
@@ -181,7 +181,7 @@ pub trait SsiValidator {
     /// Validiert das [`ReadSet`] der Transaktion `tx_id`.
     ///
     /// ### Fehlerfälle:
-    /// Gibt `Err(ContextraError::Conflict(...))` zurück, falls:
+    /// Gibt `Err(MvccError::Conflict(...))` zurück, falls:
     /// - Ein Schlüssel im ReadSet nach dem Lese-Snapshot von einer anderen Transaktion committet wurde (Write-Skew).
     /// - Ein neuer Schlüssel committet wurde, der auf einen gelesenen Bereichsscan-Präfix zutrifft (Phantom-Read).
     /// - Der Snapshot-Wasserstand der Transaktion älter ist als die bereits bereinigte Historie (`pruned_through`).
@@ -237,7 +237,7 @@ pub struct PruningBlockerInfo {
 /// ## Soundness Invariant (0% False Negatives)
 /// Coarsening guarantees that no real write-skew conflict is ever missed:
 /// - Every original key $k$ in a coarsened bucket starts with at least one extracted prefix $p$.
-/// - Any point read or range prefix read that would have conflicted with $k$ is guaranteed to overlap
+/// - Any point read or range prefix read that would have conflicted with $k$ is ensured to overlap
 ///   with $p$.
 /// - False positives may occur (a commit may be conservatively flagged as a conflict), but false
 ///   negatives are mathematically impossible.
@@ -509,7 +509,7 @@ pub struct SequenceLogSsiValidator {
     pruned_through: Arc<AtomicU64>,
     max_tracked_keys: usize,
     max_pin_duration: Duration,
-    metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+    metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>>,
     clock: Arc<dyn Clock>,
 }
 
@@ -634,10 +634,10 @@ impl SequenceLogSsiValidator {
         self.snapshot_registry = Some(registry);
     }
 
-    /// Bindet einen Metrik-Empfänger ([`contextra_ports::MetricsSink`]) für Monitoring an.
+    /// Bindet einen Metrik-Empfänger ([`MetricsSink`]) für Monitoring an.
     pub fn with_metrics_sink(
         mut self,
-        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+        sink: Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>,
     ) -> Self {
         self.metrics_sink = Some(sink);
         self
@@ -646,7 +646,7 @@ impl SequenceLogSsiValidator {
     /// Aktualisiert den Metrik-Empfänger.
     pub fn set_metrics_sink(
         &mut self,
-        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+        sink: Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>,
     ) {
         self.metrics_sink = Some(sink);
     }
@@ -684,24 +684,24 @@ impl SequenceLogSsiValidator {
     /// Bereinigt bestätigte Schreib-Einträge bis zu einem optionalen Grenzwert mit expliziter Fehlerbehandlung.
     ///
     /// ### Fehlerfälle:
-    /// Liefert `Err(ContextraError::InvalidState(...))`, wenn der Sentinel-Wert `u64::MAX`
+    /// Liefert `Err(MvccError::Internal(...))`, wenn der Sentinel-Wert `u64::MAX`
     /// oder das `TOMBSTONE_BIT` gesetzt ist. `None` führt kein Pruning aus und liefert `Ok(0)`.
     pub fn prune_through_checked(&self, bound: Option<u64>) -> Result<usize> {
         match bound {
             None => Ok(0),
             Some(seq) => {
                 if seq == u64::MAX {
-                    return Err(ContextraError::InvalidInput(format!(
+                    return Err(MvccError::InvalidInput(format!(
                         "Invalid sequence number {seq} for prune_through: sentinel MAX not allowed"
                     )));
                 }
                 if (seq & crate::types::TOMBSTONE_BIT) != 0 {
-                    return Err(ContextraError::InvalidInput(format!(
+                    return Err(MvccError::InvalidInput(format!(
                         "Invalid sequence number {seq} for prune_through: TOMBSTONE_BIT must not be set"
                     )));
                 }
                 if seq >= (i64::MAX as u64) {
-                    return Err(ContextraError::InvalidInput(format!(
+                    return Err(MvccError::InvalidInput(format!(
                         "Invalid sequence number {seq} for prune_through: sequence exceeds maximum allowable range"
                     )));
                 }
@@ -876,7 +876,7 @@ impl SequenceLogSsiValidator {
     ) -> Result<()> {
         for &(key, &snapshot_seq) in entries {
             if snapshot_seq < pruned_through {
-                return Err(ContextraError::Conflict(format!(
+                return Err(MvccError::Conflict(format!(
                     "Serializable isolation violation for TxId({}): snapshot too old (snapshot_seq {} < pruned_through {}) for key '{:?}'",
                     tx_id.inner(),
                     snapshot_seq,
@@ -887,7 +887,7 @@ impl SequenceLogSsiValidator {
 
             if let Some(commit_seq) = committed_writes.get(key) {
                 if commit_seq > snapshot_seq {
-                    return Err(ContextraError::Conflict(format!(
+                    return Err(MvccError::Conflict(format!(
                         "Serializable isolation violation for TxId({}): key '{:?}' modified at commit_seq {} > snapshot_seq {}",
                         tx_id.inner(),
                         String::from_utf8_lossy(key),
@@ -902,7 +902,7 @@ impl SequenceLogSsiValidator {
                     if let SeqBucket::Coarsened { prefixes, .. } = bucket {
                         for p in prefixes {
                             if key.starts_with(p) {
-                                return Err(ContextraError::Conflict(format!(
+                                return Err(MvccError::Conflict(format!(
                                     "Serializable isolation violation for TxId({}): key '{:?}' matches coarsened commit prefix '{:?}' at commit_seq {} > snapshot_seq {}",
                                     tx_id.inner(),
                                     String::from_utf8_lossy(key),
@@ -935,7 +935,7 @@ impl SequenceLogSsiValidator {
             let changes = seq_log.changes_since(snapshot_seq);
             for change in changes {
                 if change.doc_id() == doc_id && change.seq() > snapshot_seq {
-                    return Err(ContextraError::Conflict(format!(
+                    return Err(MvccError::Conflict(format!(
                         "Serializable isolation violation for TxId({}): doc_id {} modified at seq {} > snapshot_seq {}",
                         tx_id.inner(),
                         doc_id,
@@ -958,7 +958,7 @@ impl SequenceLogSsiValidator {
     ) -> Result<()> {
         for &(prefix, &snapshot_seq) in prefixes {
             if snapshot_seq < pruned_through {
-                return Err(ContextraError::Conflict(format!(
+                return Err(MvccError::Conflict(format!(
                     "Serializable isolation violation for TxId({}): snapshot too old (snapshot_seq {} < pruned_through {}) for range prefix '{:?}'",
                     tx_id.inner(),
                     snapshot_seq,
@@ -969,7 +969,7 @@ impl SequenceLogSsiValidator {
 
             for (committed_key, &commit_seq) in &committed_writes.keys {
                 if committed_key.starts_with(prefix) && commit_seq > snapshot_seq {
-                    return Err(ContextraError::Conflict(format!(
+                    return Err(MvccError::Conflict(format!(
                         "Serializable isolation phantom violation for TxId({}): key '{:?}' matching range prefix '{:?}' committed at commit_seq {} > snapshot_seq {}",
                         tx_id.inner(),
                         String::from_utf8_lossy(committed_key),
@@ -989,7 +989,7 @@ impl SequenceLogSsiValidator {
                     {
                         for cp in c_prefixes {
                             if cp.starts_with(prefix) || prefix.starts_with(cp) {
-                                return Err(ContextraError::Conflict(format!(
+                                return Err(MvccError::Conflict(format!(
                                     "Serializable isolation phantom violation for TxId({}): coarsened prefix '{:?}' overlapping range prefix '{:?}' committed at commit_seq {} > snapshot_seq {}",
                                     tx_id.inner(),
                                     String::from_utf8_lossy(cp),
@@ -1018,7 +1018,7 @@ impl SequenceLogSsiValidator {
         }
 
         if committed_writes.len() >= self.max_tracked_keys {
-            return Err(ContextraError::Conflict(format!(
+            return Err(MvccError::Conflict(format!(
                 "Serializable isolation validation failed for TxId({}): commit key capacity limit reached ({} >= {})",
                 tx_id.inner(),
                 committed_writes.len(),
@@ -1052,7 +1052,7 @@ impl SequenceLogSsiValidator {
     /// 2. `pruned_through`-Wasserstand abfragen.
     /// 3. Validierung gegen committed writes und range reads durchführen.
     /// 4. Bei Erfolg: Alle Schlüssel mit `commit_seq` eintragen und Kapazität prüfen.
-    /// 5. Bei Konflikt: Sofortigen Abbruch mit `Err(ContextraError::Conflict)` zurückgeben.
+    /// 5. Bei Konflikt: Sofortigen Abbruch mit `Err(MvccError::Conflict)` zurückgeben.
     pub fn validate_and_record<'a>(
         &self,
         tx_id: TxId,
@@ -1159,7 +1159,7 @@ mod tests {
 
         let res = validator.validate(tx, &rs);
         assert!(res.is_err());
-        assert!(matches!(res, Err(ContextraError::Conflict(_))));
+        assert!(matches!(res, Err(MvccError::Conflict(_))));
     }
 
     // Prüft die Erkennung von Konflikten bei Batch-Registrierung mehrerer Schlüssel.
@@ -1177,7 +1177,7 @@ mod tests {
 
         let res = validator.validate(tx, &rs);
         assert!(res.is_err());
-        assert!(matches!(res, Err(ContextraError::Conflict(_))));
+        assert!(matches!(res, Err(MvccError::Conflict(_))));
     }
 
     // Prüft das Zusammenspiel des Validators mit einem SequenceLog für Dokumentänderungen.
@@ -1201,6 +1201,6 @@ mod tests {
 
         let res = validator.validate(tx, &rs);
         assert!(res.is_err());
-        assert!(matches!(res, Err(ContextraError::Conflict(_))));
+        assert!(matches!(res, Err(MvccError::Conflict(_))));
     }
 }

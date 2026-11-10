@@ -19,12 +19,17 @@
 
 pub mod compat;
 pub mod error;
-pub mod fake;
-pub mod gguf_loader;
 pub mod traits;
+
+#[cfg(feature = "test-utils")]
+pub mod fake;
+
+#[cfg(feature = "candle")]
+pub mod gguf_loader;
 
 pub use error::{CandleError, Error, Result};
 pub use fake::{FakeEmbedder, FakeTextGenerator};
+#[cfg(feature = "candle")]
 pub use gguf_loader::{
     parse_gguf_metadata, parse_gguf_metadata_with_checksum, GgufMetadata, MAX_GGUF_METADATA_KVS,
     MAX_GGUF_STRING_LEN, MAX_GGUF_TENSORS,
@@ -48,7 +53,7 @@ pub mod gasp;
 #[cfg(feature = "kv-bridge")]
 pub mod kv_bridge;
 
-#[cfg(feature = "kv-stage-b")]
+#[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 pub mod kv_state;
 #[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 pub mod model;
@@ -65,7 +70,7 @@ pub use inference::QuantizedLlamaModel;
 pub use inference::*;
 #[cfg(feature = "kv-bridge")]
 pub use kv_bridge::KvBridgeAdapter;
-#[cfg(feature = "kv-stage-b")]
+#[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 pub use kv_state::{KvState, LayerKv};
 #[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 pub use model::quantized_llama;

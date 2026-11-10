@@ -6,9 +6,12 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+#[cfg(feature = "workspace")]
+pub mod compat;
 pub mod config;
 pub mod embedder;
 pub mod error;
+#[cfg(any(test, feature = "test-utils"))]
 pub mod fakes;
 pub mod reranker;
 pub mod traits;
@@ -19,6 +22,7 @@ pub use config::{
 };
 pub use embedder::OnnxEmbedder;
 pub use error::{Error, Result};
+#[cfg(any(test, feature = "test-utils"))]
 pub use fakes::{FakeEmbedder, FakeReranker};
 pub use reranker::{CrossEncoderReranker, OnnxReranker};
 pub use traits::{Embedder, Reranker};

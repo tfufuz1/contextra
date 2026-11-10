@@ -1,0 +1,2 @@
+    Checking contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.77s

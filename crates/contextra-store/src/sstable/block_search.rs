@@ -3,7 +3,8 @@
 //! Stellt hochoptimierte Binaersuchroutinen ueber geordnete Schluessel-Offsets
 //! innerhalb eines SSTable-Datenblocks bereit.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult};
+use contextra_types::Result;
 
 /// Entry offset accessor supporting both 16-bit (legacy v0..v2) and 32-bit (v3+) block formats.
 pub fn get_entry_at_index(
@@ -11,83 +12,83 @@ pub fn get_entry_at_index(
     offsets_start: usize,
     idx: usize,
     is_v3: bool,
-) -> Result<(usize, usize)> {
+) -> StoreResult<(usize, usize)> {
     let entry_off = if is_v3 {
         let off_pos = offsets_start
             .checked_add(idx.checked_mul(4).ok_or_else(|| {
-                ContextraError::Storage("overflow calculating offset position".into())
+                StoreError::Storage("overflow calculating offset position".into())
             })?)
             .ok_or_else(|| {
-                ContextraError::Storage("overflow calculating offset position".into())
+                StoreError::Storage("overflow calculating offset position".into())
             })?;
 
         let end_pos = off_pos.checked_add(4).ok_or_else(|| {
-            ContextraError::Storage("overflow calculating end offset position".into())
+            StoreError::Storage("overflow calculating end offset position".into())
         })?;
 
         let slice = block_data.get(off_pos..end_pos).ok_or_else(|| {
-            ContextraError::Storage("malformed block: off_pos out of bounds".into())
+            StoreError::Storage("malformed block: off_pos out of bounds".into())
         })?;
 
         usize::try_from(u32::from_le_bytes(
             slice
                 .try_into()
-                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                .map_err(|_| StoreError::Storage("invalid slice".into()))?,
         ))
-        .map_err(|_| ContextraError::Storage("entry offset exceeds platform usize".into()))?
+        .map_err(|_| StoreError::Storage("entry offset exceeds platform usize".into()))?
     } else {
         let off_pos = offsets_start
             .checked_add(idx.checked_mul(2).ok_or_else(|| {
-                ContextraError::Storage("overflow calculating offset position".into())
+                StoreError::Storage("overflow calculating offset position".into())
             })?)
             .ok_or_else(|| {
-                ContextraError::Storage("overflow calculating offset position".into())
+                StoreError::Storage("overflow calculating offset position".into())
             })?;
 
         let end_pos = off_pos.checked_add(2).ok_or_else(|| {
-            ContextraError::Storage("overflow calculating end offset position".into())
+            StoreError::Storage("overflow calculating end offset position".into())
         })?;
 
         let slice = block_data.get(off_pos..end_pos).ok_or_else(|| {
-            ContextraError::Storage("malformed block: off_pos out of bounds".into())
+            StoreError::Storage("malformed block: off_pos out of bounds".into())
         })?;
 
         usize::from(u16::from_le_bytes(
             slice
                 .try_into()
-                .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+                .map_err(|_| StoreError::Storage("invalid slice".into()))?,
         ))
     };
 
     if entry_off >= offsets_start {
-        return Err(ContextraError::Storage(
+        return Err(StoreError::Storage(
             "malformed block: entry offset exceeds offsets_start".into(),
         ));
     }
 
     let k_len_end = entry_off.checked_add(2).ok_or_else(|| {
-        ContextraError::Storage("overflow calculating key length end position".into())
+        StoreError::Storage("overflow calculating key length end position".into())
     })?;
 
     if k_len_end > offsets_start {
-        return Err(ContextraError::Storage(
+        return Err(StoreError::Storage(
             "malformed block: key length header exceeds offsets_start".into(),
         ));
     }
 
     let k_len_slice = block_data
         .get(entry_off..k_len_end)
-        .ok_or_else(|| ContextraError::Storage("malformed block: k_len out of bounds".into()))?;
+        .ok_or_else(|| StoreError::Storage("malformed block: k_len out of bounds".into()))?;
 
     let k_len = usize::from(u16::from_le_bytes(
         k_len_slice
             .try_into()
-            .map_err(|_| ContextraError::Storage("invalid slice".into()))?,
+            .map_err(|_| StoreError::Storage("invalid slice".into()))?,
     ));
 
     let min_entry_len = 2usize.saturating_add(k_len).saturating_add(20);
     if entry_off.saturating_add(min_entry_len) > offsets_start {
-        return Err(ContextraError::Storage(
+        return Err(StoreError::Storage(
             "malformed block: entry exceeds offsets_start boundary".into(),
         ));
     }
@@ -100,22 +101,22 @@ pub fn get_entry_key_at_index(
     offsets_start: usize,
     idx: usize,
     is_v3: bool,
-) -> Result<&[u8]> {
+) -> StoreResult<&[u8]> {
     let (entry_off, k_len) = get_entry_at_index(block_data, offsets_start, idx, is_v3)?;
     let ep = entry_off
         .checked_add(2)
-        .ok_or_else(|| ContextraError::Storage("overflow calculating entry key position".into()))?;
+        .ok_or_else(|| StoreError::Storage("overflow calculating entry key position".into()))?;
     let end_k = ep
         .checked_add(k_len)
-        .ok_or_else(|| ContextraError::Storage("overflow calculating entry key length".into()))?;
+        .ok_or_else(|| StoreError::Storage("overflow calculating entry key length".into()))?;
     if end_k > offsets_start {
-        return Err(ContextraError::Storage(
+        return Err(StoreError::Storage(
             "malformed block: entry key exceeds offsets_start".into(),
         ));
     }
     block_data
         .get(ep..end_k)
-        .ok_or_else(|| ContextraError::Storage("malformed block: entry_key out of bounds".into()))
+        .ok_or_else(|| StoreError::Storage("malformed block: entry_key out of bounds".into()))
 }
 
 pub fn binary_search_first_index_in_block(
@@ -124,7 +125,7 @@ pub fn binary_search_first_index_in_block(
     num_offsets: usize,
     key: &[u8],
     is_v3: bool,
-) -> Result<Option<usize>> {
+) -> StoreResult<Option<usize>> {
     if num_offsets == 0 {
         return Ok(None);
     }
@@ -216,7 +217,7 @@ pub fn block_binary_search(
     num_offsets: usize,
     key: &[u8],
     is_v3: bool,
-) -> Result<Option<usize>> {
+) -> StoreResult<Option<usize>> {
     match binary_search_first_index_in_block(block_data, offsets_start, num_offsets, key, is_v3)? {
         Some(idx) => {
             let (entry_off, _) = get_entry_at_index(block_data, offsets_start, idx, is_v3)?;

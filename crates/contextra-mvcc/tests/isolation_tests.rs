@@ -18,9 +18,10 @@ use contextra_mvcc::seq_log::SequenceLog;
 use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator};
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig};
+use contextra_mvcc::MvccError;
 use contextra_mvcc::SsiValidator;
 use contextra_testkit::ManualClock;
-use contextra_types::{ContextraError, DocId, TxId, TOMBSTONE_BIT};
+use contextra_ids::{DocId, TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use std::sync::Barrier;
@@ -54,7 +55,7 @@ fn test_isolation_write_skew_classic_bank_account() {
     // Tx2 attempts to validate its read set at seq 12 -> MUST fail write-skew validation because A was mutated at seq 11 > 10
     let res2 = validator.validate(tx2, &rs2);
     assert!(
-        matches!(res2, Err(ContextraError::Conflict(_))),
+        matches!(res2, Err(MvccError::Conflict(_))),
         "Tx2 must fail validation due to write-skew on account:A"
     );
 }
@@ -83,7 +84,7 @@ fn test_isolation_write_skew_overlapping_reads_disjoint_writes() {
 
     // Tx2 attempts to validate at seq 22 -> conflicts because key1 was modified after snap_seq 20
     let res2 = validator.validate(tx2, &rs2);
-    assert!(matches!(res2, Err(ContextraError::Conflict(_))));
+    assert!(matches!(res2, Err(MvccError::Conflict(_))));
 }
 
 // Prüft, dass disjunkte Lese- und Schreibmengen konfliktfrei nebeneinander committen können.
@@ -132,7 +133,7 @@ fn test_isolation_lost_update_concurrent_counter_increment() {
     // Tx2 attempts to commit global_counter -> lost-update detected
     let res2 = validator.validate(tx2, &rs2);
     assert!(
-        matches!(res2, Err(ContextraError::Conflict(_))),
+        matches!(res2, Err(MvccError::Conflict(_))),
         "Lost-update on global_counter must fail validation"
     );
 }
@@ -158,7 +159,7 @@ fn test_isolation_lost_update_atomic_validate_and_record() {
     // Tx2 attempting validate_and_record fails and leaves no write keys recorded
     let keys2 = vec![b"tx2_side_effect".as_slice()];
     let res2 = validator.validate_and_record(tx2, &rs2, keys2, 12);
-    assert!(matches!(res2, Err(ContextraError::Conflict(_))));
+    assert!(matches!(res2, Err(MvccError::Conflict(_))));
 
     // Verify side effect key from failed tx2 was NOT recorded
     let mut rs_check = ReadSet::new();
@@ -185,7 +186,7 @@ fn test_isolation_phantom_read_prefix_match_conflicts() {
     // Range scan validation must detect phantom insertion
     let res = validator.validate(tx_scan, &rs_scan);
     assert!(
-        matches!(res, Err(ContextraError::Conflict(_))),
+        matches!(res, Err(MvccError::Conflict(_))),
         "Phantom insertion matching range prefix must cause conflict"
     );
 }
@@ -222,7 +223,7 @@ fn test_isolation_phantom_read_multiple_range_prefixes() {
     validator.record_commit_key(b"cat:B:item_12", 45);
 
     let res = validator.validate(tx, &rs);
-    assert!(matches!(res, Err(ContextraError::Conflict(_))));
+    assert!(matches!(res, Err(MvccError::Conflict(_))));
 }
 
 // --- 4. Read-Only Snapshot Isolation Preservation Tests ---
@@ -563,7 +564,7 @@ fn test_isolation_tx_buffer_bounded_ops_limit() {
             data: "overflow".to_string(),
         },
     );
-    assert!(matches!(res, Err(ContextraError::Transaction(_))));
+    assert!(matches!(res, Err(MvccError::Transaction(_))));
 }
 
 // Prüft die Durchsetzung des Byte-Budgets für gepufferte Nutzdaten pro Transaktion.
@@ -586,7 +587,7 @@ fn test_isolation_tx_buffer_tx_staged_bytes_budget() {
             data: large_payload,
         },
     );
-    assert!(matches!(res, Err(ContextraError::Storage(_))));
+    assert!(matches!(res, Err(MvccError::Storage(_))));
 }
 
 // Prüft das Abräumen verwaister Transaktionen im TxBuffer mit ManualClock.
@@ -650,7 +651,7 @@ fn test_isolation_ssi_validator_with_sequence_log_conflict() {
     seq_log.write().record_insert(doc_id, 15);
 
     let res = validator.validate(TxId::new(1), &rs);
-    assert!(matches!(res, Err(ContextraError::Conflict(_))));
+    assert!(matches!(res, Err(MvccError::Conflict(_))));
 }
 
 // --- 10. Handgerechnete Modell-Isolationstests (P02 / WP-36 Lückenabdeckung) ---
@@ -685,38 +686,92 @@ fn test_isolation_handcrafted_snapshot_never_sees_future_commits() {
     log.record_insert(doc_c, 40);
 
     // Handgerechneter Prüfpunkt T=5
-    assert!(!log.is_visible(doc_a, 5), "At seq 5, doc_a (inserted 10) must be invisible");
-    assert!(!log.is_visible(doc_b, 5), "At seq 5, doc_b (inserted 20) must be invisible");
-    assert!(!log.is_visible(doc_c, 5), "At seq 5, doc_c (inserted 40) must be invisible");
+    assert!(
+        !log.is_visible(doc_a, 5),
+        "At seq 5, doc_a (inserted 10) must be invisible"
+    );
+    assert!(
+        !log.is_visible(doc_b, 5),
+        "At seq 5, doc_b (inserted 20) must be invisible"
+    );
+    assert!(
+        !log.is_visible(doc_c, 5),
+        "At seq 5, doc_c (inserted 40) must be invisible"
+    );
 
     // Handgerechneter Prüfpunkt T=10
-    assert!(log.is_visible(doc_a, 10), "At seq 10, doc_a must be visible");
-    assert!(!log.is_visible(doc_b, 10), "At seq 10, doc_b must be invisible");
-    assert!(!log.is_visible(doc_c, 10), "At seq 10, doc_c must be invisible");
+    assert!(
+        log.is_visible(doc_a, 10),
+        "At seq 10, doc_a must be visible"
+    );
+    assert!(
+        !log.is_visible(doc_b, 10),
+        "At seq 10, doc_b must be invisible"
+    );
+    assert!(
+        !log.is_visible(doc_c, 10),
+        "At seq 10, doc_c must be invisible"
+    );
 
     // Handgerechneter Prüfpunkt T=15
-    assert!(log.is_visible(doc_a, 15), "At seq 15, doc_a must be visible");
-    assert!(!log.is_visible(doc_b, 15), "At seq 15, doc_b must be invisible");
+    assert!(
+        log.is_visible(doc_a, 15),
+        "At seq 15, doc_a must be visible"
+    );
+    assert!(
+        !log.is_visible(doc_b, 15),
+        "At seq 15, doc_b must be invisible"
+    );
 
     // Handgerechneter Prüfpunkt T=20
-    assert!(log.is_visible(doc_a, 20), "At seq 20, doc_a must be visible");
-    assert!(log.is_visible(doc_b, 20), "At seq 20, doc_b must be visible");
-    assert!(!log.is_visible(doc_c, 20), "At seq 20, doc_c must be invisible");
+    assert!(
+        log.is_visible(doc_a, 20),
+        "At seq 20, doc_a must be visible"
+    );
+    assert!(
+        log.is_visible(doc_b, 20),
+        "At seq 20, doc_b must be visible"
+    );
+    assert!(
+        !log.is_visible(doc_c, 20),
+        "At seq 20, doc_c must be invisible"
+    );
 
     // Handgerechneter Prüfpunkt T=29
-    assert!(log.is_visible(doc_a, 29), "At seq 29, doc_a must be visible prior to delete at 30");
-    assert!(log.is_visible(doc_b, 29), "At seq 29, doc_b must be visible");
+    assert!(
+        log.is_visible(doc_a, 29),
+        "At seq 29, doc_a must be visible prior to delete at 30"
+    );
+    assert!(
+        log.is_visible(doc_b, 29),
+        "At seq 29, doc_b must be visible"
+    );
 
     // Handgerechneter Prüfpunkt T=30: Grenze Löschzeitpunkt
     // Invariante: delete_seq > as_of ist strikt -> bei as_of == delete_seq (30) ist Doc A NICHT mehr sichtbar.
-    assert!(!log.is_visible(doc_a, 30), "At seq 30, doc_a is deleted and must be invisible");
-    assert!(log.is_visible(doc_b, 30), "At seq 30, doc_b remains visible");
-    assert!(!log.is_visible(doc_c, 30), "At seq 30, doc_c must be invisible");
+    assert!(
+        !log.is_visible(doc_a, 30),
+        "At seq 30, doc_a is deleted and must be invisible"
+    );
+    assert!(
+        log.is_visible(doc_b, 30),
+        "At seq 30, doc_b remains visible"
+    );
+    assert!(
+        !log.is_visible(doc_c, 30),
+        "At seq 30, doc_c must be invisible"
+    );
 
     // Handgerechneter Prüfpunkt T=35
     assert!(!log.is_visible(doc_a, 35), "At seq 35, doc_a is deleted");
-    assert!(log.is_visible(doc_b, 35), "At seq 35, doc_b remains visible");
-    assert!(!log.is_visible(doc_c, 35), "At seq 35, doc_c must be invisible");
+    assert!(
+        log.is_visible(doc_b, 35),
+        "At seq 35, doc_b remains visible"
+    );
+    assert!(
+        !log.is_visible(doc_c, 35),
+        "At seq 35, doc_c must be invisible"
+    );
 
     // Handgerechneter Prüfpunkt T=40
     assert!(!log.is_visible(doc_a, 40), "At seq 40, doc_a is deleted");
@@ -748,12 +803,14 @@ fn test_isolation_handcrafted_write_conflict_detection_and_disjoint_reads() {
     rs2.record_read(b"inventory:item:42", 100);
     // Tx2 schreibt K1 und committet bei seq 105
     let commit_keys_tx2 = vec![b"inventory:item:42".as_slice()];
-    assert!(validator.validate_and_record(tx2, &rs2, commit_keys_tx2, 105).is_ok());
+    assert!(validator
+        .validate_and_record(tx2, &rs2, commit_keys_tx2, 105)
+        .is_ok());
 
     // Tx1 muss scheitern, weil 105 > 100
     let res1 = validator.validate(tx1, &rs1);
     assert!(
-        matches!(res1, Err(ContextraError::Conflict(_))),
+        matches!(res1, Err(MvccError::Conflict(_))),
         "Tx1 must be rejected with Conflict because commit_seq 105 > read_seq 100"
     );
 
@@ -831,8 +888,8 @@ fn test_isolation_handcrafted_read_your_own_writes_lifecycle() {
     );
     let ops_tx1 = tx_buffer.get_ops(tx1).expect("Tx1 ops must exist");
     assert_eq!(ops_tx1.len(), 1);
-    match &ops_tx1[0] {
-        IndexOp::Insert { data, .. } => {
+    match ops_tx1.first() {
+        Some(IndexOp::Insert { data, .. }) => {
             assert_eq!(data.0, key);
             assert_eq!(data.1, b"value_v2");
         }

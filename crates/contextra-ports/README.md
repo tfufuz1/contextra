@@ -19,7 +19,7 @@ Durch die Verwendung von Ports existieren keine direkten Abhängigkeiten zwische
 ## Modul-Übersicht & Sub-Preludes
 - **`env`:** Injektion der Umgebung (`Clock`, `Rng`, `IdGen`, `MetricsSink`). Sub-Prelude: `contextra_ports::env::prelude::*`.
 - **`fs`:** Virtuelles Dateisystem (`Vfs`, `VfsFile`, `VfsOpenOptions`, `VerifiedVia`). Sub-Prelude: `contextra_ports::fs::prelude::*`.
-- **`storage`:** Key-Value- und LSM-Speicherabstraktionen (`StorageEngine`, `KvPrefixStore`, `BlockCache`).
+- **`storage`:** Key-Value- und LSM-Speicherabstraktionen (`StorageEngine`, `StorageStats`, `KvPrefixStore`, `MAX_SCAN_MERGE_ACCUMULATOR`). Sub-Prelude: `contextra_ports::storage::prelude::*`.
 - **`index`:** Vektor-, Volltext- und Graph-Indizes (`VectorIndex`, `TextIndex`, `GraphIndex`). Sub-Prelude: `contextra_ports::index::prelude::*`.
 - **`inference`:** Modell-, Embedding- und Reranker-Ports (`TextEmbeddingEngine`, `EmbeddingProvider`, `Reranker`, `QueryRewriter`). Sub-Prelude: `contextra_ports::inference::prelude::*`.
 - **`policy`:** Governance- und Autorisierungsports (`LicenseGate`, `EgressPolicy`, `EgressDecision`). Sub-Prelude: `contextra_ports::policy::prelude::*`.

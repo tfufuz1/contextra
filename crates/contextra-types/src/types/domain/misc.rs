@@ -1,6 +1,6 @@
 //! Wissensgraphen-Elemente (`Entity`, `Edge`), `MemoryType`, `WorkflowState` und Verfallskonstanten.
 //!
-//! # Architektur-Rolle: Ring 0 (Wissensgraph & Gedächtnismodelle)
+//! # Architektur-Rolle: Typen-Fundament (Wissensgraph & Gedächtnismodelle)
 //!
 //! Dieses Modul enthält Strukturen für:
 //! - `WorkflowState`: Eingefrorener Workflow-Zustand mit Transaktions- und Graph-Hash als Savepoint.
@@ -174,7 +174,7 @@ impl Entity {
 /// Graph directed edge representation with explicit bitemporal axis separation.
 ///
 /// # Abgrenzung
-/// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation in Ring 0
+/// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation auf Vertragsebene
 /// mit Entitäts-IDs, Beziehungslabel, Quell-Dokumenten-ID und bitemporalen Gültigkeitsachsen
 /// (`tx_valid_from`/`tx_valid_to`, `business_valid_from`/`business_valid_to`).
 /// Im Gegensatz dazu ist `contextra_graph::csr::types::Edge` (bzw. `CsrEdge`) ein speicherkompakter
@@ -370,16 +370,16 @@ impl MemoryType {
 
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
-/// # Ring Architecture
-/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
-/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
+/// # Modulare Architektur
+/// Definiert in `contextra-types` (Vertragsebene), um Abhängigkeiten von `contextra-graph` zu vermeiden.
+/// Graph-Algorithmen in `contextra-graph` bilden diese Konfiguration auf `contextra_graph::TlHfdParams` ab.
 ///
 /// # Abgrenzung
-/// Dieser Typ `contextra_types::TlHfdParams` ist die Ring-0-Konfigurationsstruktur
+/// Dieser Typ `contextra_types::TlHfdParams` ist die Konfigurationsstruktur auf Vertragsebene
 /// (`sigma`, `delta`, `gamma`, `max_iterations`, `max_top_k_expansion`, `max_hyperedge_sort_size`),
 /// die über API-Parameter und JSON-Optionen übergeben wird.
-/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-Spezifische
-/// Parameterstruktur in Ring 1 mit Ausführungs- und Diffusionsmatrix-Validierungen.
+/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-spezifische
+/// Parameterstruktur mit Ausführungs- und Diffusionsmatrix-Validierungen.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {

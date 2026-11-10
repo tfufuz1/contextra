@@ -16,7 +16,9 @@
 //! lediglich Kandidaten/Signale. Die tatsächliche Tombstone-Ausführung bleibt in der
 //! Verantwortung des Aufrufers.
 
-use crate::session_dag::NodeIdx;
+/// Opaker Zählertyp für DAG-Knoten (entkoppelt von session_dag).
+pub type NodeIdx = u64;
+
 use contextra_types::{EntityId, TxId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -794,6 +794,8 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "bytes",
+ "contextra-env",
+ "contextra-ids",
  "contextra-ports",
  "contextra-testkit",
  "contextra-types",
@@ -803,6 +805,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.20",
  "tokio",
  "tracing",
 ]
@@ -871,6 +874,7 @@ dependencies = [
  "bytes",
  "contextra-adapt",
  "contextra-checkpoint",
+ "contextra-cognition",
  "contextra-engine",
  "contextra-graph",
  "contextra-ports",
@@ -878,6 +882,7 @@ dependencies = [
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
+ "contextra-vault",
  "contextra-vector",
  "criterion",
  "parking_lot 0.12.5",
@@ -917,6 +922,7 @@ dependencies = [
  "contextra-checkpoint",
  "contextra-graph",
  "contextra-infer-onnx",
+ "contextra-ingest",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-rank",
@@ -1064,6 +1070,8 @@ name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "contextra-ports",
+ "contextra-types",
  "criterion",
  "ndarray 0.15.6",
  "ort",
@@ -1156,6 +1164,7 @@ dependencies = [
  "contextra-infer-onnx",
  "contextra-ports",
  "contextra-privacy",
+ "contextra-prompt-guard",
  "contextra-rank",
  "contextra-router",
  "contextra-types",
@@ -1181,7 +1190,10 @@ name = "contextra-mvcc"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "bincode",
  "bytes",
+ "contextra-env",
+ "contextra-ids",
  "contextra-ports",
  "contextra-testkit",
  "contextra-types",
@@ -1190,7 +1202,9 @@ dependencies = [
  "parking_lot 0.12.5",
  "proptest",
  "serde",
+ "serde_json",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
 ]
 
@@ -1229,6 +1243,18 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
+]
+
+[[package]]
+name = "contextra-prompt-guard"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tracing",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -1309,6 +1335,7 @@ dependencies = [
  "criterion",
  "proptest",
  "serde",
+ "serde_json",
  "simsimd",
  "thiserror 2.0.20",
  "tracing",
@@ -1418,6 +1445,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-vault"
+version = "0.1.0"
+dependencies = [
+ "contextra-sys",
+ "thiserror 2.0.20",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "contextra-vector"
 version = "0.1.0"
 dependencies = [
@@ -1426,6 +1463,7 @@ dependencies = [
  "blake3",
  "contextra-mvcc",
  "contextra-ports",
+ "contextra-simd",
  "contextra-sys",
  "contextra-types",
  "criterion",
@@ -1436,6 +1474,7 @@ dependencies = [
  "rand 0.8.8",
  "roaring",
  "serde",
+ "serde_json",
  "subtle",
  "tempfile",
  "thiserror 2.0.20",

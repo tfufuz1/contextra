@@ -42,7 +42,9 @@ impl Embedder for FakeEmbedder {
         for (i, b) in bytes.iter().enumerate() {
             acc = acc.wrapping_mul(0x01000193) ^ (*b as u32);
             let idx = i % self.dimension;
-            vec[idx] += ((acc & 0xFF) as f32) / 255.0;
+            if let Some(slot) = vec.get_mut(idx) {
+                *slot += ((acc & 0xFF) as f32) / 255.0;
+            }
         }
 
         // L2-Normalisierung

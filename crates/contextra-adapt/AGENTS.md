@@ -28,7 +28,7 @@
 | Standalone-Build | `cargo build -p contextra-adapt --no-default-features --locked` |
 | Contextra-Abhängigkeiten **Ist** (Cargo) | `ports`, `types` |
 | Contextra-Abhängigkeiten **Soll** (PLAN §4) | `ports`, `types` |
-| Features | `bandit-routing`, `flow-corrected-thompson`, `rie-greedy-personalization`, `sketched-bandit` |
+| Features | `bandit-routing`, `flow-corrected-thompson`, `rie-greedy-personalization` |
 | Lints | `#![forbid(unsafe_code)]`, `warn(missing_docs)` |
 
 ## 2. Abhängigkeiten & Schulden

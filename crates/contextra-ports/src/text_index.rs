@@ -123,7 +123,7 @@ pub trait TextIndex: Send + Sync + 'static {
     /// Returns the number of documents in the index.
     ///
     /// # Fehler
-    /// Keine; garantiert panikfrei.
+    /// Keine; panikfrei.
     /// # Crash
     /// Reiner Statusabruf aus Header oder RAM-Zustand.
     fn len(&self) -> impl Future<Output = usize> + Send;

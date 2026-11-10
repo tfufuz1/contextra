@@ -23,7 +23,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, SystemClock};
 
 use crate::types::DocId;
 

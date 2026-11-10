@@ -12,9 +12,18 @@ description = "Multi-Version Concurrency Control (MVCC), sequence log, and trans
 [package.metadata.contextra]
 ring = "0"
 
+[features]
+default = ["workspace"]
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
+docid-128 = ["contextra-ids/docid-128"]
+
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
@@ -28,6 +37,9 @@ loom = "0.7"
 [dev-dependencies]
 proptest = "1.4"
 criterion = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util"] }
+serde_json = { workspace = true }
+bincode = { workspace = true }
 loom = "0.7"
 contextra-testkit = { workspace = true }
 
@@ -62,3 +74,19 @@ path = "tests/campaign_cov_tx_buffer_reap.rs"
 [[test]]
 name = "isolation_tests"
 path = "tests/isolation_tests.rs"
+
+[[test]]
+name = "loom_sequence_log"
+path = "tests/loom_sequence_log.rs"
+
+[[test]]
+name = "loom_tx_buffer"
+path = "tests/loom_tx_buffer.rs"
+
+[[test]]
+name = "golden_corpus"
+path = "tests/golden_corpus.rs"
+
+[[test]]
+name = "tombstone_diff"
+path = "tests/tombstone_diff.rs"

@@ -211,21 +211,21 @@ mod tests {
 
     #[test]
     fn test_split_endpoint_simple() {
-        let (prog, args) = split_endpoint("/usr/bin/my-slm").unwrap();
+        let (prog, args) = split_endpoint("/usr/bin/my-slm").unwrap(); // #[cfg(test)]
         assert_eq!(prog, "/usr/bin/my-slm");
         assert!(args.is_empty());
     }
 
     #[test]
     fn test_split_endpoint_with_args() {
-        let (prog, args) = split_endpoint("/usr/bin/node /opt/slm/server.js --port 9000").unwrap();
+        let (prog, args) = split_endpoint("/usr/bin/node /opt/slm/server.js --port 9000").unwrap(); // #[cfg(test)]
         assert_eq!(prog, "/usr/bin/node");
         assert_eq!(args, vec!["/opt/slm/server.js", "--port", "9000"]);
     }
 
     #[test]
     fn test_split_endpoint_quoted_spaces() {
-        let (prog, args) = split_endpoint("'/path with spaces/slm' --mode fast").unwrap();
+        let (prog, args) = split_endpoint("'/path with spaces/slm' --mode fast").unwrap(); // #[cfg(test)]
         assert_eq!(prog, "/path with spaces/slm");
         assert_eq!(args, vec!["--mode", "fast"]);
     }
@@ -246,7 +246,7 @@ mod tests {
         // Diese Strings dürfen NICHT zur Shell-Ausführung führen — split_endpoint
         // trennt nur Tokens, der zurückgegebene `program`-String wird direkt an
         // Command::new() übergeben, kein Shell-Intermediär.
-        let (prog, args) = split_endpoint("myslm; rm -rf /").unwrap();
+        let (prog, args) = split_endpoint("myslm; rm -rf /").unwrap(); // #[cfg(test)]
         assert_eq!(prog, "myslm;");
         // 'rm' wird als Argument übergeben, nicht als zweites Kommando
         assert!(args.iter().any(|a| a == "rm"));

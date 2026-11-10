@@ -20,7 +20,7 @@ pub trait EgressPolicy: Send + Sync {
     /// Evaluates if the outgoing content complies with data governance and egress rules.
     ///
     /// # Fehler
-    /// Keine; garantiert fehlerfrei über `EgressDecision` abgebildet.
+    /// Keine; fehlerfrei über `EgressDecision` abgebildet.
     /// # Crash
     /// Reiner Rechenvorgang im Arbeitsspeicher; keine persistente Mutation.
     fn evaluate(&self, ctx: &contextra_types::RequestContext, payload: &str) -> EgressDecision;

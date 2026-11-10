@@ -118,7 +118,7 @@ pub fn shadow_compare_forward_push_vs_apprh<G: PathGraph>(
 
 pub(crate) fn normalize_and_sort(map: &ahash::AHashMap<EntityId, f32>) -> Vec<(EntityId, f32)> {
     let mut entries: Vec<(EntityId, f32)> = map.iter().map(|(&id, &val)| (id, val)).collect();
-    // Sort strictly by EntityId to ensure IEEE-754 floating point summation order is 100% deterministic
+    // Sort strictly by EntityId to ensure IEEE-754 floating point summation order is fully deterministic
     entries.sort_by_key(|(id, _)| *id);
     let sum: f32 = entries.iter().map(|(_, val)| *val).sum();
 

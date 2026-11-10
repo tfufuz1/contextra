@@ -239,7 +239,7 @@ async fn test_lyapunov_drift_status_integration() -> Result<(), Box<dyn std::err
 // Test `test_lyapunov_observe_score_and_analyze_drift_detection`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_lyapunov_observe_score_and_analyze_drift_detection() {
-    use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+    use contextra_adapt::{LyapunovDriftWatcher, LyapunovResult};
 
     let mut watcher = LyapunovDriftWatcher::new(20);
     let baseline: Vec<f32> = (0..100).map(|i| (i as f32) / 100.0 * 0.2).collect();
@@ -288,7 +288,7 @@ fn test_lyapunov_observe_score_and_analyze_drift_detection() {
 // Test `test_lyapunov_update_empty_scores_or_uninitialized_baseline`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_lyapunov_update_empty_scores_or_uninitialized_baseline() {
-    use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+    use contextra_adapt::{LyapunovDriftWatcher, LyapunovResult};
 
     let mut watcher = LyapunovDriftWatcher::new(10);
     // Empty update without baseline returns InsufficientData
@@ -653,7 +653,7 @@ fn test_profile_calibration_state_edge_cases() {
 // Test `test_lyapunov_uncovered_branch_paths`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_lyapunov_uncovered_branch_paths() {
-    use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+    use contextra_adapt::{LyapunovDriftWatcher, LyapunovResult};
 
     let mut watcher = LyapunovDriftWatcher::new(10);
     // 1. update with empty baseline and empty current_scores -> InsufficientData
@@ -750,7 +750,7 @@ async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::erro
         let current = router.state.load_full();
         let mut new_state = (*current).clone();
         if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p1") {
-            watcher.latest_result = Some(crate::lyapunov::LyapunovResult::Stable {
+            watcher.latest_result = Some(contextra_adapt::LyapunovResult::Stable {
                 lyapunov_exponent: -0.1,
             });
         }
@@ -768,9 +768,9 @@ async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::erro
         let mut new_state = (*current).clone();
         if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p1") {
             // Force a warning level drift
-            watcher.latest_result = Some(crate::lyapunov::LyapunovResult::DriftDetected {
+            watcher.latest_result = Some(contextra_adapt::LyapunovResult::DriftDetected {
                 lyapunov_exponent: 0.1,
-                reason: crate::lyapunov::DriftReason {
+                reason: contextra_adapt::DriftReason {
                     kl_divergence: 0.5,
                     lyapunov_exponent: 0.1,
                 },
@@ -786,9 +786,9 @@ async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::erro
         let mut new_state = (*current).clone();
         if let Some(watcher) = new_state.lyapunov_watchers.get_mut("p2") {
             // Force a critical level drift (> 0.2)
-            watcher.latest_result = Some(crate::lyapunov::LyapunovResult::DriftDetected {
+            watcher.latest_result = Some(contextra_adapt::LyapunovResult::DriftDetected {
                 lyapunov_exponent: 0.3,
-                reason: crate::lyapunov::DriftReason {
+                reason: contextra_adapt::DriftReason {
                     kl_divergence: 1.5,
                     lyapunov_exponent: 0.3,
                 },

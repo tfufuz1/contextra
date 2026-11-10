@@ -19,11 +19,10 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [features]
-default = ["std", "bandit-routing", "flow-corrected-thompson", "rie-greedy-personalization"]
+default = ["std"]
 std = []
 bandit-routing = []
 flow-corrected-thompson = ["bandit-routing"]
-sketched-bandit = ["bandit-routing"]
 rie-greedy-personalization = []
 
 [dev-dependencies]
