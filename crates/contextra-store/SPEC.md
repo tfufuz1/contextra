@@ -1,207 +1,167 @@
-# SPEC — `contextra-store`
+# contextra-store — Spezifikation
 
-**Normativitätsklasse:** Klasse B (Storage Bundle)
-**Ring:** Ring 1
-**Status:** In Entwicklung (Welle 3 / Paket B8 / M11)
-**Normative Referenz:** `docs/SPEC.md` v4.1 (§0, §2, §3, §4, §5, §14.1, §15)
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
----
+**Pfad:** `crates/contextra-store/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
-## 1. Zweck & Systemgrenzen
-`contextra-store` implementiert das persistente Key-Value-Speichertriebwerk der Contextra-Architektur auf Basis eines Log-Structured Merge-Trees (LSM). Das Speichertriebwerk bietet atomare Schreibtransaktionen, Snapshot-Isolation über Sequenznummern, Append-Only Write-Ahead-Logging (WAL) mit HMAC-Kette und mehrstufige Hintergrundkompaktierung.
+## 1. Zweck
 
-- **Klasse B (Storage Bundle):** `contextra-store` ist Teil des zusammenhängenden Speicher-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`) und wird als Bundle exportiert/eingebunden.
-- **Ring 1:** Abhängigkeiten zeigen ausschließlich auf gleiche oder niedrigere Ringe (`contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-crypto`, `contextra-sys`).
-- **Speichersicherheit:** `#![forbid(unsafe_code)]` ohne Ausnahme im gesamten Crate (`lib.rs:25`).
+LSM-Speicher: WAL, Memtable, SSTable, Manifest, Recovery. Strikt durabilitätskritisch (INV-6). *[S]*
 
----
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
 
-## 2. Modulkarte & Verantwortlichkeiten
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | storage |
+| Ebene (Kern-Closure) | 1* |
+| Kern-Closure | ids, env, sys, mvcc, crypto |
+| Default-Features | — |
+| Fehlertyp (R3) | `StoreError` (neu) |
+| Brücke (hinter Feature `workspace`, §1.1) | `engine/`, `scanner/`, `From` |
 
-| Modul / Pfad | Verantwortung & Schnittstellen | Ist / Soll |
-|---|---|---|
-| `wal/` (`mod.rs`, `encode.rs`, `flusher.rs`, `hmac.rs`, `io.rs`, `replay.rs`) | Append-Only Write-Ahead-Log, HMAC-SHA256-Kette, asynchroner Flusher-Actor, Open-Heal bei Torn Writes, Replay | **Ist:** Aktiv; `flusher` handhabt Disk-Sync; Tail-Truncation bei Torn Writes. |
-| `lsm/` (`engine.rs`, `commit.rs`, `flush.rs`, `group_commit.rs`, `guard.rs`, `recovery.rs`, `scan.rs`, `ops/*`, `validate.rs`, `observer.rs`) | Hauptorchestrator `LsmStorage`, Commit-Pfade, Flush-Koordination, Group-Commit Leader/Follower, Transaktionslebenszyklus | **Ist:** Aktiv; orchestriert MemTable, WAL und SSTables; implementiert `StorageEngine`. |
-| `memtable.rs` | Nebenläufige, geschardete In-Memory BTreeMap mit Sequenznummern und Tombstones | **Ist:** Aktiv; Lock-freies / geschardetes BTreeMap-Design mit binärer Suche nach Sequenznummern. |
-| `sstable/` (`builder.rs`, `reader.rs`, `block_cache.rs`, `bloom.rs`, `stream.rs`, `block_search.rs`, `reader_ext.rs`, `io.rs`) | Sortierte Segmente auf Festplatte (Format V0–V4), Block-Cache (LRU / quick_cache), Bloom-Filter (Block- und Datei-Ebene) | **Ist:** Aktiv; V4-Format ist Standard; Trailer mit Index-Offset und Bloom-Filter. |
-| `manifest/` (`core.rs`, `entry.rs`, `recovery.rs`, `rollover.rs`) | Transaktionales Manifest für SSTable-Generationen und Versionierung (Magic `MFMN`) | **Ist:** Aktiv; atomare Manifest-Fortschreibung mit `sync_all` und Verzeichnis-Sync. |
-| `compaction/` (`engine.rs`, `adaptive.rs`, `config.rs`, `merge_operator.rs`, `retention.rs`) | Leveled und Adaptive Compaction-Engine, `MergeOperator`-Ausführung, Tombstone-Bereinigung, TTL-Prüfung | **Ist:** Aktiv; Bereinigung von überdeckten Versionen und abgelaufenen Schlüsseln. |
-| `scanner/` (`mod.rs`, `memtable.rs`, `sstable.rs`, `wal.rs`, `purge.rs`) | Port-Implementierungen `LayerScanner` und `Purger` für Residual-Scans und bereichsweise Purge-Kompaktierung | **Ist:** Übergangsweise im Store; **Soll:** Auslagerung nach `contextra-erasure-adapters` (SPEC §6). |
-| `fsync.rs` | Zentrale Flush- und Sync-Abstraktion (Datei- und Verzeichnis-Sync) | **Ist:** Aktiv; fail-closed Fehlerpropagation (INV-FSYNC-1). |
-| `tenant_codec.rs` | Mandanten-Präfixierung (`TenantId`) und logische Schlüssel-Isolation | **Ist:** Aktiv; trennt Keyspace mandantenrein (INV-TENANT-1). |
-| `system_pressure.rs` | Überwachung von Systemressourcen (Blocking Thread Pool, Warteschlangen) | **Ist:** Aktiv; meldet Speicherdruck an den Compaction-Planer. |
-| `engine/` (`memory_only.rs`) | In-Memory-Double (`InMemoryStorageEngine`) für schnelle Tests ohne Dateisystem | **Ist:** Aktiv; implementiert `StorageEngine` rein im RAM. |
-| `kv/` (`mod.rs`, `delete_mode.rs`, `segment.rs`) | Historische KV-Segment- und Löschmodus-Relikte | **Ist:** Altlast / Deprecated Debt DEBT-01; **Soll:** Vollständiger Rückbau. |
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
 
----
+## 3. Ist-Zustand (tools/)
 
-## 3. Datenpfad
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 18015 Zeilen in 83 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | types, ports, sys, mvcc, crypto |
+| Interne Dev-Abhängigkeiten (Ist) | testkit |
+| Features (Ist, Anzahl) | 8 |
+| Default-Features (Ist) | keine |
+| `cfg(feature = …)`-Stellen in src/ | 63 |
+| `#[test]`-Vorkommen (grep, src + tests) | 110 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 1 (Tool 50; 49 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 0 / 0 / False |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 14 (Tool 17) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | WalParseError, DurabilityConfigError |
 
-Der Datenfluss für Schreib- und Leseoperationen verläuft deterministisch und strikt geschichtet:
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
 
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
+
+## 4. Ist-vs-Ziel-Abgleich [V]
+
+- **Ist-Kanten, die das Ziel nicht vorsieht:** `types`, `ports`
+- **Ziel-Kanten, die im Ist fehlen:** `ids`, `env`
+- **Default-Features:** Ist = Ziel (leer).
+
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
+
+- Verifiziert: `FeatureRing` und `validate_against_features` in `src/lsm/config.rs:73–92` (SPEC nennt 68–92, Zeilenversatz). `kv/` existiert, ist aber nicht in `lib.rs` eingebunden (bestätigt). `io_seam` ist in `lib.rs:99` deklariert.
+
+## 6. Anforderungen
+
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
+
+(1) Eigener `StoreError`; Abbildung der heute genutzten Varianten (`Storage`, `Io`, `WalCorruption`, `ChecksumMismatch`, `Transaction*`, `Conflict`, `WalTruncationDetected`, `CrossDeviceLink`) nach §5.3. (2) `compat/`: `engine/` (370), `scanner/` (1.400), `From<StoreError>`; `StorageEngine`-Impl nur dort. (3) `lsm/config.rs:68–92` (`validate_against_features`, `FeatureRing`) entfernen — **erst nach** S-50 (Lizenz-Ports); `validate_durability` bleibt. (4) `kv/` (56 Z., **nicht** in `lib.rs` eingebunden [V]) nach `archive/`. (5) `tenant_codec` → `ids::TenantId`; `Clock`/`MetricsSink`/`IdGen` → `env`. (6) `io_seam`/`fsync` unverändert (B08), `Vfs`-Bindung per Brücke. (7) ID-Breite im Manifest (§5.2) **zuletzt**. Kern-Closure: ids, env, sys, mvcc, crypto. INV-6 gilt strikt: WAL-, Flush- und Recovery-Code wird nur an Typ-/Importstellen berührt.
+
+### 6.2 Brückenmuster [S]
+
+Die Brücke liegt ausschließlich in `src/compat/` hinter dem Feature `workspace`. Verbindliche Muster: docs/SPEC.md §4.3 (a–d). R2 gilt: `contextra_types`, `contextra_ports`, `contextra_testkit` dürfen im Kern nirgends vorkommen, auch nicht in Doc-Kommentaren oder `#[cfg(test)]`.
+
+### 6.3 Regeln für jeden Schritt [S]
+
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
+
+### 6.4 ID-Breite [S]
+
+Persistierte Formate mit IDs tragen `id_width_bits: u16` (64|128). Öffnen mit abweichender Breite ⇒ `…::IdWidthMismatch { stored, build }`, kein Panic, keine Teilmutation (docs/SPEC.md §5.2, B03).
+
+### 6.5 Fehlerabbildung [S]
+
+Eigener Fehlertyp: `StoreError` (neu) (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+### 7.1 Persistierte Formate (§5.1 Golden-Korpus) [S]
+
+| Format | Quelle / Kennung |
+|---|---|
+| Manifest | `store/manifest/core.rs`: `MFMN`, Version 1 |
+| SSTable | `store/sstable/block_cache.rs`: `MFSX`, Legacy `MFST` (Footer, Blöcke, Bloom) |
+| WAL | `store/wal/*` inkl. HMAC-Kette (`wal_crypto`) |
+| Rollback-Intent | `store/lsm/recovery.rs`: `MFRLBK\0\0` |
+
+Jeder Eintrag hat einen Erzeugertest (`#[ignore]`, Script `tools/golden_regen.sh`) und einen Prüftest, der immer läuft. Abweichung ⇒ Schritt abbrechen.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**zero-panic (Produktion, bereinigt: 1; die ersten 15):** Tool-Gesamt 50, davon 49 in Testdateien (`tests.rs` unter `#[cfg(test)]`, Tool-Fehlklassifikation).
+
+- `crates/contextra-store/src/memtable.rs:49` — assert — `const _: () = assert!(TOMBSTONE_BIT == 1u64 << 63);`
+
+**Determinismus (Produktion, bereinigt: 14; die ersten 15):** Tool-Gesamt 17.
+
+- `crates/contextra-store/src/manifest/core.rs:302` — random_hashmap — `let mut valid_map = std::collections::HashMap::new();`
+- `crates/contextra-store/src/manifest/core.rs:356` — random_hashset — `) -> std::collections::HashSet<PathBuf> {`
+- `crates/contextra-store/src/manifest/core.rs:358` — random_hashset — `let valid_set: std::collections::HashSet<PathBuf> =`
+- `crates/contextra-store/src/manifest/core.rs:360` — random_hashset — `let mut dead_set = std::collections::HashSet::new();`
+- `crates/contextra-store/src/wal/flusher.rs:184` — instant_now — `let deadline = tokio::time::Instant::now()`
+- `crates/contextra-store/src/lsm/engine.rs:18` — random_hashmap — `use std::collections::HashMap;`
+- `crates/contextra-store/src/lsm/engine.rs:69` — random_hashmap — `pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,`
+- `crates/contextra-store/src/lsm/recovery.rs:258` — random_hashset — `Option<std::collections::HashSet<std::path::PathBuf>>,`
+- `crates/contextra-store/src/lsm/recovery.rs:259` — random_hashset — `Option<std::collections::HashSet<std::path::PathBuf>>,`
+- `crates/contextra-store/src/lsm/recovery.rs:278` — random_hashmap — `let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =`
+- `crates/contextra-store/src/lsm/recovery.rs:279` — random_hashmap — `std::collections::HashMap::new();`
+- `crates/contextra-store/src/lsm/recovery.rs:282` — random_hashset — `let mut replayed_hmac_set = std::collections::HashSet::new();`
+- `crates/contextra-store/src/lsm/recovery.rs:629` — random_hashmap — `intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),`
+- `crates/contextra-store/src/lsm/recovery.rs:751` — random_hashset — `let txs_to_rollback: std::collections::HashSet<u64> = memtable`
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-store/src/wal/encode.rs:18` — WalParseError
+- `crates/contextra-store/src/lsm/config.rs:25` — DurabilityConfigError
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B01 — Drei Dokumente, drei Architekturen**
+> **Entscheidung:** - Es gibt kein `modules/`-Verzeichnis. Die Brücke ist ein **Modul** `compat/` im Crate (kein Extra-Crate). - `ids`/`env` sind für alle Bausteine erlaubte E0-Abhängigkeiten. Die Seam-Definitionen `Clock`, `Rng`, `MetricsSink`, `IdGen` der Schwester-Specs entfallen zugunsten `env`; `DocKey`/`ExternalId`-Typen zugunsten `ids`. `docid-128` gehört **ausschließlich** `ids` (B03). - Die Mikro-Crate-Zerlegung der Schwester-Specs ist **Folgeprojekt F-1** und nicht Teil dieser Spezifikation (§9.3).
+
+**B03 — `docid-128` ändert die Typbreite und ist nicht additiv**
+> **Entscheidung:** 1. `ids` besitzt `docid-128` allein. Jeder Crate mit Abhängigkeit auf `ids` leitet `docid-128 = ["contextra-ids/docid-128"]` weiter; leere/lokale Features entfallen. E0-Crates ohne `ids` (`ingest`, `erasure`) bekommen **kein** `docid-128`; ihre Konvertierung von `ids::DocId` ist `TryFrom` (fehlschlagend bei Überlauf), nie `as`. 2. `ids` führt `pub const ID_WIDTH_BITS: u32` (64 oder 128) und die Compile-Time-Prüfung `size_of`/`align_of` (8/8 bzw. 16/16). 3. Jedes persistierte Format, das IDs trägt, MUSS die Breite beim Öffnen prüfen (§5.2). Fehlt das Feld heute, wird die Formatversion erhöht und v(alt) als „Breite unbekannt“ nur mit expliziter Konfiguration geöffnet. 4. CI-Matrix: `cargo hack check --workspace --features docid-128` zusätzlich zum Default.
+
+**B04 — Entkopplungsstand von `text` ist falsch eingeschätzt; Zählungen weichen ab**
+> **Entscheidung:** Zahlen sind Orientierung. Abnahme erfolgt ausschließlich über die Null-Prüfung G-L2 (§8.2) und den Build ohne Features, nie über Zählwerte. Aufwandsklasse `text`: mittel.
+
+**B07 — Eine Verzeichnis-Regruppierung bricht messbar viel**
+> **Entscheidung (D-01):** Das Verzeichnislayout bleibt **flach** (`crates/contextra-*`). Die Gruppierung steht als Metadatum `group` in `capabilities.toml`. Die physische Regruppierung ist Nicht-Ziel (§9.3); sie liefert keinen Entnahmegewinn und kostet die oben genannten Brüche.
+
+**B08 — `Vfs` kann nicht verschoben werden, ohne den Fehlertyp zu ändern**
+> **Entscheidung:** `Vfs`, `VfsFile`, `VfsOpenOptions`, `VerifiedVia` bleiben in `ports`. `durable-fs` bleibt eigenständig (E0, Tier experimental, kein Verwender). Die Plan-Schritte „`io_seam`/`fsync.rs` nach `durable-fs`“ und „`sys-flush`“ entfallen (Nicht-Ziel). Verbraucher mit Dateisystembedarf (`store`, `checkpoint`) halten eine **crate-lokale** schmale Naht (siehe §6), die Brücke bindet an `ports::Vfs`.
+
+**B11 — Nebenläufigkeits-Abdeckung fehlt genau dort, wo umgebaut wird**
+> **Entscheidung:** S-01 nimmt `mvcc`, `kvcache`, `checkpoint`, `ids`, `env` in die Pfadfilter von `tsan.yml`/`loom-gate.yml`, `mvcc`+`kvcache` in die Crate-Liste der Mutation-Tests und `rust-ci.yml` auf. Enthält `crates/contextra-mvcc/tests` kein Loom-Modell (`rg -l loom crates/contextra-mvcc` leer), ist vor S-30 ein Modell für `SequenceLog` (Publish/Visibility, zwei Schreiber, ein Leser) zu schreiben; sonst ist S-30 nicht abnehmbar.
+
+**B13 — Dev-Kanten auf `testkit` und Entnahmenachweis**
+> **Entscheidung:** Dev-Kanten zu `testkit` sind erlaubt, stehen aber im Manifest `dev_allowed` (§8.3). Der Isolationsnachweis (G-L4) prüft `--edges normal` und baut zusätzlich `--no-dev-deps`; Tests laufen im Export nur mit `--with-dev` (nimmt dann `testkit`-Closure mit). `env` (Feature `test-utils`) übernimmt `ManualClock` und die Clock/Rng-Konformitätssuite, damit E1-Crates dafür nicht auf `testkit` angewiesen sind.
+
+**B16 — Einzelentscheidungen, die der Entwurf offen ließ**
+
+## 10. Entscheidungen und Risiken [S]
+
+**Risiken (§9.2):**
+
+| Format-/Recovery-Drift im `store` | S-37 | Crash-/Recovery-Suite oder GF rot ⇒ Schritt verwerfen, nicht reparieren |
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-store --no-default-features --locked
+cargo hack check -p contextra-store --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-store --modes no-default,default,each-feature
 ```
-[ Client / Transaktion ]
-        │
-        ▼ (put / delete mit TxId)
-[ TxBuffer (contextra-mvcc) ]
-        │
-        ▼ (commit(tx_id))
-[ LSM Commit Orchestrator (lsm/ops/write.rs / lsm/group_commit.rs) ]
-        │
-        ├─────────────────────────────────────────┐
-        ▼ (1. WAL-Phase)                          ▼ (2. MemTable-Phase)
-[ WAL Flusher Actor (wal/flusher.rs) ]    [ MemTable (memtable.rs) ]
-   - HMAC-Kette berechnen (wal/hmac.rs)       - Sharded BTreeMap
-   - Payload schreiben (wal/io.rs)            - Multi-Version Index
-   - file.sync_all() (INV-FSYNC-1)            - Tombstone (Bit 63)
-        │                                         │
-        └─────────────────────────────────────────┘
-                                │
-                                ▼ (MemTable voll / Flush-Schwelle)
-                  [ SSTable Builder (sstable/builder.rs) ]
-                     - Data Blocks (4 KiB)
-                     - Block-Level Bloom Filter
-                     - SSTable Trailer & Index
-                     - fsync(file) & fsync(parent_dir)
-                                │
-                                ▼ (Commit im Manifest)
-                  [ Manifest (manifest/core.rs) ]
-                     - ManifestEntry::AddSstable
-                     - fsync(manifest)
-                                │
-                                ▼ (Hintergrund)
-                  [ Compaction Engine (compaction/engine.rs) ]
-                     - Leveled Merge / Adaptive Compaction
-                     - MergeOperator
-                     - Physische Entfernung überschatteter Versionen
-```
 
----
-
-## 4. Invariantentabelle
-
-| INV-ID | Aussage | Durchsetzungsort (Code) | Testnachweis (`tests/`) |
-|---|---|---|---|
-| **INV-STORE-1** | **Durability & Fsync:** Dateisystem-Syncs dürfen nie ignoriert werden (`let _ =`). Nach `fsync`-Fehlern wird das Handle permanent vergiftet und der Fehler fail-closed propagiert. | `crates/contextra-store/src/fsync.rs:18–35`, `src/wal/flusher.rs:363, 465` | `tests/fsync_syscall_verification.rs`, `tests/wal_robustness.rs`, `tests/flush_durability.rs` |
-| **INV-STORE-2** | **Zweiphasiger WAL-Flush & Open-Heal:** WAL schreibt erst Payload und aktualisiert danach HMAC. Torn Writes am Dateiende werden beim Replay erkannt und getrimmt. | `crates/contextra-store/src/wal/flusher.rs:340–390`, `src/wal/replay.rs:180–230` | `tests/wal_open_heal.rs`, `tests/wal_torn_write_fault_injection.rs`, `tests/wal_replay_parity.rs` |
-| **INV-STORE-3** | **MemTable Out-of-Order Sequenzen:** Versionen pro Schlüssel sind streng nach `seq_no` sortiert (`binary_search_by_key`). Höhere Sequenzen überschatten ältere; vertauschte Schreibreihenfolgen korrumpieren nicht. | `crates/contextra-store/src/memtable.rs:130–170` | `tests/memtable_shard_distribution.rs`, `tests/campaign_fuzzregress_memtable_concurrent.rs` |
-| **INV-STORE-4** | **Tombstone-Disziplin:** Löschmarkierungen setzen Bit 63 (`TOMBSTONE_BIT = 1 << 63`). Bei allen Sequenz- und Sichtbarkeitsvergleichen ist Bit 63 vorher zu maskieren (`seq & !TOMBSTONE_BIT`). | `crates/contextra-store/src/sstable/reader.rs:490–510`, `src/compaction/adaptive.rs:120–140` | `tests/tombstone_scan.rs`, `tests/adaptive_compaction_tombstone.rs` |
-| **INV-STORE-5** | **Single-Load Snapshot Isolation:** `last_committed_tx` wird bei Leseoperationen (`get_at_seq`, `scan_prefix_at`) exakt einmal zu Beginn geladen. Flush-before-Visible erzwingt Persistenz vor Sichtbarkeit. | `crates/contextra-store/src/lsm/scan.rs:40–80`, `src/lsm/flush.rs:90–120` | `tests/ssi_write_skew_integration.rs`, `tests/ssi_unbounded_snapshot_seq.rs`, `tests/loom_commit_flush_visibility.rs` |
-| **INV-TENANT-1** | **Mandanten-Isolation:** Jeder gespeicherte Schlüssel enthält ein typisiertes `TenantId`-Präfix. Mandantenübergreifende Scans oder Datenzugriffe sind auf Store-Ebene ausgeschlossen. | `crates/contextra-store/src/tenant_codec.rs:25–65` | `tests/tenant_scoped_storage.rs` |
-| **INV-FORMAT-1** | **Header- & Magic-Validierung:** Alle persistenten Dateien besitzen deterministische Magic-Bytes und Versionsnummern. Unbekannte Versionen werden fail-closed abgewiesen. | `src/wal/encode.rs:57–65`, `src/sstable/builder.rs:470`, `src/manifest/core.rs:21` | `tests/sstable_format_v2_compat.rs`, `tests/sstable_format_v3_to_v4_compat.rs`, `tests/manifest_corruption.rs` |
-
----
-
-## 5. Dateiformate mit Magic & Version
-
-### 5.1 Write-Ahead-Log (WAL)
-- **V2 Format (Legacy):** Magic `MFW2` (`[0x4D, 0x46, 0x57, 0x32]`), batch-verschlüsselt.
-- **V3 Format (Standard):** Magic `MFW3` (`[0x4D, 0x46, 0x57, 0x33]`).
-  - Frame-Struktur: `length: u32` (Little Endian) + `CRC32C: u32` + `HMAC-SHA256: [u8; 32]` + `Payload`.
-  - HMAC-Kette: $H_N = \text{HMAC}(K, H_{N-1} \parallel \text{seq} \parallel \text{tx\_id} \parallel \text{payload})$ mit $H_0 = [0u8; 32]$.
-  - Open-Heal: Bei unvollständigen Schreibvorgängen am Dateiende schneidet der Recovery-Prozess die Datei auf den letzten verifizierten Frame-Offset zurück (`wal/replay.rs:215`).
-
-### 5.2 Sorted String Table (SSTable)
-- **Header / Magic:**
-  - Standard (Format V1–V4): Magic `MFSX` (`0x5853_464D` Little Endian im Trailer, `sstable/block_cache.rs:352`).
-  - Legacy (Format V0): Magic `MFST` (`0x4D46_5354` Little Endian im Trailer).
-- **Trailer-Struktur (Format V4):**
-  - Befindet sich an den letzten 54 Bytes der Datei:
-    - Bytes 0..8: `min_tx_id: u64`
-    - Bytes 8..16: `max_tx_id: u64`
-    - Bytes 16..24: `min_seq: u64`
-    - Bytes 24..32: `max_seq: u64`
-    - Bytes 32..40: `index_offset: u64`
-    - Bytes 40..48: `bloom_offset: u64`
-    - Bytes 48..50: `format_version: u16` (Wert: 4)
-    - Bytes 50..54: `magic: u32` (`MFSX`)
-- **Block-Format (4 KiB Blöcke):**
-  - Sequenz von Einträgen `(key, val, seq, tx_id)` gefolgt von Block-Trailer mit Eintrag-Offsets und lokalem Block-Bloom-Filter.
-
-### 5.3 Manifest
-- **Magic:** `MFMN` (`b"MFMN"`, 4 Bytes, `manifest/core.rs:21`).
-- **Header:** Magic + `version: u16` (Standard: 1).
-- **Log-Einträge:** Längen-präfigierte binäre Records (`ManifestEntry::AddSstable`, `ManifestEntry::RemoveSstable`, `ManifestEntry::Rollover`).
-
----
-
-## 6. Ports & Schnittstellen
-
-### Implementierte Ports (`contextra-ports`)
-- `StorageEngine`: Hauptvertrag für KV-Operationen (`get`, `put`, `delete`, `commit`, `rollback`, `scan_prefix`). Implementiert von `LsmStorage` (`lsm/engine.rs`) und `InMemoryStorageEngine` (`engine/memory_only.rs`).
-- `Purger`: Schnittstelle zur physischen Bereinigung von gelöschten Scopes (`compact_range`). Implementiert in `scanner/purge.rs`.
-- `LayerScanner`: Schnittstelle zur forensischen Residuenmessung. Implementiert in `scanner/mod.rs` (`MemtableScanner`, `SstableScanner`, `WalScanner`).
-- `BlockCache`: Cache-Abstraktion für SSTable-Blöcke (`sstable/block_cache.rs`).
-- `MergeOperator`: Schnittstelle für atomare Lese-Modifiziere-Schreibe-Zusammenführungen während Flush und Compaction (`compaction/merge_operator.rs`).
-
-### Konsumierte Ports
-- `Clock` (`contextra-ports::clock`): Deterministische Zeitquelle für TTL, Timeouts und Retention.
-- `Vfs` (`contextra-ports::vfs`): Dateisystemabstraktion.
-  - **Ist-Zustand:** Dateisystem-I/O nutzt derzeit `tokio::fs` für asynchrone Metadaten/Lifecycle und `std::fs` innerhalb von `spawn_blocking` für Block-I/O.
-  - **Soll-Zustand (WP 4.4):** Vollständige Umstellung auf den `Vfs`-Port für autarke Dateisystem-Isolation.
-
----
-
-## 7. Lock-Register & Poison-Matrix
-
-### 7.1 Sperrenordnung (Lock Order)
-Zur Vermeidung von Deadlocks gilt die strikte hierarchische Sperrenreihenfolge (P06 / ADR-0XX-P0A):
-
-$$\text{commit\_mutex} \longrightarrow \text{wal.truncate\_lock} \longrightarrow \text{memtable\_shard\_lock} \longrightarrow \text{sstable\_manifest\_lock}$$
-
-- **Lock-Handoff Invariante:** Im Group-Commit wird `truncate_lock` der WAL akquiriert, **bevor** `commit_mutex` freigegeben wird (`lsm/mod.rs` und ADR-0XX-P0A). Dies stellt sicher, dass die physische Schreibreihenfolge auf Platte exakt der logischen HMAC-Kettenreihenfolge entspricht.
-- **Async/Sync-Trennung:** Niemals `parking_lot`-Guards über `.await`-Punkte halten (`clippy::await_holding_lock`).
-
-### 7.2 Poison-Matrix & Fail-Closed-Verhalten (P01)
-
-| Auslösendes Ereignis | Betroffene Komponente | Zustandsübergang | Auswirkung auf Folgetransaktionen | Wiederherstellungsmethode |
-|---|---|---|---|---|
-| `fsync()`-Fehler beim WAL-Append | `Wal` / Flusher Actor | Handle wird `poisoned = true` | Alle nachfolgenden Schreibvorgänge schlagen mit `ContextraError::Storage` fehl. | `wal.recover_from_poison().await` nach Tail-Truncation oder Neustart mit Open-Heal. |
-| Torn Write / Teil-Frame am WAL-Ende | `Wal` / Replay | `Recovering` | Replay trimmt unvollständige Bytes bis zum letzten validen Frame. | Automatisch beim Replay; nach erfolgreichem Schnitt wieder `Healthy`. |
-| Prüfsummen- oder HMAC-Fehler mitten in der WAL | `Wal` / Replay | `Corrupted` | Replay bricht fail-closed ab; Storage verweigert den Start. | Manueller Eingriff / Restore aus Snapshot. |
-| Plattenüberlauf (`ENOSPC`) | LSM Storage | `ReadOnly` | Mutationen werden abgewiesen; Leseoperationen bleiben möglich. | Freigabe von Speicherplatz, anschließend `reclaim()`. |
-| Mutex-Poisoning (Panic in Thread) | Synchronisations-Locks | `Poisoned` | Kein Panic; Kapselung und Rückgabe als `ContextraError::Storage`. | Neustart des Crate-Subsystems. |
-
----
-
-## 8. Garantien und Nicht-Garantien
-
-### Garantien (G)
-- **G-1 (Crash-Konsistenz):** Ein erfolgreicher Transaktions-Commit (`commit(tx_id).await == Ok(())`) ist nach einem Prozessabsturz (`SIGKILL`) oder Stromausfall dauerhaft in der WAL persistiert.
-- **G-2 (Snapshot-Isolation):** Transaktionsleser sehen ausschließlich Datenstände mit `commit_seq <= snapshot_seq`. Unvollständige oder laufende Transaktionen sind unsichtbar.
-- **G-3 (Bit-Rot-Erkennung):** Alle Datenblöcke in SSTables und WAL-Frames sind durch CRC32C-Prüfsummen und HMAC-Hashes geschützt. Bit-Rot wird beim Lesen deterministisch erkannt und mit `ContextraError::Storage` gemeldet.
-- **G-4 (Open-Heal bei Torn Writes):** Unvollständig geschriebene Bytes am Dateiende der WAL, die durch plötzlichen Stromausfall entstehen, werden beim Replay erkannt und ohne Datenverlust an bestätigten Transaktionen abgeschnitten.
-- **G-5 (Verzeichnis-Sperre / DirLock):** Gleichzeitiges Öffnen desselben Datenverzeichnisses durch zwei Prozesse wird über eine exklusive Dateisperre (`LOCK`, 0600) abgewiesen (`util.rs:24`).
-
-### Nicht-Garantien (Nicht-Ziele / Non-Guarantees)
-- **Keine automatische Bit-Rot-Korrektur:** Bit-Rot wird zuverlässig erkannt, aber nicht repariert (keine Reed-Solomon- oder Paritätskorrektur im Triebwerk).
-- **Keine Manipulationssicherheit bei lokalem Keyfile:** Wird `.wal_integrity_key` unverschlüsselt neben der WAL-Datei im Verzeichnis abgelegt, schützt HMAC vor Bit-Rot, jedoch **nicht** vor einem Angreifer mit Schreibrechten auf das Dateisystem (siehe SECURITY NOTE in `wal/hmac.rs`). Kryptographische Fälschungssicherheit erfordert die Injektion eines externen `KeyManager`.
-- **Keine Windows-Verzeichnissynchronisation:** Auf Windows-Betriebssystemen meldet `fsync_dir` den Fehler `ContextraError::Io` mit `ErrorKind::Unsupported` (E20; `fsync.rs:10–29`), da Windows-Dateisysteme kein Verzeichnis-Fsync unterstützen.
-- **Kein Schutz vor SSD-Wear-Leveling-Resten:** Das physische Überschreiben von Flash-Speicherblöcken auf Firmware-Ebene kann durch das Triebwerk nicht sichergestellt werden.
-- **Keine Rechts- oder Löschsagas:** `contextra-store` führt keine Deletion-Proofs oder juristischen Löschketten; diese liegen ausschließlich in `contextra-erasure`.
-
----
-
-## 9. Feature-Matrix
-
-| Feature | Zweck | Standard | Abhängigkeiten |
-|---|---|---|---|
-| `default` | Minimaler Produktions-Build für LSM-Storage | Ja | keine |
-| `inspect` | Stellt Schnappschuss-APIs (`sstables_snapshot`, `memtables_snapshot`) für Scanner bereit | Nein | keine |
-| `block-cache-v2` | Aktiviert optimierten Block-Cache basierend auf `quick_cache` | Nein | `quick_cache` |
-| `memory-only-storage` | Ermöglicht flüchtigen Betrieb rein im Arbeitsspeicher | Nein | keine |
-| `docid-128` | Unterstützt 128-Bit-Dokument-IDs | Nein | `contextra-types/docid-128` |
-| `legacy-wal-key` | Abwärtskompatibilität für Migration alter WAL-Integritätsschlüssel | Nein | keine |
-| `fault-injection` | Ermöglicht simulierte I/O- und Crash-Injektionen in Tests | Nein | keine |
-| `test-hooks` | Interne Hooks für deterministische Unit- und Integrationstests | Nein | keine |
-
----
-
-## 10. Ist- und Soll-Zustand (Differenzanalyse)
-
-| Bereich | Ist-Zustand (Code) | Soll-Zustand (SPEC v4.1) | Geplante Maßnahme |
-|---|---|---|---|
-| **Dateisystem-Port** | Direkte Datei-I/O über `tokio::fs` und `std::fs::File` in `spawn_blocking`. | Vollständige Abstraktion über `contextra-ports::vfs::Vfs` (M4). | WP 4.4 / D4 Umstellung. |
-| **Port-Implementierung** | `LayerScanner` und `Purger` befinden sich direkt in `scanner/`. | Speicherkerne bieten nur Basis-APIs (`compact`, `reclaim`); Adapter liegen in `contextra-erasure-adapters`. | Welle 4 / WP 3.2. |
-| **KV-Löschrelikte** | `src/kv/segment.rs` und `src/kv/delete_mode.rs` enthalten veraltete Löschmodus-Relikte. | Vollständige Neutralisierung ohne Shredding-Begriffe. | Deprecated Debt DEBT-01 Abbau. |
-| **Intra-Doc-Links** | Wenige unaufgelöste Rustdoc-Referenzen auf `MetricsSink`, `SsiValidator`, `SstableBuilder`. | Fehlerfreier Bau unter `RUSTDOCFLAGS="-D warnings"`. | Behebung in Paket B8. |
