@@ -41,7 +41,9 @@ impl Clock for SystemClock {
 }
 
 /// Numerischer Mandanten-Identifikator (64-Bit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
 
@@ -148,4 +150,22 @@ pub enum EgressDecision {
 pub trait EgressPolicy: Send + Sync {
     /// Bewertet, ob der ausgehende Payload die Richtlinie erfüllt.
     fn evaluate(&self, payload: &str) -> EgressDecision;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct AllowAllPolicy;
+    impl EgressPolicy for AllowAllPolicy {
+        fn evaluate(&self, _payload: &str) -> EgressDecision {
+            EgressDecision::Allow
+        }
+    }
+
+    #[test]
+    fn test_egress_policy_trait_contract() {
+        let policy: Box<dyn EgressPolicy> = Box::new(AllowAllPolicy);
+        assert_eq!(policy.evaluate("test-payload"), EgressDecision::Allow);
+    }
 }

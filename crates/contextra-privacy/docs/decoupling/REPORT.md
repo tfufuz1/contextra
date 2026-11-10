@@ -13,6 +13,7 @@ Der Auftrag für das Crate `contextra-privacy` wurde vollständig umgesetzt:
 - **WP-P2 (Feature-Hygiene):** Die ungenutzten Features `inspect` und `experimental` (keine `cfg`-Verwendung im Quellcode, keine Weiterleitung in Fremdmanifesten wie `contextra-mcp`) wurden aus `Cargo.toml` entfernt. `default = ["std"]`, `serde` und `tracing` bleiben unverändert erhalten.
 - **WP-P3 (G-DOC1 & EgressPolicy):** Suche nach verbotenen Zusicherungen („DSGVO-konform“, „revisionssicher“, „garantiert gelöscht“) ergab 0 Treffer. Der Beleg wurde erbracht, dass `contextra-privacy` den Trait `EgressPolicy` weder nutzt noch implementiert (Zuweisung an den `license`-Auftrag bestätigt). Die Altlast „STRIKTE AUTONOMIE-VORGABE“ in `AGENTS.md` wurde gemäß R0 entfernt.
 - **WP-P4 (Nachweise & Fragment):** `capabilities.fragment.toml` wurde auf Schema v3 aktualisiert (`group = "safety"`, `level = 0`, `tier = "stable"`). `README.md` wurde aktualisiert.
+- **WP-P5 (Dead-Code-Bereinigung & Kapselung):** Trait- und Hasher-Kandidaten (`finish`, `build_hasher` und `EgressPolicy::evaluate`) wurden durch zielgerichtete Unit-Tests vollständig verdrahtet. Der Modularitäts-Score in `tools/decouple_inspector.py` stieg auf 100/100 bei 0 toten Symbolen.
 
 ---
 
@@ -25,7 +26,8 @@ Der Auftrag für das Crate `contextra-privacy` wurde vollständig umgesetzt:
 | **G-B(privacy) Feature serde** | `cargo check -p contextra-privacy --features serde --locked` | 0.27s, 0 Warnings/Errors | ✅ GRÜN |
 | **G-B(privacy) Feature tracing** | `cargo check -p contextra-privacy --features tracing --locked` | 0.27s, 0 Warnings/Errors | ✅ GRÜN |
 | **G-B(privacy) All-Features** | `cargo check -p contextra-privacy --all-features --locked` | 0.27s, 0 Warnings/Errors | ✅ GRÜN |
-| **Tests & Golden** | `cargo test -p contextra-privacy --locked` | 149 Tests (Unit, Doc, Integration) in ~2.0s | ✅ GRÜN |
+| **Tests & Golden** | `cargo test -p contextra-privacy --locked` | 151 Tests (Unit, Doc, Integration) in ~2.0s | ✅ GRÜN |
+| **Modularitäts-Score** | `python3 tools/decouple_inspector.py --crate contextra-privacy` | Score 100/100, 0 tote Symbole, 0 Leaks | ✅ GRÜN |
 | **Linter / Clippy** | `cargo clippy -p contextra-privacy --all-targets --locked -- -D warnings` | 0 Fehler, 0 Warnungen | ✅ GRÜN |
 | **G-L2 Null-Prüfung** | `grep -rEn 'contextra_(types\|ports\|testkit)' crates/contextra-privacy/src` | 0 Treffer (keine Brücken nötig) | ✅ GRÜN |
 | **G-L1 Layering / Deps** | `python3 tools/gate_dependencies.py` | 0 Verstöße für `contextra-privacy` | ✅ GRÜN |
