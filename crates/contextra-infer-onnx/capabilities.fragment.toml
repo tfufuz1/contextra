@@ -1,5 +1,7 @@
 [capabilities]
-ring = "2"
-klasse = "A"
-may_depend_on = []
-transitional = []
+group = "llm"
+level = 0
+tier = "beta"
+allowed_internal = []
+feature_closure_allowed = ["contextra-ports", "contextra-types"]
+dev_allowed = []

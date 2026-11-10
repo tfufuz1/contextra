@@ -1,2 +1,2 @@
-[alias]
-xtask = "run --package xtask --"
+# .cargo/config.toml
+# toter xtask-Alias gemäß docs/SPEC.md §7 (S-01 / B05) und WP-F0.3 entfernt.

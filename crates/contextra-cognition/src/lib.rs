@@ -37,6 +37,10 @@
 //                          deterministische Sortierung nach tenant_id und text_digest.
 #![forbid(unsafe_code)]
 
+pub mod error;
+pub mod ports;
+pub use error::CognitionError;
+
 // ANCHOR[contextra-cognition:ROOT-001]
 /// Modul für Aggregationsphase (LeanRAG Stage 3).
 pub mod aggregation_phase;

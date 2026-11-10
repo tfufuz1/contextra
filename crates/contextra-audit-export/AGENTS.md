@@ -41,7 +41,7 @@
 
 | Pfad | Verantwortung |
 |---|---|
-| `bsi_mapping.rs`, `markdown_template.rs`, `testkit.rs`, `error.rs` | Mapping, Vorlagen, Testhilfen |
+| `lib.rs`, `bsi_mapping.rs`, `csv_template.rs`, `markdown_template.rs`, `testkit.rs`, `error.rs`, `compat/` | Audit-Export-Generierung, Vorlagen, Testhilfen (`test-utils`), Workspace-Kompatibilität (`compat::types`) |
 
 ## 4. Verträge & Invarianten
 

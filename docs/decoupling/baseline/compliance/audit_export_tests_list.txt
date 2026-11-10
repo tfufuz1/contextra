@@ -1,0 +1,64 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running unittests src/lib.rs (target/debug/deps/contextra_audit_export-bb06cc05b94346fd)
+bsi_mapping::tests::test_bsi_mapping_table_exact_entries: test
+bsi_mapping::tests::test_render_bsi_mapping_markdown: test
+csv_template::tests::test_escape_csv_field: test
+csv_template::tests::test_render_register_csv_roundtrip: test
+
+4 tests, 0 benchmarks
+     Running tests/campaign_j27_compliance_test.rs (target/debug/deps/campaign_j27_compliance_test-747a70c46882233f)
+test_h10_gdpr_art30_processing_registry_and_canary_leak_check: test
+
+1 test, 0 benchmarks
+     Running tests/error_and_edge_cases.rs (target/debug/deps/error_and_edge_cases-792ec1c5f7235cf8)
+test_empty_optional_contacts_rendering: test
+test_error_display_formatting: test
+test_source_collection_empty_returns_empty_vec: test
+
+3 tests, 0 benchmarks
+     Running tests/golden_file_test.rs (target/debug/deps/golden_file_test-f7ee6c736e8a48b7)
+test_byte_identical_json_output: test
+test_byte_identical_markdown_output: test
+test_deterministic_sorting_by_tenant_and_purpose: test
+test_golden_file_json_export: test
+test_golden_file_markdown_export: test
+
+5 tests, 0 benchmarks
+     Running tests/property_tests.rs (target/debug/deps/property_tests-e56937a59ba1c25b)
+prop_csv_rendering_lines_and_determinism: test
+prop_json_roundtrip: test
+prop_markdown_rendering_determinism: test
+
+3 tests, 0 benchmarks
+     Running tests/register_rendering.rs (target/debug/deps/register_rendering-04fc203c9d9e0dfe)
+test_empty_entries_rendering: test
+test_json_rendering_roundtrip: test
+test_markdown_rendering_data_rows: test
+
+3 tests, 0 benchmarks
+     Running tests/sanitization_tests.rs (target/debug/deps/sanitization_tests-f9ced01a75f443a4)
+test_markdown_rendering_sanitization_in_fields: test
+test_sanitize_backticks: test
+test_sanitize_html_tags: test
+test_sanitize_newlines: test
+test_sanitize_pipes: test
+test_unicode_umlaute_preservation: test
+
+6 tests, 0 benchmarks
+     Running tests/validation_tests.rs (target/debug/deps/validation_tests-d42863aed889b808)
+test_validation_missing_controller_contact: test
+test_validation_missing_controller_name: test
+test_validation_missing_data_categories: test
+test_validation_missing_data_subject_categories: test
+test_validation_missing_legal_basis: test
+test_validation_missing_processing_purpose: test
+test_validation_missing_recipient_categories: test
+test_validation_missing_retention_period_fields: test
+test_validation_missing_retention_periods: test
+test_validation_missing_third_country_fields: test
+test_validation_missing_toms: test
+test_validation_valid_entry_passes: test
+
+12 tests, 0 benchmarks
+   Doc-tests contextra_audit_export
+0 tests, 0 benchmarks

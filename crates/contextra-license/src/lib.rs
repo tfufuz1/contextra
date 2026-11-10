@@ -39,3 +39,6 @@ pub use signed_gate::{
     SignedActivation, SignedLicenseGate, SignedLicenseOptions, StepVerificationError,
     MAX_PAYLOAD_BYTES,
 };
+
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
+pub mod compat;

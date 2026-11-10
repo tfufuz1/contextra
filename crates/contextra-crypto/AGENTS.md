@@ -41,10 +41,11 @@
 
 | Pfad | Verantwortung |
 |---|---|
-| `aead.rs`, `kdf.rs`, `secret.rs`, `dek.rs`, `crypto.rs`, `error.rs` | **Verbleibt:** AEAD, Argon2id/HKDF, `SecretKey` (zeroize), `KeyManager`, `derive_dek` |
+| `aead.rs`, `kdf.rs`, `secret.rs`, `dek.rs`, `crypto.rs`, `error.rs` | **Verbleibt:** AEAD, Argon2id/HKDF, `SecretKey` (zeroize), `KeyManager`, `derive_dek`, additive KV-Methoden mit `[u8; 32]` |
+| `compat/` (`mod.rs`, `error.rs`) | **Neu (CR4):** Brückenmodul für Fehlerkonvertierung `From<CryptoError> for ContextraError` |
 | `wal_crypto.rs`, `wal_completeness.rs`, `anti_tamper.rs`, `audit_chain.rs` | **Verbleibt:** WAL-HMAC-Kette, Vollständigkeit, Manipulationserkennung, HMAC-Audit-Kette |
-| `deletion_proof/` (6 Dateien), `ed25519_proof.rs`, `kv_shredding.rs`, `revocation_log.rs` | **Wandert nach `contextra-erasure` (PLAN 3.1)** |
-| `kv_cipher.rs`, `kv_segment/` | KV-Cache-Verschlüsselung; PLAN nennt sie nicht, Konsument `kvcache`: Zuordnung per ADR |
+| `kv_cipher.rs`, `kv_segment/` | KV-Cache-Verschlüsselung; verbleibt bis zum Schnitt/Umzug nach kvcache (B10, S-38) |
+| `tests/golden/` | **Neu (CR4):** Golden-Korpus (WAL-HMAC, MFKD, AEAD, KV v2, DEK) mit MANIFEST.sha256 |
 
 ## 4. Verträge & Invarianten
 

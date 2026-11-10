@@ -9,6 +9,11 @@ on:
       - 'crates/contextra-store/**'
       - 'crates/contextra-vector/**'
       - 'crates/contextra-graph/**'
+      - 'crates/contextra-mvcc/**'
+      - 'crates/contextra-kvcache/**'
+      - 'crates/contextra-checkpoint/**'
+      - 'crates/contextra-ids/**'
+      - 'crates/contextra-env/**'
 
 env:
   CARGO_TERM_COLOR: always

@@ -12,8 +12,8 @@
 //! (Ring 1/2) und unterhalb der API- und Netzwerk-Fassaden (Ring 4).
 //!
 //! # Einbindung und Abhängigkeiten
-//! - **Eingehend:** Wird eingebunden von `contextra`, `contextra-mcp` und `contextra-router`.
-//! - **Ausgehend:** Hängt ab von `contextra-types`, `contextra-ports`.
+//! - **Eingehend:** Wird eingebunden von `contextra-mcp`.
+//! - **Ausgehend:** Vollkommen autark (keine internen Abhängigkeiten zu `contextra-*`).
 //!
 //! # Wichtigste Module
 //! - [`egress_vault`]: DLP-Prüfung, Regex-Klassifikation und `SurrogateVault`-Pseudonymisierung.
