@@ -292,7 +292,6 @@ async fn test_crud_drop_collection_preflight_and_tenant_origin() {
     let text = res["content"][0]["text"].as_str().unwrap();
     assert!(text.contains("\"ok\":true"));
     assert!(text.contains("\"deleted\":true"));
-
 }
 
 #[tokio::test(flavor = "multi_thread")]

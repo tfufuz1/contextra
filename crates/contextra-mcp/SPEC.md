@@ -47,8 +47,9 @@ Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchst
 
 ## 4. Ist-vs-Ziel-Abgleich [V]
 
-- **Ist-Kanten, die das Ziel nicht vorsieht:** `infer-candle` (optional), `infer-ollama` (optional), `infer-onnx` (optional)
-- **Ziel-Kanten, die im Ist fehlen:** `prompt-guard`
+- **Ist-Kanten, die das Ziel vorsieht:** `contextra`, `types`, `ports`, `wire`, `rank`, `crypto`, `privacy`, `router`, `prompt-guard` (optional: `infer-candle`, `infer-ollama`, `infer-onnx`).
+- **Prompt-Guard:** Erfolgreich herausgelöst als autarker E0-Sicherheitsbaustein `contextra-prompt-guard` (MCP-2).
+- **Ports-Entkopplung:** `ports_local`-Importe in `routing.rs` vollständig auf `contextra_ports` umgestellt (S-62).
 - **Default-Features:** Ist = Ziel (leer).
 
 ## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
