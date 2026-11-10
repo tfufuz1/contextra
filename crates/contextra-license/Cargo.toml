@@ -14,9 +14,10 @@ ring = "4"
 klasse = "A"
 
 [features]
-default = ["std", "ports-compat"]
+default = ["std", "workspace"]
 std = []
-ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
+workspace = ["dep:contextra-ports", "dep:contextra-types"]
+ports-compat = ["workspace"]
 
 [dependencies]
 thiserror = { workspace = true }

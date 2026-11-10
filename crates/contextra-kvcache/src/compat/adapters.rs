@@ -230,8 +230,3 @@ mod tests {
         }
     }
 }
-
-fn _dummy_check_manifest_calls(m: &KvCachePluginManifest) {
-    let _ = m.requires();
-    let _ = m.conflicts();
-}
