@@ -148,7 +148,8 @@ fn test_schema_checksum_matches_sha256_pin() {
     let computed_hash = to_hex_string(&sha256_digest(&schema_content));
 
     assert_eq!(
-        computed_hash, expected_hash,
+        computed_hash,
+        expected_hash,
         "\n\n================================================================================\n\
         SCHEMA-PRÜFSUMMENFEHLER (G-F2) DETEKTIERT!\n\
         Die Prüfsumme von '{}' weicht von der gepinnten Prüfsumme ab.\n\n\
