@@ -490,7 +490,7 @@ impl SequenceLog {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
-    use contextra_testkit::ManualClock;
+    use contextra_env::ManualClock;
 
     // Prüft die O(1)-Sichtbarkeitsprüfung eines einzelnen SeqLogEntry-Eintrags an verschiedenen Grenzwerten.
     #[test]
@@ -725,12 +725,12 @@ mod tests {
     // Prüft TTL-Ablauf und das automatische Bereinigen veralteter Snapshot-Pins über eine manuelle Uhr.
     #[test]
     fn test_sequence_log_pin_ttl_and_expiration() {
-        let clock = Arc::new(ManualClock::new(100_000_000_000));
+        let clock = Arc::new(ManualClock::new(100_000_000_000, 100_000_000_000));
         let mut log =
-            SequenceLog::with_clock(clock.clone()).with_max_pin_duration(Duration::from_secs(10));
+            SequenceLog::with_clock(clock.clone() as Arc<dyn Clock>).with_max_pin_duration(Duration::from_secs(10));
         assert_eq!(log.max_pin_duration(), Duration::from_secs(10));
 
-        let start_nanos = clock.now_nanos();
+        let start_nanos = clock.now_unix_nanos();
         let past_5s_nanos = start_nanos.saturating_sub(5_000_000_000);
         let past_15s_nanos = start_nanos.saturating_sub(15_000_000_000);
 
@@ -767,14 +767,14 @@ mod tests {
     // Prüft die korrekte Handhabung einer benutzerdefinierten maximalen Pin-Dauer.
     #[test]
     fn test_sequence_log_pin_ttl_custom_duration() {
-        let clock = Arc::new(ManualClock::new(1_000_000_000));
-        let mut log = SequenceLog::with_clock(clock.clone());
+        let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone() as Arc<dyn Clock>);
         assert_eq!(log.max_pin_duration(), DEFAULT_MAX_PIN_DURATION);
 
         log.set_max_pin_duration(Duration::from_millis(50));
         assert_eq!(log.max_pin_duration(), Duration::from_millis(50));
 
-        let now_nanos = clock.now_nanos();
+        let now_nanos = clock.now_unix_nanos();
         let past_100ms_nanos = now_nanos.saturating_sub(100_000_000);
 
         log.pin_snapshot_at(42, past_100ms_nanos);
@@ -793,9 +793,9 @@ mod tests {
     // Prüft, dass rückwärtsspringende Zeitstempel dank sättigender Subtraktion keine Panics auslösen.
     #[test]
     fn test_sequence_log_zero_panic_time_arithmetic() {
-        let clock = Arc::new(ManualClock::new(100_000_000));
-        let mut log = SequenceLog::with_clock(clock.clone());
-        let now_nanos = clock.now_nanos();
+        let clock = Arc::new(ManualClock::new(100_000_000, 100_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone() as Arc<dyn Clock>);
+        let now_nanos = clock.now_unix_nanos();
         let future_nanos = now_nanos + 100_000_000_000;
 
         // Pin in the future (clock skew edge case)
