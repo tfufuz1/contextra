@@ -38,6 +38,9 @@
 )]
 pub mod casting;
 
+#[cfg(feature = "ports-compat")]
+pub mod compat;
+
 pub mod contract;
 pub mod error;
 pub mod types;

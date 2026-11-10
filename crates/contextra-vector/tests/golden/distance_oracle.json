@@ -1,0 +1,254 @@
+[
+  {
+    "bits": 936116224,
+    "case": "normal",
+    "dim": 4,
+    "metric": "Cosine",
+    "val": 0.000024318695068359375
+  },
+  {
+    "bits": 1065353216,
+    "case": "zero",
+    "dim": 4,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1065353216,
+    "case": "denormal",
+    "dim": 4,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1057193530,
+    "case": "normal",
+    "dim": 4,
+    "metric": "Euclidean",
+    "val": 0.513644814491272
+  },
+  {
+    "bits": 1069373506,
+    "case": "zero",
+    "dim": 4,
+    "metric": "Euclidean",
+    "val": 1.4792559146881104
+  },
+  {
+    "bits": 1069373506,
+    "case": "denormal",
+    "dim": 4,
+    "metric": "Euclidean",
+    "val": 1.4792559146881104
+  },
+  {
+    "bits": 3225200544,
+    "case": "normal",
+    "dim": 4,
+    "metric": "DotProduct",
+    "val": -2.9477310180664062
+  },
+  {
+    "bits": 2147483648,
+    "case": "zero",
+    "dim": 4,
+    "metric": "DotProduct",
+    "val": -0.0
+  },
+  {
+    "bits": 2163415504,
+    "case": "denormal",
+    "dim": 4,
+    "metric": "DotProduct",
+    "val": -2.2325285346644123e-38
+  },
+  {
+    "bits": 971438080,
+    "case": "normal",
+    "dim": 17,
+    "metric": "Cosine",
+    "val": 0.0004405379295349121
+  },
+  {
+    "bits": 1065353216,
+    "case": "zero",
+    "dim": 17,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1065353216,
+    "case": "denormal",
+    "dim": 17,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1064261151,
+    "case": "normal",
+    "dim": 17,
+    "metric": "Euclidean",
+    "val": 0.934907853603363
+  },
+  {
+    "bits": 1078606738,
+    "case": "zero",
+    "dim": 17,
+    "metric": "Euclidean",
+    "val": 3.159885883331299
+  },
+  {
+    "bits": 1078606738,
+    "case": "denormal",
+    "dim": 17,
+    "metric": "Euclidean",
+    "val": 3.159885883331299
+  },
+  {
+    "bits": 3243155489,
+    "case": "normal",
+    "dim": 17,
+    "metric": "DotProduct",
+    "val": -12.914093971252441
+  },
+  {
+    "bits": 2147483648,
+    "case": "zero",
+    "dim": 17,
+    "metric": "DotProduct",
+    "val": -0.0
+  },
+  {
+    "bits": 2183619909,
+    "case": "denormal",
+    "dim": 17,
+    "metric": "DotProduct",
+    "val": -1.2298285216857723e-37
+  },
+  {
+    "bits": 1017875328,
+    "case": "normal",
+    "dim": 128,
+    "metric": "Cosine",
+    "val": 0.020940542221069336
+  },
+  {
+    "bits": 1065353216,
+    "case": "zero",
+    "dim": 128,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1065353216,
+    "case": "denormal",
+    "dim": 128,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1074314376,
+    "case": "normal",
+    "dim": 128,
+    "metric": "Euclidean",
+    "val": 2.136507034301758
+  },
+  {
+    "bits": 1093024321,
+    "case": "zero",
+    "dim": 128,
+    "metric": "Euclidean",
+    "val": 10.389222145080566
+  },
+  {
+    "bits": 1093024321,
+    "case": "denormal",
+    "dim": 128,
+    "metric": "Euclidean",
+    "val": 10.389222145080566
+  },
+  {
+    "bits": 3267937666,
+    "case": "normal",
+    "dim": 128,
+    "metric": "DotProduct",
+    "val": -100.38575744628906
+  },
+  {
+    "bits": 2147483648,
+    "case": "zero",
+    "dim": 128,
+    "metric": "DotProduct",
+    "val": -0.0
+  },
+  {
+    "bits": 2210789230,
+    "case": "denormal",
+    "dim": 128,
+    "metric": "DotProduct",
+    "val": -1.163542642588898e-36
+  },
+  {
+    "bits": 1048899506,
+    "case": "normal",
+    "dim": 768,
+    "metric": "Cosine",
+    "val": 0.25964123010635376
+  },
+  {
+    "bits": 1065353216,
+    "case": "zero",
+    "dim": 768,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1065353216,
+    "case": "denormal",
+    "dim": 768,
+    "metric": "Cosine",
+    "val": 1.0
+  },
+  {
+    "bits": 1097636474,
+    "case": "normal",
+    "dim": 768,
+    "metric": "Euclidean",
+    "val": 14.787714004516602
+  },
+  {
+    "bits": 1101785262,
+    "case": "zero",
+    "dim": 768,
+    "metric": "Euclidean",
+    "val": 21.48861312866211
+  },
+  {
+    "bits": 1101785262,
+    "case": "denormal",
+    "dim": 768,
+    "metric": "Euclidean",
+    "val": 21.48861312866211
+  },
+  {
+    "bits": 3281501209,
+    "case": "normal",
+    "dim": 768,
+    "metric": "DotProduct",
+    "val": -303.4695129394531
+  },
+  {
+    "bits": 2147483648,
+    "case": "zero",
+    "dim": 768,
+    "metric": "DotProduct",
+    "val": -0.0
+  },
+  {
+    "bits": 42480794,
+    "case": "denormal",
+    "dim": 768,
+    "metric": "DotProduct",
+    "val": 2.0013595780171844e-37
+  }
+]
