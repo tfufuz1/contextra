@@ -1,0 +1,19 @@
+[package]
+name = "contextra-prompt-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Prompt Injection Erkennung und Guardrails (aus contextra-mcp herausgelöst)"
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["std"]
+std = []
+serde = ["dep:serde"]
+
+[lints]
+workspace = true

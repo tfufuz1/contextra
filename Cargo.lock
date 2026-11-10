@@ -838,11 +838,11 @@ dependencies = [
  "argon2",
  "bincode",
  "blake3",
+ "contextra-crypto",
  "contextra-ports",
  "contextra-testkit",
  "contextra-types",
  "criterion",
- "ed25519-dalek",
  "hkdf",
  "hmac",
  "loom",
@@ -1231,6 +1231,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-prompt-guard"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "contextra-py"
 version = "0.1.0"
 dependencies = [
@@ -1414,6 +1421,13 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "contextra-vault"
+version = "0.1.0"
+dependencies = [
+ "contextra-sys",
 ]
 
 [[package]]
