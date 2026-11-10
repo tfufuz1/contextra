@@ -6,6 +6,7 @@
 //! Suchergebnisse aus verschiedenen Retrieval-Kanälen (Dense Vector, BM25-Volltext,
 //! Graph-Traversierung, Reranking).
 mod global;
+pub mod mrrf;
 mod normalized;
 mod provenance;
 mod resonance;

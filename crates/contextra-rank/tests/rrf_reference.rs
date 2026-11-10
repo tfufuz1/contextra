@@ -4,7 +4,12 @@
 //!
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::useless_vec
+)]
 use ahash::AHashMap;
 use contextra_rank::fusion::{reciprocal_rank_fusion, SearchResult};
 use contextra_rank::DocId;
@@ -102,5 +107,109 @@ fn rrf_with_three_lists() {
     let expected_doc300 = (1.0 / 61.0_f32) + (1.0 / 63.0_f32);
     if let Some(&s300) = scores.get(&DocId::from(300)) {
         assert!((s300 - expected_doc300).abs() < 1e-6);
+    }
+}
+
+/// Differentialtest WP-60:
+/// `rrf_fuse` (Referenz-Orakel auf `ScoredItem`) und `weighted_reciprocal_rank_fusion`
+/// (Produktiver Pfad auf `SearchResult`) liefern bei Einheitsgewichten ($w=1.0$) und
+/// $k=60$ dieselbe relative Rangfolge (Ordering) und numerisch identische Scores.
+#[test]
+fn test_differential_rrf_fuse_vs_weighted_rrf() {
+    use contextra_rank::fusion::{rrf_fuse, weighted_reciprocal_rank_fusion, ScoredItem};
+
+    // Erstelle Testdaten über 3 Suchkanäle (Text, Vektor, Graph)
+    let channel_a = vec!["doc_10", "doc_20", "doc_30", "doc_40", "doc_50"];
+    let channel_b = vec!["doc_20", "doc_10", "doc_40", "doc_60", "doc_30"];
+    let channel_c = vec!["doc_30", "doc_20", "doc_70", "doc_10", "doc_80"];
+
+    // 1. Ausführung über das Referenz-Orakel rrf_fuse
+    let oracle_input: Vec<Vec<ScoredItem>> = vec![
+        channel_a
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| ScoredItem::new(id, (100 - i) as f32))
+            .collect(),
+        channel_b
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| ScoredItem::new(id, (100 - i) as f32))
+            .collect(),
+        channel_c
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| ScoredItem::new(id, (100 - i) as f32))
+            .collect(),
+    ];
+    let oracle_results = rrf_fuse(&oracle_input, 60).unwrap();
+
+    // 2. Ausführung über den produktiven Pfad weighted_reciprocal_rank_fusion
+    let prod_input = vec![
+        (
+            "signal_text".to_string(),
+            channel_a
+                .iter()
+                .enumerate()
+                .map(|(i, &id)| SearchResult {
+                    id: id.to_string(),
+                    score: (100 - i) as f32,
+                    metadata: None,
+                    matched_signals: vec!["signal_text".to_string()],
+                    provenance: None,
+                })
+                .collect(),
+            1.0_f32,
+        ),
+        (
+            "signal_vector".to_string(),
+            channel_b
+                .iter()
+                .enumerate()
+                .map(|(i, &id)| SearchResult {
+                    id: id.to_string(),
+                    score: (100 - i) as f32,
+                    metadata: None,
+                    matched_signals: vec!["signal_vector".to_string()],
+                    provenance: None,
+                })
+                .collect(),
+            1.0_f32,
+        ),
+        (
+            "signal_graph".to_string(),
+            channel_c
+                .iter()
+                .enumerate()
+                .map(|(i, &id)| SearchResult {
+                    id: id.to_string(),
+                    score: (100 - i) as f32,
+                    metadata: None,
+                    matched_signals: vec!["signal_graph".to_string()],
+                    provenance: None,
+                })
+                .collect(),
+            1.0_f32,
+        ),
+    ];
+    let prod_results = weighted_reciprocal_rank_fusion(prod_input, 100);
+
+    // Vergleich der Länge und der relativen Rangfolge (ID-Reihenfolge)
+    assert_eq!(oracle_results.len(), prod_results.len());
+    for (idx, (oracle_item, prod_item)) in
+        oracle_results.iter().zip(prod_results.iter()).enumerate()
+    {
+        assert_eq!(
+            oracle_item.id, prod_item.id,
+            "Rang-Diskrepanz an Position {idx}: Orakel={}, Produktiv={}",
+            oracle_item.id, prod_item.id
+        );
+        // Scores müssen innerhalb numerischer f32-Präzision übereinstimmen
+        assert!(
+            (oracle_item.score - prod_item.score).abs() < 1e-6,
+            "Score-Diskrepanz für doc '{}' an Position {idx}: Orakel={}, Produktiv={}",
+            oracle_item.id,
+            oracle_item.score,
+            prod_item.score
+        );
     }
 }

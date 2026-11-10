@@ -1,5 +1,12 @@
 //! Property tests for Reciprocal Rank Fusion (RRF) using proptest.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use contextra_rank::fusion::{
     reciprocal_rank_fusion, weighted_reciprocal_rank_fusion,
     weighted_reciprocal_rank_fusion_with_options, MetadataMergePriority, SearchResult,
@@ -129,6 +136,92 @@ proptest! {
         let fused = reciprocal_rank_fusion(vec![list], 10);
         prop_assert_eq!(fused.len(), 1, "Duplicate IDs in single list must be deduplicated into a single entry");
         prop_assert_eq!(fused.first().map(|f| f.id.as_str()), Some("dup_doc"));
+    }
+
+    /// WP-63: Proptest Permutation der Eingabelisten bei gleichen Gewichten ändert die Ausgabe nicht
+    /// im PRODUKTIVEN Pfad (`weighted_reciprocal_rank_fusion`).
+    #[test]
+    fn prop_weighted_rrf_permutation_invariance_arbitrary_docs(
+        _seed in 1u64..10000,
+        perm_idx in 0usize..6,
+    ) {
+        // Erzeuge 3 Listen mit pseudo-deterministischen IDs und Scores
+        let list_a: Vec<SearchResult> = (0..10)
+            .map(|i| make_search_result(&format!("doc_{}", (i * 7 + 3) % 20), (50 - i) as f32))
+            .collect();
+        let list_b: Vec<SearchResult> = (0..10)
+            .map(|i| make_search_result(&format!("doc_{}", (i * 11 + 5) % 20), (60 - i) as f32))
+            .collect();
+        let list_c: Vec<SearchResult> = (0..10)
+            .map(|i| make_search_result(&format!("doc_{}", (i * 13 + 1) % 20), (70 - i) as f32))
+            .collect();
+
+        let base_sets = vec![
+            ("signal_text".to_string(), list_a, 1.0_f32),
+            ("signal_vector".to_string(), list_b, 1.0_f32),
+            ("signal_graph".to_string(), list_c, 1.0_f32),
+        ];
+
+        let perms = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+        let p = perms[perm_idx];
+        let permuted_sets = vec![
+            base_sets[p[0]].clone(),
+            base_sets[p[1]].clone(),
+            base_sets[p[2]].clone(),
+        ];
+
+        let baseline = weighted_reciprocal_rank_fusion(base_sets, 20);
+        let permuted = weighted_reciprocal_rank_fusion(permuted_sets, 20);
+
+        prop_assert_eq!(baseline.len(), permuted.len());
+        for (b, p) in baseline.iter().zip(permuted.iter()) {
+            prop_assert_eq!(&b.id, &p.id, "ID-Reihenfolge muss exakt permutationsinvariant sein");
+            prop_assert!(
+                (b.score - p.score).abs() < 1e-6,
+                "Scores müssen bei Permutation identisch sein"
+            );
+        }
+    }
+
+    /// WP-63: Proptest Tie-Break nach ID aufsteigend im PRODUKTIVEN Pfad (`weighted_reciprocal_rank_fusion`).
+    #[test]
+    fn prop_weighted_rrf_tie_break_ascending_id(
+        suffix in "[a-z]{3,6}",
+    ) {
+        // Zwei Dokumente mit exakt symmetrischen Rängen und identischem Summenscore
+        let id_low = format!("alpha_{suffix}");
+        let id_high = format!("zeta_{suffix}");
+
+        let list1 = vec![
+            make_search_result(&id_high, 10.0),
+            make_search_result(&id_low, 5.0),
+        ];
+        let list2 = vec![
+            make_search_result(&id_low, 10.0),
+            make_search_result(&id_high, 5.0),
+        ];
+
+        let input = vec![
+            ("s1".to_string(), list1, 1.0_f32),
+            ("s2".to_string(), list2, 1.0_f32),
+        ];
+
+        let fused = weighted_reciprocal_rank_fusion(input, 10);
+        prop_assert_eq!(fused.len(), 2);
+        prop_assert_eq!(
+            fused[0].id.as_str(),
+            id_low.as_str(),
+            "Bei gleichem Score muss lexikografisch kleineres Dokument vorangestellt werden"
+        );
+        prop_assert_eq!(fused[1].id.as_str(), id_high.as_str());
+        prop_assert!((fused[0].score - fused[1].score).abs() < 1e-6);
     }
 }
 
