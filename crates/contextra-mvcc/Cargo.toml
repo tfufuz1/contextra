@@ -12,9 +12,18 @@ description = "Multi-Version Concurrency Control (MVCC), sequence log, and trans
 [package.metadata.contextra]
 ring = "0"
 
+[features]
+default = ["workspace"]
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
+docid-128 = ["contextra-ids/docid-128"]
+
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 parking_lot = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }

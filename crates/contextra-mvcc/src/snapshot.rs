@@ -32,7 +32,7 @@
 
 use crate::mvcc_error::{MvccError, Result};
 use crate::types::{TenantId, TOMBSTONE_BIT};
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, SystemClock};
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};

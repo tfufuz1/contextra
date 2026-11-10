@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 use super::runtime::ScannerRuntime;
+use super::store_scan_view::StoreScanView;
 use crate::lsm::LsmStorage;
 use crate::tenant_codec::TenantKeyCodec;
 use crate::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
@@ -19,19 +20,25 @@ use std::sync::Arc;
 
 /// Scanner für die `WalAllSegments`-Schicht.
 pub struct WalScanner {
-    storage: Arc<LsmStorage>,
+    view: StoreScanView,
     runtime: ScannerRuntime,
 }
 
 impl WalScanner {
     /// Erzeugt einen neuen `WalScanner` mit implizit erfasster Laufzeit.
-    pub fn new(storage: Arc<LsmStorage>) -> Self {
-        Self::with_runtime(storage, ScannerRuntime::capture())
+    pub fn new(view: StoreScanView) -> Self {
+        Self::with_runtime(view, ScannerRuntime::capture())
     }
 
     /// Erzeugt einen neuen `WalScanner` mit expliziter `ScannerRuntime`.
-    pub fn with_runtime(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Self {
-        Self { storage, runtime }
+    pub fn with_runtime(view: StoreScanView, runtime: ScannerRuntime) -> Self {
+        Self { view, runtime }
+    }
+
+    /// Erzeugt einen `WalScanner` aus einem `Arc<LsmStorage>` (Kompatibilitätspfad).
+    pub fn from_storage_blocking(storage: Arc<LsmStorage>, runtime: ScannerRuntime) -> Result<Self> {
+        let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;
+        Ok(Self::with_runtime(view, runtime))
     }
 
     /// Positivkontrolle für WAL-Segmente: Schreiben, Replay und Entfernen
@@ -111,13 +118,13 @@ impl LayerScanner for WalScanner {
         let codec = TenantKeyCodec::new(ctx.tenant_id);
         let target_prefix = codec.scan_prefix().to_vec();
 
-        let storage = Arc::clone(&self.storage);
+        let view = self.view.clone();
 
         let units = self.runtime.block_on(async {
-            let data_dir = storage.data_path();
+            let data_dir = view.data_path();
             let mut wal_files = Vec::new();
 
-            if let Ok(dir_entries) = self.storage.vfs().list_dir(data_dir) {
+            if let Ok(dir_entries) = view.vfs().list_dir(data_dir) {
                 for name_str in dir_entries {
                     let path = data_dir.join(&name_str);
                     let is_wal = (name_str.starts_with("wal-") && name_str.ends_with(".log"))

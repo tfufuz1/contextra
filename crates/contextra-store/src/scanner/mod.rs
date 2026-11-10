@@ -13,6 +13,7 @@ pub mod memtable;
 pub mod purge;
 pub mod runtime;
 pub mod sstable;
+pub mod store_scan_view;
 pub mod wal;
 
 #[cfg(test)]
@@ -22,6 +23,7 @@ pub use memtable::MemtableScanner;
 pub use purge::LsmPurger;
 pub use runtime::ScannerRuntime;
 pub use sstable::SstableScanner;
+pub use store_scan_view::StoreScanView;
 pub use wal::WalScanner;
 
 use crate::lsm::LsmStorage;
@@ -76,11 +78,14 @@ impl StoreInspector {
     /// # Errors
     /// Liefert einen `ContextraError::Storage`, falls das Scannen der Speicherebenen fehlschlägt.
     pub fn inspect_key(&self, key: &[u8]) -> contextra_types::Result<ResidualInspectionReport> {
+        let view = self
+            .runtime
+            .block_on(async { Ok(self.storage.scan_view().await) })?;
         let mem_scanner =
-            MemtableScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
+            MemtableScanner::with_runtime(view.clone(), self.runtime.clone());
         let sst_scanner =
-            SstableScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
-        let wal_scanner = WalScanner::with_runtime(Arc::clone(&self.storage), self.runtime.clone());
+            SstableScanner::with_runtime(view.clone(), self.runtime.clone());
+        let wal_scanner = WalScanner::with_runtime(view, self.runtime.clone());
 
         let target = contextra_ports::scanner::ScanTarget::Key(key.to_vec());
         let ctx = contextra_types::RequestContext::new_root();
@@ -145,16 +150,20 @@ pub fn lsm_scanners_with_runtime(
     storage: &Arc<LsmStorage>,
     runtime: ScannerRuntime,
 ) -> Vec<Arc<dyn LayerScanner>> {
+    let view = match runtime.block_on(async { Ok(storage.scan_view().await) }) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
     vec![
         Arc::new(MemtableScanner::with_runtime(
-            Arc::clone(storage),
+            view.clone(),
             runtime.clone(),
         )),
         Arc::new(SstableScanner::with_runtime(
-            Arc::clone(storage),
+            view.clone(),
             runtime.clone(),
         )),
-        Arc::new(WalScanner::with_runtime(Arc::clone(storage), runtime)),
+        Arc::new(WalScanner::with_runtime(view, runtime)),
     ]
 }
 

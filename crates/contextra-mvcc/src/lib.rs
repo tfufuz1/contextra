@@ -19,8 +19,8 @@
 //! - `contextra-checkpoint`: Schützt Snapshot-Zustände bei Backup-Erstellung.
 //!
 //! ### Wovon hängt diese Crate ab? (Ausgehende Abhängigkeiten)
-//! - `contextra-types`: Domänentypen wie `TxId`, `DocId`, `ContextraError`.
-//! - `contextra-ports`: Abstrakte Schnittstellen wie `Clock` (Zeitport zur deterministischen Testbarkeit).
+//! - `contextra-ids`: Kanonische ID-Typen wie `TxId`, `DocId`, `TenantId`, `TOMBSTONE_BIT`.
+//! - `contextra-env`: Abstrakte Schnittstellen wie `Clock`, `SystemClock`, `MetricsSink`.
 //! - Bibliotheken dritter Parteien: `parking_lot` (effiziente Mutexe/RwLocks), `ahash` (schnelle Hashing-Algorithmen).
 //!
 //! ### Kernkomponenten
@@ -78,13 +78,11 @@
 #![warn(missing_docs)]
 
 pub use crate::mvcc_error::{MvccError, Result as MvccResult};
-pub use contextra_types::{
-    error::{self, ContextraError, Result},
-    tombstone::{SeqBitTombstone, TombstoneSemanticsCheck},
-    types::{self, DocId, TenantId, TxId, TOMBSTONE_BIT},
-};
+pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
 
+#[cfg(feature = "workspace")]
 pub mod compat;
+
 pub mod mvcc_error;
 pub mod seq_log;
 pub mod snapshot;
@@ -95,4 +93,15 @@ pub mod tx_buffer;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
+pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use tx_buffer::{IndexOp, TxBuffer};
+
+/// Re-Exports für Types und Error-Brücken zur Wahrung der Quellkompatibilität.
+pub mod types {
+    pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
+}
+
+#[cfg(feature = "workspace")]
+pub use contextra_types::error::{self, ContextraError, Result};
+#[cfg(not(feature = "workspace"))]
+pub use crate::mvcc_error::Result;

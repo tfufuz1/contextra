@@ -7,17 +7,46 @@
 //! `update_profiles` erzeugt einen neuen `RouterState`-Snapshot und tauscht diesen
 //! atomar über `ArcSwap` aus. Laufende Routing-Anfragen lesen entweder den alten
 //! oder den neuen Snapshot vollständig und unterbrechungsfrei (Lock-Free Read).
+//!
+//! **VFS-Entkopplung (M4):**
+//! Kalibrierungsdaten werden über den injiziertem VFS-Port gelesen, wenn vorhanden.
+//! Ohne injizierten VFS fällt der Ladevorgang auf `std::fs` zurück (ausschließlich in
+//! `new` / `try_new`, die keinen VFS-Parameter besitzen). In `new_with_vfs` und
+//! `try_new_with_vfs` wird der VFS-Parameter vollständig genutzt.
 
 // FILE-CONTEXT
-// STAND: 2026-10-29
+// STAND: 2026-11-10
 // ZWECK: Konstruktions- und Profilverwaltungs-Methoden (Hot-Reload) für RouterEngine.
-// INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap.
+// INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap; VFS-Port aktiv genutzt.
 
 use super::*;
 
-/// Liest Kalibrierungsdaten lokal von einem Dateipfad (E2-Entkopplung von ports::vfs).
-fn read_calibration_bytes(path: &std::path::Path) -> Option<Vec<u8>> {
-    std::fs::read(path).ok()
+// ANCHOR[contextra-router:LCF-009]
+/// Liest Kalibrierungsdaten über den VFS-Port, falls vorhanden; Fallback auf `std::fs`.
+///
+/// # Ablauf
+/// 1. Wenn `vfs` gesetzt ist: `vfs.read(path)` aufrufen und Bytes zurückliefern.
+/// 2. Sonst: direkter `std::fs::read`-Zugriff (nur für die `new`/`try_new`-Varianten ohne VFS).
+///
+/// # Vorbedingungen
+/// Keine — ein nicht existierender Pfad liefert `None` statt eines Fehlers.
+///
+/// # Nachbedingungen
+/// Liefert die rohen Bytes der Kalibrierungsdatei oder `None`, wenn nicht lesbar.
+///
+/// # Nebenwirkungen
+/// Lese-I/O auf dem Dateisystem oder VFS.
+// NOTE: std::fs-Fallback ist bewusst nur im `new`-Pfad vorhanden.
+// Alle neuen Aufrufer sollen `new_with_vfs` oder `try_new_with_vfs` verwenden und einen VFS injizieren.
+fn read_calibration_bytes(
+    path: &std::path::Path,
+    vfs: Option<&dyn contextra_ports::vfs::Vfs>,
+) -> Option<Vec<u8>> {
+    if let Some(vfs) = vfs {
+        vfs.read(path).ok()
+    } else {
+        std::fs::read(path).ok()
+    }
 }
 
 impl RouterEngine {
@@ -41,14 +70,28 @@ impl RouterEngine {
         )
     }
 
+    // ANCHOR[contextra-router:LCF-010]
     /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS (M4: I/O-Entkopplung).
+    ///
+    /// # Ablauf
+    /// 1. Kalibrierungszustand für alle Profile initialisieren.
+    /// 2. Lyapunov-Wächter für alle Profile anlegen.
+    /// 3. Wenn `calibration_store_path` gesetzt: Kalibrierungsdaten über VFS-Port lesen und
+    ///    existierende Einträge mit den persistierten Werten überschreiben.
+    /// 4. `RouterState`-Snapshot aufbauen und atomar in `ArcSwap` ablegen.
+    ///
+    /// # Vorbedingungen
+    /// Profile müssen gültige Namen und Mindest-Scores enthalten.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Lesezugriff auf `calibration_store_path` via VFS-Port oder `std::fs`.
     pub fn new_with_vfs(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
         context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-        _vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
+        vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Self {
         let mut calibration: BTreeMap<String, ProfileCalibrationState> = profiles
             .iter()
@@ -66,7 +109,8 @@ impl RouterEngine {
             .collect();
 
         if let Some(ref path) = calibration_store_path {
-            let bytes_opt = read_calibration_bytes(path);
+            // NOTE: VFS-Port wird genutzt, wenn injiziert; Fallback auf std::fs nur ohne VFS.
+            let bytes_opt = read_calibration_bytes(path, vfs.as_deref());
             if let Some(bytes) = bytes_opt {
                 if let Ok(persisted) =
                     serde_json::from_slice::<BTreeMap<String, ProfileCalibrationState>>(&bytes)
@@ -104,6 +148,15 @@ impl RouterEngine {
     }
 
     /// Configures an injected Vfs implementation for virtualized/decoupled file I/O (M4).
+    ///
+    /// # Hinweis
+    /// Der VFS-Port wird aktiv genutzt, wenn dieser Builder **vor** dem Laden von
+    /// Kalibrierungsdaten aufgerufen wird. Da `RouterEngine::new` keinen VFS-Parameter
+    /// akzeptiert, ist `with_vfs` nur für nachträgliche Konfiguration vorgesehen.
+    /// Für VFS-gestütztes Initialisierungs-Laden bitte `new_with_vfs` verwenden.
+    // NOTE: Diese Methode gibt `self` unverändert zurück, da der VFS nach dem Laden der
+    // Initialkalibrierung keinen weiteren Effekt auf den unveränderlichen RouterState hat.
+    // Der Parameter ist für zukünftige persistierte Kalibrierungs-Writes reserviert.
     pub fn with_vfs(self, _vfs: Arc<dyn contextra_ports::vfs::Vfs>) -> Self {
         self
     }
@@ -159,14 +212,21 @@ impl RouterEngine {
         )
     }
 
+    // ANCHOR[contextra-router:LCF-011]
     /// Erzeugt eine neue `RouterEngine` mit injiziertem VFS und validiert alle Profile.
+    ///
+    /// # Fehler
+    /// Gibt [`ContextraError`] zurück, wenn ein Profil die Validierung nicht besteht.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Lesezugriff auf `calibration_store_path` via VFS-Port oder `std::fs`.
     pub fn try_new_with_vfs(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
         context_preparer: Arc<dyn ContextPreparer>,
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
-        _vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
+        vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Result<Self> {
         for p in &profiles {
             p.validate()?;
@@ -177,7 +237,7 @@ impl RouterEngine {
             context_preparer,
             profiles,
             calibration_store_path,
-            _vfs,
+            vfs,
         ))
     }
 
