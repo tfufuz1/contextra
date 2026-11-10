@@ -115,3 +115,41 @@ impl DirLock {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct DummySealer;
+    impl RecordSealer for DummySealer {
+        fn seal(&self, _key: &[u8], plaintext: &[u8]) -> Result<SealedEnvelope> {
+            Ok(SealedEnvelope { payload: plaintext.to_vec() })
+        }
+        fn open(&self, _key: &[u8], envelope: &[u8]) -> Result<Vec<u8>> {
+            Ok(envelope.to_vec())
+        }
+    }
+
+    struct DummyAuthenticator;
+    impl RecordAuthenticator for DummyAuthenticator {
+        fn authenticate(&self, _key: &[u8], data: &[u8]) -> Result<[u8; 32]> {
+            Ok(*blake3::hash(data).as_bytes())
+        }
+        fn verify(&self, key: &[u8], data: &[u8], expected_tag: &[u8; 32]) -> Result<bool> {
+            let tag = self.authenticate(key, data)?;
+            Ok(&tag == expected_tag)
+        }
+    }
+
+    #[test]
+    fn test_sealer_and_authenticator_contract() {
+        let sealer = DummySealer;
+        let env = sealer.seal(b"k", b"payload").unwrap();
+        assert_eq!(sealer.open(b"k", &env.payload).unwrap(), b"payload");
+
+        let auth = DummyAuthenticator;
+        let tag = auth.authenticate(b"k", b"data").unwrap();
+        assert!(auth.verify(b"k", b"data", &tag).unwrap());
+    }
+}

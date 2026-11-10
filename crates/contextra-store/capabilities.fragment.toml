@@ -1,10 +1,14 @@
 [crates.contextra-store]
-klasse = "B"
-may_depend_on = [
-    "contextra-crypto",
-    "contextra-mvcc",
-    "contextra-ports",
-    "contextra-sys",
-    "contextra-types",
-]
-transitional = []
+group = "storage"
+level = 1
+tier = "beta"
+path = "crates/contextra-store"
+unsafe_island = false
+allowed_internal = ["contextra-ids", "contextra-env", "contextra-sys", "contextra-mvcc", "contextra-crypto"]
+
+[crates.contextra-store.feature_closure_allowed]
+workspace = ["contextra-types", "contextra-ports"]
+
+[crates.contextra-store.dev_allowed]
+testkit = ["contextra-testkit"]
+test = "cargo test -p contextra-store --locked"

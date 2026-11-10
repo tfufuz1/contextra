@@ -27,7 +27,7 @@ struct KeyVersion {
 type StoreDataMap = BTreeMap<Vec<u8>, Vec<KeyVersion>>;
 type StagedTxMap = BTreeMap<TxId, BTreeMap<Vec<u8>, StagedOp>>;
 
-/// An in-memory implementation of [`StorageEngine`] guaranteed to perform no disk I/O.
+/// An in-memory implementation of [`StorageEngine`] designed to perform no disk I/O.
 #[derive(Debug, Clone)]
 pub struct InMemoryStorageEngine {
     data: Arc<RwLock<StoreDataMap>>,
