@@ -1,62 +1,47 @@
-# Implementierungsspezifikation & Arbeitsplan: `contextra-vector`
+# contextra-vector — Umsetzungsplan
 
-> **Ring:** 1 | **Klasse:** `K` | **Code-Budget:** 6800 LOC | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
-> **Architekturrolle:** Autarker HNSW-Vektorindex, SQ8-Quantisierung, Mandantenisolation und modulare Wartungsprimitive
-> **Spezifikationsbezug:** `docs/SPEC.md` §4, `PLAN.md`
+> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
 
----
+## 1. Vorbedingungen (global) [S]
 
-## 1. Architektonische Leitprinzipien & Baukasten-Vertrag
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
+| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
+| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
+| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
+| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
 
-Für `contextra-vector` gelten im Rahmen der Transformation zum modularen Baukastensystem folgende verbindliche Richtlinien:
+S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
 
-1. **Modulare Autarkie & Isolation:** Der Crate funktioniert als eigenständiger, isolierter Baustein. Direkte Kopplungen an Fremd-Crates werden über wohldefinierte Schnittstellen in `contextra-ports` oder generische Abstraktionen gelöst.
-2. **Entkopplung der Löschkette:** Sämtliche juristischen Begrifflichkeiten (DSGVO Art. 17), Nachweisketten, Deletion-Proofs und Saga-Orchestrierungen verbleiben exklusiv in `contextra-erasure`. Datenhaltende Module implementieren ausschließlich neutrale, funktionale Bereinigungs- und Wartungsprimitive.
-3. **Design by Contract (DbC) & Invarianten:** Alle Vorbedingungen, Nachbedingungen und Systeminvarianten werden strikt geprüft (Fail-Closed).
-4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
-5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
+## 2. Schritte dieses Crates [S]
 
----
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-12 | Feature-Hygiene (B14): `tools/feature_audit.py`, Defaults gemäß §3.1 für E0-/Test-Crates (`adapt`, `license`, `audit-export`, `testkit`, `crypto`, `graph`, `kvcache`, `rank`, `text`, `vector`), leere Features entfernen, `erasure` Features; Gate `error-domain` aktivieren | S-01 | `feature_audit` grün; `cargo hack check --each-feature -p <crate>` je Crate; `--workspace` grün | je Crate Revert | ☐ offen |
+| S-36 | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert | ☐ offen |
+| S-80 | `contextra-vector-diskann` (aus `vector/diskann/`) | S-36 | GL, DiskANN-Tests (`required-features`) isoliert grün | Revert | ☐ offen |
 
-## 2. Modul- & Komponentenarchitektur
+## 3. Reihenfolge-Zwang [S]
 
-### 2.1 Interne Struktur & Verantwortung
+> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
 
-| Komponente / Modul | Verantwortung & Schnittstellen |
-|---|---|
-| `hnsw` | HNSW Hierarchie, Graph-Aufbau, euklidische/Kosinus-Suche |
-| `quant` | SQ8 Skalare Quantisierung zur Speicherreduktion um 75% |
-| `deletion` | Geisterzeigerfreie Vektorknoten-Löschung und Rebuild-Notify |
-| `persistence` | BufferIndex - persistente Serialisierung |
-| `purge` | Wartungs- und Bereinigungsprimitive für Vektorräume (deprecated) |
+## 4. Definition of Done [S]
 
-### 2.2 Abhängigkeitsmatrix & Schnittstellen
+- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
+- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
+- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
+- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
+- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
+- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports, contextra-mvcc, contextra-sys`
-- **Verbotene Abhängigkeiten:** `contextra-crypto`, höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
-- **Konsumierte / Implementierte Ports:** Spezifiziert in `AGENTS.md` und `docs/SPEC.md`.
+## 5. Offene Entscheidungen [S]
 
----
+Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
 
-## 3. Zerlegung in Arbeitspakete (Work Packages)
+## 6. Verweise
 
-### WP-VEC-1: Entkopplung von Krypto & Löschbeweisen
-- **Fokus / Betroffene Dateien:** `src/diskann/integrity.rs, src/lib.rs`
-- **Status:** Abgeschlossen. `contextra-crypto` vollständig entfernt.
+- Spezifikation: `SPEC.md` (dieses Verzeichnis)
+- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
+- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
 
-### WP-VEC-2: BufferIndex & mmap-Optimierung
-- **Fokus / Betroffene Dateien:** `src/persistence/`
-- **Status:** In Bearbeitung / Migrationspfad.
-
-### WP-VEC-3: Geisterzeigerfreie Löschung & Reparatur
-- **Fokus / Betroffene Dateien:** `src/hnsw/deletion.rs`
-- **Status:** Etabliert; Absicherung von INV-HNSW-SLOT-1 und VETO-F02.
-
----
-
-## 4. Definition of Done (DoD) für diesen Baustein
-
-1. Alle deklarierten Arbeitspakete sind vollständig implementiert.
-2. `cargo check -p contextra-vector`, `cargo test -p contextra-vector` und `cargo clippy -p contextra-vector` laufen fehlerfrei durch.
-3. Keine unzulässigen Querabhängigkeiten zu `contextra-crypto`.
-4. Die Crate-README dokumentiert den autarken Einsatz in Drittprojekten mit einem Minimalbeispiel (`examples/standalone_vector.rs`).

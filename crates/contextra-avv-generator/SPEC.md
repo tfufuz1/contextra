@@ -1,71 +1,106 @@
-# SPEC: `contextra-avv-generator`
+# contextra-avv-generator — Spezifikation
 
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
+> **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
+
+**Pfad:** `crates/contextra-avv-generator/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
+
+## 1. Zweck
+
+Vorlagengenerator für Auftragsverarbeitungsverträge (Tier frozen). *[S]*
+
+## 2. Zielzustand (docs/SPEC.md §3.1) [S]
+
+| Merkmal | Ziel |
+|---|---|
+| Gruppe | compliance |
+| Ebene (Kern-Closure) | 0 |
+| Kern-Closure | — |
+| Default-Features | `std` |
+| Fehlertyp (R3) | besteht |
+| Brücke (hinter Feature `workspace`, §1.1) | — |
+
+Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchstens 4 Mitglieder · E2 = Integration · E3 = Anwendungen und Testwerkzeuge. Der Kern ist der Code mit `--no-default-features` ohne Feature `workspace`.
+
+## 3. Ist-Zustand (tools/)
+
+| Messgröße | Wert |
+|---|---|
+| Lines of Code (Produktion, `loc.py`) | 569 Zeilen in 10 Dateien |
+| Version / publish | workspace-vererbt / <unset> |
+| Interne Normal-Abhängigkeiten (Ist, Cargo.toml) | keine |
+| Interne Dev-Abhängigkeiten (Ist) | keine |
+| Features (Ist, Anzahl) | 3 |
+| Default-Features (Ist) | std |
+| `cfg(feature = …)`-Stellen in src/ | 1 |
+| `#[test]`-Vorkommen (grep, src + tests) | 25 |
+| zero-panic: Produktionsbefunde, bereinigt (Tool-Gesamt; davon in Testdateien) | 0 (Tool 0; 0 in Testdateien) |
+| unsafe: Vorkommen / ohne SAFETY / Insel | 0 / 0 / False |
+| Determinismus: Produktionsbefunde, bereinigt (Tool-Gesamt) | 0 (Tool 0) |
+| Port-M3-Leaks (port_contract_audit) | 0 |
+| Error-Enums (Ist) | AvvError |
+
+**Tool-Caveat:** `zero_panic_analyzer.py` klassifiziert `#[cfg(test)]`-Module (`tests.rs`) als Produktion. Im Repo betrifft das 449 von 478 Treffern. Die Zahlen oben sind deshalb bereinigt; die Rohzahl steht in Klammern. Die Korrektur am Tool ist eigener Schritt (S-00).
+
+**Quellen:** `tools/loc.py`, `tools/zero_panic_analyzer.py`, `tools/unsafe_boundary_auditor.py`, `tools/determinism_guard.py`, `tools/port_contract_auditor.py`, `tools/error_topology_mapper.py`, `tools/cargo_dependency_graph.py`, Cargo.toml-Auswertung.
+
+## 4. Ist-vs-Ziel-Abgleich [V]
+
+- **Ist-Kanten, die das Ziel nicht vorsieht:** keine
+- **Ziel-Kanten, die im Ist fehlen:** keine
+- **Default-Features:** Ist = Ziel (std).
+
+## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
+
+- Keine zusätzlichen Abweichungen in dieser Prüfung festgestellt. Die Aussagen aus docs/SPEC.md sind nur dort übernommen, wo sie oben nicht widersprochen werden.
+
+## 6. Anforderungen
+
+### 6.1 Crate-Spezifikation (docs/SPEC.md §6) [S]
+
+Doku „Ring 4“ entfernen; nur Item-Diff `AvvError`/`AvvGeneratorError` (B16); Textzusagen in `template.rs` mit den tatsächlichen Features abgleichen (G-DOC1).
+
+### 6.3 Regeln für jeden Schritt [S]
+
+INV-1 Formatgleichheit · INV-2 Pfadgleichheit (Re-Export mit `#[deprecated]`) · INV-3 Ein Schritt = Commit-Paar · INV-4 `cargo check --workspace --all-targets --locked` grün · INV-5 Determinismus (Tie-Break nach ID aufsteigend) · INV-6 Durability-Pfade unberührt · INV-7 keine Compliance-Aussagen · INV-8 keine Rückwärtspfeile. Vollständig: docs/SPEC.md §1.2, Regeln R1–R9: §3.2.
+
+### 6.5 Fehlerabbildung [S]
+
+Eigener Fehlertyp: besteht (thiserror, `#[non_exhaustive]`). Jede heute genutzte `ContextraError`-Variante hat genau eine lokale Entsprechung; `Display` bleibt bitgleich; keine Sammelvariante `Other(String)` ohne Quelle. Tabelle je Baustein: `docs/decoupling/errors/<crate>.md` (aus S-xx erzeugt). Quelle: §5.3.
+
+## 7. Schnittstellen und Persistenz
+
+Keine Zeile aus dem Golden-Korpus (§5.1) bezieht sich auf dieses Crate.
+
+### 7.2 Öffentliche Schnittstelle
+
+Ist-Stand und Ziel-Schnittstelle sind in den Abschnitten 3 bis 6 festgehalten. Die exakte Liste der `pub`-Symbole erhebt S-00 über `cargo public-api` (Gate G-A1); erlaubte Differenzen sind nur Re-Export-Pfade mit `#[deprecated]`.
+
+## 8. Fundstellen (tools/, exakt) [T]
+
+**Fehler-Enums (Ist):**
+
+- `crates/contextra-avv-generator/src/error.rs:33` — AvvError
+
+## 9. Befunde aus docs/SPEC.md (B-Nummern) [S]
+
+**B14 — Defaults und leere Features (Teil 2, G5/G6) — bestätigt, plus Ergänzungen**
+> **Entscheidung:** Zieldefaults §3.1. Da `default-members` diese Crates auslässt, genügt „wöchentlich `cargo check`“ nicht als Kompilierbarkeitsgarantie; CI führt bei **jedem** PR `cargo check --workspace --all-targets --locked` aus (S-01). Ein Feature ohne `cfg(feature = "x")` im Quelltext **und** ohne Weiterleitung in einem anderen Manifest wird entfernt; geprüft vom neuen `tools/feature_audit.py` (S-12).
+
+## 10. Entscheidungen und Risiken [S]
+
+Keine Einträge in §9.1 oder §9.2.
+
+Nicht-Ziele (§9.3), gelten für alle Crates: physische Regruppierung, Mikro-Crate-Zerlegung (F-1), Verschieben von `Vfs`/`io_seam`, crates.io-Veröffentlichung, Formatänderungen außer ID-Breite, Änderung der FlatBuffers-Schemas.
+
+## 11. Abnahme [S]
+
+Ein Crate gilt als entnehmbar (R6), wenn in dieser Reihenfolge grün: **G-L2** (Null-Prüfungen, nur bei Brücke) → **G-L1** (Kern- und Feature-Closure) → **G-L3** (`--no-default-features`, `--each-feature`) → **G-L4** (isolierter Export). Danach **G-F1/G-D1/G-E1/G-C1** für den betroffenen Schritt (§8.4).
+
+```bash
+cargo check -p contextra-avv-generator --no-default-features --locked
+cargo hack check -p contextra-avv-generator --each-feature --no-dev-deps --locked
+python3 tools/isolation_proof.py --crate contextra-avv-generator --modes no-default,default,each-feature
 ```
-Dokument:  Baustein-Spezifikation `contextra-avv-generator`
-Klasse:    A (Isolierter Baustein, SPEC v4.0 §2, §5.1)
-Ring:      0 (Extension / Utility)
-Stand:     2026-11-08
-Status:    Produktionsreif / Autark
-```
 
-## 1. Zweck und Abgrenzung
-
-`contextra-avv-generator` ist eine zustandslose, synchrone Template-Engine zur automatisierten Erzeugung strukturierter Entwürfe für Auftragsverarbeitungsverträge (AVV) nach Art. 28 DSGVO im Markdown-Format.
-
-### Nicht-Ziele (Abgrenzung)
-- **Keine Rechtsberatung:** Generierte Dokumente sind rechtlich unverbindliche Vorlagen. Ein Vorbehaltshinweis ist zwingender Bestandteil aller Ausgaben.
-- **Keine Lösch- oder Transaktionslogik (§6):** Das Crate führt keine Löschungen durch, mintet keine Nachweise und verwaltet keine Schlüssel. Es formuliert lediglich vertragliche Vereinbarungen (SLAs, TOMs).
-- **Keine externen I/O- oder Netzwerkoperationen:** Reines String-Building im Arbeitsspeicher; keine Dateisystem- oder Netzwerkzugriffe.
-
----
-
-## 2. Baustein-Eigenschaften (Klasse A)
-
-- **B1 / B2 (Keine internen Abhängigkeiten):** 0 Abhängigkeiten zu anderen `contextra-*`-Crates. Lokaler `TenantId`-Typ.
-- **B3 (API in Standard- und Eigen-Typen):** Schnittstelle nutzt ausschließlich Standardtypen (`String`, `Vec`, `u32`, `u64`) und `TenantId`, `AvvContext`, `TechnicalMeasure`.
-- **B4 (Fehlermodell):** Zentraler Fehlertyp `AvvError` (`#[non_exhaustive]`, `thiserror::Error`).
-- **B5 (Isolierter Build):** Baut und testet autark im isolierten Workspace und als exportiertes Verzeichnis (`export_crate.py`).
-- **B6 (Feature-Entkopplung):** `default = ["std"]`; `serde` ist optional hinter Feature-Flag `serde`.
-- **B8 (Dokumentation & Benchmarks):** Vollständig dokumentiert; Criterion-Benchmark unter `benches/avv_bench.rs`.
-- **B9 / B10 (Sicherheit):** `#![forbid(unsafe_code)]`, Zero-Panic in Produktion.
-- **B11 (Determinismus):** Reine deterministische String-Formatierung ohne Zeit- oder Zufallsquellen.
-- **B12 (Lizenzen):** `LICENSE-MIT`, `LICENSE-APACHE` im Crate enthalten.
-
----
-
-## 3. Invarianten
-
-| ID | Invariante | Verifikation |
-|---|---|---|
-| `INV-AVV-DISCLAIMER-1` | Jedes generierte Dokument enthält den rechtlichen Prüfungsvorbehalt (`Entwurf — ersetzt keine Rechtsberatung`). | `test_disclaimer_present_in_header` |
-| `INV-AVV-DETERMINISM-1` | Identischer `AvvContext` und gleiches Datum führen stets zu bitgenau identischem Markdown. | `test_deterministic_rendering_with_fixed_date` |
-| `INV-AVV-INJECTION-1` | Markdown-Steuerzeichen in Benutzereingaben werden in `escape_markdown` escaped, Zeilenumbrüche maskiert. | `test_markdown_escaping_injection_prevention` |
-| `INV-AVV-VALIDATION-1` | Leere Parteinamen, ungültige Lösch-SLAs (nicht in 1..=365) oder leere autorisierte Unterauftragsverarbeiter führen fail-closed zu `AvvError`. | `test_validation_*` |
-
----
-
-## 4. Fehlermodell (`AvvError`)
-
-```rust
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
-#[non_exhaustive]
-pub enum AvvError {
-    EmptyControllerName,
-    EmptyProcessorName,
-    EmptyContractDate,
-    InvalidDeletionSla { days: u32, reason: &'static str },
-    MissingSubprocessors,
-    InvalidSubprocessor(String),
-    InvalidTechnicalMeasure(String),
-    InvalidContext(String),
-    RenderError(String),
-}
-```
-
----
-
-## 5. Benchmarks
-
-Ausgeführt via Criterion (`benches/avv_bench.rs`):
-- `escape_markdown`: Escaping von Strings mit Markdown-Steuerzeichen.
-- `render_avv_markdown`: Vollständige Validierung und Generierung eines AVV-Dokuments.

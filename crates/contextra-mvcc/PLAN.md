@@ -1,99 +1,46 @@
-# Implementierungsspezifikation & Arbeitsplan: `contextra-mvcc`
+# contextra-mvcc — Umsetzungsplan
 
-> **Ring:** 0 | **Klasse:** `K` | **Code-Budget:** 1650 LOC | **Unsafe:** Streng verboten (#![forbid(unsafe_code)])
-> **Architekturrolle:** Multi-Version Concurrency Control und Serializable Snapshot Isolation (SSI)
-> **Spezifikationsbezug:** `docs/SPEC.md` §4, `PLAN.md`
+> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
 
----
+## 1. Vorbedingungen (global) [S]
 
-## 1. Architektonische Leitprinzipien & Baukasten-Vertrag
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
+| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
+| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
+| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
+| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
 
-Für `contextra-mvcc` gelten im Rahmen der Transformation zum modularen Baukastensystem folgende verbindliche Richtlinien:
+S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
 
-1. **Modulare Autarkie & Isolation:** Der Crate funktioniert als eigenständiger, isolierter Baustein. Direkte Kopplungen an Fremd-Crates werden über wohldefinierte Schnittstellen in `contextra-ports` oder generische Abstraktionen gelöst.
-2. **Entkopplung der Löschkette:** Sämtliche juristischen Begrifflichkeiten (DSGVO Art. 17), Nachweisketten, Deletion-Proofs und Saga-Orchestrierungen verbleiben exklusiv in `contextra-erasure`. Datenhaltende Module implementieren ausschließlich neutrale, funktionale Bereinigungs-Ports (`Purger`, `LayerScanner`).
-3. **Design by Contract (DbC) & Invarianten:** Alle Vorbedingungen, Nachbedingungen und Systeminvarianten werden strikt geprüft (Fail-Closed).
-4. **Zero Shared Mutable State:** Nebenläufigkeit wird über deterministisches Message-Passing, unteilbare Transaktionszustände oder atomare Sequenznummern strukturell abgesichert.
-5. **Code- & Unsafe-Disziplin:** `#![forbid(unsafe_code)]` ist im gesamten Crate verbindlich gesetzt. Keine unwrap(), expect() oder Panics im Produktivcode.
+## 2. Schritte dieses Crates [S]
 
----
+| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
+|---|---|---|---|---|---|
+| S-30 | `mvcc`: Loom-Modell (B11) → (A) `tombstone.rs` verschieben → (B) auf `ids`/`env`/`MvccError`; Brücke | S-10, S-11 | GL, GF, GC, GD (Tombstone-Semantik), GE | Revert B, A | ☐ offen |
+| S-36 | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert | ☐ offen |
 
-## 2. Modul- & Komponentenarchitektur
+## 3. Reihenfolge-Zwang [S]
 
-### 2.1 Interne Struktur & Verantwortung
+> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
 
-| Komponente / Modul | Verantwortung & Schnittstellen |
-|---|---|
-| `registry` | Lock-freie Snapshot-Registrierung und Pin-Management |
-| `ssi` | Erkennung von Read-Write-Konflikten (Anti-Dependency Cycles) |
-| `watermark` | Globale Low-Watermark Berechnung für Garbage Collection |
-| `tx_guard` | RAII-Guards für MVCC-Lese- und Schreibtransaktionen |
+## 4. Definition of Done [S]
 
-### 2.2 Abhängigkeitsmatrix & Schnittstellen
+- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
+- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
+- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
+- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
+- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
+- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
 
-- **Erlaubte interne Abhängigkeiten:** `contextra-types, contextra-ports`
-- **Verbotene Abhängigkeiten:** Höhere Ringe sowie Querverbindungen außerhalb der deklarierten Ports.
-- **Konsumierte / Implementierte Ports:** Spezifiziert in `AGENTS.md` und `docs/SPEC.md`.
+## 5. Offene Entscheidungen [S]
 
----
+Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
 
-## 3. Zerlegung in Arbeitspakete (Work Packages)
+## 6. Verweise
 
-### WP-MVC-1: Lock-freie Snapshot-Registrierung
-- **Fokus / Betroffene Dateien:** `src/registry.rs`
-- **Problemstellung & Baukasten-Ziel:** Verwaltung aktiver Reader-Snapshots mittels atomarer Bitmaps und Epochen; allokationsfreier Snapshot-Erwerb.
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
+- Spezifikation: `SPEC.md` (dieses Verzeichnis)
+- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
+- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
 
-### WP-MVC-2: SSI-Konflikt-Detektion
-- **Fokus / Betroffene Dateien:** `src/ssi.rs`
-- **Problemstellung & Baukasten-Ziel:** Erkennung von Gefahrenzyklen (si-edges) zur Garantie echter Serialisierbarkeit ohne globale Lesesperren.
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
-
-### WP-MVC-3: Low-Watermark & PinGuard
-- **Fokus / Betroffene Dateien:** `src/watermark.rs, src/tx_guard.rs`
-- **Problemstellung & Baukasten-Ziel:** Sichere Freigabe veralteter Versionen; RAII-PinGuard hält MVCC-Pins ohne Deadlocks.
-- **Design by Contract (DbC) & Invarianten:**
-  - Vorbedingungen: Gültige, typisierte Parameter; keine ungültigen Zustände oder unvollständige Kontexte.
-  - Nachbedingungen: Deterministisches Verhalten; saubere Fehlerkapselung in `ContextraError` ohne Panics.
-- **Akzeptanzkriterien:**
-  - [ ] Implementierung ist modular gekapselt und autark testbar.
-  - [ ] Alle Unit- und Integrationstests sind grün.
-  - [ ] Keine Verletzung der Ring-Hierarchie oder Crate-Grenzen.
-
----
-
-## 4. Test-, Benchmark- & Qualitätssicherungsplan
-
-### 4.1 Unit-, Integration- & Conformance-Tests
-- **Unit-Tests:** 100% Testabdeckung für Kernfunktionen und Randfall-Behandlungen.
-- **Port-Konformität:** Validierung gegen die Prüfsuiten in `contextra-testkit`.
-- **Traceability:** Jeder Test annotiert die Spezifikationsanforderung (z. B. `/// SPEC: REQ-...`).
-
-### 4.2 Property-Based Testing & Fuzzing
-- Testen aller Invarianten unter zufälligen Eingaben (proptest).
-- Fuzzing aller Parser-, Deserialisierungs- und Eingabepfade.
-
-### 4.3 Mutations-Testing (Sabotage-Checks)
-- Mutanten-Injektion zur Verifikation der Testgüte (Ziel: Mutation-Score >= 85%).
-
----
-
-## 5. Definition of Done (DoD) für diesen Baustein
-
-1. Alle deklarierten Arbeitspakete sind vollständig implementiert.
-2. `cargo check -p contextra-mvcc`, `cargo test -p contextra-mvcc` und `cargo clippy -p contextra-mvcc` laufen fehlerfrei durch.
-3. Code-Budget von maximal 1650 LOC wird strikt eingehalten.
-4. Keine unzulässigen Querabhängigkeiten oder Lecks von Implementierungsdetails.
-5. Die Crate-README dokumentiert den autarken Einsatz in Drittprojekten mit einem Minimalbeispiel.
