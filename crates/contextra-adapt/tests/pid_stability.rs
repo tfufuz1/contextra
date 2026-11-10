@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
 //! # Stabilitätstests für den PID-Latenzregler
 //!
 //! Validiert Einschwingzeit, Überschwinggrenzen und das Fehlen stationärer Regelfehler

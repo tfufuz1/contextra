@@ -400,7 +400,7 @@ fn test_adaptive_decay_controller_effective_score_zero_elapsed() {
 
 #[test]
 fn test_sketched_bandit_feature_gated_initialization() {
-    #[cfg(feature = "sketched-bandit")]
+    #[cfg(feature = "bandit-routing")]
     {
         let mut state = BanditProfileState::cold_start(4, 0.5);
         state.implementation =
