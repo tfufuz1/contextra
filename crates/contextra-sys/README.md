@@ -1,6 +1,6 @@
 # contextra-sys
 
-Low-level unsafe Systemabstraktionen, Durability-Flush, Memory-Locking und Memory-Mapping hinter einer sicheren Rust-Fassade.
+Low-level unsafe Systemabstraktionen, Durability-Flush, Memory-Locking und Memory-Mapping hinter einer sicheren Rust-Fassade (Ring 0 / Foundation).
 
 ## Zweck
 `contextra-sys` stellt autarke, betriebssystemnahe Primitive für Contextra bereit:
@@ -11,15 +11,26 @@ Low-level unsafe Systemabstraktionen, Durability-Flush, Memory-Locking und Memor
 - **POSIX-Limits & ACLs:** Restriktive Dateizugriffsrechte (`0600` und UID-Verifikation unter Unix, DACL unter Windows) sowie Dateideskriptor-Limits (`ensure_fd_limit`).
 
 ## Reifegrad
-- **Status:** Stabil / Produktionsreif (P1–P6 erfüllt)
-- **Unsafe-Insel:** Isolierte Unsafe-Stellen (22 Blöcke) mit lückenloser `// SAFETY:`-Dokumentation; vollständig sichere öffentliche Rust-Fassade.
+- **Tier:** `beta` (Ring 0 / Ebene 0 Foundation)
+- **Unsafe-Insel:** Isolierte Unsafe-Stellen (22 Blöcke) mit lückenloser `// SAFETY:`-Dokumentation; vollständig sichere öffentliche Rust-Fassade (`#![deny(unsafe_op_in_unsafe_fn)]`).
 - **Fehlermodell:** Strukturierte Fehlercodes über `Error` (`thiserror`, `#[non_exhaustive]`).
 
-## Interne Abhängigkeiten
-`contextra-sys` ist ein autarker Baustein und hat **0 interne Workspace-Abhängigkeiten**.
+## Tatsächliche Abhängigkeiten
+- **Interne Workspace-Abhängigkeiten:** **0** (Kern-Closure ist leer: Ebene 0).
+  - *Hinweis:* `contextra-durable-fs` ist unabhängig von `contextra-sys`.
+- **Externe Abhängigkeiten:**
+  - `memmap2 = "0.9"`
+  - `thiserror = "2.0"`
+  - `tracing = "0.1"`
+- **Plattformspezifische Abhängigkeiten:**
+  - Unix (`cfg(unix)`): `libc = "0.2"`
+  - Windows (`cfg(windows)`): `windows-sys = "0.61"`
+- **Dev-Abhängigkeiten:**
+  - `criterion = "0.5"`
+  - `tempfile = "3"`
 
 ## Features
-- `default = []` (reines Standard-Build mit Ziel-OS Abhängigkeiten `libc` unter Unix bzw. `windows-sys` unter Windows).
+- Keine optionalen Features (`default = []`).
 
 ## Minimalbeispiel
 ```rust
@@ -32,7 +43,7 @@ assert!(res.is_ok());
 ```
 
 ## Entnahme-Rezept
-1. Kopiere `crates/contextra-sys` in dein Projekt.
+1. Kopiere `crates/contextra-sys` in dein Projekt oder binde es als autarke Pfad-/Git-Abhängigkeit ein.
 2. Binde es in deiner `Cargo.toml` ein:
 ```toml
 [dependencies]
