@@ -65,7 +65,7 @@ Nur `contextra-types`. Ports kennen **keine** konkrete Implementierung und **kei
 
 ## 5. Ports (Übersicht der Verantwortung)
 
-**Definiert:** alle Ports aus §3. **Implementiert:** nur die Referenzobjekte aus §4.1. **Konsumiert:** `contextra-types`.
+**Definiert:** alle Ports aus §3. **Implementiert:** nur die Referenzobjekte aus §4.1. **Konsumiert:** `contextra-types`, `contextra-env`.
 
 **Fehlend laut PLAN/SPEC (Soll, noch nicht im Code):** `EgressPolicy` (WP 2.4; `privacy` kennt bisher nur `BlockReason::EgressPolicyDenied`). `KmsProvider` liegt noch in `crypto/src/wal_crypto.rs:32` und soll hierher (SPEC §5.2), `security_ports.toml` setzt das bereits voraus. `DurableLog`, `ErasureJournal`, `EffaceableKeySlot`, `ErasedSetMirror`, `GroupRevocationListener` sind hier **nicht** als Traits zu finden (gegen `grep -rn "trait <Name>"` prüfen, bevor du sie benutzt).
 

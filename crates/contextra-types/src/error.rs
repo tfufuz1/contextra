@@ -510,6 +510,21 @@ impl From<std::array::TryFromSliceError> for ContextraError {
     }
 }
 
+
+impl From<contextra_ids::IdError> for ContextraError {
+    fn from(err: contextra_ids::IdError) -> Self {
+        match err {
+            contextra_ids::IdError::TxIdAllocationOverflow(offset) => {
+                ContextraError::Transaction(format!(
+                    "Internal TxId allocation offset {offset} overflows u64::MAX (INTERNAL_BASE={})",
+                    contextra_ids::TxId::INTERNAL_BASE
+                ))
+            }
+            other => ContextraError::InvalidInput(other.to_string()),
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {

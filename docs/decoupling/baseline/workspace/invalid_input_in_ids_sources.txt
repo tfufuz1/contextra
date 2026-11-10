@@ -1,0 +1,9 @@
+19:            /// Erzeugt eine geprüfte Instanz. Verstoß führt zu `ContextraError::InvalidInput`.
+22:                    return Err(ContextraError::InvalidInput("empty identifier".into()));
+25:                    return Err(ContextraError::InvalidInput("identifier too long".into()));
+64:            Err(ContextraError::InvalidInput(
+130:            Err(ContextraError::InvalidInput(
+227:            return Err(ContextraError::InvalidInput(
+269:            return Err(ContextraError::InvalidInput(
+342:    /// Returns `ContextraError::InvalidInput` if `key` is empty, mirroring `DocId::from_key`.
+355:    /// Returns `ContextraError::InvalidInput` if `key` is empty, mirroring `DocId::from_key`.

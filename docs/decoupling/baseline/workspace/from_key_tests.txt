@@ -1,0 +1,5 @@
+crates/contextra-cognition/src/context_compaction/tests.rs:440:    let src_doc_id = DocId::from_key(src_id_str)?;
+crates/contextra-cognition/src/context_compaction/tests.rs:450:    let target_doc_id = DocId::from_key(target_str_id)?;
+crates/contextra-cognition/src/context_compaction/tests.rs:604:    let d1 = DocId::from_key("source_1")?;
+crates/contextra-cognition/src/context_compaction/tests.rs:605:    let d2 = DocId::from_key("source_2")?;
+crates/contextra-cognition/src/context_compaction/tests.rs:606:    let target_id = DocId::from_key("summary_12")?;
