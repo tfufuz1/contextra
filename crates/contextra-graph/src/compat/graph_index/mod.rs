@@ -9,13 +9,14 @@ pub mod traversal;
 
 use std::sync::atomic::Ordering;
 
-use contextra_ports::{BoxFuture, GraphIndex, GraphIndexStats};
+pub use contextra_ports::GraphIndex;
+use contextra_ports::{BoxFuture, GraphIndexStats};
 use contextra_types::{ContextraError, Entity, EntityId, PprConfig, Result, TxId};
 
-use super::graph_write::CsrGraph;
-use super::inner::GraphInner;
-use super::types::MAX_TRAVERSAL_HOPS;
-use super::visibility::is_suspicious_tx_id;
+use crate::csr::graph_write::CsrGraph;
+use crate::csr::inner::GraphInner;
+use crate::csr::types::MAX_TRAVERSAL_HOPS;
+use crate::csr::visibility::is_suspicious_tx_id;
 
 pub(crate) fn collect_entity_incident_edges(
     inner: &GraphInner,

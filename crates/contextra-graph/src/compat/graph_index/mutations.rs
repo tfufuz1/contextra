@@ -11,14 +11,15 @@ use crate::GraphIndexExt;
 use contextra_ports::{BoxFuture, GraphIndex};
 use contextra_types::{ContextraError, Entity, EntityId, Result, TxId};
 
-use super::super::graph_write::CsrGraph;
-use super::super::inner::sentinel_entity;
-use super::super::types::{
+use super::collect_entity_incident_edges;
+use crate::csr::graph_write::CsrGraph;
+use crate::csr::inner::sentinel_entity;
+use crate::csr::inner::GraphInner;
+use crate::csr::types::{
     EdgePayload, PersistedEdgePayload, StagedEdgePayload, GRAPH_ENTITY_DELETED_PREFIX,
     GRAPH_ENTITY_PREFIX,
 };
-use super::super::visibility::is_suspicious_tx_id;
-use super::collect_entity_incident_edges;
+use crate::csr::visibility::is_suspicious_tx_id;
 
 fn validate_tx_id_heuristic(tx: TxId, op_name: &str) {
     debug_assert!(
@@ -91,6 +92,7 @@ pub(crate) fn add_entity_impl<'a>(
 ) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
         validate_tx_id_heuristic(tx, "add_entity");
+        debug_assert!(tx != TxId::INVALID && tx.is_valid_origin(), "AGT-GRAPH-001");
         {
             let mut inner = graph.inner_write();
             inner
@@ -112,6 +114,7 @@ pub(crate) fn add_edge_impl<'a>(
 ) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
         validate_tx_id_heuristic(tx, "add_edge");
+        debug_assert!(tx != TxId::INVALID && tx.is_valid_origin(), "AGT-GRAPH-001");
         if !edge.weight.is_finite() || edge.weight < 0.0 {
             return Err(ContextraError::InvalidInput(format!(
                 "Invalid edge weight {}: weight must be finite and non-negative",
@@ -186,6 +189,7 @@ pub(crate) fn add_edge_impl<'a>(
 pub(crate) fn commit_impl<'a>(graph: &'a CsrGraph, tx: TxId) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
         validate_tx_id_heuristic(tx, "commit");
+        debug_assert!(tx != TxId::INVALID && tx.is_valid_origin(), "AGT-GRAPH-001");
         let mut inner = graph.inner_write();
 
         commit_staged_entities(&mut inner, tx);
@@ -226,7 +230,7 @@ pub(crate) fn remove_edge_impl<'a>(
     })
 }
 
-fn commit_staged_entities(inner: &mut super::super::inner::GraphInner, tx: TxId) {
+fn commit_staged_entities(inner: &mut GraphInner, tx: TxId) {
     let mut tx_entities = Vec::new();
     inner.staged_entities.retain(|&(t, id), entity| {
         if t == tx {
@@ -249,7 +253,7 @@ fn commit_staged_entities(inner: &mut super::super::inner::GraphInner, tx: TxId)
     }
 }
 
-fn commit_staged_edges(inner: &mut super::super::inner::GraphInner, tx: TxId) {
+fn commit_staged_edges(inner: &mut GraphInner, tx: TxId) {
     let mut tx_edges = Vec::new();
     inner.staged_edges.retain(|&(t, from_id), edges| {
         if t == tx {
@@ -298,7 +302,7 @@ fn commit_staged_edges(inner: &mut super::super::inner::GraphInner, tx: TxId) {
     }
 }
 
-fn commit_staged_removals(inner: &mut super::super::inner::GraphInner, tx: TxId) {
+fn commit_staged_removals(inner: &mut GraphInner, tx: TxId) {
     if let Some(tx_removals) = inner.staged_removals.remove(&tx) {
         for (from_id, to_id) in tx_removals {
             let from_idx = inner.id_map.get(&from_id).copied();
