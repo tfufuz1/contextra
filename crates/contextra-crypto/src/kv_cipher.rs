@@ -203,6 +203,7 @@ impl KvCipher for KvSegmentCipher {
 }
 
 #[cfg(all(test, feature = "kv-encryption"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::CryptoError;
