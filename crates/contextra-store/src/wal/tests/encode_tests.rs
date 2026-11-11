@@ -3,13 +3,10 @@
 //! Validiert Roundtrips, Framing-Grenzfaelle und Bitflips.
 
 use super::*;
-#[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;
 use contextra_ids::TxId;
-#[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
-#[cfg(feature = "encryption-at-rest")]
 use tokio::fs;
 
 #[test]
@@ -120,7 +117,6 @@ fn test_wal_entry_crc_roundtrip() {
     }
 }
 
-#[cfg(feature = "encryption-at-rest")]
 #[tokio::test]
 async fn test_batch_encryption_single_nonce_layout() {
     let dir = tempdir().expect("tempdir"); // expect
@@ -181,7 +177,6 @@ async fn test_batch_encryption_single_nonce_layout() {
     assert_eq!(nonce_bytes.len(), 12);
 }
 
-#[cfg(not(feature = "encryption-at-rest"))]
 #[tokio::test]
 async fn test_batch_plaintext_layout() {
     let dir = tempdir().expect("tempdir");
