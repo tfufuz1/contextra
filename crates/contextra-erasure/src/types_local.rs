@@ -5,7 +5,7 @@
 //! und isoliert als Ring-3-Löschkern funktioniert.
 
 #[cfg(feature = "async")]
-use futures_util::future::BoxFuture;
+pub use futures_util::future::BoxFuture;
 
 #[cfg(not(feature = "async"))]
 /// Type-Alias für gepinnte ge-boxte Futures ohne Tokio/Futures-Util.
@@ -2060,6 +2060,30 @@ pub trait LayerScanner: Send + Sync {
     }
 }
 
+impl<T: LayerScanner + ?Sized> LayerScanner for Arc<T> {
+    fn layer(&self) -> WitnessLayer {
+        (**self).layer()
+    }
+
+    fn scan_units(
+        &self,
+        session: &mut ScanSession,
+        ctx: &RequestContext,
+    ) -> Result<(), crate::error::ErasureError> {
+        (**self).scan_units(session, ctx)
+    }
+
+    fn scan(
+        &self,
+        ctx: &RequestContext,
+        target: ScanTarget,
+        technique: ScanTechnique,
+        clock: &dyn Clock,
+    ) -> Result<ScanWitness, crate::error::ErasureError> {
+        (**self).scan(ctx, target, technique, clock)
+    }
+}
+
 /// Port trait for time operations.
 pub trait Clock: Send + Sync + 'static {
     /// Returns the current wall-clock time as nanoseconds since the Unix epoch.
@@ -2265,5 +2289,142 @@ impl<T: Vfs + ?Sized> Vfs for Arc<T> {
 
     fn sync_dir(&self, path: &std::path::Path) -> Result<(), crate::error::ErasureError> {
         (**self).sync_dir(path)
+    }
+}
+
+// =========================================================================
+// Erweiterte Ports der Löschkette (Spezifikation §3.2, INV-ERA-5 / 6 / 7)
+// =========================================================================
+
+/// RAII-Token für einen aktiven Lese-/Schreib-Fence (INV-ERA-5).
+pub struct FencePermit {
+    _token: Option<Arc<()>>,
+}
+
+impl FencePermit {
+    /// Erzeugt ein neues FencePermit.
+    pub fn new(token: Option<Arc<()>>) -> Self {
+        Self { _token: token }
+    }
+}
+
+impl fmt::Debug for FencePermit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FencePermit")
+    }
+}
+
+/// Port-Vertrag für FenceGate (INV-ERA-5).
+/// Blockiert konkurrierende Schreiber und Lesezugriffe während eines physischen Purge.
+pub trait FenceGate: Send + Sync {
+    /// Aktiviert den Fence für einen bestimmten KeyScope und gibt ein RAII-Token zurück.
+    fn acquire_fence<'a>(
+        &'a self,
+        scope: &'a KeyScope,
+    ) -> BoxFuture<'a, Result<FencePermit, crate::error::ErasureError>>;
+
+    /// Prüft synchron, ob ein Fence für den gegebenen Schlüssel oder Bereich aktiv ist.
+    fn is_fenced(&self, key: &KeyBuf) -> bool;
+}
+
+impl<T: FenceGate + ?Sized> FenceGate for Arc<T> {
+    fn acquire_fence<'a>(
+        &'a self,
+        scope: &'a KeyScope,
+    ) -> BoxFuture<'a, Result<FencePermit, crate::error::ErasureError>> {
+        (**self).acquire_fence(scope)
+    }
+
+    fn is_fenced(&self, key: &KeyBuf) -> bool {
+        (**self).is_fenced(key)
+    }
+}
+
+/// Port-Vertrag für WalSink (INV-ERA-6).
+/// Verwaltet WAL-Entsorgung, Verankerung und Unlesbarmachung von WAL-Einträgen eines gelöschten Scopes.
+pub trait WalSink: Send + Sync {
+    /// Entsorgt oder überschreibt alle WAL-Segmente/Einträge, die zum Scope gehören.
+    fn purge_scope_wal(
+        &self,
+        ctx: &RequestContext,
+        scope: &KeyScope,
+    ) -> Result<u64, crate::error::ErasureError>;
+
+    /// Schreibt einen Commit-Marker zur dauerhaften Verankerung der WAL-Bereinigung.
+    fn append_erasure_marker(
+        &self,
+        ctx: &RequestContext,
+        erasure_id: &ErasureId,
+        scope: &KeyScope,
+    ) -> Result<(), crate::error::ErasureError>;
+}
+
+impl<T: WalSink + ?Sized> WalSink for Arc<T> {
+    fn purge_scope_wal(
+        &self,
+        ctx: &RequestContext,
+        scope: &KeyScope,
+    ) -> Result<u64, crate::error::ErasureError> {
+        (**self).purge_scope_wal(ctx, scope)
+    }
+
+    fn append_erasure_marker(
+        &self,
+        ctx: &RequestContext,
+        erasure_id: &ErasureId,
+        scope: &KeyScope,
+    ) -> Result<(), crate::error::ErasureError> {
+        (**self).append_erasure_marker(ctx, erasure_id, scope)
+    }
+}
+
+/// Port-Vertrag für KeyStore (WP-K).
+/// Verwaltet Schlüsselhierarchien (KEK/DEK), Wrapping und unwiderrufliche Schlüsselvernichtung.
+pub trait KeyStore: Send + Sync {
+    /// Vernichtet alle Schlüssel (DEKs / SubKeys) eines Scopes unwiderruflich.
+    fn destroy_scope_keys(
+        &self,
+        ctx: &RequestContext,
+        scope: &KeyScope,
+    ) -> Result<usize, crate::error::ErasureError>;
+
+    /// Prüft, ob ein Schlüssel für die Entschlüsselung noch existiert.
+    fn key_exists(&self, scope: &KeyScope) -> Result<bool, crate::error::ErasureError>;
+}
+
+impl<T: KeyStore + ?Sized> KeyStore for Arc<T> {
+    fn destroy_scope_keys(
+        &self,
+        ctx: &RequestContext,
+        scope: &KeyScope,
+    ) -> Result<usize, crate::error::ErasureError> {
+        (**self).destroy_scope_keys(ctx, scope)
+    }
+
+    fn key_exists(&self, scope: &KeyScope) -> Result<bool, crate::error::ErasureError> {
+        (**self).key_exists(scope)
+    }
+}
+
+/// Port-Vertrag für ResidueScanner (WP-12 / INV-CLASS-MEASURED-1).
+/// Untersucht Index-Artefakte (z.B. Vektorindex / Graph) auf unzulässige Restspuren.
+pub trait ResidueScanner: Send + Sync {
+    /// Führt den Restspuren-Scan für einen Scope auf einem Ziel-Artefakt durch.
+    fn scan_residues(
+        &self,
+        ctx: &RequestContext,
+        scope: &KeyScope,
+        target: &ScanTarget,
+    ) -> Result<u64, crate::error::ErasureError>;
+}
+
+impl<T: ResidueScanner + ?Sized> ResidueScanner for Arc<T> {
+    fn scan_residues(
+        &self,
+        ctx: &RequestContext,
+        scope: &KeyScope,
+        target: &ScanTarget,
+    ) -> Result<u64, crate::error::ErasureError> {
+        (**self).scan_residues(ctx, scope, target)
     }
 }

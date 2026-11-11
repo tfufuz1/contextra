@@ -10,6 +10,7 @@ pub mod resume;
 pub mod window;
 
 pub use cx::PurgeCx;
+pub use phase::PurgePhase;
 pub use order::{LayerPurgeOrder, PurgePriority};
 pub use phase::{
     AdmissionFailure, DisposeFailure, FenceFailure, FinalizeFailure, FlushFailure, PurgePhase,

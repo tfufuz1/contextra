@@ -1,139 +1,152 @@
 <img width="3168" height="1344" alt="banner" src="https://github.com/user-attachments/assets/443fa9d1-7b8f-4ffe-aa61-46e85f5a414a" />
 
 <p align="center"><b>CONTEXTRA</b></p>
-<p align="center"><i>Ein lokales Wissens- und Gedächtnissystem für KI-Agenten, geschrieben in Rust</i></p>
+<p align="center"><i>Das lokale Wissens- und Gedächtnissystem für KI-Assistenten und Agenten</i></p>
 
 <p align="center">
-  <a href="#was-contextra-ist">Überblick</a> ·
-  <a href="#die-herausforderungen-die-contextra-löst">Herausforderungen</a> ·
-  <a href="#so-funktioniert-es">Funktionsweise</a> ·
+  <a href="#überblick">Überblick</a> ·
+  <a href="#welche-herausforderungen-contextra-löst">Herausforderungen</a> ·
+  <a href="#so-funktioniert-contextra">Funktionsweise</a> ·
   <a href="#funktionen">Funktionen</a> ·
-  <a href="#ein-beispiel">Beispiel</a> ·
-  <a href="#anwendungsfälle">Anwendungsfälle</a>
+  <a href="#ein-beispiel-aus-der-praxis">Beispiel</a> ·
+  <a href="#einsatzbereiche">Einsatzbereiche</a>
 </p>
 
 ---
 
-## Was Contextra ist
+## Überblick
 
-KI-Agenten sind nur so gut wie das Wissen, auf das sie zugreifen können. Contextra stellt dieses Wissen als Bibliothek bereit, die direkt im eigenen Programm läuft. Dokumente, Erinnerungen und Beziehungen zwischen Begriffen werden lokal gespeichert, durchsucht und zu wenigen, belastbaren Treffern verdichtet.
+KI-Assistenten sind nur so hilfreich wie das Wissen, auf das sie zugreifen können. Contextra stellt dieses Wissen bereit, ohne dass Daten das Unternehmen verlassen.
 
-Es gibt keinen externen Dienst, keinen zweiten Prozess und keine Cloud-Verbindung. Daten bleiben dort, wo sie entstehen: auf dem eigenen Rechner, im eigenen Netz oder auf einem Gerät ohne Internetzugang.
+Contextra ist eine Softwarebibliothek, die direkt in eine bestehende Anwendung eingebunden wird. Es gibt keinen externen Dienst, keinen zusätzlichen Server-Prozess und keine Cloud-Verbindung. Dokumente, Erinnerungen und Zusammenhänge zwischen Begriffen werden auf dem eigenen Rechner, im eigenen Netzwerk oder auf einem Gerät ohne Internetzugang gespeichert und durchsucht.
 
-Contextra vereint Verfahren, die sonst in getrennten Werkzeugen stehen: Bedeutungssuche, Volltextsuche, Graphen, Rangfusion, statistische Kalibrierung, transaktionaler Speicher, Verschlüsselung und Löschnachweise. Diese Teile arbeiten zusammen, damit ein Agent nicht nur Treffer findet, sondern auch einschätzen kann, wie belastbar sie sind.
+Dabei vereint Contextra Fähigkeiten, die sonst auf mehrere Werkzeuge verteilt sind:
+
+- **Suche** nach Bedeutung, nach exakten Begriffen und nach Zusammenhängen
+- **Bewertung der Ergebnisqualität**, damit erkennbar ist, wie verlässlich ein Treffer ist
+- **Gedächtnis für KI-Agenten**, das gepflegt, verdichtet und wieder abgerufen wird
+- **Datenschutz und Verschlüsselung**, einschließlich nachweisbarer Löschung
+- **Zuverlässige Speicherung** mit gesicherten Arbeitsschritten und Rückkehr zu früheren Zuständen
+
+Das Ziel: Ein KI-System soll nicht nur Treffer finden, sondern auch einschätzen können, wie belastbar sie sind.
 
 ---
 
-## Die Herausforderungen, die Contextra löst
+## Welche Herausforderungen Contextra löst
 
-| Herausforderung | Wie Contextra damit umgeht |
+| Herausforderung | Lösung in Contextra |
 |---|---|
-| **Sensible Daten sollen das Haus nicht verlassen** | Speicherung, Suche und Auswertung laufen vollständig lokal. Ausgehende Anfragen werden auf personenbezogene Daten geprüft, und sensible Werte werden durch Platzhalter ersetzt. |
-| **Löschen muss nachvollziehbar sein** | Jede Löschung erzeugt einen digital signierten Nachweis. Verschlüsselte Daten werden durch Vernichtung ihres Schlüssels unlesbar, ohne dass der gesamte Bestand neu aufgebaut werden muss. |
-| **Exakte Begriffe gehen in reiner Bedeutungssuche verloren** | Vektorsuche, Volltextsuche und Graphsuche laufen parallel. Ihre Ergebnisse werden zu einer gemeinsamen Rangliste verschmolzen. |
-| **Ähnlich klingende Treffer sind nicht gleich verlässlich** | Konfidenzwerte werden statistisch kalibriert, so dass Schwellenwerte eine klare Bedeutung haben. |
-| **Lange Agentenläufe scheitern an einem einzigen Fehler** | Jeder Schritt wird gesichert. Bei einem Fehler wird der letzte gültige Zustand wiederhergestellt. |
-| **Kontext und Kosten wachsen unkontrolliert** | Verläufe werden verdichtet, und ein Token-Budget begrenzt Schritte und Verbrauch. |
-| **Nicht jede Anfrage braucht das größte Modell** | Ein kontextueller Bandit wählt je Anfrage das Modell mit dem besten Verhältnis aus Qualität, Latenz und Kosten. |
+| **Sensible Daten dürfen das Unternehmen nicht verlassen** | Speicherung, Suche und Auswertung erfolgen vollständig lokal. Ausgehende Anfragen werden auf personenbezogene Daten geprüft, sensible Werte durch Platzhalter ersetzt. |
+| **Löschungen müssen nachweisbar sein** | Jede Löschung wird in einem digital signierten Nachweis dokumentiert. Verschlüsselte Daten werden durch Vernichtung ihres Schlüssels dauerhaft unlesbar. |
+| **Exakte Begriffe gehen bei reiner Bedeutungssuche verloren** | Drei Suchverfahren laufen parallel und werden zu einer gemeinsamen Ergebnisliste zusammengeführt. |
+| **Ähnlich klingende Treffer sind nicht automatisch verlässlich** | Jedes Ergebnis erhält einen statistisch geprüften Vertrauenswert, sodass Schwellenwerte eine klare Bedeutung haben. |
+| **Lange Arbeitsabläufe scheitern an einem einzelnen Fehler** | Jeder Arbeitsschritt wird gesichert. Nach einem Fehler wird der letzte gültige Zustand wiederhergestellt. |
+| **Kosten und Textmengen wachsen unkontrolliert** | Verläufe werden verdichtet, und ein Budget begrenzt Arbeitsschritte und Verbrauch. |
+| **Nicht jede Anfrage braucht das leistungsstärkste Modell** | Das System wählt je Anfrage das Modell mit dem besten Verhältnis aus Qualität, Geschwindigkeit und Kosten. |
 
 ---
 
-## So funktioniert es
+## So funktioniert Contextra
 
-Contextra arbeitet in fünf Stufen. Jede Stufe ist für sich verständlich, und zusammen ergeben sie einen durchgehenden Weg von der Quelle bis zur Antwort.
+Contextra arbeitet in fünf Stufen, vom Dokument bis zur Antwort.
 
-**1. Aufnehmen.** Dokumente in Formaten wie PDF, DOCX, Markdown oder E-Mail werden gelesen. Der Text wird entlang seiner Struktur in Abschnitte zerlegt, sodass Überschriften, Listen und Absätze erhalten bleiben.
+**1. Aufnehmen.** Dokumente wie PDF, Word (DOCX), Markdown oder E-Mails werden eingelesen und entlang ihrer Struktur in Abschnitte gegliedert. Überschriften, Listen und Absätze bleiben erhalten. Dieselbe Eingabe ergibt immer dieselbe Gliederung.
 
-**2. Speichern.** Die Abschnitte landen in einem transaktionalen Speicher. Schreibvorgänge sind atomar, und ein Protokoll sichert sie gegen Abstürze. Die Daten liegen verschlüsselt auf dem Datenträger.
+**2. Speichern.** Die Abschnitte werden verschlüsselt abgelegt. Jeder Schreibvorgang wird vollständig übernommen oder vollständig verworfen und zusätzlich in einem Protokoll gesichert. Ein Absturz hinterlässt daher keine beschädigten Daten.
 
-**3. Auf mehreren Wegen suchen.** Eine Frage wird gleichzeitig an drei Suchwege gestellt. Die Bedeutungssuche findet inhaltlich verwandte Passagen, die Volltextsuche findet exakte Begriffe und Zahlen, und die Graphsuche folgt Beziehungen zwischen Personen, Begriffen und Ereignissen.
+**3. Auf mehreren Wegen suchen.** Eine Anfrage wird gleichzeitig über drei Wege beantwortet: nach inhaltlicher Bedeutung, nach exakten Begriffen und Zahlen sowie nach Beziehungen zwischen Personen, Begriffen und Ereignissen.
 
-**4. Zusammenführen und prüfen.** Die drei Trefferlisten werden mit gewichteter Rangfusion verschmolzen. Treffer, die über mehrere Wege bestätigt werden, erhalten einen Bonus. Statistische Kalibrierung macht die Konfidenz der Ergebnisse vergleichbar.
+**4. Zusammenführen und prüfen.** Die Ergebnisse der drei Wege werden gewichtet zu einer Liste verschmolzen. Treffer, die über mehrere Wege bestätigt werden, rücken nach oben. Anschließend wird für jedes Ergebnis ein Vertrauenswert berechnet und die Verteilung dieser Werte laufend überwacht.
 
-**5. Liefern.** Der Agent erhält wenige, begründete Treffer. Ist die Beleglage dünn, wird das ausgewiesen, statt eine sichere Antwort vorzutäuschen.
+**5. Liefern.** Der Anwender oder das angebundene KI-System erhält wenige, begründete Treffer. Ist die Beleglage dünn, wird das ausdrücklich ausgewiesen, statt eine scheinbar sichere Antwort vorzutäuschen.
 
 ```
    Dokument oder Erinnerung
             │
             ▼
-   ┌──────────────────────┐     ┌──────────────────────────────┐
-   │ Aufnehmen            │ ──▶ │ Speichern                    │
-   │ PDF · DOCX · MD · Mail│    │ verschlüsselt · transaktional│
-   └──────────────────────┘     └──────────────┬───────────────┘
-                                               │
-        ┌──────────────────┬──────────────────┼──────────────────┐
-        ▼                  ▼                  ▼                  ▼
-  Bedeutungssuche    Volltextsuche      Graphsuche         Zeitbezug
-  (Vektoren)         (BM25, Deutsch)    (Beziehungen)      (wann gültig)
-        └──────────────────┴─────────┬────────┴──────────────────┘
+   ┌───────────────────────┐     ┌──────────────────────────────┐
+   │ Aufnehmen             │ ──▶ │ Speichern                    │
+   │ PDF · Word · Mail     │     │ verschlüsselt · abgesichert  │
+   └───────────────────────┘     └──────────────┬───────────────┘
+                                                │
+        ┌──────────────────┬────────────────────┼─────────────────┐
+        ▼                  ▼                    ▼                 ▼
+   Bedeutungssuche   Begriffssuche        Beziehungssuche    Zeitbezug
+   (Inhalt)          (exakte Wörter)      (Zusammenhänge)    (wann gültig)
+        └──────────────────┴─────────┬──────────┴─────────────────┘
                                      ▼
-                     Rangfusion · Kalibrierung · Drift-Erkennung
+                  Zusammenführen · Vertrauenswerte · Überwachung
                                      │
                                      ▼
-                     Wenige, begründete Treffer für den Agenten
+                     Wenige, begründete Treffer
 ```
 
 ---
 
 ## Funktionen
 
-### 1. Hybride Suche und Retrieval
+### 1. Intelligente Suche
 
 <img width="2752" height="1536" alt="hybrid-retrieval" src="https://github.com/user-attachments/assets/0c24b7b2-7037-42f2-98a0-b439c33c83c7" />
 
-Contextra kombiniert Bedeutung, exakte Begriffe und Beziehungen. Jede Suchart deckt Fälle ab, die die anderen übersehen würden.
+Contextra kombiniert drei Suchverfahren. Jedes deckt Fälle ab, die die anderen übersehen würden.
 
-**Vektorsuche.** Passagen werden über Embeddings verglichen. Ein HNSW-Graph findet die nächsten Nachbarn auch in großen Beständen in Millisekunden. Die skalare Quantisierung (SQ8) speichert jede Dimension mit 8 statt 32 Bit, der Speicherbedarf der Vektoren sinkt dadurch auf ein Viertel. Für sehr große Bestände steht ein Out-of-Core-Index (DiskANN) bereit, der nicht vollständig im Arbeitsspeicher liegen muss. Binäre Quantisierung (RaBitQ) und filtergestützte Suche (Acorn) erweitern das Spektrum für spezielle Lasten.
+**Bedeutungssuche.** Findet Passagen mit gleichem Inhalt, auch wenn andere Wörter verwendet werden. Wer nach „Kündigungsfrist“ sucht, findet auch Abschnitte zur „Beendigung des Vertrags“. Die Suche bleibt auch in sehr großen Beständen schnell. Platzsparende Speicherverfahren reduzieren den Speicherbedarf deutlich, und für extrem große Bestände steht eine Variante bereit, die nicht vollständig im Arbeitsspeicher liegen muss.
 
-**Distanzberechnung in Hardware.** Kosinus-, Euklid- und Skalarproduktdistanz sind mit SIMD-Kernen für AVX2, AVX-512 und ARM NEON umgesetzt. Auf Systemen ohne diese Befehlssätze greift eine saubere Referenzimplementierung.
+**Begriffssuche.** Findet exakte Begriffe, Namen, Produktnummern und Zahlen und bewertet sie nach Häufigkeit und Seltenheit. Die deutsche Sprache wird berücksichtigt: Zusammengesetzte Wörter wie „Datenschutzfolgenabschätzung“ werden zerlegt, Umlaute vereinheitlicht und Füllwörter ignoriert. Lesende Zugriffe müssen nicht auf laufende Schreibvorgänge warten.
 
-**Volltextsuche.** BM25 bewertet Dokumente nach Termhäufigkeit und Seltenheit. Die Suche nutzt Block-Max-WAND, um unwichtige Trefferblöcke früh zu überspringen. Die deutsche Sprachbehandlung zerlegt Komposita wie *Datenschutzfolgenabschätzung*, normalisiert Umlaute und filtert Stoppwörter. Der invertierte Index arbeitet mit Snapshots, sodass Lesezugriffe nicht auf Schreibvorgänge warten.
+**Beziehungssuche.** Personen, Begriffe und Ereignisse bilden ein Netz aus Verbindungen. Contextra erkennt, welche Elemente rund um eine Frage relevant sind, und belegt Zusammenhänge mit nachvollziehbaren Pfaden. Auch Beziehungen, an denen mehr als zwei Parteien beteiligt sind, werden berücksichtigt.
 
-**Graphsuche.** Beziehungen zwischen Entitäten bilden einen Graphen, der kompakt in einer CSR-Struktur liegt. Personalisierter PageRank mit Forward-Push (nach Andersen, Chung und Lang) zeigt, welche Knoten rund um eine Frage relevant sind. Die Pfadsuche PathRAG sammelt mehrere begründete Pfade unter einem festen Knotenbudget. Diffusionsverfahren über Hyperkanten (APPRH, TL-HFD) erweitern die Suche auf Beziehungen, die mehr als zwei Entitäten verbinden.
+**Themengruppen.** Zusammengehörige Begriffe werden automatisch zu Wissensbereichen gruppiert. Häufig gemeinsam genutzte Verbindungen werden gestärkt, und das System erkennt, wenn ein Themenbereich zerfällt.
 
-**Gemeinschaften im Wissen.** Community-Erkennung gruppiert zusammengehörige Begriffe. Perkolationsschwellen zeigen, wann ein Teilgraph zerfällt, und dynamisches Kanten-Reinforcement stärkt Beziehungen, die oft gemeinsam genutzt werden.
+**Zusammenführung der Ergebnisse.** Die Trefferlisten der drei Verfahren werden gewichtet zu einer gemeinsamen Rangliste verschmolzen. Passagen, die über mehrere Wege gleichzeitig auftauchen, erhalten einen Bonus. Die Länge der Ergebnisliste wird als echtes Budget behandelt und nicht nur als feste Grenze.
 
-**Rangfusion.** Die Ergebnisse der Suchwege werden mit gewichteter Reciprocal Rank Fusion (RRF) verschmolzen. Varianten wie mRRF passen die Gewichte an den Abstand zwischen den Treffern an. Ein Resonanz-Bonus belohnt Passagen, die über mehrere Kanäle gleichzeitig auftauchen. Der Ansatz DiBud behandelt die Länge der Ergebnisliste als echtes Budget, statt sie nur als feste Schwelle zu nutzen.
-
-**Kalibrierung.** Rohwerte werden in verlässliche Wahrscheinlichkeiten überführt, mit isotonischer Regression (PAVA), Platt-Skalierung oder konformer Vorhersage. Konforme Verfahren liefern Konfidenzbereiche mit einer statistischen Garantie für endliche Stichproben. Ein Drift-Monitor beobachtet die Verteilung der Scores zur Laufzeit und meldet, wenn sie sich verschiebt.
+**Verlässliche Vertrauenswerte.** Rohwerte der Suche werden in belastbare Wahrscheinlichkeiten umgerechnet. Statistische Verfahren liefern zudem Vertrauensbereiche mit mathematisch abgesicherter Garantie. Ein Überwachungsmodul meldet, wenn sich die Qualität der Ergebnisse im laufenden Betrieb verschiebt.
 
 ---
 
-### 2. Autonome Agenten und Gedächtnis
+### 2. Gedächtnis für KI-Agenten
 
 <img width="2752" height="1536" alt="agentic" src="https://github.com/user-attachments/assets/87780e2a-54bb-492f-817b-df9f0d67c1c3" />
 
-Ein Agent braucht ein Gedächtnis, das er pflegt, verdichtet und wieder hervorholt. Contextra stellt dafür eine einfache Oberfläche bereit und darunter die Mechanik, die lange Läufe zuverlässig macht.
+Ein KI-Agent braucht ein Gedächtnis, das er pflegt, verdichtet und gezielt abruft. Contextra bietet dafür eine einfache Oberfläche und im Hintergrund die Technik, die lange Arbeitsläufe zuverlässig macht.
 
-**Gedächtnis in vier Operationen.** `remember` speichert eine Erinnerung mit optionalen Metadaten. `recall` findet relevante Erinnerungen zu einer Frage. `relate` verbindet zwei Erinnerungen, und `forget` entfernt sie kontrolliert. Die Suchwege, die Rangfusion und die Kalibrierung bleiben dabei im Hintergrund.
+**Vier einfache Operationen.**
 
-**Ausführung in Schritten.** Ein Agentenlauf folgt dem Zyklus Checkpoint, Ausführung, Commit und Audit. Vor jedem Schritt entsteht automatisch ein Zustandsabbild. Scheitert ein Schritt, kehrt der Agent deterministisch zum letzten gültigen Zustand zurück.
+| Operation | Wirkung |
+|---|---|
+| `remember` | Speichert eine Erinnerung, optional mit Zusatzinformationen |
+| `recall` | Ruft relevante Erinnerungen zu einer Frage ab |
+| `relate` | Verknüpft zwei Erinnerungen miteinander |
+| `forget` | Entfernt Erinnerungen kontrolliert |
 
-**Begrenzung von Kosten und Schleifen.** Ein Token-Budget begrenzt Verbrauch und Anzahl der Schritte. So endet ein Agent auch dann, wenn er sich verrennt.
+Suche, Zusammenführung und Vertrauensbewertung laufen dabei automatisch im Hintergrund.
 
-**Verdichtung statt Überlauf.** Lange Dialoge und Verläufe werden über Strategien wie Kürzen, Zusammenfassen oder selektives Behalten verdichtet. Ein Kontext-Scratchpad erlaubt dem Agenten, Zwischenstände zu bearbeiten und bei Teilzielen zu leeren. Jede Änderung wird protokolliert.
+**Ausführung in gesicherten Schritten.** Ein Agentenlauf folgt dem Zyklus Sicherungspunkt, Ausführung, Übernahme und Protokollierung. Vor jedem Schritt entsteht automatisch ein Abbild des Zustands. Scheitert ein Schritt, kehrt der Agent zuverlässig zum letzten gültigen Zustand zurück.
 
-**Konsolidierung.** Beinahe-Duplikate werden erkannt und zusammengeführt. Schiebefenster-Clustering findet thematische Gruppen. Ein Transitivitäts-Veto verhindert, dass zwei Erinnerungen allein wegen einer Kette von Ähnlichkeiten verschmolzen werden.
+**Begrenzung von Kosten und Endlosschleifen.** Ein Budget begrenzt Verbrauch und Anzahl der Schritte. Ein Agent endet dadurch auch dann, wenn er sich verrennt.
 
-**Aggregation nach LeanRAG.** Die dritte Stufe von LeanRAG gruppiert Wissen mit einem Gauß-Mischmodell, bereinigt Typen und erzeugt übergeordnete Knoten. Große Wissensnetze bleiben dadurch überschaubar.
+**Verdichtung statt Überlauf.** Lange Dialoge werden gekürzt, zusammengefasst oder selektiv behalten. Ein Notizbereich erlaubt dem Agenten, Zwischenstände zu bearbeiten und bei Teilzielen zu leeren. Jede Änderung wird protokolliert.
 
-**Nachvollziehbarkeit.** Jeder Agentenschritt und jede Änderung am Gedächtnis hinterlässt eine Spur, die sich später nachvollziehen lässt.
+**Aufräumen und Zusammenführen.** Doppelte oder nahezu gleiche Erinnerungen werden erkannt und zusammengeführt. Eine Schutzregel verhindert, dass unterschiedliche Inhalte allein wegen einer Kette ähnlicher Einträge verschmolzen werden. Übergeordnete Wissensknoten halten auch große Wissensbestände überschaubar.
+
+**Nachvollziehbarkeit.** Jeder Agentenschritt und jede Änderung am Gedächtnis hinterlässt eine Spur, die sich später prüfen lässt.
 
 ---
 
-### 3. Adaptive Steuerung und Modellauswahl
+### 3. Adaptive Modellauswahl
 
 <img width="2752" height="1536" alt="routing" src="https://github.com/user-attachments/assets/d792ecc5-2744-4010-b258-f9011030ad81" />
 
-Nicht jede Anfrage verdient dasselbe Modell. Contextra lernt aus den Ergebnissen, welches Modell für welche Art von Frage am besten passt, und hält die Auslastung der Modellpools im Gleichgewicht.
+Nicht jede Anfrage verdient dasselbe KI-Modell. Einfache Fragen brauchen kein teures Spitzenmodell, anspruchsvolle schon. Contextra lernt aus den Ergebnissen, welches Modell für welche Art von Anfrage am besten passt.
 
-**Kontextuelle Bandits.** LinUCB wählt je Anfrage das Modell mit dem besten Erwartungswert. Die Matrixaktualisierung nach Sherman-Morrison hält die Berechnung schnell, und ein sketchbasierter Ansatz reduziert den Speicherbedarf bei vielen Kontexten.
+**Lernende Auswahl.** Das System wählt je Anfrage das Modell mit dem besten erwarteten Ergebnis. Der Rechenaufwand bleibt auch bei vielen unterschiedlichen Anfragearten gering.
 
-**Umgang mit Veränderung.** Flow-Corrected Thompson Sampling gleicht Leistungsdrift aus, wenn sich die Güte eines Modells über die Zeit ändert. Regularisierungsinduzierte Exploration (RIE-Greedy) sorgt dafür, dass neue oder selten genutzte Modelle eine faire Chance bekommen.
+**Umgang mit Veränderung.** Verändert sich die Leistung eines Modells, passt sich die Auswahl an. Neue oder selten genutzte Modelle erhalten bewusst eine faire Chance, sich zu bewähren.
 
-**Latenzregelung.** Ein PID-Regler passt die Größe der Modellpools an eine Zielantwortzeit an. Eine Anti-Windup-Logik verhindert, dass der Regler bei Lastspitzen überreagiert.
+**Steuerung der Antwortzeit.** Die Kapazität der Modelle wird so geregelt, dass eine vorgegebene Antwortzeit eingehalten wird. Bei Lastspitzen reagiert die Regelung besonnen und schwingt nicht über.
 
-**Gleichgewicht und Abklingen.** Ein Homöostat hält die Auslastung der Pools in einem Korridor. Ein Decay-Controller lässt Erinnerungen mit einer Halbwertszeit verblassen, die sich an der Auslastung des Systems orientiert. Ein Lyapunov-basiertes Kriterium überwacht die Stabilität der Regelung.
+**Gleichgewicht und Vergessen.** Die Auslastung der Modelle wird in einem stabilen Bereich gehalten. Erinnerungen verblassen über die Zeit, und das Tempo orientiert sich an der Auslastung des Systems. Die Stabilität der gesamten Regelung wird mathematisch überwacht.
 
 ---
 
@@ -141,49 +154,49 @@ Nicht jede Anfrage verdient dasselbe Modell. Contextra lernt aus den Ergebnissen
 
 <img width="2752" height="1536" alt="security" src="https://github.com/user-attachments/assets/2c02271c-171c-4256-92fc-d43a4b98623d" />
 
-Wissen ist wertvoll, und sein Abfluss hat Folgen. Contextra schützt an den Stellen, an denen Daten die Maschine verlassen könnten, und dokumentiert, was dabei geschieht.
+Wissen ist wertvoll, und sein Abfluss hat Folgen. Contextra schützt an den Stellen, an denen Daten das System verlassen könnten, und dokumentiert, was dabei geschieht.
 
-**Erkennung personenbezogener Daten.** Regelbasierte und wortlistengestützte Verfahren erkennen IBAN, E-Mail-Adressen und weitere Kennungen in Texten.
+**Erkennung personenbezogener Daten.** Kennungen wie IBAN und E-Mail-Adressen werden in Texten automatisch erkannt.
 
-**Ersetzen statt Weitergeben.** Sensible Werte werden vor einer Modellanfrage durch deterministische Platzhalter ersetzt. Die Antwort des Modells wird danach zurückübersetzt, sodass der Nutzer das vollständige Ergebnis erhält, das Modell aber nie den Originalwert sieht.
+**Platzhalter statt Originalwerte.** Vor einer Modellanfrage werden sensible Werte durch Platzhalter ersetzt. Nach der Antwort werden die Originalwerte wieder eingesetzt. Der Anwender erhält das vollständige Ergebnis, das Modell sieht die Originalwerte nie.
 
-**Ausgangskontrolle.** Ein k-NN-Wächter vergleicht ausgehende Inhalte mit geschützten Referenzen. Ein Detektor für Massenabfluss erkennt ungewöhnlich große Datenmengen in kurzer Zeit, auch wenn jede einzelne Anfrage unauffällig wirkt.
+**Ausgangskontrolle.** Ausgehende Inhalte werden gegen geschützte Referenzen geprüft. Ein Frühwarnsystem erkennt ungewöhnlich große Datenmengen in kurzer Zeit, auch wenn jede einzelne Anfrage unauffällig wirkt.
 
-**Abwehr von Prompt-Injection.** Versteckte Anweisungen in Dokumenten werden über Muster und Phrasen erkannt und in Quarantäne gesetzt, bevor sie einen Agenten beeinflussen.
+**Schutz vor manipulierten Dokumenten.** Versteckte Anweisungen in Dokumenten, die einen Agenten fehlleiten sollen (sogenannte Prompt-Injection), werden erkannt und isoliert, bevor sie wirken.
 
-**Nachvollziehbare Änderungen.** Jede Änderung am Kontext wird in einem Audit-Protokoll festgehalten. Die Einträge sind mit BLAKE3 kryptografisch verkettet, sodass nachträgliche Manipulation auffällt.
+**Lückenloses Protokoll.** Jede Änderung am Wissensbestand wird festgehalten. Die Einträge sind kryptografisch verkettet, sodass nachträgliche Manipulationen auffallen.
 
-**Verschlüsselung.** Daten liegen auf dem Datenträger in AES-256-GCM-SIV. Schlüssel werden über eine hierarchische Ableitung mit Argon2id und HKDF erzeugt. Schlüsselmaterial wird nach Gebrauch aus dem Speicher gelöscht.
+**Verschlüsselung.** Alle gespeicherten Daten sind mit AES-256 verschlüsselt, einem anerkannten Industriestandard. Die Schlüssel werden über ein mehrstufiges Verfahren abgeleitet und nach Gebrauch aus dem Arbeitsspeicher gelöscht.
 
-**Speicherschutz.** Sensible Puffer werden mit `mlock` vor dem Auslagern auf die Festplatte geschützt. Flüchtige Werte im Arbeitsspeicher werden beim Verlassen ihres Gültigkeitsbereichs sicher überschrieben.
+**Speicherschutz.** Sensible Daten im Arbeitsspeicher werden vor dem Auslagern auf die Festplatte geschützt und beim Verlassen ihres Gültigkeitsbereichs sicher überschrieben.
 
-**Löschen durch Schlüsselvernichtung.** Wird der Schlüssel eines Dokuments vernichtet, sind seine verschlüsselten Daten dauerhaft unlesbar. Ein Neuaufbau des Index entfällt. Die Löschung läuft als nachvollziehbare Saga mit definierten Zuständen, einem Journal und einer Sperre für Lesezugriffe.
+**Löschen durch Schlüsselvernichtung.** Wird der Schlüssel eines Dokuments vernichtet, sind dessen Daten dauerhaft unlesbar. Der Bestand muss dafür nicht neu aufgebaut werden. Die Löschung läuft als nachvollziehbarer, mehrstufiger Vorgang mit Journal, und während der Löschung ist der Lesezugriff gesperrt.
 
-**Löschnachweis.** Über jede Löschung entsteht ein mit Ed25519 signierter Bericht. Er enthält Zeugen aus der Messung und lässt sich unabhängig prüfen. Beim Einspielen eines Backups bleiben bereits gelöschte Daten gelöscht. Die rechtliche Bewertung eines Löschvorgangs obliegt dem Betreiber.
+**Löschnachweis.** Über jede Löschung entsteht ein digital signierter Bericht, der sich unabhängig prüfen lässt. Beim Einspielen eines Backups bleiben bereits gelöschte Daten gelöscht. Die rechtliche Bewertung eines Löschvorgangs obliegt dem Betreiber.
 
-**Lizenzschicht und Vorlagen.** Ein Lizenz-Gate steuert freigeschaltete Funktionsringe. Ein Export erstellt ein Verzeichnis der Verarbeitungstätigkeiten nach Art. 30 DSGVO, und ein Generator liefert Vorlagen für Auftragsverarbeitungsverträge, die auf die technischen Garantien verweisen.
+**Unterstützung bei der DSGVO-Dokumentation.** Contextra kann ein Verzeichnis der Verarbeitungstätigkeiten nach Art. 30 DSGVO exportieren und liefert Vorlagen für Auftragsverarbeitungsverträge, die auf die technischen Schutzmaßnahmen verweisen. Ein Lizenzmodul steuert, welche Funktionsbereiche freigeschaltet sind.
 
 ---
 
-### 5. Speicher, Transaktionen und Isolation
+### 5. Zuverlässige Speicherung
 
 <img width="2752" height="1536" alt="storage" src="https://github.com/user-attachments/assets/4ac5cdb6-b731-4653-af1c-4435c670a7fc" />
 
-Ein Gedächtnis ist nur so verlässlich wie sein Speicher. Contextra baut auf einem Speicherkern im LSM-Stil auf, mit Transaktionen, Zeitbezug und sauberer Isolation.
+Ein Gedächtnis ist nur so verlässlich wie sein Speicher. Contextra setzt auf eine bewährte Speicherarchitektur mit Transaktionen, Zeitbezug und sauberer Trennung gleichzeitiger Zugriffe.
 
-**LSM-Speicherkern.** Schreibvorgänge landen zunächst in einer MemTable und werden später in unveränderlichen SSTables abgelegt. Hintergrund-Kompaktierung hält die Lesewege kurz. Zweistufige Bloom-Filter entscheiden meist ohne Festplattenzugriff, ob ein Schlüssel existiert.
+**Schneller und abgesicherter Speicherkern.** Schreibvorgänge werden zunächst im Arbeitsspeicher gesammelt und später dauerhaft abgelegt. Im Hintergrund wird der Bestand laufend aufgeräumt, damit Lesezugriffe schnell bleiben. Vorgeschaltete Filter klären meist ohne Festplattenzugriff, ob ein Eintrag existiert.
 
-**Write-Ahead-Log.** Jeder Schreibvorgang wird zuerst in ein crash-konsistentes Protokoll geschrieben. Die Einträge sind mit HMAC-Ketten gesichert, sodass Beschädigungen erkannt werden.
+**Absturzsicheres Protokoll.** Jeder Schreibvorgang wird zuerst in ein Protokoll geschrieben, das gegen Beschädigung gesichert ist. Fehler werden dadurch erkannt.
 
-**Atomare Gruppenschreibungen.** Beliebig viele Einträge werden unter einer gemeinsamen Transaktionsnummer in einem Block festgeschrieben. Die Haltbarkeit lässt sich pro Batch fein einstellen.
+**Alles oder nichts.** Beliebig viele Einträge werden in einer gemeinsamen Transaktion übernommen. Wie streng die Dauerhaftigkeit gesichert wird, lässt sich je Vorgang einstellen.
 
-**Serializable Snapshot Isolation.** Transaktionen laufen auf konsistenten Momentaufnahmen. Die Validierung erkennt Write-Skew und verhindert, dass zwei gleichzeitige Änderungen einander widersprechen. Ein SequenceLog und Read-Sets erfassen, was jede Transaktion gelesen und geschrieben hat.
+**Konsistenz bei gleichzeitigem Zugriff.** Jede Transaktion arbeitet auf einer konsistenten Momentaufnahme. Das System erkennt und verhindert Konflikte, bei denen sich zwei gleichzeitige Änderungen widersprechen würden.
 
-**Zeitreisen.** Contextra führt Transaktionszeit und fachliche Gültigkeitszeit getrennt. Abfragen lassen sich so stellen, wie das Wissen zu einem bestimmten Zeitpunkt aussah oder wie es für einen bestimmten Zeitraum galt.
+**Zeitreisen.** Contextra unterscheidet, wann etwas erfasst wurde und wann es fachlich galt. So lässt sich abfragen, welcher Wissensstand an einem bestimmten Datum vorlag oder was in einem bestimmten Zeitraum gültig war.
 
-**Sicherung und Wiederherstellung.** Checkpoints und Snapshots sichern den Bestand. Ein dauerhaftes Dateisystem-Layer schreibt Daten crash-sicher und synchronisiert sie auf den Datenträger.
+**Sicherung und Wiederherstellung.** Sicherungspunkte und Snapshots sichern den Bestand. Daten werden crash-sicher auf den Datenträger geschrieben.
 
-**Isolierte Werkzeuge.** Werkzeuge laufen in einer WebAssembly-Sandbox. Ein Fuel-Budget begrenzt Rechenschritte und Laufzeit, und Freigaben werden über Anfragen mit Risikobewertung gesteuert.
+**Abgeschottete Werkzeuge.** Zusätzliche Werkzeuge laufen in einer isolierten Umgebung mit festen Grenzen für Rechenaufwand und Laufzeit. Freigaben erfolgen über Anfragen mit Risikobewertung.
 
 ---
 
@@ -191,27 +204,36 @@ Ein Gedächtnis ist nur so verlässlich wie sein Speicher. Contextra baut auf ei
 
 <img width="2752" height="1536" alt="ingest" src="https://github.com/user-attachments/assets/18e529ac-5458-4d62-8dcb-48c962df873c" />
 
-Wissen kommt aus Dokumenten, und Antworten entstehen mit Modellen. Contextra verbindet beides und lässt sich in bestehende Werkzeuge einfügen.
+Wissen kommt aus Dokumenten, und Antworten entstehen mit KI-Modellen. Contextra verbindet beides und lässt sich in bestehende Werkzeuge einfügen.
 
-**Dokumentaufnahme.** PDF, DOCX, Markdown, E-Mail und weitere Formate werden formatbewusst gelesen. Das Chunking folgt der Struktur des Dokuments und ist deterministisch: derselbe Eingang ergibt immer dieselben Abschnitte.
+**Dokumentaufnahme.** PDF, Word, Markdown, E-Mails und weitere Formate werden formatbewusst gelesen. Die Gliederung folgt der Struktur des Dokuments und ist reproduzierbar.
 
-**Lokale Modelle.** Inferenz läuft direkt im Prozess über Candle mit GGUF-Modellen. Alternativ übernimmt ONNX Runtime Embeddings und Cross-Encoder-Reranking. Für Ollama-Server gibt es eine Anbindung mit Circuit-Breaker, der Ausfälle abfängt.
+**Lokale KI-Modelle.** Modelle laufen direkt im eigenen Programm. Alternativ kann ein eigener Modellserver (z. B. Ollama) angebunden werden. Fällt dieser aus, fängt eine Schutzschaltung den Fehler ab.
 
-**Wiederverwendung im KV-Cache.** Wiederkehrende Textanfänge teilen sich ihren Rechenstand über einen Präfixbaum. Mandanten bleiben dabei streng getrennt. Die Quantisierung nach KIVI reduziert den Speicherbedarf der Zwischenergebnisse.
+**Effiziente Wiederverwendung.** Wiederkehrende Textanfänge werden nur einmal berechnet und von mehreren Anfragen gemeinsam genutzt. Mandanten bleiben dabei strikt getrennt. Ein Kompressionsverfahren reduziert den Speicherbedarf zusätzlich.
 
-**Anfragen verstehen.** Ein LLM-gestützter Query-Rewriter formuliert Anfragen so um, dass sie in mehreren Schritten beantwortet werden können. Komplexe Fragen werden in Teilfragen zerlegt.
+**Verständnis komplexer Fragen.** Ein KI-gestützter Umformulierer zerlegt komplexe Fragen in Teilfragen, die schrittweise beantwortet werden.
 
-**Model Context Protocol.** Der MCP-Server macht Contextra für IDEs und Agentenumgebungen nutzbar, etwa für Claude Desktop, Cursor oder VS Code. Die Kommunikation läuft über JSON-RPC 2.0 über Standardeingabe und -ausgabe.
+**Anbindung an KI-Werkzeuge.** Über das Model Context Protocol (MCP) ist Contextra mit Anwendungen wie Claude Desktop, Cursor oder VS Code nutzbar.
 
-**Python.** Über PyO3 lässt sich Contextra aus Python heraus nutzen, ohne den Kern neu zu schreiben.
+**Python-Schnittstelle.** Bestehende Python-Anwendungen können Contextra direkt verwenden.
 
-**Ereignisgesteuerte Agenten.** Eine Dead-Letter-Queue fängt Ereignisse auf, die nicht verarbeitet werden konnten, sodass nichts verloren geht.
+**Keine verlorenen Ereignisse.** Ereignisse, die nicht verarbeitet werden konnten, werden gesondert festgehalten und können später nachbearbeitet werden.
 
 ---
 
-## Ein Beispiel
+## Ein Beispiel aus der Praxis
 
-Ein Gedächtnis in wenigen Zeilen. Die Suchwege, die Rangfusion und die Kalibrierung laufen im Hintergrund.
+Eine Anwaltskanzlei möchte, dass ein KI-Assistent Fragen zu internen Akten beantwortet, ohne dass Mandantendaten die Kanzlei verlassen.
+
+1. Akten (PDF, Word, E-Mails) werden in Contextra eingelesen und verschlüsselt gespeichert.
+2. Ein Mitarbeiter fragt: „Welche Fristen gelten im Fall Müller?“
+3. Contextra sucht gleichzeitig nach Inhalt, exakten Begriffen („Müller“, Aktenzeichen) und Zusammenhängen zwischen Personen und Ereignissen.
+4. Der Assistent erhält wenige, begründete Treffer samt Vertrauenswert. Personenbezogene Daten werden bei Bedarf durch Platzhalter ersetzt.
+5. Ist die Beleglage dünn, weist das System darauf hin.
+6. Wird ein Mandat beendet, löscht Contextra die zugehörigen Daten durch Schlüsselvernichtung und stellt einen signierten Löschnachweis aus.
+
+Für Entwickler genügen wenige Zeilen, um das Gedächtnis einzubinden:
 
 ```rust
 use contextra::{AgentMemory, ContextraBuilder};
@@ -232,36 +254,36 @@ let treffer = memory.recall("Systemprogrammiersprache", 5).await?;
 
 ---
 
-## Anwendungsfälle
+## Einsatzbereiche
 
-**Wissensassistent für Kanzleien und Verwaltungen.** Akten werden lokal durchsucht, Fristen und Zusammenhänge erkannt, und kein Dokument verlässt das Haus.
+**Wissensassistent für Kanzleien, Verwaltungen und Beratungen.** Akten werden lokal durchsucht, Fristen und Zusammenhänge erkannt, und kein Dokument verlässt das Haus.
 
-**Coding-Agenten mit Projektgedächtnis.** Der Agent behält Architekturentscheidungen, merkt sich frühere Fehler und setzt nach einem Abbruch an der richtigen Stelle fort.
+**Entwicklungsassistenten mit Projektgedächtnis.** Architekturentscheidungen und frühere Fehler bleiben erhalten, und die Arbeit wird nach einem Abbruch an der richtigen Stelle fortgesetzt.
 
-**Robotik und Edge-Geräte.** Ein Gerät ohne Netzverbindung behält Wissen über Orte, Abläufe und Ereignisse und entscheidet lokal.
+**Industrie, Robotik und Geräte ohne Netzverbindung.** Wissen über Orte, Abläufe und Ereignisse bleibt lokal verfügbar, Entscheidungen fallen direkt auf dem Gerät.
 
-**Medizinische und industrielle Systeme.** Datenschutz, Nachvollziehbarkeit und nachweisbares Löschen sind Teil der Architektur.
+**Gesundheitswesen und industrielle Systeme.** Datenschutz, Nachvollziehbarkeit und nachweisbares Löschen sind Teil der Architektur.
 
-**Forschung zur Suche.** Graph-, Vektor- und Volltextsuche lassen sich einzeln und zusammen vergleichen, mit denselben Daten und denselben Messwerten.
+**Kundenservice auf Basis geprüfter Quellen.** Antworten stützen sich auf belegte Treffer. Ist die Beleglage dünn, erkennt das System dies und gibt es zurück.
 
-**Wissensbasierter Kundenservice.** Antworten stützen sich auf geprüfte Treffer. Ist die Beleglage dünn, erkennt das System das und gibt es zurück.
+**Forschung zur Suche.** Bedeutungs-, Begriffs- und Beziehungssuche lassen sich einzeln und kombiniert vergleichen, mit denselben Daten und denselben Messwerten.
 
 ---
 
-## Bausteine im Überblick
+## Technische Eckdaten
 
-| Bereich | Bausteine |
+| Bereich | Merkmale |
 |---|---|
-| Suche | HNSW, SQ8, DiskANN, RaBitQ, Acorn, SIMD-Distanzen, BM25, Block-Max-WAND, deutsche Morphologie, Graph-PPR, PathRAG, APPRH, TL-HFD, Community-Erkennung |
-| Fusion und Kalibrierung | RRF, gewichtete RRF, mRRF, Resonanz-Bonus, DiBud, isotonische Regression, Platt-Skalierung, konforme Vorhersage, Drift-Monitor |
-| Gedächtnis und Agenten | AgentMemory, Checkpoints, Rollback, Token-Budget, Konsolidierung, Verdichtung, Scratchpad, LeanRAG, Transitivitäts-Veto |
-| Steuerung | LinUCB, FC-TS, RIE-Greedy, PID-Regler, Homöostat, Decay-Controller, Lyapunov-Kriterium |
-| Schutz | Erkennung personenbezogener Daten, Platzhalter-Vault, Ausgangsprüfung, Massenabfluss-Detektor, Prompt-Injection-Schutz, BLAKE3-Audit |
-| Verschlüsselung und Löschen | AES-256-GCM-SIV, Argon2id, HKDF, Schlüsselvernichtung, Löschsaga, Ed25519-Löschnachweis, Restore-Schutz, mlock, Zeroize |
-| Speicher | LSM-Baum, SSTables, Bloom-Filter, WAL mit HMAC, MVCC mit SSI, Zeitreisen, Checkpoints, dauerhaftes Dateisystem |
-| Isolation | WASM-Sandbox mit Fuel-Budget, Freigaben mit Risikobewertung |
-| Aufnahme und Modelle | PDF, DOCX, Markdown, E-Mail, Chunking, Candle, ONNX, Ollama, KV-Cache mit Präfixbaum, KIVI |
-| Integration | MCP-Server, Python-Bindings, Dead-Letter-Queue, Lizenz-Gate, Verarbeitungsverzeichnis, AVV-Vorlagen |
+| Betrieb | Vollständig lokal, ohne Cloud und ohne externen Dienst |
+| Entwicklung | Programmiersprache Rust, nutzbar aus Rust und Python |
+| Suche | Bedeutungs-, Begriffs- und Beziehungssuche mit gewichteter Zusammenführung und statistisch geprüften Vertrauenswerten |
+| Sprache | Deutsche Sprachverarbeitung inklusive Zerlegung zusammengesetzter Wörter |
+| Sicherheit | AES-256-Verschlüsselung, Erkennung personenbezogener Daten, manipulationssicheres Protokoll |
+| Löschung | Schlüsselvernichtung mit digital signiertem Nachweis |
+| Speicher | Transaktional, absturzsicher, mit Zeitreisen und Wiederherstellung |
+| Hardware | Beschleunigung auf x86 (AVX2, AVX-512) und ARM (NEON), Standardbetrieb auf allen anderen Systemen |
+| Integration | MCP-Server, Python-Schnittstelle, lokale Modelle, Ollama-Anbindung |
+| Compliance | Export des Verarbeitungsverzeichnisses (Art. 30 DSGVO), Vorlagen für Auftragsverarbeitungsverträge |
 
 ---
 

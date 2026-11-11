@@ -104,4 +104,22 @@ pub enum ErasureError {
     /// Vor Auslieferung eingeschränkter Daten ist zwingend ein Audit-Eintrag erforderlich (SPEC D-116, I-26).
     #[error("erasure-restricted: audit entry required before read")]
     RestrictedReadAuditRequired,
+
+    /// Unzulässiger Übergang in der Purge-Zustandsmaschine (WP-1 / WP-2).
+    #[error("purge-phase: illegal transition from {from:?} to {to:?}")]
+    PurgePhaseTransition {
+        /// Ausgangsphase.
+        from: crate::purge::PurgePhase,
+        /// Zielphase.
+        to: crate::purge::PurgePhase,
+    },
+
+    /// Fehler während einer spezifischen Purge-Phase (WP-1).
+    #[error("purge-phase-error during {phase:?}: {reason}")]
+    PurgePhaseError {
+        /// Betroffene Purge-Phase.
+        phase: crate::purge::PurgePhase,
+        /// Fehlerbegründung.
+        reason: String,
+    },
 }
