@@ -7,7 +7,8 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_types::{ContextraError, DocId, Result};
+use crate::types::DocId;
+use crate::error::{Result, VectorError};
 
 use super::batch::{
     get_neighbor_conns_in_batch, BatchContext, NeighborBacklink, PreparedInsert, SearchContext,
@@ -94,7 +95,7 @@ impl HnswIndexCore {
                     .fetch_add(1, Ordering::SeqCst)
                     + 1;
                 if current == target {
-                    return Err(ContextraError::Index(
+                    return Err(VectorError::Index(
                         "Fault injection: compute_insert simulated failure".into(),
                     ));
                 }
@@ -102,7 +103,7 @@ impl HnswIndexCore {
         }
 
         if vector.len() != self.cold.config.dimension {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Dimension mismatch: expected {}, got {}",
                 self.cold.config.dimension,
                 vector.len()
@@ -456,11 +457,11 @@ impl HnswIndexCore {
     /// vom aktuellen Entry-Point aus erreichbar sind.
     ///
     /// # Errors
-    /// Gibt [`ContextraError::Conflict`][contextra_types::ContextraError::Conflict]
+    /// Gibt [`VectorError::Conflict`][VectorError::Conflict]
     /// mit Fehlermeldung `"connectivity"` zurück, falls der Graph isolierte aktive Knoten
     /// aufweist oder kein Einstiegspunkt für vorhandene Knoten existiert.
     // ANCHOR[contextra-vector:HNSW-CHECK-CONNECTIVITY]
-    pub fn check_connectivity(&self) -> contextra_types::Result<()> {
+    pub fn check_connectivity(&self) -> Result<()> {
         let deleted = self.cold.deleted_nodes.read();
         let doc_map = self.hot.doc_to_node.read();
 
@@ -477,7 +478,7 @@ impl HnswIndexCore {
         let ep = match self.hot.get_entry_point() {
             Some(ep) if !deleted.contains(ep as u64) => ep,
             _ => {
-                return Err(contextra_types::ContextraError::Conflict(
+                return Err(VectorError::Conflict(
                     "connectivity: no valid entry point found for active nodes".to_string(),
                 ));
             }
@@ -525,7 +526,7 @@ impl HnswIndexCore {
 
         for &node_idx in &active_nodes {
             if !reachable.contains(&node_idx) {
-                return Err(contextra_types::ContextraError::Conflict(
+                return Err(VectorError::Conflict(
                     "connectivity: isolated active node unreachable from entry point".to_string(),
                 ));
             }

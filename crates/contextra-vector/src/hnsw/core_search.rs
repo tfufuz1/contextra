@@ -10,7 +10,8 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::atomic::Ordering;
 
-use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
+use crate::types::{DistanceMetric, DocId, ScoredDocument, MAX_SEARCH_K};
+use crate::error::{Result, VectorError};
 
 use super::adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 use super::arena::BacklinkTable;
@@ -185,13 +186,13 @@ impl HnswIndex {
         snapshot_seq: Option<u64>,
     ) -> Result<Vec<ScoredDocument>> {
         if let Some(ref err) = self.inner.cold.validation_error {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Invalid index configuration: {}",
                 err
             )));
         }
         if query.len() != self.inner.cold.config.dimension {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Expected dimension {}, got {}",
                 self.inner.cold.config.dimension,
                 query.len()
@@ -201,16 +202,16 @@ impl HnswIndex {
         if k == 0 {
             return Ok(Vec::new());
         }
-        if k > contextra_types::MAX_SEARCH_K {
-            return Err(ContextraError::invalid_input(format!(
+        if k > MAX_SEARCH_K {
+            return Err(VectorError::invalid_input(format!(
                 "Requested k ({k}) exceeds maximum allowed search limit ({}). \
                  Use Collection::query() with appropriate k bounds.",
-                contextra_types::MAX_SEARCH_K
+                MAX_SEARCH_K
             )));
         }
         for (i, &val) in query.iter().enumerate() {
             if !val.is_finite() {
-                return Err(ContextraError::invalid_input(format!(
+                return Err(VectorError::invalid_input(format!(
                     "Query vector element at index {i} is not finite (value: {val}). \
                      NaN/Inf values corrupt HNSW distance computation and heap ordering. \
                      Validate embedding outputs before search."
@@ -349,7 +350,7 @@ impl HnswIndex {
         let score = self.inner.connectivity_score();
         if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            let err = VectorError::ConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,
@@ -371,7 +372,7 @@ impl HnswIndex {
 
         for c in candidates.iter() {
             let node = nodes.get(c.index).ok_or_else(|| {
-                ContextraError::Index(format!("HNSW candidate node missing at index {}", c.index))
+                VectorError::Index(format!("HNSW candidate node missing at index {}", c.index))
             })?;
             if node.committed_tx == 0 {
                 continue;
@@ -398,7 +399,7 @@ impl HnswIndex {
                 if let VectorData::U8(v) = &node.vector {
                     let guard = self.inner.cold.quantizer.read();
                     let q = guard.as_ref().ok_or_else(|| {
-                        contextra_types::ContextraError::Index("Quantizer not trained".into())
+                        VectorError::Index("Quantizer not trained".into())
                     })?;
                     q.asymmetric_dist(query, v, self.inner.cold.config.distance_metric)?
                 } else {
@@ -413,12 +414,12 @@ impl HnswIndex {
                 DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
                 DistanceMetric::DotProduct => -final_dist,
                 other => {
-                    return Err(ContextraError::Index(format!(
+                    return Err(VectorError::Index(format!(
                         "Unsupported DistanceMetric variant in search_filtered(): {other:?}"
                     )));
                 }
             };
-            results.push(ScoredDocument::new(doc_id, score));
+            results.push(ScoredDocument::new(doc_id, score, final_dist));
         }
 
         if results.len() > k {
@@ -474,12 +475,12 @@ impl HnswIndex {
         policy.validate()?;
 
         if let Some(ref err) = self.inner.cold.validation_error {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Invalid index configuration: {err}"
             )));
         }
         if query.len() != self.inner.cold.config.dimension {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Expected dimension {}, got {}",
                 self.inner.cold.config.dimension,
                 query.len()
@@ -497,16 +498,16 @@ impl HnswIndex {
             ));
         }
 
-        if k > contextra_types::MAX_SEARCH_K {
-            return Err(ContextraError::invalid_input(format!(
+        if k > MAX_SEARCH_K {
+            return Err(VectorError::invalid_input(format!(
                 "Requested k ({k}) exceeds maximum allowed search limit ({}).",
-                contextra_types::MAX_SEARCH_K
+                MAX_SEARCH_K
             )));
         }
 
         for (i, &val) in query.iter().enumerate() {
             if !val.is_finite() {
-                return Err(ContextraError::invalid_input(format!(
+                return Err(VectorError::invalid_input(format!(
                     "Query vector element at index {i} is not finite (value: {val})."
                 )));
             }
@@ -705,12 +706,12 @@ impl HnswIndex {
                     DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
                     DistanceMetric::DotProduct => -final_dist,
                     other => {
-                        return Err(ContextraError::Index(format!(
+                        return Err(VectorError::Index(format!(
                             "Unsupported DistanceMetric variant in search_adaptive(): {other:?}"
                         )));
                     }
                 };
-                results.push(ScoredDocument::new(doc_id, score));
+                results.push(ScoredDocument::new(doc_id, score, final_dist));
             }
 
             if results.len() > k {
@@ -737,7 +738,7 @@ impl HnswIndex {
         let score = self.inner.connectivity_score();
         if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            let err = VectorError::ConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,

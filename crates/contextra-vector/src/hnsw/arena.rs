@@ -6,7 +6,7 @@
 
 //! Arena Allocator for HNSW neighbor lists and O(1) Backlink management.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{Result, VectorError};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -121,7 +121,7 @@ impl HnswArena {
     ) -> Result<usize> {
         let raw_capacity = (m * 2) + max_layer * m;
         if raw_capacity == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "Node connection capacity cannot be 0",
             ));
         }
@@ -246,7 +246,7 @@ impl HnswArena {
         let mut arena = self.arena.write();
 
         if ram_idx >= offsets.len() || ram_idx >= count_offsets.len() {
-            return Err(ContextraError::Index(format!(
+            return Err(VectorError::Index(format!(
                 "Invalid ram_idx {ram_idx} for backlink update"
             )));
         }

@@ -16,125 +16,7 @@ use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // SECTION Identifikatoren (DocId, TxId)
-
-// ANCHOR[contextra-vector:TYPES-DOCID]
-/// Dokumenten-Identifikator (64-Bit oder 128-Bit).
-///
-/// Unter dem Feature `docid-128` wird eine 128-Bit-ID verwendet, standardmäßig 64-Bit.
-#[cfg(not(feature = "docid-128"))]
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-#[repr(transparent)]
-pub struct DocId(pub u64);
-
-#[cfg(feature = "docid-128")]
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-#[repr(transparent)]
-pub struct DocId(pub u128);
-
-impl DocId {
-    /// Kleinstmöglicher Bezeichner.
-    pub const MIN: Self = Self(0);
-
-    /// Erstellt eine neue `DocId`.
-    #[cfg(not(feature = "docid-128"))]
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
-
-    #[cfg(feature = "docid-128")]
-    pub const fn new(id: u128) -> Self {
-        Self(id)
-    }
-
-    /// Gibt den inneren ganzzahligen Wert zurück.
-    #[cfg(not(feature = "docid-128"))]
-    pub const fn inner(&self) -> u64 {
-        self.0
-    }
-
-    #[cfg(feature = "docid-128")]
-    pub const fn inner(&self) -> u128 {
-        self.0
-    }
-
-    /// Erzeugt eine DocId aus einem Schlüssel-String via BLAKE3-Hashing.
-    // ANCHOR[contextra-vector:TYPES-DOCID-FROM-KEY]
-    pub fn from_key(key: &str) -> Result<Self, crate::error::VectorError> {
-        let hash = blake3::hash(key.as_bytes());
-        let bytes = hash.as_bytes();
-        #[cfg(not(feature = "docid-128"))]
-        {
-            let mut num_bytes = [0u8; 8];
-            num_bytes.copy_from_slice(&bytes[..8]);
-            Ok(Self(u64::from_le_bytes(num_bytes)))
-        }
-        #[cfg(feature = "docid-128")]
-        {
-            let mut num_bytes = [0u8; 16];
-            num_bytes.copy_from_slice(&bytes[..16]);
-            Ok(Self(u128::from_le_bytes(num_bytes)))
-        }
-    }
-}
-
-impl fmt::Display for DocId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DocId({})", self.0)
-    }
-}
-
-#[cfg(not(feature = "docid-128"))]
-impl From<u64> for DocId {
-    fn from(val: u64) -> Self {
-        Self(val)
-    }
-}
-
-#[cfg(feature = "docid-128")]
-impl From<u128> for DocId {
-    fn from(val: u128) -> Self {
-        Self(val)
-    }
-}
-
-// ANCHOR[contextra-vector:TYPES-TXID]
-/// Transaktions-Identifikator (64-Bit).
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
-#[repr(transparent)]
-pub struct TxId(pub u64);
-
-impl TxId {
-    /// Transaktion 0 (System/Baseline).
-    pub const SYSTEM: Self = Self(0);
-
-    /// Erstellt eine neue `TxId`.
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
-
-    /// Gibt den numerischen Wert zurück.
-    pub const fn as_u64(&self) -> u64 {
-        self.0
-    }
-}
-
-impl fmt::Display for TxId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TxId({})", self.0)
-    }
-}
-
-impl From<u64> for TxId {
-    fn from(val: u64) -> Self {
-        Self(val)
-    }
-}
+pub use contextra_ids::{DocId, TxId, TOMBSTONE_BIT};
 // !SECTION
 
 // SECTION Metriken & Suchergebnisse
@@ -180,8 +62,6 @@ impl ScoredDocument {
 /// Maximal zulässiges `k` für Nachbarschaftssuchen.
 pub const MAX_SEARCH_K: usize = 10_000;
 
-/// Bitmaske für Tombstone-Markierung in Sequenznummern.
-pub const TOMBSTONE_BIT: u64 = 1 << 63;
 // !SECTION
 
 // SECTION Umwelt-Abstraktionen (Clock, Rng, Metrics, Maintain)
@@ -228,6 +108,10 @@ pub trait Rng: Send + Sync {
     fn next_u64(&self) -> u64;
     /// Liefert ein gleichverteiltes `f64` im Intervall `[0.0, 1.0)`.
     fn next_f64(&self) -> f64;
+    /// Liefert eine normalisierte Zufallszahl `[0.0, 1.0)`.
+    fn next_unit_f64(&self) -> f64 {
+        self.next_f64()
+    }
 }
 
 /// Einfacher deterministischer SplitMix64 RNG.

@@ -3,7 +3,7 @@
 // INVARIANTEN: Scanner vertraut Tombstones nie — prüft tatsächliche Vektorbytes (f32/u8), Arena-Nachbarlisten, Freelisten & mmap.
 // NICHT-OFFENSICHTLICH: Positivkontrolle validiert, dass scan_index_content die Canary-Einheiten in der Session aufzeichnet.
 
-#![cfg(feature = "ports-compat")]
+#![cfg(any(feature = "workspace", feature = "ports-compat"))]
 
 use std::sync::Arc;
 

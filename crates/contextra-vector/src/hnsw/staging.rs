@@ -2,7 +2,8 @@
 // ZWECK: Autarke Abstraktion für Transaktions-Staging und Versionsprotokollierung (Inversion of Control).
 // INVARIANTEN: Zero-Panic Doctrine; isolierte Puffer-Verwaltung ohne feste Bindung an konkrete MVCC-Implementierungen.
 
-use contextra_types::{DocId, TxId};
+use crate::types::{DocId, TxId};
+use crate::error::{Result, VectorError};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -39,11 +40,11 @@ impl VectorTxBuffer {
     }
 
     /// Stages an operation into the transaction buffer.
-    pub fn stage(&self, tx: TxId, op: VectorStagingOp) -> contextra_types::Result<()> {
+    pub fn stage(&self, tx: TxId, op: VectorStagingOp) -> Result<()> {
         let mut guard = self.buffers.write();
         let ops = guard.entry(tx.inner()).or_default();
         if ops.len() >= self.capacity {
-            return Err(contextra_types::ContextraError::Conflict(
+            return Err(VectorError::Conflict(
                 "Staging buffer capacity exceeded for transaction".into(),
             ));
         }

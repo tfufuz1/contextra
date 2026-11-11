@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_types::DocId;
+use crate::types::DocId;
 
 use super::arena::{BacklinkTable, HnswArena};
 use super::types::{HnswIndexCore, HnswNode, VectorData};

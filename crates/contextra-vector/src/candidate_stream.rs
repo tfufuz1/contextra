@@ -1,3 +1,4 @@
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 // FILE-CONTEXT: On-demand candidate streaming for vector search.
 // ZWECK: Liefert Vector-Kandidaten in Batches à 16 (oder konfigurierbar) via geometrisches Nachladen.
 // INVARIANTEN: #![forbid(unsafe_code)], zero panic/unwrap, max_depth = MAX_SEARCH_K.

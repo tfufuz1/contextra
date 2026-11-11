@@ -54,6 +54,22 @@ pub enum VectorError {
     #[error("io error: {0}")]
     Io(String),
 
+    /// Speicher- oder Formatfehler.
+    #[error("storage error: {0}")]
+    Storage(String),
+
+    /// Konflikt bei Transaktions- oder Mutationsoperationen.
+    #[error("conflict: {0}")]
+    Conflict(String),
+
+    /// Gesuchtes Element oder Knoten nicht gefunden.
+    #[error("not found: {0}")]
+    NotFound(String),
+
+    /// Interner Triebwerks- oder Systemfehler.
+    #[error("internal error: {0}")]
+    Internal(String),
+
     /// Nicht unterstützte Fähigkeit der Index-Engine.
     #[error("unsupported capability: {0}")]
     Unsupported(String),
@@ -63,6 +79,31 @@ impl VectorError {
     /// Hilfsmethode zur Konstruktion von `InvalidInput`.
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
+    }
+
+    /// Hilfsmethode zur Konstruktion von `Index`.
+    pub fn index(msg: impl Into<String>) -> Self {
+        Self::Index(msg.into())
+    }
+
+    /// Hilfsmethode zur Konstruktion von `Storage`.
+    pub fn storage(msg: impl Into<String>) -> Self {
+        Self::Storage(msg.into())
+    }
+
+    /// Hilfsmethode zur Konstruktion von `Conflict`.
+    pub fn conflict(msg: impl Into<String>) -> Self {
+        Self::Conflict(msg.into())
+    }
+
+    /// Hilfsmethode zur Konstruktion von `NotFound`.
+    pub fn not_found(msg: impl Into<String>) -> Self {
+        Self::NotFound(msg.into())
+    }
+
+    /// Hilfsmethode zur Konstruktion von `Internal`.
+    pub fn internal(msg: impl Into<String>) -> Self {
+        Self::Internal(msg.into())
     }
 }
 

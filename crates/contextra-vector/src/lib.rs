@@ -44,7 +44,7 @@ pub mod casting;
 
 // ANCHOR[contextra-vector:ROOT-MOD-COMPAT]
 // Optionale Übergangsbrücke für contextra-ports und contextra-types.
-#[cfg(feature = "ports-compat")]
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 pub mod compat;
 
 // ANCHOR[contextra-vector:ROOT-MOD-CONTRACT]
@@ -79,6 +79,7 @@ pub mod quantize;
 pub mod acorn;
 // ANCHOR[contextra-vector:ROOT-MOD-STREAM]
 // Zero-Allocation Streaming von Such-Kandidaten.
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 pub mod candidate_stream;
 // ANCHOR[contextra-vector:ROOT-MOD-POOL]
 // Thread-Pool für rechenintensive Distanz- und Rebuild-Operationen.
@@ -97,6 +98,7 @@ pub mod quantize_rabitq;
 // !SECTION
 
 // SECTION Öffentliche Re-Exports
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
 pub use contract::{
@@ -116,7 +118,7 @@ pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
     )
 )]
 #[allow(deprecated)]
-#[cfg(feature = "ports-compat")]
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 pub use hnsw::{hnsw_purger, hnsw_scanner, HnswPurger, HnswScanner};
 pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
 pub use persistence::{HnswHeader, MmapIndex};

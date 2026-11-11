@@ -3,7 +3,8 @@
 // INVARIANTEN: Zero-Panic, keine Zufallsquellen/Systemzeit (deterministisch).
 // NICHT-OFFENSICHTLICH: Bricht Suche ab, sobald sich die Top-k-Kandidaten über das Konvergenzfenster stabilisieren.
 
-use contextra_types::{ContextraError, DocId, Result};
+use crate::types::DocId;
+use crate::error::{Result, VectorError};
 
 /// Configuration policy for adaptive ef_search (Ada-ef).
 #[derive(Debug, Clone, PartialEq)]
@@ -30,27 +31,27 @@ impl AdaptiveEfPolicy {
         stability_threshold: f32,
     ) -> Result<Self> {
         if min_ef == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "min_ef must be greater than 0",
             ));
         }
         if max_ef < min_ef {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "max_ef must be greater than or equal to min_ef",
             ));
         }
         if !growth_factor.is_finite() || growth_factor <= 1.0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "growth_factor must be a finite float greater than 1.0",
             ));
         }
         if convergence_window == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "convergence_window must be greater than 0",
             ));
         }
         if !stability_threshold.is_finite() || !(0.0..=1.0).contains(&stability_threshold) {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "stability_threshold must be a finite float in range [0.0, 1.0]",
             ));
         }
@@ -66,28 +67,28 @@ impl AdaptiveEfPolicy {
     /// Validates policy invariants.
     pub fn validate(&self) -> Result<()> {
         if self.min_ef == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "min_ef must be greater than 0",
             ));
         }
         if self.max_ef < self.min_ef {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "max_ef must be greater than or equal to min_ef",
             ));
         }
         if !self.growth_factor.is_finite() || self.growth_factor <= 1.0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "growth_factor must be a finite float greater than 1.0",
             ));
         }
         if self.convergence_window == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "convergence_window must be greater than 0",
             ));
         }
         if !self.stability_threshold.is_finite() || !(0.0..=1.0).contains(&self.stability_threshold)
         {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "stability_threshold must be a finite float in range [0.0, 1.0]",
             ));
         }

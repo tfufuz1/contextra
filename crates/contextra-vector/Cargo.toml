@@ -14,9 +14,11 @@ ring = "0"
 klasse = "A"
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-mvcc = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-contextra-mvcc = { workspace = true, optional = true }
 contextra-simd = { workspace = true, optional = true }
 contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
@@ -32,23 +34,25 @@ thiserror = { workspace = true }
 blake3 = { workspace = true }
 
 [features]
-default = ["std", "ports-compat"]
+default = ["std", "workspace"]
 std = []
+workspace = [
+    "dep:contextra-ports",
+    "dep:contextra-types",
+    "dep:contextra-sys",
+    "mmap",
+]
+ports-compat = ["workspace"]
+types-compat = ["workspace"]
 simd = ["dep:contextra-simd", "contextra-simd?/serde"]
 serde = []
 tracing = []
 inspect = []
 experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
-mmap = []
+mmap = ["dep:contextra-sys"]
 diskann = ["experimental-diskann"]
 quantize-rabitq = ["experimental-rabitq"]
-ports-compat = [
-    "dep:contextra-ports",
-    "dep:contextra-types",
-    "dep:contextra-mvcc",
-    "dep:contextra-sys",
-]
-docid-128 = []
+docid-128 = ["contextra-ids/docid-128"]
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []

@@ -44,11 +44,11 @@ pub mod sq8_bias;
 // SECTION Kompatibilitäts-Exporte (Transitional Bridge)
 
 #[allow(deprecated)]
-#[cfg(feature = "ports-compat")]
-pub use purge::{hnsw_purger, HnswPurger};
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
+pub use self::purge::{hnsw_purger, HnswPurger};
 #[allow(deprecated)]
-#[cfg(feature = "ports-compat")]
-pub use scanner::{hnsw_scanner, HnswScanner};
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
+pub use self::scanner::{hnsw_scanner, HnswScanner};
 // !SECTION
 
 // SECTION Private & Interne Module

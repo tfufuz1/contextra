@@ -2,7 +2,7 @@
 // ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - NodeRecord-Format.
 // INVARIANTEN: Zero-Panic bei Deserialisierung.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{Result, VectorError};
 
 /// Represents a node's metadata in the flat file.
 #[derive(Debug, Clone, Copy)]
@@ -24,42 +24,42 @@ impl NodeRecord {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < Self::SIZE {
-            return Err(ContextraError::Storage("NodeRecord bytes too small".into()));
+            return Err(VectorError::Storage("NodeRecord bytes too small".into()));
         }
         #[cfg(not(feature = "docid-128"))]
         let doc_id = u64::from_le_bytes(
             bytes
                 .get(0..8)
-                .ok_or_else(|| ContextraError::Storage("Invalid doc_id offset".into()))?
+                .ok_or_else(|| VectorError::Storage("Invalid doc_id offset".into()))?
                 .try_into()
-                .map_err(|_| ContextraError::Storage("Invalid doc_id bytes".into()))?,
+                .map_err(|_| VectorError::Storage("Invalid doc_id bytes".into()))?,
         );
         #[cfg(feature = "docid-128")]
         let doc_id = u128::from_le_bytes(
             bytes
                 .get(0..16)
-                .ok_or_else(|| ContextraError::Storage("Invalid doc_id offset".into()))?
+                .ok_or_else(|| VectorError::Storage("Invalid doc_id offset".into()))?
                 .try_into()
-                .map_err(|_| ContextraError::Storage("Invalid doc_id bytes".into()))?,
+                .map_err(|_| VectorError::Storage("Invalid doc_id bytes".into()))?,
         );
 
         let doc_id_bytes = std::mem::size_of_val(&doc_id);
         let max_layer = *bytes
             .get(doc_id_bytes)
-            .ok_or_else(|| ContextraError::Storage("Invalid max_layer offset".into()))?;
+            .ok_or_else(|| VectorError::Storage("Invalid max_layer offset".into()))?;
         let vector_offset = u64::from_le_bytes(
             bytes
                 .get(doc_id_bytes + 1..doc_id_bytes + 9)
-                .ok_or_else(|| ContextraError::Storage("Invalid vector_offset offset".into()))?
+                .ok_or_else(|| VectorError::Storage("Invalid vector_offset offset".into()))?
                 .try_into()
-                .map_err(|_| ContextraError::Storage("Invalid vector_offset bytes".into()))?,
+                .map_err(|_| VectorError::Storage("Invalid vector_offset bytes".into()))?,
         );
         let connections_offset = u64::from_le_bytes(
             bytes
                 .get(doc_id_bytes + 9..doc_id_bytes + 17)
-                .ok_or_else(|| ContextraError::Storage("Invalid connections_offset offset".into()))?
+                .ok_or_else(|| VectorError::Storage("Invalid connections_offset offset".into()))?
                 .try_into()
-                .map_err(|_| ContextraError::Storage("Invalid connections_offset bytes".into()))?,
+                .map_err(|_| VectorError::Storage("Invalid connections_offset bytes".into()))?,
         );
         Ok(Self {
             doc_id,

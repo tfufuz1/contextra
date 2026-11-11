@@ -14,7 +14,7 @@ pub mod naive_reference;
 pub use gamma_augmentation::compute_gamma_edge_budget;
 pub use naive_reference::NaiveReferenceIndex;
 
-use contextra_types::DocId;
+use crate::types::DocId;
 // !SECTION
 
 // SECTION Trait & Fehler-Definitionen

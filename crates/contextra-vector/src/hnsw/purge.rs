@@ -3,7 +3,7 @@
 // INVARIANTEN: Zeroize von Vektoren (f32/u8) und Arena-Slots vor Slot-Freigabe; physische Bereinigung.
 // NICHT-OFFENSICHTLICH: Graph-Reparatur entfernt alle eingehenden/ausgehenden Kanten und wählt Entry-Point neu.
 
-#![cfg(feature = "ports-compat")]
+#![cfg(any(feature = "workspace", feature = "ports-compat"))]
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

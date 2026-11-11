@@ -8,7 +8,8 @@ use roaring::RoaringTreemap;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
-use contextra_types::{ContextraError, DocId, Result};
+use crate::types::DocId;
+use crate::error::{Result, VectorError};
 use parking_lot::{Mutex, RwLock};
 
 use super::arena::HnswArena;
@@ -152,22 +153,22 @@ impl HnswIndexCore {
     }
 
     /// Returns the metrics sink.
-    pub fn metrics_sink(&self) -> std::sync::Arc<dyn contextra_ports::MetricsSink> {
+    pub fn metrics_sink(&self) -> std::sync::Arc<dyn crate::types::MetricsSink> {
         self.cold.metrics_sink.read().clone()
     }
 
     /// Sets the metrics sink.
-    pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
+    pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn crate::types::MetricsSink>) {
         *self.cold.metrics_sink.write() = sink;
     }
 
     /// Returns the clock instance used by this index.
-    pub fn clock(&self) -> std::sync::Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> std::sync::Arc<dyn crate::types::Clock> {
         self.cold.clock.read().clone()
     }
 
     /// Sets the clock instance.
-    pub fn set_clock(&self, clock: std::sync::Arc<dyn contextra_ports::Clock>) {
+    pub fn set_clock(&self, clock: std::sync::Arc<dyn crate::types::Clock>) {
         *self.cold.clock.write() = clock;
     }
 }
@@ -233,9 +234,9 @@ pub struct HnswColdCore {
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
     pub compute_pool: crate::compute_pool::ComputePool,
-    pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
-    pub clock: RwLock<std::sync::Arc<dyn contextra_ports::Clock>>,
-    pub metrics_sink: RwLock<std::sync::Arc<dyn contextra_ports::MetricsSink>>,
+    pub rng: std::sync::Arc<dyn crate::types::Rng>,
+    pub clock: RwLock<std::sync::Arc<dyn crate::types::Clock>>,
+    pub metrics_sink: RwLock<std::sync::Arc<dyn crate::types::MetricsSink>>,
     pub last_rebuild_nanos: AtomicU64,
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
@@ -271,8 +272,8 @@ impl HnswIndex {
     // ANCHOR[contextra-vector:HNSW-NEW-RNG-CLOCK]
     pub fn try_new_with_rng_and_clock(
         config: HnswConfig,
-        rng: std::sync::Arc<dyn contextra_ports::Rng>,
-        clock: std::sync::Arc<dyn contextra_ports::Clock>,
+        rng: std::sync::Arc<dyn crate::types::Rng>,
+        clock: std::sync::Arc<dyn crate::types::Clock>,
     ) -> Result<Self> {
         config.validate()?;
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
@@ -317,7 +318,7 @@ impl HnswIndex {
                     rng,
                     clock: RwLock::new(clock),
                     metrics_sink: RwLock::new(std::sync::Arc::new(
-                        contextra_ports::NoopMetricsSink,
+                        crate::types::NoopMetricsSink,
                     )),
                     last_rebuild_nanos: AtomicU64::new(0),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
@@ -343,7 +344,7 @@ impl HnswIndex {
     /// Uses [`MonotonicCounterClock`] by default (never `SystemTime`).
     pub fn try_new_with_rng(
         config: HnswConfig,
-        rng: std::sync::Arc<dyn contextra_ports::Rng>,
+        rng: std::sync::Arc<dyn crate::types::Rng>,
     ) -> Result<Self> {
         let clock = std::sync::Arc::new(super::clock::MonotonicCounterClock::default());
         Self::try_new_with_rng_and_clock(config, rng, clock)
@@ -354,7 +355,7 @@ impl HnswIndex {
     /// Uses an internal, non-cryptographic, reproducible default RNG seeded with `DEFAULT_LAYER_SEED`
     /// and a deterministic [`MonotonicCounterClock`].
     pub fn try_new(config: HnswConfig) -> Result<Self> {
-        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        let rng = std::sync::Arc::new(crate::types::SeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
     }
 
@@ -363,7 +364,7 @@ impl HnswIndex {
         config: HnswConfig,
         _kernel: std::sync::Arc<dyn DistanceKernel>,
     ) -> Result<Self> {
-        let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
+        let rng = std::sync::Arc::new(crate::types::SeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
     }
 
@@ -375,9 +376,9 @@ impl HnswIndex {
         let validation_error = config.validate().err().map(|e| e.to_string());
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
         let ml = 1.0 / (config.m as f64).ln();
-        let rng: std::sync::Arc<dyn contextra_ports::Rng> =
-            std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
-        let clock: std::sync::Arc<dyn contextra_ports::Clock> =
+        let rng: std::sync::Arc<dyn crate::types::Rng> =
+            std::sync::Arc::new(crate::types::SeededRng::new(DEFAULT_LAYER_SEED));
+        let clock: std::sync::Arc<dyn crate::types::Clock> =
             std::sync::Arc::new(super::clock::MonotonicCounterClock::default());
         #[cfg(feature = "partial-index-rebuild")]
         let partial_rebuild_config = config.partial_rebuild_config.clone();
@@ -419,7 +420,7 @@ impl HnswIndex {
                     rng,
                     clock: RwLock::new(clock),
                     metrics_sink: RwLock::new(std::sync::Arc::new(
-                        contextra_ports::NoopMetricsSink,
+                        crate::types::NoopMetricsSink,
                     )),
                     last_rebuild_nanos: AtomicU64::new(0),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
@@ -464,28 +465,28 @@ impl HnswIndex {
     }
 
     /// Returns the metrics sink.
-    pub fn metrics_sink(&self) -> std::sync::Arc<dyn contextra_ports::MetricsSink> {
+    pub fn metrics_sink(&self) -> std::sync::Arc<dyn crate::types::MetricsSink> {
         self.inner.metrics_sink()
     }
 
     /// Sets the metrics sink.
-    pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) {
+    pub fn set_metrics_sink(&self, sink: std::sync::Arc<dyn crate::types::MetricsSink>) {
         self.inner.set_metrics_sink(sink);
     }
 
     /// Builder method to set the metrics sink.
-    pub fn with_metrics_sink(self, sink: std::sync::Arc<dyn contextra_ports::MetricsSink>) -> Self {
+    pub fn with_metrics_sink(self, sink: std::sync::Arc<dyn crate::types::MetricsSink>) -> Self {
         self.set_metrics_sink(sink);
         self
     }
 
     /// Sets the clock instance.
-    pub fn set_clock(&self, clock: std::sync::Arc<dyn contextra_ports::Clock>) {
+    pub fn set_clock(&self, clock: std::sync::Arc<dyn crate::types::Clock>) {
         self.inner.set_clock(clock);
     }
 
     /// Builder method to set the clock port.
-    pub fn with_clock(self, clock: std::sync::Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(self, clock: std::sync::Arc<dyn crate::types::Clock>) -> Self {
         self.set_clock(clock);
         self
     }
@@ -511,7 +512,7 @@ impl HnswIndex {
         self.inner.connectivity_score()
     }
 
-    pub fn check_connectivity(&self) -> contextra_types::Result<()> {
+    pub fn check_connectivity(&self) -> Result<()> {
         self.inner.check_connectivity()
     }
 
@@ -660,7 +661,7 @@ impl HnswIndex {
     }
 
     /// Returns the clock instance used by this index.
-    pub fn clock(&self) -> std::sync::Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> std::sync::Arc<dyn crate::types::Clock> {
         self.inner.clock()
     }
 
@@ -671,7 +672,7 @@ impl HnswIndex {
     pub fn wait_for_rebuild_blocking(
         &self,
         timeout: std::time::Duration,
-        clock: &dyn contextra_ports::Clock,
+        clock: &dyn crate::types::Clock,
     ) -> bool {
         self.inner.wait_for_rebuild_blocking(timeout, clock)
     }
@@ -734,19 +735,19 @@ impl HnswIndex {
                     .mmap
                     .get(offset..offset + dim * 4 * 2)
                     .ok_or_else(|| {
-                        ContextraError::Storage("Calibration segment out of bounds".into())
+                        VectorError::Storage("Calibration segment out of bounds".into())
                     })?;
 
                 for i in 0..dim {
                     let min_bytes = &cal_bytes[i * 4..(i + 1) * 4];
                     mins.push(f32::from_le_bytes(min_bytes.try_into().map_err(|_| {
-                        ContextraError::Storage("Invalid calibration min float".into())
+                        VectorError::Storage("Invalid calibration min float".into())
                     })?));
                 }
                 for i in 0..dim {
                     let max_bytes = &cal_bytes[(dim + i) * 4..(dim + i + 1) * 4];
                     maxes.push(f32::from_le_bytes(max_bytes.try_into().map_err(|_| {
-                        ContextraError::Storage("Invalid calibration max float".into())
+                        VectorError::Storage("Invalid calibration max float".into())
                     })?));
                 }
             } else {
@@ -802,7 +803,7 @@ impl HnswIndex {
 
         let temp_path = path_buf.with_extension("hnsw.tmp");
         let file = std::fs::File::create(&temp_path).map_err(|e| {
-            ContextraError::Storage(format!("Failed to create temporary HNSW file: {}", e))
+            VectorError::Storage(format!("Failed to create temporary HNSW file: {}", e))
         })?;
         let mut writer = std::io::BufWriter::new(file);
 
@@ -842,7 +843,7 @@ impl HnswIndex {
 
         writer
             .write_all(&header.to_bytes())
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| VectorError::Storage(e.to_string()))?;
 
         let mut node_records = Vec::with_capacity(node_count);
         for _ in 0..node_count {
@@ -856,7 +857,7 @@ impl HnswIndex {
         for record in &node_records {
             writer
                 .write_all(&record.to_bytes())
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                .map_err(|e| VectorError::Storage(e.to_string()))?;
         }
 
         let mut current_pos = vectors_offset;
@@ -870,14 +871,14 @@ impl HnswIndex {
                     for &val in v.iter() {
                         writer
                             .write_all(&val.to_le_bytes())
-                            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                            .map_err(|e| VectorError::Storage(e.to_string()))?;
                     }
                     current_pos += (v.len() * 4) as u64;
                 }
                 VectorData::U8(v) => {
                     writer
                         .write_all(v.as_slice())
-                        .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                        .map_err(|e| VectorError::Storage(e.to_string()))?;
                     current_pos += v.len() as u64;
                 }
             }
@@ -890,7 +891,7 @@ impl HnswIndex {
             let padding = [0u8; 4];
             writer
                 .write_all(&padding[..(connections_offset - current_pos) as usize])
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                .map_err(|e| VectorError::Storage(e.to_string()))?;
         }
 
         let mut conn_pos = connections_offset;
@@ -899,7 +900,7 @@ impl HnswIndex {
             let num_layers = (node.max_layer + 1) as u8;
             writer
                 .write_all(&[num_layers])
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                .map_err(|e| VectorError::Storage(e.to_string()))?;
             conn_pos += 1;
 
             for layer in 0..num_layers as usize {
@@ -909,11 +910,11 @@ impl HnswIndex {
                 let len = layer_conns.len() as u32;
                 writer
                     .write_all(&len.to_le_bytes())
-                    .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                    .map_err(|e| VectorError::Storage(e.to_string()))?;
                 for &conn in layer_conns.iter() {
                     writer
                         .write_all(&conn.to_le_bytes())
-                        .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                        .map_err(|e| VectorError::Storage(e.to_string()))?;
                 }
                 conn_pos += 4 + (len as u64) * 4;
             }
@@ -928,12 +929,12 @@ impl HnswIndex {
             for &m in &q.mins {
                 writer
                     .write_all(&m.to_le_bytes())
-                    .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                    .map_err(|e| VectorError::Storage(e.to_string()))?;
             }
             for &m in &q.maxes {
                 writer
                     .write_all(&m.to_le_bytes())
-                    .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                    .map_err(|e| VectorError::Storage(e.to_string()))?;
             }
         }
 
@@ -957,32 +958,32 @@ impl HnswIndex {
 
         writer
             .flush()
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| VectorError::Storage(e.to_string()))?;
         let mut file = writer.into_inner().map_err(|_| {
-            ContextraError::Storage("Failed to retrieve file from BufWriter".into())
+            VectorError::Storage("Failed to retrieve file from BufWriter".into())
         })?;
 
         file.seek(std::io::SeekFrom::Start(0))
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| VectorError::Storage(e.to_string()))?;
         file.write_all(&header.to_bytes())
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| VectorError::Storage(e.to_string()))?;
         file.seek(std::io::SeekFrom::Start(nodes_offset))
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| VectorError::Storage(e.to_string()))?;
         for record in &node_records {
             file.write_all(&record.to_bytes())
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                .map_err(|e| VectorError::Storage(e.to_string()))?;
         }
         file.sync_all()
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| VectorError::Storage(e.to_string()))?;
 
         std::fs::rename(&temp_path, &path_buf).map_err(|e| {
-            ContextraError::Storage(format!("Failed to rename temporary HNSW file: {}", e))
+            VectorError::Storage(format!("Failed to rename temporary HNSW file: {}", e))
         })?;
 
         if let Some(parent) = path_buf.parent() {
             if let Ok(parent_dir) = std::fs::File::open(parent) {
                 parent_dir.sync_all().map_err(|e| {
-                    ContextraError::Storage(format!(
+                    VectorError::Storage(format!(
                         "Failed to fsync parent directory after rename: {}",
                         e
                     ))

@@ -1,15 +1,18 @@
+use crate::types::DocId;
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 use contextra_ports::{VectorIndex, VectorIndexStats};
-use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
+use contextra_types::{ContextraError, Result, ScoredDocument, TxId};
 
 use super::batch::{BatchContext, SearchContext};
 use super::config::validate_vector;
 use super::sq8_bias::Sq8Bias;
 use super::types::{HnswIndex, HnswNode, SnapshotPinGuard, VectorData};
 
-#[cfg(feature = "ports-compat")]
+#[cfg(any(feature = "workspace", feature = "ports-compat"))]
 impl VectorIndex for HnswIndex {
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
         if let Some(ref err) = self.inner.cold.validation_error {
@@ -34,7 +37,7 @@ impl VectorIndex for HnswIndex {
                 doc_id: id,
                 embedding: embedding.to_vec(),
             },
-        )
+        ).map_err(Into::into)
     }
 
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
@@ -187,10 +190,10 @@ impl VectorIndex for HnswIndex {
             };
 
             let score = match self.inner.cold.config.distance_metric {
-                DistanceMetric::Cosine => 1.0 - final_dist,
-                DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
-                DistanceMetric::DotProduct => -final_dist,
-                other => {
+                crate::types::DistanceMetric::Cosine => 1.0 - final_dist,
+                crate::types::DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
+                crate::types::DistanceMetric::DotProduct => -final_dist,
+                                other => {
                     return Err(ContextraError::Index(format!(
                         "Unsupported DistanceMetric variant in search(): {other:?}"
                     )));
@@ -222,7 +225,7 @@ impl VectorIndex for HnswIndex {
         k: usize,
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<ScoredDocument>> {
-        self.search_filtered_internal(query, k, filter, None).await
+        self.search_filtered_internal(query, k, filter, None).await.map(|vec| vec.into_iter().map(|d| contextra_types::ScoredDocument { doc_id: d.doc_id, score: d.score }).collect()).map_err(Into::into)
     }
 
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
@@ -235,7 +238,7 @@ impl VectorIndex for HnswIndex {
         self.inner
             .cold
             .tx_buffer
-            .stage(tx, super::staging::VectorStagingOp::Delete { doc_id: id })
+            .stage(tx, super::staging::VectorStagingOp::Delete { doc_id: id }).map_err(Into::into)
     }
 
     async fn commit(&self, tx: TxId) -> Result<()> {
@@ -375,7 +378,7 @@ impl VectorIndex for HnswIndex {
         };
         let filter_fn = move |doc_id: DocId| -> bool { log.is_visible(doc_id, seq_no) };
         self.search_filtered_internal(query, k, Some(&filter_fn), Some(seq_no))
-            .await
+            .await.map(|vec| vec.into_iter().map(|d| contextra_types::ScoredDocument { doc_id: d.doc_id, score: d.score }).collect()).map_err(Into::into)
     }
 
     async fn rollback(&self, tx: TxId) -> Result<()> {
@@ -779,10 +782,10 @@ impl Index<ExternalId, [f32]> for HnswIndex {
 
             let final_dist = c.distance;
             let score = match self.inner.cold.config.distance_metric {
-                DistanceMetric::Cosine => 1.0 - final_dist,
-                DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
-                DistanceMetric::DotProduct => -final_dist,
-                _ => 1.0 / (1.0 + final_dist),
+                crate::types::DistanceMetric::Cosine => 1.0 - final_dist,
+                crate::types::DistanceMetric::Euclidean => 1.0 / (1.0 + final_dist),
+                crate::types::DistanceMetric::DotProduct => -final_dist,
+                                _ => 1.0 / (1.0 + final_dist),
             };
 
             results.push(ScoredPoint {
