@@ -4,8 +4,10 @@
 
 pub mod codec;
 pub mod file;
+pub mod flight;
 pub mod set;
 
 pub use codec::{decode_scope, encode_scope};
 pub use file::{load_scope_file, scope_file_path, store_scope_file};
+pub use flight::{ActiveScopeFlight, SingleFlightCoordinator};
 pub use set::{LayerScopeSet, ResolvedLayerScope};

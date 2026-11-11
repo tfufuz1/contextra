@@ -4,10 +4,12 @@
 
 pub mod cx;
 pub mod order;
+pub mod phase;
 pub mod reserve;
 pub mod window;
 
 pub use cx::PurgeCx;
+pub use phase::PurgePhase;
 pub use order::{LayerPurgeOrder, PurgePriority};
 pub use reserve::{check_disk_reserve, ReserveCheck};
 #[cfg(feature = "async")]

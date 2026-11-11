@@ -2,12 +2,14 @@
 //!
 //! Zusammenstellung, Kanonisierung und Signierung des Löschberichts.
 
+pub mod binding;
 pub mod build;
 pub mod canonical;
 pub mod risk;
 #[cfg(feature = "signing")]
 pub mod signing;
 
+pub use binding::{compute_witnesses_chain_hash, verify_witnesses_binding};
 pub use build::{
     build_report, build_report_with_options, canonicalize_report, ErasureReport,
     FieldMeasurementSection, LayerKeyCoverage, LayerWitnessReport, ProcessHardeningStatus,
