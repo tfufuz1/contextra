@@ -1,4 +1,7 @@
-// TODO(baukasten): Server-Dispatch rein protokollbasiert aufbauen; Tool-Registrierung über generischen Trait ToolHandler abstrahieren (AD-8).
+// =========================================================================
+// SECTION: server_dispatch
+// =========================================================================
+// ANCHOR[contextra-mcp:SERVER-DIS-001]
 use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse};
 use crate::server::McpServer;
 use serde_json::{json, Value};
