@@ -3,6 +3,15 @@
 //! Validiert das Zusammenwirken von `GaspValidator` (isotone Regression/Kalibrierung)
 //! und `execute_background_consolidation_with_rich_validator` zum Schutz vor Halluzinationen.
 
+
+// FILE-CONTEXT
+// ZWECK: Umfassende Pfadtests fuer Grounding-Validator-Integration.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Grounding-Validator Rich-Path Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -220,3 +229,4 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
         "Synthesis chunk must be discarded by rich GroundingValidator path due to calibration & PolicyViolation"
     );
 }
+// !SECTION: Grounding-Validator Rich-Path Tests

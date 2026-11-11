@@ -1,7 +1,7 @@
 //! # Kognitions-Engine (`contextra-cognition`)
 //!
 //! Die Crate `contextra-cognition` bildet die Kognitions- und Konsolidierungsschicht
-//! im Contextra-Workspace (historisch Ring 3, adaptiert nach Spezifikation §4/§5.2).
+//! im Contextra-Workspace (Ebene E2 nach Spezifikation docs/SPEC.md v3).
 //! Sie stellt Hintergrundprozesse für Gedächtniskonsolidierung (Memory Consolidation),
 //! Kontext-Kompaktierung (Context Compaction), semantische Aggregation (LeanRAG / Hyperedge Consolidation)
 //! und Wartungsplanung (Maintenance Scheduling) bereit.
@@ -37,6 +37,9 @@
 //                          deterministische Sortierung nach tenant_id und text_digest.
 #![forbid(unsafe_code)]
 
+// =========================================================================
+// SECTION: Modul-Deklarationen
+// =========================================================================
 pub mod error;
 pub mod ports;
 pub use error::CognitionError;
@@ -75,6 +78,11 @@ pub mod synthesis_phase;
 pub mod transitivity_veto;
 mod types_local;
 
+// !SECTION: Modul-Deklarationen
+
+// =========================================================================
+// SECTION: Oeffentliche Re-Exports
+// =========================================================================
 pub use aggregation_phase::{
     check_compaction_budget, compute_entity_community_hash, run_aggregation_pass,
     AggregationConfig, AggregationEdge, AggregationNode, AggregationPhaseResult, AlphaNode,
@@ -110,3 +118,4 @@ pub use memory_consolidation::{
 pub use semantic_aggregation_facade::consolidate_semantic_hyperedges;
 pub use synthesis_phase::run_synthesis_pass;
 pub use transitivity_veto::{filter_candidates_with_transitivity_veto, validate_transitivity_veto};
+// !SECTION: Oeffentliche Re-Exports

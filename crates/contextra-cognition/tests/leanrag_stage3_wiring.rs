@@ -3,6 +3,15 @@
 //! Validiert die Ausführung von `execute_leanrag_aggregation_stage` und
 //! das persistente Schreiben von synthetischen Super-Hyperkanten in den `CsrGraph`.
 
+
+// FILE-CONTEXT
+// ZWECK: Wiring- und Verknuepfungstests fuer LeanRAG Stage 3.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: LeanRAG Stage 3 Wiring Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -195,3 +204,4 @@ async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph()
         assert!(!edge.child_edge_ids.is_empty());
     }
 }
+// !SECTION: LeanRAG Stage 3 Wiring Tests

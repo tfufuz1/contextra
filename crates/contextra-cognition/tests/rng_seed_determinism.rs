@@ -3,6 +3,15 @@
 //! Validiert die bit-exakte Reproduzierbarkeit und Determinismus aller
 //! stochastischen Prozesse (Konsolidierung, Kompaktierung, GMM-Clustering).
 
+
+// FILE-CONTEXT
+// ZWECK: Determinismus- und Reproduzierbarkeitstests via SeededRng.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: RNG Seed Determinism Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -211,3 +220,4 @@ async fn test_aggregation_pass_seed_determinism() {
     assert_eq!(sink1.invalidations, sink2.invalidations);
     assert_eq!(sink1.super_edges, sink2.super_edges);
 }
+// !SECTION: RNG Seed Determinism Tests

@@ -3,6 +3,15 @@
 //! Zeigt die Initialisierung von `ContextManager`, `InMemoryCognitiveChannel`,
 //! Vorprüfung von Compaction-Budgets und Intake von vorverdichteten Segmenten.
 
+
+// FILE-CONTEXT
+// ZWECK: Beispiel fuer eigenstaendige Konsolidierungsausfuehrung.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Standalone Consolidation Example
+// =========================================================================
 use contextra_cognition::aggregation_phase::{check_compaction_budget, AggregationConfig};
 use contextra_cognition::channel::{CognitiveInputChannel, InMemoryCognitiveChannel};
 use contextra_cognition::context::ContextManager;
@@ -55,3 +64,4 @@ async fn main() -> Result<()> {
     println!("Baukasten-Demo erfolgreich beendet.");
     Ok(())
 }
+// !SECTION: Standalone Consolidation Example

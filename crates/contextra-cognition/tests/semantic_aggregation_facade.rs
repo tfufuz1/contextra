@@ -3,6 +3,15 @@
 //! Validiert die freie Fassadenfunktion `consolidate_semantic_hyperedges` zur
 //! Hyperkanten-Konsolidierung (LeanRAG Stage 3) unter Einhaltung von Budgetgrenzen und Seed-Determinismus.
 
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer die Fassadenschnittstelle der semantischen Aggregation.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Semantic Aggregation Facade Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -296,3 +305,4 @@ async fn test_consolidate_semantic_hyperedges_deterministic_seed() {
         "Identical inputs with identical gmm_deterministic_seed must produce bit-identical results"
     );
 }
+// !SECTION: Semantic Aggregation Facade Tests
