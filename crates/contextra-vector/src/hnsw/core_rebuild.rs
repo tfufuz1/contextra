@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// ZWECK: Index-Reorganisation (Rebuild Phase 1 & 2), Backoff-Cooldown und globale Konnektivitäts-Verifikation.
+// INVARIANTEN: Zero-Panic; deterministische Rekonstruktion (INV-INDEX-APPLY-1); Swap unter write_mutex (SSI-Determinismus).
+// HOTSPOTS: rebuild_sync_with_clock, rebuild_phase1_snapshot_and_build, rebuild_phase2_merge_and_swap, verify_full_connectivity
+// STAND: TS:2026-11-11T02:00:00Z
+
 use roaring::RoaringTreemap;
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
@@ -9,6 +15,8 @@ use super::batch::{PreparedInsert, SearchContext};
 use super::sq8_bias::Sq8Bias;
 use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
 use crate::distance::compute_distance_trusted;
+
+// SECTION Zeitstempel-Hilfsfunktionen
 
 fn get_last_rebuild_nanos(core: &HnswIndexCore) -> Option<u64> {
     let val = core.cold.last_rebuild_nanos.load(Ordering::Acquire);
@@ -22,8 +30,12 @@ fn get_last_rebuild_nanos(core: &HnswIndexCore) -> Option<u64> {
 fn set_last_rebuild_nanos(core: &HnswIndexCore, nanos: u64) {
     core.cold.last_rebuild_nanos.store(nanos, Ordering::Release);
 }
+// !SECTION
+
+// SECTION Rebuild-Status & Synchronisation
 
 impl HnswIndexCore {
+    // ANCHOR[contextra-vector:REBUILD-STATUS]
     pub fn rebuild_status(&self) -> RebuildStatus {
         if self.hot.rebuilding.load(Ordering::SeqCst) {
             RebuildStatus::Running
@@ -32,6 +44,7 @@ impl HnswIndexCore {
         }
     }
 
+    // ANCHOR[contextra-vector:REBUILD-WAIT-BLOCKING]
     pub fn wait_for_rebuild_blocking(
         &self,
         timeout: std::time::Duration,
@@ -71,13 +84,19 @@ impl HnswIndexCore {
     ) -> bool {
         self.wait_for_rebuild_blocking(timeout, clock)
     }
+}
+// !SECTION
 
+// SECTION Schicht- & Distanzauflösung
+
+impl HnswIndexCore {
     /// Assigns a random layer for node insertion using geometric distribution.
     ///
     /// Governance Rule P28 Compliance:
     /// Uhrzeit und Zufall im Produktionscode muessen ausschliesslich über injizierte
     /// Ports (`Rng` aus `contextra-ports`) bezogen werden. Diese Methode bezieht den
     /// Pseudozufallswert direkt ueber `self.cold.rng.read()`.
+    // ANCHOR[contextra-vector:REBUILD-RANDOM-LAYER]
     pub(super) fn random_layer(&self) -> usize {
         let r = self.cold.rng.next_unit_f64() as f32;
         let r_clamped = r.max(f32::EPSILON);
@@ -505,7 +524,12 @@ impl HnswIndexCore {
         }
         false
     }
+}
+// !SECTION
 
+// SECTION Vollständiger Rebuild & Regionaler Rebuild (Phase 1 & 2)
+
+impl HnswIndexCore {
     pub fn rebuild(&self) -> Result<()> {
         self.rebuild_sync()
     }
@@ -519,6 +543,7 @@ impl HnswIndexCore {
         self.rebuild_sync_with_clock(clock.as_ref())
     }
 
+    // ANCHOR[contextra-vector:REBUILD-SYNC-WITH-CLOCK]
     pub fn rebuild_sync_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
         let now_nanos = clock.monotonic_nanos();
         {
@@ -729,6 +754,7 @@ impl HnswIndexCore {
         Ok(())
     }
 
+    // ANCHOR[contextra-vector:REBUILD-PHASE1]
     fn rebuild_phase1_snapshot_and_build(&self) -> Result<(HnswIndex, u64)> {
         let (all_nodes, config, snapshot_tx) = {
             let nodes = self.hot.nodes.read();
@@ -854,6 +880,7 @@ impl HnswIndexCore {
     ///
     /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
     /// `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs`.
+    // ANCHOR[contextra-vector:REBUILD-PHASE2-SWAP]
     fn rebuild_phase2_merge_and_swap(&self, new_index: HnswIndex, snapshot_tx: u64) -> Result<()> {
         let _write_lock = self.hot.write_mutex.lock();
 
@@ -976,12 +1003,16 @@ impl HnswIndexCore {
         Ok(())
     }
 }
+// !SECTION
+
+// SECTION Globale Konnektivitätsprüfung & Maintain Trait
 
 impl HnswIndex {
     /// Führt Graphtraversierung durch zur Überprüfung von `INV-VEC-CONNECTIVITY-1`.
     ///
     /// Verifiziert, dass jeder lebende Knoten im Index vom Einstiegspunkt über
     /// Graphkanten erreichbar ist.
+    // ANCHOR[contextra-vector:REBUILD-VERIFY-CONNECTIVITY]
     pub fn verify_full_connectivity(&self) -> bool {
         let mmap_guard = self.inner.cold.mmap_index.read();
         let mmap_node_count = mmap_guard
@@ -1065,6 +1096,7 @@ impl HnswIndex {
     }
 }
 
+// ANCHOR[contextra-vector:REBUILD-IMPL-MAINTAIN]
 impl crate::types::Maintain for HnswIndex {
     fn compact(&self) -> crate::error::Result<()> {
         self.inner
@@ -1082,6 +1114,7 @@ impl crate::types::Maintain for HnswIndex {
         self.is_rebuild_required()
     }
 }
+// !SECTION
 
 #[cfg(test)]
 mod tests {
