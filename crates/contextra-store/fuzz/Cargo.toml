@@ -1,4 +1,3 @@
-
 [package]
 name = "contextra-store-fuzz" # <!-- crate-ref-ignore -->
 version = "0.0.0"
@@ -77,5 +76,23 @@ doc = false
 [[bin]]
 name = "fuzz_tenant_codec"
 path = "fuzz_targets/fuzz_tenant_codec.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_rollback_intent"
+path = "fuzz_targets/fuzz_rollback_intent.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_wal_hmac_chain"
+path = "fuzz_targets/fuzz_wal_hmac_chain.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_sstable_legacy_footer"
+path = "fuzz_targets/fuzz_sstable_legacy_footer.rs"
 test = false
 doc = false
