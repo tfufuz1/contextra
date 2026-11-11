@@ -10,15 +10,86 @@
 
 use contextra_mvcc::SequenceLogSsiValidator;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_env::MetricsSink;
-use contextra_testkit::{ManualClock, MetricEvent, TestMetricsSink};
-use parking_lot::RwLock;
+use contextra_env::{Clock, ManualClock, MetricsSink};
+use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
+
+#[derive(Debug, Clone, PartialEq)]
+enum MetricEvent {
+    Counter {
+        name: String,
+        value: u64,
+        labels: Vec<(String, String)>,
+    },
+    Gauge {
+        name: String,
+        value: f64,
+        labels: Vec<(String, String)>,
+    },
+    Histogram {
+        name: String,
+        value: f64,
+        labels: Vec<(String, String)>,
+    },
+}
+
+#[derive(Default)]
+struct LocalTestMetricsSink {
+    events: Arc<Mutex<Vec<MetricEvent>>>,
+}
+
+impl LocalTestMetricsSink {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn events(&self) -> Vec<MetricEvent> {
+        self.events.lock().clone()
+    }
+}
+
+impl MetricsSink for LocalTestMetricsSink {
+    fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
+        let labels_vec = labels
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        self.events.lock().push(MetricEvent::Counter {
+            name: name.to_string(),
+            value,
+            labels: labels_vec,
+        });
+    }
+
+    fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        let labels_vec = labels
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        self.events.lock().push(MetricEvent::Gauge {
+            name: name.to_string(),
+            value,
+            labels: labels_vec,
+        });
+    }
+
+    fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+        let labels_vec = labels
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        self.events.lock().push(MetricEvent::Histogram {
+            name: name.to_string(),
+            value,
+            labels: labels_vec,
+        });
+    }
+}
 
 // Prüft die Emission von Füllstands- und Coarsening-Gauges beim Überschreiten der 80 %-Schwelle.
 #[test]
 fn test_ssi_metrics_observability_threshold_and_coarsening() {
-    let test_sink = Arc::new(TestMetricsSink::new());
+    let test_sink = Arc::new(LocalTestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
         Arc::new(RwLock::new(test_sink.clone() as Arc<dyn MetricsSink>));
 
@@ -65,14 +136,14 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
 // Prüft die metrische Erfassung der Haltedauer überalterter Snapshot-Pins.
 #[test]
 fn test_ssi_metrics_observability_long_pin_duration() {
-    let test_sink = Arc::new(TestMetricsSink::new());
+    let test_sink = Arc::new(LocalTestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
         Arc::new(RwLock::new(test_sink.clone() as Arc<dyn MetricsSink>));
 
-    let clock = Arc::new(ManualClock::new(500_000_000_000));
+    let clock = Arc::new(ManualClock::new(500_000_000_000, 500_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
 
-    let now_nanos = clock.now_nanos();
+    let now_nanos = clock.now_unix_nanos();
     let past_350s_nanos = now_nanos.saturating_sub(350_000_000_000);
     let _guard = registry.register_at(42, past_350s_nanos);
 
@@ -106,7 +177,7 @@ fn test_ssi_metrics_observability_long_pin_duration() {
 // Prüft das unterbrechungsfreie Austauschen (Hot-Swap) des MetricsSink während des Betriebs.
 #[test]
 fn test_ssi_metrics_observability_hot_swap_consistency() {
-    let sink1 = Arc::new(TestMetricsSink::new());
+    let sink1 = Arc::new(LocalTestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
         Arc::new(RwLock::new(sink1.clone() as Arc<dyn MetricsSink>));
 
@@ -124,7 +195,7 @@ fn test_ssi_metrics_observability_hot_swap_consistency() {
     );
 
     // Swap the inner MetricsSink inside the RwLock container (simulating set_metrics_sink())
-    let sink2 = Arc::new(TestMetricsSink::new());
+    let sink2 = Arc::new(LocalTestMetricsSink::new());
     *sink_container.write() = sink2.clone() as Arc<dyn MetricsSink>;
 
     // Trigger metrics again after hot-swap

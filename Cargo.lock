@@ -1201,7 +1201,6 @@ dependencies = [
  "contextra-env",
  "contextra-ids",
  "contextra-ports",
- "contextra-testkit",
  "contextra-types",
  "criterion",
  "loom",

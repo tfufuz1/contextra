@@ -1,28 +1,30 @@
 # contextra-mvcc
 
-Multi-Version Concurrency Control (MVCC) und Serializable Snapshot Isolation (SSI).
+Multi-Version Concurrency Control (MVCC), Sequence Log, Snapshot-Registry und Serializable Snapshot Isolation (SSI).
 
 ## Zweck
-`contextra-mvcc` bietet deterministische Multi-Version Concurrency Control (SequenceLog, SnapshotRegistry, TxBuffer, ReadSet, SSI-Validator) für serielle Transaktionsisolation ohne Tokio-Laufzeitabhängigkeit.
+`contextra-mvcc` bietet deterministische Multi-Version Concurrency Control (`SequenceLog`, `SnapshotRegistry`, `TxBuffer`, `ReadSet`, `SequenceLogSsiValidator`) für serielle Transaktionsisolation ohne Async- oder Tokio-Laufzeitabhängigkeit.
 
-## Reifegrad
-- **Status:** Stabil (`stable`), autarker Kernbaustein.
-- **Sicherheitsstufe:** `#![forbid(unsafe_code)]`, Zero-Panic in Nicht-Test-Code.
+## Reifegrad & Qualität
+- **Status:** Stabil (`stable`), autarker Kernbaustein (Reifegrad R3).
+- **Sicherheitsstufe:** `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, Zero-Panic in Nicht-Test-Code.
 
-## Interne Abhängigkeiten
-`contextra-mvcc` hängt im Kern ausschließlich von minimalen Micro-Kernel-Crates ab:
+## Interne Abhängigkeiten (Kern)
+Laut `cargo tree -p contextra-mvcc -e normal --no-default-features`:
 - `contextra-ids`: Kanonische ID-Typen wie `TxId`, `DocId`, `TenantId`, `TOMBSTONE_BIT`.
-- `contextra-env`: Zeitabstraktion (`Clock`, `SystemClock`, `MetricsSink`).
+- `contextra-env`: Abstrakte Umgebungs-Schnittstellen (`Clock`, `SystemClock`, `MetricsSink`).
 - Optionale Workspace-Brücke (`workspace`, `ports-compat`, `types-compat`): `contextra-types`, `contextra-ports`.
 - Externe Abhängigkeiten: `ahash`, `bytes`, `parking_lot`, `serde`, `thiserror`, `tracing`.
 Keine Abhängigkeiten zu höheren Schichten (`store`, `vector`, `graph`, `engine`, `db`).
 
 ## Features
-- `default = ["workspace"]`: Kompatibilitätsbrücke für bestehende Workspace-Konsumenten.
+- `default = ["workspace"]`: Kompatibilitätsbrücke für bestehende Workspace-Konsumenten (`store`, `vector`, `engine`, `checkpoint`).
 - `workspace`: Aktiviert `contextra-types` und `contextra-ports` unter `compat/`.
+- `types-compat` / `ports-compat`: Abwärtskompatible Aliase für `workspace`.
+- `docid-128`: Propagiert 128-Bit DocId-Support an `contextra-ids`.
 - Für Standalone-Nutzung: `--no-default-features`.
 
-## Doctest
+## Quickstart (Doctest)
 ```rust
 use std::sync::Arc;
 use contextra_mvcc::{SnapshotRegistry, TxBuffer, ReadSet, SequenceLogSsiValidator, SsiValidator, IndexOp};
@@ -60,6 +62,6 @@ In `Cargo.toml` des Zielprojekts:
 contextra-mvcc = { path = "./contextra-mvcc", default-features = false }
 ```
 
-## Bekannte Grenzen
+## Bekannte Grenzen & IST-Verhalten
 - **In-Memory-Fokus:** `contextra-mvcc` speichert Transaktionszustände, ReadSets und Staging-Puffer flüchtig im Arbeitsspeicher (RAM). Persistente WAL- und SSTable-Verwaltung wird durch das Zusammenspiel mit dem Storage-Layer (`contextra-store`) sichergestellt.
-- **Speicherbegrenzung:** Bei Erreichen von 80 % der maximal getrackten Commit-Schlüssel (`DEFAULT_MAX_TRACKED_COMMIT_KEYS = 1.000.000`) schaltet der SSI-Validator auf konservatives Präfix-Coarsening um, um den Arbeitsspeicher zu begrenzen (0 % False Negatives, erhöhte Abort-Rate bei hohem Durchsatz).
+- **Speicherbegrenzung:** Bei Erreichen von 80 % der maximal getrackten Commit-Schlüssel (`DEFAULT_MAX_TRACKED_COMMIT_KEYS = 1.000.000`) schaltet der SSI-Validator auf konservatives Präfix-Coarsening um, um den Arbeitsspeicher zu begrenzen (0 % False Negatives, konservative Aborts bei hohem Durchsatz).

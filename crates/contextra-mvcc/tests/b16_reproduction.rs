@@ -75,14 +75,14 @@ fn test_b16_coarsening_prevents_false_negatives() {
 #[test]
 fn test_long_lived_snapshot_pin_blocker_alarm() {
     use contextra_mvcc::SnapshotRegistry;
-    use contextra_testkit::ManualClock;
+    use contextra_env::{Clock, ManualClock};
     use std::sync::Arc;
     use std::time::Duration;
 
-    let clock = Arc::new(ManualClock::new(400_000_000_000));
+    let clock = Arc::new(ManualClock::new(400_000_000_000, 400_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
 
-    let now_nanos = clock.now_nanos();
+    let now_nanos = clock.now_unix_nanos();
     let past_350s_nanos = now_nanos.saturating_sub(350_000_000_000);
 
     // Register a snapshot guard at 350s ago (> DEFAULT_MAX_PIN_DURATION of 300s)
