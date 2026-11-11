@@ -23,6 +23,7 @@
 // NICHT-OFFENSICHTLICH: Token-Schätzung nutzt CJK/Code-Aware Heuristiken ohne schwere Tokenizer-Crate Dependency.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
+// TODO(baukasten): Context Compaction Strategien (Truncate, Summary, Selective) implementieren (F8/WP-P3) um Spezifikationslücke zu schließen.
 //! Autonomous Context Management (WP-6.3).
 //!
 //! Proactively injects the most relevant context into the LLM working memory

@@ -19,6 +19,7 @@
 // SIEHE AUCH: crates/contextra-graph/src/csr.rs
 
 use crate::CsrGraph;
+// TODO(baukasten): Community Detection & Graph-Perkolation entkoppeln (AD-2/AD-4). Algorithmen müssen vollkommen autark ohne contextra-types funktionieren.
 use contextra_types::{EntityId, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

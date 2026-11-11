@@ -27,6 +27,7 @@
 //              Keine LLM-API-Aufrufe im Structural Consolidation Pass. Keine Abhängigkeit zu contextra-graph (P1-DAG-Integrität).
 // STAND: TS:2026-08-29T18:00:00Z
 
+// TODO(baukasten): Memory Consolidation Kernlogik (Near-Duplicate-Detection) isolieren (AD-8/F6). Reine Algorithmen arbeiten auf Vektor-Slices; Datenbank-Integration gehört in den Executor.
 //! Structural Consolidation Pass — deterministische, LLM-freie Bereinigung (Near-Duplicate-Detection, Sliding-Window-Clustering, verwaiste Kanten identifizieren). Analog zu Garbage Collection / Index Compaction.
 //!
 //! # Architektur-Hinweis (Generative Synthesis Pass vs. Structural Consolidation Pass)

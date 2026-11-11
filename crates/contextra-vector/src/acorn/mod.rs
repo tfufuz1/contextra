@@ -14,6 +14,7 @@ pub mod naive_reference;
 pub use gamma_augmentation::compute_gamma_edge_budget;
 pub use naive_reference::NaiveReferenceIndex;
 
+// TODO(baukasten): ACORN Predicate-Augmented HNSW entkoppeln (AD-2). DocId aus contextra-ids beziehen und Filter-Prädikate als generischen Trait kapseln.
 use contextra_types::DocId;
 // !SECTION
 
