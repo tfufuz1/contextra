@@ -18,7 +18,7 @@ S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionier
 
 | Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
 |---|---|---|---|---|---|
-| S-62 | `router`: `ports_local` weg (nach `mcp`-Umstellung), `wire` optional, `Vfs`-Stelle | S-01 | GL | Revert | ☐ offen |
+| S-62 | `router`: `ports_local` weg (nach `mcp`-Umstellung), `wire` optional, `Vfs`-Stelle | S-01 | GL | Revert | ☑ abgeschlossen (WP-RT-1) |
 
 ## 3. Reihenfolge-Zwang [S]
 
