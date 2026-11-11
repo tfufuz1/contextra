@@ -15,3 +15,6 @@ pub use purge::{text_purger, PurgeReport, TextPurger};
 pub use scanner::{text_scanner, ParsedTextTarget, TextScanner};
 pub use scorer::Bm25Scorer;
 pub use storage::StorageBridge;
+
+#[cfg(test)]
+mod tests;

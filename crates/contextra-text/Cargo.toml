@@ -7,7 +7,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version = "1.89"
-description = "Contextra — Text processing and BM25 search for Hybrid Search"
+description = "Contextra — BM25, Block-Max WAND, Inverted Index, Tokenizer and German Morphology for Hybrid Search"
+repository = "https://github.com/tfufuz1/contextra"
+readme = "README.md"
+keywords = ["bm25", "wand", "inverted-index", "tokenizer", "search"]
+categories = ["algorithms", "text-processing", "database-implementations"]
+# publish = false: Interner Baustein des Contextra-Ökosystems; kein öffentliches Crates.io-Release geplant.
+publish = false
 
 [package.metadata.contextra]
 ring = "0"

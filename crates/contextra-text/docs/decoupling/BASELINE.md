@@ -1,44 +1,36 @@
-# Baseline-Bericht contextra-text (S-32)
+# BASELINE.md — `contextra-text` Baseline-Befund
 
-## 1. Messungen Vorher (HEAD ca103a3c7)
+**Datum:** 2026-11-11
+**Commit:** HEAD (882aada72)
+**Rust-Version:** 1.89.0 (`rust-toolchain.toml`)
 
-- **Referenzen auf `types|ports|testkit` außerhalb `compat/` (G-D):** 67
-  - `wand.rs`: 20
-  - `error.rs`: 15
-  - `inverted/tests/mock.rs`: 10
-  - `types.rs`: 8
-  - `lib.rs`: 4 (im Test-Modul)
-  - `inverted/tests/search_tests.rs`: 4
-  - `inverted/index_struct.rs`: 2
-  - `inverted/tests/tx_tests.rs`: 2
-  - `stream.rs`: 1
-  - `posting_list.rs`: 1
-- **Referenzen innerhalb `compat/`:** 16 (in `scorer.rs` (6), `purge.rs` (3), `scanner.rs` (3), `morph_index.rs` (2), `storage.rs` (2))
-- **Gesamt-Referenzen in `src/`:** 83
+## 1. Ausgangsmessungen
 
-## 2. Nachweis des Hohlkerns
+| Befehl | Ergebnis | Dauer | Bemerkung |
+|---|---|---|---|
+| `cargo check -p contextra-text --all-targets --locked` | GRÜN | ~1s | 0 Fehler, Warnings bzgl. deprecated TextScanner/TextPurger in Tests |
+| `cargo test -p contextra-text --locked` | GRÜN (1 Flaky Test bei parallelem Gesamtlauf) | ~87s | `test_high_frequency_term_resident_index_performance` einzeln/wiederholt GRÜN |
+| `cargo check -p contextra-text --no-default-features --locked` | GRÜN | ~0.3s | Autarker Kern kompiliert fehlerfrei |
+| `cargo test -p contextra-text --test golden_oracle_tests` | GRÜN | 0.06s | 4 passed, 1 ignored (generate_golden_corpus), SHA256-Manifest verifiziert |
+| `cargo check --workspace --lib --bins --locked --keep-going` | 3211 Fehler-Zeilen in `/tmp/ws_lib_baseline.txt` | ~30s | Externe Baseline (bekannte rote Targets laut BUILD_REPARATUR.md) |
+| `cargo check --workspace --all-targets --locked --keep-going` | 23 sortierte Fehlerkategorien in `/tmp/ws_all_baseline.txt` | ~45s | Externe Baseline |
 
-In `crates/contextra-text/src/lib.rs` sind die zentralen Module:
-- `pub mod inverted;`
-- `pub mod stream;`
-- `pub mod wand;`
-- `pub mod compat;`
-mit `#[cfg(feature = "types-compat")]` gegatet.
+## 2. Brücken- und Modularitäts-Baseline
 
-Bei `cargo doc -p contextra-text --no-default-features --no-deps` erzeugt rustdoc 4 Warnungen über unaufgelöste Links:
-- `Bm25Scorer`
-- `TextIndex`
-- `InvertedIndex`
-- `Bm25CandidateStream`
-Ohne Default-Features fehlen dem Crate die Hauptfunktionalitäten des Invertierten Index und der WAND-Suche.
+- `tools/count_bridge_refs.py -c contextra-text`: 16 direkte Bridge-Refs außerhalb `compat/` (Hotspots: `src/inverted/tests/mock.rs`, `search_tests.rs`, `tx_tests.rs`).
+- `tools/gate_layering.py --crate contextra-text`: GRÜN (Exit 0).
+- `tools/zero_panic_analyzer.py --crate contextra-text`: 0 Prod-Panics.
+- `tools/unsafe_boundary_auditor.py --crate contextra-text`: 5 Unsafe-Vorkommen im Repo-Suchlauf (in `tests/alloc_profiler.rs`, im Kern `#![forbid(unsafe_code)]` strikt gesetzt).
 
-## 3. Kompilierungs- und Teststatus
+## 3. Golden Files
 
-- `cargo check -p contextra-text --no-default-features`: GRÜN
-- Feature-Matrix: alle 10 Features (`std`, `serde`, `tracing`, `inspect`, `experimental`, `workspace`, `types-compat`, `ports-compat`, `bm25f`, `docid-128`) bauen mit `--no-default-features --features <f>` sauber.
-- `cargo test -p contextra-text --no-default-features`: GRÜN (75 unittests, 1 doctest, alle Integrationstests).
-- `cargo test -p contextra-text` (mit Default-Features):
-  - Unit- und Integrationstests laufen.
-- Stand Workspace:
-  - `cargo check --workspace --all-targets --keep-going`: 2 Target-Fehler in `contextra-store` (`MemtableScanner.runtime` ungenutztes Feld unter lib und lib test).
-  - Konsumentenprüfung: `contextra-engine`, `contextra-agent` nutzen `contextra-text`.
+- `tests/golden/MANIFEST.sha256`:
+  - `bm25_ranking.json`
+  - `clock_reference.json`
+  - `doc_id.bin`
+  - `doc_id.json`
+  - `doc_key.bin`
+  - `posting_list_v2.bin`
+  - `tokenizer_default.json`
+  - `tokenizer_german.json`
+Alle SHA256-Prüfsummen und Invarianten stimmen überein.

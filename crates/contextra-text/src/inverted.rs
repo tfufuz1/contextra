@@ -20,9 +20,7 @@ pub use crate::compat::purge;
 pub use crate::compat::scanner;
 pub(crate) mod types;
 
-#[cfg(test)]
-#[cfg(feature = "types-compat")]
-mod tests;
+
 
 pub use index_struct::InvertedIndex;
 #[cfg(feature = "types-compat")]

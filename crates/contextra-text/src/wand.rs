@@ -234,6 +234,7 @@ pub struct WandSearchResult {
 
 // ANCHOR[contextra-text:WAND-008]
 #[allow(clippy::too_many_arguments)]
+/// Führt eine dynamisch geprunte Block-Max WAND Volltextsuche über den gegebenen Termen aus.
 pub async fn block_max_wand_search<S: PostingStore>(
     storage: &S,
     terms: &[String],

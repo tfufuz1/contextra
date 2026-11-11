@@ -34,9 +34,11 @@ pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 pub const BLOCK_SIZE: usize = 64;
 
 #[cfg(not(feature = "docid-128"))]
+/// Primitiver Rohdatentyp für Dokument-IDs im Postings-Format.
 pub type DocIdRaw = u64;
 
 #[cfg(feature = "docid-128")]
+/// Primitiver Rohdatentyp für 128-Bit Dokument-IDs im Postings-Format.
 pub type DocIdRaw = u128;
 
 // ANCHOR[contextra-text:POST-003]
@@ -69,6 +71,7 @@ pub struct Posting {
 
 impl Posting {
     #[inline]
+    /// Erzeugt einen neuen `Posting`-Eintrag.
     pub fn new(doc_id: DocId, tf: u32, doc_len: u32) -> Self {
         Self {
             doc_id: doc_id.inner() as _,
@@ -78,6 +81,7 @@ impl Posting {
     }
 
     #[inline]
+    /// Liefert die `DocId` dieses Eintrags.
     pub fn doc_id(&self) -> DocId {
         DocId::new(self.doc_id as _)
     }

@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 #![allow(deprecated)]
 #![deny(dead_code)]
 // FILE-CONTEXT: Layer 1 text search integration facade (contextra-text).
@@ -25,7 +26,7 @@
 //!   sowie Benchmarks (`contextra-bench`).
 //!
 //! # Haupttypen
-//! - [`Bm25Scorer`]: Öffentliche Fassade zur Anbindung an den Port [`TextIndex`].
+//! - `Bm25Scorer`: Öffentliche Fassade zur Anbindung an den Port `TextIndex` (unter Feature `workspace`).
 //! - [`InvertedIndex`]: Kern des persistenten invertierten Index mit MVCC-Snapshot-Isolation.
 //! - [`BM25`] & [`BM25F`]: Mathematische Scoring-Modelle für Dokument-Relevanz.
 //! - [`Bm25CandidateStream`]: Asynchroner Pull-Stream zur iterativen Ermittlung von Treffern.
