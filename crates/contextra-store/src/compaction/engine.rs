@@ -2,6 +2,10 @@
 //!
 //! Fuehrt das Zusammenfuehren ueberlappender SSTables durch und bereinigt alte Versionen.
 
+pub mod select;
+pub mod throttle;
+pub mod install;
+
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
@@ -476,18 +480,7 @@ impl CompactionEngine {
     /// Computes a conservative estimate taking into account candidate file sizes, block stream
     /// buffers, heap node structures, and in-memory deserialization overhead.
     pub(super) fn estimate_compaction_peak_bytes(&self, candidates: &[Arc<SstableReader>]) -> u64 {
-        let mut total_file_size: u64 = 0;
-        for candidate in candidates {
-            total_file_size += candidate.metadata().file_size;
-        }
-
-        // Base memory estimate for stream buffers and multi-way merge priority queue:
-        // Each stream buffers at least 1 block (BLOCK_SIZE = 4KB), plus heap structures and
-        // deserialized entry overhead (estimated as ~1.5x raw candidate file size).
-        let raw_overhead = (total_file_size as f64 * 1.5) as u64;
-        let min_stream_buffer = (candidates.len() as u64) * 4096 * 4;
-
-        raw_overhead + min_stream_buffer
+        select::estimate_compaction_peak_bytes(candidates)
     }
 
     /// Performs a multi-way merge of input SSTables into a single output SSTable.
@@ -651,14 +644,8 @@ impl CompactionEngine {
                 // PERF-3: System Pressure-Awareness
                 // Check pressure_rx at batch boundaries between merge iterations.
                 // Critical pressure level triggers a 50ms backpressure sleep delay to reduce NVMe / CPU contention.
-                if let Some(ref pressure_rx) = self.pressure_rx {
-                    let level = pressure_rx.borrow().pressure_level;
-                    if level == crate::system_pressure::PressureLevel::Critical {
-                        tracing::warn!("Compaction merge delayed due to Critical system pressure.");
-                        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                    } else if level == crate::system_pressure::PressureLevel::Elevated {
-                        tracing::debug!("Compaction merge active under Elevated system pressure.");
-                    }
+                if let Some(delay) = throttle::calculate_throttle_delay(self.pressure_rx.as_ref()) {
+                    tokio::time::sleep(delay).await;
                 }
 
                 // FIND-STO-002: Budgeted Compaction
@@ -914,11 +901,7 @@ impl CompactionEngine {
 
     /// Generates a unique SSTable file path using a monotonic counter.
     pub fn generate_sst_path(&self, data_path: &std::path::Path) -> Result<PathBuf> {
-        let seq = COMPACTION_SST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let count = self
-            .compaction_counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Ok(data_path.join(format!("sst-compact-{:020}-{:04}.sst", seq, count % 10000)))
+        install::generate_sst_path(data_path, &COMPACTION_SST_COUNTER, &self.compaction_counter)
     }
 
     /// Runs the background compaction loop.
