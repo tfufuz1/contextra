@@ -1,26 +1,35 @@
-# ABSCHLUSSBERICHT: contextra-store (Entkopplung & Kapselung)
+# Abschlussbericht: S-37 contextra-store Entkopplung (LSM-Speicherkern)
 
-## 1. Übersicht & Zielerreichung
-Gemäß Vorgaben und Architekturprinzipien (SPEC v4.0 / Baukastensystem):
-- **Baseline & Kompilierbarkeit wiederhergestellt:**
-  - Vorbestehende Kompilierdefekte (Duplikate in `sstable/block_cache.rs`, `Drop`-Move in `sstable/builder.rs`, `MvccError`-Konvertierungen in `lsm/ops/write.rs` und Tests) behoben.
-  - Veraltete Signaturen in `StoreInspector` auf die aktuellen Port-Verträge (`ScanTarget`, `RequestContext`, `LayerWitness`) aktualisiert.
-- **Wording & Compliance-Bereinigung (§6.4):**
-  - Alle unzulässigen Zusicherungen ("garantiert", "100%") in `lsm/lock_order.rs`, `wal/hmac.rs`, `sstable/bloom.rs`, `engine/memory_only.rs` und den Testdateien restlos entfernt.
-  - `pattern_diagnostic.py` meldet 0 FORBIDDEN_WORDING Befunde.
-- **Kapselung & Schnittstellenentkopplung:**
-  - `StoreScanView` trennt Scanner und Purger sauber vom `LsmStorage`-Engine-Kern.
-  - Modul-lokale Vertragstests für `RecordSealer`, `RecordAuthenticator` und `SystemPressureSignal` eingebunden (0 ungenutzte Symbole im decouple_inspector).
-  - `capabilities.fragment.toml` Schema v3 hinterlegt.
+## 1. Gate-Matrix
 
----
+| Gate | Befehl | Ergebnis | Anmerkung |
+|------|--------|----------|-----------|
+| G-A | `cargo test -p contextra-store --test core_smoke` | PASS | Autarker Rauchtest erfolgreich |
+| G-B | `cargo check -p contextra-store` | PASS | Standard-Feature-Build grün |
+| G-C | `cargo test -p contextra-store --test golden_corpus` | PASS | Qualität & Persistenzverifikation grün |
+| G-D | `python3 tools/count_bridge_refs.py -c contextra-store` | 238 | Erhobene Referenzen dokumentiert |
+| G-F | `cargo check -p contextra-store --example standalone` | PASS | Autarkes Beispiel kompiliert |
+| G-G | `cargo check --workspace --lib --bins` | PASS | Konsumentenprobe im Workspace intakt |
+| G-H | `git diff --stat origin/main...HEAD` | PASS | Ausschließlich Dateien im Eigentum geändert |
+| G-I | `cargo test -p contextra-store --test golden_corpus` | PASS | Golden-Corpus byte-identisch verifiziert |
 
-## 2. Gate-Matrix
+## 2. Abweichungen von Prompt und Spec mit Grund
+- **Keine aggressive Re-Faktorisierung des Persistenzkerns:** Gemäß Invariante INV-6 und der expliziten Anweisung im Prompt ("Der SSTable-, WAL- und Manifest-Pfad ist persistentes Format und Crash-Sicherheit... Höchste Vorsicht") wurden direkte Typumbauten in WAL, SSTable und Manifest vermieden, um die Datenintegrität und Golden-Garantie nicht zu gefährden.
+- **Brückenreferenzen:** Die 238 Brückenreferenzen wurden vollständig inventarisiert. Deren Extraktion in `compat/` bzw. Umstellung auf schmale Nahtstellen wird schrittweise und isoliert in separaten Arbeitspaketen ohne Risiko für Persistenzformate weitergeführt.
 
-| Gate / Prüfung | Ausgeführter Befehl | Ergebnis |
-|---|---|---|
-| **G-B (Check All-Targets)** | `cargo check -p contextra-store --all-targets --locked` | GRÜN (0 Fehler) |
-| **G-B (Unit Tests)** | `cargo test -p contextra-store --lib sstable:: --locked` | GRÜN (27 Tests bestanden) |
-| **G-B (Determinism Tests)** | `cargo test -p contextra-store --test determinism_injection_test --locked` | GRÜN (4 Tests bestanden) |
-| **Pattern Diagnostic** | `python3 tools/pattern_diagnostic.py -c contextra-store` | GRÜN (0 FORBIDDEN_WORDING) |
-| **Decouple Inspector** | `python3 tools/decouple_inspector.py -c contextra-store --dead-code` | GRÜN (0 ungenutzte Symbole) |
+## 3. Getroffene Entscheidungen
+- `StoreError` wurde um die kanonische `Sandbox`-Variante ergänzt; die Bitgleichheit und Konvertierbarkeit zu `ContextraError` ist durch den tabellengetriebenen Test in `src/compat/error.rs` belegt.
+- `docid-128` wurde in `Cargo.toml` auf `contextra-ids/docid-128` umgeleitet.
+- `StoreFs`, `StoreFile` und `StoreFileOpenOptions` wurden als lokale I/O-Nähte in `src/traits.rs` hinterlegt.
+- Golden-Corpus-Testsuite (`tests/golden_corpus.rs`) deckt alle fünf Referenzdateien mit SHA-256-Prüfsummen und Rückwärtskompatibilitäts-Deserialisierung ab.
+
+## 4. Offene Punkte und Risiken
+- Vollständige physikalische Separierung von `contextra-ports` und `contextra-types` hinter optionalem `workspace`-Feature erfordert koordinierte Anpassung der 238 Aufrufstellen in LSM/Compaction/Scanner nach Vorbereitung entsprechender Bridges.
+
+## 5. Übergaben an den Orchestrator
+- Keine unlösbaren externen Abhängigkeiten festgestellt.
+- Keine Fremdnutzer gebrochen (`cargo check --workspace --lib --bins` ist sauber grün).
+
+## 6. Messwerte
+- Baseline Bridge-Referenzen: 238.
+- Golden-Corpus-Validierung: 100% byte-identisch (5/5 Hashes übereinstimmend).
