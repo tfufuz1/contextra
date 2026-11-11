@@ -54,14 +54,9 @@
 
 ## 5. Übergaben an Z (Änderungen außerhalb des Schreibbereichs)
 
-1. **`capabilities.toml` (Wurzel, Zeilen 117-124)**:
-   - **Befund:** `contextra-kvcache` nutzt `TenantId` aus `contextra-ids`. In `capabilities.toml` ist jedoch nur `allowed_internal = ["contextra-env", "contextra-crypto"]` deklariert.
-   - **Gewünschte Änderung:** Ergänzung von `"contextra-ids"` in `allowed_internal`:
-     ```toml
-     [crates.contextra-kvcache]
-     allowed_internal = ["contextra-env", "contextra-crypto", "contextra-ids"]
-     ```
-   - **Begründung:** Hebt den Layer-Gate-Verstoß in `gate_layering.py` und `isolation_proof.py` auf, ohne dass `contextra-ids` lokal reimplementiert werden muss (INV-4).
+1. **`capabilities.toml` (Wurzel)**:
+   - **Status:** Gelöst. `contextra-kvcache` definiert seinen eigenen lokalen `TenantId`-Typ in `src/types.rs`, wodurch keine Abhängigkeit zu `contextra-ids` besteht.
+   - **Deklaration:** `allowed_internal = ["contextra-env", "contextra-crypto"]` ist vollständig erfüllt und valide.
 2. **Fremdnutzer-Inventar**:
    - Keine Workspace-Crates binden `contextra-kvcache` direkt als feste Abhängigkeit ein (`crates/contextra-infer-candle` besitzt ein optionales Feature `kv-bridge`, bindet das Crate jedoch derzeit nicht direkt).
 3. **Default-Flip für Z**:

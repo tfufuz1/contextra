@@ -2,8 +2,8 @@
     clippy::all,
     clippy::type_complexity,clippy::expect_used)]
 //! Standalone-Beispiel für `contextra-kvcache` (<= 30 Zeilen).
-use contextra_ids::TenantId;
 use contextra_kvcache::contract::{KvCacheEngine, MemoryKvCache};
+use contextra_kvcache::types::TenantId;
 use contextra_kvcache::radix::KvReusePolicy;
 use contextra_kvcache::segment::KvSegment;
 
