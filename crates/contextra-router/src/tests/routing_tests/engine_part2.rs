@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (engine_part2.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Tests für Kernfunktionen der RouterEngine (Teil 2)
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

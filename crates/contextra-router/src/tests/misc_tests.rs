@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (misc_tests.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Verschiedene zusätzliche Tests und Hilfstests
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).
