@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::radix::{KvReusePolicy, PrefixMatch};
 use crate::segment::KvSegment;
 use crate::store::TenantIsolatedKvStore;
-use contextra_ids::TenantId;
+use crate::types::TenantId;
 use std::sync::Arc;
 
 /// Minimaler Zeiterfassungs-Trait für das KV-Cache-Subsystem.

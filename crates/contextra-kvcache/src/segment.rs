@@ -323,8 +323,7 @@ impl std::fmt::Debug for KvSegment {
 mod tests {
     use super::*;
     #[cfg(feature = "kv-encryption")]
-    #[cfg(feature = "kv-encryption")]
-        use crate::kv_encryption::CryptoKey;
+    use crate::kv_encryption::{CryptoKey, KvSegmentCipher, ModelFingerprint};
 
     // Prüft, dass Daten im KvSegment beim Drop oder expliziten Zeroize genullt werden.
     #[test]
@@ -419,8 +418,9 @@ mod tests {
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"legacy version 0 plaintext payload";
 
+        let crypto_tenant = crate::kv_encryption::to_crypto_tenant(tenant);
         let encrypted_layer = cipher
-            .encrypt_with_version(tenant, 1, 0, fp.clone(), plaintext)
+            .encrypt_with_version(crypto_tenant, 1, 0, fp.clone(), plaintext)
             .unwrap();
         let ciphertext_copy = encrypted_layer.ciphertext.clone();
 

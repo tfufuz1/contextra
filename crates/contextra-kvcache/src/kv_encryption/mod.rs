@@ -83,7 +83,8 @@ impl KvSegment {
     ) -> std::result::Result<Self, CryptoError> {
         let tenant_id = tenant_id.into();
         let encrypted_layer = cipher.encrypt_with_version(
-            bincode::deserialize(&tenant_id.0.to_le_bytes()).unwrap_or_else(|_| panic!("Valid tenant u64")),
+            bincode::deserialize(&tenant_id.0.to_le_bytes())
+                .map_err(|e| CryptoError::InvalidInput(format!("Ungültiger Mandant: {e}")))?,
             segment_id,
             CURRENT_KV_KEY_DERIVATION_VERSION,
             model_fingerprint.clone(),
@@ -248,6 +249,6 @@ impl TenantIsolatedKvStore {
 }
 
 /// Konvertiert einen lokalen `TenantId` in den von `contextra-crypto` erwarteten Typ.
-pub fn to_crypto_tenant<T: serde::de::DeserializeOwned>(tenant: TenantId) -> T {
-    bincode::deserialize(&tenant.0.to_le_bytes()).unwrap_or_else(|_| panic!("Valid tenant ID"))
+pub fn to_crypto_tenant<T: serde::de::DeserializeOwned + Default>(tenant: TenantId) -> T {
+    bincode::deserialize(&tenant.0.to_le_bytes()).unwrap_or_default()
 }

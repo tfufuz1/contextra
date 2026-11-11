@@ -11,8 +11,8 @@
 //! Property-basierte Tests für `PrefixRadixTree` und Mandantenisolation (INV-KV-1).
 
 use std::collections::BTreeMap;
-use contextra_ids::TenantId;
 use contextra_kvcache::radix::{KvReusePolicy, PrefixRadixTree};
+use contextra_kvcache::types::TenantId;
 use proptest::prelude::*;
 
 fn naive_longest_prefix_match(

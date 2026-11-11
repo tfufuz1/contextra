@@ -15,8 +15,8 @@
 //! 2. Nach dem Shredden schlagen nachfolgende Entschlüsselungs- oder Verschlüsselungsoperationen fehl.
 //! 3. `KvSegment::as_bytes()` und Zeroize-Drop-Mechanik stellen sicher, dass Tensordaten gereinigt werden können.
 
-use contextra_ids::TenantId;
 use contextra_kvcache::segment::{KvSegment, ShreddableSegmentKey};
+use contextra_kvcache::types::TenantId;
 use zeroize::Zeroize;
 
 #[test]
