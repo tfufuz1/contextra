@@ -16,6 +16,7 @@
 //! For normalized vectors ($\|v\|_2 = 1$), the reconstructed Euclidean distance error is strictly bounded.
 
 use crate::distance::euclidean_distance_sq_f32_u8;
+// TODO(baukasten): SQ8-Quantisierung entkoppeln (AD-4/AD-5). Rückgabetypen auf Result<T, VectorError> umstellen und DistanceMetric aus contextra-simd beziehen statt aus contextra-types.
 use contextra_types::DistanceMetric;
 
 use serde::{Deserialize, Serialize};

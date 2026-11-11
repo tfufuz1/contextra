@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-tools/export_crate.py — Standalone Crate Exporter & Gate G3 Validator (SPEC v4.0 §7 / Gate G3).
+tools/export_crate.py — Standalone Crate Exporter & Gate G3 Validator (SPEC §8.5 / Gate G-L4).
 
 Zweck:
 - Exportiert ein Building-Block-Crate in ein isoliertes Verzeichnis.
 - Löst Workspace-Vererbung ([package] und [dependencies] mit workspace = true) dynamisch
   aus dem Root-Cargo.toml auf (inklusive Features wie derive bei serde).
 - Bereinigt workspace = true Lints und interne Abhängigkeiten für autarken Standalone-Build.
-- Führt `cargo check` im Export-Verzeichnis aus, um Copy-Paste-Readiness zu beweisen (G3).
+- Führt `cargo check` im Export-Verzeichnis aus, um Copy-Paste-Readiness zu beweisen (G3/G-L4).
 
 Bekannte Grenzen:
 - rust-toolchain.toml wird nicht automatisch mitkopiert (erfordert Standard Rust 1.89+).
 - Root-Lizenzdateien (LICENSE-MIT, LICENSE-APACHE) müssen im Crate lokal vorhanden sein.
 - [lints]-Tabellen aus dem Workspace werden im Standalone-Modus bereinigt, da kein Root existiert.
-- Bei Crates mit noch nicht entkoppelten internen Typen (wie contextra-rank vor Welle 1)
+- Bei Crates mit noch nicht entkoppelten internen Typen
   werden interne contextra-*-Abhängigkeiten im Standalone-Export ausgeklammert; solche Crates
-  bestehen Gate G3 vollständig erst nach Vollendung ihres Entkopplungspakets (SPEC §12).
+  bestehen Gate G3 vollständig erst nach Vollendung ihres Entkopplungspakets (SPEC §6).
 """
 
 from __future__ import annotations

@@ -12,6 +12,7 @@
 // ANCHOR[contextra-agent:budget-primitives]
 
 
+// TODO(baukasten): TokenBudget Seam deduplizieren (F4/AD-2). Harmonisierung mit zentralem Token-Budget-Typ bzw. klare Zuordnung als domänenneutraler Zähler.
 pub use contextra_types::types::budget::{
     BudgetStrategy, Reservation, ResourceBudget, ResourceTracker, TokenBudget,
 };

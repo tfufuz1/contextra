@@ -8,6 +8,7 @@ use roaring::RoaringTreemap;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
+// TODO(baukasten): Entkopplung von contextra-types und contextra-ports (F2/AD-4). HNSW-Kern muss vollständig autark auf contextra-ids::DocId, contextra-env::{Clock, Rng, MetricsSink} und lokalem VectorError basieren.
 use contextra_types::{ContextraError, DocId, Result};
 use parking_lot::{Mutex, RwLock};
 

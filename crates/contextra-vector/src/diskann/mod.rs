@@ -4,6 +4,7 @@
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
+// TODO(baukasten): DiskANN als eigenständiges Crate contextra-vector-diskann auslagern (AD-8/S-80) oder Port-Bindung strikt nach compat/ verschieben.
 pub(crate) mod build;
 pub(crate) mod config;
 pub(crate) mod filtered;

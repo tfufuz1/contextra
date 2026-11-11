@@ -27,6 +27,7 @@
 
 use crate::aggregation_phase::{AggregationConfig, AggregationNode};
 use crate::memory_consolidation::{cosine_similarity, detect_near_duplicates};
+// TODO(baukasten): Transitivity-Veto als eigenständige mathematische Invariante kapseln (AD-8). Null Kopplung an Aggregationsphasen-Pipeline.
 use crate::types_local::{DocId, EntityId};
 use ahash::{AHashMap, AHashSet};
 

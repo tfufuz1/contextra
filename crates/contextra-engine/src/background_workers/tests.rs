@@ -667,6 +667,7 @@ async fn test_decay_eviction_thresholds() {
     let decay_controller = AdaptiveDecayController::new(DecayControllerConfig {
         kappa: 2.0,
         base_half_life_tx: 1_000,
+        base_half_life_ms: None,
         eviction_threshold: 0.01,
     });
 

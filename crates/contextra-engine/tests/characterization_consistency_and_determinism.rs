@@ -50,21 +50,15 @@ fn test_fusion_determinism_and_tie_breaking() {
         SearchResult {
             id: "doc-b".to_string(),
             score: 0.9,
-            signals: vec![SignalContribution {
-                modality: "text".to_string(),
-                original_score: 0.9,
-                rrf_rank: 1,
-            }],
+            metadata: None,
+            matched_signals: vec!["text".to_string()],
             provenance: None,
         },
         SearchResult {
             id: "doc-a".to_string(),
             score: 0.9,
-            signals: vec![SignalContribution {
-                modality: "text".to_string(),
-                original_score: 0.9,
-                rrf_rank: 2,
-            }],
+            metadata: None,
+            matched_signals: vec!["text".to_string()],
             provenance: None,
         },
     ];
@@ -73,27 +67,21 @@ fn test_fusion_determinism_and_tie_breaking() {
         SearchResult {
             id: "doc-a".to_string(),
             score: 0.9,
-            signals: vec![SignalContribution {
-                modality: "vector".to_string(),
-                original_score: 0.9,
-                rrf_rank: 1,
-            }],
+            metadata: None,
+            matched_signals: vec!["vector".to_string()],
             provenance: None,
         },
         SearchResult {
             id: "doc-b".to_string(),
             score: 0.9,
-            signals: vec![SignalContribution {
-                modality: "vector".to_string(),
-                original_score: 0.9,
-                rrf_rank: 2,
-            }],
+            metadata: None,
+            matched_signals: vec!["vector".to_string()],
             provenance: None,
         },
     ];
 
     // Beide Dokumente erhalten identischen fusionierten RRF-Score
-    let fused = reciprocal_rank_fusion(&[set1, set2], 10);
+    let fused = reciprocal_rank_fusion(vec![set1, set2], 10);
     assert_eq!(fused.len(), 2);
     // Bei gleichem Score greift stabiler Tie-Break nach ID aufsteigend: "doc-a" vor "doc-b"
     assert_eq!(fused[0].id, "doc-a");

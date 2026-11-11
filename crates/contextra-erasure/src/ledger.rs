@@ -2,13 +2,17 @@
 //!
 //! Ledger-Einträge, Hash-Kette und In-Memory/Datei-Sink außerhalb des Datenverzeichnisses.
 
+pub mod durable;
 pub mod entry;
 pub mod persistent;
 pub mod sink;
+pub mod storage;
 
+pub use durable::{BatchRecordItem, ErasureLedger, LedgerAnchorProof};
 pub use entry::{LedgerEntry as ChainedLedgerEntry, GENESIS_HASH};
 pub use persistent::ErasureLedger;
 pub use sink::InMemoryLedger as FileLedger;
+pub use storage::{FileLedgerStorage, LedgerStorage, MemLedgerStorage};
 
 use crate::error::ErasureError;
 use crate::report::build::{build_report, ErasureReport};

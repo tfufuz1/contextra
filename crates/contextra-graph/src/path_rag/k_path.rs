@@ -12,6 +12,7 @@
 
 use crate::path_rag::{PathGraph, PathRAGEngine};
 use ahash::AHashSet;
+// TODO(baukasten): K-Path Algorithmus für Path-RAG entkoppeln (AD-2/AD-4). Reiner Graph-Pfadsuch-Algorithmus auf contextra-ids::EntityId und lokalem GraphError.
 use contextra_types::EntityId;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};

@@ -78,7 +78,11 @@ pub mod doubles {
     pub use crate::in_memory_text::InMemoryTextIndex;
     pub use crate::in_memory_vector::InMemoryVectorIndex;
     pub use crate::manual_clock::ManualClock;
-    pub use crate::mocks::*;
+    pub use crate::mocks::{
+        BudgetTruncatingContextPreparer, InMemoryKvBridgeStorage, InMemoryKvPrefixStore,
+        MockEmbedder, ScriptedAttentionExporter, ScriptedEgressPolicy, ScriptedHybridSearchProvider,
+        StaticCommunityResolver, StaticDriftStatusProvider, TestMetricsSink,
+    };
 }
 
 /// Baukasten-Zielmodul `fault`: Fehlerinjektion und Fehlersimulation (VFS, I/O, Crashes).
