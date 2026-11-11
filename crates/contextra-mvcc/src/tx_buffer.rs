@@ -1,4 +1,9 @@
+// ANCHOR[id=tx-buffer-module-root]
 //! # Transaktions-Puffer (`TxBuffer`) für das Staging von Index-Operationen
+//!
+//! LINK crates/contextra-mvcc/src/lib.rs
+//! LINK crates/contextra-mvcc/src/snapshot.rs
+//! LINK crates/contextra-mvcc/src/ssi.rs
 //!
 //! Der `TxBuffer` puffert Einfüge- und Löschoperationen aktiver Transaktionen vorübergehend
 //! im Hauptspeicher, bis die Transaktion entweder erfolgreich bestätigt (Commit / `drain`)
@@ -30,9 +35,6 @@
 // INVARIANTEN: Shard-Isolation per TxId; Niemals zwei Shards gleichzeitig sperren (Deadlock-Prävention); Bounded ReadSet via try_register_read.
 // HOTSPOTS: 110-380
 // NICHT-OFFENSICHTLICH: Orphan Reaper & min_read_snapshot führen getrennte Locks pro Shard 0..N-1 durch; keinesfalls verschachtelt.
-// SIEHE AUCH: crates/contextra-mvcc/src/ssi.rs
-
-// INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
 
 use crate::mvcc_error::{MvccError, Result};
 use crate::ssi::ReadSet;
@@ -45,6 +47,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+// SECTION Constants
+// ANCHOR[id=tx-buffer-constants]
 /// Fester Speicher-Overhead pro gepufferter Operation (32 Bytes).
 pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 
@@ -52,7 +56,6 @@ pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 32;
 pub const DEFAULT_SHARD_COUNT: usize = 64;
 
 /// Empfohlene Maximalanzahl an Operationen pro Einzelschreibtransaktion (10.000 Operationen).
-// AI-TAG[SMELL][MINOR] RESOLVED: AGT-CORE-001 — Bounded staging capacity enforced (TS:2026-08-29T12:00:00Z) (SESSION: a3f29c1d)
 pub const DEFAULT_MAX_OPS_PER_TX: usize = 10_000;
 
 /// Standard-Maximalanzahl an getrackten Lese-Schlüsseln pro Transaktion (100.000 Schlüssel).
@@ -63,7 +66,10 @@ pub const DEFAULT_MAX_TX_STAGED_BYTES: usize = 16 * 1024 * 1024;
 
 /// Standard-Maximalgröße für den globalen Puffer über alle Transaktionen hinweg (256 MiB).
 pub const DEFAULT_MAX_TOTAL_STAGED_BYTES: usize = 256 * 1024 * 1024;
+// !SECTION Constants
 
+// SECTION Configuration
+// ANCHOR[id=tx-buffer-config]
 /// Konfigurationsoptionen für den [`TxBuffer`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxBufferConfig {
@@ -94,7 +100,10 @@ impl Default for TxBufferConfig {
         }
     }
 }
+// !SECTION Configuration
 
+// SECTION Index Operations
+// ANCHOR[id=index-op-enum]
 /// Eine im Puffer vorgemerkte Operation auf einem Index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -125,6 +134,7 @@ impl<T: Clone> IndexOp<T> {
     }
 }
 
+// ANCHOR[id=staged-op-size-trait]
 /// Trait zur Schätzung des Speicherverbrauchs in Bytes für gepufferte Nutzdaten.
 ///
 /// Ermöglicht genaue Buchführung des verbrauchten Hauptspeichers pro Transaktion und global.
@@ -180,7 +190,10 @@ impl<T: Clone + StagedOpSize> IndexOp<T> {
             }
     }
 }
+// !SECTION Index Operations
 
+// SECTION Shard Internals
+// ANCHOR[id=tx-shard-struct]
 #[derive(Debug)]
 struct TxShard<T: Clone> {
     ops: AHashMap<TxId, (Vec<IndexOp<T>>, u64)>,
@@ -210,7 +223,10 @@ impl KeyShard {
         }
     }
 }
+// !SECTION Shard Internals
 
+// SECTION TxBuffer Engine
+// ANCHOR[id=tx-buffer-struct]
 /// Verwaltet gepufferte Transaktionen, deren Staging-Operationen und ReadSets.
 ///
 /// ### Synchronisations- und Sperrstrategie:
@@ -238,6 +254,7 @@ impl<T: Clone> std::fmt::Debug for TxBuffer<T> {
 }
 
 impl<T: Clone> TxBuffer<T> {
+    // ANCHOR[id=tx-buffer-constructors]
     /// Erstellt einen neuen Puffer mit 64 Shards, 30 Sekunden Timeout und [`SystemClock`].
     pub fn new() -> Self {
         Self::new_with_config(DEFAULT_SHARD_COUNT, Duration::from_secs(30))
@@ -338,6 +355,7 @@ impl<T: Clone> TxBuffer<T> {
         self.global_staged_bytes.load(Ordering::Relaxed)
     }
 
+    // ANCHOR[id=tx-buffer-sharding-indices]
     #[inline]
     fn shard_idx(&self, tx: TxId) -> usize {
         let num_shards = self.shards.len();
@@ -371,6 +389,7 @@ impl<T: Clone> TxBuffer<T> {
         }
     }
 
+    // ANCHOR[id=tx-buffer-begin]
     /// Registriert eine neue Transaktion im Puffer zu einem bestimmten Nanosekunden-Zeitstempel.
     ///
     /// ### Ablauf:
@@ -396,6 +415,7 @@ impl<T: Clone> TxBuffer<T> {
         self.begin_at(tx, now_nanos);
     }
 
+    // ANCHOR[id=tx-buffer-read-registration]
     /// Registriert einen Lesezugriff im ReadSet der Transaktion `tx`.
     pub fn register_read(&self, tx: TxId, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let shard_idx = self.shard_idx(tx);
@@ -448,6 +468,7 @@ impl<T: Clone> TxBuffer<T> {
         self.register_read(tx, key, snapshot_seq);
     }
 
+    // ANCHOR[id=tx-buffer-min-read-snapshot]
     /// Findet die kleinste Snapshot-Sequenznummer über alle aktiven ReadSets aller Shards hinweg.
     ///
     /// Dient der Bestimmung des globalen GC-Schwellenwerts (Tombstone-Compaction-Floor).
@@ -478,6 +499,7 @@ impl<T: Clone> TxBuffer<T> {
         self.get_read_set(tx)
     }
 
+    // ANCHOR[id=tx-buffer-staging]
     /// Puffert eine Indexoperation für die Transaktion `tx` unter Prüfung aller Speichergrenzen.
     pub fn stage(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
     where
@@ -616,6 +638,7 @@ impl<T: Clone> TxBuffer<T> {
         Ok(())
     }
 
+    // ANCHOR[id=tx-buffer-drain-discard]
     /// Entnimmt alle gepufferten Operationen der Transaktion `tx` für den anschließenden Commit
     /// und gibt den reservierten Speicherplatz frei.
     pub fn drain(&self, tx: TxId) -> Vec<IndexOp<T>> {
@@ -663,6 +686,7 @@ impl<T: Clone> TxBuffer<T> {
         self.shards.iter().all(|s| s.read().ops.is_empty())
     }
 
+    // ANCHOR[id=tx-buffer-orphan-reaping]
     /// Räumt abgelaufene (verwaiste) Transaktionen bezüglich `now_nanos` über alle Shards ab.
     pub fn reap_orphans_at(&self, now_nanos: u64) -> Vec<TxId> {
         self.reap_orphans_bounded_at(usize::MAX, now_nanos)
@@ -737,6 +761,8 @@ impl<T: Clone> TxBuffer<T> {
     }
 }
 
+// SECTION KV Buffer Extension
+// ANCHOR[id=tx-buffer-kv-impl]
 impl TxBuffer<(Vec<u8>, Vec<u8>)> {
     fn track_key_stage(&self, tx: TxId, key: &[u8], is_insert: bool) {
         let idx = self.key_shard_idx(key);
@@ -868,6 +894,7 @@ impl TxBuffer<(Vec<u8>, Vec<u8>)> {
         None
     }
 }
+// !SECTION KV Buffer Extension
 
 impl<T: Clone> Default for TxBuffer<T> {
     fn default() -> Self {
@@ -1018,7 +1045,11 @@ mod tests {
             tx_timeout: Duration::from_millis(5),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(
+            clock.clone() as Arc<dyn Clock>,
+            1,
+            config,
+        );
 
         buffer.begin(TxId::new(1));
         buffer.begin(TxId::new(2));
@@ -1098,7 +1129,11 @@ mod tests {
             tx_timeout: Duration::from_millis(10),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(
+            clock.clone() as Arc<dyn Clock>,
+            1,
+            config,
+        );
         let tx = TxId::new(1);
         buffer.begin(tx);
 
@@ -1117,7 +1152,11 @@ mod tests {
             tx_timeout: Duration::from_secs(10),
             ..Default::default()
         };
-        let buffer = TxBuffer::<String>::new_with_clock_and_config(clock.clone() as Arc<dyn Clock>, 1, config);
+        let buffer = TxBuffer::<String>::new_with_clock_and_config(
+            clock.clone() as Arc<dyn Clock>,
+            1,
+            config,
+        );
         let tx = TxId::new(100);
 
         let past_nanos = clock.now_unix_nanos().saturating_sub(15_000_000_000);
