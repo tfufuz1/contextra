@@ -910,6 +910,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[allow(clippy::disallowed_methods)]
     fn bench_sherman_morrison_p95_latency() {
         use std::time::Instant;
 

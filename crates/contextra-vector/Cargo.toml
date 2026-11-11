@@ -14,9 +14,11 @@ ring = "0"
 klasse = "A"
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-contextra-mvcc = { workspace = true, optional = true }
+contextra-mvcc = { workspace = true }
 contextra-simd = { workspace = true, optional = true }
 contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
@@ -42,13 +44,13 @@ experimental = ["experimental-diskann", "experimental-rabitq", "experimental-pre
 mmap = []
 diskann = ["experimental-diskann"]
 quantize-rabitq = ["experimental-rabitq"]
-ports-compat = [
+workspace = [
     "dep:contextra-ports",
     "dep:contextra-types",
-    "dep:contextra-mvcc",
     "dep:contextra-sys",
 ]
-docid-128 = []
+ports-compat = ["workspace"]
+docid-128 = ["contextra-ids/docid-128"]
 experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []

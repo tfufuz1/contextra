@@ -9,9 +9,10 @@ use crate::io_seam::RealFs;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_ports::StorageStats;
-use contextra_ports::Vfs;
-use contextra_types::{Result, TOMBSTONE_BIT};
+use crate::stats::StorageStats;
+use crate::io_seam::Vfs;
+use crate::error::{StoreError, StoreResult as Result};
+use contextra_ids::TOMBSTONE_BIT;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 
@@ -27,14 +28,14 @@ pub struct CompactionEngine {
     pub(super) snapshot_registry: Arc<SnapshotRegistry>,
     block_cache: Arc<BlockCache>,
     key_manager: Option<Arc<KeyManager>>,
-    budget: Arc<contextra_ports::ResourceTracker>,
+    budget: Arc<crate::budget::ResourceTracker>,
     manifest: Option<Arc<crate::manifest::Manifest>>,
     compaction_counter: AtomicU64,
     pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
     workload_metrics: WorkloadMetrics,
     adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>>,
     merge_operator: Option<Arc<dyn MergeOperator>>,
-    clock: Arc<dyn contextra_ports::Clock>,
+    clock: Arc<dyn contextra_env::Clock>,
     pub(crate) vfs: Arc<dyn Vfs>,
 }
 
@@ -45,7 +46,7 @@ impl CompactionEngine {
         snapshot_registry: Arc<SnapshotRegistry>,
         block_cache: Arc<BlockCache>,
         key_manager: Option<Arc<KeyManager>>,
-        budget: Arc<contextra_ports::ResourceTracker>,
+        budget: Arc<crate::budget::ResourceTracker>,
         manifest: Option<Arc<crate::manifest::Manifest>>,
     ) -> Self {
         let adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>> =
@@ -71,7 +72,7 @@ impl CompactionEngine {
             workload_metrics: WorkloadMetrics::new(),
             adaptive_planner,
             merge_operator: None,
-            clock: Arc::new(contextra_ports::SystemClock::new()),
+            clock: Arc::new(contextra_env::SystemClock::new()),
             vfs: Arc::new(RealFs),
         }
     }
@@ -89,7 +90,7 @@ impl CompactionEngine {
     }
 
     /// Attaches a custom clock port for deterministic execution timing (P28).
-    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_env::Clock>) -> Self {
         self.clock = clock;
         self
     }
@@ -301,7 +302,7 @@ impl CompactionEngine {
                     limit_bytes,
                     limit_mb
                 );
-                return Err(contextra_types::ContextraError::MemoryBudgetExceeded {
+                return Err(crate::error::StoreError::MemoryBudgetExceeded {
                     used_mb,
                     limit_mb,
                 });
@@ -532,7 +533,7 @@ impl CompactionEngine {
 
         if merge_res.is_err() {
             if let Err(e) = self.vfs.remove_file(output_path) {
-                if !matches!(e, contextra_ports::ContextraError::NotFound(_)) {
+                if !matches!(e, crate::error::StoreError::NotFound(_)) {
                     tracing::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
                         output_path,
@@ -639,7 +640,7 @@ impl CompactionEngine {
         while let Some(item) = heap.pop() {
             if let Some(ct) = cancel_token {
                 if ct.is_cancelled() {
-                    return Err(contextra_types::ContextraError::Internal(
+                    return Err(crate::error::StoreError::Internal(
                         "Compaction cancelled during merge stream processing".into(),
                     ));
                 }
@@ -680,14 +681,14 @@ impl CompactionEngine {
                                 "Compaction aborted: backpressure wait timeout exceeded ({:?}) while memory budget exhausted",
                                 self.config.max_backpressure_wait
                             );
-                            return Err(contextra_types::ContextraError::MemoryBudgetExceeded {
+                            return Err(crate::error::StoreError::MemoryBudgetExceeded {
                                 used_mb,
                                 limit_mb,
                             });
                         }
                         if let Some(ct) = cancel_token {
                             if ct.is_cancelled() {
-                                return Err(contextra_types::ContextraError::Internal(
+                                return Err(crate::error::StoreError::Internal(
                                     "Compaction cancelled during memory budget wait".into(),
                                 ));
                             }
@@ -743,12 +744,12 @@ impl CompactionEngine {
                                 u64::try_from(self.config.merge_wall_clock_timeout.as_nanos())
                                     .unwrap_or(u64::MAX);
 
-                            let merge_res = if timeout_nanos > 0 && elapsed_nanos > timeout_nanos {
-                                Err(contextra_types::ContextraError::Sandbox(
+                            let merge_res: Result<Vec<u8>> = if timeout_nanos > 0 && elapsed_nanos > timeout_nanos {
+                                Err(crate::error::StoreError::Sandbox(
                                     "Merge operator wall-clock timeout exceeded".into(),
                                 ))
                             } else {
-                                merge_res
+                                merge_res.map_err(|e| StoreError::Sandbox(e.to_string()))
                             };
 
                             // existing_val is older version (next_item), new_val is newer version (item)

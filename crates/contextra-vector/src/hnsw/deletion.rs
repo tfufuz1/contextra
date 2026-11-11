@@ -6,7 +6,8 @@
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 // STAND: TS:2026-11-11T02:00:00Z
 
-use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
+use crate::error::{Result, VectorError};
+use crate::types::DocId;
 use std::collections::BTreeSet;
 use zeroize::Zeroize;
 
@@ -90,9 +91,7 @@ impl GhostFreeVectorIndex for HnswIndex {
             match doc_map.get(&doc_id.inner()).copied() {
                 Some(idx) => idx,
                 None => {
-                    return Err(ContextraError::GraphRepairFailed(
-                        HnswDeletionError::NodeNotFound(doc_id),
-                    ));
+                    return Err(VectorError::NotFound(format!("Node for doc_id {:?} not found in HNSW index", doc_id)));
                 }
             }
         };
@@ -105,9 +104,7 @@ impl GhostFreeVectorIndex for HnswIndex {
             .read()
             .contains(target_idx as u64)
         {
-            return Err(ContextraError::GraphRepairFailed(
-                HnswDeletionError::NodeNotFound(doc_id),
-            ));
+            return Err(VectorError::NotFound(format!("Node for doc_id {:?} not found in HNSW index", doc_id)));
         }
 
         let m = self.inner.cold.config.m;
@@ -290,7 +287,7 @@ impl GhostFreeVectorIndex for HnswIndex {
         let remaining_ghost_pointers = self.verify_no_ghost_pointers(target_idx as u32, budget);
 
         if remaining_ghost_pointers > 0 {
-            return Err(ContextraError::Conflict(
+            return Err(VectorError::Conflict(
                 "connectivity: residual ghost pointers after graph repair".to_string(),
             ));
         }
@@ -349,7 +346,7 @@ impl HnswIndex {
         let doc_id = id.into_doc_id();
         match self.remove_with_graph_repair(doc_id) {
             Ok(_) => Ok(true),
-            Err(ContextraError::GraphRepairFailed(HnswDeletionError::NodeNotFound(_))) => Ok(false),
+            Err(VectorError::NotFound(_)) => Ok(false),
             Err(e) => Err(e),
         }
     }

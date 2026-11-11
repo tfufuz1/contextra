@@ -8,8 +8,8 @@ use super::bloom::BloomFilter;
 use crate::io_seam::RealFs;
 use crate::wal::KeyManager;
 use bytes::{BufMut, Bytes, BytesMut};
-use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
-use contextra_types::{ContextraError, Result};
+use crate::io_seam::{Vfs, VfsFile, VfsOpenOptions};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -380,7 +380,7 @@ impl SstableBuilder {
             )));
         }
 
-        let raw_seq = seq_no & !contextra_types::TOMBSTONE_BIT;
+        let raw_seq = seq_no & !contextra_ids::TOMBSTONE_BIT;
 
         if let Some(prev_k) = &self.last_key {
             if key < prev_k.as_ref() {
@@ -483,7 +483,7 @@ impl SstableBuilder {
         if let Err(e) = self.flush_block().await {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
-            return Err(e);
+            return Err(e.into());
         }
 
         let index_offset = self.offset;
@@ -510,7 +510,7 @@ impl SstableBuilder {
         if let Err(e) = self.write_to_file(&index_to_write, self.offset) {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
-            return Err(e);
+            return Err(e.into());
         }
         let index_write_len = u64::try_from(index_to_write.len())
             .map_err(|_| ContextraError::Storage("Index bytes length overflow".into()))?;
@@ -530,7 +530,7 @@ impl SstableBuilder {
         if let Err(e) = self.write_to_file(&bloom_to_write, self.offset) {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
-            return Err(e);
+            return Err(e.into());
         }
         let bloom_write_len = u64::try_from(bloom_to_write.len())
             .map_err(|_| ContextraError::Storage("Bloom bytes length overflow".into()))?;
@@ -551,7 +551,7 @@ impl SstableBuilder {
         if let Err(e) = self.write_to_file(&trailer, self.offset) {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
-            return Err(e);
+            return Err(e.into());
         }
         self.offset += 54;
 
@@ -581,7 +581,7 @@ impl SstableBuilder {
         if let Err(e) = self.vfs.rename(&self.tmp_path, &self.path) {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
-            return Err(e);
+            return Err(e.into());
         }
 
         // 3. sync_dir on parent directory
@@ -589,7 +589,7 @@ impl SstableBuilder {
         if let Err(e) = self.vfs.sync_dir(parent) {
             self.poisoned = true;
             // Failure on sync_dir after rename: fail-closed (INV-FSYNC-1)
-            return Err(e);
+            return Err(e.into());
         }
 
         self.finished = true;

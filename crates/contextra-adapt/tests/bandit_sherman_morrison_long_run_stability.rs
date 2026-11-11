@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::indexing_slicing, clippy::unwrap_used, clippy::panic, clippy::expect_used)]
 //! Testfall für Sherman-Morrison Langzeit-Stabilität und Präzisions-Matrix-Drift-Erkennung (§13.2).
 #![allow(clippy::needless_range_loop)]
 #![cfg(feature = "bandit-routing")]

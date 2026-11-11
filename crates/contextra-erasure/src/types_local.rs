@@ -35,6 +35,12 @@ impl ErasureId {
     }
 }
 
+impl AsRef<[u8]> for KeyBuf {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl fmt::Debug for ErasureId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -2104,6 +2110,7 @@ impl SystemClock {
     #[allow(clippy::disallowed_methods)]
     pub fn new() -> Self {
         Self {
+            // ALLOW-DETERMINISM: Wall clock and monotonic time access for SystemClock
             start_instant: std::time::Instant::now(),
         }
     }
@@ -2118,6 +2125,7 @@ impl Default for SystemClock {
 impl Clock for SystemClock {
     #[allow(clippy::disallowed_methods)]
     fn now_unix_nanos(&self) -> u64 {
+        // ALLOW-DETERMINISM: Wall clock and monotonic time access for SystemClock
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
@@ -2126,6 +2134,7 @@ impl Clock for SystemClock {
 
     #[allow(clippy::disallowed_methods)]
     fn monotonic_nanos(&self) -> u64 {
+        // ALLOW-DETERMINISM: Wall clock and monotonic time access for SystemClock
         let nanos = std::time::Instant::now()
             .saturating_duration_since(self.start_instant)
             .as_nanos();

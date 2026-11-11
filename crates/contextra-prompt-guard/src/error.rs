@@ -53,4 +53,30 @@ mod tests {
             "Fehler beim Dekodieren von Inhalten: invalid utf8"
         );
     }
+
+    #[test]
+    fn test_guard_error_table_driven_display() {
+        let test_cases: Vec<(GuardError, &'static str)> = vec![
+            (
+                GuardError::Io("test-io-error".into()),
+                "I/O-Fehler beim Guard-Betrieb: test-io-error",
+            ),
+            (
+                GuardError::Serialization("test-ser-error".into()),
+                "Format- oder Parsefehler im Guard-Schema: test-ser-error",
+            ),
+            (
+                GuardError::InvalidConfiguration("test-cfg-error".into()),
+                "Ungültige Guard-Konfiguration: test-cfg-error",
+            ),
+            (
+                GuardError::DecodeError("test-dec-error".into()),
+                "Fehler beim Dekodieren von Inhalten: test-dec-error",
+            ),
+        ];
+
+        for (err, expected_display) in test_cases {
+            assert_eq!(err.to_string(), expected_display);
+        }
+    }
 }

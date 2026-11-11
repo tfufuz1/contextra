@@ -7,7 +7,7 @@ use crate::wal::KeyManager;
 use crate::wal::Wal;
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::wal_crypto::WalHmac;
-use contextra_types::TxId;
+use contextra_ids::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;

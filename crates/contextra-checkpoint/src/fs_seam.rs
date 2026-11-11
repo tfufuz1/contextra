@@ -1,7 +1,7 @@
 //! # Lokale Dateisystem-Naht für Checkpoint
 //!
 //! Kapselt Dateisystem-Operationen für Hardlink-Klone und Orphan-State-Persistenz,
-//! ohne auf `contextra_ports::Vfs` angewiesen zu sein.
+//! ohne auf externe VFS-Ports angewiesen zu sein.
 
 use std::fs;
 use std::io;
@@ -30,6 +30,7 @@ pub trait FsSeam: Send + Sync {
 pub struct StdFsSeam;
 
 impl StdFsSeam {
+    /// Erzeugt eine neue Instanz von [`StdFsSeam`].
     pub fn new() -> Self {
         Self
     }

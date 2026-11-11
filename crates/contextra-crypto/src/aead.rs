@@ -14,13 +14,13 @@ use zeroize::Zeroizing;
 
 pub const REC_AAD: &[u8] = b"ctx/rec/v2";
 
-/// Seals a plaintext record into an envelope using an explicit, caller-provided 12-byte nonce.
-/// Binds `doc` and `key_bytes` into the Associated Data (AAD) preventing replay/reordering across documents.
 // !SECTION
 
 // SECTION [epic=crypto-aead,seq=2] Rekord-Versiegelung (Seal)
 // ANCHOR[contextra-crypto:AEAD-001] Authentifizierte Umschlag-Erzeugung mit Nonce-Bindung
 // NOTE: Bindet Dokument-ID und Schlüssel in die AAD ein zur Replay-Vermeidung (TS:2026-11-11)
+/// Seals a plaintext record into an envelope using an explicit, caller-provided 12-byte nonce.
+/// Binds `doc` and `key_bytes` into the Associated Data (AAD) preventing replay/reordering across documents.
 pub fn seal_record_with_nonce(
     dek: &Dek,
     doc: [u8; 16],
@@ -71,13 +71,13 @@ pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> 
     seal_record_with_rng(dek, doc, key_bytes, plain, &mut rand::rngs::OsRng).unwrap_or_default()
 }
 
-/// Opens an encrypted record envelope, verifying the associated data and authentication tag.
-/// Fails with a uniform `CryptoError::Aead` on any authentication or corruption issue without leaking oracle details.
 // !SECTION
 
 // SECTION [epic=crypto-aead,seq=3] Rekord-Entsiegelung (Open)
 // ANCHOR[contextra-crypto:AEAD-004] Sichere Umschlag-Prüfung und Entschlüsselung
 // NOTE: Fail-Closed Rückgabe ohne Orakel-Leckage (TS:2026-11-11)
+/// Opens an encrypted record envelope, verifying the associated data and authentication tag.
+/// Fails with a uniform `CryptoError::Aead` on any authentication or corruption issue without leaking oracle details.
 pub fn open_record(dek: &Dek, key_bytes: &[u8], env: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     if env.len() < 1 + 1 + 16 + 12 + 16 {
         return Err(CryptoError::Aead("record envelope too short".into()));

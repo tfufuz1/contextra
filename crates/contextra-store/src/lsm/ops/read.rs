@@ -6,13 +6,13 @@ use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use contextra_ports::StorageEngine;
-use contextra_types::{Result, TOMBSTONE_BIT};
+use crate::error::StoreResult as Result;
+use contextra_ids::TOMBSTONE_BIT;
 use std::sync::atomic::Ordering;
 
 pub(crate) async fn get_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_types::TxId,
+    tx_id: contextra_ids::TxId,
     key: &[u8],
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
@@ -36,7 +36,7 @@ pub(crate) async fn get_tracked(
 /// handled in a separate task.
 pub(crate) async fn get_at_seq_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_types::TxId,
+    tx_id: contextra_ids::TxId,
     key: &[u8],
     snapshot_seq: u64,
 ) -> Result<Option<Bytes>> {
@@ -51,7 +51,7 @@ pub(crate) async fn get_at_seq_tracked(
 
 pub(crate) async fn scan_prefix_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_types::TxId,
+    tx_id: contextra_ids::TxId,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
@@ -64,7 +64,7 @@ pub(crate) async fn scan_prefix_tracked(
     Ok(results)
 }
 
-pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
+pub(crate) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
     let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     let res = storage.get_at_seq(key, snapshot_seq).await?;
@@ -77,7 +77,7 @@ pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes
     Ok(res)
 }
 
-pub(super) async fn get_at_seq(
+pub(crate) async fn get_at_seq(
     storage: &LsmStorage,
     key: &[u8],
     seq_no: u64,
@@ -121,7 +121,7 @@ pub(super) async fn get_at_seq(
     // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
     let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
-        if (sst.metadata().min_tx_id < contextra_types::TxId::INTERNAL_BASE
+        if (sst.metadata().min_tx_id < contextra_ids::TxId::INTERNAL_BASE
             && snapshot_tx < sst.metadata().min_tx_id)
             || seq_no < sst.metadata().min_seq
         {
@@ -147,14 +147,14 @@ pub(super) async fn get_at_seq(
     Ok(None)
 }
 
-pub(super) async fn scan_prefix(
+pub(crate) async fn scan_prefix(
     storage: &LsmStorage,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
     storage.scan_prefix_at(prefix, u64::MAX).await
 }
 
-pub(super) async fn scan_prefix_bounded(
+pub(crate) async fn scan_prefix_bounded(
     storage: &LsmStorage,
     prefix: &[u8],
     limit: usize,
@@ -217,7 +217,7 @@ pub(super) async fn scan_prefix_bounded(
     Ok((results, next_cursor))
 }
 
-pub(super) async fn scan_prefix_at(
+pub(crate) async fn scan_prefix_at(
     storage: &LsmStorage,
     prefix: &[u8],
     seq_no: u64,
@@ -242,7 +242,7 @@ pub(super) async fn scan_prefix_at(
     Ok(results)
 }
 
-pub(super) async fn scan_bounded(
+pub(crate) async fn scan_bounded(
     storage: &LsmStorage,
     start: std::ops::Bound<&[u8]>,
     end: std::ops::Bound<&[u8]>,
@@ -299,7 +299,7 @@ pub(super) async fn scan_bounded(
     Ok((results, next_cursor))
 }
 
-pub(super) async fn scan(
+pub(crate) async fn scan(
     storage: &LsmStorage,
     start: std::ops::Bound<&[u8]>,
     end: std::ops::Bound<&[u8]>,

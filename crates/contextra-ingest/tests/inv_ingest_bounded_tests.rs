@@ -3,6 +3,8 @@
 //! Stellt sicher, dass Formaterkennung unabhängig von Eingabegröße und Streaming-Quelle
 //! strikt niemals mehr als `MAX_DETECT_BYTES` (64 KiB) einliest oder analysiert.
 
+#![allow(clippy::cast_possible_truncation)]
+
 use contextra_ingest::detect::{detect, detect_reader, DetectHints, MAX_DETECT_BYTES};
 use proptest::prelude::*;
 use std::io::Read;

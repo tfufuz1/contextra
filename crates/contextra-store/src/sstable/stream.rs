@@ -5,7 +5,7 @@
 
 use super::reader::SstableReader;
 use bytes::Bytes;
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
 use std::sync::Arc;
 
 pub struct SstableStream {

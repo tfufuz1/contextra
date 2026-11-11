@@ -4,7 +4,7 @@
 
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult as Result};
 use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
@@ -92,7 +92,7 @@ pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
 
 #[cfg(not(feature = "legacy-wal-key"))]
 pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
-    Err(ContextraError::Storage(
+    Err(StoreError::Storage(
         "Legacy WAL key support is disabled at compile time. Enable Cargo feature 'legacy-wal-key' to allow legacy key fallback.".into()
     ))
 }
@@ -109,7 +109,7 @@ pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
 /// wipes, key material in memory is handled via standard Rust slice operations without manual zeroing.
 ///
 /// # Errors
-/// Returns [`ContextraError::Storage`] if `legacy` does not match the expected legacy integrity key,
+/// Returns [`StoreError::Storage`] if `legacy` does not match the expected legacy integrity key,
 /// if `new_key_material` is not 32 bytes long, or if `new_key_material` is identical to `legacy`.
 #[cfg(feature = "legacy-wal-key")]
 pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8; 32]> {
@@ -117,20 +117,20 @@ pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8;
 
     let expected_legacy = deobfuscate_legacy_integrity_key();
     if legacy != expected_legacy {
-        return Err(ContextraError::Storage(
+        return Err(StoreError::Storage(
             "Provided legacy key material does not match expected legacy integrity key".into(),
         ));
     }
 
     if new_key_material.len() != 32 {
-        return Err(ContextraError::Storage(format!(
+        return Err(StoreError::Storage(format!(
             "New key material must be exactly 32 bytes, got {}",
             new_key_material.len()
         )));
     }
 
     if new_key_material == expected_legacy {
-        return Err(ContextraError::Storage(
+        return Err(StoreError::Storage(
             "New key material cannot be identical to the legacy integrity key".into(),
         ));
     }
@@ -142,7 +142,7 @@ pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8;
 
 #[cfg(not(feature = "legacy-wal-key"))]
 pub fn migrate_legacy_key(_legacy: &[u8], _new_key_material: &[u8]) -> Result<[u8; 32]> {
-    Err(ContextraError::Storage(
+    Err(StoreError::Storage(
         "Legacy WAL key support is disabled at compile time. Recompile with Cargo feature 'legacy-wal-key' to perform legacy key migration.".into()
     ))
 }
@@ -152,7 +152,7 @@ impl Wal {
     pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(PreparedBatch, [u8; 32])> {
         let mut last_hmac = self.last_hmac.lock().await;
         if self.is_sealed() {
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "Cannot prepare batch for sealed WAL segment {}",
                 self.path.display()
             )));
@@ -198,7 +198,7 @@ impl Wal {
         } else if let Some(key) = self.fallback_integrity_key {
             Ok(key)
         } else {
-            Err(ContextraError::Storage(
+            Err(StoreError::Storage(
                 "Integrity key missing from WAL state".into(),
             ))
         }
@@ -251,15 +251,15 @@ impl Wal {
 
         async fn read_key_file(path: &Path) -> Result<[u8; 32]> {
             let bytes = super::fs::read(path).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to read WAL integrity key: {}", e))
+                StoreError::Storage(format!("Failed to read WAL integrity key: {}", e))
             })?;
             if bytes.is_empty() {
-                return Err(ContextraError::Storage(
+                return Err(StoreError::Storage(
                     "WAL integrity key file is empty — possible crash during creation. Delete and restart.".into(),
                 ));
             }
             if bytes.len() != 32 {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "WAL integrity key has unexpected length: {} (expected 32)",
                     bytes.len()
                 )));
@@ -296,7 +296,7 @@ impl Wal {
             let mut file = match file_res {
                 Ok(f) => f,
                 Err(e) => {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "Failed to create temporary WAL integrity key file at {}: {}",
                         tmp_path.display(),
                         e
@@ -306,14 +306,14 @@ impl Wal {
 
             if let Err(e) = file.write_all(&key).await {
                 let _ = super::fs::remove_file(&tmp_path).await;
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to write WAL integrity key: {}",
                     e
                 )));
             }
             if let Err(e) = file.sync_all().await {
                 let _ = super::fs::remove_file(&tmp_path).await;
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to sync WAL integrity key file: {}",
                     e
                 )));
@@ -331,7 +331,7 @@ impl Wal {
 
             match link_res {
                 Ok(()) => {
-                    crate::util::fsync_parent_dir(&key_path).await?;
+                    crate::fsync::sync_parent_dir(&key_path).await?;
                     Ok(key)
                 }
                 Err(_) => read_key_file(&key_path).await,
@@ -404,7 +404,7 @@ impl Wal {
         let mut file = match options.open(&tmp_path).await {
             Ok(f) => f,
             Err(e) => {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to create temporary WAL migration marker file at {}: {}",
                     tmp_path.display(),
                     e
@@ -415,7 +415,7 @@ impl Wal {
         let marker_content = Self::calculate_retirement_marker_hash(wal_path, new_key);
         if let Err(e) = file.write_all(marker_content.as_bytes()).await {
             let _ = super::fs::remove_file(&tmp_path).await;
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "Failed to write WAL migration marker: {}",
                 e
             )));
@@ -423,7 +423,7 @@ impl Wal {
 
         if let Err(e) = file.sync_all().await {
             let _ = super::fs::remove_file(&tmp_path).await;
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "Failed to sync WAL migration marker file: {}",
                 e
             )));
@@ -432,7 +432,7 @@ impl Wal {
 
         if let Err(e) = super::fs::rename(&tmp_path, &marker_path).await {
             let _ = super::fs::remove_file(&tmp_path).await;
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "Failed to rename WAL migration marker from {} to {}: {}",
                 tmp_path.display(),
                 marker_path.display(),
@@ -440,7 +440,7 @@ impl Wal {
             )));
         }
 
-        crate::util::fsync_parent_dir(&marker_path).await?;
+        crate::fsync::sync_parent_dir(&marker_path).await?;
         Ok(())
     }
 
@@ -451,7 +451,7 @@ impl Wal {
 
     pub(crate) async fn load_or_create_wal_uuid_with_gen(
         wal_path: &Path,
-        id_gen: Option<&dyn contextra_ports::IdGen>,
+        id_gen: Option<&dyn contextra_env::IdGen>,
     ) -> Result<[u8; 16]> {
         let uuid_path = {
             let mut p = wal_path.as_os_str().to_os_string();
@@ -461,10 +461,10 @@ impl Wal {
 
         async fn read_uuid_file(path: &Path) -> Result<[u8; 16]> {
             let bytes = super::fs::read(path).await.map_err(|e| {
-                ContextraError::Storage(format!("Failed to read WAL UUID sidecar: {}", e))
+                StoreError::Storage(format!("Failed to read WAL UUID sidecar: {}", e))
             })?;
             if bytes.len() != 16 {
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "WAL UUID sidecar has unexpected length: {} (expected 16)",
                     bytes.len()
                 )));
@@ -530,7 +530,7 @@ impl Wal {
                     if uuid_path.exists() {
                         return read_uuid_file(&uuid_path).await;
                     }
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "Failed to create temporary WAL UUID sidecar at {}: {}",
                         tmp_path.display(),
                         e
@@ -540,7 +540,7 @@ impl Wal {
 
             if let Err(e) = file.write_all(&bytes).await {
                 let _ = super::fs::remove_file(&tmp_path).await;
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to write WAL UUID sidecar: {}",
                     e
                 )));
@@ -548,7 +548,7 @@ impl Wal {
 
             if let Err(e) = file.sync_all().await {
                 let _ = super::fs::remove_file(&tmp_path).await;
-                return Err(ContextraError::Storage(format!(
+                return Err(StoreError::Storage(format!(
                     "Failed to sync WAL UUID sidecar file: {}",
                     e
                 )));
@@ -560,7 +560,7 @@ impl Wal {
 
             match link_res {
                 Ok(()) => {
-                    crate::util::fsync_parent_dir(&uuid_path).await?;
+                    crate::fsync::sync_parent_dir(&uuid_path).await?;
                     Ok(bytes)
                 }
                 Err(_) => read_uuid_file(&uuid_path).await,

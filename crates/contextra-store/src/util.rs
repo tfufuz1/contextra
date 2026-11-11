@@ -6,7 +6,7 @@
 // FILE-CONTEXT: Utility functions for contextra-store (fsync helpers, etc.) (TS: 2026-08-29T17:17:31Z) (SESSION: 8f882f1f)
 //! Utility functions for storage engine operations.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult as Result};
 use std::fmt;
 use std::path::Path;
 
@@ -88,7 +88,7 @@ impl DirLock {
     pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
         let lock_path = dir.join("LOCK");
         let file = File::create(&lock_path).map_err(|e| {
-            ContextraError::Storage(format!(
+            StoreError::Storage(format!(
                 "Failed to open/create LOCK file at {}: {e}",
                 lock_path.display()
             ))
@@ -96,12 +96,12 @@ impl DirLock {
 
         match file.try_lock() {
             Ok(()) => Ok(Self { _file: Some(file) }),
-            Err(TryLockError::WouldBlock) => Err(ContextraError::Storage(
+            Err(TryLockError::WouldBlock) => Err(StoreError::Storage(
                 "Datenverzeichnis bereits in Benutzung".into(),
             )),
             Err(TryLockError::Error(e)) => {
                 if durability_mode == DurabilityMode::Full {
-                    Err(ContextraError::Storage(format!(
+                    Err(StoreError::Storage(format!(
                         "Dateisperre auf diesem Dateisystem nicht unterstützt: {e}"
                     )))
                 } else {

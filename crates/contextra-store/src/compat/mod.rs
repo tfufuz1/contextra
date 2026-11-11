@@ -1,5 +1,8 @@
+#[cfg(feature = "workspace")]
 pub mod error;
-#[cfg(not(loom))]
+#[cfg(all(feature = "workspace", not(loom)))]
 pub mod engine;
-#[cfg(not(loom))]
+#[cfg(all(feature = "workspace", not(loom)))]
 pub mod scanner;
+#[cfg(feature = "workspace")]
+pub mod license;

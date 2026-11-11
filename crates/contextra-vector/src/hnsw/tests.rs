@@ -1,9 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock)]
 use super::*;
-use contextra_ports::MetricsSink;
-use contextra_ports::Rng;
+use crate::types::MetricsSink;
+#[cfg(feature = "ports-compat")]
 use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
+use crate::types::Rng;
+use crate::types::{DistanceMetric, DocId, TxId};
+use crate::error::VectorError;
 use parking_lot::Mutex;
 
 fn test_config(dim: usize) -> HnswConfig {
@@ -34,13 +36,13 @@ async fn test_hnsw_topology_and_search_determinism() {
         .build()
         .expect("valid config");
 
-    let rng1 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
-    let rng2 = std::sync::Arc::new(contextra_ports::SeededRng::new(seed));
+    let rng1 = std::sync::Arc::new(crate::types::SeededRng::new(seed));
+    let rng2 = std::sync::Arc::new(crate::types::SeededRng::new(seed));
 
     let idx1 = HnswIndex::try_new_with_rng(config.clone(), rng1).expect("idx1 creation");
     let idx2 = HnswIndex::try_new_with_rng(config, rng2).expect("idx2 creation");
 
-    let sm = contextra_ports::SeededRng::new(1001);
+    let sm = crate::types::SeededRng::new(1001);
     let mut vecs = Vec::with_capacity(n);
     for _ in 0..n {
         let v: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
@@ -138,12 +140,12 @@ fn test_hnsw_config_builder_and_validation() {
         ..Default::default()
     }
     .validate();
-    assert!(matches!(res_ef_c, Err(ContextraError::InvalidInput(_))));
+    assert!(matches!(res_ef_c, Err(VectorError::InvalidInput(_))));
 
     let res_builder_err = HnswConfigBuilder::new(128).m(16).ef_construction(8).build();
     assert!(matches!(
         res_builder_err,
-        Err(ContextraError::InvalidInput(_))
+        Err(VectorError::InvalidInput(_))
     ));
 }
 
@@ -236,7 +238,7 @@ struct TestMetricsSink {
     histograms: Mutex<Vec<(String, f64, Vec<(String, String)>)>>,
 }
 
-impl contextra_ports::MetricsSink for TestMetricsSink {
+impl crate::types::MetricsSink for TestMetricsSink {
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         let label_vec = labels
             .iter()

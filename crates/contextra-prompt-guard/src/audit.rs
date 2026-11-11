@@ -1,4 +1,5 @@
-// Herkunft: contextra-mcp/src/prompt_injection/audit.rs @ HEAD 9305c5d048cc6a4143d4e7cbf114cd85a6fca34a
+//! Isoliertes Sicherheits-Audit-Logging für Prompt-Injection-Ereignisse.
+
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "file-audit")]
 use std::fs::OpenOptions;
@@ -10,11 +11,17 @@ use std::sync::{Arc, Mutex};
 /// Struktur für Sicherheits-Audit-Logeinträge bei Auslösung des `Escalate`-Modus.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SecurityAuditRecord {
+    /// Zeitstempel des Ereignisses.
     pub timestamp: String,
+    /// Typ des Sicherheitsereignisses.
     pub event_type: String,
+    /// Dokument-Identifikator des betroffenen Dokuments.
     pub doc_id: String,
+    /// Name der betroffenen Collection.
     pub collection: String,
+    /// Das erkannte Angriffsmuster oder die Trigger-Phrase.
     pub pattern_matched: String,
+    /// Die ausgeführte Sicherheitsaktion (z. B. Redaktion/Quarantäne).
     pub action_taken: String,
 }
 
@@ -27,6 +34,7 @@ pub struct SecurityAuditLogger {
 }
 
 impl SecurityAuditLogger {
+    /// Erstellt eine neue Instanz des `SecurityAuditLogger`, optional mit Dateipfad für Datei-Audits.
     pub fn new(file_path: Option<PathBuf>) -> Self {
         Self {
             file_path,
@@ -34,6 +42,7 @@ impl SecurityAuditLogger {
         }
     }
 
+    /// Protokolliert ein Sicherheitsereignis im Speicher und optional in einer Datei.
     pub fn log_event(&self, record: SecurityAuditRecord) {
         // 1. In-Memory Puffer für Tests und Auditing
         if let Ok(mut records) = self.in_memory_records.lock() {
@@ -63,6 +72,7 @@ impl SecurityAuditLogger {
         }
     }
 
+    /// Gibt alle im Speicher erfassten Audit-Ereignisse zurück.
     pub fn get_recorded_events(&self) -> Vec<SecurityAuditRecord> {
         self.in_memory_records
             .lock()

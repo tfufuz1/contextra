@@ -1,4 +1,9 @@
 [crates.contextra-vector]
 klasse = "A"
-may_depend_on = []          # Autarker Baustein der Klasse A (Soll nach Abschluss von Welle 6)
-transitional = ["ports-compat"]  # Features/Kanten mit internen Deps, Entfernung in Welle 6
+group = "retrieval"
+level = "E1b"
+tier = "core"
+allowed_internal = ["contextra-ids", "contextra-env", "contextra-mvcc"]
+feature_closure_allowed = { mmap = ["contextra-sys"], simd = ["contextra-simd"], workspace = ["contextra-types", "contextra-ports", "contextra-sys"] }
+dev_allowed = []
+transitional = ["ports-compat"]

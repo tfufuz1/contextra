@@ -1,18 +1,15 @@
-//! Kryptografische Schlüsselquellen-Implementierungen für contextra-store.
-//!
-//! Der Port-Trait [`KeyMaterialSource`] lebt in `contextra-ports::key_material` und
-//! wird hier für Rückwärtskompatibilität re-exportiert.
-//! Diese Datei enthält ausschließlich die konkreten Implementierungen:
-//! - [`OsKeyMaterialSource`]: Produktive Implementierung via OS-CSPRNG.
-//! - [`StaticKeyMaterialSource`]: Deterministische Test-Implementierung.
+//! Cryptographic key material source for contextra-store.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult as Result};
+use std::fmt::Debug;
 
-// Re-Export des Port-Traits aus contextra-ports — keine Duplizierung der Trait-Definition.
-pub use contextra_ports::KeyMaterialSource;
+/// Port trait for key and salt material generation.
+pub trait KeyMaterialSource: Send + Sync + Debug + 'static {
+    /// Fills dest with random bytes.
+    fn fill_key_bytes(&self, dest: &mut [u8]) -> Result<()>;
+}
 
-/// Default production implementation using OS CSPRNG (`rand::rngs::OsRng`).
-/// Fail-closed: returns error on entropy exhaustion or failure without fallback.
+/// Default production implementation using OS CSPRNG.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct OsKeyMaterialSource;
 
@@ -23,7 +20,7 @@ impl KeyMaterialSource for OsKeyMaterialSource {
 
         OsRng
             .try_fill_bytes(dest)
-            .map_err(|e| ContextraError::Storage(format!("OS entropy source error: {e}")))
+            .map_err(|e| StoreError::Storage(format!("OS entropy source error: {e}")))
     }
 }
 
@@ -46,7 +43,6 @@ impl KeyMaterialSource for StaticKeyMaterialSource {
     fn fill_key_bytes(&self, dest: &mut [u8]) -> Result<()> {
         let mut stream = self.key_stream.lock();
         if stream.is_empty() {
-            // Fill with deterministic repeating pattern if exhausted
             for (i, b) in dest.iter_mut().enumerate() {
                 *b = (i as u8).wrapping_add(0x42);
             }

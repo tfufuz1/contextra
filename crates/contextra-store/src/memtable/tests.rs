@@ -69,7 +69,7 @@ use super::*;
 
     #[test]
     fn test_mvcc_tombstone_binary_search() {
-        use contextra_types::TOMBSTONE_BIT;
+        use contextra_ids::TOMBSTONE_BIT;
         let mt = MemTable::new();
         let key = Bytes::from("key1");
 

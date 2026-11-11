@@ -1,9 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::await_holding_lock)]
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für HNSW Persistenz-Schicht.
+#[cfg(feature = "ports-compat")]
 
 use super::*;
-use contextra_types::{ContextraError, Result};
+use crate::error::{Result, VectorError};
 
 #[test]
 fn test_hnsw_header_roundtrip_and_errors() -> Result<()> {
@@ -16,12 +17,12 @@ fn test_hnsw_header_roundtrip_and_errors() -> Result<()> {
 
     let small_bytes = vec![0u8; 10];
     let err_small = HnswHeader::try_from_bytes(&small_bytes);
-    assert!(matches!(err_small, Err(ContextraError::Storage(_))));
+    assert!(matches!(err_small, Err(VectorError::Storage(_))));
 
     let mut bad_magic_bytes = bytes;
     bad_magic_bytes[0..4].copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
     let err_magic = HnswHeader::try_from_bytes(&bad_magic_bytes);
-    assert!(matches!(err_magic, Err(ContextraError::Storage(_))));
+    assert!(matches!(err_magic, Err(VectorError::Storage(_))));
 
     Ok(())
 }
@@ -45,18 +46,17 @@ fn test_node_record_roundtrip_and_errors() -> Result<()> {
 
     let small_bytes = vec![0u8; 10];
     let err = NodeRecord::from_bytes(&small_bytes);
-    assert!(matches!(err, Err(ContextraError::Storage(_))));
+    assert!(matches!(err, Err(VectorError::Storage(_))));
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
+async fn test_mmap_index_boundary_checks() -> crate::error::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DistanceMetric, DocId, TxId};
+        use crate::types::{DistanceMetric, DocId, TxId};
 
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("bounds_test.hnsw");
 
     let config = HnswConfig {
@@ -88,12 +88,11 @@ async fn test_mmap_index_boundary_checks() -> contextra_types::Result<()> {
 }
 
 #[tokio::test]
-async fn test_mmap_open_async() -> contextra_types::Result<()> {
+async fn test_mmap_open_async() -> crate::error::Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DistanceMetric, DocId, TxId};
+        use crate::types::{DistanceMetric, DocId, TxId};
 
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("test_async.hnsw");
 
     let config = HnswConfig {
@@ -162,16 +161,16 @@ fn test_mmap_index_error_paths() {
 
 #[test]
 fn test_open_rejects_invalid_magic() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("invalid_magic.hnsw");
     let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 0, -1, 64, 64, 1);
     let mut bytes = header.to_bytes().to_vec();
     bytes[0..4].copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
-    std::fs::write(&path, &bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &bytes).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let res = MmapIndex::open(&path);
     assert!(res.is_err(), "Expected error for invalid magic");
-    if let Err(ContextraError::Storage(msg)) = res {
+    if let Err(VectorError::Storage(msg)) = res {
         assert!(
             msg.contains("bad magic"),
             "Unexpected error message: {}",
@@ -185,17 +184,17 @@ fn test_open_rejects_invalid_magic() -> Result<()> {
 
 #[test]
 fn test_open_rejects_unsupported_version() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("unsupported_version.hnsw");
     let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 0, -1, 64, 64, 1);
     let mut bytes = header.to_bytes().to_vec();
     let unsupported_version = 99u16;
     bytes[4..6].copy_from_slice(&unsupported_version.to_le_bytes());
-    std::fs::write(&path, &bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &bytes).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let res = MmapIndex::open(&path);
     assert!(res.is_err(), "Expected error for unsupported version");
-    if let Err(ContextraError::Storage(msg)) = res {
+    if let Err(VectorError::Storage(msg)) = res {
         assert!(
             msg.contains("Unsupported HNSW version"),
             "Unexpected error message: {}",
@@ -212,7 +211,7 @@ fn test_open_rejects_unsupported_version() -> Result<()> {
 async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
 
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("legacy_v1.hnsw");
 
     let v1_header_bytes = [
@@ -245,7 +244,7 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
     file_bytes.push(127);
     file_bytes.push(127);
 
-    std::fs::write(&path, &file_bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &file_bytes).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let config = HnswConfig {
         dimension: 2,
@@ -267,10 +266,9 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
 #[tokio::test]
 async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{DocId, TxId};
+        use crate::types::{DocId, TxId};
 
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("v2_roundtrip.hnsw");
 
     let config = HnswConfig {
@@ -322,15 +320,15 @@ async fn test_v2_save_load_roundtrip_preserves_per_dim_calibration() -> Result<(
 
 #[test]
 fn test_open_rejects_truncated_header() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("truncated_header.hnsw");
     let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 0, -1, 64, 64, 1);
     let bytes = header.to_bytes();
-    std::fs::write(&path, &bytes[..20]).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &bytes[..20]).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let res = MmapIndex::open(&path);
     assert!(res.is_err(), "Expected error for truncated header");
-    if let Err(ContextraError::Storage(msg)) = res {
+    if let Err(VectorError::Storage(msg)) = res {
         assert!(
             msg.contains("too small"),
             "Unexpected error message: {}",
@@ -344,7 +342,7 @@ fn test_open_rejects_truncated_header() -> Result<()> {
 
 #[test]
 fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("oob_connections.hnsw");
     let conn_offset = HnswHeader::SIZE + NodeRecord::SIZE;
     let header = HnswHeader::new(
@@ -368,7 +366,7 @@ fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
         connections_offset: 9999,
     };
     file_bytes.extend_from_slice(&record.to_bytes());
-    std::fs::write(&path, &file_bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &file_bytes).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let mmap_index = MmapIndex::open(&path)?;
     let res = mmap_index.get_connections(&record, 0);
@@ -376,7 +374,7 @@ fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
         res.is_err(),
         "Expected error for out-of-bounds connections_offset"
     );
-    if let Err(ContextraError::Storage(msg)) = res {
+    if let Err(VectorError::Storage(msg)) = res {
         assert!(
             msg.contains("out of bounds"),
             "Unexpected error message: {}",
@@ -390,7 +388,7 @@ fn test_get_connections_rejects_out_of_bounds_offset() -> Result<()> {
 
 #[test]
 fn test_get_vector_rejects_out_of_bounds_offset() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("oob_vector.hnsw");
     let header = HnswHeader::new(
         128,
@@ -413,7 +411,7 @@ fn test_get_vector_rejects_out_of_bounds_offset() -> Result<()> {
         connections_offset: (HnswHeader::SIZE + NodeRecord::SIZE) as u64,
     };
     file_bytes.extend_from_slice(&record.to_bytes());
-    std::fs::write(&path, &file_bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &file_bytes).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let mmap_index = MmapIndex::open(&path)?;
     let mut bad_record = record;
@@ -423,7 +421,7 @@ fn test_get_vector_rejects_out_of_bounds_offset() -> Result<()> {
         res.is_err(),
         "Expected error for out-of-bounds vector_offset"
     );
-    if let Err(ContextraError::Storage(msg)) = res {
+    if let Err(VectorError::Storage(msg)) = res {
         assert!(
             msg.contains("out of bounds"),
             "Unexpected error message: {}",
@@ -437,7 +435,7 @@ fn test_get_vector_rejects_out_of_bounds_offset() -> Result<()> {
 
 #[test]
 fn test_get_connections_rejects_absurd_length_field() -> Result<()> {
-    let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+    let temp_dir = tempfile::tempdir().map_err(|e| VectorError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("absurd_length.hnsw");
     let conn_offset = HnswHeader::SIZE + NodeRecord::SIZE;
     let header = HnswHeader::new(
@@ -463,12 +461,12 @@ fn test_get_connections_rejects_absurd_length_field() -> Result<()> {
     file_bytes.extend_from_slice(&record.to_bytes());
     file_bytes.push(1);
     file_bytes.extend_from_slice(&u32::MAX.to_le_bytes());
-    std::fs::write(&path, &file_bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
+    std::fs::write(&path, &file_bytes).map_err(|e| VectorError::Storage(e.to_string()))?;
 
     let mmap_index = MmapIndex::open(&path)?;
     let res = mmap_index.get_connections(&record, 0);
     assert!(res.is_err(), "Expected error for absurd length field");
-    if let Err(ContextraError::Storage(msg)) = res {
+    if let Err(VectorError::Storage(msg)) = res {
         assert!(
             msg.contains("overflow") || msg.contains("out of bounds"),
             "Unexpected error message: {}",

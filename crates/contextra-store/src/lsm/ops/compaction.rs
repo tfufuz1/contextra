@@ -6,7 +6,8 @@ use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
 use crate::compaction::retain_key_versions;
 use bytes::Bytes;
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_ids::TOMBSTONE_BIT;
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -16,7 +17,7 @@ use std::sync::Arc;
 /// MUST NOT be called while holding `commit_mutex` (will deadlock).
 /// Rotation (WAL swap and MemTable swap) is performed under `commit_mutex` to prevent
 /// concurrent sequence allocation races during rotation.
-pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
+pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {
     let _flush_lock = storage.flush_mutex.lock().await;
 
     // Dekker-Write-Fence: Flush vs Purge Koordination
@@ -179,7 +180,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
         let sst_max_tx = reader.metadata().max_tx_id;
-        storage.advance_visibility(contextra_types::TxId::new(sst_max_tx));
+        storage.advance_visibility(contextra_ids::TxId::new(sst_max_tx));
 
         sstables.push(Arc::new(reader));
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
@@ -218,7 +219,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         let uuid_sidecar =
                             std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
                         if let Err(e) = storage.compaction_engine.vfs.remove_file(&uuid_sidecar) {
-                            if !matches!(e, contextra_types::ContextraError::NotFound(_)) {
+                            if !matches!(e, crate::error::StoreError::NotFound(_)) {
                                 tracing::debug!(
                                     "Could not delete sidecar {:?}: {}",
                                     uuid_sidecar,

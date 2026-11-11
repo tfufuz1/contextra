@@ -1,3 +1,13 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 //! # Benchmarking der Cache-Hitrate durch Content-Addressed KV-Stores
 //!
 //! ANCHOR[contextra-kvcache:TEST-CONTENT-HIT-001]

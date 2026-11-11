@@ -2,7 +2,7 @@
 // ZWECK: Zentrales Fehler-Enum VectorError für contextra-vector (B4/R3-Konformität).
 // INVARIANTEN: Zero-Panic, thiserror, non_exhaustive, saubere Zuordnung lokaler Fehler.
 // HOTSPOTS: VectorError, Result<T>
-// STAND: TS:2026-11-11T02:00:00Z
+// STAND: TS:2026-11-11T04:30:00Z
 
 //! # Fehlerbehandlung für `contextra-vector` (B4- & R3-Konformität)
 //!
@@ -19,15 +19,19 @@ use thiserror::Error;
 #[non_exhaustive]
 pub enum VectorError {
     /// Ungültige Eingabe oder Konfigurationsparameter.
-    #[error("invalid input: {0}")]
+    #[error("Invalid input: {0}")]
     InvalidInput(String),
 
     /// Strukturelle Beschädigung oder Inkonsistenz des Index.
-    #[error("index error: {0}")]
+    #[error("Index error: {0}")]
     Index(String),
 
+    /// Speicher- oder Persistenzfehler.
+    #[error("Storage error: {0}")]
+    Storage(String),
+
     /// Dimensionsabweichung bei Einfüge- oder Suchoperationen.
-    #[error("dimension mismatch: expected {expected}, got {actual}")]
+    #[error("Embedding dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch {
         /// Erwartete Vektor-Dimensionalität.
         expected: usize,
@@ -36,7 +40,7 @@ pub enum VectorError {
     },
 
     /// HNSW-Konnektivitätsdegradation festgestellt.
-    #[error("HNSW connectivity degraded: deleted ratio {deleted_ratio:.4}")]
+    #[error("HNSW graph connectivity degraded: {deleted_ratio:.1}% deleted nodes")]
     ConnectivityDegraded {
         /// Verhältnis von gelöschten zu Gesamtknoten.
         deleted_ratio: f64,
@@ -46,17 +50,29 @@ pub enum VectorError {
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(String),
 
+    /// Ressource, Knoten oder Dokument nicht gefunden.
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    /// Konflikt bei Schreiboperation oder Transaktion.
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     /// Fehler bei Nebenläufigkeit oder Sperren-Erfassung.
-    #[error("concurrency error: {0}")]
+    #[error("Concurrency error: {0}")]
     Concurrency(String),
 
     /// Ein-/Ausgabe- oder Persistenzfehler.
-    #[error("io error: {0}")]
+    #[error("I/O error: {0}")]
     Io(String),
 
     /// Nicht unterstützte Fähigkeit der Index-Engine.
-    #[error("unsupported capability: {0}")]
+    #[error("Capability unsupported: vector - {0}")]
     Unsupported(String),
+
+    /// Interner Fehlerzustand.
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl VectorError {

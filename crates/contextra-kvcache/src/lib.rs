@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 #![allow(
     clippy::indexing_slicing,
@@ -45,7 +46,9 @@
 //! 9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung.
 
 pub mod cipher;
+pub mod contract;
 #[cfg(feature = "workspace")]
+/// Kompatibilitätsbrücken für `contextra-types` und `contextra-ports`.
 pub mod compat;
 
 #[cfg(feature = "workspace")]
@@ -54,6 +57,7 @@ pub mod error;
 pub mod types;
 
 pub use cipher::{PlaintextSegmentCipher, SegmentCipher};
+pub use contract::{Clock as KvClock, KvCacheEngine, MemoryKvCache, Rng as KvRng};
 pub use error::{KvCacheError, Result as KvResult};
 pub use types::{
     CacheDirective as KvCacheDirective, ModelFingerprint as KvModelFingerprint,

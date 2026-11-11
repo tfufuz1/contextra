@@ -41,8 +41,11 @@ use serde::{Deserialize, Serialize};
 /// - `checksum`: Hexadezimaler BLAKE3-Hash über die serialisierte Kombination aus `meta` und `components`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CheckpointManifest {
+    /// Zugehörige Checkpoint-Metadaten.
     pub meta: CheckpointMeta,
+    /// Liste der beteiligten Speicherkomponenten oder SSTable-Dateien.
     pub components: Vec<String>,
+    /// BLAKE3-Prüfsumme des Manifests.
     pub checksum: String,
 }
 

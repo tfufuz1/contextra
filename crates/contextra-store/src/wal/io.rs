@@ -3,7 +3,8 @@
 //! Fuehrt sequentielle Appends und fsync-Befehle auf dem physischen Dateisystem durch.
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
-use contextra_types::{ContextraError, Result, TxId};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_ids::TxId;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};

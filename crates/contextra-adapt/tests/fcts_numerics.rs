@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing, clippy::cast_sign_loss)]
 //! Numerische und verhaltensbasierte Testfälle für Flow-Corrected Thompson Sampling (§21.3).
 
 #![cfg(feature = "flow-corrected-thompson")]

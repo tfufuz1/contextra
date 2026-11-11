@@ -211,7 +211,9 @@ fn orphan_file_path() -> std::path::PathBuf {
 /// - `timestamp_ms`: Zeitpunkt der Registrierung in Millisekunden.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PinnedSeqNoOrphan {
+    /// Die verwaiste LSM-Sequenznummer.
     pub seq_no: u64,
+    /// Zeitstempel der Pin-Erstellung in Millisekunden.
     pub timestamp_ms: u64,
 }
 
@@ -237,8 +239,11 @@ pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
 /// - `persist_path`: Dateipfad zur dauerhaften Ablage im JSON-Format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct OrphanState {
+    /// Liste der verwaisten Checkpoints.
     pub checkpoints: Vec<StateCheckpoint>,
+    /// Liste der verwaisten Sequenznummern-Pins.
     pub pinned_seq_nos: Vec<PinnedSeqNoOrphan>,
+    /// Dateipfad zur Persistierung des Zustands.
     pub persist_path: std::path::PathBuf,
 }
 

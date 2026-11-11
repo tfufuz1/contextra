@@ -4,7 +4,7 @@
 
 use super::*;
 use bytes::Bytes;
-use contextra_types::ContextraError;
+use crate::error::StoreError;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 

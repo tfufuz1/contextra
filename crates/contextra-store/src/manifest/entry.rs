@@ -11,7 +11,7 @@
 // Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.
 
 use crate::error::{StoreError, StoreResult};
-use contextra_types::Result;
+use crate::error::StoreResult as Result;
 use std::path::PathBuf;
 
 use super::MAX_MANIFEST_ENTRY_SIZE;

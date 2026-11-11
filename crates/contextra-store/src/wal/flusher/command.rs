@@ -1,4 +1,4 @@
-use contextra_types::Result;
+use crate::error::StoreResult as Result;
 use std::path::PathBuf;
 use super::super::{WalEntry, WalVersion};
 

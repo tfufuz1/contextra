@@ -106,6 +106,10 @@ pub enum StoreError {
     /// Konfigurationsfehler im Durability-Modus.
     #[error("Durability configuration error: {0}")]
     DurabilityConfig(String),
+
+    /// Sandbox error.
+    #[error("Sandbox error: {0}")]
+    Sandbox(String),
 }
 
 impl StoreError {
@@ -129,6 +133,13 @@ impl StoreError {
 
     /// Erzeugt einen neuen `StoreError::InvalidInput`.
     #[must_use]
+    pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
+        Self::WalTruncationDetected {
+            expected_hmac,
+            actual_hmac,
+        }
+    }
+
     pub fn invalid_input(reason: impl Into<String>) -> Self {
         Self::InvalidInput(reason.into())
     }
@@ -142,3 +153,16 @@ impl From<contextra_crypto::CryptoError> for StoreError {
 
 /// Ergebnis-Typ fuer Speicheroperationen.
 pub type StoreResult<T> = std::result::Result<T, StoreError>;
+
+impl From<contextra_mvcc::MvccError> for StoreError {
+    fn from(err: contextra_mvcc::MvccError) -> Self {
+        match err {
+            contextra_mvcc::MvccError::Conflict(s) => StoreError::Conflict(s),
+            contextra_mvcc::MvccError::Transaction(s) => StoreError::Transaction(s),
+            contextra_mvcc::MvccError::LimitExceeded { limit, context } => StoreError::LimitExceeded { limit, context },
+            contextra_mvcc::MvccError::Storage(s) => StoreError::Storage(s),
+            contextra_mvcc::MvccError::InvalidInput(s) => StoreError::InvalidInput(s),
+            other => StoreError::Transaction(other.to_string()),
+        }
+    }
+}

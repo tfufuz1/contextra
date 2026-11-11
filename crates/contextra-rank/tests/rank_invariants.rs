@@ -7,6 +7,14 @@
 //! - Conformal Coverage: Empirische Überdeckung >= 1 - alpha.
 //! - DiBud Streaming- vs Batch-Äquivalenz.
 
+#![allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation
+)]
+
 use contextra_rank::calibration::{
     calibrate_score, AdaptiveConformalCalibrator, Calibrator, ConformalCalibrator,
     IsotonicCalibrator,

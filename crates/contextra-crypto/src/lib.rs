@@ -43,6 +43,7 @@
 pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
+pub mod contract;
 #[cfg(feature = "workspace")]
 pub mod compat;
 pub mod crypto;
@@ -60,6 +61,7 @@ pub mod wal_crypto;
 // SECTION [epic=crypto-core,seq=2] Re-Exports & Primäre Schnittstellen
 // ANCHOR[contextra-crypto:LIB-001] Zentraler Einstiegspunkt für Baustein-Nutzer
 pub use aead::*;
+pub use contract::*;
 pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};
 pub use kdf::hkdf_expand;
 pub use secret::SecretKey;

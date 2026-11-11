@@ -1,0 +1,10 @@
+[
+  {
+    "crate": "contextra-crypto",
+    "is_allowed_island": false,
+    "root_forbid_unsafe": true,
+    "total_unsafe_occurrences": 0,
+    "missing_safety_comments": 0,
+    "files_with_unsafe": []
+  }
+]

@@ -274,6 +274,31 @@ impl InMemoryFenceGate {
         }
         Ok(())
     }
+
+    /// Synchroner Check auf einen Schlüssel (inherente Methode für Abwärtskompatibilität).
+    pub fn is_fenced(&self, key: impl AsRef<[u8]>) -> bool {
+        <Self as FenceGate>::is_fenced(self, key.as_ref())
+    }
+
+    /// Fügt einen Einzelschlüssel zum Fence hinzu (inherente Hilfsmethode).
+    pub fn add_fenced_key(&self, key: [u8; 16]) {
+        let _ = <Self as FenceGate>::acquire_fence(self, FenceRange::Exact(key.to_vec()));
+    }
+}
+
+impl crate::types_local::FenceGate for InMemoryFenceGate {
+    fn acquire_fence<'a>(
+        &'a self,
+        _scope: &'a crate::types_local::KeyScope,
+    ) -> crate::types_local::BoxFuture<'a, Result<crate::types_local::FencePermit, crate::error::ErasureError>> {
+        Box::pin(async move {
+            Ok(crate::types_local::FencePermit::new(Some(Arc::new(()))))
+        })
+    }
+
+    fn is_fenced(&self, key: &crate::types_local::KeyBuf) -> bool {
+        <Self as FenceGate>::is_fenced(self, key.as_bytes())
+    }
 }
 
 impl FenceGate for InMemoryFenceGate {

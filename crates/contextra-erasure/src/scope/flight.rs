@@ -86,6 +86,7 @@ impl SingleFlightCoordinator {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::types_local::TenantId;

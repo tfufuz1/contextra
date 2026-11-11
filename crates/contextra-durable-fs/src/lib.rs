@@ -1,7 +1,7 @@
 #![allow(clippy::disallowed_types, clippy::disallowed_methods)]
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 //! # Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`contextra-durable-fs`)
 //!

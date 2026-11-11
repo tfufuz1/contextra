@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop, clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::indexing_slicing, clippy::expect_used)]
 #![cfg(feature = "bandit-routing")]
 #![allow(clippy::needless_range_loop)]
 //! # Differential-Property-Tests für Sherman-Morrison Matrixinversion

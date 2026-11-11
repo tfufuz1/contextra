@@ -1,6 +1,5 @@
 //! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
 
-// TODO(baukasten): WAL und Integritätskette modularisieren (AD-8). Abstraktion der kryptografischen Verkettung über ChainSigner-Trait; Trennung von Store-LSM und Store-WAL.
 pub mod encode;
 pub mod flusher;
 pub mod hmac;
@@ -342,7 +341,7 @@ pub(crate) mod fs {
 }
 
 pub use contextra_crypto::crypto::KeyManager;
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -382,7 +381,7 @@ pub struct WalConfig {
     pub(crate) allow_legacy_integrity_key_fallback: bool,
     pub min_wal_version: WalVersion,
     pub flusher_config: WalFlusherConfig,
-    pub id_gen: Option<Arc<dyn contextra_ports::IdGen>>,
+    pub id_gen: Option<Arc<dyn contextra_env::IdGen>>,
 }
 
 impl std::fmt::Debug for WalConfig {
@@ -418,7 +417,7 @@ impl WalConfig {
         self
     }
 
-    pub fn with_id_gen(mut self, id_gen: Arc<dyn contextra_ports::IdGen>) -> Self {
+    pub fn with_id_gen(mut self, id_gen: Arc<dyn contextra_env::IdGen>) -> Self {
         self.id_gen = Some(id_gen);
         self
     }
@@ -727,7 +726,7 @@ impl Wal {
                     e
                 ))
             })?;
-            crate::util::fsync_parent_dir(&path).await?;
+            crate::fsync::sync_parent_dir(&path).await?;
         }
 
         let metadata = file
@@ -795,7 +794,7 @@ impl Wal {
                             "WAL backup fsync failed before rewrite: {e}"
                         ))
                     })?;
-                    crate::util::fsync_parent_dir(&bak_path).await?;
+                    crate::fsync::sync_parent_dir(&bak_path).await?;
                 }
                 let rewrite_res = wal.rewrite_as_v3(&entries).await;
 

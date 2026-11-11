@@ -2,9 +2,16 @@
 name = "contextra-adapt"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
-rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+rust-version = "1.89"
 description = "Adaptive controllers, bandits, and PID regulators for Contextra"
+repository = "https://github.com/tfufuz1/contextra"
+readme = "README.md"
+keywords = ["adaptive-control", "bandits", "pid", "drift-detection", "online-learning"]
+categories = ["algorithms", "mathematics", "science"]
+include = ["src/**/*", "tests/**/*", "benches/**/*", "examples/**/*", "Cargo.toml", "README.md", "CHANGELOG.md", "LICENSE-*"]
+# Internes Bausteinlager; keine Veröffentlichung auf crates.io
+publish = false
 
 [package.metadata.contextra]
 ring = "0"
@@ -13,6 +20,8 @@ klasse = "A"
 [dependencies]
 ahash = { workspace = true }
 blake3 = { workspace = true }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0", default-features = false, optional = true }
+contextra-types = { path = "../contextra-types", version = "0.1.0", default-features = false, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -21,9 +30,19 @@ tracing = { workspace = true }
 [features]
 default = ["std"]
 std = []
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+types-compat = ["dep:contextra-types"]
+ports-compat = ["dep:contextra-ports"]
+
+# Standard & experimentelle Bandit-Features
 bandit-routing = []
-flow-corrected-thompson = ["bandit-routing"]
-rie-greedy-personalization = []
+exp-bandit-routing = ["bandit-routing"]
+
+flow-corrected-thompson = ["exp-flow-thompson"]
+exp-flow-thompson = ["bandit-routing"]
+
+rie-greedy-personalization = ["exp-rie-greedy"]
+exp-rie-greedy = []
 
 [dev-dependencies]
 criterion = { workspace = true }

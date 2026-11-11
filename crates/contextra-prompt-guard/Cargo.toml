@@ -4,9 +4,17 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Signatur- und phrasenbasierte Prompt-Injection-Erkennung und Quarantäne-Policy"
+repository = "https://github.com/contextra/contextra"
+keywords = ["prompt-injection", "security", "guard", "filter", "heuristics"]
+categories = ["algorithms", "text-processing"]
+readme = "README.md"
+rust-version = "1.89.0"
+include = ["src/**/*", "Cargo.toml", "README.md", "CHANGELOG.md"]
+# Interner Baustein des Baukastens, kein Standalone-Crates.io-Publishing vorgesehen
+publish = false
 
 [features]
-default = ["std", "file-audit"]
+default = ["std"]
 std = []
 file-audit = []
 

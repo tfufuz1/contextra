@@ -12,8 +12,8 @@ mod tests {
         DISKANN_INTEGRITY_KEY, DISKANN_VERSION, PENDING_WAL_MAGIC, PENDING_WAL_VERSION,
     };
     use crate::diskann::types::{DiskAnnIndex, SearchCandidate};
-    use contextra_ports::VectorIndex;
-    use contextra_types::{ContextraError, DistanceMetric, DocId, Result, TxId};
+        use crate::error::{Result, VectorError};
+use crate::types::{DistanceMetric, DocId, TxId};
     use std::collections::HashSet;
     use std::path::PathBuf;
 
@@ -57,7 +57,7 @@ mod tests {
             ..DiskAnnConfig::default()
         };
         let res = DiskAnnIndex::try_new(bad_config);
-        assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
+        assert!(matches!(res, Err(VectorError::InvalidInput(_))));
     }
 
     #[tokio::test]
@@ -67,12 +67,12 @@ mod tests {
         let doc_id = DocId::from(100u64);
 
         let delete_res = index.delete(tx, doc_id).await;
-        assert!(matches!(delete_res, Err(ContextraError::NotFound(_))));
+        assert!(matches!(delete_res, Err(VectorError::NotFound(_))));
     }
 
     #[tokio::test]
     async fn test_diskann_tombstone_delete_search_filtering() -> Result<()> {
-        let dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let index_path = dir.path().join("tombstone_filtering.idx");
         let config = DiskAnnConfig {
             index_path: index_path.clone(),
@@ -105,7 +105,7 @@ mod tests {
 
         // Deleting doc 10 again returns NotFound
         let del2 = index.delete(TxId(1), DocId::from(10u64)).await;
-        assert!(matches!(del2, Err(ContextraError::NotFound(_))));
+        assert!(matches!(del2, Err(VectorError::NotFound(_))));
 
         // 3. Search query no longer returns doc 10, instead returns doc 20
         let res_after_del = index.search(&query, 1).await?;
@@ -523,7 +523,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_diskann_build_search_roundtrip() -> Result<()> {
-        let dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let config = DiskAnnConfig {
             index_path: dir.path().join("smoke.diskann"),
             dimension: 4,
@@ -646,7 +646,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_diskann_loaded_doc_ids_match_original() -> Result<()> {
-        let dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let config = DiskAnnConfig {
             index_path: dir.path().join("doc_ids.diskann"),
             dimension: 4,
@@ -680,7 +680,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_diskann_incremental_insert_connectivity_and_searchability() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let index_path = temp_dir.path().join("connectivity.idx");
 
         let config = DiskAnnConfig {
@@ -824,7 +824,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_diskann_pending_wal_recovery() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let index_path = temp_dir.path().join("wal_recovery.idx");
 
         let config = DiskAnnConfig {
@@ -894,7 +894,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_diskann_robust_prune_handles_nan_distance_without_panic() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let config = DiskAnnConfig {
             index_path: temp_dir.path().join("robust_prune_nan.idx"),
             dimension: 4,
@@ -949,7 +949,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_diskann_query_handles_nan_neighbor_distance() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let index_path = temp_dir.path().join("query_nan_neighbor.idx");
         let config = DiskAnnConfig {
             index_path: index_path.clone(),
@@ -981,7 +981,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pending_wal_roundtrip_hmac() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let wal_path = temp_dir.path().join("test_roundtrip.pending.wal");
 
         let doc_id = DocId::from(42u64);
@@ -999,7 +999,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pending_wal_corrupt_payload_skips_entry() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let wal_path = temp_dir.path().join("test_corrupt.pending.wal");
 
         let doc1 = DocId::from(100u64);
@@ -1013,13 +1013,13 @@ mod tests {
         // Corrupt a byte in the embedding payload of entry 1
         let mut data = tokio::fs::read(&wal_path)
             .await
-            .map_err(ContextraError::Io)?;
+            .map_err(VectorError::Io)?;
         // Header is 5 bytes. Entry 1 starts at byte 5.
         // ID: 8 bytes, Dim: 4 bytes -> Embedding starts at byte 5 + 12 = 17.
         data[18] ^= 0xFF;
         tokio::fs::write(&wal_path, &data)
             .await
-            .map_err(ContextraError::Io)?;
+            .map_err(VectorError::Io)?;
 
         let recovered = DiskAnnIndex::read_pending_wal(&wal_path)?;
 
@@ -1033,7 +1033,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pending_wal_absurd_dim_prevents_allocation() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let wal_path = temp_dir.path().join("test_absurd_dim.pending.wal");
 
         let mut data = Vec::new();
@@ -1047,7 +1047,7 @@ mod tests {
 
         tokio::fs::write(&wal_path, &data)
             .await
-            .map_err(ContextraError::Io)?;
+            .map_err(VectorError::Io)?;
 
         let recovered = DiskAnnIndex::read_pending_wal(&wal_path)?;
 
@@ -1059,7 +1059,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pending_wal_rejects_legacy_unversioned_file() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
+        let temp_dir = tempfile::tempdir().map_err(VectorError::Io)?;
         let wal_path = temp_dir.path().join("legacy.pending.wal");
 
         // Legacy format: raw u64 id, u32 dim, f32s without PWAL magic header
@@ -1071,7 +1071,7 @@ mod tests {
 
         tokio::fs::write(&wal_path, &data)
             .await
-            .map_err(ContextraError::Io)?;
+            .map_err(VectorError::Io)?;
 
         let result = DiskAnnIndex::read_pending_wal(&wal_path);
         assert!(result.is_err());

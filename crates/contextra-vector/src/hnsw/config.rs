@@ -4,7 +4,8 @@
 // HOTSPOTS: HnswConfig::validate, HnswConfigBuilder::build
 // STAND: TS:2026-11-11T02:00:00Z
 
-use contextra_types::{ContextraError, DistanceMetric, Result};
+use crate::error::{Result, VectorError};
+use crate::types::DistanceMetric;
 
 use super::types::HNSW_REBUILD_DELETION_RATIO;
 
@@ -80,32 +81,32 @@ impl HnswConfig {
     // ANCHOR[contextra-vector:HNSW-CONFIG-VALIDATE]
     pub fn validate(&self) -> Result<()> {
         if self.dimension == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "dimension must be greater than 0",
             ));
         }
         if self.m == 0 {
-            return Err(ContextraError::invalid_input("m must be greater than 0"));
+            return Err(VectorError::invalid_input("m must be greater than 0"));
         }
         if self.ef_search == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "ef_search must be greater than 0",
             ));
         }
         if self.ef_construction < self.m {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "ef_construction ({}) must be >= m ({})",
                 self.ef_construction, self.m
             )));
         }
         if !(0.0..=1.0).contains(&self.rebuild_threshold) {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "rebuild_threshold ({}) must be between 0.0 and 1.0",
                 self.rebuild_threshold
             )));
         }
         if !(0.0..=1.0).contains(&self.quantizer_drift_threshold) {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "quantizer_drift_threshold ({}) must be between 0.0 and 1.0",
                 self.quantizer_drift_threshold
             )));

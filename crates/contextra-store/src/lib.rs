@@ -58,6 +58,7 @@ pub use error::{StoreError, StoreResult};
 #[cfg(not(loom))]
 pub mod compaction;
 #[cfg(not(loom))]
+#[cfg(feature = "workspace")]
 pub mod engine;
 pub mod fsync;
 pub mod key_source;
@@ -68,6 +69,7 @@ pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
 #[cfg(not(loom))]
+#[cfg(feature = "workspace")]
 pub mod scanner;
 #[cfg(not(loom))]
 pub mod sstable;
@@ -103,4 +105,4 @@ pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
 
 pub mod io_seam;
-pub use io_seam::{RealFs, RealFsFile, StoreIo};
+pub use io_seam::{RealFs, RealFsFile, StoreIo, Vfs, VfsFile, VfsOpenOptions};

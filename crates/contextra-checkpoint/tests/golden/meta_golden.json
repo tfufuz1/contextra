@@ -7,5 +7,6 @@
     "env": "golden_production",
     "retention_days": 30
   },
-  "created_at": 1700000000000
+  "created_at": 1700000000000,
+  "id_width_bits": 64
 }

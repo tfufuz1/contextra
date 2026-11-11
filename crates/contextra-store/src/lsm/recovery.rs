@@ -11,9 +11,10 @@ use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
-use contextra_ports::Vfs;
-use contextra_ports::{ResourceBudget, ResourceTracker};
-use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
+use crate::io_seam::Vfs;
+use crate::budget::{ResourceBudget, ResourceTracker};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_ids::{TxId, TOMBSTONE_BIT};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -191,7 +192,7 @@ impl LsmStorage {
                 }
                 buf
             }
-            Err(ContextraError::NotFound(_)) => {
+            Err(crate::error::StoreError::NotFound(_)) => {
                 if !directory_is_pristine(&config.path).await? {
                     return Err(ContextraError::Storage(
                         "SALT file missing in non-pristine database directory".into(),
@@ -386,10 +387,10 @@ impl LsmStorage {
         };
         let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;
 
-        let budget_config = ResourceBudget {
-            memory_limit: config.max_ram_mb * 1024 * 1024,
+        let budget_config = crate::budget::ResourceBudget {
+            memory_limit: (config.max_ram_mb * 1024 * 1024) as usize,
         };
-        let resource_tracker = Arc::new(ResourceTracker::new(budget_config));
+        let resource_tracker = Arc::new(crate::budget::ResourceTracker::new(budget_config));
         if replayed_size > 0 {
             if let Err(e) = resource_tracker.consume_memory(replayed_size) {
                 tracing::warn!(
@@ -537,9 +538,9 @@ impl LsmStorage {
         let pressure_rx = pressure_monitor.pressure_rx.clone();
         let ct_pressure = cancel_token.clone();
         let metrics_sink_container = Arc::new(parking_lot::RwLock::new(Arc::new(
-            contextra_ports::NoopMetricsSink,
+            contextra_env::NoopMetricsSink,
         )
-            as Arc<dyn contextra_ports::MetricsSink>));
+            as Arc<dyn contextra_env::MetricsSink>));
         let metrics_sink_for_pressure = Arc::clone(&metrics_sink_container);
 
         task_tracker.spawn(async move {

@@ -20,9 +20,8 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_ports::StorageStats;
-use contextra_ports::{BoxFuture, Result, StorageEngine};
-use contextra_types::{CollectionId, DocId, TenantId, TxId};
+use crate::stats::StorageStats;
+use contextra_ids::{CollectionId, DocId, TenantId, TxId};
 use std::ops::Bound;
 use std::sync::Arc;
 
@@ -112,393 +111,13 @@ impl TenantKeyCodec {
 }
 
 /// Internal trait abstraction enabling `TenantScopedStorage` to wrap both `S: StorageEngine` and `Arc<S>`.
-pub trait StorageEngineHandle: Send + Sync + 'static {
-    fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
-    fn get_at_seq_handle<'a>(
-        &'a self,
-        key: &'a [u8],
-        seq_no: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>>;
-    fn get_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<Bytes>>>;
-    fn get_at_seq_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>>;
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
-    fn supports_ssi_tracking_handle(&self) -> bool;
-    fn put_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>>;
-    fn put_if_absent_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<bool>>;
-    fn put_batch_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        entries: &'a [(Vec<u8>, Vec<u8>)],
-    ) -> BoxFuture<'a, Result<()>>;
-    fn delete_handle<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>>;
-    fn delete_many_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        keys: Vec<Vec<u8>>,
-    ) -> BoxFuture<'a, Result<u64>>;
-    fn delete_prefix_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<u64>>;
-    fn commit_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
-    fn rollback_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
-    fn rollback_to_tx_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
-    fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>>;
-    fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>>;
-    fn last_seq_no_handle<'a>(&'a self) -> BoxFuture<'a, Result<u64>>;
-    fn last_tx_id_handle<'a>(&'a self) -> BoxFuture<'a, Result<TxId>>;
-    fn pin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
-    fn unpin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix_bounded_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>>;
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix_at_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        seq_no: u64,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
-    #[allow(clippy::type_complexity)]
-    fn scan_handle<'a>(
-        &'a self,
-        start: Bound<&'a [u8]>,
-        end: Bound<&'a [u8]>,
-        limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>>;
-    #[allow(clippy::type_complexity)]
-    fn scan_bounded_handle<'a>(
-        &'a self,
-        start: Bound<&'a [u8]>,
-        end: Bound<&'a [u8]>,
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>>;
-}
+// MIGRATION(S-70): StorageEngineHandle moved to compat::engine::tenant_storage
+#[cfg(feature = "workspace")]
+pub use crate::compat::engine::tenant_storage::*;
 
-impl StorageEngineHandle for LsmStorage {
-    fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        self.get(key)
-    }
-    fn get_at_seq_handle<'a>(
-        &'a self,
-        key: &'a [u8],
-        seq_no: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        self.get_at_seq(key, seq_no)
-    }
-    fn get_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        Box::pin(self.get_tracked(tx_id, key))
-    }
-    fn get_at_seq_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        Box::pin(self.get_at_seq_tracked(tx_id, key, seq))
-    }
-    fn scan_prefix_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(self.scan_prefix_tracked(tx_id, prefix))
-    }
-    fn supports_ssi_tracking_handle(&self) -> bool {
-        self.supports_ssi_tracking()
-    }
-    fn put_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
-        self.put(tx_id, key, value)
-    }
-    fn put_if_absent_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<bool>> {
-        self.put_if_absent(tx_id, key, value)
-    }
-    fn put_batch_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        entries: &'a [(Vec<u8>, Vec<u8>)],
-    ) -> BoxFuture<'a, Result<()>> {
-        self.put_batch(tx_id, entries)
-    }
-    fn delete_handle<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        self.delete(tx_id, key)
-    }
-    fn delete_many_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        keys: Vec<Vec<u8>>,
-    ) -> BoxFuture<'a, Result<u64>> {
-        self.delete_many(tx_id, keys)
-    }
-    fn delete_prefix_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<u64>> {
-        self.delete_prefix(tx_id, prefix)
-    }
-    fn commit_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        self.commit(tx_id)
-    }
-    fn rollback_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        self.rollback(tx_id)
-    }
-    fn rollback_to_tx_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(self.rollback_to_tx(tx_id))
-    }
-    fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        self.flush()
-    }
-    fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        self.stats()
-    }
-    fn last_seq_no_handle<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        self.last_seq_no()
-    }
-    fn last_tx_id_handle<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        self.last_tx_id()
-    }
-    fn pin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        self.pin_checkpoint(seq_no)
-    }
-    fn unpin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        self.unpin_checkpoint(seq_no)
-    }
-    fn scan_prefix_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        self.scan_prefix(prefix)
-    }
-    fn scan_prefix_bounded_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        self.scan_prefix_bounded(prefix, limit, cursor)
-    }
-    fn scan_prefix_at_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        seq_no: u64,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        self.scan_prefix_at(prefix, seq_no)
-    }
-    fn scan_handle<'a>(
-        &'a self,
-        start: Bound<&'a [u8]>,
-        end: Bound<&'a [u8]>,
-        limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        self.scan(start, end, limit)
-    }
-    fn scan_bounded_handle<'a>(
-        &'a self,
-        start: Bound<&'a [u8]>,
-        end: Bound<&'a [u8]>,
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        self.scan_bounded(start, end, limit, cursor)
-    }
-}
-
-impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
-    fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get(key)
-    }
-    fn get_at_seq_handle<'a>(
-        &'a self,
-        key: &'a [u8],
-        seq_no: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq(key, seq_no)
-    }
-    fn get_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_tracked(tx_id, key)
-    }
-    fn get_at_seq_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        seq: u64,
-    ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq_tracked(tx_id, key, seq)
-    }
-    fn scan_prefix_tracked_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_tracked(tx_id, prefix)
-    }
-    fn supports_ssi_tracking_handle(&self) -> bool {
-        (**self).supports_ssi_tracking()
-    }
-    fn put_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
-        (**self).put(tx_id, key, value)
-    }
-    fn put_if_absent_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<bool>> {
-        (**self).put_if_absent(tx_id, key, value)
-    }
-    fn put_batch_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        entries: &'a [(Vec<u8>, Vec<u8>)],
-    ) -> BoxFuture<'a, Result<()>> {
-        (**self).put_batch(tx_id, entries)
-    }
-    fn delete_handle<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        (**self).delete(tx_id, key)
-    }
-    fn delete_many_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        keys: Vec<Vec<u8>>,
-    ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_many(tx_id, keys)
-    }
-    fn delete_prefix_handle<'a>(
-        &'a self,
-        tx_id: TxId,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_prefix(tx_id, prefix)
-    }
-    fn commit_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).commit(tx_id)
-    }
-    fn rollback_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback(tx_id)
-    }
-    fn rollback_to_tx_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback_to_tx(tx_id)
-    }
-    fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        (**self).flush()
-    }
-    fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        (**self).stats()
-    }
-    fn last_seq_no_handle<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        (**self).last_seq_no()
-    }
-    fn last_tx_id_handle<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        (**self).last_tx_id()
-    }
-    fn pin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).pin_checkpoint(seq_no)
-    }
-    fn unpin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).unpin_checkpoint(seq_no)
-    }
-    fn scan_prefix_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix(prefix)
-    }
-    fn scan_prefix_bounded_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_prefix_bounded(prefix, limit, cursor)
-    }
-    fn scan_prefix_at_handle<'a>(
-        &'a self,
-        prefix: &'a [u8],
-        seq_no: u64,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_at(prefix, seq_no)
-    }
-    fn scan_handle<'a>(
-        &'a self,
-        start: Bound<&'a [u8]>,
-        end: Bound<&'a [u8]>,
-        limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan(start, end, limit)
-    }
-    fn scan_bounded_handle<'a>(
-        &'a self,
-        start: Bound<&'a [u8]>,
-        end: Bound<&'a [u8]>,
-        limit: usize,
-        cursor: Option<&'a [u8]>,
-    ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_bounded(start, end, limit, cursor)
-    }
-}
-
-/// Tenant-aware `StorageEngine` wrapper implementing strict key-level isolation (INV-TENANT-2).
 pub struct TenantScopedStorage<S> {
-    inner: S,
-    codec: TenantKeyCodec,
+    pub(crate) inner: S,
+    pub(crate) codec: TenantKeyCodec,
 }
 
 impl<S> TenantScopedStorage<S> {
@@ -516,7 +135,7 @@ impl<S> TenantScopedStorage<S> {
     }
 
     #[inline]
-    fn make_key(&self, key: &[u8]) -> Vec<u8> {
+    pub(crate) fn make_key(&self, key: &[u8]) -> Vec<u8> {
         let prefix = self.codec.scan_prefix();
         let mut physical = Vec::with_capacity(prefix.len() + key.len());
         physical.extend_from_slice(prefix);
@@ -525,7 +144,7 @@ impl<S> TenantScopedStorage<S> {
     }
 
     #[inline]
-    fn strip_key(&self, key: Vec<u8>) -> Option<Vec<u8>> {
+    pub(crate) fn strip_key(&self, key: Vec<u8>) -> Option<Vec<u8>> {
         let prefix = self.codec.scan_prefix();
         if key.starts_with(prefix) {
             Some(key[prefix.len()..].to_vec())
@@ -534,7 +153,7 @@ impl<S> TenantScopedStorage<S> {
         }
     }
 
-    fn filter_strip_batch(&self, batch: Vec<(Vec<u8>, Vec<u8>)>) -> Vec<(Vec<u8>, Vec<u8>)> {
+    pub(crate) fn filter_strip_batch(&self, batch: Vec<(Vec<u8>, Vec<u8>)>) -> Vec<(Vec<u8>, Vec<u8>)> {
         let prefix = self.codec.scan_prefix();
         batch
             .into_iter()
@@ -549,7 +168,7 @@ impl<S> TenantScopedStorage<S> {
     }
 }
 
-fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
     let mut ub = prefix.to_vec();
     while let Some(last) = ub.pop() {
         if last < 0xFF {
@@ -560,7 +179,7 @@ fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
     None
 }
 
-fn bound_as_ref(bound: &Bound<Vec<u8>>) -> Bound<&[u8]> {
+pub(crate) fn bound_as_ref(bound: &Bound<Vec<u8>>) -> Bound<&[u8]> {
     match bound {
         Bound::Included(v) => Bound::Included(v.as_slice()),
         Bound::Excluded(v) => Bound::Excluded(v.as_slice()),

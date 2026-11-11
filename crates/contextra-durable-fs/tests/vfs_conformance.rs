@@ -1,3 +1,4 @@
+#![allow(clippy::expect_used, clippy::indexing_slicing)]
 use contextra_durable_fs::vfs::{StdVfs, Vfs};
 use tempfile::tempdir;
 

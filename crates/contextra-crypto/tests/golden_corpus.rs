@@ -141,7 +141,7 @@ fn test_golden_corpus_files_exist_and_match_manifest() {
         let file_path = format!("{GOLDEN_DIR}/{filename}");
 
         let file_bytes = fs::read(&file_path)
-            .unwrap_or_else(|e| panic!("Could not read golden file {file_path}: {e}"));
+            .expect("Could not read golden file");
         let actual_sha256 = compute_sha256(&file_bytes);
 
         assert_eq!(

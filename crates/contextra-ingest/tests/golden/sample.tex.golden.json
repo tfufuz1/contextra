@@ -1,0 +1,51 @@
+{
+  "source_file": "sample.tex",
+  "detected_format": "Tex",
+  "title": "Einleitung",
+  "canonical_hash": "c90721d00d09c6d7bdf5b1285a6d1a1d6b21746f4f0bbf28d146f23d0b1e8856",
+  "chunk_count": 2,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Beispiel LaTeX\n\nContextra",
+      "token_count": 6,
+      "metadata": {
+        "chunk_id": "a1ce5c0714b108d2c822a63715d6bf71",
+        "chunk_index": 0,
+        "chunk_total": 2,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Einleitung",
+        "format": "tex",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 25,
+          "start": 0
+        },
+        "strategy": "prose"
+      }
+    },
+    {
+      "index": 1,
+      "content": "## Einleitung\n\nDies ist ein einfacher -Beispieltext.",
+      "token_count": 13,
+      "metadata": {
+        "breadcrumb": "## Einleitung",
+        "chunk_id": "6450701b3907cefc6a85a95c97a06982",
+        "chunk_index": 1,
+        "chunk_total": 2,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Einleitung",
+        "format": "tex",
+        "heading_level": 2,
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 79,
+          "start": 27
+        },
+        "strategy": "prose"
+      }
+    }
+  ]
+}

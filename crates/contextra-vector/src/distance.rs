@@ -14,7 +14,8 @@
 pub mod contract;
 
 use contract::{DistanceFn, Error as ContractError, Metric as ContractMetric};
-use contextra_types::{ContextraError, DistanceMetric, Result};
+use crate::error::{Result, VectorError};
+use crate::types::DistanceMetric;
 
 // SECTION Datentypen für SIMD- und Quantisierungs-Distanz
 
@@ -96,7 +97,7 @@ impl ScalarKernel {
     #[inline]
     fn validate_slices(a: &[f32], b: &[f32]) -> Result<()> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Vector dimensions must match: {} != {}",
                 a.len(),
                 b.len()
@@ -110,13 +111,13 @@ impl ScalarKernel {
     #[inline]
     fn validate_bytes(a: &[f32], b_bytes: &[u8]) -> Result<()> {
         if b_bytes.len() % 4 != 0 {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Byte slice length {} is not aligned to 4 bytes",
                 b_bytes.len()
             )));
         }
         if b_bytes.len() / 4 != a.len() {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Dimension mismatch: f32 slice len {} != byte float count {}",
                 a.len(),
                 b_bytes.len() / 4
@@ -128,7 +129,7 @@ impl ScalarKernel {
             arr.copy_from_slice(chunk);
             let val = f32::from_le_bytes(arr);
             if !val.is_finite() {
-                return Err(ContextraError::invalid_input(
+                return Err(VectorError::invalid_input(
                     "NaN or Infinity detected in vector bytes",
                 ));
             }
@@ -153,7 +154,7 @@ impl DistanceKernel for ScalarKernel {
     #[inline]
     fn distance_trusted(&self, metric: DistanceMetric, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Vector dimensions must match: {} != {}",
                 a.len(),
                 b.len()
@@ -163,7 +164,7 @@ impl DistanceKernel for ScalarKernel {
             DistanceMetric::Cosine => self.cosine_distance(a, b),
             DistanceMetric::Euclidean => self.euclidean_distance(a, b),
             DistanceMetric::DotProduct => self.dot_product_distance(a, b),
-            _ => Err(ContextraError::invalid_input("Unsupported distance metric")),
+            _ => Err(VectorError::invalid_input("Unsupported distance metric")),
         }
     }
 
@@ -175,7 +176,7 @@ impl DistanceKernel for ScalarKernel {
         b_bytes: &[u8],
     ) -> Result<f32> {
         if b_bytes.len() % 4 != 0 || b_bytes.len() / 4 != a.len() {
-            return Err(ContextraError::invalid_input(format!(
+            return Err(VectorError::invalid_input(format!(
                 "Byte alignment or length mismatch: b_bytes len {}, a len {}",
                 b_bytes.len(),
                 a.len()
@@ -225,14 +226,14 @@ impl DistanceKernel for ScalarKernel {
                 }
                 Ok(-dot)
             }
-            _ => Err(ContextraError::invalid_input("Unsupported distance metric")),
+            _ => Err(VectorError::invalid_input("Unsupported distance metric")),
         }
     }
 
     #[inline]
     fn cosine_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "Vector dimensions must match",
             ));
         }
@@ -258,7 +259,7 @@ impl DistanceKernel for ScalarKernel {
     #[inline]
     fn dot_product_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "Vector dimensions must match",
             ));
         }
@@ -272,7 +273,7 @@ impl DistanceKernel for ScalarKernel {
     #[inline]
     fn euclidean_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
         if a.len() != b.len() {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "Vector dimensions must match",
             ));
         }
@@ -451,7 +452,7 @@ impl<D: DistanceFn + 'static> DistanceKernel for InjectedDistanceKernel<D> {
         ScalarKernel::validate_slices(a, b)?;
         let d = self.distance_fn.distance(a, b);
         if d.is_nan() {
-            Err(ContextraError::invalid_input("Distance computation produced NaN"))
+            Err(VectorError::invalid_input("Distance computation produced NaN"))
         } else {
             Ok(d)
         }
@@ -537,7 +538,7 @@ impl<D: DistanceFn + 'static> DistanceKernel for InjectedDistanceKernel<D> {
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
-        return Err(ContextraError::invalid_input(
+        return Err(VectorError::invalid_input(
             "NaN or Infinity detected in vector",
         ));
     }
@@ -566,10 +567,10 @@ pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) ->
     {
         let disp = contextra_simd::Dispatcher::auto();
         match metric {
-            DistanceMetric::Cosine => disp.cosine_distance(a, b).map_err(|e| ContextraError::invalid_input(e.to_string())),
-            DistanceMetric::Euclidean => disp.euclidean_distance(a, b).map_err(|e| ContextraError::invalid_input(e.to_string())),
-            DistanceMetric::DotProduct => disp.dot_product_distance(a, b).map_err(|e| ContextraError::invalid_input(e.to_string())),
-            _ => disp.cosine_distance(a, b).map_err(|e| ContextraError::invalid_input(e.to_string())),
+            DistanceMetric::Cosine => disp.cosine_distance(a, b).map_err(|e| VectorError::invalid_input(e.to_string())),
+            DistanceMetric::Euclidean => disp.euclidean_distance(a, b).map_err(|e| VectorError::invalid_input(e.to_string())),
+            DistanceMetric::DotProduct => disp.dot_product_distance(a, b).map_err(|e| VectorError::invalid_input(e.to_string())),
+            _ => disp.cosine_distance(a, b).map_err(|e| VectorError::invalid_input(e.to_string())),
         }
     }
     #[cfg(not(feature = "simd"))]
@@ -589,10 +590,10 @@ pub fn compute_distance_f32_bytes_trusted(
     {
         let disp = contextra_simd::Dispatcher::auto();
         match metric {
-            DistanceMetric::Cosine => disp.cosine_distance_f32_bytes(a, b_bytes).map_err(|e| ContextraError::invalid_input(e.to_string())),
-            DistanceMetric::Euclidean => disp.euclidean_distance_f32_bytes(a, b_bytes).map_err(|e| ContextraError::invalid_input(e.to_string())),
-            DistanceMetric::DotProduct => disp.dot_product_distance_f32_bytes(a, b_bytes).map_err(|e| ContextraError::invalid_input(e.to_string())),
-            _ => disp.cosine_distance_f32_bytes(a, b_bytes).map_err(|e| ContextraError::invalid_input(e.to_string())),
+            DistanceMetric::Cosine => disp.cosine_distance_f32_bytes(a, b_bytes).map_err(|e| VectorError::invalid_input(e.to_string())),
+            DistanceMetric::Euclidean => disp.euclidean_distance_f32_bytes(a, b_bytes).map_err(|e| VectorError::invalid_input(e.to_string())),
+            DistanceMetric::DotProduct => disp.dot_product_distance_f32_bytes(a, b_bytes).map_err(|e| VectorError::invalid_input(e.to_string())),
+            _ => disp.cosine_distance_f32_bytes(a, b_bytes).map_err(|e| VectorError::invalid_input(e.to_string())),
         }
     }
     #[cfg(not(feature = "simd"))]
@@ -665,7 +666,7 @@ pub fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::DistanceMetric;
+    use crate::types::DistanceMetric;
 
     #[test]
     fn test_scalar_distance_contract() {

@@ -1,0 +1,32 @@
+{
+  "source_file": "sample.jsonl",
+  "detected_format": "Jsonl",
+  "title": null,
+  "canonical_hash": "fe310767659945ad6908a54d30c4c0312f55b189112b2e94ba682600b5fed655",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "[0].id: 1\n\n[0].msg: Event 1\n\n[0].level: info\n\n[1].id: 2\n\n[1].msg: Event 2\n\n[1].level: warn",
+      "token_count": 29,
+      "metadata": {
+        "chunk_id": "5c4f2657c055701135ba70fe70005b15",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "jsonl",
+        "locator": {},
+        "record_range": {
+          "first": 0,
+          "last": 5
+        },
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 90,
+          "start": 0
+        },
+        "strategy": "structured"
+      }
+    }
+  ]
+}

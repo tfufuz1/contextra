@@ -1,27 +1,49 @@
 # contextra-crypto
 
-Kryptographische Primitive, AEAD, Schlüsselableitung, WAL-Integritätsketten und sichere Schlüsselcontainer.
+Kryptographische Primitive, AEAD-Blockverschlüsselung, Schlüsselableitung, WAL-Integritätsketten und Zeroize-Schlüsselcontainer für die Contextra-Architektur.
 
-## Rolle in einem Satz
-`contextra-crypto` stellt I/O-freie kryptographische Primitive, symmetrische Schlüsselcontainer, Integritätsketten für WAL und KV-Segmentverschlüsselung bereit.
+## Rolle und Zweck
+`contextra-crypto` ist ein autarker Ring-0-Baustein (Ebene 1, Foundation) zur Bereitstellung I/O-freier kryptographischer Primitive:
+- **AEAD-Blockverschlüsselung:** Authentifizierte Verschlüsselung via AES-256-GCM-SIV (RFC 8452) mit Nonce-Misuse-Resistance und AAD-Integrität.
+- **Schlüsselableitung (KDF):** Schlüsselhierarchie via HKDF-SHA256 (RFC 5869) und Passwort-/Passphrasen-Verarbeitung via Argon2id (RFC 9106).
+- **WAL-Integrität:** Kryptographische Integritätsketten mittels HMAC-SHA256 für das Write-Ahead-Log.
+- **Sichere Speicherhygiene:** Sämtliche sensiblen Schlüsselstrukturen implementieren `ZeroizeOnDrop` und maskieren sich in `Debug` und `Display`.
 
-## Profil
-- **Zweck:** Authentifizierte Blockverschlüsselung (AES-256-GCM-SIV), KDF (Argon2id, HKDF), WAL-HMAC-Integritätsprüfung, KV-Segment-Verschlüsselung.
-- **Abhängigkeiten:** `contextra-ports`, `contextra-types`.
-- **Lints:** `#![forbid(unsafe_code)]`, Zero-Panic in Produktionscode.
-- **Features:** `kv-encryption` (Standard), `test-utils`, `cloud-egress-guard`.
-- **Schlanke Defaults:** `default = ["kv-encryption"]`. `ed25519-dalek` und Beweis-/Nachweismodule wurden nach `archive/contextra-crypto-proofs/` ausgelagert.
+## Abgrenzung (Nicht-Ziele)
+- **Keine Rechts-, Zertifizierungs- oder Compliance-Garantien:** Das Crate implementiert technische kryptographische Algorithmen; es liefert keine Aussagen über regulatorische Konformität.
+- **Keine Löschketten- oder Audit-Nachweis-Logik:** Löschketten, Sagas, Deletion-Proofs und Auditberichte gehören ausschließlich nach `contextra-erasure`.
+- **I/O- und Netzwerk-Freiheit:** Reine mathematische und kryptographische Routinen; Persistenz und Dateizugriffe erfolgen ausschließlich über Konsumenten-Ports.
 
-## Sicherheitsmodell
-- **Vertraulichkeit & Authentizität:** AES-256-GCM-SIV (RFC 8452) bietet Nonce-Misuse-Resistance gegen versehentliche Nonce-Wiederverwendung und authentifiziert Header/Metadaten vollständig über Associated Data (AAD).
-- **Timing-Schutz:** Sämtliche Hash-, Schlüssel- und Tag-Vergleiche werden in konstanter Zeit mittels `subtle::ConstantTimeEq` ausgeführt.
-- **Speicherhygiene:** Alle Schlüsselstrukturen (`SecretKey`, `Secret`, `VolatileEncryptionKey`, `UnitKey`, `Dek`) implementieren `ZeroizeOnDrop` und werden bei Freigabe deterministisch genullt. Sensible Daten werden in `Debug` und `Display` als `[REDACTED]` maskiert.
-- **Nicht-Ziele:** Keine Nachweiserstellung für Löschungen (diese liegen in `contextra-erasure`).
+## Reifegrad und Tier
+- **Gruppe:** `foundation`
+- **Ebene:** 1 (Ring 0)
+- **Klasse:** A (autarker Baustein)
+- **Tier:** `beta`
 
-## Minimalbeispiel
+## Tatsächliche interne Abhängigkeiten (Minimaler Kern)
+Ermittelt via `cargo tree -p contextra-crypto -e normal --no-default-features`:
+- `contextra-ids`: Typisierte Bezeichner (`TenantId`, `DocId`, `TxId`, `TenantScoped`)
+- `contextra-env`: Minimaler Umwelt- und Plattform-Kontext
+
+*Optionale Integrations-Abhängigkeiten (hinter Feature `workspace`):*
+- `contextra-types`: Typen für Workspace-Integration
+- `contextra-ports`: Port-Definitionen für Workspace-Integration
+
+## Feature-Tabelle
+
+| Feature | Standard | Beschreibung |
+|---|---|---|
+| `kv-encryption` | Ja | KV-Segment-Verschlüsselung und Tenant-Isolierung für KV-Cache |
+| `workspace` | Ja | Brücke für `ContextraError` und Workspace-Typen in `compat/` |
+| `types-compat` | Nein | Alias für `workspace` |
+| `ports-compat` | Nein | Alias für `workspace` |
+| `cloud-egress-guard` | Nein | Zusätzliche Egress-Wächter-Strukturen |
+| `test-utils` | Nein | Hilfsroutinen für Testläufe |
+
+## Schnellstart / Minimalbeispiel
 
 ```rust
-use contextra_crypto::aead::{seal_record_with_nonce, open_record};
+use contextra_crypto::aead::{open_record, seal_record_with_nonce};
 use contextra_crypto::dek::Dek;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,4 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+```
+
+Ausführung ohne optionale Features:
+```bash
+cargo run -p contextra-crypto --example standalone --no-default-features
 ```

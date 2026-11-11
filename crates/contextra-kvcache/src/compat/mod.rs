@@ -129,6 +129,7 @@ mod tests {
     use contextra_types::ContextraError;
 
     #[test]
+    #[allow(clippy::type_complexity)]
     fn test_kv_cache_error_to_contextra_error_mapping() {
         let cases: Vec<(KvCacheError, fn(&ContextraError) -> bool)> = vec![
             (

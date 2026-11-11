@@ -48,11 +48,19 @@ fn test_golden_checkpoint_meta_legacy_compatibility_without_id_width_field() {
     }"#;
 
     let meta: CheckpointMeta = serde_json::from_str(legacy_json).expect("Deserialize legacy meta");
-    assert_eq!(meta.id_width_bits, contextra_checkpoint::CURRENT_ID_WIDTH_BITS);
+    assert_eq!(
+        meta.id_width_bits,
+        contextra_checkpoint::CURRENT_ID_WIDTH_BITS
+    );
     assert!(meta.validate_id_width().is_ok());
 
-    let mismatched_bits = if contextra_checkpoint::CURRENT_ID_WIDTH_BITS == 64 { 128 } else { 64 };
-    let mismatch_json = format!(r#"{{
+    let mismatched_bits = if contextra_checkpoint::CURRENT_ID_WIDTH_BITS == 64 {
+        128
+    } else {
+        64
+    };
+    let mismatch_json = format!(
+        r#"{{
       "name": "mismatched_checkpoint",
       "collection_id": "tenant_coll",
       "seq_no": 10,
@@ -60,7 +68,8 @@ fn test_golden_checkpoint_meta_legacy_compatibility_without_id_width_field() {
       "metadata": {{}},
       "created_at": 1600000000000,
       "id_width_bits": {mismatched_bits}
-    }}"#);
+    }}"#
+    );
 
     let meta_mismatch: CheckpointMeta =
         serde_json::from_str(&mismatch_json).expect("Deserialize mismatch meta");
