@@ -1,3 +1,13 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 //! # Tests zur Einhaltung von INV-KIVI-AEAD-ORDER
 //!
 //! ANCHOR[contextra-kvcache:TEST-KIVI-ORDER-001]

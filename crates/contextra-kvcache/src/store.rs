@@ -137,7 +137,7 @@ impl TenantState {
             id,
             SegmentMeta {
                 directive: directive.clone(),
-                pinned_at: std::time::Instant::now(),
+                pinned_at: std::time::Instant::now(), // ALLOW-DETERMINISM: relative monotonic instant for TTL expiration
             },
         );
 
@@ -205,7 +205,7 @@ impl TenantState {
             return None;
         }
 
-        let now = std::time::Instant::now();
+        let now = std::time::Instant::now(); // ALLOW-DETERMINISM: relative monotonic instant for TTL expiration
         let unref_ids: Vec<u64> =
             self.cache
                 .iter()
@@ -238,7 +238,7 @@ impl TenantState {
             return self.remove(unref_ids[0]);
         }
 
-        let base_time = std::time::Instant::now();
+        let base_time = std::time::Instant::now(); // ALLOW-DETERMINISM: synthetic relative access instant baseline
         let candidates: Vec<(u64, std::time::Instant)> = unref_ids
             .into_iter()
             .enumerate()
@@ -650,6 +650,7 @@ impl TenantIsolatedKvStore {
     }
 
     #[cfg(test)]
+    /// Führt eine faire LRU-Verdrängung durch und ruft nach jedem Shard den Hook auf.
     pub fn evict_lru_fair_with_hook<F>(&self, target_free_bytes: usize, mut hook: F) -> usize
     where
         F: FnMut(),

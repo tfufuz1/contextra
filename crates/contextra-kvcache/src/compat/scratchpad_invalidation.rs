@@ -265,8 +265,11 @@ impl Default for InvalidationBudget {
 
 /// Begrenzter Invalidator für Scratchpads mit deterministischer Schranke.
 pub struct BoundedScratchpadInvalidator<'a> {
+    /// Referenz auf den zugrundeliegenden Prefix-Store.
     pub store: &'a TenantPrefixKvStore,
+    /// Zu invalidierende Präfix-Schlüssel.
     pub keys: Vec<PrefixKey>,
+    /// Konfiguriertes Invalidation-Budget.
     pub budget: InvalidationBudget,
 }
 

@@ -4,7 +4,7 @@
 //!
 //! Stellt eine einheitliche, mandantenisolierte Schnittstelle bereit mit Unterstützung für:
 //! - Speicherbudgetierung & Eviction-Policy ([`KvReusePolicy`])
-//! - Verschlüsselten Tier-2-Spill ([`KvBridgeStorage`])
+//! - Verschlüsselten Tier-2-Spill (Tier-2 Spill-Storage)
 //! - KIVI 2-Bit Quantisierung
 //! - Scratchpad-Invalidierung & Mandanten-Bereinigung ([`TenantId`])
 //!
@@ -39,7 +39,9 @@ use std::sync::Arc;
 #[cfg(feature = "kv-encryption")]
 use contextra_crypto::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
 use contextra_env::{Clock, SystemClock};
-use contextra_ids::{TenantId, TxId};
+use contextra_ids::TenantId;
+#[cfg(feature = "workspace")]
+use contextra_ids::TxId;
 use parking_lot::RwLock;
 
 use crate::attention_score::AttentionScoreSource;
@@ -56,6 +58,7 @@ use crate::scratchpad_invalidation::ScratchpadCacheScope;
 use crate::segment::KvSegment;
 use crate::store::TenantIsolatedKvStore;
 
+#[allow(dead_code)]
 fn block_on_simple<F: std::future::Future>(fut: F) -> F::Output {
     let waker = std::task::Waker::noop();
     let mut cx = std::task::Context::from_waker(waker);
@@ -167,7 +170,7 @@ impl KvCacheServiceBuilder {
     }
 
     #[cfg(feature = "workspace")]
-    /// Konfiguriert den Tier-2 Spill-Storage Adapter ([`KvBridgeStorage`]).
+    /// Konfiguriert den Tier-2 Spill-Storage Adapter (Tier-2 Spill-Storage).
     pub fn spill_storage(
         mut self,
         storage: Arc<dyn crate::compat::adapters::KvBridgeStorage>,
@@ -190,7 +193,7 @@ impl KvCacheServiceBuilder {
     }
 
     #[cfg(feature = "workspace")]
-    /// Konfiguriert einen [`AttentionExporter`] für den [`EvictionWorker`].
+    /// Konfiguriert einen Attention-Exporter für den [`EvictionWorker`].
     pub fn attention_exporter(
         mut self,
         exporter: Arc<dyn crate::compat::adapters::AttentionExporter>,
@@ -210,6 +213,7 @@ impl KvCacheServiceBuilder {
         let clock = self.clock.unwrap_or_else(|| Arc::new(SystemClock::new()));
         let store = Arc::new(TenantIsolatedKvStore::new());
 
+        #[allow(unused_mut)]
         let mut eviction_worker = EvictionWorker::spawn(Arc::clone(&store));
         #[cfg(feature = "workspace")]
         if let Some(exporter) = self.attention_exporter {

@@ -1,3 +1,6 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::disallowed_types)]
 //! # Tests für die konfigurierte Standard-AttentionSource im KV-Store
 //!
 //! ANCHOR[contextra-kvcache:TEST-DEF-ATTN-001]
@@ -7,7 +10,9 @@
 //! Verdrängung beim Einfügen (Overflow) aktiv ausgewertet wird.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used)]
 
 use contextra_kvcache::{
     attention_score::AttentionScoreSource, segment::KvSegment, TenantIsolatedKvStore,

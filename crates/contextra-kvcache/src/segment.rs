@@ -22,9 +22,8 @@
 //!   Aktive Inferenz-Prozesse halten einen Guard. Ein Segment mit `active_refs > 0` darf unter
 //!   keinen Umständen verdrängt werden.
 
-use crate::error::{KvCacheError, Result};
+use crate::error::Result;
 use contextra_ids::TenantId;
-use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -37,6 +36,10 @@ use super::quantize_kivi::{
 };
 use super::radix::KvBlockGuard;
 
+#[cfg(feature = "kv-encryption")]
+use crate::error::KvCacheError;
+#[cfg(feature = "kv-encryption")]
+use parking_lot::RwLock;
 #[cfg(feature = "kv-encryption")]
 use contextra_crypto::{CryptoError, EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
 
@@ -213,8 +216,10 @@ pub struct EncryptedSegmentPayload {
 /// Darf niemals unverschlüsselt auf Sekundärspeicher (Tier-2) geschrieben werden.
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct KvSegment {
+    /// Eindeutiger Mandanten-Identifikator.
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,
+    /// Eindeutige Segment-ID innerhalb des Mandanten.
     #[zeroize(skip)]
     pub segment_id: u64,
     /// Versionsnummer der HKDF-Schlüsselableitung.
@@ -223,6 +228,7 @@ pub struct KvSegment {
     /// Gibt an, ob der Inhalt im RAM verschlüsselt vorliegt.
     #[zeroize(skip)]
     pub encrypted: bool,
+    /// Optionaler Modell-Fingerabdruck bei Verschlüsselung.
     #[zeroize(skip)]
     #[cfg(feature = "kv-encryption")]
     pub model_fingerprint: Option<ModelFingerprint>,
@@ -234,6 +240,7 @@ pub struct KvSegment {
     pub active_refs: Arc<AtomicUsize>,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
     data: Vec<u8>,
+    /// Strukturierter oder roher Tensor-Inhalt des Segments.
     #[zeroize(skip)]
     pub content: KvSegmentContent,
     #[cfg(feature = "kv-encryption")]

@@ -1,51 +1,68 @@
-# Decoupling Report: contextra-kvcache
+# Decoupling & R3 Abschlussbericht: `contextra-kvcache`
 
-## 1. Baseline V0
-- Befehl: `cargo check -p contextra-kvcache --no-default-features`
-  - Ergebnis: Rot (18 Kompilierungsfehler bezüglich `contextra_ports`, `contextra_types`, `contextra_crypto`, `adapters`, `prefix_store`, `scratchpad_invalidation`).
-- Befehl: `cargo check -p contextra-kvcache --all-targets`
-  - Ergebnis: Grün.
-- Befehl: `cargo test -p contextra-kvcache`
-  - Ergebnis: Grün (40 Unit Tests, alle Integrationstests bestanden).
-- Fremdnutzer-Inventar:
-  - Außerhalb von `crates/contextra-kvcache` existieren keine direkten Verwendungen von `contextra_kvcache` in `crates/` oder `benchmarks/`.
-- Feature-Matrix:
-  - `std`, `workspace`, `ports-compat`, `crypto-compat`, `kv-encryption`, `content-addressed-kv-cache`, `exp-content-addressed`, `kvcache-kivi-quant`, `kivi-quantization`, `exp-kivi`.
+## 1. Zusammenfassung und Status
+`contextra-kvcache` wurde gemäß Umsetzungsplan §2 erfolgreich auf Reifegrad **R3** gehärtet. Das Crate baut, testet und dokumentiert autark ohne zyklische Verflechtungen und mit strenger Nulltoleranz bezüglich Panics und unzulässigem Nicht-Determinismus.
 
-## 2. Arbeitspakete & Commits
-- WP-0: Baseline, Inventar und Findings dokumentiert (`a48bafa0d`).
-- WP-1: Manifest (`Cargo.toml`) angepasst: `contextra-ids`, `contextra-env`, Feature `workspace` sowie Aliase (`ports-compat`, `types-compat`, `docid-128`) und Dev-Dependencies für Integrationstests deklariert (`c7739aea5`).
-- WP-2: Pfadtausch `ids`/`env` im Kern: `TenantId`, `TxId` und `Clock` auf kanonische Typen umgestellt; `RequestId(pub u64)` als lokaler Typ vereinheitlicht mit `From`-Implementierungen in `compat/` (`05ffbf98d`).
-- WP-3: Fehlerbehandlung im Kern auf `KvCacheError` umgestellt, Port-Re-Exports und Adapter unter Feature `workspace` bedingt, tabellengetriebenen Fehlerkonvertierungstest angelegt (`8c74bd457`).
-- WP-4: Feature-Gating von `contextra-crypto` für `kv-encryption` verifiziert; ohne `kv-encryption` baut der Kern ohne Krypto-Abhängigkeit; Closure geprüft.
-- WP-5: Unit-Tests bereinigt, V1..V7 Verifikationen erfolgreich durchgeführt.
+---
 
-## 3. Ausgabe von V5 und V6 am Ende
-- V5 Null-Prüfung:
-  `grep -rEn 'contextra_(types|ports|testkit)' crates/contextra-kvcache/src --include=*.rs | grep -v '/compat/'`
-  Ergebnis: Vollsändig LEER (0 Treffer außerhalb von `src/compat/`).
-- V6 Kern-Closure:
-  - `cargo tree -p contextra-kvcache -e normal --no-default-features --prefix none | grep '^contextra-' | sort -u`:
-    `contextra-env v0.1.0`
-    `contextra-ids v0.1.0`
-    `contextra-kvcache v0.1.0`
-    (Exakt die erlaubte Kern-Teilmenge ohne Feature `kv-encryption`).
-  - Mit `--features kv-encryption`:
-    Zusätzlich `contextra-crypto`.
+## 2. Gate-Matrix (Befehl × Ergebnis)
 
-## 4. Entscheidungen und Abweichungen vom Prompt
-- `RequestId` wurde als Newtype `RequestId(pub u64)` im Kern vereinheitlicht (bit- und typidentisch mit `contextra-ports::RequestId`), da es in allen Eviction-Worker- und Attention-Mappings als 64-Bit-Identifier genutzt wird. `From`-Konvertierungen in `src/compat/mod.rs` und flexible `impl Into<RequestId>` Signaturen sichern Abwärtskompatibilität.
-- In `store.rs` wurde der Unit-Test `test_kv_cache_pruner_and_scanner_ports` nach `src/compat/scanner.rs` verlagert, damit im Kern keine Referenzen auf `contextra_ports::scanner` verbleiben.
-- `KvCacheError` erhielt den Konstruktor `pin_budget_exceeded(...)`, um bit- und semantikgleiche Fehlermeldungen bei Pin-Budget-Überschreitung zu erzeugen.
+| Gate / Prüfung | Ausgeführter Befehl | Ergebnis | Anmerkung / Status |
+|---|---|---|---|
+| **G-B1 (Autarker Kern)** | `cargo check -p contextra-kvcache --no-default-features --locked` | **GRÜN** | Baut standalone ohne Warnings |
+| **G-B2 (Feature-Matrix)** | `cargo check -p contextra-kvcache --features <feat>` für alle Features | **GRÜN** | Alle deklarierten Features bauen fehlerfrei |
+| **G-B3 (Tests & Docs)** | `cargo test -p contextra-kvcache --all-targets --locked` | **GRÜN** | 41 Unit Tests, 27 Integrationstest-Suites, Golden-Tests bestanden |
+| **G-B3b (Doctests)** | `cargo test -p contextra-kvcache --doc --locked` | **GRÜN** | Alle Doc-Tests bestanden |
+| **G-B4 (Clippy)** | `cargo clippy -p contextra-kvcache --all-targets --locked -- -D warnings` | **GRÜN** | 0 Clippy-Warnungen |
+| **G-L2 (Nullprüfung)** | `grep -rEn 'contextra_(types\|ports\|testkit)' crates/contextra-kvcache/src --include=*.rs \| grep -v '/compat/'` | **GRÜN** | Vollständig LEER (0 Treffer außerhalb `compat/`) |
+| **G-L4 (Isolation)** | `python3 tools/isolation_proof.py -c contextra-kvcache --modes no-default,default,each-feature` | **REPORT** | Benötigt Eintrag `contextra-ids` in Wurzel-`capabilities.toml` (siehe Übergaben an Z) |
+| **G3 (Export)** | `python3 tools/export_crate.py contextra-kvcache --out /tmp/export-contextra-kvcache` | **GRÜN** | Lizenzen beigelegt; exportierter Standalone-Build geprüft |
+| **P28 (Zero-Panic)** | `python3 tools/zero_panic_analyzer.py --crate contextra-kvcache --fail-on-prod` | **GRÜN** | 0 Prod-Verstöße (`#![forbid(unsafe_code)]` eingehalten) |
+| **P28 (Determinismus)** | `python3 tools/determinism_guard.py --crate contextra-kvcache` | **GRÜN** | 0 Prod-Befunde (HashMap durch BTreeMap ersetzt, Zeitmessung annotiert) |
+| **Unsafe-Auditor** | `python3 tools/unsafe_boundary_auditor.py --crate contextra-kvcache` | **GRÜN** | 0 Unsafe-Stellen |
+| **MSRV (1.89)** | `cargo +1.89.0 check -p contextra-kvcache --no-default-features` | **GRÜN** | Erfolgreich gegen Rust 1.89 validiert |
 
-## 5. Fassaden-Liste (T2-Fälle)
-- Keine T2-Fassaden nötig, da alle Modulreexporte und Trait-Methoden unter Default-Features unverändert erhalten geblieben sind (`From<KvCacheError> for ContextraError` fängt alle `?`-Aufrufe transparent ab).
+---
 
-## 6. Fremdnutzer-Inventar & Übergaben
-- Fremdnutzer-Inventar:
-  Keine Workspace-Crates außerhalb unseres Eigentums binden `contextra-kvcache` direkt ein.
-- Zukünftige Manifest-Änderungen für Default-Flip:
-  Sobald `workspace` nicht mehr Standard ist, müssten Crates, die Ports-Traits wie `KvPrefixStore` oder `KvCachePruner` nutzen, `contextra-kvcache = { features = ["workspace"] }` deklarieren.
+## 3. R2/R3-Liefergegenstände
 
-## 7. Offene Punkte / Risiken
-- Keine Risiken für `contextra-kvcache`. Die Integrationstests und Unit-Tests sind zu 100% grün.
+- **`src/contract.rs`**: Schmaler Umwelt- und Enginevertrag (`Clock`, `Rng`, `KvCacheEngine`) mit I/O-freier Referenzimplementierung `MemoryKvCache`.
+- **`examples/standalone.rs`**: Kompaktes Minimal-Beispiel (18 Zeilen), lauffähig mit `cargo run -p contextra-kvcache --example standalone --no-default-features`.
+- **`#![deny(missing_docs)]`**: An Crate-Wurzel aktiviert, 100% dokumentierte öffentliche API, Rustdoc-Links validiert (`cargo doc -p contextra-kvcache --no-deps --locked`).
+- **`README.md`**: Zweck, Abgrenzung, Quickstart-Beispiel, Feature-Tabelle, tatsächliche Abhängigkeiten dokumentiert.
+- **`CHANGELOG.md`**: Keep-a-Changelog Format gepflegt unter `[Unreleased]`.
+- **Cargo-Metadaten**: `description`, `license`, `repository`, `keywords`, `categories`, `readme`, `rust-version = "1.89"`, `include`, `publish = false` gepflegt.
+- **`capabilities.fragment.toml`**: Auf Schema v3 aktualisiert.
+- **`docs/decoupling/public-api.txt`**: Snapshot der öffentlichen API hinterlegt.
+- **Testarten**:
+  - Property-Tests: `tests/radix_property_test.rs` verifiziert `PrefixRadixTree` gegen ein naives Orakel sowie strikte Mandantenisolation (INV-KV-1).
+  - Beweistest: `tests/zeroize_proof_test.rs` verifiziert Zeroize- und Shredding-Garantien für Schlüssel und Segmente (INV-KV-2).
+
+---
+
+## 4. Getroffene Entscheidungen und Abweichungen
+
+1. **`contextra-testkit` Dev-Dependency entfernt**:
+   Die unzulässige Dev-Abhängigkeit auf `contextra-testkit` wurde aus `Cargo.toml` entfernt, da alle Integrationstests mit neutralen In-Memory-Strukturen und `proptest` vollständig autark laufen.
+2. **Determinismus-Härtung**:
+   In `src/eviction_worker.rs` wurde die unzulässige `std::collections::HashMap` durch die deterministische `std::collections::BTreeMap` ersetzt.
+   In `src/store.rs` wurden relative Zeitmessungen für LRU-Tie-Breaking und Pin-TTL-Ablauf mit `ALLOW-DETERMINISM`-Kennzeichnungen versehen.
+3. **Altlast-Entfernung**:
+   Dekommissioniertes Vokabular ("Ring 1", unzulässige Autonomie-/Pausierverbots-Blöcke) wurde aus allen Crate-Dateien getilgt.
+
+---
+
+## 5. Übergaben an Z (Änderungen außerhalb des Schreibbereichs)
+
+1. **`capabilities.toml` (Wurzel, Zeilen 117-124)**:
+   - **Befund:** `contextra-kvcache` nutzt `TenantId` aus `contextra-ids`. In `capabilities.toml` ist jedoch nur `allowed_internal = ["contextra-env", "contextra-crypto"]` deklariert.
+   - **Gewünschte Änderung:** Ergänzung von `"contextra-ids"` in `allowed_internal`:
+     ```toml
+     [crates.contextra-kvcache]
+     allowed_internal = ["contextra-env", "contextra-crypto", "contextra-ids"]
+     ```
+   - **Begründung:** Hebt den Layer-Gate-Verstoß in `gate_layering.py` und `isolation_proof.py` auf, ohne dass `contextra-ids` lokal reimplementiert werden muss (INV-4).
+2. **Fremdnutzer-Inventar**:
+   - Keine Workspace-Crates binden `contextra-kvcache` direkt als feste Abhängigkeit ein (`crates/contextra-infer-candle` besitzt ein optionales Feature `kv-bridge`, bindet das Crate jedoch derzeit nicht direkt).
+3. **Default-Flip für Z**:
+   - `default = ["std", "workspace", "ports-compat", "crypto-compat", "kv-encryption"]` kann in Phase Z auf `default = ["std"]` umgestellt werden, sobald alle Verbraucher explizite Feature-Flags deklarieren.

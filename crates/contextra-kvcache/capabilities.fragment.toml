@@ -1,7 +1,11 @@
 [crates.contextra-kvcache]
-klasse = "A"
-may_depend_on = []          # Autarker Baustein (Klasse A)
-transitional = [
-    "ports-compat",         # Übergangs-Feature für contextra-ports / contextra-types
-    "crypto-compat",        # Übergangs-Feature für contextra-crypto
-]
+group = "llm"
+level = 1
+tier = "beta"
+path = "crates/contextra-kvcache"
+unsafe_island = false
+allowed_internal = ["contextra-env", "contextra-crypto", "contextra-ids"]
+[crates.contextra-kvcache.feature_closure_allowed]
+workspace = ["contextra-types", "contextra-ports"]
+[crates.contextra-kvcache.dev_allowed]
+test = "cargo test -p contextra-kvcache --locked"
