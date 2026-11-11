@@ -79,28 +79,13 @@ def check_layering(root: Path, target_crate: str | None = None) -> Tuple[List[st
     crates_to_check = [target_crate] if target_crate else sorted(crates_spec.keys())
 
     # 1. Zyklenprüfung und Ebenenprüfung E_n -> E_m (m > n verboten nach INV-8 / SPEC §8.1)
-    # Baue Ebenen-Map auf
+    # Baue Ebenen-Map auf (Schema v3)
     level_map: Dict[str, int] = {}
     for c_name, c_spec in crates_spec.items():
         if "level" in c_spec:
             level_map[c_name] = c_spec["level"]
-        elif "ring" in c_spec:
-            # Fallback falls v2 schema: Ring 0 -> 0, Ring 1 -> 1, Ring 2 -> 2, Ring 3 -> 3, Ring 4 -> 4
-            ring_str = str(c_spec["ring"]).lower()
-            if "0" in ring_str:
-                level_map[c_name] = 0
-            elif "1" in ring_str:
-                level_map[c_name] = 1
-            elif "2" in ring_str:
-                level_map[c_name] = 2
-            elif "3" in ring_str:
-                level_map[c_name] = 3
-            elif "4" in ring_str:
-                level_map[c_name] = 4
-            elif "tooling" in ring_str or "extension" in ring_str:
-                level_map[c_name] = 3
-            else:
-                level_map[c_name] = 0
+        else:
+            level_map[c_name] = 0
 
     for c in crates_to_check:
         if c not in crates_spec:
@@ -111,12 +96,18 @@ def check_layering(root: Path, target_crate: str | None = None) -> Tuple[List[st
 
         c_level = level_map.get(c, 0)
         allowed_internal = set(c_spec.get("allowed_internal", []))
-        if not allowed_internal and "may_depend_on" in c_spec:
-            # Kompatibilität zu v2
-            allowed_internal = set(c_spec.get("may_depend_on", []))
 
         feature_closure_allowed: Dict[str, List[str]] = c_spec.get("feature_closure_allowed", {})
-        dev_allowed = set(c_spec.get("dev_allowed", []))
+        dev_allowed_raw = c_spec.get("dev_allowed", {})
+        dev_allowed = set()
+        if isinstance(dev_allowed_raw, list):
+            dev_allowed.update(dev_allowed_raw)
+        elif isinstance(dev_allowed_raw, dict):
+            for v in dev_allowed_raw.values():
+                if isinstance(v, list):
+                    dev_allowed.update(v)
+                elif isinstance(v, str) and v.startswith("contextra-"):
+                    dev_allowed.add(v)
 
         # (a) Kern-Closure Prüfung: cargo tree --no-default-features
         try:
@@ -164,7 +155,7 @@ def check_layering(root: Path, target_crate: str | None = None) -> Tuple[List[st
             if d.get("kind") == "dev"
         }
         if "contextra-testkit" in dev_deps and "contextra-testkit" not in dev_allowed:
-            # Falls c_spec Klasse A oder nicht in dev_allowed
+            # Falls nicht in dev_allowed deklariert
             violations.append(
                 f"[{c}] Dev-Abhängigkeit auf 'contextra-testkit' unzulässig (nicht in dev_allowed)"
             )
