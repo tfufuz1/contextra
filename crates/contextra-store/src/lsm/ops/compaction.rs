@@ -1,6 +1,10 @@
 //! # Kompaktierungsoperationen (Ring 1)
 //!
-//! Integriert die CompactionEngine in den Lebenszyklus des LSM-Speichers.
+//! ZWECK: Integriert Flush und CompactionEngine in den Lebenszyklus des LSM-Speichers.
+//! INVARIANTEN:
+//! - Flush-before-Visible: Manifest-Commit vor Sichtbarkeit neuer SSTables.
+//! - Dekker-Write-Fence: Flush vs. Purge Koordination ueber `FlushPurgeFence`.
+//! - Sperrenreihenfolge: `flush_mutex` -> `commit_mutex` (fuer MemTable/WAL Swap) -> `state.write`.
 
 use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};

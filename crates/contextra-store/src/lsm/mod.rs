@@ -1,19 +1,18 @@
 //! LSM-Tree (Log-Structured Merge-Tree) storage engine.
 // FILE-CONTEXT
-// STAND: 2026-08-30T21:49:55Z (SESSION: 283abf0f)
-// ZWECK: LSM-Tree-Implementierung (MemTable + SSTable + Compaction)
-// INVARIANTEN: Compaction darf keine Daten verlieren; WAL-Replay vor MemTable-Aufbau; LOCK-REIHENFOLGE: commit_mutex → state.write/read → MemTable-RwLock
-//              Single-Commit: state.write (Flush-Schutz). Group-Commit-Leader: state.read (commit_mutex hält Isolation).
-// NICHT-OFFENSICHTLICH: Compaction-Lock muss VOR MemTable-Lock genommen werden (Deadlock-Gefahr)
-// SIEHE AUCH: wal.rs, sstable.rs, DECISIONS.md ADR-003
-
-// INVARIANT: Zentraler Storage-Engine-Orchestrator des Triebwerks.
-// IMPLEMENTS: StorageEngine Trait (contextra-ports/src/storage.rs)
-// READ-PATH:  get() → Active MemTable → Immutable MemTables → SSTables (newest first)
-// WRITE-PATH: put()/delete() → TxBuffer → commit() → WAL + MemTable
-// FLUSH:      MemTable > size_limit → rotate → SSTable schreiben → cleanup
-// BACKGROUND: CompactionEngine läuft als tokio::spawn loop
-// INVARIANTE: WAL Replay bei Neustart stellt MemTable deterministisch wieder her.
+// STAND: 2026-11-11
+// ZWECK: LSM-Tree-Implementierung (MemTable + SSTable + Compaction + Lesepfad + Recovery)
+// INVARIANTEN: Compaction darf keine Daten verlieren; WAL-Replay vor MemTable-Aufbau.
+// SPERRENHIERARCHIE: Siehe lock_order.rs (INV-LOCK-ORDER-1, SPEC §3.5):
+//   1. Document-Lock / Intent (RANK 100)
+//   2. commit_mutex (RANK 200)
+//   3. flush_mutex (RANK 300)
+//   4. state-RwLock (RANK 400)
+//   5. wal.truncate_lock (RANK 500)
+//   6. sstables-RwLock (RANK 600)
+//   7. MemTable-Shards (RANK 700)
+//   8. Manifest-Append (RANK 800)
+// KEIN synchroner Guard (std / parking_lot) ueber ein .await halten!
 //!
 //! The `LsmStorage` engine provides a high-performance, persistent key-value store
 //! implementing the `StorageEngine` trait.
@@ -49,20 +48,17 @@
 //! configured thresholds, compaction merges multiple SSTables into a single new SSTable,
 //! deduplicating key versions and garbage-collecting tombstones not pinned by active snapshots.
 //!
-//! ## `commit_mutex` Role
-//! `commit_mutex` serializes sequence allocation and WAL batch preparation during commits, preventing
-//! snapshot inversion. In the group commit leader path, `commit_mutex` is released prior to executing physical
-//! disk I/O (`wal.append_batch`) and re-acquired afterwards for MemTable updates / visibility advancement (and on error for WAL rollback).
-//!
 //! ## Lock Hierarchy & Concurrency Control
-//! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following strict order:
-//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations.
-//! 2. `pending_commit_queue` (`tokio::sync::Mutex<Option<PendingCommitQueue>>`) - Protects group commit queue coordination.
-//! 3. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & active WAL handle.
-//! 4. `wal` (`RwLock<Arc<Wal>>`) - Protects active WAL reference.
-//! 5. `wal.truncate_lock` (`tokio::sync::Mutex<()>`) - Innermost WAL I/O truncation/append guard.
+//! Formal acquisition order strictly follows `lock_order.rs` (`INV-LOCK-ORDER-1`):
+//! 1. Document intent locks (`intent_locks`)
+//! 2. Commit mutex (`commit_mutex`)
+//! 3. Flush mutex (`flush_mutex`)
+//! 4. State read/write lock (`state`)
+//! 5. WAL truncation lock (`wal.truncate_lock`)
+//! 6. SSTables read/write lock (`sstables`)
+//! 7. MemTable shard locks (`MemTable::shards`)
 //!
-//! Note: `intent_locks` (`std::Mutex`) and `tx_buffer` shards are leaf locks; no `.await` points are permitted while holding leaf locks.
+//! Note: synchronous locks must never be held across an `.await` boundary.
 
 pub(super) use crate::memtable::MemTable;
 pub(super) use crate::sstable::{SstableBuilder, SstableReader};
