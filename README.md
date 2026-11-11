@@ -7,10 +7,8 @@
 
 ## Contextra Komponenten
 
-<img width="2752" height="1536" alt="hybrid-retrieval" src="https://github.com/user-attachments/assets/0c24b7b2-7037-42f2-98a0-b439c33c83c7" />
-
-
 ### 1. Domäne: Hybrid Retrieval & Suche
+<img width="2752" height="1536" alt="hybrid-retrieval" src="https://github.com/user-attachments/assets/0c24b7b2-7037-42f2-98a0-b439c33c83c7" />
 Diese Domäne kombiniert semantische Vektorsuche, klassische Volltextsuche, Graph-Traversierung und Ergebnisse-Rangfusion zu Such- und RAG-Systemen.
 
 * **Vektorsuche (`contextra-vector`, `contextra-simd`)**:
@@ -45,10 +43,8 @@ Diese Domäne kombiniert semantische Vektorsuche, klassische Volltextsuche, Grap
 Kombiniert semantische Vektorsuche (HNSW, SQ8, SIMD) mit klassischer Volltextsuche (BM25) und Rangfusion (RRF).
 
 ---
-
-<img width="2752" height="1536" alt="agentic" src="https://github.com/user-attachments/assets/87780e2a-54bb-492f-817b-df9f0d67c1c3" />
-
 ### 2. Domäne: Autonome Agenten & Kognition (`agentic`)
+<img width="2752" height="1536" alt="agentic" src="https://github.com/user-attachments/assets/87780e2a-54bb-492f-817b-df9f0d67c1c3" />
 Diese Domäne stellt die Execution-Engine für mehrstufige Agenten-Prozesse und die langfristige Verwaltung und Verdichtung des Gedächtnisses bereit.
 
 * **Agenten-Engine (`contextra-agent`)**:
@@ -63,10 +59,8 @@ Diese Domäne stellt die Execution-Engine für mehrstufige Agenten-Prozesse und 
   * **Transitivity Veto**: Schutzalgorithmus zur Verhinderung fehlerhafter transitiver Verschmelzungen von Erinnerungsnetzwerken.
 
 ---
-
-<img width="2752" height="1536" alt="routing" src="https://github.com/user-attachments/assets/d792ecc5-2744-4010-b258-f9011030ad81" />
-
 ### 3. Domäne: Adaptives Routing & Modellsteuerung (`llm`)
+<img width="2752" height="1536" alt="routing" src="https://github.com/user-attachments/assets/d792ecc5-2744-4010-b258-f9011030ad81" />
 Steuert die Auswahl, Auslastung und Parametrierung verschiedener KI-Modelle (Candidate Pools, SLMs, Gateways).
 
 * **Bandit-Routing & Regler (`contextra-adapt`, `contextra-router`)**:
@@ -77,11 +71,8 @@ Steuert die Auswahl, Auslastung und Parametrierung verschiedener KI-Modelle (Can
   * **Homeostat & Decay-Controller**: Exponentielles Abklingen (Half-Life) und Regelung des Gleichgewichts von Modell-Pools.
 
 ---
-
-<img width="2752" height="1536" alt="security" src="https://github.com/user-attachments/assets/2c02271c-171c-4256-92fc-d43a4b98623d" />
-
-
 ### 4. Domäne: Datenschutz, Sicherheit & Compliance (`safety` & `compliance`)
+<img width="2752" height="1536" alt="security" src="https://github.com/user-attachments/assets/2c02271c-171c-4256-92fc-d43a4b98623d" />
 Gewährleistet den Schutz vor Datenabfluss, Injection-Angriffen und die Einhaltung von Datenschutzvorgaben.
 
 * **Egress-Schutz & DLP (`contextra-privacy`, `contextra-prompt-guard`)**:
@@ -100,11 +91,8 @@ Gewährleistet den Schutz vor Datenabfluss, Injection-Angriffen und die Einhaltu
 
 ---
 
-
-<img width="2752" height="1536" alt="storage" src="https://github.com/user-attachments/assets/4ac5cdb6-b731-4653-af1c-4435c670a7fc" />
-
-
 ### 5. Domäne: Speichersystem, Transaktionen & Isolation (`storage` & `foundation`)
+<img width="2752" height="1536" alt="storage" src="https://github.com/user-attachments/assets/4ac5cdb6-b731-4653-af1c-4435c670a7fc" />
 Stellt die fundamentale Persistenz, ACID-Garantien und isolierte Laufzeitumgebungen bereit.
 
 * **LSM-Tree Speicherkern (`contextra-store`)**:
@@ -120,12 +108,8 @@ Stellt die fundamentale Persistenz, ACID-Garantien und isolierte Laufzeitumgebun
   * **WASM Fuel-Budgeting**: Rechenschritt-Zählung (*Fuel*) zur zeitlichen und ressourcenmäßigen Begrenzung isolierter WASM-Tools.
 
 ---
-
-<img width="2752" height="1536" alt="ingest" src="https://github.com/user-attachments/assets/18e529ac-5458-4d62-8dcb-48c962df873c" />
-
-
 ### 6. Domäne: Ingest, Inferenz & Anwendungen (`data`, `llm` & `apps`)
-
+<img width="2752" height="1536" alt="ingest" src="https://github.com/user-attachments/assets/18e529ac-5458-4d62-8dcb-48c962df873c" />
 * **Dokumenten-Ingest (`contextra-ingest`)**:
   * **Prose & Structure Chunking**: Formatbewusste Extraktion (PDF, DOCX, Markdown) und deterministisches semantisches Text-Chunking.
 * **Inferenz-Anbindung (`contextra-infer-candle`, `contextra-infer-onnx`, `contextra-infer-ollama`)**:
