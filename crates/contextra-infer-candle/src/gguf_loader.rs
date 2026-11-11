@@ -81,7 +81,8 @@ pub fn parse_gguf_metadata_with_checksum(
     }
 
     let mut reader = BufReader::new(&file);
-    let _parsed_meta = validate_gguf_header_and_offsets(&mut reader, model_path, file_len)?;
+    #[cfg_attr(not(feature = "candle"), allow(unused_variables))]
+    let parsed_meta = validate_gguf_header_and_offsets(&mut reader, model_path, file_len)?;
 
     #[cfg(feature = "candle")]
     {

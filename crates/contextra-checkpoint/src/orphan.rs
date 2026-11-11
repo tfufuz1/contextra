@@ -15,9 +15,9 @@
 //! 3. Ein "Dirty"-Flag markiert die Registry für das nächste Persistieren (Piggyback-Flush oder Shutdown).
 //! 4. Beim nächsten Store-Start oder Recovery-Lauf (`recover_orphaned_pins`) werden die verwaisten Pins entpinnt.
 
+use crate::error::Result;
 use crate::meta::StateCheckpoint;
 use contextra_env::{Clock, SystemClock};
-use crate::error::Result;
 use contextra_ids::TxId;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -756,14 +756,20 @@ mod tests {
             Ok(())
         }
         fn read(&self, path: &std::path::Path) -> std::io::Result<Vec<u8>> {
-            self.0.lock().get(path).cloned().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "not found"))
+            self.0
+                .lock()
+                .get(path)
+                .cloned()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "not found"))
         }
     }
 
     // Prüft, dass die Orphan-Registry über ein injiziertes Vfs sauber lädt und speichert.
     #[test]
     fn test_instance_orphan_registry_with_vfs() {
-        let vfs = Arc::new(MockVfs(parking_lot::Mutex::new(std::collections::BTreeMap::new())));
+        let vfs = Arc::new(MockVfs(parking_lot::Mutex::new(
+            std::collections::BTreeMap::new(),
+        )));
         let path = std::path::PathBuf::from("/test/orphans.json");
 
         let reg = InstanceOrphanRegistry::new_with_vfs(&path, vfs.clone());

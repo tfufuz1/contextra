@@ -2,7 +2,7 @@
 //!
 //! Exakt die 12 Methoden, die in `src/` von der StorageEngine aufgerufen werden.
 
-use crate::error::Result;
+use crate::error::CheckpointResult as Result;
 use bytes::Bytes;
 use contextra_ids::TxId;
 use std::future::Future;

@@ -59,7 +59,10 @@ fn build_consolidated_chunk_from_summary(
         serde_json::Value::Number(chunks.len().into()),
     );
 
-    let prov = ProvenanceRecord::synthesized_from(source_doc_ids);
+    // `ProvenanceRecord` arbeitet mit der Rank-eigenen `DocId`-Kopie. Die Konvertierung
+    // über die Ids-Ebene ist bis zur Ein-Besitzer-Migration (P3) die kleinste korrekte Brücke.
+    let rank_doc_ids: Vec<_> = source_doc_ids.iter().map(|d| d.inner().into()).collect();
+    let prov = ProvenanceRecord::synthesized_from(&rank_doc_ids);
     if let Ok(prov_val) = serde_json::to_value(&prov) {
         combined_metadata.insert("provenance".to_string(), prov_val);
     }

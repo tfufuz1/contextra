@@ -89,9 +89,7 @@ pub mod types {
 pub mod compat;
 
 #[cfg(feature = "workspace")]
-pub use crate::compat::{
-    workspace_error as error, ContextraError, Result, SeqBitTombstone, TombstoneSemanticsCheck,
-};
+pub use crate::compat::{workspace_error as error, ContextraError, Result};
 pub mod mvcc_error;
 pub mod seq_log;
 pub mod snapshot;
@@ -105,12 +103,5 @@ pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use tx_buffer::{IndexOp, TxBuffer};
 
-/// Re-Exports für Types und Error-Brücken zur Wahrung der Quellkompatibilität.
-pub mod types {
-    pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
-}
-
-#[cfg(feature = "workspace")]
-pub use contextra_types::error::{self, ContextraError, Result};
 #[cfg(not(feature = "workspace"))]
 pub use crate::mvcc_error::Result;
