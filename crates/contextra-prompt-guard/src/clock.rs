@@ -2,14 +2,8 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Trait für Zeitgeber (ohne Abhängigkeit von contextra-ports).
-pub trait Clock: Send + Sync {
-    /// Liefert die aktuellen Unix-Nanosekunden.
-    fn now_unix_nanos(&self) -> u64;
-
-    /// Liefert monotone Nanosekunden.
-    fn monotonic_nanos(&self) -> u64;
-}
+// MIGRATION(S-70): Clock wurde nach contract::Clock verlegt, bleibt hier re-exportiert.
+pub use crate::contract::Clock;
 
 /// Standard-Implementierung basierend auf `std::time::SystemTime`.
 #[derive(Debug, Default, Clone)]

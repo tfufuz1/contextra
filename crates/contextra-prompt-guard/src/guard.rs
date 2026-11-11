@@ -1,3 +1,5 @@
+//! Kern-Filterlogik für die Erkennung von Prompt-Injection-Mustern.
+
 // Herkunft: contextra-mcp/src/prompt_injection/guard.rs @ HEAD 9305c5d048cc6a4143d4e7cbf114cd85a6fca34a
 use super::audit::{SecurityAuditLogger, SecurityAuditRecord};
 use super::clock::{Clock, SystemClock};
@@ -14,8 +16,11 @@ use unicode_normalization::UnicodeNormalization;
 /// Vornormalisiertes Injection-Pattern zur Performance-Optimierung.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NormalizedPattern {
+    /// Originalmuster wie definiert.
     pub original: String,
+    /// Muster mit kollabierten Whitespaces.
     pub collapsed: String,
+    /// Muster ohne jegliche Whitespaces.
     pub no_ws: String,
 }
 
@@ -38,6 +43,7 @@ pub struct NormalizedPattern {
 #[derive(Clone)]
 pub struct PromptInjectionGuard {
     policy: QuarantinePolicy,
+    /// Platzhaltertext für redigierten Text.
     pub redaction_placeholder: String,
     patterns: Vec<String>,
     normalized_patterns: Vec<NormalizedPattern>,
@@ -69,6 +75,7 @@ impl Default for PromptInjectionGuard {
 }
 
 impl PromptInjectionGuard {
+    /// Erstellt eine neue Instanz des `PromptInjectionGuard`.
     pub fn new(
         policy: QuarantinePolicy,
         redaction_placeholder: String,
@@ -99,11 +106,13 @@ impl PromptInjectionGuard {
         }
     }
 
+    /// Überschreibt die verwendete `Clock`-Instanz für zeitabhängige Operationen.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
 
+    /// Liefert eine Referenz auf den aktuellen Zeitgeber.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
@@ -177,14 +186,17 @@ impl PromptInjectionGuard {
         ]
     }
 
+    /// Liefert die aktive Quarantäne-Policy.
     pub fn policy(&self) -> QuarantinePolicy {
         self.policy
     }
 
+    /// Liefert die konfigurierten Muster.
     pub fn patterns(&self) -> &[String] {
         &self.patterns
     }
 
+    /// Liefert eine Referenz auf den Audit-Logger.
     pub fn audit_logger(&self) -> &SecurityAuditLogger {
         &self.audit_logger
     }
@@ -361,7 +373,7 @@ impl PromptInjectionGuard {
             '\u{042F}' => 'R', // Я
             '\u{0404}' => 'E', // Є
             '\u{0406}' => 'I', // І
-            '\u{0407}' => 'I', // Ї
+            '\u{0407}' => 'I', // ї
             '\u{0405}' => 'S', // Ѕ
             '\u{0408}' => 'J', // Ј
             // Greek small homoglyphs

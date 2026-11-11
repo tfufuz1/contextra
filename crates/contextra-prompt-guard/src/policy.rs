@@ -1,4 +1,5 @@
-// Herkunft: contextra-mcp/src/prompt_injection/policy.rs @ HEAD 9305c5d048cc6a4143d4e7cbf114cd85a6fca34a
+//! Quarantäne-Policies und Konfiguration für die Prompt-Injection-Behandlung.
+
 use serde::{Deserialize, Serialize};
 
 /// Neutraler Standard-Platzhalter für als verdächtig erkannten Text im Strict/Escalate-Modus.
@@ -31,6 +32,7 @@ pub enum QuarantinePolicy {
 }
 
 impl QuarantinePolicy {
+    /// Liest die Policy aus der Umgebungsvariablen `CONTEXTRA_MCP_QUARANTINE_POLICY`.
     #[cfg(any(feature = "std", feature = "file-audit"))]
     #[allow(clippy::disallowed_methods)]
     pub fn from_env() -> Self {
@@ -49,16 +51,21 @@ impl QuarantinePolicy {
 /// Konfiguration zur Initialisierung aus einer externen Konfigurationsdatei.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptInjectionConfig {
+    /// Ausgewählte Quarantäne-Policy.
     #[serde(default)]
     pub policy: QuarantinePolicy,
+    /// Platzhaltertext für redigierte Inhalte.
     #[serde(default = "default_redaction_placeholder")]
     pub redaction_placeholder: String,
+    /// Optionaler Dateipfad für das Audit-Log.
     #[serde(default)]
     pub audit_log_path: Option<String>,
+    /// Zusätzliche benutzerdefinierte Erkennungsmuster.
     #[serde(default)]
     pub custom_patterns: Vec<String>,
 }
 
+/// Gibt den Standard-Redaktionsplatzhalter zurück.
 pub fn default_redaction_placeholder() -> String {
     DEFAULT_REDACTION_PLACEHOLDER.to_string()
 }
