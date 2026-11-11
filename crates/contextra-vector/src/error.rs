@@ -2,7 +2,7 @@
 // ZWECK: Zentrales Fehler-Enum VectorError für contextra-vector (B4/R3-Konformität).
 // INVARIANTEN: Zero-Panic, thiserror, non_exhaustive, saubere Zuordnung lokaler Fehler.
 // HOTSPOTS: VectorError, Result<T>
-// STAND: TS:2026-11-11T04:30:00Z
+// STAND: 2026-11-11
 
 //! # Fehlerbehandlung für `contextra-vector` (B4- & R3-Konformität)
 //!

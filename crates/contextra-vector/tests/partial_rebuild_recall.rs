@@ -1,6 +1,7 @@
 use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashSet;

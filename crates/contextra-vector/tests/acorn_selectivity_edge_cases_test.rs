@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: ACORN Filtered Search unter extremen Selektivitätsbedingungen (0% und 100%).
+// INVARIANTEN: Korrekte Behandlung leerer Treffermengen und vollständiger Selektion.
+// HOTSPOTS: 20-75
+// STAND: 2026-11-12
 use contextra_ports::VectorIndex;
 use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};

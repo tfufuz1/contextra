@@ -22,8 +22,8 @@ Er implementiert:
 
 ## Quickstart
 ```rust
-use contextra_ids::TenantId;
 use contextra_kvcache::contract::{KvCacheEngine, MemoryKvCache};
+use contextra_kvcache::types::TenantId;
 use contextra_kvcache::radix::KvReusePolicy;
 use contextra_kvcache::segment::KvSegment;
 

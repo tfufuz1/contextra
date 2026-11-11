@@ -50,6 +50,7 @@ pub mod compat;
 
 #[cfg(feature = "workspace")]
 pub use compat::{adapters, prefix_store, scratchpad_invalidation};
+pub mod contract;
 pub mod error;
 pub mod types;
 

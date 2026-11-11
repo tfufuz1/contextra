@@ -311,7 +311,7 @@ mod tests {
         {
             let res = should_trigger_partial_rebuild(&tracker, &tombstone_map, 0.05, &config);
             assert!(res.is_some());
-            let triggered_nodes = res.unwrap(); // unwrap
+            let triggered_nodes = res.expect("triggered nodes present");
             assert_eq!(triggered_nodes.len(), 10);
         }
     }

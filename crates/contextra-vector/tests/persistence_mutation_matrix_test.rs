@@ -9,9 +9,8 @@ fn test_persistence_header_mutation_matrix() {
     let dir = tempdir().unwrap();
     let file_path = dir.path().join("test_mut.hnsw");
 
-    let header = HnswHeader::new_v2_with_bias(
-        128, 16, 0, 1, 0.0, 1.0, 10, 0, 100, 500, 1, 0, 0, 0.0, 0.0,
-    );
+    let header =
+        HnswHeader::new_v2_with_bias(128, 16, 0, 1, 0.0, 1.0, 10, 0, 100, 500, 1, 0, 0, 0.0, 0.0);
     let bytes = header.to_bytes();
 
     // 1. Bit-Mutation an Magic-Bytes -> Rejection

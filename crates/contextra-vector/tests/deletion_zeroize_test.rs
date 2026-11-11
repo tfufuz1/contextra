@@ -1,6 +1,7 @@
 use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 
 #[tokio::test]
 async fn test_inv_vec_zeroize_1_slot_nulling_on_deletion() {

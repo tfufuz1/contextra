@@ -1,9 +1,16 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop, clippy::indexing_slicing, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::needless_range_loop,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
 
 use ahash::AHashSet;
 use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 use std::collections::VecDeque;
 
 /// Deterministischer einfacher Zufallsgenerator für wiederholbare Tests
@@ -163,7 +170,10 @@ async fn test_edge_cases_entry_point_and_hub_deletion() {
     // Randfall 2: Einzelknoten einfügen und löschen
     let tx1 = TxId::new(1);
     let doc1 = DocId::new(1);
-    index.insert(tx1, doc1, &rng.next_unit_vector(dim)).await.expect("insert 1");
+    index
+        .insert(tx1, doc1, &rng.next_unit_vector(dim))
+        .await
+        .expect("insert 1");
     index.commit(tx1).await.expect("commit 1");
     assert_eq!(index.len().await, 1);
     assert!(verify_layer0_bfs_reachability(&index));
@@ -183,7 +193,10 @@ async fn test_edge_cases_entry_point_and_hub_deletion() {
     // Wiederaufbau: 30 Knoten einfügen
     let tx4 = TxId::new(4);
     for i in 10..=40u64 {
-        index.insert(tx4, DocId::new(i), &rng.next_unit_vector(dim)).await.expect("insert");
+        index
+            .insert(tx4, DocId::new(i), &rng.next_unit_vector(dim))
+            .await
+            .expect("insert");
     }
     index.commit(tx4).await.expect("commit 4");
 
@@ -206,7 +219,11 @@ async fn test_edge_cases_entry_point_and_hub_deletion() {
         verify_layer0_bfs_reachability(&index),
         "BFS-Konnektivität nach Löschung des Entry-Points verletzt!"
     );
-    assert_ne!(index.entry_point(), Some(ep_node_idx), "Entry-Point muss neu gewählt worden sein!");
+    assert_ne!(
+        index.entry_point(),
+        Some(ep_node_idx),
+        "Entry-Point muss neu gewählt worden sein!"
+    );
 }
 
 #[tokio::test]
@@ -295,7 +312,10 @@ async fn test_50_percent_deletion_recall_regression() {
     let gt_post = compute_gt(&active_docs);
     let recall_post = evaluate_recall(&index, &queries, &gt_post).await;
 
-    println!("Recall vor Löschungen: {:.4}, nach 50% Löschungen: {:.4}", recall_initial, recall_post);
+    println!(
+        "Recall vor Löschungen: {:.4}, nach 50% Löschungen: {:.4}",
+        recall_initial, recall_post
+    );
     assert!(
         recall_post >= recall_initial - 0.05,
         "Recall@10 Abfall zu groß: initial {:.4}, post {:.4}",
@@ -320,7 +340,10 @@ async fn test_inv_hnsw_slot_1_no_slot_reuse_before_rebuild() {
     // 10 Knoten einfügen
     let tx1 = TxId::new(1);
     for i in 1..=10u64 {
-        index.insert(tx1, DocId::new(i), &rng.next_unit_vector(dim)).await.expect("insert");
+        index
+            .insert(tx1, DocId::new(i), &rng.next_unit_vector(dim))
+            .await
+            .expect("insert");
     }
     index.commit(tx1).await.expect("commit 1");
 
@@ -335,7 +358,10 @@ async fn test_inv_hnsw_slot_1_no_slot_reuse_before_rebuild() {
     // Neuen Knoten einfügen VOR Rebuild: Slot darf NICHT sofort wiederverwendet werden!
     let tx3 = TxId::new(3);
     let new_doc = DocId::new(11);
-    index.insert(tx3, new_doc, &rng.next_unit_vector(dim)).await.expect("insert 11");
+    index
+        .insert(tx3, new_doc, &rng.next_unit_vector(dim))
+        .await
+        .expect("insert 11");
     index.commit(tx3).await.expect("commit 3");
 
     let new_slot = index.node_idx_for_doc(new_doc).expect("slot for doc 11");

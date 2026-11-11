@@ -2,7 +2,7 @@
 // ZWECK: Konfiguration und Builder für den HNSW-Index (Hyperparameter, Resource Limits).
 // INVARIANTEN: ef_construction >= m, M-Werte begrenzt (4..256), Rebuild-Threshold im Intervall (0.0..1.0).
 // HOTSPOTS: HnswConfig::validate, HnswConfigBuilder::build
-// STAND: TS:2026-11-11T02:00:00Z
+// STAND: 2026-11-12
 
 use crate::error::{Result, VectorError};
 use crate::types::DistanceMetric;

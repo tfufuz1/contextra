@@ -422,7 +422,9 @@ async fn test_manifest_poisoning_on_fsync_failure() {
     assert!(!manifest.is_poisoned());
 
     // Manually trigger poison state to simulate fsync failure (INV-FSYNC-1)
-    manifest.is_poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
+    manifest
+        .is_poisoned
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     assert!(manifest.is_poisoned());
 
     let entry = ManifestEntry::Add {
@@ -430,7 +432,10 @@ async fn test_manifest_poisoning_on_fsync_failure() {
         max_tx: 99,
     };
     let err = manifest.append(&entry).await;
-    assert!(err.is_err(), "Poisoned manifest must reject append operations");
+    assert!(
+        err.is_err(),
+        "Poisoned manifest must reject append operations"
+    );
     let err_msg = err.unwrap_err().to_string();
     assert!(
         err_msg.contains("poisoned") && err_msg.contains("INV-FSYNC-1"),

@@ -1,6 +1,6 @@
+use contextra_vector::persistence::MmapIndex;
 use std::fs;
 use tempfile::tempdir;
-use contextra_vector::persistence::MmapIndex;
 
 #[test]
 fn test_hnsw_corrupted_file_recovery_fail_closed() {
@@ -42,7 +42,10 @@ fn test_hnsw_corrupted_file_recovery_fail_closed() {
             let res = MmapIndex::open(&flip_path);
             if let Ok(idx) = res {
                 let check = idx.header.verify_checksum(&[0u8; 32]);
-                assert!(check.is_err(), "Checksum verification must detect corruption");
+                assert!(
+                    check.is_err(),
+                    "Checksum verification must detect corruption"
+                );
             }
         }
     }

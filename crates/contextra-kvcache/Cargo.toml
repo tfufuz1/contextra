@@ -47,7 +47,6 @@ bytes = { workspace = true }
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
 contextra-crypto = { version = "0.1.0", path = "../contextra-crypto" }
-contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
 criterion = { workspace = true, features = ["async_tokio"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"

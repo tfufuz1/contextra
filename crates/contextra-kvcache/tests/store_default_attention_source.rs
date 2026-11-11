@@ -17,7 +17,7 @@
 use contextra_kvcache::{
     attention_score::AttentionScoreSource, segment::KvSegment, TenantIsolatedKvStore,
 };
-use contextra_types::TenantId;
+use contextra_kvcache::types::TenantId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

@@ -14,7 +14,7 @@ ring = "1"
 
 [features]
 default = []
-workspace = ["dep:contextra-types", "dep:contextra-ports"]
+workspace = ["contextra-types", "contextra-ports"]
 test-hooks = []
 inspect = []
 memory-only-storage = []
