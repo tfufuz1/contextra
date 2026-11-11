@@ -1,10 +1,19 @@
+// FILE-CONTEXT
+// ZWECK: Fuzz-Target für beliebige Operationsfolgen (Insert, Search, Delete) auf dem HNSW-Index
+// INVARIANTEN: Reines fuzz_one ohne direkte libfuzzer-Laufzeitabhängigkeit für Smoke-Treiber
+// HOTSPOTS: 35-100
+// STAND: 2026-11-11
+// BEREICH: AGENTS §8, SPEC §11.4 — HNSW Zustandsübergänge, Tombstones und Suche
+
+// ANCHOR[contextra-vector:W11-FUZZ-006]
+
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libfuzzer_sys::fuzz_target;
-use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
+use libfuzzer_sys::fuzz_target;
 
 #[derive(Arbitrary, Debug)]
 pub enum HnswFuzzOp {
@@ -33,7 +42,8 @@ pub struct HnswFuzzInput {
     pub ops: Vec<HnswFuzzOp>,
 }
 
-fuzz_target!(|input: HnswFuzzInput| {
+/// Reines Fuzz-Primitiv zur Ausführung einer HnswFuzzInput-Struktur.
+pub fn fuzz_one_input(input: HnswFuzzInput) {
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -84,4 +94,9 @@ fuzz_target!(|input: HnswFuzzInput| {
             }
         }
     });
+}
+
+/// Fuzzing Einstiegspunkt für libFuzzer.
+fuzz_target!(|input: HnswFuzzInput| {
+    fuzz_one_input(input);
 });
