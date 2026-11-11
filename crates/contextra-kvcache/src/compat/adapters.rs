@@ -10,8 +10,9 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+pub use contextra_ports::attention::AttentionExporter;
 use contextra_ports::embedding::EmbeddingProvider;
-use contextra_ports::kv_bridge_port::KvBridgeStorage;
+pub use contextra_ports::kv_bridge_port::KvBridgeStorage;
 use contextra_ports::license::FeatureRing;
 use contextra_ports::plugin::{PluginCapability, PluginError, PluginManifest};
 use contextra_ports::storage::StorageEngine;

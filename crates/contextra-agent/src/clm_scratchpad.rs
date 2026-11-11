@@ -14,8 +14,14 @@
 //! # Port-Entscheidung & Lokale Traits
 //! `ContextEditAuditSink` und `ScratchpadCacheInvalidator` sind als schlanke, lokale Traits
 //! in diesem Modul definiert, da die endgültige Entscheidung über eine Auslagerung in `contextra-ports`
-//! noch aussteht (siehe ADR-106). Sie verhindern direkte Ring-Verstöße gegen `contextra-privacy`
+//! noch aussteht (siehe ADR-106). Sie verhindern direkte Schichtungs-Verstöße gegen `contextra-privacy`
 //! und `contextra-kvcache`.
+
+// =========================================================================
+// SECTION: Context-Language-Model Scratchpad
+// =========================================================================
+// ANCHOR[contextra-agent:clm-scratchpad]
+
 
 use contextra_db::volatile_vault::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
 use contextra_ports::{Clock, SystemClock};
@@ -223,7 +229,7 @@ fn clone_chunk(chunk: &VaultChunk) -> VaultChunk {
         chunk.id,
         chunk.content.clone(),
         chunk.modality.clone(),
-        TxId(chunk.captured_tx),
+        VaultTxId(chunk.captured_tx),
     );
     if let Some(ref label) = chunk.label {
         cloned = cloned.with_label(label.as_str());
@@ -364,7 +370,13 @@ impl ClmScratchpad {
         let doc_id = DocId::new(self.next_chunk_id);
         self.next_chunk_id += 1;
 
-        let mut chunk = VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
+        // Vault-Typen sind eigene Newtypes. Die Umwandlung erfolgt an dieser Grenze.
+        let mut chunk = VaultChunk::new(
+            VaultDocId(doc_id.inner()),
+            content,
+            SignalModality::TextInput,
+            VaultTxId(captured_tx.0),
+        );
         if let Some(lbl) = label {
             chunk = chunk.with_label(lbl);
         }
@@ -774,3 +786,5 @@ mod tests {
         assert!(err_remove.is_err());
     }
 }
+
+// !SECTION

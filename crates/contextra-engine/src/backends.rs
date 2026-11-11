@@ -59,7 +59,7 @@ pub struct DefaultBackends;
 impl Backends for DefaultBackends {
     type Storage = LsmStorage;
     type Vector = HnswIndex;
-    type Text = InvertedIndex;
+    type Text = InvertedIndex<LsmStorage>;
     type Graph = CsrGraph;
 }
 // !SECTION Backends-Architektur

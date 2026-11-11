@@ -98,3 +98,59 @@ impl contextra_ports::scanner::LayerScanner for KvCacheScanner {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::segment::KvSegment;
+    use crate::store::TenantIsolatedKvStore;
+    use contextra_ids::TenantId;
+    use contextra_ports::clock::SystemClock;
+    use contextra_ports::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer};
+    use contextra_types::{RequestContext, TxId};
+    use std::sync::Arc;
+
+    // Prüft, dass KvCachePruner und KvCacheScanner die Port-Verträge für KV-Cache-Segmente korrekt erfüllen.
+    #[test]
+    fn test_kv_cache_pruner_and_scanner_ports() {
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let tenant = TenantId::try_new(77).unwrap();
+        let pruner = KvCachePruner::new(Arc::clone(&store));
+        let scanner = KvCacheScanner::new(Arc::clone(&store));
+
+        let ctx = RequestContext::new(tenant, TxId(101));
+        let target = ScanTarget::new("tenant_77", [0x77; 32]);
+        let clock = SystemClock::new();
+
+        // 1. Initialer Scan auf leerem Store: Positivkontrolle besteht, Restmenge ist 0
+        let scan_result = scanner
+            .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
+            .expect("Scanner must succeed on empty store");
+        assert_eq!(scan_result.witness_layer(), &WitnessLayer::KvCacheSegments);
+        assert_eq!(scan_result.scanned(), 1); // Positivkontrolle registriert
+        assert_eq!(scan_result.remaining(), 0);
+
+        // 2. Segmente einfügen
+        store.insert_segment(tenant, KvSegment::new(tenant, 10, vec![1, 2, 3, 4]));
+        store.insert_segment(tenant, KvSegment::new(tenant, 20, vec![5, 6, 7, 8, 9]));
+
+        // 3. Scan mit Restmenge (2 Einheiten)
+        let scan_with_data = scanner
+            .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
+            .expect("Scanner must succeed with data");
+        assert_eq!(scan_with_data.remaining(), 2);
+        assert_eq!(scan_with_data.scanned(), 3); // 1 Canary + 2 Segmente
+
+        // 4. Pruning ausführen
+        let purge_stats = pruner.purge(&ctx, &target).expect("Pruner must succeed");
+        assert_eq!(purge_stats.purged_units, 2);
+        assert_eq!(purge_stats.bytes_freed, 9);
+        assert_eq!(store.get_tenant_segment_len(tenant), 0);
+
+        // 5. Verifikation nach Bereinigung: Restmenge wieder 0
+        let scan_after = scanner
+            .scan(&ctx, target, ScanTechnique::Structural, &clock)
+            .expect("Scanner must succeed after purge");
+        assert_eq!(scan_after.remaining(), 0);
+    }
+}

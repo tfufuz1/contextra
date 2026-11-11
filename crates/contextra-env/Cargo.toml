@@ -11,6 +11,10 @@ description = "Injectable environment (clock, rng, id generation, metrics) for C
 [dev-dependencies]
 
 [features]
-default = ["std", "test-utils"]
+default = ["std"]
 std = []
 test-utils = []
+
+[[test]]
+name = "legacy_reference_unix_ms"
+required-features = ["test-utils"]

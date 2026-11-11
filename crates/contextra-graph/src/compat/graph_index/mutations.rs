@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
+// INVARIANTEN: Isolierte Workspace-Konvertierungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-CSR-GRAPH-INDEX-MUTATIONS-001]
 //! Mutationsmethoden des `GraphIndex`-Ports auf `CsrGraph`.
 //!
@@ -16,9 +23,12 @@ use crate::csr::graph_write::CsrGraph;
 use crate::csr::inner::sentinel_entity;
 use crate::csr::inner::GraphInner;
 use crate::csr::types::{
+
     EdgePayload, PersistedEdgePayload, StagedEdgePayload, GRAPH_ENTITY_DELETED_PREFIX,
     GRAPH_ENTITY_PREFIX,
 };
+
+// SECTION Mutations Core Implementation
 use crate::csr::visibility::is_suspicious_tx_id;
 
 fn validate_tx_id_heuristic(tx: TxId, op_name: &str) {
@@ -318,3 +328,5 @@ fn commit_staged_removals(inner: &mut GraphInner, tx: TxId) {
         }
     }
 }
+
+// !SECTION Mutations Core Implementation

@@ -6,7 +6,7 @@
 //! Token-Budget angepasst (gekürzt oder trunkiert) werden.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Greift auf Basistypen aus `contextra-types` zurück.
+//! Teil der Kognitionsschicht (Ebene E2). Greift auf Basistypen aus `contextra-types` zurück.
 //!
 //! ## Hauptkomponenten
 //! - [`ContextManager`]: Kernstruktur zur Relevanzfilterung und Token-Budget-Kompaktierung.
@@ -44,6 +44,11 @@ use crate::types_local::{ContextChunk, ContextWindow, Result, TokenBudget};
 /// 3. Trim to token budget (relevance-weighted)
 // ANCHOR[contextra-cognition:CTX-001]
 /// Verwaltet autonome Kontextvorbereitung und Token-Budgetierung für Sprachmodelle.
+// !SECTION: SpatialFence Definition
+
+// =========================================================================
+// SECTION: ContextManager Definition & Verwaltung
+// =========================================================================
 pub struct ContextManager {
     /// Token budget configuration.
     budget: TokenBudget,
@@ -250,6 +255,9 @@ impl ContextManager {
 #[derive(Debug, Clone)]
 // ANCHOR[contextra-cognition:CTX-008]
 /// Geographische Beschränkung (Spatial Fencing) für regionsspezifische Chunks.
+// =========================================================================
+// SECTION: SpatialFence Definition
+// =========================================================================
 pub struct SpatialFence {
     /// The region identifier to filter by.
     pub region: String,
@@ -283,6 +291,11 @@ impl SpatialFence {
     }
 }
 
+// !SECTION: Kontext-Operationen & Budgetierung
+
+// =========================================================================
+// SECTION: ContextManager Unit-Tests
+// =========================================================================
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -481,6 +494,11 @@ mod tests {
     }
 }
 
+// !SECTION: Kontext-Operationen & Budgetierung
+
+// =========================================================================
+// SECTION: ContextManager Unit-Tests
+// =========================================================================
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -638,3 +656,4 @@ mod token_tests {
         assert!(!window.truncated);
     }
 }
+// !SECTION: ContextManager Unit-Tests

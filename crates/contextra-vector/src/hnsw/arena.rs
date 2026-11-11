@@ -1,6 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Arena-Allocator (HnswArena) für HNSW-Nachbarlisten mit 64-Byte-Alignment, Slot-Freilisten und CAS-Relinking.
 // INVARIANTEN: Zero-Panic Doctrine (ContextraError bei Kapazität/Grenzen); SIMD-Cacheline Alignment (64 Bytes).
+// HOTSPOTS: allocate_node, get_ram_node_connections, update_backlink, zeroize_node_connections
+// STAND: TS:2026-11-11T02:00:00Z
 
 //! Arena Allocator for HNSW neighbor lists and O(1) Backlink management.
 
@@ -9,6 +11,9 @@ use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// SECTION Konstanten & Typ-Aliase
+
+// ANCHOR[contextra-vector:ARENA-ALIGNMENT]
 /// Slot alignment in bytes (64-byte alignment = 16 u32 elements for SIMD cache-line compatibility).
 pub const ARENA_ALIGNMENT_BYTES: usize = 64;
 /// Alignment in u32 elements (64 bytes / 4 bytes = 16 u32 elements).
@@ -16,7 +21,11 @@ pub const ARENA_ALIGNMENT_U32: usize = ARENA_ALIGNMENT_BYTES / std::mem::size_of
 
 /// Composite key (neighbor_ram_idx, layer) for backlink lookups.
 pub type BacklinkKey = (usize, usize);
+// !SECTION
 
+// SECTION BacklinkTable
+
+// ANCHOR[contextra-vector:ARENA-BACKLINK-TABLE]
 /// Deterministic backlink connection table using `BTreeMap`.
 #[derive(Debug, Default, Clone)]
 pub struct BacklinkTable {
@@ -48,7 +57,11 @@ impl BacklinkTable {
         self.map.clear();
     }
 }
+// !SECTION
 
+// SECTION HnswArena Allocator
+
+// ANCHOR[contextra-vector:ARENA-ALLOCATOR-STRUCT]
 /// Contiguous 64-byte aligned arena allocator for HNSW node connections with free-list slot reuse.
 #[derive(Debug)]
 pub struct HnswArena {
@@ -99,6 +112,7 @@ impl HnswArena {
 
     /// Allocates or reuses a slot for a node's neighbor lists across all its layers.
     /// Ensures 64-byte alignment and validates capacity on slot reuse.
+    // ANCHOR[contextra-vector:ARENA-ALLOCATE-NODE]
     pub fn allocate_node(
         &self,
         max_layer: usize,
@@ -180,6 +194,7 @@ impl HnswArena {
     }
 
     /// Gets connection list for a node at a specific layer without panicking.
+    // ANCHOR[contextra-vector:ARENA-GET-RAM-CONNS]
     pub fn get_ram_node_connections(&self, ram_idx: usize, layer: usize, m: usize) -> Vec<u32> {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();
@@ -217,6 +232,7 @@ impl HnswArena {
     }
 
     /// Updates connection list for a backlink update safely.
+    // ANCHOR[contextra-vector:ARENA-UPDATE-BACKLINK]
     pub fn update_backlink(
         &self,
         ram_idx: usize,
@@ -257,6 +273,7 @@ impl HnswArena {
     }
 
     /// Non-blocking relinking for lazy neighbor pruning during search traversal.
+    // ANCHOR[contextra-vector:ARENA-RELINK-PRUNED]
     pub fn try_relink_pruned_neighbors(
         &self,
         ram_idx: usize,
@@ -295,6 +312,7 @@ impl HnswArena {
 
     /// Zeroizes connection memory for a node slot across all layers and clears counts,
     /// without releasing to `free_list` (`INV-VEC-ZEROIZE-1`, `INV-HNSW-SLOT-1`).
+    // ANCHOR[contextra-vector:ARENA-ZEROIZE-CONNECTIONS]
     pub fn zeroize_node_connections(&self, ram_idx: usize, max_layer: usize, m: usize) {
         let offsets = self.offsets.read();
         let count_offsets = self.count_offsets.read();
@@ -340,6 +358,7 @@ impl HnswArena {
         }
     }
 }
+// !SECTION
 
 #[cfg(test)]
 mod tests {

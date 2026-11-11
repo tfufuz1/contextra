@@ -4,6 +4,13 @@
 //! KEIN neuer Index — nutzt bestehende CSR-Struktur und Embedding-Infrastruktur.
 //! Re-Bonding ist eine seltene, asynchrone Background-Operation.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Perkolations- und Resilienz-Metriken für Graph-Topologien.
+// INVARIANTEN: Numerisch stabile Schwellenwertberechnungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_types::EntityId;
 use std::collections::HashMap;
 
@@ -15,6 +22,8 @@ use std::collections::HashMap;
 /// `contextra-cognition`, welche systemweite Sleep-Cycle-Intervalle und Konsolidierungs-Trigger orchestriert.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-graph:SRC-PERCOLATION-001]
+
+// SECTION Percolation Core Implementation
 pub struct PercolationConfig {
     /// Kritischer Perkolationsschwellenwert θ_perc. Default: 0.7.
     pub critical_threshold: f32,
@@ -328,3 +337,5 @@ mod tests {
         );
     }
 }
+
+// !SECTION Percolation Core Implementation

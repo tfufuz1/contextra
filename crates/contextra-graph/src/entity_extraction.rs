@@ -15,6 +15,8 @@
 // kann an genau dieser Stelle durch Aufruf von `RuleBasedEntityExtractor::extract` und anschließender
 // Übergabe der extrahierten Relationen an `ingest_extracted_relations` eingehängt werden.
 
+
+// SECTION Entity Extraction Core Implementation
 #![forbid(unsafe_code)]
 
 use crate::csr::{CsrGraph, EdgeType};
@@ -316,3 +318,5 @@ pub fn ingest_extracted_relations(
 
     Ok(created_edges)
 }
+
+// !SECTION Entity Extraction Core Implementation

@@ -1,8 +1,16 @@
-//! Text index and segment synthesizer traits.
-
-// FILE-CONTEXT
-// ZWECK: TextIndex & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
-// INVARIANTEN: AFIT for TextIndex, BoxFuture for SegmentSynthesizer.
+//! # Text Index Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/vector_index.rs
+//!
+//! Abstrakter Vertrag für Volltext- und Inverted-Index-Engines (z. B. BM25 in `contextra-text`).
+//!
+//! // ANCHOR[contextra-ports:TXT-001]
+//! // SECTION text-index-contracts
+//! // NOTE: Verwendet AFIT / impl Future für statische Bindung in Hot-Paths.
+//! // Invarianten:
+//! // 1. INV-TXT-SEARCH: Deterministische Score-Berechnung nach BM25-Formel.
+//! // 2. INV-TXT-MVCC: Snapshot-Isolation via `search_at`.
 
 use super::BoxFuture;
 use crate::types::{DocId, ScoredDocument, TxId};
@@ -12,6 +20,7 @@ use std::future::Future;
 
 pub use crate::embedding::TextEmbeddingEngine;
 
+// ANCHOR[contextra-ports:SEG-SYNTH-001]
 /// Trait-Abstraktion für LLM-Synthesizer zur Segment-Zusammenfassung (REM-Phase).
 pub trait SegmentSynthesizer: Send + Sync {
     /// Synthetisiert ein Segment von Texten zu einer abstrakten Zusammenfassung.
@@ -28,6 +37,7 @@ pub trait SegmentSynthesizer: Send + Sync {
     fn model_id(&self) -> &str;
 }
 
+// ANCHOR[contextra-ports:TXT-STATS-001]
 /// Statistics for a text index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextIndexStats {
@@ -39,11 +49,13 @@ pub struct TextIndexStats {
     pub memory_usage_bytes: usize,
 }
 
+// ANCHOR[contextra-ports:TXT-TRAIT-001]
 /// Text-Index Trait — abstrahiert BM25/Inverted-Index-Operationen.
 ///
 /// # Dyn-Kompatibilität
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait TextIndex: Send + Sync + 'static {
+    // ANCHOR[contextra-ports:TXT-SEARCH-001]
     /// Searches for documents matching the query.
     fn search(
         &self,
@@ -146,6 +158,7 @@ pub trait TextIndex: Send + Sync + 'static {
     /// Reiner Lesevorgang ohne Zustandsänderung.
     fn stats(&self) -> impl Future<Output = Result<TextIndexStats>> + Send;
 }
+// !SECTION text-index-contracts
 
 #[cfg(test)]
 mod tests {

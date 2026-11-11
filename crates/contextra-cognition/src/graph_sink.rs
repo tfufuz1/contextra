@@ -6,7 +6,7 @@
 //! [`CsrGraph`] publiziert.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3), greift auf `contextra-graph` (Ring 0) zu.
+//! Teil der Kognitionsschicht (Ebene E2), greift auf `contextra-graph` zu.
 //!
 //! ## Invarianten
 //! - **Single Writer:** Es wird von einem einzelnen aktiven Schreiber während der Konsolidierung
@@ -15,12 +15,20 @@
 //! - **Generische Rollenbindung:** Bei der Erzeugung synthetischer Hyperkanten wird ein Standard-Rollen-Binding
 //!   mit `RoleId::new(0)` verwendet.
 
+// FILE-CONTEXT
+// ZWECK: Gepufferte Hyperedge-Senke fuer LeanRAG Stage 3 mit atomarem RCU-Commit in den CsrGraph.
+// INVARIANTEN: Batch-Commit via RCU; externer Schreibschutz via ConsolidationNodesGuard; generische Rollenbindung.
+// STAND: 2026-11-11
+
 use crate::aggregation_phase::{SuperEdgeDraft, SuperEdgeSink};
 use crate::graph_local::csr::EdgeType;
 use crate::graph_local::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use crate::graph_local::CsrGraph;
 use crate::types_local::{ContextraError, Result, TxId};
 
+// =========================================================================
+// SECTION: CsrGraphSuperEdgeSink Definition
+// =========================================================================
 /// Buffered sink implementation writing synthetic superedges and invalidation requests to [`CsrGraph`].
 ///
 /// # Invariant
@@ -103,3 +111,4 @@ impl<'a> SuperEdgeSink for CsrGraphSuperEdgeSink<'a> {
         Ok(())
     }
 }
+// !SECTION: SuperEdgeSink Trait-Implementierung

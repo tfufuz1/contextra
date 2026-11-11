@@ -3,7 +3,7 @@
 //! Öffentliche Fassaden-Schnittstelle für die LeanRAG Stage-3-Hyperkantenaggregation (Spec §5.3, §12.4).
 //!
 //! ## Ring-Zugehörigkeit & Architektur-Invariante
-//! Gemäß der Ring-DAG-Ebenenhierarchie (§4) hängt `contextra-cognition` von `contextra-engine` ab (Ring 3 -> Ring 2).
+//! Gemäß der Ring-DAG-Ebenenhierarchie (§4) hängt `contextra-cognition` von `contextra-engine` ab (Ebene E2 -> Ring 2).
 //! Eine `impl`-Methode direkt auf `crate::engine_local::Collection` innerhalb von `contextra-engine` würde
 //! eine zyklische Abhängigkeit erzeugen. Stattdessen wird [`consolidate_semantic_hyperedges`]
 //! als freie Funktion in `contextra-cognition` bereitgestellt.
@@ -55,6 +55,9 @@ use crate::types_local::{DocId, Result};
 /// wird die Konsolidierung sofort abgebrochen, ohne LLM-Aufrufe oder Cluster-Allokationen durchzuführen.
 // ANCHOR[contextra-cognition:FACADE-001]
 /// Freie Funktion zur Ausführung der semantischen Hyperkanten-Konsolidierung (LeanRAG Stage 3).
+// =========================================================================
+// SECTION: Fassaden-Konsolidierung
+// =========================================================================
 pub async fn consolidate_semantic_hyperedges<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     embedder: &dyn TextEmbeddingEngine,
@@ -124,3 +127,4 @@ pub async fn consolidate_semantic_hyperedges<S: StorageEngine, V: VectorIndex>(
 
     Ok(phase_result)
 }
+// !SECTION: Fassaden-Konsolidierung

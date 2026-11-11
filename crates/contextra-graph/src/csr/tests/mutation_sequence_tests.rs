@@ -3,11 +3,20 @@
 //! # Zweck
 //! Überprüft die Konsistenz nach wechselnden `add_edge`, `remove_edge` und Re-Insert-Aufrufen.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId, TxId};
 use std::sync::Arc;
 
+
+// SECTION Mutation Sequence Tests Core Implementation
 fn create_entity(id: u64) -> Entity {
     Entity::new(EntityId::new(id), "label", "type")
 }
@@ -108,3 +117,5 @@ async fn test_csr_mutation_sequence_equivalence() {
     let n6: Vec<EntityId> = res6.into_iter().map(|(id, _)| id).collect();
     assert!(n6.contains(&EntityId::new(1)));
 }
+
+// !SECTION Mutation Sequence Tests Core Implementation

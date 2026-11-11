@@ -4,6 +4,7 @@
 //! strict nonce discipline, constant-time verification, and uniform error reporting.
 //! All header components (version, algorithm, doc id) are cryptographically bound into the AAD.
 
+// SECTION [epic=crypto-aead,seq=1] Imports & Konstanten
 use crate::dek::Dek;
 use crate::error::{CryptoError, Result};
 use aes_gcm_siv::aead::{Aead, KeyInit, Payload};
@@ -15,6 +16,11 @@ pub const REC_AAD: &[u8] = b"ctx/rec/v2";
 
 /// Seals a plaintext record into an envelope using an explicit, caller-provided 12-byte nonce.
 /// Binds `doc` and `key_bytes` into the Associated Data (AAD) preventing replay/reordering across documents.
+// !SECTION
+
+// SECTION [epic=crypto-aead,seq=2] Rekord-Versiegelung (Seal)
+// ANCHOR[contextra-crypto:AEAD-001] Authentifizierte Umschlag-Erzeugung mit Nonce-Bindung
+// NOTE: Bindet Dokument-ID und Schlüssel in die AAD ein zur Replay-Vermeidung (TS:2026-11-11)
 pub fn seal_record_with_nonce(
     dek: &Dek,
     doc: [u8; 16],
@@ -46,6 +52,7 @@ pub fn seal_record_with_nonce(
 }
 
 /// Seals a plaintext record into an envelope using an injected RNG for nonce generation.
+// ANCHOR[contextra-crypto:AEAD-002] Rekord-Versiegelung mit injiziertem RNG
 pub fn seal_record_with_rng<R: RngCore>(
     dek: &Dek,
     doc: [u8; 16],
@@ -59,12 +66,18 @@ pub fn seal_record_with_rng<R: RngCore>(
 }
 
 /// Seals a record using OsRng (convenience wrapper).
+// ANCHOR[contextra-crypto:AEAD-003] Standard-Versiegelung via OsRng
 pub fn seal_record(dek: &Dek, doc: [u8; 16], key_bytes: &[u8], plain: &[u8]) -> Vec<u8> {
     seal_record_with_rng(dek, doc, key_bytes, plain, &mut rand::rngs::OsRng).unwrap_or_default()
 }
 
 /// Opens an encrypted record envelope, verifying the associated data and authentication tag.
 /// Fails with a uniform `CryptoError::Aead` on any authentication or corruption issue without leaking oracle details.
+// !SECTION
+
+// SECTION [epic=crypto-aead,seq=3] Rekord-Entsiegelung (Open)
+// ANCHOR[contextra-crypto:AEAD-004] Sichere Umschlag-Prüfung und Entschlüsselung
+// NOTE: Fail-Closed Rückgabe ohne Orakel-Leckage (TS:2026-11-11)
 pub fn open_record(dek: &Dek, key_bytes: &[u8], env: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     if env.len() < 1 + 1 + 16 + 12 + 16 {
         return Err(CryptoError::Aead("record envelope too short".into()));
@@ -102,6 +115,9 @@ pub fn open_record(dek: &Dek, key_bytes: &[u8], env: &[u8]) -> Result<Zeroizing<
     Ok(Zeroizing::new(pt))
 }
 
+// !SECTION
+
+// SECTION [epic=crypto-aead,seq=4] Unit-Tests & Invarianten
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,3 +204,4 @@ mod tests {
         );
     }
 }
+// !SECTION

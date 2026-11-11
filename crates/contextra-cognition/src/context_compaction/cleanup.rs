@@ -2,24 +2,32 @@
 //!
 //! Bereinigt nach Systemabstürzen verwaiste `ConsolidationIntent`-Einträge im Speicher.
 //!
-//! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Verwendet den `StorageEngine`-Port.
+//! ## Ebene und Einordnung
+//! Teil der Kognitionsschicht (Ebene E2). Verwendet den `StorageEngine`-Port.
 //!
 //! ## Invarianten
 //! - **Transaktionale Sicherheit:** Jedes Entfernen erfolgt über eine reguläre, atomare Speicher-Transaktion.
 //! - **Präfix-Scans:** Sucht unter `consolidation_intent:` und `__tx_intent:`.
+//
+// FILE-CONTEXT
+// ZWECK: Bereinigung verwaister Konsolidierungs-Intents nach Systemabstürzen (Recovery-Phase).
+// INVARIANTEN: Atomare Transaktionen für Löschungen; sequentieller TxId-Fortschritt via AtomicU64.
+// STAND: 2026-11-11
 
 use crate::engine_local::transaction::CommitIntent;
 use crate::ports_local::StorageEngine;
 use crate::types_local::{Result, TxId};
 
+// =========================================================================
+// SECTION: Cleanup-Logik
+// =========================================================================
+
+// ANCHOR[contextra-cognition:CLEAN-001]
 /// Aufgerufen beim Öffnen einer Collection / DB. Findet und entfernt verwaiste
 /// ConsolidationIntents aus dem WAL/Storage.
 ///
 /// Verwaiste Intents entstehen wenn consolidate_with_retry() nach commit(intent_key)
 /// aber vor dem eigentlichen Dokument-Commit crashed.
-// ANCHOR[contextra-cognition:CLEAN-001]
-/// Bereinigt nach Abstürzen verwaiste ConsolidationIntents im Storage.
 pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     storage: &S,
     next_tx: &std::sync::atomic::AtomicU64,
@@ -28,6 +36,7 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     let mut cleaned = 0usize;
 
     for &prefix in prefixes {
+        // NOTE: Präfix-Scan zur Erkennung noch nicht finalisierter Intent-Einträge.
         let orphaned_keys = storage.scan_prefix(prefix).await?;
 
         for (key, value) in orphaned_keys {
@@ -50,3 +59,4 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     }
     Ok(cleaned)
 }
+// !SECTION: Cleanup-Logik

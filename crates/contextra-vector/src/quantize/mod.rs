@@ -3,7 +3,7 @@
 // INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben; INV-SQ8-ERROR-BOUND-1.
 // NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen vor Rekalibrierung der Min/Max-Grenzen.
 // HOTSPOTS: quantize.rs (ScalarQuantizer::try_train, quantize, dequantize)
-// STAND: TS:2026-08-30T21:55:29Z (SESSION: 10569099)
+// STAND: TS:2026-11-11T02:00:00Z
 
 //! Scalar Quantization (SQ8) for HNSW Index.
 //!
@@ -21,6 +21,9 @@ use contextra_types::DistanceMetric;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// SECTION Quantisierungs-Konstanten
+
+// ANCHOR[contextra-vector:SQ8-CONSTANTS]
 /// Default low percentile for quantization scaling (0.5%).
 pub const DEFAULT_P_LOW: f32 = 0.005;
 /// Default high percentile for quantization scaling (99.5%).
@@ -28,7 +31,11 @@ pub const DEFAULT_P_HIGH: f32 = 0.995;
 
 /// Theoretical maximum quantization error bound factor per dimension: $1 / (2 \cdot 255) = 1 / 510$.
 pub const SQ8_MAX_ERROR_FACTOR_PER_DIM: f32 = 1.0 / 510.0;
+// !SECTION
 
+// SECTION ScalarQuantizer Struktur & Training
+
+// ANCHOR[contextra-vector:SQ8-QUANTIZER-STRUCT]
 /// An 8-bit Scalar Quantizer (SQ8) with per-dimension scaling.
 ///
 /// Quantization reduces the memory footprint of vector storage by 4x.
@@ -61,14 +68,9 @@ impl Clone for ScalarQuantizer {
 }
 
 impl ScalarQuantizer {
-    /// Creates a new ScalarQuantizer trained on a batch of vectors to find per-dimension min/max.
-    ///
-    /// For long-lived or growing collections, callers should periodically recalibrate the
-    /// quantizer (e.g., during index rebuilds) using a representative sample of active vectors.
-    /// Without recalibration, new vectors that fall outside the initial range will be clamped,
-    /// leading to degraded quantization accuracy.
     /// Safely creates a new ScalarQuantizer trained on a batch of vectors using default percentile clipping (0.5% / 99.5%).
     /// Returns `ContextraError::InvalidInput` if dimension is 0 or any vector dimension mismatches.
+    // ANCHOR[contextra-vector:SQ8-TRY-TRAIN]
     pub fn try_train(batch: &[&[f32]], dimension: usize) -> contextra_types::Result<Self> {
         Self::try_train_with_percentiles(batch, dimension, DEFAULT_P_LOW, DEFAULT_P_HIGH)
     }
@@ -197,11 +199,6 @@ impl ScalarQuantizer {
     }
 
     /// Creates a new ScalarQuantizer trained on a batch of vectors to find per-dimension min/max.
-    ///
-    /// For long-lived or growing collections, callers should periodically recalibrate the
-    /// quantizer (e.g., during index rebuilds) using a representative sample of active vectors.
-    /// Without recalibration, new vectors that fall outside the initial range will be clamped,
-    /// leading to degraded quantization accuracy.
     pub fn train(batch: &[&[f32]], dimension: usize) -> Self {
         Self::try_train(batch, dimension).unwrap_or_else(|_| Self {
             mins: vec![0.0; dimension],
@@ -235,9 +232,6 @@ impl ScalarQuantizer {
     }
 
     /// Returns the theoretical maximum quantization reconstruction error bound for dimension `dim`.
-    ///
-    /// According to INV-SQ8-ERROR-BOUND-1:
-    /// $$e_i \le \frac{\text{max}_i - \text{min}_i}{2 \cdot 255} = \frac{\Delta_i}{510}$$
     pub fn max_reconstruction_error_per_dim(&self, dim: usize) -> Option<f32> {
         if dim < self.dimension {
             let range = self.maxes.get(dim)? - self.mins.get(dim)?;
@@ -251,14 +245,15 @@ impl ScalarQuantizer {
     pub fn dimension(&self) -> usize {
         self.dimension
     }
+}
+// !SECTION
 
+// SECTION Drift-Messung & Quantisierungs-Operationen
+
+impl ScalarQuantizer {
     /// Calculates quantization drift for a single vector as the fraction of dimensions
     /// falling outside `[mins[i], maxes[i]]`.
-    ///
-    /// This is a **pure calculation** with no side-effects. It does NOT update
-    /// cumulative query metrics (`total_queries`, `out_of_range_queries`).
-    /// For stateful metric tracking across query history, see [`quantize`](Self::quantize)
-    /// and [`drift_ratio`](Self::drift_ratio).
+    // ANCHOR[contextra-vector:SQ8-CALC-DRIFT]
     pub fn calculate_vector_drift(&self, vector: &[f32]) -> f32 {
         if self.dimension == 0 || vector.is_empty() {
             return 0.0;
@@ -273,20 +268,12 @@ impl ScalarQuantizer {
     }
 
     /// Legacy pure drift calculation wrapper for [`calculate_vector_drift`](Self::calculate_vector_drift).
-    ///
-    /// # Deprecated
-    /// Renamed to [`calculate_vector_drift`](Self::calculate_vector_drift) to explicitly distinguish
-    /// pure stateless drift calculations from stateful query metric tracking in [`drift_ratio`](Self::drift_ratio).
     #[deprecated(since = "0.1.0", note = "Use `calculate_vector_drift` instead")]
     pub fn check_drift(&self, vector: &[f32]) -> f32 {
         self.calculate_vector_drift(vector)
     }
 
     /// Returns the fraction of quantized queries that contained values outside the trained min/max range.
-    ///
-    /// This is a **stateful metric** reflecting cumulative historical queries processed via
-    /// [`quantize`](Self::quantize). Pure drift checks via [`calculate_vector_drift`](Self::calculate_vector_drift)
-    /// do not update query counters or affect this ratio.
     pub fn drift_ratio(&self) -> f32 {
         let total = self.total_queries.load(Ordering::Relaxed);
         if total == 0 {
@@ -297,8 +284,6 @@ impl ScalarQuantizer {
     }
 
     /// Checks if recalibration / index rebuild is required based on cumulative quantization drift ratio.
-    ///
-    /// Requires at least 20 queries to avoid false positives on small initial samples.
     pub fn is_rebuild_required(&self, threshold: f32) -> bool {
         let total = self.total_queries.load(Ordering::Relaxed);
         if total < 20 {
@@ -308,6 +293,7 @@ impl ScalarQuantizer {
     }
 
     /// Quantizes an `f32` vector to `u8`.
+    // ANCHOR[contextra-vector:SQ8-QUANTIZE]
     pub fn quantize(&self, vector: &[f32]) -> contextra_types::Result<Vec<u8>> {
         if self.mins.len() < self.dimension
             || self.maxes.len() < self.dimension
@@ -382,6 +368,7 @@ impl ScalarQuantizer {
     }
 
     /// Dequantizes a `u8` vector back to `f32`.
+    // ANCHOR[contextra-vector:SQ8-DEQUANTIZE]
     pub fn dequantize(&self, vector: &[u8]) -> contextra_types::Result<Vec<f32>> {
         if self.inv_scales.len() < self.dimension || self.mins.len() < self.dimension {
             return Err(contextra_types::ContextraError::invalid_input(
@@ -415,6 +402,7 @@ impl ScalarQuantizer {
 
     /// Computes the asymmetric distance between an exact query and a quantized vector.
     /// Optimized for zero allocations via inline dequantization.
+    // ANCHOR[contextra-vector:SQ8-ASYMMETRIC-DIST]
     pub fn asymmetric_dist(
         &self,
         query: &[f32],
@@ -474,6 +462,7 @@ impl ScalarQuantizer {
 
     /// Computes symmetric (approximate) distance purely in u8.
     /// Optimized for zero allocations via inline dequantization.
+    // ANCHOR[contextra-vector:SQ8-SYMMETRIC-DIST]
     pub fn symmetric_dist(
         &self,
         q1: &[u8],
@@ -520,6 +509,7 @@ impl ScalarQuantizer {
         Ok(acc)
     }
 }
+// !SECTION
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
