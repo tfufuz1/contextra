@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Benchmark / Beispiel für contextra-router (cost_routing_savings_bench.rs).
+// INVARIANTEN: Deterministische Ausführung, Latenz- und Budgetüberwachung.
+
 //! # Benchmark für Ressourceneinsparungen durch intelligentes Routing
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

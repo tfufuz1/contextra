@@ -1,4 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// =========================================================================
+// SECTION: tools_crud_direct_tests
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-TOOLS-CRUD-001]
 
 use contextra::Contextra;
 use contextra_mcp::protocol::JsonRpcRequest;
@@ -520,3 +524,5 @@ async fn test_crud_search_and_explain() {
     let resp_explain = server.handle(req_explain).await;
     assert!(resp_explain.error.is_none());
 }
+
+// !SECTION: tools_crud_direct_tests

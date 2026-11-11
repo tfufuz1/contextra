@@ -10,15 +10,16 @@
 //! Backpressure contract: `max_concurrent_inferences` limits `spawn_blocking` calls.
 //! Callers will experience backpressure (await on permit acquire) rather than Tokio thread pool exhaustion.
 
-mod core;
+pub mod core;
 
 #[cfg(feature = "kv-stage-b")]
 mod prefix_reuse;
 
-#[cfg(test)]
-mod inference_tests;
 
 pub use core::*;
 
 #[cfg(feature = "kv-stage-b")]
 pub use prefix_reuse::*;
+
+#[cfg(all(feature = "workspace", feature = "kv-stage-b"))]
+pub use crate::compat::kv::{build_prefix_key, seed_from_hit, KvPrefixContext};

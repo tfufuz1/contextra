@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (bandit_tests.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Einheitentests für Bandit-Routing und Richtlinien
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

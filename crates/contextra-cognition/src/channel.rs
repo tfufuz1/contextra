@@ -3,6 +3,11 @@
 //! Decouples cognitive memory consolidation, context compaction, and RAG synthesis
 //! from specific agent frameworks, queues, or HTTP transports. External inputs
 //! are accepted as abstract streams, channels, or queues.
+//
+// FILE-CONTEXT
+// ZWECK: Entkoppelte Eingabe- und Ausgabe-Channels für Kognition & Vorverdichtung.
+// INVARIANTEN: Zero-Panic; Send + Sync für asynchrone Pipelines; saubere Fehlerkapselung.
+// STAND: 2026-11-11
 
 use crate::memory_consolidation::{PreCondensedInput, TurnSegment};
 use crate::ports_local::BoxFuture;
@@ -10,6 +15,11 @@ use crate::types_local::{Result, TenantId};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+// =========================================================================
+// SECTION: Channel Interfaces
+// =========================================================================
+
+// ANCHOR[contextra-cognition:CHAN-001]
 /// Abstract asynchronous input channel for feeding cognitive inputs.
 pub trait CognitiveInputChannel: Send + Sync {
     /// Ingests a pre-condensed input batch into the cognition engine.
@@ -20,12 +30,19 @@ pub trait CognitiveInputChannel: Send + Sync {
     ) -> BoxFuture<'a, Result<Vec<TurnSegment>>>;
 }
 
+// ANCHOR[contextra-cognition:CHAN-002]
 /// Abstract asynchronous output sink for dispatching consolidated or synthesized chunks.
 pub trait CognitiveOutputSink<T>: Send + Sync {
     /// Emits a consolidated item to the destination sink.
     fn emit<'a>(&'a self, item: T) -> BoxFuture<'a, Result<()>>;
 }
+// !SECTION: Channel Interfaces
 
+// =========================================================================
+// SECTION: In-Memory Implementations
+// =========================================================================
+
+// ANCHOR[contextra-cognition:CHAN-003]
 /// In-Memory asynchronous MPSC implementation of `CognitiveInputChannel`.
 pub struct InMemoryCognitiveChannel {
     tx: mpsc::Sender<(TenantId, Vec<PreCondensedInput>)>,
@@ -63,6 +80,7 @@ impl CognitiveInputChannel for InMemoryCognitiveChannel {
     }
 }
 
+// ANCHOR[contextra-cognition:CHAN-004]
 /// Standalone synchronous/direct intake adapter implementing `CognitiveInputChannel`.
 pub struct DirectCognitiveChannel;
 
@@ -83,6 +101,7 @@ impl CognitiveInputChannel for DirectCognitiveChannel {
     }
 }
 
+// ANCHOR[contextra-cognition:CHAN-005]
 /// In-memory queue sink collecting emitted items in an `Arc<parking_lot::Mutex<Vec<T>>>`.
 pub struct InMemoryOutputSink<T> {
     items: Arc<parking_lot::Mutex<Vec<T>>>,
@@ -126,3 +145,4 @@ impl<T: Send + Sync + Clone + 'static> CognitiveOutputSink<T> for InMemoryOutput
         })
     }
 }
+// !SECTION: In-Memory Implementations

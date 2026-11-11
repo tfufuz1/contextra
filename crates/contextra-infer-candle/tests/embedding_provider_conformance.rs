@@ -28,7 +28,7 @@ impl CandleEmbedInner for MockConformantEmbedModel {
         text: &str,
         _tokenizer: &tokenizers::Tokenizer,
         _device: &Device,
-    ) -> Result<Vec<f32>> {
+    ) -> contextra_infer_candle::Result<Vec<f32>> {
         // Generate deterministic non-zero values based on input length
         Ok(vec![text.len() as f32; self.dim])
     }

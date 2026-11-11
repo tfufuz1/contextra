@@ -300,3 +300,391 @@ mod tests {
         assert!(sink.events().is_empty());
     }
 }
+
+// ============================================================================
+// KV, ATTENTION & ROUTING FAKES (WP-TK-1.2 & WP-TK-1.3)
+// ============================================================================
+
+use bytes::Bytes;
+use contextra_ports::{
+    policy::{EgressDecision, EgressPolicy},
+    AttentionExporter, CommunityResolver, ContextChunk, ContextPreparer, ContextWindow,
+    ContextraError, DriftStatusProvider, HybridSearchProvider, KvBlock, KvBridgeStorage,
+    KvPrefixHit, KvPrefixStore, PrefixKey, RequestId, TenantId, TokenBudget, TxId,
+};
+use contextra_types::{EntityId, RequestContext};
+use parking_lot::RwLock;
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+type TxStagingMap = BTreeMap<TxId, BTreeMap<Vec<u8>, Bytes>>;
+type KvPrefixEntryMap = BTreeMap<(u64, String), (Vec<u32>, Vec<KvBlock>)>;
+
+// ANCHOR[contextra-testkit:KV-BRIDGE-FAKES-001]
+/// Deterministische In-Memory-Implementierung von [`KvBridgeStorage`].
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryKvBridgeStorage {
+    committed: Arc<RwLock<BTreeMap<Vec<u8>, Bytes>>>,
+    staging: Arc<RwLock<TxStagingMap>>,
+}
+
+impl InMemoryKvBridgeStorage {
+    /// Erzeugt einen neuen leeren `InMemoryKvBridgeStorage`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Gibt die Anzahl der aktuell committeten Schlüssel zurück.
+    pub fn len(&self) -> usize {
+        self.committed.read().len()
+    }
+
+    /// Prüft, ob der committete Speicher leer ist.
+    pub fn is_empty(&self) -> bool {
+        self.committed.read().is_empty()
+    }
+}
+
+impl KvBridgeStorage for InMemoryKvBridgeStorage {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, contextra_ports::Result<Option<Bytes>>> {
+        Box::pin(async move {
+            let guard = self.committed.read();
+            Ok(guard.get(key).cloned())
+        })
+    }
+
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, contextra_ports::Result<()>> {
+        Box::pin(async move {
+            let mut guard = self.staging.write();
+            guard.entry(tx_id).or_default().insert(key.to_vec(), Bytes::copy_from_slice(value));
+            Ok(())
+        })
+    }
+
+    fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, contextra_ports::Result<()>> {
+        Box::pin(async move {
+            let staged_ops = {
+                let mut staging_guard = self.staging.write();
+                staging_guard.remove(&tx_id)
+            };
+
+            if let Some(ops) = staged_ops {
+                let mut comm_guard = self.committed.write();
+                for (k, v) in ops {
+                    comm_guard.insert(k, v);
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+// ANCHOR[contextra-testkit:ATTENTION-FAKES-001]
+/// Skriptbare, deterministische Implementierung von [`AttentionExporter`].
+#[derive(Debug, Default, Clone)]
+pub struct ScriptedAttentionExporter {
+    weights: Arc<RwLock<BTreeMap<u64, Vec<f32>>>>,
+}
+
+impl ScriptedAttentionExporter {
+    /// Erstellt einen leeren `ScriptedAttentionExporter`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registriert oder aktualisiert die Aufmerksamkeitsgewichte für einen Request.
+    pub fn set_weights(&self, request_id: RequestId, weights: Vec<f32>) {
+        self.weights.write().insert(request_id.0, weights);
+    }
+
+    /// Entfernt die registrierten Gewichte für einen Request.
+    pub fn remove_weights(&self, request_id: RequestId) -> Option<Vec<f32>> {
+        self.weights.write().remove(&request_id.0)
+    }
+}
+
+impl AttentionExporter for ScriptedAttentionExporter {
+    fn export_attention_weights(&self, request_id: RequestId) -> Option<Vec<f32>> {
+        self.weights.read().get(&request_id.0).cloned()
+    }
+}
+
+// ANCHOR[contextra-testkit:KV-PREFIX-FAKES-001]
+/// Deterministische In-Memory-Implementierung von [`KvPrefixStore`].
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryKvPrefixStore {
+    entries: Arc<RwLock<KvPrefixEntryMap>>,
+}
+
+impl InMemoryKvPrefixStore {
+    /// Erzeugt einen neuen leeren `InMemoryKvPrefixStore`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn make_key(tenant: TenantId, key: &PrefixKey) -> (u64, String) {
+        let key_repr = format!(
+            "{}:{}:{}:{}",
+            key.model.model_id,
+            key.layout.dtype,
+            key.tokenizer_hash.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            key.rope.base
+        );
+        (tenant.as_u64(), key_repr)
+    }
+}
+
+impl KvPrefixStore for InMemoryKvPrefixStore {
+    fn lookup(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit> {
+        let internal_key = Self::make_key(tenant, key);
+        let guard = self.entries.read();
+        let (cached_tokens, blocks) = guard.get(&internal_key)?;
+
+        let match_len = tokens
+            .iter()
+            .zip(cached_tokens.iter())
+            .take_while(|(a, b)| a == b)
+            .count();
+
+        if match_len == 0 {
+            None
+        } else {
+            Some(KvPrefixHit {
+                matched_tokens: match_len,
+                blocks: blocks.clone(),
+            })
+        }
+    }
+
+    fn insert(
+        &self,
+        tenant: TenantId,
+        key: &PrefixKey,
+        tokens: &[u32],
+        blocks: Vec<KvBlock>,
+    ) -> Result<(), ContextraError> {
+        let internal_key = Self::make_key(tenant, key);
+        let mut guard = self.entries.write();
+        guard.insert(internal_key, (tokens.to_vec(), blocks));
+        Ok(())
+    }
+
+    fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64, ContextraError> {
+        let internal_key = Self::make_key(tenant, key);
+        let mut guard = self.entries.write();
+        if let Some((_, blocks)) = guard.remove(&internal_key) {
+            Ok(blocks.len() as u64)
+        } else {
+            Ok(0)
+        }
+    }
+}
+
+// ANCHOR[contextra-testkit:ROUTING-FAKES-001]
+/// Skriptbare, deterministische Implementierung von [`HybridSearchProvider`].
+#[derive(Debug, Default, Clone)]
+pub struct ScriptedHybridSearchProvider {
+    chunks: Arc<RwLock<Vec<ContextChunk>>>,
+}
+
+impl ScriptedHybridSearchProvider {
+    /// Erzeugt einen neuen leeren `ScriptedHybridSearchProvider`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Setzt die vorgegebenen Context-Chunks.
+    pub fn set_chunks(&self, mut chunks: Vec<ContextChunk>) {
+        chunks.sort_by(|a, b| {
+            b.relevance
+                .partial_cmp(&a.relevance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.doc_id.cmp(&b.doc_id))
+        });
+        *self.chunks.write() = chunks;
+    }
+}
+
+impl HybridSearchProvider for ScriptedHybridSearchProvider {
+    fn search_hybrid<'a>(
+        &'a self,
+        _query_text: &'a str,
+        _query_embedding: &'a [f32],
+        top_k: usize,
+    ) -> BoxFuture<'a, contextra_ports::Result<Vec<ContextChunk>>> {
+        Box::pin(async move {
+            if top_k == 0 {
+                return Ok(Vec::new());
+            }
+            let guard = self.chunks.read();
+            let count = guard.len().min(top_k);
+            Ok(guard.get(..count).map(|s| s.to_vec()).unwrap_or_default())
+        })
+    }
+}
+
+// ANCHOR[contextra-testkit:ROUTING-FAKES-002]
+/// Statische, deterministische Implementierung von [`CommunityResolver`].
+#[derive(Debug, Default, Clone)]
+pub struct StaticCommunityResolver {
+    communities: Arc<RwLock<BTreeMap<EntityId, u64>>>,
+}
+
+impl StaticCommunityResolver {
+    /// Erzeugt einen neuen leeren `StaticCommunityResolver`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registriert die Community-Zuordnung für eine Entity.
+    pub fn insert(&self, entity_id: EntityId, community_id: u64) {
+        self.communities.write().insert(entity_id, community_id);
+    }
+}
+
+impl CommunityResolver for StaticCommunityResolver {
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, contextra_ports::Result<Option<u64>>> {
+        Box::pin(async move {
+            let guard = self.communities.read();
+            Ok(guard.get(&entity_id).copied())
+        })
+    }
+}
+
+// ANCHOR[contextra-testkit:ROUTING-FAKES-003]
+/// Deterministische Implementierung von [`ContextPreparer`].
+#[derive(Debug, Default, Clone)]
+pub struct BudgetTruncatingContextPreparer;
+
+impl BudgetTruncatingContextPreparer {
+    /// Erzeugt einen neuen `BudgetTruncatingContextPreparer`.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl ContextPreparer for BudgetTruncatingContextPreparer {
+    fn prepare_context(
+        &self,
+        chunks: Vec<ContextChunk>,
+        budget: &TokenBudget,
+        relevance_threshold: f32,
+    ) -> contextra_ports::Result<ContextWindow> {
+        let max_available = budget.available();
+        let mut included = Vec::new();
+        let mut total_tokens = 0usize;
+        let mut truncated = false;
+
+        let mut candidate_chunks: Vec<ContextChunk> = chunks
+            .into_iter()
+            .filter(|c| c.relevance >= relevance_threshold)
+            .collect();
+
+        candidate_chunks.sort_by(|a, b| {
+            b.relevance
+                .partial_cmp(&a.relevance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.doc_id.cmp(&b.doc_id))
+        });
+
+        for chunk in candidate_chunks {
+            if total_tokens.saturating_add(chunk.token_count) <= max_available {
+                total_tokens = total_tokens.saturating_add(chunk.token_count);
+                included.push(chunk);
+            } else {
+                truncated = true;
+            }
+        }
+
+        Ok(ContextWindow {
+            chunks: included,
+            total_tokens,
+            truncated,
+        })
+    }
+}
+
+// ANCHOR[contextra-testkit:ROUTING-FAKES-004]
+/// Statische Implementierung von [`DriftStatusProvider`].
+#[derive(Debug, Clone)]
+pub struct StaticDriftStatusProvider {
+    status: Arc<RwLock<String>>,
+}
+
+impl Default for StaticDriftStatusProvider {
+    fn default() -> Self {
+        Self {
+            status: Arc::new(RwLock::new("stabil".to_string())),
+        }
+    }
+}
+
+impl StaticDriftStatusProvider {
+    /// Erzeugt einen `StaticDriftStatusProvider` mit Default-Status `"stabil"`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Erzeugt einen `StaticDriftStatusProvider` mit spezifischem Status.
+    pub fn with_status(status: impl Into<String>) -> Self {
+        Self {
+            status: Arc::new(RwLock::new(status.into())),
+        }
+    }
+
+    /// Ändert den aktuellen Status.
+    pub fn set_status(&self, status: impl Into<String>) {
+        *self.status.write() = status.into();
+    }
+}
+
+impl DriftStatusProvider for StaticDriftStatusProvider {
+    fn overall_drift_status(&self) -> String {
+        self.status.read().clone()
+    }
+}
+
+// ANCHOR[contextra-testkit:ROUTING-FAKES-005]
+/// Skriptbare Implementierung von [`EgressPolicy`].
+#[derive(Debug, Default, Clone)]
+pub struct ScriptedEgressPolicy {
+    deny_patterns: Arc<RwLock<Vec<String>>>,
+    redact_patterns: Arc<RwLock<Vec<String>>>,
+}
+
+impl ScriptedEgressPolicy {
+    /// Erzeugt eine neue leere `ScriptedEgressPolicy` (erlaubt standardmäßig alles).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Fügt ein Muster hinzu, das zu `Deny` führt.
+    pub fn add_deny_pattern(&self, pattern: impl Into<String>) {
+        self.deny_patterns.write().push(pattern.into());
+    }
+
+    /// Fügt ein Muster hinzu, das zu `Redact` führt.
+    pub fn add_redact_pattern(&self, pattern: impl Into<String>) {
+        self.redact_patterns.write().push(pattern.into());
+    }
+}
+
+impl EgressPolicy for ScriptedEgressPolicy {
+    fn evaluate(&self, _ctx: &RequestContext, payload: &str) -> EgressDecision {
+        let deny_guard = self.deny_patterns.read();
+        for pattern in deny_guard.iter() {
+            if payload.contains(pattern) {
+                return EgressDecision::Deny(format!("payload contains denied pattern '{pattern}'"));
+            }
+        }
+
+        let redact_guard = self.redact_patterns.read();
+        for pattern in redact_guard.iter() {
+            if payload.contains(pattern) {
+                return EgressDecision::Redact(format!("payload contains pattern '{pattern}' requiring redaction"));
+            }
+        }
+
+        EgressDecision::Allow
+    }
+}

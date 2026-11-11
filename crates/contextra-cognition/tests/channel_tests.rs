@@ -1,6 +1,15 @@
 //! Tests for abstract cognitive channels in `contextra-cognition`.
 //! Confirms RAG memory intake can operate over channels decoupled from concrete pipelines.
 
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer abstrakte kognitive Eingabe- und Ausgabe-Channels.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Cognitive Channel Tests
+// =========================================================================
 use contextra_cognition::channel::{
     CognitiveInputChannel, CognitiveOutputSink, DirectCognitiveChannel, InMemoryCognitiveChannel,
     InMemoryOutputSink,
@@ -67,3 +76,4 @@ async fn test_in_memory_mpsc_channel_intake_and_sink() {
         "Consolidation finished for tenant-beta"
     );
 }
+// !SECTION: Cognitive Channel Tests

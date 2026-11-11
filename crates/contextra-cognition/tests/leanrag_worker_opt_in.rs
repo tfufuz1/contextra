@@ -3,6 +3,15 @@
 //! Validiert die optionale Aktivierung der LeanRAG Stage-3-Aggregation
 //! in der `ConsolidationEngine`, Superkanten-Generierung, Fehlerisolation und Budgetprüfungen.
 
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer Worker-Opt-In-Flags und Hintergrund-Aggregationsworker.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: LeanRAG Worker Opt-In Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -427,3 +436,4 @@ async fn test_invalid_config_or_zero_budget_skipped_gracefully() {
         "No superedge should be created when config validation fails"
     );
 }
+// !SECTION: LeanRAG Worker Opt-In Tests

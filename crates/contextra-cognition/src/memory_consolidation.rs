@@ -4,7 +4,7 @@
 //! mathematisch-statistische Bereinigung) sowie Schnittstellen zur Aufnahme vorverdichteter Eingaben.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Keine direkte Abhängigkeit zu `contextra-graph`
+//! Teil der Kognitionsschicht (Ebene E2). Keine direkte Abhängigkeit zu `contextra-graph`
 //! im strukturellen Durchlauf (P1-DAG-Integrität).
 //!
 //! ## Kernkonzepte
@@ -27,6 +27,7 @@
 //              Keine LLM-API-Aufrufe im Structural Consolidation Pass. Keine Abhängigkeit zu contextra-graph (P1-DAG-Integrität).
 // STAND: TS:2026-08-29T18:00:00Z
 
+// TODO(baukasten): Memory Consolidation Kernlogik (Near-Duplicate-Detection) isolieren (AD-8/F6). Reine Algorithmen arbeiten auf Vektor-Slices; Datenbank-Integration gehört in den Executor.
 //! Structural Consolidation Pass — deterministische, LLM-freie Bereinigung (Near-Duplicate-Detection, Sliding-Window-Clustering, verwaiste Kanten identifizieren). Analog zu Garbage Collection / Index Compaction.
 //!
 //! # Architektur-Hinweis (Generative Synthesis Pass vs. Structural Consolidation Pass)
@@ -272,6 +273,11 @@ pub fn group_turns_into_segments(
 /// RÜCKGABE: `Vec<(DocId /* zu superseden: älterer Turn */, DocId /* Original: neuerer/wichtigerer Turn */)>`
 // ANCHOR[contextra-cognition:MEM-005]
 /// Führt segmentlokale Duplikatserkennung via Cosine-Similarity durch.
+// !SECTION: Konsolidierungs-Pass & Segmentierung
+
+// =========================================================================
+// SECTION: Near-Duplicate-Erkennung & Cosine-Aehnlichkeit
+// =========================================================================
 pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Vec<(DocId, DocId)> {
     let mut pairs = Vec::new();
     let n = turns.len();
@@ -656,6 +662,9 @@ pub const MAX_PRE_CONDENSED_PROVENANCE_COUNT: usize = 256;
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-cognition:MEM-016]
 /// Struktur für vorverdichtete externe Eingabeknoten.
+// =========================================================================
+// SECTION: PreCondensedInput & Eingangsstrukturen
+// =========================================================================
 pub struct PreCondensedInput {
     pub tenant_id: contextra_types::TenantId,
     pub source_label: String,
@@ -791,6 +800,11 @@ fn process_pre_condensed_input_node(
 /// - **Deterministic Ordering**: Inputs are sorted canonically by `tenant_id`, then `text_digest`, then `source_label`.
 // ANCHOR[contextra-cognition:MEM-017]
 /// Nimmt vorverdichtete Eingabeknoten mandantengeschützt in die Pipeline auf.
+// !SECTION: PreCondensedInput & Eingangsstrukturen
+
+// =========================================================================
+// SECTION: Vorverdichtungs-Intake & Validierung
+// =========================================================================
 pub fn intake_pre_condensed_inputs(
     target_tenant_id: &contextra_types::TenantId,
     inputs: &[PreCondensedInput],
@@ -1298,3 +1312,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Near-Duplicate-Erkennung & Cosine-Aehnlichkeit

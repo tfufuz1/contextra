@@ -83,7 +83,7 @@ def zeilen_code(ws: dict, name: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Abhängigkeits-Budget für Contextra-Crates (SPEC v4.1)")
+    parser = argparse.ArgumentParser(description="Abhängigkeits-Budget für Contextra-Crates (SPEC §1.1, §3.1)")
     parser.add_argument("meta_or_crates", nargs="*", help="Optional meta.json gefolgt von Crate-Namen")
     parser.add_argument("--crate", "-c", action="append", help="Spezifisches Crate analysieren")
     parser.add_argument("--json", action="store_true", help="JSON-Format für Maschinenlesbarkeit ausgeben")

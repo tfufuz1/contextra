@@ -1,7 +1,13 @@
 # Contextra Baukasten – Katalog autarker Entkopplungs-Prompts für Coding-Agenten
 
-Berücksichtige die angestrebte Architektur jeweils aus docs/SPEC.md um diese Prompts zu überarbeiten.
-Diese Prompts sollen wiederverwendbar sein und autark mit den Tools aus tools/ selbstständig die Refaktorisierungen und Implementierungen identifizieren, du musst pro Prompt die korrekten Befehle für die Tools jeweils geben, damit dieser seinen Bereich jeweils untersuchen kann.
+**Maßgebliche Grundlagen & Referenzen:**
+- **Leitfaden für Implementierer:** [`docs/decoupling/BAUKASTEN_LEITFADEN.md`](../decoupling/BAUKASTEN_LEITFADEN.md) (Verbindliche 10 Gebote, Schichtenmodell E0–E3, Gate-Befehle)
+- **Architekturentscheidungen (AD-1 bis AD-10):** [`docs/decoupling/BAUKASTEN_ARCHITEKTURENTSCHEIDUNG.md`](../decoupling/BAUKASTEN_ARCHITEKTURENTSCHEIDUNG.md)
+- **Arbeitspaket-Umsetzungsplan (WP-00 bis WP-91):** [`docs/decoupling/BAUKASTEN_UMSETZUNGSPLAN.md`](../decoupling/BAUKASTEN_UMSETZUNGSPLAN.md)
+- **Normative Spezifikation:** `docs/SPEC.md` v3
+
+Berücksichtige die angestrebte Architektur jeweils aus den obigen Dokumenten.
+Diese Prompts sollen wiederverwendbar sein und autark mit den Tools aus tools/ selbstständig die Refaktorisierungen und Implementierungen identifizieren.
 
 
 

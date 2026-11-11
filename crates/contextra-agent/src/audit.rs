@@ -10,7 +10,14 @@
 //! Provides append-only logging of every step an agent takes.
 //! Entries are stored via [`Collection`] and keyed `audit:{task_id}:step:{n}`.
 
+// =========================================================================
+// SECTION: Append-Only Immutable Audit Log
+// =========================================================================
+// ANCHOR[contextra-agent:audit-log]
+
+
 use crate::context::{validate_node_id, validate_task_id};
+// TODO(baukasten): Audit-Logging abstrahieren (AD-8). Bindung an db::Collection durch entkoppelten AuditSink-Port ersetzen.
 use contextra_db::Collection;
 use contextra_ports::StorageEngine;
 use contextra_types::Result;
@@ -510,3 +517,5 @@ mod tests {
         Ok(())
     }
 }
+
+// !SECTION

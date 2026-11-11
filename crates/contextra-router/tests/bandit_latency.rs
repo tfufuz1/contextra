@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Integrationstest für contextra-router (bandit_latency.rs).
+// INVARIANTEN: Deterministische Ausführung, Zero-Panic, korrekte Fehlertaxonomie.
+
 #![allow(
     clippy::indexing_slicing,
     clippy::disallowed_methods,

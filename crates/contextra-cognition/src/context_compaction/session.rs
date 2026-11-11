@@ -4,7 +4,7 @@
 //! für die Gedächtniskompaktierung im Schlafzyklus.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Koordiniert `Collection`, Speicher-Engine und LLM-Aufrufe.
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert `Collection`, Speicher-Engine und LLM-Aufrufe.
 //!
 //! ## Invarianten
 //! - **Optimistic Concurrency Control (OCC):** Verhindert verlorene Aktualisierungen (Lost Updates),
@@ -12,6 +12,11 @@
 //! - **Crash-Resilienz (INV-CONSOLIDATE-1/2):** Schreibt zu Beginn einen `CommitIntent::Consolidation`
 //!   in das Speichersystem, der bei erfolgreichem Abschluss gelöscht wird.
 //! - **Fail-Closed bei Löschfehlern:** Scheitert das Entfernen von Quelldokumenten, schlägt der Commit fehl.
+
+// FILE-CONTEXT
+// ZWECK: Transaktionale OCC-Konsolidierungssitzung mit Crash-Resilienz und Intent-Tracking.
+// INVARIANTEN: INV-CONSOLIDATE-1/2 Intent-Protokollierung; atomare Dokument-Updates; Fail-Closed bei Loeschfehlern.
+// STAND: 2026-11-11
 
 use crate::engine_local::collection::{Collection, StoredDocumentMeta};
 use crate::engine_local::transaction::CommitIntent;
@@ -30,6 +35,9 @@ use super::types::CompactionStrategy;
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
 // ANCHOR[contextra-cognition:SESS-001]
 /// Transaktionale OCC-Konsolidierungssitzung.
+// =========================================================================
+// SECTION: ConsolidationSession Struktur
+// =========================================================================
 pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex> {
     /// Reference to the active collection.
     pub collection: &'a Collection<S, V>,
@@ -115,6 +123,11 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     /// Returns a list of document IDs that were mutated or deleted since the session started.
     // ANCHOR[contextra-cognition:SESS-004]
     /// Aktualisiert Versionen nach einem OCC-Konflikt.
+// !SECTION: ConsolidationSession Struktur
+
+// =========================================================================
+// SECTION: OCC-Refresh & Validierung
+// =========================================================================
     pub async fn refresh(&mut self) -> Result<Vec<DocId>> {
         let mut changed_docs = Vec::new();
         let mut new_source_docs = Vec::with_capacity(self.source_docs.len());
@@ -173,6 +186,11 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     /// validates OCC, reads source document contents, generates summary, and commits.
     // ANCHOR[contextra-cognition:SESS-006]
     /// Führt den gesamten Konsolidierungsablauf aus.
+// !SECTION: OCC-Refresh & Validierung
+
+// =========================================================================
+// SECTION: LLM-Ausfuehrung & Finalisierung
+// =========================================================================
     pub async fn execute<G>(&self, generator: &G) -> Result<()>
     where
         G: LlmTextGenerator + ?Sized,
@@ -341,3 +359,4 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         Ok(())
     }
 }
+// !SECTION: Private Schluesselgenerierung

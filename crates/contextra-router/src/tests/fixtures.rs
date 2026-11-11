@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (fixtures.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Gemeinsame Test-Fixtures, Mock-Provider und Hilfsstrukturen
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

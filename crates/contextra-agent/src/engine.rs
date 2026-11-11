@@ -9,7 +9,14 @@
 //!
 //! Implements the core execution loop: checkpoint → execute → commit → audit → resolve-next.
 
+// =========================================================================
+// SECTION: Deterministic Orchestrator Engine Loop
+// =========================================================================
+// ANCHOR[contextra-agent:engine-core]
+
+
 use crate::context::{validate_node_id, AgentContext};
+// TODO(baukasten): StateGraph-Engine von contextra-db entkoppeln (AD-8/S-63). Harte Kopplung an Contextra/Collection invertieren: Engine konsumiert generische AgentCheckpointStore- und Tool-Traits.
 use crate::dlq::DeadLetterQueue;
 use crate::graph::{AgentNode, NodeType, StateGraph};
 use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
@@ -868,3 +875,5 @@ mod fallback_tests {
         let _ = fallback.take_snapshot(contextra_types::TxId::new(1)).await;
     }
 }
+
+// !SECTION

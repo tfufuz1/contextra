@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (id_gen_determinism_test.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Tests für die deterministische Generierung von Entscheidungs-IDs
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

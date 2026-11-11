@@ -14,12 +14,16 @@
 //! # Port-Entscheidung & Lokale Traits
 //! `ContextEditAuditSink` und `ScratchpadCacheInvalidator` sind als schlanke, lokale Traits
 //! in diesem Modul definiert, da die endgültige Entscheidung über eine Auslagerung in `contextra-ports`
-//! noch aussteht (siehe ADR-106). Sie verhindern direkte Ring-Verstöße gegen `contextra-privacy`
+//! noch aussteht (siehe ADR-106). Sie verhindern direkte Schichtungs-Verstöße gegen `contextra-privacy`
 //! und `contextra-kvcache`.
 
-use contextra_db::volatile_vault::{
-    SignalModality, VaultChunk, VaultConfig, VaultDocId, VaultTxId, VolatileContextVault,
-};
+// =========================================================================
+// SECTION: Context-Language-Model Scratchpad
+// =========================================================================
+// ANCHOR[contextra-agent:clm-scratchpad]
+
+
+use contextra_db::volatile_vault::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
 use contextra_ports::{Clock, SystemClock};
 use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
@@ -782,3 +786,5 @@ mod tests {
         assert!(err_remove.is_err());
     }
 }
+
+// !SECTION

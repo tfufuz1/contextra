@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (mod.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! Unit tests for contextra-router.
 
 #[cfg(test)]

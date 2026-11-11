@@ -7,6 +7,12 @@
 
 //! Declarative StateGraph definition for Agent Workflows.
 
+// =========================================================================
+// SECTION: Declarative StateGraph & Node Routing
+// =========================================================================
+// ANCHOR[contextra-agent:graph-primitives]
+
+
 use crate::context::{validate_node_id, MAX_ID_LEN};
 use crate::goal_condition::{parse_legacy_condition_string, GoalCondition};
 use crate::step::StepResult;
@@ -322,3 +328,5 @@ mod tests {
         ));
     }
 }
+
+// !SECTION

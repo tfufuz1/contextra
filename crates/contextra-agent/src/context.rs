@@ -10,6 +10,12 @@
 //! Carries task identity, graph position, token budget, DB references, and
 //! accumulated step memory across the entire lifecycle of a single workflow run.
 
+// =========================================================================
+// SECTION: AgentContext & Execution State
+// =========================================================================
+// ANCHOR[contextra-agent:context-primitives]
+
+
 use contextra_db::{Collection, Contextra};
 use contextra_types::error::{CacheDirective, StepId};
 use contextra_types::{ContextraError, Result, TokenBudget};
@@ -570,3 +576,5 @@ mod tests {
         Ok(())
     }
 }
+
+// !SECTION

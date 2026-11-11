@@ -6,21 +6,28 @@
 //! da hier stochastische Sprachmodelle über den [`SegmentSynthesizer`]-Port aufgerufen werden.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Nutzt den Port `SegmentSynthesizer` aus `contextra-ports`.
+//! Teil der Kognitionsschicht (Ebene E2). Nutzt den Port `SegmentSynthesizer` aus `contextra-ports`.
 //!
 //! ## Invarianten
 //! - **Fehlertoleranz:** Ein Einzelfehler bei der LLM-Synthese führt niemals zum Abbruch des gesamten Laufs,
 //!   sondern inkrementiert lediglich `skipped_segments` (Fail-Soft).
 //! - **Provenienzerhalt:** Jeder synthetisierte Chunk speichert exakt die Quell-`DocId`s der Ausgangs-Turns.
 
+// FILE-CONTEXT
+// ZWECK: LLM-basierte Wissenssynthese auf Segment-Ebene zur Erzeugung uebergeordneter Chunks.
+// INVARIANTEN: Fail-Soft bei LLM-Fehlern; vollstaendige Provenienzverfolgung ueber source_doc_ids.
+// STAND: 2026-11-11
+
 use crate::memory_consolidation::TurnSegment;
 use crate::ports_local::SegmentSynthesizer;
 use crate::types_local::DocId;
 
+// =========================================================================
+// SECTION: Synthese-Datenstrukturen
+// =========================================================================
 /// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
 #[derive(Debug, Clone, PartialEq, Eq)]
 // ANCHOR[contextra-cognition:SYNTH-001]
-/// Ergebnis des Generative Synthesis Pass auf Segment-Ebene.
 pub struct SegmentSynthesisResult {
     /// Neu synthetisierte Chunks (einer pro konsolidiertem Segment).
     pub synthesized_chunks: Vec<SynthesizedChunk>,
@@ -56,6 +63,11 @@ pub use crate::ports_local::SegmentSynthesizer as TraitSegmentSynthesizer;
 /// # Fehlerverhalten
 /// Einzelne Segment-Fehler werden übersprungen (`skipped_segments` inkrementiert),
 /// nie als Err propagiert. Globale Fehler (Trait-Fehler im Setup) propagieren als Err.
+// !SECTION: Synthese-Datenstrukturen
+
+// =========================================================================
+// SECTION: Synthese-Ausfuehrung
+// =========================================================================
 // ANCHOR[contextra-cognition:SYNTH-004]
 /// Führt den generativen Syntheselauf über Turn-Segmente aus.
 pub async fn run_synthesis_pass(
@@ -235,3 +247,4 @@ mod tests {
         assert_eq!(chunk.model_id, "test-model");
     }
 }
+// !SECTION: Synthese-Ausfuehrung

@@ -6,15 +6,20 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
 
 use crate::*;
-use contextra_ports::license::{AuthorizedRing, FeatureRing, LicenseGate, OpenFastGate};
+use crate::license_seam::{AuthorizedRing, FeatureRing, LicenseGate, OpenFastGate};
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
+// SECTION Engine-Lifecycle-Open
+// ANCHOR[id=engine-lifecycle-open,epic=architecture,seq=2]
+// NOTE: Initialisierungs- und Autorisierungsroutinen der Engine beim Öffnen eines Speicherpfads.
+// LINK crates/contextra-engine/src/lib.rs#engine-config
+
 impl Contextra {
-    /// Opens or creates a `Contextra` instance at `path` enforcing `deletion_proof_active = false`
-    /// and using default [`contextra_ports::license::LicenseGate`].
+    /// Opens or creates a `Contextra` instance at `path` in standard durability mode
+    /// and using default [`crate::license_seam::LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path))]
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
         let config = ContextraConfig {
@@ -28,8 +33,7 @@ impl Contextra {
         Self::open_authorized(path, config, &token, fast_gate).await
     }
 
-    /// Opens or creates a `Contextra` instance at `path` with explicit `config`, forcing
-    /// `deletion_proof_active = false` (as no authorized token was provided) and using default [`LicenseGate`].
+    /// Opens or creates a `Contextra` instance at `path` with explicit `config` using default [`LicenseGate`].
     #[tracing::instrument(level = "trace", skip(path, config))]
     pub async fn open_with_config(
         path: impl AsRef<Path>,
@@ -181,6 +185,7 @@ impl Contextra {
 
         Ok(db)
     }
+    // !SECTION Engine-Lifecycle-Open
 
     async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {
         match backend {

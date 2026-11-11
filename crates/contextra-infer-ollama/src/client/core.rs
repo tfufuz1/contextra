@@ -12,7 +12,7 @@ use super::wire::{
 use crate::error::{LocalClock, LocalRng, LocalSeededRng, OllamaError, Result, SystemClock};
 
 use futures_util::StreamExt;
-use serde::Deserialize;
+
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -188,19 +188,6 @@ impl OllamaClient {
     /// Sets a custom random number generator for retry jitter computation.
     pub fn with_rng(mut self, rng: Arc<dyn LocalRng>) -> Self {
         self.rng = rng;
-        self
-    }
-
-    /// Sets a custom random number generator from contextra_ports.
-    #[cfg(feature = "ports-compat")]
-    pub fn with_ports_rng(mut self, rng: Arc<dyn contextra_ports::Rng>) -> Self {
-        struct PortsRngAdapter(Arc<dyn contextra_ports::Rng>);
-        impl LocalRng for PortsRngAdapter {
-            fn next_u64(&self) -> u64 {
-                self.0.next_u64()
-            }
-        }
-        self.rng = Arc::new(PortsRngAdapter(rng));
         self
     }
 

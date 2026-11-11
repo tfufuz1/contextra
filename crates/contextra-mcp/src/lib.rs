@@ -17,6 +17,7 @@
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
 //! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
 
+// TODO(baukasten): MCP-Crate in mcp-core (Protokoll/IO/Dispatch) und mcp-contextra (Tool-Bindung) aufteilen (AD-8). mcp-core darf keine Abhängigkeit zur Facade contextra besitzen.
 pub mod bulk_exfiltration_detector;
 pub mod config;
 pub mod egress_gateway;
@@ -66,3 +67,5 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 // INVARIANTEN: Transport ist ausschließlich stdin/stdout — niemals TCP/axum, bounded RPC message size
 // HOTSPOTS:    run_stdio_loop(), handle_request(), read_line_bounded()
 // SIEHE AUCH:  ADR-010, rules/async-io.md
+
+// !SECTION: Modul-Deklaration & Sicherheits-Attribute

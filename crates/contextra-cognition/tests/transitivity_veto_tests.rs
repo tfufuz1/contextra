@@ -3,6 +3,15 @@
 //! Prüft die Vermeidung fehlerhafter Duplikatverschmelzungen durch transitive
 //! Ähnlichkeitsketten, die Einhaltung der P24-Lokalität und das Überspringen bei Budgetüberschreitung.
 
+
+// FILE-CONTEXT
+// ZWECK: Validierungstests fuer das Dreiecks-Transitivitaets-Veto.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Transitivity Veto Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -15,10 +24,6 @@
     clippy::unreachable
 )]
 
-// FILE-CONTEXT
-// ZWECK: Tests für Transitivity Veto Inspektion, Orchestrierung & Budget-Steuerung.
-// INVARIANTEN: P24-Lokalitätsnachweis; Zero-Panic; Budget-Grenzprüfung.
-// STAND: TS:2026-09-27T00:00:00Z
 
 use contextra_cognition::aggregation_phase::{AggregationConfig, AggregationNode};
 use contextra_cognition::memory_consolidation::{run_consolidation_pass, ConsolidationConfig};
@@ -218,3 +223,4 @@ fn test_p24_locality_bounded_runtime_on_large_graph() {
         duration
     );
 }
+// !SECTION: Transitivity Veto Tests
