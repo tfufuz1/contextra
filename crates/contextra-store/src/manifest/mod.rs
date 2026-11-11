@@ -4,8 +4,11 @@
 // ZWECK: Append-Only Manifest-Protokolldatei zur Verfolgung gültiger SSTables für Crash-Safety.
 // INVARIANTEN: fsync NACH jedem Manifest-Eintrag; Add erst nach fsync der SSTable-Datei.
 
+mod apply;
+mod cleanup;
 mod core;
 mod entry;
+mod handle;
 mod recovery;
 mod rollover;
 

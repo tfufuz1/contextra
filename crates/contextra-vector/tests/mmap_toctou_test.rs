@@ -1,3 +1,4 @@
+#![cfg(feature = "experimental-diskann")]
 // FILE-CONTEXT
 // ZWECK: Empirische TOCTOU-Testreihen für Mmap Truncation & Unlink/Deletion Szenarien in DiskANN & HNSW.
 // INVARIANTEN: Nutzt Subprozess-Isolierung (`std::process::Command`) zur sicheren Erfassung von SIGBUS (Signal 7 / Exit-Code 135).
@@ -83,11 +84,12 @@ fn child_truncation_runner() {
 
     rt.block_on(async {
         use contextra_ports::VectorIndex;
-        use contextra_types::{DistanceMetric, DocId, TxId};
+        use contextra_types::{DocId, TxId};
         #[cfg(feature = "experimental-diskann")]
         use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
         use contextra_vector::hnsw::{HnswConfig, HnswIndex};
         use contextra_vector::persistence::MmapIndex;
+        use contextra_vector::types::DistanceMetric;
 
         let temp_dir = tempfile::tempdir().unwrap();
         #[cfg(feature = "experimental-diskann")]
@@ -190,7 +192,7 @@ fn child_deletion_runner() {
 
     rt.block_on(async {
         use contextra_ports::VectorIndex;
-        use contextra_types::{DistanceMetric, DocId, TxId};
+        use contextra_types::{DocId, TxId};
         #[cfg(feature = "experimental-diskann")]
         use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
         use contextra_vector::hnsw::{HnswConfig, HnswIndex};

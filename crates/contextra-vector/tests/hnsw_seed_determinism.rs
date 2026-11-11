@@ -2,8 +2,9 @@
 
 use contextra_ports::SeededRng;
 use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 use std::sync::Arc;
 
 struct SimpleRng {

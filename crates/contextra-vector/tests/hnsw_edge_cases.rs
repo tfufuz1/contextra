@@ -1,6 +1,7 @@
 use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
+use contextra_types::{ContextraError, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
