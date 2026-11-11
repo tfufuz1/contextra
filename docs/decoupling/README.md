@@ -1,6 +1,12 @@
 # Entkopplungs-Architektur & Gate-Infrastruktur
 
-Normativ: `docs/SPEC.md` (v2), `docs/decoupling/JULES_RAHMEN.md`.
+Normativ: `docs/SPEC.md` (v3), `docs/decoupling/BAUKASTEN_LEITFADEN.md`, `docs/decoupling/BAUKASTEN_ARCHITEKTURENTSCHEIDUNG.md`, `docs/decoupling/BAUKASTEN_UMSETZUNGSPLAN.md`.
+
+## Dokumentations-Übersicht für Implementierer
+- **Leitfaden:** [`docs/decoupling/BAUKASTEN_LEITFADEN.md`](BAUKASTEN_LEITFADEN.md) – Verbindliche 10 Gebote, Schichtenmodell E0–E3, Prüfbefehle und Autonomieregeln.
+- **Architekturentscheidungen (AD-1 bis AD-10):** [`docs/decoupling/BAUKASTEN_ARCHITEKTURENTSCHEIDUNG.md`](BAUKASTEN_ARCHITEKTURENTSCHEIDUNG.md) – Analysebefunde, Seams (`ids`/`env`), Fehlerstrategie, Crate-Schnitte.
+- **Umsetzungsplan (WP-00 bis WP-91):** [`docs/decoupling/BAUKASTEN_UMSETZUNGSPLAN.md`](BAUKASTEN_UMSETZUNGSPLAN.md) – Detaillierte Arbeitspakete, Spuren A–D, Abhängigkeiten und Abnahmekriterien.
+- **Prompt-Katalog:** [`docs/prompts/MODULAR_DECOUPLING_PROMPTS.md`](../prompts/MODULAR_DECOUPLING_PROMPTS.md) – Autarke Prompts für Coding-Agenten je Crate.
 
 ## 1. Stufenplan (Roadmap)
 - **S-00 / S-01 (WP-F0):** Baseline-Erhebung, Gate-Infrastruktur (`gate_layering.py`, `isolation_proof.py`, `feature_audit.py`), CI-Härtung, Root-Metadaten (`capabilities.toml` Schema v3, `ratchet.toml`), Workspace-Gerüste (`prompt-guard`, `vault`).
