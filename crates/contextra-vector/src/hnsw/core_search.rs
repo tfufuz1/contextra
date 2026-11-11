@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// ZWECK: Suchtraversierung auf Schichten (Layer Search), gefilterte Suche und adaptive ef-Suche.
+// INVARIANTEN: Zero-Panic; deterministische Sortierung (Score absteigend, DocId aufsteigend); k <= MAX_SEARCH_K.
+// HOTSPOTS: search_layer_with_context, search_filtered_internal, search_adaptive_with_stats
+// STAND: TS:2026-11-11T02:00:00Z
+
 use crate::fixed_hasher::new_fixed_hashset;
 use std::borrow::Cow;
 use std::cmp::Reverse;
@@ -11,6 +17,8 @@ use super::arena::BacklinkTable;
 use super::batch::{PreparedInsert, SearchContext};
 use super::types::{Candidate, HnswIndex, HnswIndexCore, VectorData};
 
+// SECTION Layer-Suche (Graph-Traversierung)
+
 impl HnswIndexCore {
     pub(super) fn search_layer(
         &self,
@@ -23,6 +31,7 @@ impl HnswIndexCore {
         self.search_layer_with_context(query, query_quantized, entry_points, ef, layer, &[], None)
     }
 
+    // ANCHOR[contextra-vector:HNSW-SEARCH-LAYER-CTX]
     pub(super) fn search_layer_with_context(
         &self,
         query: &[f32],
@@ -162,8 +171,12 @@ impl HnswIndexCore {
         Ok(vec)
     }
 }
+// !SECTION
+
+// SECTION Gefilterte & Adaptive Suche
 
 impl HnswIndex {
+    // ANCHOR[contextra-vector:HNSW-SEARCH-FILTERED]
     pub(super) async fn search_filtered_internal(
         &self,
         query: &[f32],
@@ -450,6 +463,7 @@ impl HnswIndex {
     }
 
     /// Performs an adaptive search (Ada-ef) returning scored documents along with execution statistics.
+    // ANCHOR[contextra-vector:HNSW-SEARCH-ADAPTIVE-STATS]
     pub async fn search_adaptive_with_stats(
         &self,
         query: &[f32],
@@ -735,3 +749,4 @@ impl HnswIndex {
         Ok((final_results, state_machine.stats()))
     }
 }
+// !SECTION
