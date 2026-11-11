@@ -1,6 +1,10 @@
-// ZWECK: Win32 & POSIX ACL restriction and file ownership verification wrappers (Ring 0 / SPEC 7.7)
-// INVARIANTEN: 100% safe Rust facade; zero panic; cross-platform file permissions enforcement
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
+// =========================================================================
+// ANCHOR[id=sys-acl-main,epic=sys-acl,seq=0] Zugriffskontrolle und Besitzverifikation
+// =========================================================================
+// LINK crates/contextra-sys/src/lib.rs
+// NOTE: Win32 & POSIX ACL restriction and file ownership verification wrappers (Ring 0 / E0 / docs/SPEC.md §7.7 / §10.1).
+// Invariante: Safe Rust facade; zero panic; cross-platform file permissions enforcement.
+// Keine unzulässigen Garantieversprechen (SPEC §6.4).
 
 //! # Modul: Zugriffskontrolle und Besitzverifikation für Dateien (`acl_win32`)
 //!
@@ -9,21 +13,24 @@
 //! Write-Ahead-Logs (WAL).
 //!
 //! ## Ring-Zugehörigkeit und Zweck
-//! - **Ring 0 (Systemnaher Kern):** Kapselt FFI-Aufrufe (Foreign Function Interface) nach POSIX (`libc`)
+//! - **Ring 0 / Ebene E0 (Systemnaher Kern):** Kapselt FFI-Aufrufe (Foreign Function Interface) nach POSIX (`libc`)
 //!   und Windows (`windows-sys`).
-//! - **Sicherheitsziel (Fail-Closed):** Eine Datei mit sensiblen Daten darf unter keinen Umständen von
+//! - **Sicherheitsziel (Fail-Closed):** Eine Datei mit sensiblen Daten darf nicht von
 //!   anderen Benutzern des Betriebssystems gelesen oder modifiziert werden können. Kann dies nicht
-//!   garantiert oder verifiziert werden, schlägt die Operation fehl.
+//!   verifiziert oder durchgesetzt werden, schlägt die Operation fehl.
 //!
 //! ## Plattformunterstützung
 //! - **Unix/POSIX:** Setzen des Dateimodus auf `0600` (`-rw-------`) und Verifikation, dass keine Gruppen-
 //!   oder Welt-Rechte existieren sowie die Besitzer-UID (User ID) exakt mit der effektiven UID des aktuellen
 //!   Prozesses übereinstimmt.
 //! - **Windows (Win32):** Erstellung und Verifikation einer DACL (Discretionary Access Control List), die
-//!   ausschließlich den SID (Security Identifier) des aktuellen Prozesses berechtigt und Vererbung blockiert.
+//!   ausschließlich den SID (Security Identifier) des aktuellen Prozesses berechtigt und Vererbung blockiert (`SE_DACL_PROTECTED`).
 //! - **Andere Plattformen:** Best-Effort-Fallback (No-Op), falls weder Unix noch Windows vorliegen.
 
 use std::path::Path;
+
+// SECTION POSIX ACL & Permissions
+// ANCHOR[id=sys-acl-unix,epic=sys-acl,seq=1] Unix Chmod 0600 & UID-Prüfung
 
 #[cfg(unix)]
 /// Beschränkt die Zugriffsrechte der angegebenen Datei unter Unix auf den Besitzer (`0600` / `-rw-------`).
@@ -103,6 +110,10 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     }
     Ok(())
 }
+// !SECTION POSIX ACL & Permissions
+
+// SECTION Windows Win32 DACL
+// ANCHOR[id=sys-acl-win32,epic=sys-acl,seq=2] Windows DACL & SID-Verifikation
 
 #[cfg(windows)]
 /// RAII-Wächter (Resource Acquisition Is Initialization) für Windows-Prozesstoken-Handles (`HANDLE`).
@@ -388,6 +399,10 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 
     Ok(())
 }
+// !SECTION Windows Win32 DACL
+
+// SECTION Fallback Platforms
+// ANCHOR[id=sys-acl-fallback,epic=sys-acl,seq=3] Fallback für Nicht-Unix & Nicht-Windows
 
 #[cfg(not(any(unix, windows)))]
 /// Best-Effort-Fallback für Zielarchitekturen, die weder Unix noch Windows sind (No-Op).
@@ -402,7 +417,10 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
+// !SECTION Fallback Platforms
 
+// SECTION Unit Tests
+// ANCHOR[id=sys-acl-tests,epic=sys-acl,seq=4] Modultests für Dateiberechtigungen
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -497,3 +515,4 @@ mod tests {
         Ok(())
     }
 }
+// !SECTION Unit Tests

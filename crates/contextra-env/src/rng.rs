@@ -5,12 +5,35 @@ use std::hash::{BuildHasher, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+// =========================================================================
+// SECTION: Module Statics & Constants
+// ANCHOR[id=rng-constants,epic=rng,seq=1]
+// NOTE: SplitMix64 verwendet den Goldenen Schnitt für 64-Bit-Ganzzahlen.
+// =========================================================================
+
+/// Globaler monotoner Atom-Zähler für zusätzliche Entropie bei `from_entropy()`.
 static ENTROPY_COUNTER: AtomicU64 = AtomicU64::new(1);
+
+/// Fractional approximation of the golden ratio: $2^{64} / \phi \approx \text{0x9e3779b97f4a7c15}$.
+/// Wird in SplitMix64 als Schrittweite (Weyl sequence increment) genutzt.
+const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
+
+// !SECTION: Module Statics & Constants
+
+// =========================================================================
+// SECTION: Rng Port Trait
+// ANCHOR[id=rng-root,epic=rng,seq=2]
+// NOTE: Primäre Zufallsabstraktion; entkoppelt Algorithmen von Systementropie.
+// LINK crates/contextra-env/SPEC.md#42-rng
+// =========================================================================
 
 /// Port trait for random number generators, enabling deterministic testing by decoupling
 /// non-deterministic entropy sources.
 pub trait Rng: Send + Sync + 'static {
     /// Generates the next pseudorandom 64-bit unsigned integer.
+    ///
+    /// # Invarianten
+    /// - `INV-ENV-RNG-1`: Deterministische Reproduzierbarkeit bei gleichem Seed.
     ///
     /// # Fehler
     /// Keine; garantiert panikfrei und nicht-blockierend.
@@ -29,12 +52,23 @@ pub trait Rng: Send + Sync + 'static {
     /// Returns a pseudorandom `f64` value in the half-open interval `[0.0, 1.0)`
     /// with 53 bits of precision.
     ///
+    /// # Invarianten
+    /// - `INV-ENV-RNG-2`: Ergebnis liegt strikt im Bereich `[0.0, 1.0)`.
+    ///
     /// # Fehler
     /// Keine; garantiert panikfrei.
     /// # Crash
     /// Reiner Statusabruf ohne persistente Mutation.
     fn next_unit_f64(&self) -> f64;
 }
+
+// !SECTION: Rng Port Trait
+
+// =========================================================================
+// SECTION: SeededRng (SplitMix64) Implementation
+// ANCHOR[id=rng-splitmix64,epic=rng,seq=3]
+// NOTE: Lock-freie, threadsichere SplitMix64-Implementierung mit atomarem Zustand.
+// =========================================================================
 
 /// A fast, deterministic 64-bit pseudorandom number generator using SplitMix64
 /// with atomic state transitions (`AtomicU64`).
@@ -47,13 +81,14 @@ pub trait Rng: Send + Sync + 'static {
 /// at startup and pass the initial seed to [`SeededRng::new`].
 #[derive(Debug)]
 pub struct SeededRng {
+    /// Interner 64-Bit-Zustand, atomar fortgeschaltet über `fetch_add(GOLDEN_RATIO_64)`.
     state: AtomicU64,
 }
 
-const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
-
 impl SeededRng {
     /// Creates a new [`SeededRng`] initialized with the given seed.
+    ///
+    /// Garantiert exakte Bitgleichheit zu den kanonischen Golden-Testvektoren.
     pub fn new(seed: u64) -> Self {
         Self {
             state: AtomicU64::new(seed),
@@ -72,8 +107,10 @@ impl SeededRng {
     /// Only Composition Roots (application entry points) should construct a [`SeededRng`] via `from_entropy`.
     /// Internal library logic MUST accept an injected [`Rng`] instance instead of calling `from_entropy` directly.
     pub fn from_entropy() -> Self {
+        // NOTE: Atomare Entropie-Beimischung über Prozesszähler
         let counter = ENTROPY_COUNTER.fetch_add(1, Ordering::Relaxed);
 
+        // NOTE: Mischen mit ASLR/SipHash-Entropie aus RandomState
         let mut hasher1 = RandomState::new().build_hasher();
         hasher1.write_u64(counter);
         let h1 = hasher1.finish();
@@ -82,12 +119,20 @@ impl SeededRng {
         hasher2.write_u64(h1);
         let h2 = hasher2.finish();
 
+        // NOTE: Kombination aus Hash-Rotationswerten und linearem Zähler
         let seed = h1 ^ h2.rotate_left(32) ^ GOLDEN_RATIO_64.wrapping_mul(counter);
         Self::new(seed)
     }
 }
 
 impl Rng for SeededRng {
+    /// Generiert die nächste 64-Bit-Pseudozufallszahl gemäß SplitMix64.
+    ///
+    /// # Didaktische Erklärung der Bit-Operationen:
+    /// 1. `fetch_add`: Atomares Inkrementieren des Zustands um den Goldenen Schnitt.
+    /// 2. `wrapping_add`: Zustandswert für diese Ziehung isolieren.
+    /// 3. Bit-Mixing-Konstanten `0xbf58476d1ce4e5b9` und `0x94d049bb133111eb`:
+    ///    Verteilen die Entropie gleichmäßig über alle 64 Bits (Avalanche-Effekt).
     fn next_u64(&self) -> u64 {
         let z = self
             .state
@@ -99,6 +144,7 @@ impl Rng for SeededRng {
         z ^ (z >> 31)
     }
 
+    /// Befüllt den Zielpuffer blockweise mit Little-Endian 64-Bit Werten.
     #[allow(clippy::indexing_slicing)]
     fn fill_bytes(&self, mut dest: &mut [u8]) {
         while !dest.is_empty() {
@@ -116,35 +162,60 @@ impl Rng for SeededRng {
         }
     }
 
+    /// Skaliert eine Zufallszahl in das halboffene Fließkommaintervall `[0.0, 1.0)`.
+    ///
+    /// # Didaktische Erklärung:
+    /// Ein IEEE-754 `f64` besitzt eine 53-Bit Mantisse. Durch `>> 11` werden exakt
+    /// 53 Bits Zufall extrahiert und durch Division durch $2^{53}$ normalisiert.
     fn next_unit_f64(&self) -> f64 {
-        // Extract 53 bits for f64 mantissa: (next_u64() >> 11) / 2^53
+        // NOTE: Extrahiere 53 Bits für f64 Mantisse: (next_u64() >> 11) / 2^53
         let mantissa = self.next_u64() >> 11;
         (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
     }
 }
 
+// !SECTION: SeededRng (SplitMix64) Implementation
+
+// =========================================================================
+// SECTION: Blanket Implementation for Arc<T>
+// ANCHOR[id=rng-arc,epic=rng,seq=4]
+// NOTE: Erlaubt direkte Nutzung von `Arc<dyn Rng>` ohne zusätzliche Allokationen.
+// =========================================================================
+
 impl<T: Rng + ?Sized> Rng for Arc<T> {
+    #[inline]
     fn next_u64(&self) -> u64 {
         (**self).next_u64()
     }
 
+    #[inline]
     fn fill_bytes(&self, dest: &mut [u8]) {
         (**self).fill_bytes(dest);
     }
 
+    #[inline]
     fn next_unit_f64(&self) -> f64 {
         (**self).next_unit_f64()
     }
 }
 
+// !SECTION: Blanket Implementation for Arc<T>
+
+// =========================================================================
+// SECTION: Unit Tests
+// ANCHOR[id=rng-tests,epic=rng,seq=5]
+// =========================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Statische Typprüfung, ob `&dyn Rng` dynamisch dispatchbar ist (Object Safety).
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
 
     #[test]
     fn test_seeded_rng_reproducibility() {
+        // NOTE: Verifiziert INV-ENV-RNG-1 (Gleicher Seed liefert identische Zahlenfolge)
         let rng1 = SeededRng::new(12345);
         let rng2 = SeededRng::new(12345);
 
@@ -155,6 +226,7 @@ mod tests {
 
     #[test]
     fn test_from_entropy_different_sequences() {
+        // NOTE: Verifiziert, dass zwei Aufrufe von `from_entropy()` divergente Sequenzen erzeugen
         let rng1 = SeededRng::from_entropy();
         let rng2 = SeededRng::from_entropy();
 
@@ -177,6 +249,7 @@ mod tests {
 
     #[test]
     fn test_next_unit_f64_in_bounds() {
+        // NOTE: Verifiziert INV-ENV-RNG-2 (Intervall-Grenzen 0.0 <= val < 1.0)
         let rng = SeededRng::new(42);
         for _ in 0..1000 {
             let val = rng.next_unit_f64();
@@ -206,3 +279,5 @@ mod tests {
         assert!((0.0..1.0).contains(&f));
     }
 }
+
+// !SECTION: Unit Tests
