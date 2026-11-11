@@ -31,8 +31,8 @@ use crate::orphan::{
 };
 use crate::snapshot_source::SnapshotSource;
 use contextra_env::{Clock, MetricsSink};
-use contextra_ports::BoxFuture;
-use contextra_types::TxId;
+use crate::snapshot_source::BoxFuture;
+use contextra_ids::TxId;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -791,6 +791,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         &self.storage
     }
 
+    /// Liefert eine Referenz auf die Orphan-Registry.
     pub fn orphan_registry(&self) -> &Arc<InstanceOrphanRegistry> {
         &self.orphan_registry
     }
