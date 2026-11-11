@@ -71,6 +71,14 @@ pub mod vector;
 /// Konformitätssuite für den `Vfs`-Port.
 pub mod vfs;
 
+// ANCHOR[contextra-testkit:CONF-MOD-KV-001]
+/// Konformitaetssuiten fuer KV-Ports.
+pub mod kv_ports;
+
+// ANCHOR[contextra-testkit:CONF-MOD-ROUTING-001]
+/// Konformitaetssuiten fuer Routing-Ports.
+pub mod routing_ports;
+
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
@@ -81,3 +89,15 @@ pub use storage::run_storage_engine_suite;
 pub use text::run_text_index_suite;
 pub use vector::run_vector_index_suite;
 pub use vfs::run_vfs_suite;
+pub use kv_ports::{
+    assert_attention_exporter_conformance, assert_kv_bridge_storage_conformance,
+    assert_kv_prefix_store_conformance, run_attention_exporter_suite,
+    run_kv_bridge_storage_suite, run_kv_prefix_store_suite,
+};
+pub use routing_ports::{
+    assert_community_resolver_conformance, assert_context_preparer_conformance,
+    assert_drift_status_provider_conformance, assert_egress_policy_conformance,
+    assert_hybrid_search_provider_conformance, run_community_resolver_suite,
+    run_context_preparer_suite, run_drift_status_provider_suite, run_egress_policy_suite,
+    run_hybrid_search_provider_suite,
+};
