@@ -25,10 +25,10 @@ docid-128 = ["contextra-ids/docid-128"]
 legacy-wal-key = []
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }

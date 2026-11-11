@@ -14,7 +14,7 @@ use contextra_simd::{
     compute_distance, compute_distance_trusted, validate_vector, DistanceMetric, SimdError,
 };
 
-const TEST_DIMS: &[usize] = &[4, 17, 128, 768];
+const TEST_DIMS: &[usize] = &[1, 4, 17, 128, 768, 1536];
 const TOLERANCE: f32 = 1e-5;
 
 fn approx_eq(a: f32, b: f32, tol: f32) -> bool {

@@ -51,9 +51,7 @@
 )]
 
 pub mod error;
-pub mod budget;
-pub mod stats;
-#[cfg(feature = "workspace")]
+pub mod traits;
 pub mod compat;
 pub use error::{StoreError, StoreResult};
 
