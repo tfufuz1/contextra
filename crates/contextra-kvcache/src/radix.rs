@@ -22,7 +22,7 @@
 //!   semantischer Ähnlichkeitssuche (unter Feature `content-addressed-kv-cache`).
 
 use crate::error::{KvCacheError, Result};
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
