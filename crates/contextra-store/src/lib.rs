@@ -51,6 +51,7 @@
 )]
 
 pub mod error;
+pub mod traits;
 pub mod compat;
 pub use error::{StoreError, StoreResult};
 

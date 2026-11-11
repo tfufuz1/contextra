@@ -15,7 +15,7 @@
 //!   RegEx-Überlastung (ReDoS-Schutz) oder internen Fehlern wird strikt blockiert (`Block`).
 //! - **Zeroize-on-Drop**: Sitzungssalts und sensitive Surrogat-Mappings werden beim Verlassen des Scopes
 //!   sicher aus dem Speicher genullt (Zeroization via `zeroize`).
-//! - **Mandantentrennung**: Egress-Operationen erzwingen explizite Mandantenprüfungen ([`TenantScoped`]).
+//! - **Mandantentrennung**: Egress-Operationen erzwingen explizite Mandantenprüfungen ([`crate::types::TenantScoped`]).
 
 use rand::RngCore;
 use serde::{Deserialize, Serialize};

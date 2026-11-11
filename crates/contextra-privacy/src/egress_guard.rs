@@ -102,7 +102,7 @@ impl EgressGuard {
     }
 
     // ANCHOR[contextra-privacy:EG-012]
-    /// Prüft einen an einen Mandanten gebundenen Payload ([`TenantScoped`]) mit Mandantenisolationsprüfung.
+    /// Prüft einen an einen Mandanten gebundenen Payload ([`crate::types::TenantScoped`]) mit Mandantenisolationsprüfung.
     ///
     /// Liefert `Block(BlockReason::PolicyDenied(...))` bei Mandantenkonflikten.
     pub async fn check_scoped(

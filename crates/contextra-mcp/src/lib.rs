@@ -17,7 +17,18 @@
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
 //! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
 
-// TODO(baukasten): MCP-Crate in mcp-core (Protokoll/IO/Dispatch) und mcp-contextra (Tool-Bindung) aufteilen (AD-8). mcp-core darf keine Abhängigkeit zur Facade contextra besitzen.
+// =========================================================================
+// SECTION: Modul-Deklaration & Sicherheits-Attribute
+// =========================================================================
+// FILE-CONTEXT
+// STAND:       2026-11-11
+// ZWECK:       stdio JSON-RPC 2.0 MCP-Server (kein HTTP! ADR-010)
+// INVARIANTEN: Transport ist ausschließlich stdin/stdout — niemals TCP/axum, bounded RPC message size
+// HOTSPOTS:    run_stdio_loop(), handle_request(), read_line_bounded()
+// SIEHE AUCH:  ADR-010, rules/async-io.md
+
+// ANCHOR[contextra-mcp:MOD-001]
+
 pub mod bulk_exfiltration_detector;
 pub mod config;
 pub mod egress_gateway;
