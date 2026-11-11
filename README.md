@@ -105,6 +105,7 @@ Stellt die fundamentale Persistenz, ACID-Garantien und isolierte Laufzeitumgebun
 ---
 ### 6. Domäne: Ingest, Inferenz & Anwendungen (`data`, `llm` & `apps`)
 <img width="2752" height="1536" alt="ingest" src="https://github.com/user-attachments/assets/18e529ac-5458-4d62-8dcb-48c962df873c" />
+
 * **Dokumenten-Ingest (`contextra-ingest`)**:
   * **Prose & Structure Chunking**: Formatbewusste Extraktion (PDF, DOCX, Markdown) und deterministisches semantisches Text-Chunking.
 * **Inferenz-Anbindung (`contextra-infer-candle`, `contextra-infer-onnx`, `contextra-infer-ollama`)**:
