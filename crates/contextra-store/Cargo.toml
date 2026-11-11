@@ -27,8 +27,8 @@ legacy-wal-key = []
 [dependencies]
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-types = { workspace = true, optional = true }
+contextra-ports = { workspace = true, optional = true }
 contextra-sys = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
