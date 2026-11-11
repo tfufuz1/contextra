@@ -39,7 +39,7 @@ let mut read_set = ReadSet::new();
 read_set.record_read(b"account:42", 100);
 
 buffer.begin(tx);
-buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(1u64), data: "value".into() }).unwrap();
+buffer.stage(tx, IndexOp::Insert { doc_id: DocId::from(1u64), data: "value".into() })?;
 
 // Validierung vor Commit gegen Anti-Dependencies
 assert!(ssi.validate(tx, &read_set).is_ok());
