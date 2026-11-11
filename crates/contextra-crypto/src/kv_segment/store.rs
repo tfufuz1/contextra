@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use ahash::AHashMap;
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use lru::LruCache;
 use parking_lot::RwLock;
 

@@ -17,7 +17,7 @@
 //!
 //! ## Ring-Zugehörigkeit und Einbindung
 //! - **Ring:** Ring 0 (Kern / Foundation)
-//! - **Abhängigkeiten (ausgehend):** `contextra-ports`, `contextra-types`
+//! - **Abhängigkeiten (ausgehend):** `contextra-ids`, `contextra-env`
 //! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
 //!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
 //!   `contextra-store`, `contextra-vector`.
@@ -41,6 +41,7 @@
 pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
+#[cfg(feature = "workspace")]
 pub mod compat;
 pub mod crypto;
 pub mod dek;
