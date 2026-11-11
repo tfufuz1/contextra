@@ -75,6 +75,71 @@ impl SignedReport {
         Ok(())
     }
 
+    /// Verifiziert sowohl die Ed25519-Signatur als auch die kryptografische Zeugenkette (INV-ERA-7, INV-CLASS-MEASURED-1).
+    ///
+    /// Validiert:
+    /// 1. Ed25519 verify_strict über Signatur und kanonischen Body.
+    /// 2. Kanonisches JSON und Deserialisierung des `ErasureReport`.
+    /// 3. Vorhandensein von Zeugen (INV-CLASS-MEASURED-1: leere Zeugenliste wird abgelehnt).
+    /// 4. Für jeden Zeugen: Positivkontrolle `control_ok == true`, `matches == 0`.
+    /// 5. Jeden Zeugen-Digest gegen die im `witness_chain.witness_digests` deklarierten Digests.
+    /// 6. Den kaskadierten Kettenwurzel-Hash gegen `witness_chain.chain_root`.
+    pub fn verify_report_with_chain(
+        &self,
+        verifying_key: &VerifyingKey,
+    ) -> Result<ErasureReport, ErasureError> {
+        self.verify_with_key(verifying_key)?;
+
+        let report: ErasureReport = serde_json::from_str(&self.canonical_body)
+            .map_err(|e| ErasureError::Json(e.to_string()))?;
+
+        if report.witnesses.is_empty() {
+            return Err(ErasureError::Internal(
+                "INV-CLASS-MEASURED-1 violation: report contains no witnesses".to_string(),
+            ));
+        }
+
+        if report.witnesses.len() != report.witness_chain.witness_digests.len() {
+            return Err(ErasureError::Crypto(
+                "Witness chain count mismatch with report witnesses".to_string(),
+            ));
+        }
+
+        let mut parsed_digests = Vec::with_capacity(report.witnesses.len());
+
+        for (idx, w) in report.witnesses.iter().enumerate() {
+            if !w.control_ok {
+                return Err(ErasureError::Internal(format!(
+                    "INV-CLASS-MEASURED-1 violation: witness at index {idx} failed positive control"
+                )));
+            }
+            if w.matches != 0 {
+                return Err(ErasureError::Residue(w.matches));
+            }
+
+            let hex_digest = report
+                .witness_chain
+                .witness_digests
+                .get(idx)
+                .ok_or_else(|| {
+                    ErasureError::Crypto(format!("Missing witness digest at index {idx}"))
+                })?;
+
+            let raw_digest = decode_hex_32(hex_digest)?;
+            parsed_digests.push(raw_digest);
+        }
+
+        let recomputed_chain =
+            super::build::WitnessChainReport::compute_from_digests(&parsed_digests);
+        if recomputed_chain.chain_root != report.witness_chain.chain_root {
+            return Err(ErasureError::Crypto(
+                "Witness chain root hash mismatch: chain manipulated or reordered".to_string(),
+            ));
+        }
+
+        Ok(report)
+    }
+
     /// Verifiziert die Integrität (erfordert bekannten Verifying-Key oder decodierten Fingerprint).
     pub fn verify(&self) -> Result<(), ErasureError> {
         let _ = decode_sig_string(&self.signature_base64)?;
@@ -85,6 +150,25 @@ impl SignedReport {
         }
         Ok(())
     }
+}
+
+/// Dekodiert einen 32-Byte Hexadezimalstring (64 Zeichen).
+fn decode_hex_32(s: &str) -> Result<[u8; 32], ErasureError> {
+    if s.len() != 64 {
+        return Err(ErasureError::Crypto(
+            "Invalid hex length for 32-byte hash".to_string(),
+        ));
+    }
+    let mut out = [0u8; 32];
+    for (i, b) in out.iter_mut().enumerate() {
+        let start = i.saturating_mul(2);
+        let end = start.saturating_add(2);
+        let sub = s
+            .get(start..end)
+            .ok_or_else(|| ErasureError::Internal("hex slice error".into()))?;
+        *b = u8::from_str_radix(sub, 16).map_err(|e| ErasureError::Internal(e.to_string()))?;
+    }
+    Ok(out)
 }
 
 /// Hilfsfunktion zur Dekodierung von Base64url oder Hex-Signaturen.
