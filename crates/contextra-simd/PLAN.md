@@ -1,45 +1,27 @@
 # contextra-simd — Umsetzungsplan
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus `docs/SPEC.md` v3/v4.0. Dokumentiert den Umsetzungs- und Reifegrad von `contextra-simd` als autarkem Baustein (Ring 0, Klasse A).
 
-## 1. Vorbedingungen (global) [S]
+## 1. Baustein-Status
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+| Schritt | Inhalt | Status | Beleg |
+|---|---|---|---|
+| E0-Entkopplung | 0 interne Pflicht-Dependencies im Kern | Abgeschlossen | `count_bridge_refs.py` = 0 außerhalb von `compat/` |
+| Brücken-Isolation | `contextra-types`-Abhängigkeit hinter Feature `workspace` / `types-compat` | Abgeschlossen | `src/compat/mod.rs` |
+| B09-Metrik | Lokale gespiegelte `DistanceMetric` mit Round-Trip & Serde Tests | Abgeschlossen | `src/metric.rs`, `src/compat/mod.rs` |
+| Unsafe-Audit | Lückenlose `// SAFETY:`-Dokumentation aller Kernel-Blöcke | Abgeschlossen | Insel-Audit grün |
+| Zero-Panic | Keine unkontrollierten Panics in Produktionspfaden | Abgeschlossen | `SimdError` Fail-Closed Rückgaben |
+| API-Härtung | Sichere Fassaden (`compute_distance`, `validate_vector`, `Dispatcher`) | Abgeschlossen | `src/lib.rs`, `src/dispatch.rs` |
+| Kommentierungs-System | Strukturierte Comment-Anchors, Regionen und Inline-Dokumentation | In Umsetzung | Gemäß Kommentar-Syntax-Vorgabe |
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. Invarianten-Prüfungen
 
-## 2. Schritte dieses Crates [S]
+- **INV-SIMD-DETERMINISM-1:** Bestätigt in `tests/simd_cross_validation.rs` und `tests/differential_tests.rs`.
+- **INV-SIMD-FINITE-1:** Bestätigt in `tests/edge_cases_tests.rs`.
+- **INV-SIMD-ALIGN-1:** Bestätigt in `tests/differential_tests.rs` und `tests/kernel_reference_tests.rs`.
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-36 | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert | ☐ offen |
+## 3. Definition of Done
 
-## 3. Reihenfolge-Zwang [S]
-
-Keine direkte Reihenfolgeregel im Zyklen-Absatz von §7. Gilt die globale Reihenfolge (S-00 → S-01 → S-02 → S-03).
-
-## 4. Definition of Done [S]
-
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+- Unabhängige Standalone-Exportierbarkeit via `tools/export_crate.py`.
+- Lückenlose Einhaltung der Rustdoc- und Kommentar-Konventionen (keine verbotenen Begriffe, saubere Regionen).
+- Sämtliche Tests des Crates kompilieren und laufen erfolgreich.
