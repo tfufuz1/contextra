@@ -1,6 +1,10 @@
 //! MCP JSON-RPC 2.0 Protokoll-Typen (Model Context Protocol Spec v2024-11-05)
 //!
 //! Begrenzte und gehärtete Protokollstrukturen für JSON-RPC 2.0.
+// =========================================================================
+// SECTION: protocol
+// =========================================================================
+// ANCHOR[contextra-mcp:PROTOCOL-001]
 
 use serde_json::Value;
 use thiserror::Error;
@@ -147,3 +151,5 @@ mod tests {
         assert!(validate_json_depth(&val, 3).is_err());
     }
 }
+
+// !SECTION: protocol

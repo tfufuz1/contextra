@@ -4,7 +4,7 @@
 //! (Tombstones, Graph-Invalidierungen, synthetisierte Chunks) auf eine [`Collection`] an.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Koordiniert Speicher-, Vektor- und Graphoperationen
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert Speicher-, Vektor- und Graphoperationen
 //! über Port- und Crate-Schnittstellen.
 //!
 //! ## Hauptkomponenten
@@ -431,6 +431,11 @@ pub async fn execute_background_consolidation_with_rich_validator<
 /// atomar über [`CsrGraphSuperEdgeSink`] an.
 // ANCHOR[contextra-cognition:EXEC-006]
 /// Führt die LeanRAG Stage 3 Aggregation aus.
+// !SECTION: Sleep-Cycle & Workflow-Steuerung
+
+// =========================================================================
+// SECTION: LeanRAG Aggregations-Ausfuehrung
+// =========================================================================
 pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     nodes: &[AggregationNode],
@@ -445,6 +450,11 @@ pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>
     run_aggregation_pass(nodes, edges, cfg, llm, tracker, &mut sink).await
 }
 
+// !SECTION: ConsolidationEngine Definition
+
+// =========================================================================
+// SECTION: Sleep-Cycle & Workflow-Steuerung
+// =========================================================================
 /// Deprecated legacy wrapper for `execute_background_consolidation`.
 #[deprecated(note = "use execute_background_consolidation instead")]
 // ANCHOR[contextra-cognition:EXEC-007]
@@ -513,6 +523,9 @@ pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + '
 /// Tokio-Background-Task Engine für periodische Speicher-Konsolidierung und Wissenssynthese.
 // ANCHOR[contextra-cognition:EXEC-010]
 /// Engine für periodische Hintergrund-Konsolidierung und Wissenssynthese.
+// =========================================================================
+// SECTION: ConsolidationEngine Definition
+// =========================================================================
 pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex> {
     collection: Arc<Collection<S, V>>,
     llm: Option<Arc<dyn LlmTextGenerator>>,
@@ -1141,3 +1154,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Hintergrund-Worker & Reaper

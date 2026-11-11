@@ -1,28 +1,56 @@
 // FILE-CONTEXT
 // STAND: 2026-09-22T00:00:00Z
 // ZWECK: KvState implementation for native Candle Llama model KV cache management (Spec §9.2 Stufe B).
-// INVARIANTEN: Zero-Panic doctrine (no unwrap or expect in production code);
-// Full tensor export, import, and truncation for multi-layer KV caches.
 
 use bytes::Bytes;
 use candle_core::{DType, Device, Tensor};
-use contextra_ports::kv::KvBlock;
-use contextra_types::ContextraError;
+use crate::error::{Error, Result};
 use half::f16;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
-/// Represents the key (`k`) and value (`v`) tensors for a single transformer layer.
+/// Repräsentiert ein einzelnes exportiertes KV-Cache-Block-Segment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KvBlock {
+    pub block_id: u64,
+    pub data: Bytes,
+}
+
+/// Konfiguration für KV-Cache-Layout und Dimensionen.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct KvLayout {
+    pub n_layer: u32,
+    pub n_kv_head: u32,
+    pub head_dim: u32,
+    pub dtype: String,
+}
+
+/// Konfiguration für RoPE (Rotary Position Embeddings).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RopeConfig {
+    pub base: f32,
+    pub scaling: Option<f32>,
+}
+
+impl Eq for RopeConfig {}
+
+impl std::hash::Hash for RopeConfig {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.base.to_bits().hash(state);
+        if let Some(sc) = self.scaling {
+            sc.to_bits().hash(state);
+        }
+    }
+}
+
+/// Key and Value tensors for a single transformer layer.
 #[derive(Debug, Clone)]
 pub struct LayerKv {
-    /// Key tensor of shape `(batch, seq_len, n_kv_head, head_dim)` or `(batch, n_kv_head, seq_len, head_dim)`.
     pub k: Tensor,
-    /// Value tensor of shape `(batch, seq_len, n_kv_head, head_dim)` or `(batch, n_kv_head, seq_len, head_dim)`.
     pub v: Tensor,
 }
 
 impl LayerKv {
-    /// Creates a new `LayerKv` pair.
     pub fn new(k: Tensor, v: Tensor) -> Self {
         Self { k, v }
     }
@@ -31,9 +59,7 @@ impl LayerKv {
 /// Explicit KV-Cache state holding layer-wise tensors and current sequence length position.
 #[derive(Debug, Clone)]
 pub struct KvState {
-    /// Layer-wise KV cache tensor pairs.
     pub layers: Vec<LayerKv>,
-    /// Active sequence length (token count) represented in the cache.
     pub pos: usize,
 }
 
@@ -56,19 +82,19 @@ struct KvStateBlockPayload {
     seq_len: usize,
 }
 
-fn tensor_to_payload(tensor: &Tensor) -> Result<TensorPayload, ContextraError> {
+fn tensor_to_payload(tensor: &Tensor) -> Result<TensorPayload> {
     let shape = tensor.dims().to_vec();
     let cpu_tensor = tensor
         .to_device(&Device::Cpu)
-        .map_err(|e| ContextraError::Internal(format!("Failed to transfer tensor to CPU: {e}")))?;
+        .map_err(|e| Error::Inference(format!("Failed to transfer tensor to CPU: {e}")))?;
 
     match tensor.dtype() {
         DType::F32 => {
             let flat = cpu_tensor
                 .flatten_all()
-                .map_err(|e| ContextraError::Internal(format!("Failed to flatten tensor: {e}")))?;
+                .map_err(|e| Error::Inference(format!("Failed to flatten tensor: {e}")))?;
             let floats = flat.to_vec1::<f32>().map_err(|e| {
-                ContextraError::Internal(format!("Failed to extract f32 vector: {e}"))
+                Error::Inference(format!("Failed to extract f32 vector: {e}"))
             })?;
             let data = floats.iter().flat_map(|f| f.to_le_bytes()).collect();
             Ok(TensorPayload {
@@ -80,9 +106,9 @@ fn tensor_to_payload(tensor: &Tensor) -> Result<TensorPayload, ContextraError> {
         DType::F16 => {
             let flat = cpu_tensor
                 .flatten_all()
-                .map_err(|e| ContextraError::Internal(format!("Failed to flatten tensor: {e}")))?;
+                .map_err(|e| Error::Inference(format!("Failed to flatten tensor: {e}")))?;
             let f16s = flat.to_vec1::<f16>().map_err(|e| {
-                ContextraError::Internal(format!("Failed to extract f16 vector: {e}"))
+                Error::Inference(format!("Failed to extract f16 vector: {e}"))
             })?;
             let data = f16s.iter().flat_map(|f| f.to_le_bytes()).collect();
             Ok(TensorPayload {
@@ -91,20 +117,17 @@ fn tensor_to_payload(tensor: &Tensor) -> Result<TensorPayload, ContextraError> {
                 data,
             })
         }
-        other => Err(ContextraError::capability_unsupported(
-            "kv_tensor_serialization",
+        other => Err(Error::Inference(
             format!("KV cache tensor serialization for dtype {other:?} is not supported"),
         )),
     }
 }
 
-fn payload_to_tensor(payload: &TensorPayload, device: &Device) -> Result<Tensor, ContextraError> {
+fn payload_to_tensor(payload: &TensorPayload, device: &Device) -> Result<Tensor> {
     match payload.dtype.as_str() {
         "f32" => {
             if payload.data.len() % 4 != 0 {
-                return Err(ContextraError::InvalidInput(
-                    "Invalid f32 payload data length".to_string(),
-                ));
+                return Err(Error::InvalidInput("Invalid f32 payload data length".to_string()));
             }
             let floats: Vec<f32> = payload
                 .data
@@ -113,16 +136,14 @@ fn payload_to_tensor(payload: &TensorPayload, device: &Device) -> Result<Tensor,
                 .collect();
 
             let tensor = Tensor::from_vec(floats, payload.shape.as_slice(), &Device::Cpu)
-                .map_err(|e| ContextraError::Internal(format!("Failed to build tensor: {e}")))?;
+                .map_err(|e| Error::Inference(format!("Failed to build tensor: {e}")))?;
             tensor
                 .to_device(device)
-                .map_err(|e| ContextraError::Internal(format!("Failed to move tensor: {e}")))
+                .map_err(|e| Error::Inference(format!("Failed to move tensor: {e}")))
         }
         "f16" => {
             if payload.data.len() % 2 != 0 {
-                return Err(ContextraError::InvalidInput(
-                    "Invalid f16 payload data length".to_string(),
-                ));
+                return Err(Error::InvalidInput("Invalid f16 payload data length".to_string()));
             }
             let f16s: Vec<f16> = payload
                 .data
@@ -131,35 +152,30 @@ fn payload_to_tensor(payload: &TensorPayload, device: &Device) -> Result<Tensor,
                 .collect();
 
             let tensor = Tensor::from_vec(f16s, payload.shape.as_slice(), &Device::Cpu)
-                .map_err(|e| ContextraError::Internal(format!("Failed to build tensor: {e}")))?;
+                .map_err(|e| Error::Inference(format!("Failed to build tensor: {e}")))?;
             tensor
                 .to_device(device)
-                .map_err(|e| ContextraError::Internal(format!("Failed to move tensor: {e}")))
+                .map_err(|e| Error::Inference(format!("Failed to move tensor: {e}")))
         }
-        other => Err(ContextraError::capability_unsupported(
-            "kv_tensor_deserialization",
+        other => Err(Error::Inference(
             format!("Unsupported KV cache payload dtype: {other}"),
         )),
     }
 }
 
 impl KvState {
-    /// Creates a new `KvState` wrapping layer-wise KV tensors and position tracking.
     pub fn new(layers: Vec<LayerKv>, pos: usize) -> Self {
         Self { layers, pos }
     }
 
-    /// Returns `true` if there are no layer KV tensors or position is zero.
     pub fn is_empty(&self) -> bool {
         self.layers.is_empty() || self.pos == 0
     }
 
-    /// Returns the active sequence length / position.
     pub fn pos(&self) -> usize {
         self.pos
     }
 
-    /// Returns the number of transformer layers in this state.
     pub fn layer_count(&self) -> usize {
         self.layers.len()
     }
@@ -181,8 +197,7 @@ impl KvState {
         }
     }
 
-    /// Truncates stored KV tensors to at most `len` tokens along the sequence dimension.
-    pub fn truncate(&mut self, len: usize) -> Result<(), ContextraError> {
+    pub fn truncate(&mut self, len: usize) -> Result<()> {
         if len >= self.pos {
             return Ok(());
         }
@@ -191,13 +206,13 @@ impl KvState {
             if layer.k.dims().len() >= 2 {
                 let dim = Self::tensor_seq_dim(&layer.k, self.pos);
                 layer.k = layer.k.narrow(dim, 0, len).map_err(|e| {
-                    ContextraError::Internal(format!("Failed to truncate key tensor: {e}"))
+                    Error::Inference(format!("Failed to truncate key tensor: {e}"))
                 })?;
             }
             if layer.v.dims().len() >= 2 {
                 let dim = Self::tensor_seq_dim(&layer.v, self.pos);
                 layer.v = layer.v.narrow(dim, 0, len).map_err(|e| {
-                    ContextraError::Internal(format!("Failed to truncate value tensor: {e}"))
+                    Error::Inference(format!("Failed to truncate value tensor: {e}"))
                 })?;
             }
         }
@@ -205,10 +220,9 @@ impl KvState {
         Ok(())
     }
 
-    /// Exports a sub-range of KV cache tensors across all layers into a `KvBlock`.
-    pub fn export_block(&self, range: Range<usize>) -> Result<KvBlock, ContextraError> {
+    pub fn export_block(&self, range: Range<usize>) -> Result<KvBlock> {
         if range.start > range.end || range.end > self.pos {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(Error::InvalidInput(format!(
                 "Range {:?} is out of bounds for KvState pos {}",
                 range, self.pos
             )));
@@ -222,10 +236,10 @@ impl KvState {
             let dim_v = Self::tensor_seq_dim(&layer.v, self.pos);
 
             let k_slice = layer.k.narrow(dim_k, range.start, len).map_err(|e| {
-                ContextraError::Internal(format!("Failed to slice key tensor: {e}"))
+                Error::Inference(format!("Failed to slice key tensor: {e}"))
             })?;
             let v_slice = layer.v.narrow(dim_v, range.start, len).map_err(|e| {
-                ContextraError::Internal(format!("Failed to slice value tensor: {e}"))
+                Error::Inference(format!("Failed to slice value tensor: {e}"))
             })?;
 
             let k_payload = tensor_to_payload(&k_slice)?;
@@ -243,7 +257,7 @@ impl KvState {
         };
 
         let encoded = bincode::serialize(&payload).map_err(|e| {
-            ContextraError::Internal(format!("Failed to serialize KvState block payload: {e}"))
+            Error::Inference(format!("Failed to serialize KvState block payload: {e}"))
         })?;
 
         Ok(KvBlock {
@@ -252,10 +266,9 @@ impl KvState {
         })
     }
 
-    /// Imports a `KvBlock` and concatenates its layer tensors onto the current state.
-    pub fn import_block(&mut self, block: &KvBlock) -> Result<(), ContextraError> {
+    pub fn import_block(&mut self, block: &KvBlock) -> Result<()> {
         let payload: KvStateBlockPayload = bincode::deserialize(&block.data).map_err(|e| {
-            ContextraError::InvalidInput(format!("Failed to deserialize KvBlock payload: {e}"))
+            Error::InvalidInput(format!("Failed to deserialize KvBlock payload: {e}"))
         })?;
 
         let device = if let Some(first_layer) = self.layers.first() {
@@ -273,7 +286,7 @@ impl KvState {
             self.pos = payload.seq_len;
         } else {
             if self.layers.len() != payload.layers.len() {
-                return Err(ContextraError::InvalidInput(format!(
+                return Err(Error::InvalidInput(format!(
                     "Layer count mismatch: state has {} layers, block has {}",
                     self.layers.len(),
                     payload.layers.len()
@@ -289,10 +302,10 @@ impl KvState {
                 let dim_v = Self::tensor_seq_dim(&layer.v, cur_pos);
 
                 layer.k = Tensor::cat(&[&layer.k, &imp_k], dim_k).map_err(|e| {
-                    ContextraError::Internal(format!("Failed to concatenate key tensors: {e}"))
+                    Error::Inference(format!("Failed to concatenate key tensors: {e}"))
                 })?;
                 layer.v = Tensor::cat(&[&layer.v, &imp_v], dim_v).map_err(|e| {
-                    ContextraError::Internal(format!("Failed to concatenate value tensors: {e}"))
+                    Error::Inference(format!("Failed to concatenate value tensors: {e}"))
                 })?;
             }
             self.pos += payload.seq_len;
@@ -301,15 +314,14 @@ impl KvState {
         Ok(())
     }
 
-    /// Imports a `KvBlock` at a specific position or appends it if `at == self.pos`.
-    pub fn import_block_at(&mut self, block: &KvBlock, at: usize) -> Result<(), ContextraError> {
+    pub fn import_block_at(&mut self, block: &KvBlock, at: usize) -> Result<()> {
         if at == self.pos {
             self.import_block(block)
         } else if at < self.pos {
             self.truncate(at)?;
             self.import_block(block)
         } else {
-            Err(ContextraError::InvalidInput(format!(
+            Err(Error::InvalidInput(format!(
                 "Cannot import block at position {at} past current pos {}",
                 self.pos
             )))

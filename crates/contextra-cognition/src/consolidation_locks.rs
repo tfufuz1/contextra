@@ -4,7 +4,7 @@
 //! und geordnete Kaskaden-Invalidierung veralteter Graphkanten im Schlafzyklus bereit.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Koordiniert `Collection` (Ring 2) und Graph-Operationen (Ring 0).
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert `Collection` (Ring 2) und Graph-Operationen (Ring 0).
 //!
 //! ## Invarianten
 //! - **Nicht-blockierender Erwerb:** Der Lock wird atomar via `try_lock` angefordert, um Livelocks zu verhindern.
@@ -42,6 +42,9 @@ use tokio::sync::MutexGuard;
 ///    ausgeführt werden, um Lock Order Inversions (APM-LOCK-ORDER-INVERSION) und Deadlocks zu verhindern.
 // ANCHOR[contextra-cognition:LOCK-001]
 /// Guard zur Erzwingung der Lock-Reihenfolge und kanonischen Node-Sortierung während der Konsolidierung.
+// =========================================================================
+// SECTION: ConsolidationNodesGuard Definition
+// =========================================================================
 pub struct ConsolidationNodesGuard<'a, S: StorageEngine, V: VectorIndex> {
     collection: &'a Collection<S, V>,
     _guard: MutexGuard<'a, ()>,
@@ -125,3 +128,4 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
         (reports, errors)
     }
 }
+// !SECTION: Lock-Akquisition & Validierung

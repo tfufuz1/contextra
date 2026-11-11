@@ -1032,6 +1032,7 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "contextra-crypto",
+ "contextra-env",
  "contextra-ports",
  "contextra-rank",
  "contextra-types",

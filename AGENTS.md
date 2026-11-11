@@ -70,7 +70,7 @@ Verworfene Compliance-, Proof- und Orchestrierungs-Ansätze:
 | Frage | Maßgebliche Quelle |
 |---|---|
 | Was ist **jetzt** im Code? | Der Code selbst (`cargo metadata`, `cargo tree`, Quellen). Jede Behauptung ist eine Hypothese, bis am Code geprüft. |
-| Wohin soll der Umbau? | `docs/CONTEXTRA_IMPLEMENTIERUNGS_SPEC.md` (ersetzt und vereinigt ältere Entwürfe). |
+| Wohin soll der Umbau? | `docs/SPEC.md` v3 sowie der Baukasten-Leitfaden `docs/decoupling/BAUKASTEN_LEITFADEN.md` (mit `docs/decoupling/BAUKASTEN_ARCHITEKTURENTSCHEIDUNG.md` und `docs/decoupling/BAUKASTEN_UMSETZUNGSPLAN.md`). |
 | Offene Punkte & Build-Fehler | `docs/handoff/OPEN_ISSUES.md`. |
 | Status & Abnahme | `docs/handoff/STATUS.md`. |
 

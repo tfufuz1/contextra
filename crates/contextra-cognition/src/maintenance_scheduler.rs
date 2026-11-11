@@ -6,7 +6,7 @@
 //! und fehlertolerant aus (ADR-079).
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Integriert Speichertreiber (`StorageEngine`)
+//! Teil der Kognitionsschicht (Ebene E2). Integriert Speichertreiber (`StorageEngine`)
 //! und Vektorindizes (`VectorIndex`) über Port-Abstraktionen.
 //!
 //! ## Invarianten
@@ -42,6 +42,9 @@ use std::time::Duration;
 /// Zentraler Scheduler für die Ausführung der Background-Maintenance-Prozesse (ADR-079).
 // ANCHOR[contextra-cognition:SCHED-001]
 /// Zentraler Scheduler für koordiniertes Ausführen von Background-Maintenance-Prozessen (ADR-079).
+// =========================================================================
+// SECTION: MaintenanceScheduler Definition & Initialisierung
+// =========================================================================
 pub struct MaintenanceScheduler<S: StorageEngine, V: VectorIndex> {
     config: MaintenanceConfig,
     collection: Arc<Collection<S, V>>,
@@ -562,3 +565,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Sub-Routinen (Scratchpad, Cache, Graph)

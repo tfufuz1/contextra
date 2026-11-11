@@ -5,7 +5,7 @@
 //! Perkolationsgesundheit (Percolation Health), Replikatordynamik und Gedächtniskonsolidierung.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Bindet Konfigurationen aus `contextra-engine` und `contextra-graph` ein.
+//! Teil der Kognitionsschicht (Ebene E2). Bindet Konfigurationen aus `contextra-engine` und `contextra-graph` ein.
 //!
 //! ## Invarianten
 //! - **Keine Duplikation (P10):** Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig).
@@ -46,6 +46,9 @@ impl Default for PercolationConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-cognition:CFG-002]
 /// Zentrale Konfiguration für den MaintenanceScheduler (§10.2).
+// =========================================================================
+// SECTION: MaintenanceConfig Definition
+// =========================================================================
 pub struct MaintenanceConfig {
     /// Intervall zwischen Ticks in Sekunden. Default: 60s.
     pub tick_interval_secs: u64,
@@ -89,6 +92,11 @@ pub struct MaintenanceConfig {
     pub background_consolidation_episode_threshold: usize,
 }
 
+// !SECTION: MaintenanceConfig Definition
+
+// =========================================================================
+// SECTION: Default-Werte & Builder
+// =========================================================================
 impl Default for MaintenanceConfig {
     fn default() -> Self {
         Self {
@@ -107,3 +115,4 @@ impl Default for MaintenanceConfig {
         }
     }
 }
+// !SECTION: Default-Werte & Builder
