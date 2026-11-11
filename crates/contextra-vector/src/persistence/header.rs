@@ -2,10 +2,10 @@
 // ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - Header-Format.
 // INVARIANTEN: Zero-Panic bei Deserialisierung; HNSW_MAGIC = 0x484E5357; HNSW_VERSION = 2.
 // HOTSPOTS: HnswHeader::try_from_bytes, HnswHeader::to_bytes, HnswHeader::checksum
-// STAND: TS:2026-11-11T02:00:00Z
+// STAND: TS:2026-11-12T00:00:00Z
 
-use crate::hnsw::Sq8Bias;
 use crate::error::{Result, VectorError};
+use crate::hnsw::Sq8Bias;
 
 // SECTION Konstanten
 
@@ -357,9 +357,7 @@ impl HnswHeader {
             let off = u64::from_le_bytes(
                 bytes
                     .get(64..72)
-                    .ok_or_else(|| {
-                        VectorError::Storage("Invalid quant_calibration_offset".into())
-                    })?
+                    .ok_or_else(|| VectorError::Storage("Invalid quant_calibration_offset".into()))?
                     .try_into()
                     .map_err(|_| {
                         VectorError::Storage("Invalid quant_calibration_offset bytes".into())
@@ -393,9 +391,7 @@ impl HnswHeader {
                     .get(80..84)
                     .ok_or_else(|| VectorError::Storage("Invalid sq8_bias_variance".into()))?
                     .try_into()
-                    .map_err(|_| {
-                        VectorError::Storage("Invalid sq8_bias_variance bytes".into())
-                    })?,
+                    .map_err(|_| VectorError::Storage("Invalid sq8_bias_variance bytes".into()))?,
             );
             (mean, variance)
         } else {
