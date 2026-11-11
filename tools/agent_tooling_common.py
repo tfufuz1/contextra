@@ -17,6 +17,7 @@ import json
 import os
 import re
 import sys
+import tomllib
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,10 +46,24 @@ def get_diagnostics_dir(repo_root: Optional[Path] = None) -> Path:
 class CrateMeta:
     name: str
     path: Path
-    ring: Optional[int] = None
-    role: Optional[str] = None
+    level: Optional[int] = None
+    tier: Optional[str] = None
+    group: Optional[str] = None
+    allowed_internal: List[str] = field(default_factory=list)
+    feature_closure_allowed: Dict[str, List[str]] = field(default_factory=dict)
+    dev_allowed: Dict[str, Any] = field(default_factory=dict)
+    unsafe_island: bool = False
     category: Optional[str] = None
     manifest_path: Path = field(init=False)
+
+    # Backward-compatibility properties
+    @property
+    def ring(self) -> Optional[int]:
+        return self.level
+
+    @property
+    def role(self) -> Optional[str]:
+        return self.group
 
     def __post_init__(self):
         self.manifest_path = self.path / "Cargo.toml"
@@ -63,54 +78,25 @@ class CrateMeta:
 
     @property
     def benches_path(self) -> Path:
-        return self.path / "benches"
+        return self.path / "benchmarks" if (self.path / "benchmarks").is_dir() else self.path / "benches"
 
 
 def parse_capabilities_toml(repo_root: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
-    """Parse capabilities.toml to get ring, class, and may_depend_on for each crate."""
+    """Parse capabilities.toml (Schema v3) to retrieve metadata and allowed dependencies for each crate."""
     root = repo_root or get_repo_root()
     cap_file = root / "capabilities.toml"
-    capabilities: Dict[str, Dict[str, Any]] = {}
     if not cap_file.is_file():
-        return capabilities
+        return {}
 
-    current_crate = None
-    with open(cap_file, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("[[crate]]"):
-                current_crate = {}
-                continue
-            if current_crate is not None:
-                if line.startswith("name ="):
-                    name = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    current_crate["name"] = name
-                    capabilities[name] = current_crate
-                elif line.startswith("ring ="):
-                    val = line.split("=", 1)[1].strip()
-                    try:
-                        current_crate["ring"] = int(val)
-                    except ValueError:
-                        current_crate["ring"] = None
-                elif line.startswith("class ="):
-                    current_crate["class"] = line.split("=", 1)[1].strip().strip('"')
-                elif line.startswith("maturity ="):
-                    current_crate["maturity"] = line.split("=", 1)[1].strip().strip('"')
-                elif line.startswith("may_depend_on ="):
-                    raw_deps = line.split("=", 1)[1].strip()
-                    deps = [
-                        d.strip().strip('"').strip("'")
-                        for d in raw_deps.strip("[]").split(",")
-                        if d.strip()
-                    ]
-                    current_crate["may_depend_on"] = deps
-    return capabilities
+    with open(cap_file, "rb") as f:
+        data = tomllib.load(f)
+
+    crates_spec: Dict[str, Dict[str, Any]] = data.get("crates", {})
+    return crates_spec
 
 
 def discover_crates(repo_root: Optional[Path] = None) -> Dict[str, CrateMeta]:
-    """Discover all crates in crates/ and benchmarks/."""
+    """Discover all crates in crates/ and benchmarks/ with Schema v3 metadata."""
     root = repo_root or get_repo_root()
     caps = parse_capabilities_toml(root)
     crates: Dict[str, CrateMeta] = {}
@@ -134,13 +120,16 @@ def discover_crates(repo_root: Optional[Path] = None) -> Dict[str, CrateMeta]:
                     pass
 
                 cap_info = caps.get(actual_name, {})
-                ring = cap_info.get("ring")
-                role = cap_info.get("class")
                 crates[actual_name] = CrateMeta(
                     name=actual_name,
                     path=child,
-                    ring=ring,
-                    role=role,
+                    level=cap_info.get("level"),
+                    tier=cap_info.get("tier"),
+                    group=cap_info.get("group"),
+                    allowed_internal=list(cap_info.get("allowed_internal", [])),
+                    feature_closure_allowed=dict(cap_info.get("feature_closure_allowed", {})),
+                    dev_allowed=dict(cap_info.get("dev_allowed", {})),
+                    unsafe_island=bool(cap_info.get("unsafe_island", False)),
                     category=sdir.name,
                 )
     return crates

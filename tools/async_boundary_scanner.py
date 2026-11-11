@@ -3,8 +3,8 @@
 async_boundary_scanner.py - Diagnosewerkzeug für Asynchronitäts- und Sperr-Grenzen (M8 / INV-LOCK-ORDER-1).
 
 Prüfungen:
-- Vorkommen von `async fn`, `tokio::`, `.await` in Ring 0 und Persistenzschichten.
-  (M8: Ring 0 und Speicherkerne halten ihre Logik synchron. Async nur an der Port-Grenze).
+- Vorkommen von `async fn`, `tokio::`, `.await` in Ebene E0 und Persistenzschichten.
+  (M8: E0 und Speicherkerne halten ihre Logik synchron. Async nur an der Port-Grenze).
 - Erkennung von potenziellen Lock-Guards über `.await`-Aufrufen (clippy::await_holding_lock).
 - Identifikation von Blockierern in synchronen Threads.
 """
@@ -150,7 +150,7 @@ def main():
     with open(md_path, "w", encoding="utf-8") as mf:
         mf.write("# Async Boundary & Concurrency Scanner (M8 / INV-LOCK-ORDER-1)\n\n")
         mf.write(f"> Generiert durch `tools/async_boundary_scanner.py`.\n")
-        mf.write(f"> Regel M8: Ring 0 und Speicherkerne halten ihre Logik synchron. Async nur an der Port-Grenze.\n\n")
+        mf.write(f"> Regel M8: Ebene E0 und Speicherkerne halten ihre Logik synchron. Async nur an der Port-Grenze.\n\n")
 
         mf.write("## Crate Übersicht (Produktivpfade)\n\n")
         mf.write("| Crate | Sync Mandat (M8) | async fn | .await | tokio:: | block_on | Lock across Await |\n")

@@ -3,7 +3,7 @@
 generate_function_inventory.py — Robust Function & Method Inventory Generator.
 
 Extracts all function and method definitions from workspace Rust files with the canonical schema:
-crate,ring,datei,zeile,ende,loc,qualifizierter_name,sichtbarkeit,async,unsafe,dokumentiert,generiert,kontext,signatur
+crate,level,datei,zeile,ende,loc,qualifizierter_name,sichtbarkeit,async,unsafe,dokumentiert,generiert,kontext,signatur
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -22,7 +23,7 @@ from typing import Dict, List, Optional, Tuple
 @dataclass
 class FunctionEntry:
     crate: str
-    ring: str
+    level: str
     datei: str
     zeile: int
     ende: int
@@ -37,27 +38,27 @@ class FunctionEntry:
     signatur: str
 
 
-def get_ring_mapping(repo_root: Path) -> Dict[str, str]:
+def get_level_mapping(repo_root: Path) -> Dict[str, str]:
     cap_file = repo_root / "capabilities.toml"
     mapping: Dict[str, str] = {
         "(root)": "–",
-        "xtask": "–",
-        "contextra-bench": "–",
+        "contextra-bench": "E3",
         "contextra-store-fuzz": "–",
     }
     if cap_file.is_file():
-        content = cap_file.read_text(encoding="utf-8")
-        matches = re.findall(
-            r'\[crates\.([^\]]+)\][^\[]*?ring\s*=\s*[\x27"]([^\x27"]+)[\x27"]',
-            content,
-            re.DOTALL,
-        )
-        for crate_name, ring_val in matches:
-            if ring_val == "Extension":
-                mapping[crate_name] = "Ring 0"
-            else:
-                mapping[crate_name] = ring_val
+        try:
+            with open(cap_file, "rb") as f:
+                data = tomllib.load(f)
+            for c_name, c_spec in data.get("crates", {}).items():
+                lvl = c_spec.get("level")
+                mapping[c_name] = f"E{lvl}" if lvl is not None else "–"
+        except Exception:
+            pass
     return mapping
+
+
+def get_ring_mapping(repo_root: Path) -> Dict[str, str]:
+    return get_level_mapping(repo_root)
 
 
 def determine_crate_and_ring(rel_path: str, ring_map: Dict[str, str]) -> Tuple[str, str]:
