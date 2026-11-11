@@ -10,7 +10,7 @@
 
 #![allow(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![doc = "Contextra Unsafe System Abstraction Crate (Ring 0 / E0 - Unsafe-Insel)"]
 
 //! # Contextra-Sys: Low-Level-Systemabstraktionen und Unsafe-Insel (E0 / Ring 0)
@@ -33,17 +33,20 @@
 //!
 //! ## Kernkomponenten
 //! 1. [`acl_win32`]: Plattformspezifische Zugriffsbeschränkungen (DACL unter Windows, chmod `0600` und UID-Prüfung unter Unix).
-//! 2. [`durability`]: Haltbare Dateisystem-Synchronisation (WAL/LSM fsync, fdatasync, F_FULLFSYNC, FlushFileBuffers, Handle-Poisoning).
-//! 3. [`error`]: Strukturiertes Fehlermodell (`thiserror`, `#[non_exhaustive]`) mit maschinenlesbarem OS-Errno.
-//! 4. [`mlock`]: Festpinnen sensibler Speicherseiten im RAM (`mlock`, `VirtualLock`, `MADV_DONTDUMP`).
-//! 5. [`mmap`]: Sichere Nur-Lese-Speicherabbildung (`mmap_readonly`, `SealedFile`, `SealedMap`) für Vektordaten und SSTables.
-//! 6. [`posix`]: POSIX-Ressourcenlimits (`rlimit` für Dateideskriptoren) und Deskriptorumleitungen (`dup2`).
-//! 7. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`], [`VaultBuffer`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen (Zeroize).
+//! 2. [`contract`]: Minimale Umwelt-Traits ([`MemoryLocker`]) und I/O-freie Referenzimplementierungen ([`NoopMemoryLocker`]).
+//! 3. [`durability`]: Haltbare Dateisystem-Synchronisation (WAL/LSM fsync, fdatasync, F_FULLFSYNC, FlushFileBuffers, Handle-Poisoning).
+//! 4. [`error`]: Strukturiertes Fehlermodell (`thiserror`, `#[non_exhaustive]`) mit maschinenlesbarem OS-Errno.
+//! 5. [`mlock`]: Festpinnen sensibler Speicherseiten im RAM (`mlock`, `VirtualLock`, `MADV_DONTDUMP`).
+//! 6. [`mmap`]: Sichere Nur-Lese-Speicherabbildung (`mmap_readonly`, `SealedFile`, `SealedMap`) für Vektordaten und SSTables.
+//! 7. [`posix`]: POSIX-Ressourcenlimits (`rlimit` für Dateideskriptoren) und Deskriptorumleitungen (`dup2`).
+//! 8. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`], [`VaultBuffer`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen (Zeroize).
 
 // SECTION Submodule
 // ANCHOR[id=sys-submodules,epic=sys-core,seq=1] Deklaration der internen Module
 // LINK crates/contextra-sys/src/acl_win32.rs
 pub mod acl_win32;
+// LINK crates/contextra-sys/src/contract.rs
+pub mod contract;
 // LINK crates/contextra-sys/src/durability.rs
 pub mod durability;
 // LINK crates/contextra-sys/src/error.rs
@@ -65,6 +68,7 @@ pub mod vault;
 // LINK crates/contextra-sys/src/mlock.rs
 // LINK crates/contextra-sys/src/vault.rs
 pub mod mem {
+    pub use crate::contract::{MemoryLocker, NoopMemoryLocker, OsMemoryLocker};
     pub use crate::mlock::{
         apply_dont_dump, mem_lock, mem_lock_typed, mem_lock_with_policy, mem_unlock, MemLockPolicy,
     };
@@ -88,6 +92,7 @@ pub mod map {
 // ANCHOR[id=sys-reexports,epic=sys-core,seq=3] Ergonomische Direktzugriffe
 // NOTE: Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-vector, contextra-vault).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
+pub use contract::{MemoryLocker, NoopMemoryLocker, OsMemoryLocker};
 pub use durability::{durable_flush_dir, durable_flush_file, write_all_durable, DurableFile};
 pub use error::{Error, Result, SysError};
 pub use mlock::{
