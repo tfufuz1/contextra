@@ -1,8 +1,13 @@
+# Schema v3 capabilities fragment for contextra-engine (SPEC §8.3)
 [crates.contextra-engine]
-klasse = "C"
-may_depend_on = [
-    "contextra-ports",
+group = "integration"
+level = 2
+tier = "stable"
+path = "crates/contextra-engine"
+unsafe_island = false
+allowed_internal = [
     "contextra-types",
+    "contextra-ports",
     "contextra-mvcc",
     "contextra-checkpoint",
     "contextra-store",
@@ -10,8 +15,14 @@ may_depend_on = [
     "contextra-text",
     "contextra-graph",
     "contextra-rank",
-    "contextra-adapt",
-    "contextra-infer-onnx",
-    "contextra-sandbox",
 ]
-transitional = []
+
+[crates.contextra-engine.feature_closure_allowed]
+adaptive-candidate-pool-sizing = ["contextra-adapt"]
+onnx = ["contextra-infer-onnx"]
+sandbox = ["contextra-sandbox"]
+
+[crates.contextra-engine.dev_allowed]
+ingest = ["contextra-ingest"]
+testkit = ["contextra-testkit"]
+test = "cargo test -p contextra-engine --locked"

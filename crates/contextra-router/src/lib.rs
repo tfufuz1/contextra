@@ -1,16 +1,16 @@
 //! # contextra-router
 //!
-//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht / Peripherie).
-//! **Zweck:** Intelligentes Routing von Anfragen an geeignete Small Language Models (SLM).
+//! Intelligentes Routing von Anfragen an geeignete Small Language Models (SLM).
 //! Bewertet Modell-Profile (z. B. Token-Limits, Domänen-Affinitäten), kalibriert Konfidenzwerte
 //! über konforme Vorhersagen (Conformal Prediction) und steuert Multi-Armed-Bandit-Verfahren (LinUCB / Thompson Sampling).
 //!
 //! **Abhängigkeiten:**
 //! - Upstream: `contextra-types`, `contextra-ports`, `contextra-adapt`, `contextra-wire` (optional).
-//! - Downstream: Wird eingebunden von `contextra-agent` und `contextra-mcp`.
+//! - Downstream: MCP-Server (`contextra-mcp`).
 //!
 //! **Hauptkomponenten:**
 //! - [`RouterEngine`]: Primärer Routing-Endpunkt zur Entscheidung für das beste Modell.
+//! - [`RouterEngineBuilder`]: Ergonomischer Builder zur Konstruktion von `RouterEngine`.
 //! - [`SlmProfile`]: Spezifikation der Fähigkeiten und Begrenzungen eines Modells.
 //! - [`ConformalCalibrator`]: Statistische Fehlerüberwachung und Kalibrierung.
 //! - [`ArmRegistry`]: Zuordnung von Modellprofilen zu Bandit-Armen.
@@ -26,12 +26,14 @@
 #![forbid(unsafe_code)]
 
 pub mod arm_registry;
+pub mod builder;
 #[cfg(feature = "subprocess-dispatch")]
 pub mod dispatch;
 pub mod outcome;
 pub mod ports_local;
 pub mod profile;
 pub mod router;
+pub mod seam;
 pub mod serde_helpers;
 
 #[cfg(feature = "flow-corrected-thompson")]
@@ -47,16 +49,15 @@ mod bandit_regret_tests;
 mod tests;
 
 // ANCHOR[contextra-router:LIB-002]
-// NOTE: Bandit-, Lyapunov- und Off-Policy-Typen werden hier bewusst NICHT re-exportiert.
-// Konsumenten importieren direkt aus `contextra_adapt`:
-//   use contextra_adapt::{BanditProfileState, LyapunovDriftWatcher, OffPolicyEvaluator};
 pub use arm_registry::{ArmRegistry, ArmRegistryError};
+pub use builder::RouterEngineBuilder;
 #[cfg(feature = "subprocess-dispatch")]
 pub use dispatch::dispatch_to_slm;
 pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 #[allow(deprecated)]
 pub use profile::{ConformalCalibrator, ProfileCalibrator, SlmProfile};
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
+pub use seam::{CalibrationSource, NoCalibrationSource, StdFsCalibrationSource, VfsCalibrationSource};
 
 #[cfg(feature = "flow-corrected-thompson")]
 pub use fc_ts_dispatch::{deterministic_fc_ts_rng, select_profile_fc_ts, FcTsDispatchError};

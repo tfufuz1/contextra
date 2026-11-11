@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: server_tools
+// =========================================================================
+// ANCHOR[contextra-mcp:SERVER-TOO-001]
 use crate::io::MAX_SEARCH_QUERY_BYTES;
 use crate::protocol::McpError;
 use crate::server::McpServer;
@@ -374,3 +378,5 @@ impl McpServer {
         }
     }
 }
+
+// !SECTION: server_tools
