@@ -3,6 +3,9 @@
 use crate::error::StoreError;
 use contextra_types::ContextraError;
 
+#[cfg(test)]
+pub mod tests;
+
 impl From<StoreError> for ContextraError {
     fn from(err: StoreError) -> Self {
         match err {
