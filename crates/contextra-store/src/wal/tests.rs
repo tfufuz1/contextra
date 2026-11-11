@@ -3,7 +3,6 @@
 //! Sammelmodul fuer interne WAL-Tests.
 
 pub use super::*;
-#[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::crypto::KeyManager;
 use crate::error::{StoreError, StoreResult as Result};
 
@@ -11,11 +10,9 @@ use crate::error::{StoreError, StoreResult as Result};
 mod encode_tests;
 #[cfg(test)]
 mod flusher_tests;
-#[cfg(feature = "encryption-at-rest")]
 #[cfg(test)]
 mod hmac_tests;
 #[cfg(test)]
 mod io_tests;
-#[cfg(feature = "encryption-at-rest")]
 #[cfg(test)]
 mod replay_tests;

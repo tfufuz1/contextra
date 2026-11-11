@@ -100,7 +100,7 @@ async fn test_wal_crc_middle_corruption() {
 
     // Should fail because corruption is in the middle (before the last entry)
     assert!(
-        matches!(result, Err(ContextraError::WalCorruption { .. })),
+        matches!(result, Err(StoreError::WalCorruption { .. })),
         "Expected WalCorruption error, got {:?}",
         result
     );
@@ -228,9 +228,9 @@ async fn test_wal_header_systematic_fuzzing() {
                     assert!(
                         matches!(
                             e,
-                            ContextraError::Serialization(_)
-                                | ContextraError::WalCorruption { .. }
-                                | ContextraError::Storage(_)
+                            StoreError::Serialization(_)
+                                | StoreError::WalCorruption { .. }
+                                | StoreError::Storage(_)
                         ),
                         "Unexpected error type at byte {}, bit {}: {:?}",
                         byte_idx,
@@ -452,7 +452,7 @@ async fn test_old_v1_format_backward_compatibility() {
     // Manually construct an old V1 encrypted WAL file (no MFW2 header, each entry encrypted separately)
     let integrity_key = sub_km
         .integrity_key()
-        .map_err(ContextraError::from)
+        .map_err(StoreError::from)
         .expect("integrity key"); // expect
 
     let op1 = WalOp::Put {
@@ -877,7 +877,7 @@ async fn test_split_brain_legacy_fallback_chain_continuity() {
     };
 
     assert!(
-            matches!(replay_err, ContextraError::WalCorruption { .. }),
+            matches!(replay_err, StoreError::WalCorruption { .. }),
             "Forged entry 3 with prev_hmac=[0;32] must be rejected during fallback because chain state was non-zero! Got: {:?}",
             replay_err
         );
@@ -1052,7 +1052,7 @@ async fn test_attack_a_swap_blocks_unencrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error, got: {:?}",
         err
     );
@@ -1106,7 +1106,7 @@ async fn test_attack_a_swap_blocks_encrypted_detected() {
     );
     assert!(matches!(
         open_res.unwrap_err(),
-        ContextraError::WalCorruption { .. }
+        StoreError::WalCorruption { .. }
     ));
 }
 
@@ -1172,7 +1172,7 @@ async fn test_attack_c_duplicate_block_3_unencrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error, got: {:?}",
         err
     );
@@ -1209,7 +1209,7 @@ async fn test_attack_d_cross_file_replay_unencrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error, got: {:?}",
         err
     );
@@ -1279,7 +1279,7 @@ async fn test_attack_d_cross_file_replay_encrypted_detected() {
     );
     let err = open_res.unwrap_err();
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Expected WalCorruption error due to per-file UUID key isolation failure, got: {:?}",
         err
     );
@@ -1519,7 +1519,7 @@ async fn test_mmap_slice_bounds_mismatch_no_panic() {
 
     // Verify it handles the truncated slice gracefully without panic
     assert!(
-        res.is_ok() || matches!(res, Err(ContextraError::WalCorruption { .. })),
+        res.is_ok() || matches!(res, Err(StoreError::WalCorruption { .. })),
         "parse_mmap_slice with slice shorter than file_size must not panic"
     );
 }
