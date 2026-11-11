@@ -1,8 +1,19 @@
-//! Deterministic Fixed Hasher for Hot-Path sets/maps where ordering or reproducible traversal is critical.
+// FILE-CONTEXT
+// ZWECK: Deterministischer Fixed-Hasher für Hot-Path Mengen/Maps mit reproduzierbarer Traversierung (P28/INV-5).
+// INVARIANTEN: Konstante Seeds, deterministische Iteration, Schutzschicht gegen HashMap-Drift.
+// HOTSPOTS: fixed_hasher, new_fixed_hashset, new_fixed_hashmap
+// STAND: TS:2026-11-11T02:00:00Z
+
+//! Deterministischer Fixed Hasher für Hot-Path sets/maps where ordering or reproducible traversal is critical.
+//!
+//! Verhindert unkontrollierten Hash-Drift und Random-State-Injektionen in der HNSW-Graph-Traversierung.
 
 use ahash::RandomState;
 use std::collections::{HashMap, HashSet};
 
+// SECTION Konstanten & Initialisierung
+
+// ANCHOR[contextra-vector:HASHER-SEEDS]
 const FIXED_SEEDS: (u64, u64, u64, u64) = (
     0x2345_6789_abcd_ef01,
     0x3456_789a_bcde_f012,
@@ -10,23 +21,29 @@ const FIXED_SEEDS: (u64, u64, u64, u64) = (
     0x5678_9abc_def0_1234,
 );
 
-/// Returns a deterministic `RandomState` build hasher seeded with constant values.
+// ANCHOR[contextra-vector:HASHER-BUILDER]
+/// Liefert einen deterministischen `RandomState` Build-Hasher mit fixierten Seeds.
 pub fn fixed_hasher() -> RandomState {
     RandomState::with_seeds(FIXED_SEEDS.0, FIXED_SEEDS.1, FIXED_SEEDS.2, FIXED_SEEDS.3)
 }
+// !SECTION
 
-/// A deterministic `HashSet` using constant seeds.
+// SECTION Deterministische Kollektionen
+
+// ANCHOR[contextra-vector:HASHER-COLLECTIONS]
+/// Deterministisches `HashSet` mit fixem Hasher.
 pub type FixedHashSet<T> = HashSet<T, RandomState>;
 
-/// A deterministic `HashMap` using constant seeds.
+/// Deterministische `HashMap` mit fixem Hasher.
 pub type FixedHashMap<K, V> = HashMap<K, V, RandomState>;
 
-/// Creates a new deterministic `FixedHashSet` with the given capacity.
+/// Erzeugt ein neues deterministisches `FixedHashSet` mit vorgegebener Kapazität.
 pub fn new_fixed_hashset<T>(capacity: usize) -> FixedHashSet<T> {
     HashSet::with_capacity_and_hasher(capacity, fixed_hasher())
 }
 
-/// Creates a new deterministic `FixedHashMap` with the given capacity.
+/// Erzeugt eine neue deterministische `FixedHashMap` mit vorgegebener Kapazität.
 pub fn new_fixed_hashmap<K, V>(capacity: usize) -> FixedHashMap<K, V> {
     HashMap::with_capacity_and_hasher(capacity, fixed_hasher())
 }
+// !SECTION

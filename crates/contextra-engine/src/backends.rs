@@ -21,13 +21,13 @@ pub trait Backends: Send + Sync + 'static {
 }
 
 #[cfg(not(loom))]
-use contextra_store::LsmStorage;
+use contextra_graph::CsrGraph;
 #[cfg(not(loom))]
-use contextra_vector::HnswIndex;
+use contextra_store::LsmStorage;
 #[cfg(not(loom))]
 use contextra_text::InvertedIndex;
 #[cfg(not(loom))]
-use contextra_graph::CsrGraph;
+use contextra_vector::HnswIndex;
 
 /// Standard-Backends unter Verwendung von LSM-Storage, HNSW-Index, Inverted-Text und CSR-Graph.
 #[cfg(not(loom))]
@@ -38,6 +38,6 @@ pub struct DefaultBackends;
 impl Backends for DefaultBackends {
     type Storage = LsmStorage;
     type Vector = HnswIndex;
-    type Text = InvertedIndex;
+    type Text = InvertedIndex<LsmStorage>;
     type Graph = CsrGraph;
 }

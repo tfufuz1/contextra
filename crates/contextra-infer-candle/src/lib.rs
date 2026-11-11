@@ -28,6 +28,7 @@ pub mod fake;
 pub mod gguf_loader;
 
 pub use error::{CandleError, Error, Result};
+#[cfg(feature = "test-utils")]
 pub use fake::{FakeEmbedder, FakeTextGenerator};
 #[cfg(feature = "candle")]
 pub use gguf_loader::{
