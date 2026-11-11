@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 //! `contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection
 //!

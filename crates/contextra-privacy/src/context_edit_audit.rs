@@ -39,7 +39,11 @@ pub enum ContextEditKind {
 pub enum ContextEditAuditError {
     /// Manipulationserkennung: Die Audit-Kette ist ab dem angegebenen Index fehlerhaft oder manipuliert.
     #[error("Audit chain tampered or invalid at index {index}")]
-    ChainTampered { index: usize },
+    /// Verifikationsfehler: Kette ab Index manipuliert.
+    ChainTampered {
+        /// Index des manipulierten Eintrags.
+        index: usize,
+    },
 }
 
 // ANCHOR[contextra-privacy:CEA-003]

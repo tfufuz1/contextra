@@ -256,16 +256,33 @@ impl CompiledPattern {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum EgressVaultError {
+    /// Ungültiges Regex-Muster.
     #[error("Invalid pattern '{pattern}': {reason}")]
-    InvalidPattern { pattern: String, reason: String },
+    InvalidPattern {
+        /// Das fehlerhafte Muster.
+        pattern: String,
+        /// Grund des Fehlers.
+        reason: String,
+    },
+    /// Nutzlast überschreitet die Größenbegrenzung.
     #[error("Payload size exceeds limit: {size} bytes > {limit} limit")]
-    PayloadTooLarge { size: usize, limit: usize },
+    PayloadTooLarge {
+        /// Tatsächliche Größe.
+        size: usize,
+        /// Maximal erlaubte Größe.
+        limit: usize,
+    },
+    /// Mandanten-Gültigkeitsbereich verletzt.
     #[error("Tenant scope violation: {0}")]
     TenantScopeViolation(#[from] crate::types::TenantScopeViolation),
+    /// Kollision bei der Surrogat-Token-Generierung.
     #[error("Surrogate token collision detected for token '{surrogate}': existing plaintext '{existing_plaintext}' != new plaintext '{new_plaintext}'")]
     SurrogateCollision {
+        /// Erzeugtes Surrogat-Token.
         surrogate: String,
+        /// Existierender Klartext.
         existing_plaintext: String,
+        /// Neuer abweichender Klartext.
         new_plaintext: String,
     },
 }
