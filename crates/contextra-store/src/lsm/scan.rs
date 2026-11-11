@@ -1,6 +1,9 @@
 //! # Bereichsscans im LSM-Tree (Ring 1)
 //!
-//! Merged Iteratoren ueber MemTable und SSTables mit Snapshot-Sichtbarkeit.
+//! ZWECK: Zusammenfuehrung von Iteratoren ueber MemTable und SSTables mit Snapshot-Sichtbarkeit.
+//! INVARIANTEN:
+//! - INV-STORE-4: Sequenznummernvergleich maskiert mit `!TOMBSTONE_BIT`.
+//! - Begrenzung von Scans und Pagination ueber `MAX_SCAN_MERGE_ACCUMULATOR`.
 
 pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;
 use super::*;
