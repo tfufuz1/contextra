@@ -1,0 +1,16 @@
+# Schema v3: capabilities.fragment.toml für contextra-prompt-guard
+
+[crates.contextra-prompt-guard]
+group = "safety"
+level = 0
+tier = "experimental"
+path = "crates/contextra-prompt-guard"
+unsafe_island = false
+allowed_internal = []
+
+[crates.contextra-prompt-guard.feature_closure_allowed]
+std = []
+file-audit = []
+
+[crates.contextra-prompt-guard.dev_allowed]
+test = "cargo test -p contextra-prompt-guard --locked"

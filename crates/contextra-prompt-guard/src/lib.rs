@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 #![deny(dead_code)]
 //! # contextra-prompt-guard
 //!
@@ -7,6 +8,8 @@
 
 pub mod audit;
 pub mod clock;
+pub mod compat;
+pub mod contract;
 pub mod error;
 pub mod guard;
 pub mod policy;
@@ -15,7 +18,8 @@ pub mod policy;
 mod tests;
 
 pub use audit::{SecurityAuditLogger, SecurityAuditRecord};
-pub use clock::{Clock, SystemClock};
+pub use clock::SystemClock;
+pub use contract::Clock;
 pub use error::GuardError;
 pub use guard::{NormalizedPattern, PromptInjectionGuard};
 pub use policy::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};

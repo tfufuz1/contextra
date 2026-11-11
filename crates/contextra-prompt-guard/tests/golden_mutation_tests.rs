@@ -1,3 +1,5 @@
+#![cfg(feature = "file-audit")]
+
 use contextra_prompt_guard::PromptInjectionGuard;
 use std::io::Write;
 use tempfile::NamedTempFile;

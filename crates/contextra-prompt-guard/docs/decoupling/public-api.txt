@@ -1,0 +1,107 @@
+// Public API Snapshot für contextra-prompt-guard v0.1.0
+// Stand: 2026-11-11
+
+pub mod contextra_prompt_guard
+pub mod contextra_prompt_guard::audit
+pub mod contextra_prompt_guard::clock
+pub mod contextra_prompt_guard::compat
+pub mod contextra_prompt_guard::compat::error
+pub mod contextra_prompt_guard::contract
+pub mod contextra_prompt_guard::error
+pub mod contextra_prompt_guard::guard
+pub mod contextra_prompt_guard::policy
+
+// Trait Clock
+pub trait contextra_prompt_guard::Clock: Send + Sync {
+    fn now_unix_nanos(&self) -> u64;
+    fn monotonic_nanos(&self) -> u64;
+}
+
+// SystemClock
+pub struct contextra_prompt_guard::SystemClock;
+impl contextra_prompt_guard::SystemClock {
+    pub fn new() -> Self;
+}
+impl contextra_prompt_guard::Clock for contextra_prompt_guard::SystemClock;
+
+// GuardError
+pub enum contextra_prompt_guard::GuardError {
+    Io(String),
+    Serialization(String),
+    InvalidConfiguration(String),
+    DecodeError(String),
+}
+impl contextra_prompt_guard::GuardError {
+    pub fn error_message(&self) -> String;
+}
+impl std::error::Error for contextra_prompt_guard::GuardError;
+impl std::fmt::Display for contextra_prompt_guard::GuardError;
+
+// NormalizedPattern
+pub struct contextra_prompt_guard::NormalizedPattern {
+    pub original: String,
+    pub collapsed: String,
+    pub no_ws: String,
+}
+
+// PromptInjectionGuard
+pub struct contextra_prompt_guard::PromptInjectionGuard {
+    pub redaction_placeholder: String,
+}
+impl contextra_prompt_guard::PromptInjectionGuard {
+    pub fn new(policy: QuarantinePolicy, redaction_placeholder: String, patterns: Vec<String>, audit_logger: SecurityAuditLogger) -> Self;
+    pub fn with_clock(self, clock: std::sync::Arc<dyn Clock>) -> Self;
+    pub fn clock(&self) -> &std::sync::Arc<dyn Clock>;
+    pub fn default_patterns() -> Vec<String>;
+    pub fn policy(&self) -> QuarantinePolicy;
+    pub fn patterns(&self) -> &[String];
+    pub fn audit_logger(&self) -> &SecurityAuditLogger;
+    #[cfg(feature = "file-audit")]
+    pub fn load_from_file(path: impl AsRef<std::path::Path>) -> Result<Self, GuardError>;
+    #[cfg(feature = "file-audit")]
+    pub fn from_env() -> Self;
+    pub fn is_zero_width(c: char) -> bool;
+    pub fn skeletonize_char(c: char) -> char;
+    pub fn normalize_text(text: &str) -> String;
+    pub fn collapse_whitespace(s: &str) -> String;
+    pub fn strip_whitespace(s: &str) -> String;
+    pub fn decode_base64(input: &str) -> Option<Vec<u8>>;
+    pub fn extract_base64_candidates(text: &str) -> Vec<&str>;
+    pub fn detect_recursive(&self, text: &str, depth: usize) -> Option<String>;
+    pub fn detect(&self, text: &str) -> Option<String>;
+    pub fn process_result(&self, doc_id: &str, collection: &str, obj: &mut serde_json::Map<String, serde_json::Value>) -> bool;
+}
+
+// QuarantinePolicy & Config
+pub const contextra_prompt_guard::DEFAULT_REDACTION_PLACEHOLDER: &str;
+pub enum contextra_prompt_guard::QuarantinePolicy {
+    Strict,
+    FlagOnly,
+    Escalate,
+}
+impl contextra_prompt_guard::QuarantinePolicy {
+    pub fn from_env() -> Self;
+}
+pub struct contextra_prompt_guard::PromptInjectionConfig {
+    pub policy: QuarantinePolicy,
+    pub redaction_placeholder: String,
+    pub audit_log_path: Option<String>,
+    pub custom_patterns: Vec<String>,
+}
+pub fn contextra_prompt_guard::default_redaction_placeholder() -> String;
+
+// SecurityAuditLogger & Record
+pub struct contextra_prompt_guard::SecurityAuditRecord {
+    pub timestamp: String,
+    pub event_type: String,
+    pub doc_id: String,
+    pub collection: String,
+    pub pattern_matched: String,
+    pub action_taken: String,
+}
+pub struct contextra_prompt_guard::SecurityAuditLogger;
+impl contextra_prompt_guard::SecurityAuditLogger {
+    pub fn new(file_path: Option<std::path::PathBuf>) -> Self;
+    pub fn log_event(&self, record: SecurityAuditRecord);
+    pub fn get_recorded_events(&self) -> Vec<SecurityAuditRecord>;
+}

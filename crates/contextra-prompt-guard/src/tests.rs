@@ -5,6 +5,7 @@ use super::audit::SecurityAuditLogger;
 use super::clock::Clock;
 use super::guard::PromptInjectionGuard;
 use super::policy::{QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
+#[cfg(feature = "file-audit")]
 use tempfile::NamedTempFile;
 
 #[test]

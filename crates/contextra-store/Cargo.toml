@@ -20,10 +20,12 @@ memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
-docid-128 = ["contextra-types/docid-128"]
+docid-128 = ["contextra-ids/docid-128"]
 legacy-wal-key = []
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }

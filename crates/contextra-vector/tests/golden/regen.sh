@@ -7,8 +7,8 @@ CRATE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 echo "Regenerating golden files for contextra-vector..."
 cd "$CRATE_DIR"
 
-cargo test --test golden_test -- --ignored generate_golden_files --exact --nocapture
+cargo test --test golden_test --features experimental-diskann -- --ignored generate_golden_files --exact --nocapture
 
 cd "$SCRIPT_DIR"
-sha256sum *.bin *.json > MANIFEST.sha256
+sha256sum *.bin *.json *.dann *.wal > MANIFEST.sha256
 echo "Regeneration complete. MANIFEST.sha256 updated."
