@@ -12,6 +12,11 @@ use contextra_types::{Result, TxId};
 use std::path::Path;
 use std::sync::Arc;
 
+// SECTION Engine-Lifecycle-Open
+// ANCHOR[id=engine-lifecycle-open,epic=architecture,seq=2]
+// NOTE: Initialisierungs- und Autorisierungsroutinen der Engine beim Öffnen eines Speicherpfads.
+// LINK crates/contextra-engine/src/lib.rs#engine-config
+
 impl Contextra {
     /// Opens or creates a `Contextra` instance at `path` enforcing `deletion_proof_active = false`
     /// and using default [`contextra_ports::license::LicenseGate`].
@@ -181,6 +186,7 @@ impl Contextra {
 
         Ok(db)
     }
+    // !SECTION Engine-Lifecycle-Open
 
     async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {
         match backend {
