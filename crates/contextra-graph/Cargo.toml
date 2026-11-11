@@ -19,7 +19,13 @@ workspace = ["ports-compat", "types-compat"]
 types-compat = ["dep:contextra-types", "dep:contextra-ports"]
 ports-compat = ["types-compat"]
 experimental-graph = []
-docid-128 = []
+docid-128 = ["contextra-ids/docid-128"]
+
+# Canonical Experiment features (SPEC Klasse A & B)
+exp-apprh = ["apprh-diffusion"]
+exp-edge-reinforcement = ["edge-reinforcement-learning"]
+exp-percolation = ["graph-connectivity-health"]
+exp-k-path = ["k-path-diffusion"]
 graph-connectivity-health = []
 edge-reinforcement-learning = []
 # Retained for CI compatibility (.github/workflows/rust-ci.yml); PPR forward-push is baseline in ppr.rs
@@ -31,6 +37,8 @@ apprh-diffusion = []
 physio-percolation = ["graph-connectivity-health"]
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }
