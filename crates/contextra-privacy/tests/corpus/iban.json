@@ -1,0 +1,40 @@
+{
+  "category": "IBAN",
+  "cases": [
+    {
+      "input": "Konto: DE89370400440532013000 bitte prüfen",
+      "expected_match": true,
+      "expected_value": "DE89370400440532013000"
+    },
+    {
+      "input": "DE 89 3704 0044 0532 0130 00 mit Leerzeichen",
+      "expected_match": true,
+      "expected_value": "DE 89 3704 0044 0532 0130 00"
+    },
+    {
+      "input": "AT611904300234573201 Österreich IBAN",
+      "expected_match": true,
+      "expected_value": "AT611904300234573201"
+    },
+    {
+      "input": "CH9300762011623852957 Schweiz IBAN",
+      "expected_match": true,
+      "expected_value": "CH9300762011623852957"
+    },
+    {
+      "input": "DE00000000000000000000 Ungültige Prüfziffer",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "DE12345 Zu kurz",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "Reiner Text ohne Kontonummer oder Kennzeichen",
+      "expected_match": false,
+      "expected_value": null
+    }
+  ]
+}
