@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Index-Validierung für ungültige Vektorkomponenten (NaN, Inf, -Inf).
+// INVARIANTEN: Konsistente Ablehnung mit Err(InvalidInput) vor Index-Mutation.
+// HOTSPOTS: 20-90
+// STAND: 2026-11-12
 use contextra_ports::VectorIndex;
 use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_vector::distance::{compute_distance_trusted, validate_vector};

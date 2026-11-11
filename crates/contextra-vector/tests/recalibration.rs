@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Rekalibrierung von Bias und Schwellwerten bei inkrementellen Updates.
+// INVARIANTEN: Automatische Rekalibrierung verhindert Drift des SQ8-Bias über Toleranz.
+// HOTSPOTS: 20-60
+// STAND: 2026-11-12
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};

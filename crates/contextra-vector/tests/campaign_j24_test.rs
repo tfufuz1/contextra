@@ -1,5 +1,10 @@
 //! Campaign J-24 Test Suite — contextra-vector
 //! Covers Hypotheses H1 - H10 for Product 3 Vector Index Deep Audit.
+// FILE-CONTEXT
+// ZWECK: Campaign J-24 Test Suite — Vector Index Deep Audit Hypothesen H1 - H10.
+// INVARIANTEN: Deterministische Validierung von Mmap, DiskANN, Quantisierung und Rebuild.
+// HOTSPOTS: 30-150
+// STAND: 2026-11-12
 
 use std::collections::HashSet;
 use std::f32;
