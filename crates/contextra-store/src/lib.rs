@@ -54,6 +54,8 @@ pub mod error;
 pub mod traits;
 pub mod compat;
 pub use error::{StoreError, StoreResult};
+pub mod budget;
+pub mod stats;
 
 #[cfg(not(loom))]
 pub mod compaction;

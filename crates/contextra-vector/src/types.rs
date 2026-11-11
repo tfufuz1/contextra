@@ -1,8 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Lokale Typ- und Traitabstraktionen für Vektorsuche und Indexierung (Klasse A).
 // INVARIANTEN: Zero-Panic, DocId-Breite konfigurierbar (64/128-Bit), deterministischer RNG.
-// HOTSPOTS: DocId::from_key, SeededRng, SystemClock
-// STAND: TS:2026-11-11T02:00:00Z
+// HOTSPOTS: types.rs:41-59 (ScoredDocument), types.rs:69-75 (Maintain)
+// STAND: 2026-11-11
 
 //! `types` — Lokale Typ- und Traitabstraktionen für Vektorsuche und Indexierung (Klasse A).
 //!
@@ -11,7 +11,6 @@
 //! zu `contextra-ports`, `contextra-types` oder `contextra-mvcc` funktioniert (SPEC v4.0 §4, B1–B4).
 //! Bei aktiviertem transitionalen Feature `ports-compat` stehen verlustfreie Konvertierungen
 //! zu den Workspace-Typen bereit.
-
 
 // SECTION Identifikatoren (DocId, TxId)
 
@@ -48,10 +47,16 @@ pub struct ScoredDocument {
 }
 
 impl ScoredDocument {
+    /// Erzeugt ein ScoredDocument mit abgeleiteter Distanz (`1.0 - score`).
     pub fn from_score(doc_id: DocId, score: f32) -> Self {
-        Self { doc_id, score, distance: 1.0 - score }
+        Self {
+            doc_id,
+            score,
+            distance: 1.0 - score,
+        }
     }
-    /// Erzeugt ein neues ScoredDocument.
+
+    /// Erzeugt ein neues ScoredDocument mit explizitem Score und Distanzwert.
     pub fn new(doc_id: DocId, score: f32, distance: f32) -> Self {
         Self {
             doc_id,
@@ -70,7 +75,9 @@ pub const TOMBSTONE_BIT: u64 = 1 << 63;
 
 // SECTION Umwelt-Abstraktionen (Clock, Rng, Metrics, Maintain)
 
-pub use contextra_env::{Clock, MetricsSink, NoopMetricsSink, Rng, SeededRng, SystemClock, unix_ms};
+pub use contextra_env::{
+    unix_ms, Clock, MetricsSink, NoopMetricsSink, Rng, SeededRng, SystemClock,
+};
 
 // ANCHOR[contextra-vector:TYPES-MAINTAIN]
 /// Neutraler Wartungs-Trait für Speicherfreigaben und Kompaktierung (SPEC §6.1).

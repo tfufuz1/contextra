@@ -1,17 +1,25 @@
 // FILE-CONTEXT
 // ZWECK: Vertragsdatei für contextra-vector (Eingefrorener Crate-Vertrag Klasse A).
 // INVARIANTEN: Zero-Panic, autarker Baustein ohne interne Workspace-Kopplung (SPEC §4.3).
-// HOTSPOTS: Index, Maintain, DistanceFn, BlockTransform
-// STAND: TS:2026-11-11T02:00:00Z
+// HOTSPOTS: contract.rs:90-95 (DistanceFn), contract.rs:97-110 (Index), contract.rs:112-123 (Maintain), contract.rs:125-132 (BlockTransform)
+// STAND: 2026-11-11
 
 //! Vertragsdatei für `contextra-vector` (Eingefrorener Crate-Vertrag Klasse A).
 //!
 //! Definiert die kanonischen Typen und Schnittstellen für die autarke Nutzung
 //! des Vektorindex-Bausteins gemäß SPEC §4.3 (B1–B4).
+//!
+//! # Kanonische Einordnung (SPEC §2, §4.3)
+//! - **Kanonische Kern-Umwelt:** `contextra-env` ([`crate::types::Clock`], [`crate::types::Rng`])
+//! - **Kanonische Kern-Identifikatoren:** `contextra-ids` ([`crate::types::DocId`], [`crate::types::TxId`])
+//! - **Kanonische Verträge Klasse A:** Die hier deklarierten Traits ([`Index`], [`Maintain`],
+//!   [`DistanceFn`], [`BlockTransform`]) sowie Hilfstypen ([`ExternalId`], [`Metric`], [`ScoredPoint`])
+//!   definieren den minimalen, portablen Vertrag für Einbettungsumgebungen ohne Workspace-Kopplung.
 
 // SECTION Vertragsfehler
 
 // ANCHOR[contextra-vector:CONTRACT-ERROR]
+/// Lokales Fehler-Enum für Vertragsoperationen.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
