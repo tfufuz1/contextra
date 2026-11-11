@@ -1,10 +1,10 @@
 //! Kompatibilitätsbrücke für `contextra-ports` und `StorageEngine` (SPEC §6.2 text, B04).
 // ANCHOR[contextra-text:COMPAT-001]
 
+use crate::contract::Epoch;
 use crate::storage::{BoxFuture, PostingStore};
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 
 impl<T: StorageEngine + ?Sized> PostingStore for T {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, crate::error::Result<Option<Bytes>>> {
@@ -25,49 +25,50 @@ impl<T: StorageEngine + ?Sized> PostingStore for T {
 
     fn put<'a>(
         &'a self,
-        tx: TxId,
+        tx: Epoch,
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, crate::error::Result<()>> {
         Box::pin(async move {
-            self.put(tx, key, value)
+            self.put(tx.into(), key, value)
                 .await
                 .map_err(crate::error::TextError::from)
         })
     }
 
-    fn delete<'a>(&'a self, tx: TxId, key: &'a [u8]) -> BoxFuture<'a, crate::error::Result<()>> {
+    fn delete<'a>(&'a self, tx: Epoch, key: &'a [u8]) -> BoxFuture<'a, crate::error::Result<()>> {
         Box::pin(async move {
-            self.delete(tx, key)
+            self.delete(tx.into(), key)
                 .await
                 .map_err(crate::error::TextError::from)
         })
     }
 
-    fn commit<'a>(&'a self, tx: TxId) -> BoxFuture<'a, crate::error::Result<()>> {
-        Box::pin(async move { self.commit(tx).await.map_err(crate::error::TextError::from) })
+    fn commit<'a>(&'a self, tx: Epoch) -> BoxFuture<'a, crate::error::Result<()>> {
+        Box::pin(async move { self.commit(tx.into()).await.map_err(crate::error::TextError::from) })
     }
 
-    fn rollback<'a>(&'a self, tx: TxId) -> BoxFuture<'a, crate::error::Result<()>> {
+    fn rollback<'a>(&'a self, tx: Epoch) -> BoxFuture<'a, crate::error::Result<()>> {
         Box::pin(async move {
-            self.rollback(tx)
+            self.rollback(tx.into())
                 .await
                 .map_err(crate::error::TextError::from)
         })
     }
 
-    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, crate::error::Result<()>> {
+    fn rollback_to_tx<'a>(&'a self, tx_id: Epoch) -> BoxFuture<'a, crate::error::Result<()>> {
         Box::pin(async move {
-            self.rollback_to_tx(tx_id)
+            self.rollback_to_tx(tx_id.into())
                 .await
                 .map_err(crate::error::TextError::from)
         })
     }
 
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, crate::error::Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, crate::error::Result<Epoch>> {
         Box::pin(async move {
             self.last_tx_id()
                 .await
+                .map(|tx| tx.into())
                 .map_err(crate::error::TextError::from)
         })
     }

@@ -35,5 +35,19 @@ impl From<u128> for DocKey {
         DocKey(val)
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Epoch(pub u64); // opake, monotone Sichtbarkeitsmarke; ersetzt TxId (Konvertierung nur im Adapter)
+
+impl From<u64> for Epoch {
+    #[inline]
+    fn from(val: u64) -> Self {
+        Epoch(val)
+    }
+}
+
+impl From<Epoch> for u64 {
+    #[inline]
+    fn from(e: Epoch) -> Self {
+        e.0
+    }
+}

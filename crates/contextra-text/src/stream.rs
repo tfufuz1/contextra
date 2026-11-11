@@ -15,7 +15,8 @@
 //! Trefferzahl (`MAX_SEARCH_K`) ermittelt werden.
 
 use crate::storage::PostingStore;
-use contextra_types::{DocId, Result, MAX_SEARCH_K};
+use crate::error::Result;
+use crate::types::{DocId, MAX_SEARCH_K};
 use std::collections::{BTreeSet, VecDeque};
 
 use crate::inverted::InvertedIndex;

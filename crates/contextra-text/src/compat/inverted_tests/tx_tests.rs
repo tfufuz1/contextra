@@ -7,7 +7,9 @@ use super::mock::MockStorage;
 use crate::inverted::{BM25MorphIndex, InvertedIndex, Language, TextIndexMetadata};
 use crate::tokenizer::{DefaultTokenizer, Tokenizer};
 use contextra_ports::{StorageEngine, TextIndex};
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_types::{ContextraError, TxId};
+use crate::types::DocId;
+use crate::error::TextError;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -15,7 +17,7 @@ use std::sync::Arc;
 // ANCHOR[contextra-text:TEST-120]
 // Testfall `test_staged_insert_not_visible_before_commit`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_staged_insert_not_visible_before_commit() -> Result<()> {
+async fn test_staged_insert_not_visible_before_commit() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "staged_test");
     let tx = TxId::new(1);
@@ -23,7 +25,7 @@ async fn test_staged_insert_not_visible_before_commit() -> Result<()> {
 
     let seq_before = storage.last_seq_no().await?;
 
-    index.upsert_document(tx, doc_id, "test content").await?;
+    index.upsert_document(tx.into(), doc_id, "test content").await?;
 
     // Before commit (with snapshot isolation at previous committed sequence), search returns empty
     let results_before = index.search_bm25_at("test", 10, Some(seq_before)).await?;
@@ -46,7 +48,7 @@ async fn test_staged_insert_not_visible_before_commit() -> Result<()> {
 // ANCHOR[contextra-text:TEST-121]
 // Testfall `test_inverted_index_rollback_cleans_up`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_inverted_index_rollback_cleans_up() -> Result<()> {
+async fn test_inverted_index_rollback_cleans_up() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "rollback_test");
 
@@ -54,7 +56,7 @@ async fn test_inverted_index_rollback_cleans_up() -> Result<()> {
     let doc_id = DocId::new(100);
 
     index
-        .insert(tx1, doc_id, "German morphological search engine")
+        .insert(tx1, doc_id.into(), "German morphological search engine")
         .await?;
     assert_eq!(index.search("morphological", 10).await?.len(), 1);
 
@@ -77,28 +79,28 @@ async fn test_inverted_index_rollback_cleans_up() -> Result<()> {
 // ANCHOR[contextra-text:TEST-122]
 // Testfall `test_text_search_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_text_search_snapshot_isolation() -> Result<()> {
+async fn test_text_search_snapshot_isolation() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "isolation");
 
     // 1. Initial State: Document 1
     let tx1 = TxId::new(1);
     let d1 = DocId::new(1);
-    index.upsert_document(tx1, d1, "rust programming").await?;
+    index.upsert_document(tx1.into(), d1, "rust programming").await?;
     storage.commit(tx1).await?;
     let seq1 = storage.last_seq_no().await?;
 
     // 2. Second State: Document 2 (should not be visible at seq1)
     let tx2 = TxId::new(2);
     let d2 = DocId::new(2);
-    index.upsert_document(tx2, d2, "rust compiler").await?;
+    index.upsert_document(tx2.into(), d2, "rust compiler").await?;
     storage.commit(tx2).await?;
 
     // 3. Verify Isolation
     // At seq1, only d1 should exist
     let results_at_seq1 = index.search_at("rust", 10, seq1).await?;
     assert_eq!(results_at_seq1.len(), 1);
-    assert_eq!(results_at_seq1[0].doc_id, d1);
+    assert_eq!(results_at_seq1[0].doc_id, d1.into());
 
     // At latest (None or higher seq), both should exist
     let results_latest = index.search("rust", 10).await?;
@@ -109,7 +111,7 @@ async fn test_text_search_snapshot_isolation() -> Result<()> {
 // ANCHOR[contextra-text:TEST-123]
 // Testfall `test_avgdl_accuracy_incremental_updates`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
+async fn test_avgdl_accuracy_incremental_updates() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "test_avgdl");
 
@@ -136,8 +138,8 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
         let tokens = DefaultTokenizer.tokenize(text);
         current_doc_lengths.insert(doc_id, tokens.len() as u64);
 
-        index.upsert_document(tx, doc_id, text).await?;
-        index.commit_stats(tx).await?;
+        index.upsert_document(tx.into(), doc_id, text).await?;
+        index.commit_stats(tx.into()).await?;
         storage.commit(tx).await?;
     }
 
@@ -149,8 +151,8 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
         let tx = TxId::new(100 + i as u64);
         current_doc_lengths.remove(&doc_id);
 
-        index.delete_document(tx, doc_id).await?;
-        index.commit_stats(tx).await?;
+        index.delete_document(tx.into(), doc_id).await?;
+        index.commit_stats(tx.into()).await?;
         storage.commit(tx).await?;
     }
 
@@ -171,8 +173,8 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
         let tokens = DefaultTokenizer.tokenize(text);
         current_doc_lengths.insert(doc_id, tokens.len() as u64);
 
-        index.upsert_document(tx, doc_id, text).await?;
-        index.commit_stats(tx).await?;
+        index.upsert_document(tx.into(), doc_id, text).await?;
+        index.commit_stats(tx.into()).await?;
         storage.commit(tx).await?;
     }
 
@@ -203,7 +205,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
 // ANCHOR[contextra-text:TEST-124]
 // Testfall `test_idf_recalculation_with_rare_term_after_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_idf_recalculation_with_rare_term_after_delete() -> Result<()> {
+async fn test_idf_recalculation_with_rare_term_after_delete() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "idf_rare_test");
 
@@ -212,10 +214,10 @@ async fn test_idf_recalculation_with_rare_term_after_delete() -> Result<()> {
     let tx = TxId::new(1);
     let d1 = DocId::new(1);
     let d2 = DocId::new(2);
-    index.insert(tx, d1, "common rare").await?;
-    index.insert(tx, d2, "common rare").await?;
+    index.insert(tx, d1.into(), "common rare").await?;
+    index.insert(tx, d2.into(), "common rare").await?;
     for i in 3..=10 {
-        index.insert(tx, DocId::new(i), "common filler").await?;
+        index.insert(tx, DocId::new(i).into(), "common filler").await?;
     }
     index.commit(tx).await?;
 
@@ -224,20 +226,20 @@ async fn test_idf_recalculation_with_rare_term_after_delete() -> Result<()> {
     let score_before = search_before
         .iter()
         .find(|(id, _)| *id == d2)
-        .ok_or_else(|| ContextraError::InvalidInput("d2 not found in search_before".into()))?
+        .ok_or_else(|| TextError::InvalidInput("d2 not found in search_before".into()))?
         .1;
 
     // Delete d1 -> N=9, df=1 for "rare"
     let tx_del = TxId::new(2);
-    index.delete(tx_del, d1).await?;
-    index.commit(tx_del).await?;
+    index.delete(tx_del, d1.into()).await?;
+    index.commit(tx_del.into()).await?;
 
     // Score for "rare" in d2 when N=9, df=1
     let search_after = index.search_bm25("rare", 10, None).await?;
     let score_after = search_after
         .iter()
         .find(|(id, _)| *id == d2)
-        .ok_or_else(|| ContextraError::InvalidInput("d2 not found in search_after".into()))?
+        .ok_or_else(|| TextError::InvalidInput("d2 not found in search_after".into()))?
         .1;
 
     // With N=10, df=2: idf_arg = (10 - 2 + 0.5)/(2 + 0.5) = 8.5 / 2.5 = 3.4 -> ln(3.4) ~= 1.2237
@@ -256,28 +258,28 @@ async fn test_idf_recalculation_with_rare_term_after_delete() -> Result<()> {
 // ANCHOR[contextra-text:TEST-125]
 // Testfall `test_text_index_search_at_snapshot_isolation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_text_index_search_at_snapshot_isolation() -> Result<()> {
+async fn test_text_index_search_at_snapshot_isolation() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "text_search_at_test");
 
     // tx1: insert doc 1 "hello world"
     let tx1 = TxId::new(1);
     let doc1 = DocId::new(1);
-    index.insert(tx1, doc1, "hello world").await?;
+    index.insert(tx1, doc1.into(), "hello world").await?;
     index.commit(tx1).await?;
     let seq1 = storage.last_seq_no().await?;
 
     // tx2: insert doc 2 "hello rust"
     let tx2 = TxId::new(2);
     let doc2 = DocId::new(2);
-    index.insert(tx2, doc2, "hello rust").await?;
+    index.insert(tx2, doc2.into(), "hello rust").await?;
     index.commit(tx2).await?;
     let seq2 = storage.last_seq_no().await?;
 
     // search_at seq1: should return doc1, but NOT doc2
     let res_seq1 = index.search_at("hello", 10, seq1).await?;
     assert_eq!(res_seq1.len(), 1);
-    assert_eq!(res_seq1[0].doc_id, doc1);
+    assert_eq!(res_seq1[0].doc_id, doc1.into());
 
     // search_at seq2: should return doc1 and doc2
     let res_seq2 = index.search_at("hello", 10, seq2).await?;
@@ -289,7 +291,7 @@ async fn test_text_index_search_at_snapshot_isolation() -> Result<()> {
 // ANCHOR[contextra-text:TEST-126]
 // Testfall `test_upsert_document_oversized_text_returns_error`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_upsert_document_oversized_text_returns_error() -> Result<()> {
+async fn test_upsert_document_oversized_text_returns_error() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "oversized_test");
     let tx = TxId::new(1);
@@ -298,15 +300,15 @@ async fn test_upsert_document_oversized_text_returns_error() -> Result<()> {
     // Construct oversized string (> 10 MiB)
     let oversized = "a".repeat(InvertedIndex::<MockStorage>::MAX_TEXT_BYTES + 1);
     let err = index
-        .upsert_document(tx, doc_id, &oversized)
+        .upsert_document(tx.into(), doc_id, &oversized)
         .await
         .unwrap_err();
 
     match err {
-        ContextraError::InvalidInput(msg) => {
+        TextError::InvalidInput(msg) => {
             assert!(msg.contains("exceeds maximum allowed size"));
         }
-        _ => panic!("Expected ContextraError::InvalidInput, got {:?}", err),
+        _ => panic!("Expected TextError::InvalidInput, got {:?}", err),
     }
 
     Ok(())
@@ -350,7 +352,7 @@ fn test_language_from_iso_case_iso_codes_and_fallback() {
 // ANCHOR[contextra-text:TEST-129]
 // Testfall `test_bm25_morph_index_case_full_lifecycle`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_bm25_morph_index_case_full_lifecycle() -> Result<()> {
+async fn test_bm25_morph_index_case_full_lifecycle() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let morph_index = BM25MorphIndex::new(
         storage,
@@ -363,19 +365,19 @@ async fn test_bm25_morph_index_case_full_lifecycle() -> Result<()> {
     let tx = TxId::new(1);
     let doc_id = DocId::new(10);
     morph_index
-        .insert(tx, doc_id, "test morphological index")
+        .insert(tx, doc_id.into(), "test morphological index")
         .await?;
     morph_index.commit(tx).await?;
 
     assert_eq!(morph_index.len().await, 1);
     let results = morph_index.search("morphological", 5).await?;
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].doc_id, doc_id);
+    assert_eq!(results[0].doc_id, doc_id.into());
 
     let stats = morph_index.stats().await?;
     assert_eq!(stats.num_documents, 1);
 
-    morph_index.delete(tx, doc_id).await?;
+    morph_index.delete(tx, doc_id.into()).await?;
     morph_index.commit(tx).await?;
     assert_eq!(morph_index.len().await, 0);
 
@@ -389,7 +391,7 @@ async fn test_bm25_morph_index_case_full_lifecycle() -> Result<()> {
 // ANCHOR[contextra-text:TEST-130]
 // Testfall `test_inverted_index_case_empty_and_unicode_inputs`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
+async fn test_inverted_index_case_empty_and_unicode_inputs() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let mut index = InvertedIndex::new(storage, "edge_ns");
     index = index.with_tokenizer(Arc::new(crate::tokenizer::DefaultTokenizer));
@@ -398,14 +400,14 @@ async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
     let doc_id = DocId::new(5);
 
     // Insert empty string (doc is registered in doc_count, but 0 tokens indexed)
-    index.insert(tx, doc_id, "").await?;
+    index.insert(tx, doc_id.into(), "").await?;
     index.commit(tx).await?;
     assert_eq!(index.len().await, 1);
 
     let doc_id2 = DocId::new(6);
     // Insert unicode text
     index
-        .insert(tx, doc_id2, "Ärger über Ölpreise in Düsseldorf")
+        .insert(tx, doc_id2.into(), "Ärger über Ölpreise in Düsseldorf")
         .await?;
     index.commit(tx).await?;
     assert_eq!(index.len().await, 2);
@@ -421,7 +423,7 @@ async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
     // Search unicode query
     let unicode_res = index.search("ölpreise", 10).await?;
     assert_eq!(unicode_res.len(), 1);
-    assert_eq!(unicode_res[0].doc_id, doc_id2);
+    assert_eq!(unicode_res[0].doc_id, doc_id2.into());
 
     // Search oversized query returns error
     let oversized_q = "q".repeat(InvertedIndex::<MockStorage>::MAX_TEXT_BYTES + 1);
@@ -434,7 +436,7 @@ async fn test_inverted_index_case_empty_and_unicode_inputs() -> Result<()> {
 // ANCHOR[contextra-text:TEST-131]
 // Testfall `test_staged_stats_limit_exceeded`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_staged_stats_limit_exceeded() -> Result<()> {
+async fn test_staged_stats_limit_exceeded() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage, "limit_ns");
 
@@ -442,17 +444,17 @@ async fn test_staged_stats_limit_exceeded() -> Result<()> {
     for i in 1..=InvertedIndex::<MockStorage>::MAX_STAGED_TRANSACTIONS {
         let tx = TxId::new(i as u64);
         let doc_id = DocId::new(i as u64);
-        index.upsert_document(tx, doc_id, "test document").await?;
+        index.upsert_document(tx.into(), doc_id, "test document").await?;
     }
 
     // The (MAX_STAGED_TRANSACTIONS + 1)-th transaction should fail with InvalidInput
     let overflow_tx = TxId::new((InvertedIndex::<MockStorage>::MAX_STAGED_TRANSACTIONS + 1) as u64);
     let overflow_doc = DocId::new(999_999);
     let err = index
-        .upsert_document(overflow_tx, overflow_doc, "overflow text")
+        .upsert_document(overflow_tx.into(), overflow_doc, "overflow text")
         .await
         .unwrap_err(); // unwrap allowed
-    assert!(matches!(err, ContextraError::InvalidInput(_)));
+    assert!(matches!(err, TextError::InvalidInput(_)));
 
     Ok(())
 }
@@ -460,13 +462,13 @@ async fn test_staged_stats_limit_exceeded() -> Result<()> {
 // ANCHOR[contextra-text:TEST-132]
 // Testfall `test_load_stats_persistence`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_load_stats_persistence() -> Result<()> {
+async fn test_load_stats_persistence() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index1 = InvertedIndex::new(storage.clone(), "persisted_stats");
 
     let tx = TxId::new(1);
     index1
-        .upsert_document(tx, DocId::new(1), "rust memory safe search engine")
+        .upsert_document(tx.into(), DocId::new(1), "rust memory safe search engine")
         .await?;
     index1.commit(tx).await?;
 
@@ -487,14 +489,14 @@ async fn test_load_stats_persistence() -> Result<()> {
 // ANCHOR[contextra-text:TEST-133]
 // Testfall `test_inverted_index_clone_sharing`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_inverted_index_clone_sharing() -> Result<()> {
+async fn test_inverted_index_clone_sharing() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index1 = InvertedIndex::new(storage, "clone_sharing");
     let index2 = index1.clone();
 
     let tx = TxId::new(1);
     index1
-        .upsert_document(tx, DocId::new(10), "cloned index sharing atomic state")
+        .upsert_document(tx.into(), DocId::new(10), "cloned index sharing atomic state")
         .await?;
     index1.commit(tx).await?;
 
@@ -504,7 +506,7 @@ async fn test_inverted_index_clone_sharing() -> Result<()> {
 
     let results = index2.search("sharing", 10).await?;
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].doc_id, DocId::new(10));
+    assert_eq!(results[0].doc_id, DocId::new(10).into());
 
     Ok(())
 }

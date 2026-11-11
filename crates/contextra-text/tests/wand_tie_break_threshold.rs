@@ -147,7 +147,7 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     let doc_ids = [10u64, 20, 30, 40, 50, 60];
     for &id_val in &doc_ids {
         index
-            .upsert_document(tx, DocId::new(id_val), "alpha beta gamma delta")
+            .upsert_document(tx.into(), contextra_text::types::DocId::new(id_val), "alpha beta gamma delta")
             .await?;
     }
     index.commit(tx).await?;
@@ -201,7 +201,7 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
             );
             assert!(
                 doc_id.inner() <= 30,
-                "DocId {} exceeds boundary threshold DocId 30",
+                "DocId {:?} exceeds boundary threshold DocId 30",
                 doc_id
             );
         }
@@ -225,19 +225,19 @@ async fn test_wand_tie_break_heterogeneous_scores_threshold_boundary() -> Result
     // Doc 30: "alpha beta" (medium score - ties with Doc 10 and 20)
     // Doc 40: "alpha beta" (medium score - ties with Doc 10, 20, 30)
     index
-        .upsert_document(tx, DocId::new(5), "alpha alpha alpha beta")
+        .upsert_document(tx.into(), contextra_text::types::DocId::new(5), "alpha alpha alpha beta")
         .await?;
     index
-        .upsert_document(tx, DocId::new(10), "alpha beta")
+        .upsert_document(tx.into(), contextra_text::types::DocId::new(10), "alpha beta")
         .await?;
     index
-        .upsert_document(tx, DocId::new(20), "alpha beta")
+        .upsert_document(tx.into(), contextra_text::types::DocId::new(20), "alpha beta")
         .await?;
     index
-        .upsert_document(tx, DocId::new(30), "alpha beta")
+        .upsert_document(tx.into(), contextra_text::types::DocId::new(30), "alpha beta")
         .await?;
     index
-        .upsert_document(tx, DocId::new(40), "alpha beta")
+        .upsert_document(tx.into(), contextra_text::types::DocId::new(40), "alpha beta")
         .await?;
 
     index.commit(tx).await?;

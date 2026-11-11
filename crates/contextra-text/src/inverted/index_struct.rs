@@ -6,8 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::storage::PostingStore;
-use contextra_ports::{TextIndex, TextIndexStats};
-use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
+use crate::error::{Result, TextError};
+use crate::types::{DocId, MAX_SEARCH_K};
+use crate::contract::Epoch as TxId;
 // ANCHOR[contextra-text:INV-008]
 /// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
 ///
@@ -123,7 +124,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         let meta_key = self.key("meta:stats");
         if let Some(bytes) = self.storage.get(&meta_key).await? {
             let meta: TextIndexMetadata = bincode::deserialize(&bytes)
-                .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
+                .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
             self.total_docs.store(meta.total_docs, Ordering::SeqCst);
             self.total_tokens.store(meta.total_tokens, Ordering::SeqCst);
             self.avg_doc_len_x1000
@@ -214,13 +215,13 @@ impl<S: PostingStore> InvertedIndex<S> {
                         let doc_id = DocId::new(doc_id_raw as _);
                         let tf =
                             u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
-                                ContextraError::Storage("Invalid posting tf length".into())
+                                TextError::Storage("Invalid posting tf length".into())
                             })?);
                         let dl_key = self.key_with_id("dl:", doc_id.inner());
                         let doc_len = match self.storage.get(&dl_key).await? {
                             Some(dl_bytes) if dl_bytes.len() == 4 => {
                                 u32::from_le_bytes((&dl_bytes[..]).try_into().map_err(|_| {
-                                    ContextraError::Storage("Invalid doc_len length".into())
+                                    TextError::Storage("Invalid doc_len length".into())
                                 })?)
                             }
                             _ => 0,
@@ -271,7 +272,7 @@ impl<S: PostingStore> InvertedIndex<S> {
     #[tracing::instrument(skip(self, text))]
     pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {
         if text.len() > Self::MAX_TEXT_BYTES {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(TextError::InvalidInput(format!(
                 "Text length {} exceeds maximum allowed size {}",
                 text.len(),
                 Self::MAX_TEXT_BYTES
@@ -296,13 +297,13 @@ impl<S: PostingStore> InvertedIndex<S> {
                 old_len = u32::from_le_bytes(
                     (&bytes[..])
                         .try_into()
-                        .map_err(|_| ContextraError::Storage("Invalid doc_len length".into()))?,
+                        .map_err(|_| TextError::Storage("Invalid doc_len length".into()))?,
                 );
                 is_update = true;
 
                 if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
                     let old_terms: Vec<String> = bincode::deserialize(&fw_bytes)
-                        .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
+                        .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
                     for term in old_terms {
                         if !tfs.contains_key(&term) {
                             let tbs_key = self.key_tombstone(doc_id, &term);
@@ -322,7 +323,7 @@ impl<S: PostingStore> InvertedIndex<S> {
 
         let unique_terms: Vec<&str> = tfs_vec.iter().map(|(k, _)| k.as_str()).collect();
         let fw_bytes = bincode::serialize(&unique_terms)
-            .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
+            .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
         self.storage.put(tx, &fw_key, &fw_bytes).await?;
 
         // Stage stats changes (Option B: Atomics as Source of Truth, no direct read-modify-write)
@@ -432,7 +433,7 @@ impl<S: PostingStore> InvertedIndex<S> {
             let is_live = if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
                 let live_terms: Vec<String> = bincode::deserialize::<Vec<String>>(&fw_bytes)
                     .map_err(|e| {
-                        ContextraError::Storage(format!(
+                        TextError::Storage(format!(
                             "forward-index corrupt for doc {}: {}",
                             doc_id.inner(),
                             e
@@ -477,7 +478,7 @@ impl<S: PostingStore> InvertedIndex<S> {
                 doc_len = u32::from_le_bytes(
                     (&bytes[..])
                         .try_into()
-                        .map_err(|_| ContextraError::Storage("Invalid doc_len length".into()))?,
+                        .map_err(|_| TextError::Storage("Invalid doc_len length".into()))?,
                 );
             }
         } else {
@@ -524,7 +525,7 @@ impl<S: PostingStore> InvertedIndex<S> {
     fn stage_stats_change(&self, tx: TxId, change: StagedStatsChange) -> Result<()> {
         let mut guard = self.staged_stats.lock();
         if guard.len() >= Self::MAX_STAGED_TRANSACTIONS && !guard.contains_key(&tx) {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(TextError::InvalidInput(format!(
                 "Staged stats limit ({}) exceeded for uncommitted transactions",
                 Self::MAX_STAGED_TRANSACTIONS
             )));
@@ -537,7 +538,7 @@ impl<S: PostingStore> InvertedIndex<S> {
 
     // ANCHOR[contextra-text:INV-018]
     /// Überträgt die gepufferten statistischen Änderungen einer Transaktion dauerhaft.
-    pub(crate) async fn commit_stats(&self, tx: TxId) -> Result<()> {
+    pub async fn commit_stats(&self, tx: TxId) -> Result<()> {
         let change = {
             let mut guard = self.staged_stats.lock();
             guard.remove(&tx).unwrap_or_default()
@@ -587,7 +588,7 @@ impl<S: PostingStore> InvertedIndex<S> {
                 avg_doc_len_x1000: avg_len,
             };
             bincode::serialize(&meta)
-                .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?
+                .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?
         };
         let meta_key = self.key("meta:stats");
 
@@ -599,7 +600,7 @@ impl<S: PostingStore> InvertedIndex<S> {
 
     // ANCHOR[contextra-text:INV-019]
     /// Verwirft die gepufferten statistischen Änderungen einer Transaktion bei Rollback.
-    pub(crate) async fn rollback_stats(&self, tx: TxId) -> Result<()> {
+    pub async fn rollback_stats(&self, tx: TxId) -> Result<()> {
         let mut guard = self.staged_stats.lock();
         guard.remove(&tx);
         self.resident_index.clear();
@@ -634,7 +635,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         let k = k.min(MAX_SEARCH_K);
 
         if query.len() > Self::MAX_TEXT_BYTES {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(TextError::InvalidInput(format!(
                 "Query length {} exceeds maximum allowed size {}",
                 query.len(),
                 Self::MAX_TEXT_BYTES
@@ -673,70 +674,3 @@ impl<S: PostingStore> InvertedIndex<S> {
     }
 }
 
-impl<S: PostingStore + 'static> TextIndex for InvertedIndex<S> {
-    async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
-        let results = self.search_bm25(query, k, None).await?;
-        Ok(results
-            .into_iter()
-            .map(|(doc_id, score)| ScoredDocument { doc_id, score })
-            .collect())
-    }
-
-    /// Searches the inverted index at a specific MVCC sequence number snapshot.
-    ///
-    /// Snapshot isolation is preserved by delegating to `search_bm25_at()`, which uses
-    /// `scan_prefix_at()` and `get_at_seq()` on the underlying `StorageEngine`.
-    async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
-        let results = self.search_bm25(query, k, Some(seq_no)).await?;
-        Ok(results
-            .into_iter()
-            .map(|(doc_id, score)| ScoredDocument { doc_id, score })
-            .collect())
-    }
-
-    async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
-        self.upsert_document(tx, id, text).await
-    }
-
-    async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
-        self.delete_document(tx, id).await
-    }
-
-    async fn commit(&self, tx: TxId) -> Result<()> {
-        self.commit_stats(tx).await?;
-        self.storage.commit(tx).await.map_err(Into::into)
-    }
-
-    async fn rollback(&self, tx: TxId) -> Result<()> {
-        self.rollback_stats(tx).await?;
-        self.storage.rollback(tx).await.map_err(Into::into)
-    }
-
-    async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
-        self.storage.rollback_to_tx(tx_id).await.map_err(Into::into)
-    }
-
-    async fn last_tx_id(&self) -> Result<TxId> {
-        self.storage.last_tx_id().await.map_err(Into::into)
-    }
-
-    async fn len(&self) -> usize {
-        self.total_docs.load(Ordering::Acquire) as usize
-    }
-
-    async fn stats(&self) -> Result<TextIndexStats> {
-        let meta_key = self.key("meta:stats");
-        let meta = if let Some(bytes) = self.storage.get(&meta_key).await? {
-            bincode::deserialize::<TextIndexMetadata>(&bytes)
-                .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?
-        } else {
-            TextIndexMetadata::default()
-        };
-
-        Ok(TextIndexStats {
-            num_documents: meta.total_docs as usize,
-            num_tokens: meta.total_tokens as usize,
-            memory_usage_bytes: 0,
-        })
-    }
-}

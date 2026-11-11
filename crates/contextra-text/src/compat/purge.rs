@@ -294,7 +294,7 @@ impl<S: StorageEngine + 'static> TextPurger<S> {
             };
 
             let updated_plist = match plist_opt {
-                Some(plist) => plist.remove(doc_id),
+                Some(plist) => plist.remove(doc_id.into()),
                 None => PostingList::empty(),
             };
 
@@ -317,7 +317,7 @@ impl<S: StorageEngine + 'static> TextPurger<S> {
                 }
                 self.index
                     .resident_index
-                    .remove_posting_from_terms(std::slice::from_ref(term), doc_id);
+                    .remove_posting_from_terms(std::slice::from_ref(term), doc_id.into());
                 self.index
                     .resident_index
                     .remove_terms(std::slice::from_ref(term));
@@ -352,8 +352,8 @@ impl<S: StorageEngine + 'static> TextPurger<S> {
             }
 
             // Delete individual posting key `pl:{term}:{doc_id}` and tombstone key `tbs:{doc_id}:{term}`
-            let pl_doc_key = self.index.key_with_term_doc(term, doc_id);
-            let tbs_key = self.index.key_tombstone(doc_id, term);
+            let pl_doc_key = self.index.key_with_term_doc(term, doc_id.into());
+            let tbs_key = self.index.key_tombstone(doc_id.into(), term);
             let storage = self.index.storage().clone();
             if let Err(e) = block_on_async(async move {
                 let _ = storage.delete(tx, &pl_doc_key).await;

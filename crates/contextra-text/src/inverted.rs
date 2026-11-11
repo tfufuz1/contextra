@@ -9,19 +9,21 @@
 //! LSM-backed Inverted Index.
 
 mod index_struct;
-// MIGRATION(S-70): morph_index moved to compat/
+#[cfg(feature = "workspace")]
 pub use crate::compat::morph_index;
-// MIGRATION(S-70): purge moved to compat/
+#[cfg(feature = "workspace")]
 pub use crate::compat::purge;
-// MIGRATION(S-70): scanner moved to compat/
+#[cfg(feature = "workspace")]
 pub use crate::compat::scanner;
 pub(crate) mod types;
 
-#[cfg(test)]
-mod tests;
+// Tests moved to compat/inverted_tests.rs
 
 pub use index_struct::InvertedIndex;
+#[cfg(feature = "workspace")]
 pub use morph_index::BM25MorphIndex;
+#[cfg(feature = "workspace")]
 pub use purge::{text_purger, PurgeReport, TextPurger};
+#[cfg(feature = "workspace")]
 pub use scanner::{text_scanner, ParsedTextTarget, TextScanner};
 pub use types::{Language, TextIndexMetadata};

@@ -14,21 +14,21 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat"]
+default = ["std", "workspace"]
 std = []
 serde = []
 tracing = []
 inspect = []
 experimental = []
-workspace = ["types-compat"]
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-ports-compat = ["types-compat"]
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
 bm25f = []
 docid-128 = []
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
+contextra-types = { version = "0.1.0", path = "../contextra-types", optional = true }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports", optional = true }
 bytes = { workspace = true }
 itoa = "1.0"
 regex = "1.10"
@@ -43,6 +43,9 @@ blake3 = { workspace = true }
 futures = "0.3"
 
 [dev-dependencies]
+contextra-types = { version = "0.1.0", path = "../contextra-types" }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
+contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
 tokio = { workspace = true, features = ["test-util", "macros"] }
 tempfile = { workspace = true }
 proptest = "1.4"

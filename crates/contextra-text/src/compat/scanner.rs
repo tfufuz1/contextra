@@ -140,7 +140,7 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         let scratch_c = scratch_index_arc.clone();
         block_on_async(async move {
             scratch_c
-                .upsert_document(tx, canary_doc_id, "canary_positive_control_term")
+                .upsert_document(tx.into(), canary_doc_id.into(), "canary_positive_control_term")
                 .await?;
             scratch_c.commit(tx).await
         })?;
@@ -160,7 +160,7 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
             }
             if k.starts_with(&scratch_index_arc.key("plb:")) {
                 if let Ok(plist) = PostingList::decode_compact(v) {
-                    if plist.as_slice().iter().any(|p| p.doc_id() == canary_doc_id) {
+                    if plist.as_slice().iter().any(|p| p.doc_id() == canary_doc_id.into()) {
                         found_canary = true;
                         break;
                     }
@@ -237,7 +237,7 @@ impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
                         is_residual = true;
                     } else if k.starts_with(&self.index.key("plb:")) {
                         if let Ok(plist) = PostingList::decode_compact(v) {
-                            if plist.as_slice().iter().any(|p| p.doc_id() == target_doc_id) {
+                            if plist.as_slice().iter().any(|p| p.doc_id() == target_doc_id.into()) {
                                 is_residual = true;
                             }
                         }
@@ -254,7 +254,7 @@ impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
                         let term_bytes = &k[plb_prefix.len()..];
                         if let Ok(term) = std::str::from_utf8(term_bytes) {
                             if let Some(plist) = resident.get(term) {
-                                if plist.as_slice().iter().any(|p| p.doc_id() == target_doc_id) {
+                                if plist.as_slice().iter().any(|p| p.doc_id() == target_doc_id.into()) {
                                     let mut hasher = blake3::Hasher::new();
                                     hasher.update(b"resident:");
                                     hasher.update(term.as_bytes());

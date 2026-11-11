@@ -6,7 +6,9 @@
 use super::mock::MockStorage;
 use crate::inverted::{InvertedIndex, Language, TextIndexMetadata};
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_types::TxId;
+use crate::types::DocId;
+use crate::error::TextError;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -38,10 +40,10 @@ async fn test_wand_exact_threshold_tie_break_determinism(
         let doc_id = DocId::new(id_val as u128);
 
         index
-            .upsert_document(tx, doc_id, "apple banana cherry")
+            .upsert_document(tx.into(), doc_id, "apple banana cherry")
             .await?;
     }
-    index.commit_stats(tx).await?;
+    index.commit_stats(tx.into()).await?;
     storage.commit(tx).await?;
 
     // Request Top-3 results (k = 3).
@@ -96,25 +98,25 @@ async fn test_bm25_ranks_exact_keyword_higher(
     let tx1 = TxId::new(1);
     let d1 = DocId::new(1);
     index
-        .upsert_document(tx1, d1, "Rust is a fast programming language for systems.")
+        .upsert_document(tx1.into(), d1, "Rust is a fast programming language for systems.")
         .await?;
-    index.commit_stats(tx1).await?;
+    index.commit_stats(tx1.into()).await?;
     storage.commit(tx1).await?;
 
     let tx2 = TxId::new(2);
     let d2 = DocId::new(2);
     index
-        .upsert_document(tx2, d2, "I like rust programming and rust ownership rules.")
+        .upsert_document(tx2.into(), d2, "I like rust programming and rust ownership rules.")
         .await?;
-    index.commit_stats(tx2).await?;
+    index.commit_stats(tx2.into()).await?;
     storage.commit(tx2).await?;
 
     let tx3 = TxId::new(3);
     let d3 = DocId::new(3);
     index
-        .upsert_document(tx3, d3, "Python is dynamically typed.")
+        .upsert_document(tx3.into(), d3, "Python is dynamically typed.")
         .await?;
-    index.commit_stats(tx3).await?;
+    index.commit_stats(tx3.into()).await?;
     storage.commit(tx3).await?;
 
     let results = index.search_bm25("rust programming", 3, None).await?;
@@ -147,14 +149,14 @@ async fn test_stats_consistency() -> std::result::Result<(), Box<dyn std::error:
 
     let tx1 = TxId::new(1);
     let d1 = DocId::new(1);
-    index.upsert_document(tx1, d1, "one two three").await?;
-    index.commit_stats(tx1).await?;
+    index.upsert_document(tx1.into(), d1, "one two three").await?;
+    index.commit_stats(tx1.into()).await?;
     storage.commit(tx1).await?;
 
     let tx2 = TxId::new(2);
     let d2 = DocId::new(2);
-    index.upsert_document(tx2, d2, "four five").await?;
-    index.commit_stats(tx2).await?;
+    index.upsert_document(tx2.into(), d2, "four five").await?;
+    index.commit_stats(tx2.into()).await?;
     storage.commit(tx2).await?;
 
     // total_docs = 2, total_tokens = 5
@@ -170,8 +172,8 @@ async fn test_stats_consistency() -> std::result::Result<(), Box<dyn std::error:
 
     // Update d1
     let tx3 = TxId::new(3);
-    index.upsert_document(tx3, d1, "one").await?;
-    index.commit_stats(tx3).await?;
+    index.upsert_document(tx3.into(), d1, "one").await?;
+    index.commit_stats(tx3.into()).await?;
     storage.commit(tx3).await?;
 
     // total_docs = 2, total_tokens = 3 (5 - 3 + 1)
@@ -185,8 +187,8 @@ async fn test_stats_consistency() -> std::result::Result<(), Box<dyn std::error:
 
     // Delete d2
     let tx4 = TxId::new(4);
-    index.delete_document(tx4, d2).await?;
-    index.commit_stats(tx4).await?;
+    index.delete_document(tx4.into(), d2).await?;
+    index.commit_stats(tx4.into()).await?;
     storage.commit(tx4).await?;
 
     // total_docs = 1, total_tokens = 1
@@ -209,7 +211,7 @@ async fn test_forward_index_consistency() -> std::result::Result<(), Box<dyn std
 
     let tx1 = TxId::new(1);
     let d1 = DocId::new(1);
-    index.upsert_document(tx1, d1, "rust programming").await?;
+    index.upsert_document(tx1.into(), d1, "rust programming").await?;
     storage.commit(tx1).await?;
 
     // Should be in "rust" and "programming"
@@ -218,14 +220,14 @@ async fn test_forward_index_consistency() -> std::result::Result<(), Box<dyn std
 
     // Update d1 to something else
     let tx2 = TxId::new(2);
-    index.upsert_document(tx2, d1, "python coding").await?;
+    index.upsert_document(tx2.into(), d1, "python coding").await?;
     storage.commit(tx2).await?;
 
     // Tombstone path: new pl: entries for "python"/"coding" overwrite the
     // old ones immediately via LSM semantics.  Stale entries for "rust"/
     // "programming" are removed AFTER resolve_tombstones().
     let tx_resolve = TxId::new(10);
-    index.resolve_tombstones(tx_resolve).await?;
+    index.resolve_tombstones(tx_resolve.into()).await?;
     storage.commit(tx_resolve).await?;
 
     // Should NOT be in "rust" or "programming" anymore (resolved)
@@ -237,7 +239,7 @@ async fn test_forward_index_consistency() -> std::result::Result<(), Box<dyn std
 
     // Delete d1
     let tx3 = TxId::new(3);
-    index.delete_document(tx3, d1).await?;
+    index.delete_document(tx3.into(), d1).await?;
     storage.commit(tx3).await?;
 
     assert_eq!(index.search_bm25("python", 10, None).await?.len(), 0);
@@ -247,7 +249,7 @@ async fn test_forward_index_consistency() -> std::result::Result<(), Box<dyn std
 // ANCHOR[contextra-text:TEST-105]
 // Testfall `test_text_index_trait_implementation`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_text_index_trait_implementation() -> Result<()> {
+async fn test_text_index_trait_implementation() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = Arc::new(InvertedIndex::new(storage.clone(), "trait_test"));
 
@@ -255,14 +257,14 @@ async fn test_text_index_trait_implementation() -> Result<()> {
     let doc_id = DocId::new(100);
 
     index
-        .insert(tx, doc_id, "Testing the TextIndex trait.")
+        .insert(tx, doc_id.into(), "Testing the TextIndex trait.")
         .await?;
     index.commit(tx).await?;
 
     // Verify search
     let results = index.search("testing", 10).await?;
     assert_eq!(results.len(), 1);
-    assert_eq!(results[0].doc_id, doc_id);
+    assert_eq!(results[0].doc_id, doc_id.into());
 
     // Verify stats
     let stats = index.stats().await?;
@@ -271,8 +273,8 @@ async fn test_text_index_trait_implementation() -> Result<()> {
 
     // Verify delete
     let tx2 = TxId::new(101);
-    index.delete(tx2, doc_id).await?;
-    index.commit(tx2).await?;
+    index.delete(tx2, doc_id.into()).await?;
+    index.commit(tx2.into()).await?;
 
     let results_after = index.search("testing", 10).await?;
     assert_eq!(results_after.len(), 0);
@@ -286,7 +288,7 @@ async fn test_text_index_trait_implementation() -> Result<()> {
 // ANCHOR[contextra-text:TEST-106]
 // Testfall `test_bm25_stability_edge_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_bm25_stability_edge_cases() -> Result<()> {
+async fn test_bm25_stability_edge_cases() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "stability");
 
@@ -300,7 +302,7 @@ async fn test_bm25_stability_edge_cases() -> Result<()> {
     let d1 = DocId::new(1);
     // If tokenizer filters everything, upsert might return error or do nothing?
     // Let's assume some tokens remain but we manually corrupt or use empty.
-    index.upsert_document(tx, d1, "").await?;
+    index.upsert_document(tx.into(), d1, "").await?;
     storage.commit(tx).await?;
 
     let results = index.search_bm25("anything", 10, None).await?;
@@ -308,9 +310,9 @@ async fn test_bm25_stability_edge_cases() -> Result<()> {
 
     // Case 3: Mixed documents, some very short
     let tx2 = TxId::new(2);
-    index.upsert_document(tx2, DocId::new(2), "test").await?;
+    index.upsert_document(tx2.into(), DocId::new(2), "test").await?;
     index
-        .upsert_document(tx2, DocId::new(3), "test test test")
+        .upsert_document(tx2.into(), DocId::new(3), "test test test")
         .await?;
     storage.commit(tx2).await?;
 
@@ -357,16 +359,16 @@ fn test_language_default_is_english() {
 // ANCHOR[contextra-text:TEST-109]
 // Testfall `test_new_with_language_german_tokenizes_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_new_with_language_german_tokenizes_compounds() -> Result<()> {
+async fn test_new_with_language_german_tokenizes_compounds() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new_with_language(storage.clone(), "test_de", Language::German);
 
     let tx = TxId::new(1);
     let doc_id = DocId::new(1);
     index
-        .upsert_document(tx, doc_id, "Bundesverfassungsgericht")
+        .upsert_document(tx.into(), doc_id, "Bundesverfassungsgericht")
         .await?;
-    index.commit_stats(tx).await?;
+    index.commit_stats(tx.into()).await?;
     storage.commit(tx).await?;
 
     // German tokenizer should decompose "Bundesverfassungsgericht" into components
@@ -383,16 +385,16 @@ async fn test_new_with_language_german_tokenizes_compounds() -> Result<()> {
 // ANCHOR[contextra-text:TEST-110]
 // Testfall `test_new_default_english_does_not_split_compounds`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_new_default_english_does_not_split_compounds() -> Result<()> {
+async fn test_new_default_english_does_not_split_compounds() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "test_en");
 
     let tx = TxId::new(1);
     let doc_id = DocId::new(1);
     index
-        .upsert_document(tx, doc_id, "Bundesverfassungsgericht")
+        .upsert_document(tx.into(), doc_id, "Bundesverfassungsgericht")
         .await?;
-    index.commit_stats(tx).await?;
+    index.commit_stats(tx.into()).await?;
     storage.commit(tx).await?;
 
     // English tokenizer should NOT decompose German compounds
@@ -415,14 +417,14 @@ async fn test_new_default_english_does_not_split_compounds() -> Result<()> {
 // ANCHOR[contextra-text:TEST-111]
 // Testfall `test_contextual_bm25_indexes_prefix_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_contextual_bm25_indexes_prefix_terms() -> Result<()> {
+async fn test_contextual_bm25_indexes_prefix_terms() -> contextra_types::Result<()> {
     use contextra_types::ContextChunk;
 
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "contextual_test");
 
     let chunk = ContextChunk {
-        doc_id: DocId::new(10),
+        doc_id: DocId::new(10).into(),
         content: "Informationen über Wirtschaftspolitik.".to_string(),
         relevance: 1.0,
         token_count: 5,
@@ -436,7 +438,7 @@ async fn test_contextual_bm25_indexes_prefix_terms() -> Result<()> {
     let tx = TxId::new(1);
     // combined_text_owned() returns "Diese Passage beschreibt die Bundeshauptstadt Berlin.\n\nInformationen über Wirtschaftspolitik."
     index
-        .insert(tx, chunk.doc_id, &chunk.combined_text_owned())
+        .insert(tx, chunk.doc_id.into(), &chunk.combined_text_owned())
         .await?;
     index.commit(tx).await?;
 
@@ -451,7 +453,7 @@ async fn test_contextual_bm25_indexes_prefix_terms() -> Result<()> {
 // ANCHOR[contextra-text:TEST-112]
 // Testfall `test_german_tokenizer_symmetry_index_and_query`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_german_tokenizer_symmetry_index_and_query() -> Result<()> {
+async fn test_german_tokenizer_symmetry_index_and_query() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index =
         InvertedIndex::new_with_language(storage.clone(), "test_de_symmetry", Language::German);
@@ -459,9 +461,9 @@ async fn test_german_tokenizer_symmetry_index_and_query() -> Result<()> {
     let tx = TxId::new(1);
     let doc_id = DocId::new(42);
     index
-        .upsert_document(tx, doc_id, "Datenbankmanagement")
+        .upsert_document(tx.into(), doc_id, "Datenbankmanagement")
         .await?;
-    index.commit_stats(tx).await?;
+    index.commit_stats(tx.into()).await?;
     storage.commit(tx).await?;
 
     // Indexing "Datenbankmanagement" with German tokenizer decomposes into "datenbank" and "management".
@@ -480,20 +482,20 @@ async fn test_german_tokenizer_symmetry_index_and_query() -> Result<()> {
 // ANCHOR[contextra-text:TEST-113]
 // Testfall `test_idf_recalculation_after_delete`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_idf_recalculation_after_delete() -> Result<()> {
+async fn test_idf_recalculation_after_delete() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "idf_test");
 
     // Insert doc1: "rust compiler"
     let tx1 = TxId::new(1);
     let d1 = DocId::new(1);
-    index.insert(tx1, d1, "rust compiler").await?;
+    index.insert(tx1, d1.into(), "rust compiler").await?;
     index.commit(tx1).await?;
 
     // Insert doc2: "rust language"
     let tx2 = TxId::new(2);
     let d2 = DocId::new(2);
-    index.insert(tx2, d2, "rust language").await?;
+    index.insert(tx2, d2.into(), "rust language").await?;
     index.commit(tx2).await?;
 
     // Search for "rust" when N=2, df=2
@@ -502,13 +504,13 @@ async fn test_idf_recalculation_after_delete() -> Result<()> {
     let score_before_d2 = search_before
         .iter()
         .find(|(id, _)| *id == d2)
-        .ok_or_else(|| ContextraError::InvalidInput("d2 not found in search_before".into()))?
+        .ok_or_else(|| TextError::InvalidInput("d2 not found in search_before".into()))?
         .1;
 
     // Delete doc1
     let tx3 = TxId::new(3);
-    index.delete(tx3, d1).await?;
-    index.commit(tx3).await?;
+    index.delete(tx3, d1.into()).await?;
+    index.commit(tx3.into()).await?;
 
     // Search for "rust" when N=1, df=1
     let search_after = index.search_bm25("rust", 10, None).await?;
@@ -529,12 +531,12 @@ async fn test_idf_recalculation_after_delete() -> Result<()> {
 // ANCHOR[contextra-text:TEST-114]
 // Testfall `test_search_bm25_at_clamped_k`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_search_bm25_at_clamped_k() -> Result<()> {
+async fn test_search_bm25_at_clamped_k() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage, "clamp_k_ns");
 
     let tx = TxId::new(1);
-    index.insert(tx, DocId::new(1), "keyword alpha").await?;
+    index.insert(tx, DocId::new(1).into(), "keyword alpha").await?;
     index.commit(tx).await?;
 
     // Search with k = usize::MAX should be clamped to MAX_SEARCH_K without panic or error
@@ -547,20 +549,20 @@ async fn test_search_bm25_at_clamped_k() -> Result<()> {
 // ANCHOR[contextra-text:TEST-115]
 // Testfall `test_search_bm25_prefix_overlapping_colon_terms`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_search_bm25_prefix_overlapping_colon_terms() -> Result<()> {
+async fn test_search_bm25_prefix_overlapping_colon_terms() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage, "colon_prefix");
 
     let tx = TxId::new(1);
     // Insert doc 1 with term "user" and doc 2 with term "user:id"
-    index.upsert_document(tx, DocId::new(1), "user").await?;
-    index.upsert_document(tx, DocId::new(2), "user:id").await?;
+    index.upsert_document(tx.into(), DocId::new(1), "user").await?;
+    index.upsert_document(tx.into(), DocId::new(2), "user:id").await?;
     index.commit(tx).await?;
 
     // Search for "user" must not crash on key for "user:id"
     let results = index.search("user", 10).await?;
     assert!(!results.is_empty());
-    assert_eq!(results[0].doc_id, DocId::new(1));
+    assert_eq!(results[0].doc_id, DocId::new(1).into());
 
     Ok(())
 }
@@ -568,7 +570,7 @@ async fn test_search_bm25_prefix_overlapping_colon_terms() -> Result<()> {
 // ANCHOR[contextra-text:TEST-116]
 // Testfall `test_bm25_bounded_top_k_ordering_equivalence`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_bm25_bounded_top_k_ordering_equivalence() -> Result<()> {
+async fn test_bm25_bounded_top_k_ordering_equivalence() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "bounded_top_k_test");
 
@@ -577,10 +579,10 @@ async fn test_bm25_bounded_top_k_ordering_equivalence() -> Result<()> {
     for i in 1..=20 {
         let text = "performance ".repeat(i);
         index
-            .upsert_document(tx, DocId::new(i as u64), &text)
+            .upsert_document(tx.into(), DocId::new(i as u64), &text)
             .await?;
     }
-    index.commit_stats(tx).await?;
+    index.commit_stats(tx.into()).await?;
     storage.commit(tx).await?;
 
     // Query top 5 documents
@@ -613,48 +615,48 @@ impl CountingStorage {
 }
 
 impl StorageEngine for CountingStorage {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
         self.inner.get(key)
     }
-    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.put(tx_id, key, value)
     }
-    fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
+    fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.delete(tx_id, key)
     }
-    fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+    fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.commit(tx_id)
     }
-    fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+    fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.rollback(tx_id)
     }
-    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
+    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.rollback_to_tx(tx_id)
     }
     fn get_at_seq<'a>(
         &'a self,
         key: &'a [u8],
         seq: u64,
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Option<bytes::Bytes>>> {
         self.get_at_seq_calls.fetch_add(1, Ordering::SeqCst);
         self.inner.get_at_seq(key, seq)
     }
-    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
+    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<u64>> {
         self.inner.last_seq_no()
     }
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
+    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<TxId>> {
         self.inner.last_tx_id()
     }
-    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
+    fn flush<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.flush()
     }
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, contextra_types::Result<contextra_ports::StorageStats>> {
         self.inner.stats()
     }
-    fn pin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, Result<()>> {
+    fn pin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.pin_checkpoint(id)
     }
-    fn unpin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, Result<()>> {
+    fn unpin_checkpoint<'a>(&'a self, id: u64) -> BoxFuture<'a, contextra_types::Result<()>> {
         self.inner.unpin_checkpoint(id)
     }
     fn scan<'a>(
@@ -662,20 +664,20 @@ impl StorageEngine for CountingStorage {
         start: std::ops::Bound<&'a [u8]>,
         end: std::ops::Bound<&'a [u8]>,
         limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         self.inner.scan(start, end, limit)
     }
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         self.inner.scan_prefix(prefix)
     }
     fn scan_prefix_at<'a>(
         &'a self,
         prefix: &'a [u8],
         seq_no: u64,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+    ) -> BoxFuture<'a, contextra_types::Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         self.inner.scan_prefix_at(prefix, seq_no)
     }
 }
@@ -683,16 +685,16 @@ impl StorageEngine for CountingStorage {
 // ANCHOR[contextra-text:TEST-117]
 // Testfall `test_tombstone_lookup_caching_per_query_run`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_tombstone_lookup_caching_per_query_run() -> Result<()> {
+async fn test_tombstone_lookup_caching_per_query_run() -> contextra_types::Result<()> {
     let storage = Arc::new(CountingStorage::new());
     let index = InvertedIndex::new(storage.clone(), "tbs_cache_test");
 
     let tx1 = TxId::new(1);
     let d1 = DocId::new(1);
     index
-        .upsert_document(tx1, d1, "repeat repeat repeat")
+        .upsert_document(tx1.into(), d1, "repeat repeat repeat")
         .await?;
-    index.commit_stats(tx1).await?;
+    index.commit_stats(tx1.into()).await?;
     storage.inner.commit(tx1).await?;
 
     // Query with duplicated term in string: "repeat repeat"
@@ -720,7 +722,7 @@ async fn test_tombstone_lookup_caching_per_query_run() -> Result<()> {
 // ANCHOR[contextra-text:TEST-118]
 // Testfall `test_high_frequency_term_resident_index_performance`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_high_frequency_term_resident_index_performance() -> Result<()> {
+async fn test_high_frequency_term_resident_index_performance() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "high_freq_perf");
 
@@ -731,9 +733,9 @@ async fn test_high_frequency_term_resident_index_performance() -> Result<()> {
     for i in 1..=doc_count {
         let doc_id = DocId::new(i as u64);
         let text = format!("system module process {}", i);
-        index.upsert_document(tx, doc_id, &text).await?;
+        index.upsert_document(tx.into(), doc_id, &text).await?;
     }
-    index.commit_stats(tx).await?;
+    index.commit_stats(tx.into()).await?;
     storage.commit(tx).await?;
 
     // 1. Warm query using Resident Posting Index (populated during upsert)
@@ -782,7 +784,7 @@ async fn test_high_frequency_term_resident_index_performance() -> Result<()> {
 // ANCHOR[contextra-text:TEST-119]
 // Testfall `test_batch_posting_list_persistence_and_fallback`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-async fn test_batch_posting_list_persistence_and_fallback() -> Result<()> {
+async fn test_batch_posting_list_persistence_and_fallback() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "batch_test");
 
@@ -791,8 +793,8 @@ async fn test_batch_posting_list_persistence_and_fallback() -> Result<()> {
     let d2 = DocId::new(20);
 
     // Upsert documents using batch persistence
-    index.upsert_document(tx, d1, "rust batch search").await?;
-    index.upsert_document(tx, d2, "rust stream search").await?;
+    index.upsert_document(tx.into(), d1, "rust batch search").await?;
+    index.upsert_document(tx.into(), d2, "rust stream search").await?;
     index.commit(tx).await?;
 
     // Verify batch key plb:rust exists in storage

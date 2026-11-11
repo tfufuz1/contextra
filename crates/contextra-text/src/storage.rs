@@ -1,11 +1,8 @@
 //! Lokales Trait `PostingStore` für Speicherung und Abruf von Posting-Listen und Metadaten (SPEC §6.2 text, B04).
 // ANCHOR[contextra-text:STORE-001]
 
-#[cfg(not(feature = "types-compat"))]
-use crate::contract::Epoch as TxId;
 use bytes::Bytes;
-#[cfg(feature = "types-compat")]
-use contextra_types::TxId;
+use crate::contract::Epoch as TxId;
 use std::future::Future;
 use std::pin::Pin;
 

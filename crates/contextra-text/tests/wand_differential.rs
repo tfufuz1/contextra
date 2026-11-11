@@ -236,7 +236,7 @@ fn naive_bm25_reference(
 /// Tolerates small float rounding differences (< 1e-4) in score summation,
 /// but strictly enforces exact ranking order and DocId matching.
 fn assert_wand_matches_reference(
-    wand_results: &[(DocId, f32)],
+    wand_results: &[(contextra_text::types::DocId, f32)],
     reference_results: &[(DocId, f32)],
     scenario: &str,
 ) {
@@ -255,7 +255,7 @@ fn assert_wand_matches_reference(
         .enumerate()
     {
         assert_eq!(
-            wand_item.0, ref_item.0,
+            wand_item.0, ref_item.0.into(),
             "Rank {} DocId mismatch in {}: WAND {:?} vs Ref {:?}",
             rank, scenario, wand_item, ref_item
         );
