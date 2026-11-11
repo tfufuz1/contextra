@@ -4,6 +4,8 @@ use crate::inverted::InvertedIndex;
 use crate::morphology::MorphologicalTokenizer;
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
 use contextra_types::{DocId, Result, ScoredDocument, TxId};
+#[allow(unused_imports)]
+use contextra_ports::TextIndex as _;
 use std::sync::Arc;
 
 // ANCHOR[contextra-text:INV-005]
@@ -63,19 +65,19 @@ impl<S: StorageEngine> TextIndex for BM25MorphIndex<S> {
     }
 
     async fn commit(&self, tx: TxId) -> Result<()> {
-        self.inner.commit(tx).await
+        self.inner.commit(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)
     }
 
     async fn rollback(&self, tx: TxId) -> Result<()> {
-        self.inner.rollback(tx).await
+        self.inner.rollback(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)
     }
 
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
-        self.inner.rollback_to_tx(tx_id).await
+        self.inner.rollback_to_tx(contextra_ids::TxId::new(tx_id.inner())).await.map_err(Into::into)
     }
 
     async fn last_tx_id(&self) -> Result<TxId> {
-        self.inner.last_tx_id().await
+        self.inner.last_tx_id().await.map(|t| TxId::new(t.inner())).map_err(Into::into)
     }
 
     async fn len(&self) -> usize {

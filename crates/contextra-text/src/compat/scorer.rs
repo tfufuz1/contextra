@@ -4,6 +4,8 @@
 use crate::inverted::InvertedIndex;
 use contextra_ports::{TextIndex, TextIndexStats};
 use contextra_types::{DocId, Result, ScoredDocument, TxId};
+#[allow(unused_imports)]
+use contextra_ports::TextIndex as _;
 
 /// `Bm25Scorer` fungiert als primäre Integrationsfassade für den Port [`TextIndex`].
 ///
@@ -80,25 +82,25 @@ impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
     // ANCHOR[contextra-text:LIB-007]
     /// Schreibt alle für Transaktion `tx` vorgemerkten Änderungen dauerhaft in die Storage-Engine.
     async fn commit(&self, tx: TxId) -> Result<()> {
-        self.index.commit(tx).await
+        self.index.commit(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)
     }
 
     // ANCHOR[contextra-text:LIB-008]
     /// Verwirft alle für die Transaktion `tx` im Speicher gepufferten Änderungen.
     async fn rollback(&self, tx: TxId) -> Result<()> {
-        self.index.rollback(tx).await
+        self.index.rollback(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)
     }
 
     // ANCHOR[contextra-text:LIB-009]
     /// Führt einen Rollback aller Transaktionen bis einschließlich `tx_id` aus.
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
-        self.index.rollback_to_tx(tx_id).await
+        self.index.rollback_to_tx(contextra_ids::TxId::new(tx_id.inner())).await.map_err(Into::into)
     }
 
     // ANCHOR[contextra-text:LIB-010]
     /// Liefert die höchste im Index registrierte Transaktions-ID.
     async fn last_tx_id(&self) -> Result<TxId> {
-        self.index.last_tx_id().await
+        self.index.last_tx_id().await.map(|t| TxId::new(t.inner())).map_err(Into::into)
     }
 
     // ANCHOR[contextra-text:LIB-011]
