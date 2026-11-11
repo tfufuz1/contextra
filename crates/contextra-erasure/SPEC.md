@@ -1,6 +1,7 @@
 # contextra-erasure — Spezifikation (docs/SPEC.md §3.1) [S]
 
 > Diese Spezifikation ist die normative Vorgabe für `contextra-erasure`. Sie beschreibt den kanonischen Zielzustand, den verifizierten Ist-Zustand und die einzuhaltenden Verträge als autarker Baustein.
+> Die fachliche Spezifikation der Löschkette ist in `docs/erasure/Loeschkette_Implementierungsspezifikation.md` definiert.
 
 **Pfad:** `crates/contextra-erasure/` · **Umsetzungsplan:** `PLAN.md` (im selben Verzeichnis)
 
