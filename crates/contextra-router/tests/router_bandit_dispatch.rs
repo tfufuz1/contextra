@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Integrationstest für contextra-router (router_bandit_dispatch.rs).
+// INVARIANTEN: Deterministische Ausführung, Zero-Panic, korrekte Fehlertaxonomie.
+
 #![allow(clippy::indexing_slicing)]
 //! # Integrationstest: Vollständiger Durchstich des Bandit-Dispatches
 //!

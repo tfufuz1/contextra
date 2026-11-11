@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Benchmark / Beispiel für contextra-router (bandit_latency_gate.rs).
+// INVARIANTEN: Deterministische Ausführung, Latenz- und Budgetüberwachung.
+
 //! # Benchmark für die Latenzschranke der Bandit-Entscheidung
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Benchmark / Beispiel für contextra-router (simple_router.rs).
+// INVARIANTEN: Deterministische Ausführung, Latenz- und Budgetüberwachung.
+
 //! Standalone example for `contextra-router` (Building-Block Architecture M10)
 //!
 //! Demonstrates isolated router engine configuration, profile registration,

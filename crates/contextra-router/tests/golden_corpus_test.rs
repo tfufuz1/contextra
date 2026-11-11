@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Integrationstest für contextra-router (golden_corpus_test.rs).
+// INVARIANTEN: Deterministische Ausführung, Zero-Panic, korrekte Fehlertaxonomie.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
