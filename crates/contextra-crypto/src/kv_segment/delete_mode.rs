@@ -1,3 +1,4 @@
+// MIGRATION(S-38): Besitzer wird contextra-kvcache
 //! # Bereinigungsmodi fuer Key-Value-Segmente
 //!
 //! Definiert [], um festzulegen, ob Bereinigung ueber regulaere

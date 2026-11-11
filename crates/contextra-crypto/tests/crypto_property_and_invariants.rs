@@ -7,7 +7,9 @@
 //! - Bit-mutation rejection across ciphertext, tag, AAD, and nonce.
 
 use contextra_crypto::aead::{open_record, seal_record_with_nonce};
-use contextra_crypto::anti_tamper::{constant_time_compare, verify_tag_constant_time, VolatileEncryptionKey};
+use contextra_crypto::anti_tamper::{
+    constant_time_compare, verify_tag_constant_time, VolatileEncryptionKey,
+};
 use contextra_crypto::dek::{unwrap_dek, wrap_dek, Dek, UnitKey};
 use contextra_crypto::secret::{Secret, SecretKey};
 use proptest::prelude::*;

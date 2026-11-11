@@ -1,3 +1,4 @@
+// MIGRATION(S-38): Besitzer wird contextra-kvcache
 //! # Segment-Repräsentation (`kv_segment/segment.rs`)
 //!
 //! Kapselt ein verschlüsseltes oder geschütztes Datensegment im Speicher.

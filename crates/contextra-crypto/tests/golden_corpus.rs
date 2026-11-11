@@ -207,14 +207,20 @@ fn test_golden_corpus_bitflip_and_truncation_rejection() {
         let mut corrupted = ciphertext.to_vec();
         corrupted[pos] ^= 0x01;
         let res = open_record(&dek, key_bytes, &corrupted);
-        assert!(res.is_err(), "Bitflip at position {pos} must be rejected with Err");
+        assert!(
+            res.is_err(),
+            "Bitflip at position {pos} must be rejected with Err"
+        );
     }
 
     // 2. Truncation at deterministic lengths must yield Err and never panic
     for trunc_len in 0..ciphertext.len() {
         let truncated = &ciphertext[..trunc_len];
         let res = open_record(&dek, key_bytes, truncated);
-        assert!(res.is_err(), "Truncation at length {trunc_len} must be rejected with Err");
+        assert!(
+            res.is_err(),
+            "Truncation at length {trunc_len} must be rejected with Err"
+        );
     }
 
     // 3. Bitflip in DEK wrapping must yield Err and never panic
@@ -226,14 +232,20 @@ fn test_golden_corpus_bitflip_and_truncation_rejection() {
         let mut corrupted = wrapped.to_vec();
         corrupted[pos] ^= 0x01;
         let res = unwrap_dek(&parent_key, &corrupted);
-        assert!(res.is_err(), "Bitflip in wrapped DEK at position {pos} must be rejected with Err");
+        assert!(
+            res.is_err(),
+            "Bitflip in wrapped DEK at position {pos} must be rejected with Err"
+        );
     }
 
     // 4. Truncation in wrapped DEK must yield Err and never panic
     for trunc_len in 0..wrapped.len() {
         let truncated = &wrapped[..trunc_len];
         let res = unwrap_dek(&parent_key, truncated);
-        assert!(res.is_err(), "Truncated wrapped DEK at length {trunc_len} must be rejected with Err");
+        assert!(
+            res.is_err(),
+            "Truncated wrapped DEK at length {trunc_len} must be rejected with Err"
+        );
     }
 }
 
