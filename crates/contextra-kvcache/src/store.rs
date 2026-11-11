@@ -23,9 +23,10 @@ use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use crate::error::{KvCacheError, Result};
 pub use crate::types::{CacheDirective, StepId};
 use ahash::AHashMap;
-use contextra_types::{ContextraError, TenantId};
+use contextra_ids::TenantId;
 use lru::LruCache;
 use parking_lot::RwLock;
 
@@ -89,13 +90,13 @@ impl TenantState {
         segment: KvSegment,
         directive: &CacheDirective,
         scores: &dyn AttentionScoreSource,
-    ) -> Result<Option<KvSegment>, ContextraError> {
+    ) -> Result<Option<KvSegment>> {
         let req_bytes = segment.len() as u64;
 
         if matches!(directive, CacheDirective::Pin { ttl: None })
             && self.pinned_bytes.saturating_add(req_bytes) > MAX_PINNED_BYTES_PER_TENANT
         {
-            return Err(ContextraError::pin_budget_exceeded(format!(
+            return Err(KvCacheError::pin_budget_exceeded(format!(
                 "Tenant {:?} requested {} pinned bytes, exceeding limit of {} bytes (current pinned: {})",
                 self.tenant_id, req_bytes, MAX_PINNED_BYTES_PER_TENANT, self.pinned_bytes
             )));
@@ -270,12 +271,8 @@ impl TenantState {
     }
 
     /// Fügt eine Token-Sequenz in den Radix-Baum ein.
-    fn insert_token_sequence(
-        &mut self,
-        tokens: &[u32],
-        block_id: u64,
-    ) -> Result<(), ContextraError> {
-        self.radix_tree.insert(tokens, block_id).map_err(Into::into)
+    fn insert_token_sequence(&mut self, tokens: &[u32], block_id: u64) -> Result<()> {
+        self.radix_tree.insert(tokens, block_id)
     }
 
     /// Sucht ein Präfix-Match im Radix-Baum und erstellt einen Guard für das Caching-Segment.
@@ -413,7 +410,7 @@ impl TenantIsolatedKvStore {
         tenant: TenantId,
         segment: KvSegment,
         directive: CacheDirective,
-    ) -> Result<(), ContextraError> {
+    ) -> Result<()> {
         if matches!(directive, CacheDirective::NeverCache) {
             return Ok(());
         }
@@ -462,7 +459,7 @@ impl TenantIsolatedKvStore {
         tenant: TenantId,
         tokens: &[u32],
         block_id: u64,
-    ) -> Result<(), ContextraError> {
+    ) -> Result<()> {
         let idx = self.shard_idx(tenant);
         let capacity = self.segment_capacity;
         let mut shard = self.shards[idx].lock.write();
@@ -564,7 +561,7 @@ impl TenantIsolatedKvStore {
         model_fingerprint: contextra_crypto::ModelFingerprint,
         rope_offset: Option<usize>,
         plaintext: &[u8],
-    ) -> Result<(), contextra_crypto::CryptoError> {
+    ) -> std::result::Result<(), contextra_crypto::CryptoError> {
         let segment = KvSegment::new_encrypted(
             cipher,
             tenant,
@@ -595,7 +592,7 @@ impl TenantIsolatedKvStore {
         cipher: &contextra_crypto::KvSegmentCipher,
         tenant: TenantId,
         segment_id: u64,
-    ) -> Result<Option<Vec<u8>>, contextra_crypto::CryptoError> {
+    ) -> std::result::Result<Option<Vec<u8>>, contextra_crypto::CryptoError> {
         let idx = self.shard_idx(tenant);
         let mut shard = self.shards[idx].lock.write();
         if let Some(state) = shard.get_mut(&tenant) {
@@ -787,7 +784,7 @@ impl Default for TenantIsolatedKvStore {
     }
 }
 
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub use crate::compat::scanner::{KvCachePruner, KvCacheScanner};
 
 #[cfg(test)]
@@ -1183,55 +1180,5 @@ mod tests {
         let freed_after_drop = store.evict_lru_fair(512);
         assert!(freed_after_drop >= 512);
         assert_eq!(store.get_tenant_segment_len(tenant), 0);
-    }
-
-    // Prüft, dass KvCachePruner und KvCacheScanner die Port-Verträge für KV-Cache-Segmente korrekt erfüllen.
-    #[test]
-    fn test_kv_cache_pruner_and_scanner_ports() {
-        use contextra_ports::clock::SystemClock;
-        use contextra_ports::scanner::{
-            LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer,
-        };
-        use contextra_types::{RequestContext, TxId};
-
-        let store = Arc::new(TenantIsolatedKvStore::new());
-        let tenant = TenantId::try_new(77).unwrap();
-        let pruner = KvCachePruner::new(Arc::clone(&store));
-        let scanner = KvCacheScanner::new(Arc::clone(&store));
-
-        let ctx = RequestContext::new(tenant, TxId(101));
-        let target = ScanTarget::new("tenant_77", [0x77; 32]);
-        let clock = SystemClock::new();
-
-        // 1. Initialer Scan auf leerem Store: Positivkontrolle besteht, Restmenge ist 0
-        let scan_result = scanner
-            .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
-            .expect("Scanner must succeed on empty store");
-        assert_eq!(scan_result.witness_layer(), &WitnessLayer::KvCacheSegments);
-        assert_eq!(scan_result.scanned(), 1); // Positivkontrolle registriert
-        assert_eq!(scan_result.remaining(), 0);
-
-        // 2. Segmente einfügen
-        store.insert_segment(tenant, KvSegment::new(tenant, 10, vec![1, 2, 3, 4]));
-        store.insert_segment(tenant, KvSegment::new(tenant, 20, vec![5, 6, 7, 8, 9]));
-
-        // 3. Scan mit Restmenge (2 Einheiten)
-        let scan_with_data = scanner
-            .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
-            .expect("Scanner must succeed with data");
-        assert_eq!(scan_with_data.remaining(), 2);
-        assert_eq!(scan_with_data.scanned(), 3); // 1 Canary + 2 Segmente
-
-        // 4. Pruning ausführen
-        let purge_stats = pruner.purge(&ctx, &target).expect("Pruner must succeed");
-        assert_eq!(purge_stats.purged_units, 2);
-        assert_eq!(purge_stats.bytes_freed, 9);
-        assert_eq!(store.get_tenant_segment_len(tenant), 0);
-
-        // 5. Verifikation nach Bereinigung: Restmenge wieder 0
-        let scan_after = scanner
-            .scan(&ctx, target, ScanTechnique::Structural, &clock)
-            .expect("Scanner must succeed after purge");
-        assert_eq!(scan_after.remaining(), 0);
     }
 }

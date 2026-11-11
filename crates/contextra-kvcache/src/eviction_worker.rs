@@ -15,8 +15,10 @@
 
 use super::attention_score::{AttentionScoreSource, NullAttentionScoreSource};
 use super::store::TenantIsolatedKvStore;
-use contextra_ports::{AttentionExporter, RequestId};
-use contextra_types::TenantId;
+#[cfg(feature = "workspace")]
+use crate::compat::adapters::AttentionExporter;
+use crate::types::RequestId;
+use contextra_ids::TenantId;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -28,6 +30,7 @@ enum EvictionCommand {
     Shutdown,
 }
 
+#[cfg(feature = "workspace")]
 /// Adapter: Übersetzt die anfragezentrierte Schnittstelle [`AttentionExporter`] (Ring 2)
 /// in die segmentzentrierte Schnittstelle [`AttentionScoreSource`] (Ring 1).
 struct ExporterBackedScoreSource {
@@ -35,6 +38,7 @@ struct ExporterBackedScoreSource {
     segment_map: RwLock<HashMap<(TenantId, u64), RequestId>>,
 }
 
+#[cfg(feature = "workspace")]
 impl ExporterBackedScoreSource {
     fn new(exporter: Arc<dyn AttentionExporter>) -> Self {
         Self {
@@ -44,6 +48,7 @@ impl ExporterBackedScoreSource {
     }
 }
 
+#[cfg(feature = "workspace")]
 impl AttentionScoreSource for ExporterBackedScoreSource {
     fn importance_score(&self, segment_id: u64) -> Option<f32> {
         self.importance_score_for_tenant(TenantId::SYSTEM, segment_id)
@@ -57,7 +62,7 @@ impl AttentionScoreSource for ExporterBackedScoreSource {
         .unwrap_or(RequestId(segment_id));
 
         // Note: Read lock is dropped before calling external exporter
-        let weights = self.exporter.export_attention_weights(request_id)?;
+        let weights = self.exporter.export_attention_weights(request_id.into())?;
         if weights.is_empty() {
             return None;
         }
@@ -142,6 +147,7 @@ impl EvictionWorker {
         }
     }
 
+    #[cfg(feature = "workspace")]
     /// Builder-Methode zur Injektion eines echten Attention-Backends via [`AttentionExporter`].
     pub fn with_attention_exporter(self, exporter: Arc<dyn AttentionExporter>) -> Self {
         let adapter: Arc<dyn AttentionScoreSource> =
@@ -156,11 +162,11 @@ impl EvictionWorker {
         &self,
         tenant_id: TenantId,
         segment_id: u64,
-        request_id: RequestId,
+        request_id: impl Into<RequestId>,
     ) {
         self.attention_source
             .read()
-            .register_segment(tenant_id, segment_id, request_id);
+            .register_segment(tenant_id, segment_id, request_id.into());
     }
 
     /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.
@@ -222,7 +228,7 @@ pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
 mod tests {
     use super::*;
     use crate::segment::KvSegment;
-    use contextra_types::TenantId;
+    use contextra_ids::TenantId;
     use std::time::Duration;
 
     // Prüft, dass der Aufruf von trigger_eviction den aufrufenden Thread nicht blockiert.
