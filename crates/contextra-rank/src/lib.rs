@@ -49,10 +49,11 @@
 //! ```
 
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #[cfg(feature = "workspace")]
 pub mod compat;
 pub mod calibration;
+pub mod contract;
 pub mod drift;
 pub mod error;
 pub mod explain;

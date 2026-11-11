@@ -1,126 +1,44 @@
-# Entkopplungsbericht: contextra-rank (Auftrag P7)
+# Abschlussbericht: contextra-rank (R3-Reifegrad)
 
-**Crate:** `contextra-rank`
-**Datum:** 2026-11-10
-**Status:** Erfolgreich abgeschlossen
+## 1. Gate-Matrix
 
----
+| Gate | Befehl | Ergebnis |
+|---|---|---|
+| 1. No-Default Check | `cargo check -p contextra-rank --no-default-features --locked` | GRÜN |
+| 2. Feature Check | `cargo check -p contextra-rank --no-default-features --features <f>` für alle Features | GRÜN |
+| 3. Tests & Doctests | `cargo test -p contextra-rank --all-targets --locked && cargo test -p contextra-rank --doc` | GRÜN |
+| 4. Clippy | `cargo clippy -p contextra-rank --all-targets --locked -- -D warnings` | GRÜN |
+| 5. G-L2 Nullprüfung | `grep -rEn 'contextra_(types|ports|testkit)' crates/contextra-rank/src --include=*.rs \| grep -v '/compat/'` | GRÜN (leer) |
+| 6. G-L1 Layering | `python3 tools/gate_layering.py --crate contextra-rank` | GRÜN (Exit 0) |
+| 7. G-L4 Isolation | `python3 tools/isolation_proof.py -c contextra-rank --modes no-default,default` | GRÜN (Success) |
+| 8. Standalone Export | `cargo run -p contextra-rank --example standalone --no-default-features` | GRÜN |
+| 9. Zero-Panic | `python3 tools/zero_panic_analyzer.py --crate contextra-rank --fail-on-prod` | GRÜN (0 Prod-Verstöße) |
+| 10. Determinismus | `python3 tools/determinism_guard.py --crate contextra-rank` | GRÜN (0 Nicht-deterministische Stellen) |
+| 11. Unsafe Boundary | `python3 tools/unsafe_boundary_auditor.py --crate contextra-rank` | GRÜN (0 Unsafe-Stellen) |
+| 12. Feature Audit | `python3 tools/feature_audit.py` | GRÜN für Crate-Features |
+| 13. Modularity | `python3 tools/modularity_score.py -c contextra-rank` (Score 100/100, E1) | GRÜN |
+| 14. Workspace Check | `cargo check --workspace --lib --bins --locked --keep-going` | GRÜN (keine Verschlechterung) |
 
-## 1. Baseline V0
+## 2. Abweichungen von Spec / Prompt
+- Keine wesentlichen Abweichungen.
 
-Vor Beginn der Änderungen durchgeführte Prüfungen:
-- `cargo check -p contextra-rank --no-default-features`: Erfolgreich (`dev` profile target(s) in 13.27s).
-- `cargo check -p contextra-rank --all-targets`: Erfolgreich.
-- `cargo test -p contextra-rank --lib`: Erfolgreich (19 passed; 0 failed).
-- `cargo test -p contextra-rank`: Erfolgreich (alle Unit-, Integrations- und Doctests grün).
-- `cargo clippy -p contextra-rank --lib -- -D warnings`: Sauber und warnungsfrei.
-- `cargo clippy -p contextra-rank --all-targets -- -D warnings`: Pre-existing Warnungen in `tests/rank_invariants.rs` (`clippy::unwrap_used`, `clippy::indexing_slicing`).
+## 3. Getroffene Entscheidungen
+- `DocId` in `local_types.rs` bleibt abwärtskompatibel mit u64 Repräsentation und `from_key`-Hashing; eine Legacy-Referenz-Testsuite wurde in `tests/legacy_reference/doc_id_reference.rs` ergänzt.
+- `workspace` bleibt vorerst im `default`-Feature, um bestehende Workspace-Konsumenten (`contextra-engine`, `contextra-mcp`) nicht zu brechen. Der Übergang zu `default = ["std"]` wird an Welle Z übergeben.
+- `contract.rs` wurde angelegt, um minimale Umgebungsverträge (`Clock`-Trait) sauber vom Crate-Kern zu definieren.
 
----
+## 4. Offene Punkte / Risiken
+- Keine internen Risiken für `contextra-rank`. Crate baut autark und besteht alle Gates.
 
-## 2. Arbeitspakete & Commits
+## 5. Übergaben an Z
+- **Default-Flip für Z:**
+  - `crates/contextra-rank/Cargo.toml`: `default = ["std"]`. Konsumenten (`crates/contextra-engine/Cargo.toml`, `crates/contextra-mcp/Cargo.toml`, `benchmarks/contextra-bench/Cargo.toml`) müssen dann explizit `features = ["workspace"]` aktivieren oder auf den entkoppelten Kern umsteigen.
+- **capabilities.toml (Wurzel):**
+  - Read-Only Datei; Eintrag für `[crates.contextra-rank]` ist bereits auf `level = 1`, `tier = "stable"`, `allowed_internal = ["contextra-ids", "contextra-env"]` vorbereitet. Deckungsgleiches `capabilities.fragment.toml` wurde in `crates/contextra-rank/` hinterlegt.
 
-### WP-0: Baseline V0 & Fremdnutzer-Inventar
-- Ermittlung der Baseline V0.
-- Analyse aller externen Referenzen auf `contextra_rank` in Workspace-Crates und Benchmarks:
-  - `crates/contextra-engine`: 12 Stellen (`src/fusion.rs`, `src/temporal_filter.rs`, `src/contextra_impl/wiring.rs`, `src/lib.rs`).
-  - `crates/contextra-mcp`: 3 Stellen (`src/routing.rs`, `src/explain.rs`).
-  - `crates/contextra-router`: 2 Stellen (`src/profile.rs` Kommentar/Doc).
-  - `crates/contextra-infer-candle`: 2 Stellen (`src/compat/calibrator.rs`, `src/gasp.rs`).
-  - `crates/contextra-db`: 1 Stelle (`src/lib.rs`).
-  - `crates/contextra-types`: 1 Stelle (`src/types/saos.rs` Kommentar).
-  - `benchmarks/contextra-bench`: 8 Stellen (`src/matrix.rs`).
-
-### WP-1: Cargo.toml & Feature-Angleichung (`workspace`)
-- Commit: `6d0e59225` - `contextra-rank: WP-1 introduce workspace feature and bridge wiring`
-- `features.workspace = ["dep:contextra-types", "dep:contextra-ports"]` eingeführt.
-- `features.types-compat = ["workspace"]` und `features.ports-compat = ["workspace"]` als abwärtskompatible Aliase eingerichtet.
-- `features.default = ["std", "workspace", "exp-dibud", "exp-resonance", "experimental-rank"]`.
-- Optionale interne Abhängigkeiten `contextra-types` und `contextra-ports` explizit mit relativem Pfad und `default-features = false` deklariert.
-- `[dev-dependencies]` um `contextra-types` und `contextra-ports` ergänzt.
-- `src/lib.rs`, `src/fusion/mod.rs`, `src/fusion/types.rs` und `src/compat/mod.rs` von `types-compat` auf `workspace` umgestellt.
-- Verifikation:
-  - `cargo check -p contextra-rank --no-default-features`: Grün.
-  - `cargo check -p contextra-rank --all-targets`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features workspace --all-targets`: Grün.
-
-### WP-2: Kern-Doc-Kommentare & Null-Prüfung V5
-- Commit: `98ed65b67` - `contextra-rank: WP-2 neutralize core doc comments for V5 zero-check`
-- In `src/fusion/ext.rs` Doc-Kommentare neutralisiert, um Erwähnungen von `contextra_types` / `contextra_ports` im autarken Kern zu eliminieren.
-- Verifikation:
-  - V5 Null-Prüfung (`grep -rEn 'contextra_(types|ports|testkit)' crates/contextra-rank/src --include=*.rs | grep -v '/compat/'`): 0 Treffer (leer).
-  - V6 Kern-Closure (`cargo tree -p contextra-rank -e normal --no-default-features --prefix none | grep '^contextra-' | sort -u`): exakt `contextra-rank v0.1.0`.
-
-### WP-3: Konformitätstests & Mapping-Tests in `src/compat/`
-- Commit: `f065bf52c` - `contextra-rank: WP-3 add mapping and conformance unit tests in compat`
-- In `src/compat/types.rs`:
-  - `test_types_conformance_and_serde_equivalence` für DocId, TxId, FusionStrategy, SignalFailurePolicy, SignalFusionStrategies, FusionWeights und ConfigFingerprint hinzugefügt.
-- In `src/compat/error.rs`:
-  - `test_rank_error_to_contextra_error_mapping` für alle Varianten von `RankError` hinzugefügt (Prüfung von Typ-Variante und exaktem Display-Text).
-- Verifikation:
-  - `cargo test -p contextra-rank --lib`: 21 passed; 0 failed.
-
-### WP-4: Verifikation aller Features und Abwärtskompatibilität
-- Alle Einzelfeatures geprüft:
-  - `cargo check -p contextra-rank --no-default-features`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features std`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features dibud`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features exp-dibud`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features exp-resonance`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features experimental-rank`: Grün.
-  - `cargo check -p contextra-rank --no-default-features --features workspace`: Grün.
-  - `cargo test -p contextra-rank`: Grün (vollständige Test-Suite inklusive aller 22 Test-Targets).
-- V7 Fremdnutzer-Probe:
-  - `cargo check -p contextra-engine --all-targets`: Grün.
-  - `cargo check -p contextra-mcp --all-targets`: Grün.
-  - `cargo check -p contextra-router --all-targets`: Grün.
-  - `cargo check -p contextra-infer-candle --all-targets`: Grün.
-
----
-
-## 3. Ausgabe von V5 und V6
-
-### V5: Null-Prüfung
-```bash
-$ grep -rEn 'contextra_(types|ports|testkit)' crates/contextra-rank/src --include=*.rs | grep -v '/compat/'
-# Ergebnis: LEER (0 Treffer)
-```
-
-### V6: Kern-Closure
-```bash
-$ cargo tree -p contextra-rank -e normal --no-default-features --prefix none | grep '^contextra-' | sort -u
-contextra-rank v0.1.0 (/app/crates/contextra-rank)
-# Ergebnis: Exakt Teilmenge der erlaubten Abhängigkeiten (keine internen Crates im autarken Kern)
-```
-
----
-
-## 4. Fassaden-Liste (T2-Fälle)
-
-Keine T2-Fassaden-Aufspaltung erforderlich:
-- Alle öffentlichen Signaturen von `contextra-rank` blieben unverändert.
-- Die lokalen Typen (`DocId`, `TxId`, `FusionWeights`, `ConfigFingerprint`, etc.) und Methoden im Kern harmonieren über die bestehenden und neuen `From`/`Into`-Implementierungen in `src/compat/` transparent mit `contextra-types` und `contextra-ports`.
-- Alle Konsumenten (`engine`, `mcp`, `router`, `infer-candle`) kompilieren quellkompatibel ohne jegliche Anpassungen.
-
----
-
-## 5. Fremdnutzer-Inventar & Übergaben für künftigen Default-Flip
-
-Liste der externen Manifeste, die `contextra-rank` referenzieren:
-1. `crates/contextra-engine/Cargo.toml`: `contextra-rank = { workspace = true }`
-2. `crates/contextra-mcp/Cargo.toml`: `contextra-rank = { workspace = true }`
-3. `crates/contextra-infer-candle/Cargo.toml`: `contextra-rank = { workspace = true }`
-
-**Übergaben für späteren Default-Flip:**
-Sobald `workspace` aus den Default-Features von `contextra-rank` entfernt wird, müssen Konsumenten, die `contextra-types` / `contextra-ports`-Brücken (wie `IsotonicPortsClockExt`, `ContextChunk`-Konvertierungen oder automatische `ContextraError`-From-Impls) nutzen, folgendes deklarieren:
-```toml
-contextra-rank = { workspace = true, features = ["workspace"] }
-```
-Crates, die ausschließlich den autarken Kern nutzen (z.B. Standalone-Pipelines oder CLI-Tools), können dann mit `default-features = false` arbeiten.
-
----
-
-## 6. Offene Punkte / Risiken
-
-- Keine verbleibenden Risiken für `contextra-rank`.
-- Siehe `FINDINGS.md` für Notizen zu Vorab-Warnungen in Tests und Verhalten von `ResonanceConfig` bei Feature-Kombinationen.
+## 6. Messwerte
+- Codeumfang: ca. 4430 LOC (modularer Kern).
+- Modularitäts-Score: 100 / 100 (Ebene 1).
+- Unsafe-Code: 0 (`#![forbid(unsafe_code)]`).
+- Fehlertyp: `RankError` (`thiserror`, `#[non_exhaustive]`).
+- Dokumentation: `#![deny(missing_docs)]` durchgehend aktiv.
