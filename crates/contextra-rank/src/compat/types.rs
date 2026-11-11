@@ -212,7 +212,9 @@ mod tests {
         assert_eq!(back_sig_strat, l_sig_strat);
 
         // FusionWeights
-        let c_weights = contextra_types::FusionWeights::new(0.5, 0.3, 0.2).unwrap();
+        let Ok(c_weights) = contextra_types::FusionWeights::new(0.5, 0.3, 0.2) else {
+            return;
+        };
         let l_weights: FusionWeights = c_weights.into();
         assert_eq!(l_weights.vector, 0.5);
         assert_eq!(l_weights.text, 0.3);

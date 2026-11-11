@@ -36,10 +36,10 @@ mod tests {
         for (rank_err, expected_display) in cases {
             let ctx_err: contextra_types::ContextraError = rank_err.into();
             assert_eq!(ctx_err.to_string(), expected_display);
-            match ctx_err {
-                contextra_types::ContextraError::InvalidInput(_) => {}
-                other => panic!("Erwartete InvalidInput, erhalten: {other:?}"),
-            }
+            assert!(
+                matches!(ctx_err, contextra_types::ContextraError::InvalidInput(_)),
+                "Erwartete InvalidInput, erhalten: {ctx_err:?}"
+            );
         }
     }
 }
