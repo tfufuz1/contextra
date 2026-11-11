@@ -1,3 +1,4 @@
+// MIGRATION(S-38): Besitzer wird contextra-kvcache
 //! # Geshardeter Segment-Store (`kv_segment/store.rs`)
 //!
 //! Bietet thread-sicheren Zugriff auf Segmente über konfigurierbare Shards,

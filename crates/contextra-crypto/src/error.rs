@@ -65,7 +65,6 @@ pub enum CryptoError {
         reason: String,
     },
 
-
     #[error("WAL truncation detected: tail HMAC mismatch")]
     WalTruncationDetected,
 

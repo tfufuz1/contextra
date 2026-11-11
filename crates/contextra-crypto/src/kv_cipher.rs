@@ -1,3 +1,4 @@
+// MIGRATION(S-38): Besitzer wird contextra-kvcache
 //! # KV-Segment-Verschlüsselung (`kv_cipher.rs`)
 //!
 //! Stellt die Authenticated Encryption with Associated Data (AEAD) für Key-Value-Segmente
@@ -113,12 +114,9 @@ impl KvCipher for KeyManager {
                 "Ciphertext too short for nonce payload".into(),
             ));
         }
-        let nonce: &[u8; 12] =
-            ciphertext[..12]
-                .try_into()
-                .map_err(|e: std::array::TryFromSliceError| {
-                    CryptoError::InvalidInput(e.to_string())
-                })?;
+        let nonce: &[u8; 12] = ciphertext[..12]
+            .try_into()
+            .map_err(|e: std::array::TryFromSliceError| CryptoError::InvalidInput(e.to_string()))?;
         let ct = &ciphertext[12..];
         self.decrypt_auto_nonce(ct, nonce)
     }
@@ -139,9 +137,7 @@ pub struct KvSegmentCipher {
 impl KvSegmentCipher {
     /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
     pub fn new(key_manager: KeyManager) -> Self {
-        Self {
-            key_manager,
-        }
+        Self { key_manager }
     }
 
     /// Encrypts KV-cache plaintext payload for a given `(tenant_id, model_fingerprint)` pair.
@@ -362,6 +358,4 @@ mod tests {
             "Expected KvFormatVersionMismatch, got: {err:?}"
         );
     }
-
-
 }
