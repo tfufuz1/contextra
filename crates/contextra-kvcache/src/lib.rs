@@ -45,10 +45,10 @@
 //! 9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung.
 
 pub mod cipher;
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub mod compat;
 
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub use compat::{adapters, prefix_store, scratchpad_invalidation};
 pub mod error;
 pub mod types;
@@ -69,6 +69,7 @@ pub mod segment;
 pub mod service;
 pub mod store;
 
+#[cfg(feature = "workspace")]
 pub use adapters::{
     EmbeddingProviderSemanticEmbedder, KvCachePluginConfig, KvCachePluginManifest,
     StorageEngineKvBridge,
@@ -77,6 +78,7 @@ pub use attention_score::{
     rank_for_eviction, rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
 };
 pub use eviction_worker::{emergency_wipe, EvictionWorker};
+#[cfg(feature = "workspace")]
 pub use prefix_store::TenantPrefixKvStore;
 #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 pub use quantize_kivi::{
@@ -88,6 +90,7 @@ pub use radix::{
     ContentAddressedKvStore, KvLookupResult, KvSegmentRef, SemanticCacheConfig, SemanticEmbedder,
 };
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
+#[cfg(feature = "workspace")]
 pub use scratchpad_invalidation::{
     PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
 };
@@ -96,4 +99,6 @@ pub use segment::{
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
 pub use service::{KvCacheConfig, KvCacheService, KvCacheServiceBuilder, KvCacheStats};
-pub use store::{KvCachePruner, KvCacheScanner, SpillHandler, TenantIsolatedKvStore};
+#[cfg(feature = "workspace")]
+pub use store::{KvCachePruner, KvCacheScanner};
+pub use store::{SpillHandler, TenantIsolatedKvStore};

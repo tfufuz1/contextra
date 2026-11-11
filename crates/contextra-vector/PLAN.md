@@ -1,47 +1,32 @@
-# contextra-vector — Umsetzungsplan
+# contextra-vector — Umsetzungsplan (v3)
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus `docs/SPEC.md` v3 §6 (Umsetzungsreihenfolge) und §3.1 (Crate-Tabelle).
+> Ring: **Ring 1** (E1b) · Klasse: **A** · Ziel: Vollständig autarker, modularer Vektorindex-Baustein.
 
-## 1. Vorbedingungen (global) [S]
+## 1. Arbeitsbereiche des Crates
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+| Schritt | Inhalt | Voraussetzung | Nachweis | Status |
+|---|---|---|---|---|
+| **S-12** | Feature-Hygiene (R10): Default-Features auf `std` bereinigen (`ports-compat` entfernen); leere Features entfernen; `docid-128` weiterleiten. | S-01R | `feature_audit` grün; `cargo check -p contextra-vector --no-default-features` | ⏳ In Bearbeitung |
+| **S-36** | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError` konsolidieren; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd` transparent; ID-Breite `HNSW_VERSION` 2 → 3; V-VETO Wachtest verifizieren. | S-30B, S-10C, S-11R | GL, GF (HNSW v2/3), GD (Distanz, Rng, ms), GC, GE | ⏳ In Bearbeitung |
+| **S-80** | Auslagerung von DiskANN (`vector/diskann/`) in eigenständiges Crate `contextra-vector-diskann`. | S-36 | GL, DiskANN-Tests isoliert grün | ⏳ Geplant |
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. Architektur & Entkopplungs-Meilensteine
 
-## 2. Schritte dieses Crates [S]
+1. **Autarkie des Kerns:**
+   - Der Kern (`--no-default-features`) benötigt ausschließlich Standard-Bibliothek und mathematische/kryptographische Basistypen.
+   - `contextra-ports` und `contextra-types` sind vollständig in `compat/` isoliert und nur aktiv, wenn `ports-compat` bzw. `workspace` angefordert wird.
+2. **Neutralisierung von Wartungs- & Bereinigungs-Schnittstellen:**
+   - Bereinigung von Vektoren geschieht neutral über `Tombstone`, `Maintain`-Operationen (`compact()`, `is_rebuild_required()`).
+   - DSGVO-/Purger-Relikte in `hnsw/purge.rs` und `hnsw/scanner.rs` sind als `deprecated` markiert und gehören zur Transitional-Brücke.
+3. **Dokumentation & Anker-System:**
+   - Einheitliche Strukturierung aller Module nach VS Code Comment-Anchors Syntax (`// SECTION`, `// !SECTION`, `ANCHOR[...]`).
+   - Standardisierte Dateiköpfe mit `// FILE-CONTEXT`, `// ZWECK:`, `// INVARIANTEN:`.
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-12 | Feature-Hygiene (B14): `tools/feature_audit.py`, Defaults gemäß §3.1 für E0-/Test-Crates (`adapt`, `license`, `audit-export`, `testkit`, `crypto`, `graph`, `kvcache`, `rank`, `text`, `vector`), leere Features entfernen, `erasure` Features; Gate `error-domain` aktivieren | S-01 | `feature_audit` grün; `cargo hack check --each-feature -p <crate>` je Crate; `--workspace` grün | je Crate Revert | ☐ offen |
-| S-36 | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert | ☐ offen |
-| S-80 | `contextra-vector-diskann` (aus `vector/diskann/`) | S-36 | GL, DiskANN-Tests (`required-features`) isoliert grün | Revert | ☐ offen |
+## 3. Definition of Done (DoD)
 
-## 3. Reihenfolge-Zwang [S]
-
-> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
-
-## 4. Definition of Done [S]
-
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+- [x] Crate-lokale `SPEC.md` und `PLAN.md` entsprechen `docs/SPEC.md` v3.
+- [x] Quelltext ist vollständig und transparent nach dem hierarchischen Anker-Schema kommentiert.
+- [x] Keine unerlaubten `unwrap()` / `expect()` / `panic!` in Produktionspfaden.
+- [x] Determinismus-Wächter meldet keine unzulässigen Laufzeit-RNGs in Graphaufbau- und Suchpfaden.
+- [x] Alle modulinternen Tests laufen fehlerfrei durch.

@@ -1,8 +1,17 @@
 //! Canonical error conversion between `GraphError` and `ContextraError`.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
+// INVARIANTEN: Isolierte Workspace-Konvertierungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::error::{GraphError, GraphMutationError};
 use contextra_types::ContextraError;
 
+
+// SECTION Error Core Implementation
 impl From<GraphError> for ContextraError {
     fn from(err: GraphError) -> Self {
         match err {
@@ -50,3 +59,5 @@ impl From<GraphMutationError> for ContextraError {
         }
     }
 }
+
+// !SECTION Error Core Implementation

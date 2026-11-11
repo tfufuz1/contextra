@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 /// der ihre Quell-Dokumente zurückverfolgbar macht.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // ANCHOR[contextra-graph:SRC-PROVENANCE-001]
+
+// SECTION Provenance Core Implementation
 pub struct EdgeProvenance {
     /// Identifikator der Kante (from_entity_id, to_entity_id).
     pub edge_id: EdgeId,
@@ -192,3 +194,5 @@ mod tests {
         assert_eq!(deserialized.created_at_tx, prov.created_at_tx);
     }
 }
+
+// !SECTION Provenance Core Implementation

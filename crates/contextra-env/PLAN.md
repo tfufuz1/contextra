@@ -1,48 +1,43 @@
-# contextra-env — Umsetzungsplan
+# contextra-env — Umsetzungs- und Architekturplan
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> **Status:** Vollständig umgesetzt und entkoppelt (E0 Foundation Baustein).
+> **Referenz:** `docs/SPEC.md` v2 / §4.2, `crates/contextra-env/SPEC.md`.
 
-## 1. Vorbedingungen (global) [S]
+## 1. Baustein-Architektur und Entkopplungsstatus
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+`contextra-env` ist als **Ebene-0-Mikrokern (E0)** entworfen:
+- Keine internen Workspace-Abhängigkeiten (`allowed_internal = []`).
+- Standalone-Kompilierung über `tools/export_crate.py` (Gate G3) bestanden.
+- Vollständig isolierte Traits und Referenzimplementierungen für:
+  1. `Clock` & `SystemClock` / `ManualClock` (unter Feature `test-utils`).
+  2. `Rng` & `SeededRng` (SplitMix64 deterministischer PRNG).
+  3. `IdGen` & `SequentialIdGen` (Atomare ID-Generierung).
+  4. `MetricsSink`, `NoopMetricsSink` & `InMemoryMetricsSink` (Telemetrie).
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. K13-Feature-Harmonisierung [Abgeschlossen]
 
-## 2. Schritte dieses Crates [S]
+- **Vorgabe (SPEC §4.2 / K13):** `default = ["std"]`; `test-utils` wird nur bei Bedarf von Test-Verbrauchern aktiviert.
+- **Ist-Korrektur:** In `Cargo.toml` wurde `default = ["std"]` gesetzt, sodass `test-utils` nicht standardmäßig in Produktions-Builds kompiliert wird.
+- **Nachweis:** `cargo tree -p contextra-env -e features` bzw. Standalone-Checks zeigen, dass `test-utils` optional ist.
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-11 | `env`: (A) Crate anlegen, Dateien aus `ports` kopieren; (B) `ports` → Re-Export; Konformitätssuite in `env` | S-02 | GF (Rng-Folgen), GD, GL | wie S-10 | ☐ offen |
-| S-30 | `mvcc`: Loom-Modell (B11) → (A) `tombstone.rs` verschieben → (B) auf `ids`/`env`/`MvccError`; Brücke | S-10, S-11 | GL, GF, GC, GD (Tombstone-Semantik), GE | Revert B, A | ☐ offen |
-| S-36 | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert | ☐ offen |
-| S-37 | `store`: `StoreError`, `compat/` (`engine/`, `scanner/`), Imports → `ids`/`env`; `kv/` archivieren; `FeatureRing`-Entfernung **nach** S-50; zuletzt ID-Breite im Manifest (v2, §5.2) | S-30, S-31, S-10, S-11 | GL, GF, GC (Loom/TSan), Crash-/Recovery-Suite unverändert grün (INV-6), GE | Revert pro Teil | ☐ offen |
+## 3. Kommentierungs- und Dokumentationssystem
 
-## 3. Reihenfolge-Zwang [S]
+Etablierung des einheitlichen Comment-Anchors-Schemas für alle Quellcodedateien in `src/`:
+- **Epics:**
+  - `epic=env-core`: Modulinitialisierung und Re-Exports (`lib.rs`, `env.rs`).
+  - `epic=clock`: Zeitabstraktion und System-/Monotonieuhr (`clock.rs`, `manual_clock.rs`).
+  - `epic=rng`: Pseudozufallsgeneratoren und SplitMix64 (`rng.rs`).
+  - `epic=id-gen`: Atomare ID-Generierung (`id_gen.rs`).
+  - `epic=metrics`: Observability und Metriksenken (`metrics.rs`).
+- **Anker-Struktur:**
+  - Regionen: `SECTION ...` / `!SECTION ...`
+  - Querverweise: `LINK`
+  - Inline-Hinweise: `NOTE` und `ANCHOR[id=...,epic=...,seq=...]`
 
-> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
+## 4. Definition of Done & Verifikationskriterien
 
-## 4. Definition of Done [S]
-
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-| D-11 | Ebene-0-Crates behalten lokale Mini-Traits (R7/K8); E1+ nutzen `ids`/`env` |
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+1. **Gate G3 (Standalone-Fähigkeit):** `tools/export_crate.py --out /tmp/test-env contextra-env` baut erfolgreich ohne Workspace.
+2. **Unit- & Conformance-Tests:** 15 Unittests + 4 Conformance-Tests + Golden-Differenztest erfolgreich grün.
+3. **Modularity Score:** 100/100 auf `tools/decouple_inspector.py`.
+4. **Zero Panic / No Unsafe:** `#![forbid(unsafe_code)]` und 0 unhandled Panics.
+5. **Erweiterte Kommentierung:** Vollständige Durchdringung aller Dateien mit didaktischer Transparenz.

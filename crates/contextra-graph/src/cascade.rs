@@ -15,6 +15,8 @@ use contextra_types::{DocId, EntityId, Result, TxId};
 /// Maximum number of hyperedges processed synchronously per cascade invalidation run
 /// to bound latency spikes. Any remaining hyperedges are returned in `deferred`.
 // ANCHOR[contextra-graph:SRC-CASCADE-001]
+
+// SECTION Cascade Core Implementation
 pub const MAX_HYPEREDGE_CASCADE_FANOUT: usize = 1_000;
 
 /// Default fan-out limit for hyperedge cascade invalidation per document (§6.8).
@@ -1090,3 +1092,5 @@ mod tests {
         );
     }
 }
+
+// !SECTION Cascade Core Implementation

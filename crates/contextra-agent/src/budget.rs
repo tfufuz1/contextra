@@ -6,6 +6,12 @@
 
 //! RAII budget management and token reservation for agent workflows (§6.3.3).
 
+// =========================================================================
+// SECTION: Token Budget & RAII Reservation
+// =========================================================================
+// ANCHOR[contextra-agent:budget-primitives]
+
+
 pub use contextra_types::types::budget::{
     BudgetStrategy, Reservation, ResourceBudget, ResourceTracker, TokenBudget,
 };
@@ -88,3 +94,5 @@ mod tests {
         assert_eq!(budget.consumed(), 400);
     }
 }
+
+// !SECTION

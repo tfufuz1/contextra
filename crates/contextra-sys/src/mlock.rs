@@ -1,6 +1,10 @@
-// ZWECK: Platform-aware RAM memory locking abstractions with policy enforcement (Ring 0 / SPEC §10.1 / INV-SYS-MEMLOCK-1)
-// INVARIANTEN: Zero panic; configurable mlock policy; madvise(MADV_DONTDUMP) integration; structured error propagation
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
+// =========================================================================
+// ANCHOR[id=sys-mlock-main,epic=sys-mlock,seq=0] RAM Memory Locking & Schutz
+// =========================================================================
+// LINK crates/contextra-sys/src/lib.rs
+// NOTE: Platform-aware RAM memory locking abstractions with policy enforcement (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-SYS-MEMLOCK-1).
+// Invariante: Zero panic; configurable mlock policy; madvise(MADV_DONTDUMP) integration; structured error propagation.
+// Keine unzulässigen Garantieversprechen (SPEC §6.4).
 
 //! # Modul: Speichersperrung im Arbeitsspeicher (`mlock`)
 //!
@@ -11,9 +15,9 @@
 //! Core-Dumps auszuschließen (INV-SYS-MEMLOCK-1).
 //!
 //! ## Ring-Zugehörigkeit und Sicherheitsrelevanz
-//! - **Ring 0 (Kern / Unsafe-Insel):** Direkte Aufrufe von POSIX `libc::mlock` / `libc::munlock`
+//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Direkte Aufrufe von POSIX `libc::mlock` / `libc::munlock`
 //!   / `libc::madvise(MADV_DONTDUMP)` bzw. Windows `VirtualLock` / `VirtualUnlock`.
-//! - **Kryptografischer Schutz:** Wenn kryptografische Schlüssel (z. B. für die Verschlüsselung
+//! - **Kryptografischer Schutz:** Wenn sensible Daten (z. B. für die Verschlüsselung
 //!   im Ruhezustand = Encryption-at-Rest) in den RAM geladen werden, bestünde bei einem Swap
 //!   das Risiko, dass Klartext-Schlüssel auf unverschlüsselten Swap-Partitionen landen.
 //! - **Konfigurierbare Fehlerrichtlinie ([`MemLockPolicy`]):**
@@ -25,6 +29,8 @@ use std::io::{Error as IoError, Result as IoResult};
 
 use crate::error::{Error, Result};
 
+// SECTION Fault Injection Harness
+// ANCHOR[id=sys-mlock-fault,epic=sys-mlock,seq=1] Test-Fehlerinjektion
 #[cfg(test)]
 pub(crate) mod fault_injection {
     use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -45,6 +51,10 @@ pub(crate) mod fault_injection {
         }
     }
 }
+// !SECTION Fault Injection Harness
+
+// SECTION Policy Definition
+// ANCHOR[id=sys-mlock-policy,epic=sys-mlock,seq=2] MemLockPolicy Enum
 
 /// Konfigurierbare Richtlinie für das Sperren von Speicherregionen (`mlock` / `VirtualLock`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -57,9 +67,17 @@ pub enum MemLockPolicy {
     #[default]
     Tolerant,
 }
+// !SECTION Policy Definition
+
+// SECTION Core Locking Functions
+// ANCHOR[id=sys-mlock-dontdump,epic=sys-mlock,seq=3] Core-Dump-Ausschluss (MADV_DONTDUMP)
 
 /// Schließt eine Speicherregion per `madvise(MADV_DONTDUMP)` aus Core-Dumps aus (Unix).
 /// Auf Nicht-Unix-Systemen ist dies ein no-op.
+///
+/// # Argumente
+/// * `ptr`: Zeiger auf den Beginn der Speicherregion.
+/// * `len`: Länge in Bytes.
 pub fn apply_dont_dump(ptr: *const u8, len: usize) -> Result<()> {
     if len == 0 || ptr.is_null() {
         return Ok(());
@@ -95,7 +113,13 @@ pub fn apply_dont_dump(ptr: *const u8, len: usize) -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[id=sys-mlock-typed,epic=sys-mlock,seq=4] mem_lock_typed
+
 /// Sperrt eine Speicherregion im RAM gemäß Richtlinie und liefert ein typisiertes [`Result<bool>`].
+///
+/// Liefert `Ok(true)`, wenn das Sperren erfolgreich war.
+/// Liefert `Ok(false)`, wenn das Sperren fehlschlug, aber `policy == MemLockPolicy::Tolerant` gewählt wurde.
+/// Liefert [`crate::Error::MemoryLockFailed`], wenn das Sperren fehlschlug und `policy == MemLockPolicy::FailClosed` gewählt wurde.
 pub fn mem_lock_typed(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
     if len == 0 || ptr.is_null() {
         return Ok(true);
@@ -197,6 +221,8 @@ pub fn mem_lock_typed(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Resu
     }
 }
 
+// ANCHOR[id=sys-mlock-compat,epic=sys-mlock,seq=5] mem_lock_with_policy und mem_lock / mem_unlock
+
 /// Sperrt unter POSIX/Windows eine Speicherregion im RAM, um das Auslagern (Swapping) zu verhindern.
 pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> IoResult<bool> {
     mem_lock_typed(ptr, len, policy).map_err(Into::into)
@@ -234,7 +260,10 @@ pub fn mem_unlock(addr: usize, len: usize) {
 pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
     mem_lock_typed(ptr, len, MemLockPolicy::Tolerant).unwrap_or(false)
 }
+// !SECTION Core Locking Functions
 
+// SECTION Unit Tests
+// ANCHOR[id=sys-mlock-tests,epic=sys-mlock,seq=6] Mlock-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,3 +325,4 @@ mod tests {
         Ok(())
     }
 }
+// !SECTION Unit Tests

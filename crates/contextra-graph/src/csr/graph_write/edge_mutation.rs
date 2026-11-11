@@ -3,12 +3,21 @@
 //! # Zweck
 //! Führt Kantenaktualisierungen durch und pflegt Adjazenzvektoren sowie Inverted Lists.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::super::types::EdgePayload;
 use super::CsrGraph;
 use crate::consistency_enforcement::EdgeAssertion;
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use std::sync::Arc;
 
+
+// SECTION Edge Mutation Core Implementation
 impl CsrGraph {
     fn check_consistency_before_insert(
         &self,
@@ -213,3 +222,5 @@ impl CsrGraph {
         Ok(())
     }
 }
+
+// !SECTION Edge Mutation Core Implementation

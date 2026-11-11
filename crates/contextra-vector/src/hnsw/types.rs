@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// ZWECK: Kern-Datenstrukturen, Lock-Hierarchie und Lifecycle-Zustände für HNSW.
+// INVARIANTEN: Lock-Hierarchie: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes -> arena.
+// HOTSPOTS: HnswHotCore, HnswColdCore, HnswIndexCore, GenericHnswIndex, save_internal
+// STAND: TS:2026-11-11T02:00:00Z
+
 use roaring::RoaringTreemap;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -10,15 +16,24 @@ use super::config::HnswConfig;
 use super::sq8_bias::Sq8Bias;
 use crate::distance::{DistanceKernel, ScalarKernel};
 
+// SECTION HNSW-Konstanten
+
+// ANCHOR[contextra-vector:HNSW-SENTINEL-ENTRY]
 /// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
 
+// ANCHOR[contextra-vector:HNSW-REBUILD-RATIO]
 /// Standard-Löschanteil (0.10 = 10 % gelöschte Knoten), ab dem ein Rebuild getriggert wird.
 pub const HNSW_REBUILD_DELETION_RATIO: f64 = 0.10;
 
+// ANCHOR[contextra-vector:HNSW-DEFAULT-SEED]
 /// Default-Seed für die deterministische HNSW-Ebenenzuweisung (wie in hnswlib üblich).
 pub const DEFAULT_LAYER_SEED: u64 = 100;
+// !SECTION
 
+// SECTION Vektordaten & Graphknoten
+
+// ANCHOR[contextra-vector:HNSW-VECTOR-DATA]
 #[derive(Debug, Clone)]
 pub enum VectorData {
     /// Standard 32-bit floating point vectors.
@@ -27,6 +42,7 @@ pub enum VectorData {
     U8(Vec<u8>),
 }
 
+// ANCHOR[contextra-vector:HNSW-NODE]
 /// A node in the HNSW graph.
 #[derive(Debug)]
 pub struct HnswNode {
@@ -36,6 +52,7 @@ pub struct HnswNode {
     pub(super) committed_tx: u64,
 }
 
+// ANCHOR[contextra-vector:HNSW-CANDIDATE]
 /// Search candidate.
 #[derive(Clone, Copy, Debug)]
 pub struct Candidate {
@@ -62,6 +79,7 @@ impl Ord for Candidate {
     }
 }
 
+// ANCHOR[contextra-vector:HNSW-REBUILD-GUARD]
 pub struct RebuildGuard<'a>(pub &'a AtomicBool, pub &'a parking_lot::Condvar);
 
 impl<'a> Drop for RebuildGuard<'a> {
@@ -72,6 +90,7 @@ impl<'a> Drop for RebuildGuard<'a> {
     }
 }
 
+// ANCHOR[contextra-vector:HNSW-SNAPSHOT-PIN-GUARD]
 pub struct SnapshotPinGuard<'a>(pub &'a HnswIndexCore, u64);
 
 impl<'a> SnapshotPinGuard<'a> {
@@ -86,7 +105,11 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
         self.0.cold.seq_log.write().unpin_snapshot(self.1);
     }
 }
+// !SECTION
 
+// SECTION Generic & Default HnswIndex
+
+// ANCHOR[contextra-vector:HNSW-GENERIC-INDEX]
 /// Generic HNSW (Hierarchical Navigable Small World) vector index parameterized by distance kernel.
 pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
     pub(super) inner: std::sync::Arc<HnswIndexCore>,
@@ -95,7 +118,11 @@ pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
 
 /// The default HNSW vector index using the scalar reference distance kernel.
 pub type HnswIndex = GenericHnswIndex<ScalarKernel>;
+// !SECTION
 
+// SECTION HotCore & ColdCore Split
+
+// ANCHOR[contextra-vector:HNSW-HOT-CORE]
 #[repr(align(64))]
 pub struct HnswHotCore {
     pub nodes: RwLock<Vec<HnswNode>>,
@@ -193,6 +220,7 @@ impl HnswHotCore {
     }
 }
 
+// ANCHOR[contextra-vector:HNSW-COLD-CORE]
 pub struct HnswColdCore {
     pub config: HnswConfig,
     pub validation_error: Option<String>,
@@ -218,6 +246,7 @@ pub struct HnswColdCore {
     pub fault_injection_insert_count: AtomicU64,
 }
 
+// ANCHOR[contextra-vector:HNSW-INDEX-CORE]
 /// The core implementation of the HNSW index.
 pub struct HnswIndexCore {
     pub hot: HnswHotCore,
@@ -233,9 +262,13 @@ pub enum RebuildStatus {
     /// Rebuild wurde getriggert, startet bald.
     Pending,
 }
+// !SECTION
+
+// SECTION HnswIndex Konstruktoren & Operationen
 
 impl HnswIndex {
     /// Creates a new HNSW index with explicit random number generator and clock injection for full determinism (B11).
+    // ANCHOR[contextra-vector:HNSW-NEW-RNG-CLOCK]
     pub fn try_new_with_rng_and_clock(
         config: HnswConfig,
         rng: std::sync::Arc<dyn contextra_ports::Rng>,
@@ -519,7 +552,6 @@ impl HnswIndex {
             tombstone_map.insert(id, deleted_guard.contains(id));
         }
 
-
         let regions = crate::partial_rebuild::should_trigger_partial_rebuild(
             &tracker,
             &tombstone_map,
@@ -757,6 +789,7 @@ impl HnswIndex {
         Ok(())
     }
 
+    // ANCHOR[contextra-vector:HNSW-SAVE-INTERNAL]
     pub(super) fn save_internal(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         let inner = &self.inner;
         let path_buf = path.as_ref().to_path_buf();
@@ -969,3 +1002,4 @@ impl HnswIndex {
         self.save_sync(path)
     }
 }
+// !SECTION

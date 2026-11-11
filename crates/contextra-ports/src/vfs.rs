@@ -1,30 +1,26 @@
-//! Virtual File System (VFS) port trait definition.
+//! # Virtual File System (VFS) Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/fs.rs
 //!
 //! # SPEC-REF & Rule 5 Compliance
 //! In accordance with AGENTS.md Rule 5 ("I/O nur über `Vfs`") and contract V-VFS,
 //! all file system I/O operations in storage, engine, and index layers must interact
 //! exclusively through this abstract VFS interface.
 //!
-//! # Crash Consistency & Durability Contract
-//! Concrete implementations of [`Vfs`] must satisfy strict crash-consistency guarantees:
-//! - **Atomic Write (`write_atomic`)**:
-//!   1. Data must first be written completely to a temporary file in the target directory (or sibling location on the same filesystem).
-//!   2. The temporary file must be explicitly flushed/synced to disk (`fsync` / `FlushFileBuffers`).
-//!   3. The temporary file must be atomically renamed to the target `path`.
-//!   4. The parent directory must be synced (`sync_dir`) to ensure directory entry durability on filesystems like ext4/xfs.
-//!   5. If any failure occurs prior to final rename, the original file at `path` must remain untouched and uncorrupted.
-//! - **Directory Sync (`sync_dir`)**:
-//!   Flushes pending directory metadata changes (file additions/deletions/renames) to persistent storage.
-//! - **Fail-Closed Propagation**:
-//!   I/O errors must be converted into [`ContextraError::Io`](crate::error::ContextraError::Io) or appropriate domain errors
-//!   and propagated immediately. Swallowing I/O errors or ignoring sync returns is strictly prohibited.
-//! - **Cancel-Safety**:
-//!   Synchronous VFS operations are inherently non-preemptible by async cancellations once executing within OS boundaries.
+//! // ANCHOR[contextra-ports:VFS-001]
+//! // SECTION vfs-contracts
+//! // NOTE: Vfs ist synchron gehalten (SPEC §10 K1, B08), um Blockaden im async-Kontext
+//! // via spawn_blocking handhabbar zu machen und deterministische Durability zu sichern.
+//! // Crash Consistency & Durability Contract:
+//! // 1. Atomic Write (`write_atomic`): Temp-File -> Fsync -> Atomic Rename -> Sync Dir.
+//! // 2. Fail-Closed: Sync-Fehler vergiften Handles (`INV-FSYNC-1`).
 
 use crate::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+// ANCHOR[contextra-ports:VFS-TYPES-001]
 /// Method via which medium verification was performed (SPEC D-113).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VerifiedVia {
@@ -72,6 +68,7 @@ impl VfsOpenOptions {
     }
 }
 
+// ANCHOR[contextra-ports:VFS-FILE-001]
 /// Abstract file handle providing positional I/O without modifying internal file offsets.
 pub trait VfsFile: Send + Sync {
     /// Reads data from byte offset `offset` into `buf` without moving the file pointer.
@@ -158,6 +155,7 @@ pub trait VfsFile: Send + Sync {
     fn sync_all(&self) -> std::io::Result<()>;
 }
 
+// ANCHOR[contextra-ports:VFS-TRAIT-001]
 /// Abstract object-safe Virtual File System interface.
 ///
 /// Implements required file operations for LSM storage engine, SSTables, WAL sidecars,
@@ -402,3 +400,4 @@ impl<T: Vfs + ?Sized> Vfs for Arc<T> {
         (**self).sync_dir(path)
     }
 }
+// !SECTION vfs-contracts

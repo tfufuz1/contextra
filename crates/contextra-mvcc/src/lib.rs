@@ -6,9 +6,9 @@
 //! Leser sehen konsistente Snapshots (Schnappschüsse) zu einem logischen Zeitpunkt,
 //! während Schreiber isoliert neue Versionen im Staging-Puffer vorbereiten.
 //!
-//! ## Architektur-Rolle (Ring 0 — Kernkomponente)
+//! ## Architektur-Rolle (Ring 0 / Ebene E1a — Kernkomponente)
 //!
-//! `contextra-mvcc` gehört zur innersten Systemschicht (Ring 0, Basis/Kern). Es bietet fundamentale
+//! `contextra-mvcc` gehört zur innersten Systemschicht (Ring 0 / Ebene E1a). Es bietet fundamentale
 //! Isolationsgarantien für relationale und vektorielle Indexstrukturen und besitzt keinerlei
 //! Kenntnisse über Festplatten-Layouts oder Netzwerkprotokolle.
 //!
@@ -77,21 +77,26 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+// ANCHOR[id=contextra-mvcc-exports]
 pub use crate::mvcc_error::{MvccError, Result as MvccResult};
 pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
 
-/// Kanonische Typen und Identifikatoren für MVCC.
+/// Kanonische Typen und Identifikatoren für MVCC aus `contextra-ids`.
 pub mod types {
     pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
 }
 
+// SECTION Workspace Compatibility Bridge
 #[cfg(feature = "workspace")]
 pub mod compat;
 
 #[cfg(feature = "workspace")]
-pub use crate::compat::{
-    workspace_error as error, ContextraError, Result, SeqBitTombstone, TombstoneSemanticsCheck,
-};
+pub use crate::compat::{workspace_error as error, ContextraError, Result};
+#[cfg(not(feature = "workspace"))]
+pub use crate::mvcc_error::Result;
+// !SECTION Workspace Compatibility Bridge
+
+// SECTION Core MVCC Modules
 pub mod mvcc_error;
 pub mod seq_log;
 pub mod snapshot;
@@ -104,13 +109,4 @@ pub use snapshot::{SnapshotGuard, SnapshotRegistry};
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use tx_buffer::{IndexOp, TxBuffer};
-
-/// Re-Exports für Types und Error-Brücken zur Wahrung der Quellkompatibilität.
-pub mod types {
-    pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
-}
-
-#[cfg(feature = "workspace")]
-pub use contextra_types::error::{self, ContextraError, Result};
-#[cfg(not(feature = "workspace"))]
-pub use crate::mvcc_error::Result;
+// !SECTION Core MVCC Modules

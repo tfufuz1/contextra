@@ -5,6 +5,12 @@
 
 //! Read-only tenant context retrieval tool.
 
+// =========================================================================
+// SECTION: Context Retrieval Tool
+// =========================================================================
+// ANCHOR[contextra-agent:retrieve-tool]
+
+
 use crate::context::AgentContext;
 use crate::step::{AgentTool, StepResult};
 use contextra_ports::BoxFuture;
@@ -149,3 +155,5 @@ impl AgentTool for RetrieveTool {
         2
     }
 }
+
+// !SECTION

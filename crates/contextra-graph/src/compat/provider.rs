@@ -1,5 +1,12 @@
 //! Generic `GraphProvider` trait and implementations for isolated graph algorithms.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
+// INVARIANTEN: Isolierte Workspace-Konvertierungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding};
 use crate::path_rag::PathGraph;
 use contextra_types::{EntityId, Result};
@@ -7,6 +14,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 /// Generic Graph Provider abstraction.
+
+// SECTION Provider Core Implementation
 pub trait GraphProvider: Send + Sync {
     /// Returns all active node IDs in the graph.
     fn node_ids(&self) -> Vec<EntityId>;
@@ -296,3 +305,5 @@ pub fn detect_communities_on_provider<G: GraphProvider>(
         })
         .collect())
 }
+
+// !SECTION Provider Core Implementation

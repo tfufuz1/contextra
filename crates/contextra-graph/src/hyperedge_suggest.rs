@@ -3,6 +3,13 @@
 //! Derives candidate hyperedges from entity co-occurrence in source documents,
 //! and provides LLM validation before candidates are committed via `relate_n_ary`.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Heuristisches und LLM-gestütztes Hyperkanten-Vorschlagssystem.
+// INVARIANTEN: Budgetierte Generierung von Hyperkanten-Kandidaten.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::error::GraphMutationError;
 use contextra_ports::LlmTextGenerator;
 use contextra_types::{DocId, EntityId};
@@ -11,6 +18,8 @@ use thiserror::Error;
 
 /// Maximum allowed participants in a hyperedge candidate (Combinatorial explosion guard, P5).
 // ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-001]
+
+// SECTION Hyperedge Suggest Core Implementation
 pub const MAX_RELATE_PARTICIPANTS: usize = 64;
 
 /// A candidate hyperedge derived from document co-occurrence.
@@ -182,3 +191,5 @@ pub async fn validate_candidates_with_llm(
 
     Ok(validated)
 }
+
+// !SECTION Hyperedge Suggest Core Implementation

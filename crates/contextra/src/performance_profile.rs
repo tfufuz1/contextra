@@ -216,9 +216,9 @@ mod tests {
         fn authorize(
             &self,
             ring: FeatureRing,
-        ) -> Result<contextra_ports::license::GateToken, contextra_ports::license::LicenseError>
+        ) -> Result<contextra_ports::license::AuthorizedRing, contextra_ports::license::LicenseError>
         {
-            Ok(contextra_ports::license::GateToken::for_test(ring))
+            contextra_ports::license::OpenFastGate.authorize(ring)
         }
     }
 

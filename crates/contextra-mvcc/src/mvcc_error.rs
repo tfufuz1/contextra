@@ -1,5 +1,8 @@
-// ANCHOR[contextra-mvcc:ERR-001]
+// ANCHOR[id=mvcc-error-root]
 //! # Lokale Fehlerdefinition für MVCC (`MvccError`)
+//!
+//! LINK crates/contextra-mvcc/src/lib.rs
+//! LINK crates/contextra-mvcc/src/compat/error.rs
 //!
 //! Gemäß SPEC-v2 §5.3 (B12):
 //! Kontextra-MVCC verwendet einen stark typisierten, lokalen Fehlertyp ohne
@@ -7,6 +10,8 @@
 
 use thiserror::Error;
 
+// SECTION Error Types
+// ANCHOR[id=mvcc-error-enum]
 /// Lokaler Fehlertyp für Multi-Version Concurrency Control und Transaktionsverwaltung.
 #[non_exhaustive]
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
@@ -42,6 +47,7 @@ pub enum MvccError {
 }
 
 impl MvccError {
+    // ANCHOR[id=mvcc-error-limit-exceeded]
     /// Hilfskonstruktor zur Erzeugung eines [`MvccError::LimitExceeded`].
     #[inline]
     pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self {
@@ -52,5 +58,7 @@ impl MvccError {
     }
 }
 
+// ANCHOR[id=mvcc-result-type]
 /// Lokaler Result-Typ für MVCC-Operationen.
 pub type Result<T, E = MvccError> = std::result::Result<T, E>;
+// !SECTION Error Types

@@ -20,10 +20,9 @@
 
 use crate::engine_local::collection::{Collection, StoredDocumentMeta};
 use crate::engine_local::transaction::CommitIntent;
+use crate::error::CognitionError;
 use crate::ports_local::{LlmTextGenerator, StorageEngine, VectorIndex};
-use crate::types_local::{
-    ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId,
-};
+use crate::types_local::{ContextChunk, DocId, Result, TenantId, TokenBudget, TxId};
 use std::sync::Arc;
 
 use super::compactor::ContextCompactor;
@@ -100,17 +99,18 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
             match self.collection.get_doc_tx(doc_id).await? {
                 Some(current_tx) => {
                     if current_tx.inner() > expected_tx.inner() {
-                        return Err(ContextraError::StaleRead(format!(
+                        return Err(CognitionError::StaleRead(format!(
                             "OCC conflict: Document {:?} was mutated during consolidation (snapshot tx={}, current tx={})",
                             doc_id, expected_tx, current_tx
-                        )));
+                        )).into());
                     }
                 }
                 None => {
-                    return Err(ContextraError::StaleRead(format!(
+                    return Err(CognitionError::StaleRead(format!(
                         "OCC conflict: Document {:?} was deleted or missing during consolidation",
                         doc_id
-                    )));
+                    ))
+                    .into());
                 }
             }
         }
@@ -230,9 +230,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         }
 
         if chunks.is_empty() {
-            return Err(ContextraError::NotFound(
+            return Err(CognitionError::NotFound(
                 "No source documents found for consolidation".to_string(),
-            ));
+            )
+            .into());
         }
 
         // 3. Generate summary via LLM
@@ -332,10 +333,11 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
                             })?;
                     }
                     Err(e) => {
-                        return Err(ContextraError::Serialization(format!(
+                        return Err(CognitionError::Serialization(format!(
                             "Consolidation commit: cannot deserialize meta for source doc {:?}: {}",
                             src_id, e
-                        )));
+                        ))
+                        .into());
                     }
                 },
                 None => {

@@ -34,6 +34,7 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "workspace")]
 pub mod compat;
 mod error;
 mod fs_seam;
@@ -42,8 +43,11 @@ mod hardlink_cloner;
 mod manifest;
 mod meta;
 mod orphan;
-mod source;
+mod snapshot_source;
 mod store;
+mod vfs;
+
+pub use vfs::CheckpointVfs;
 
 // Öffentliche Re-Exports für bequemen Zugriff von außen ohne tiefe Pfade
 pub use error::{CheckpointError, CheckpointResult};
@@ -62,5 +66,5 @@ pub use orphan::{
     pending_rollback_count, register_orphaned_checkpoint, register_pinned_seq_no_orphan,
     InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
-pub use source::{LocalBoxFuture, SnapshotSource};
+pub use snapshot_source::{BoxFuture as LocalBoxFuture, SnapshotSource};
 pub use store::{CheckpointRegistry, PersistentCheckpointStore};

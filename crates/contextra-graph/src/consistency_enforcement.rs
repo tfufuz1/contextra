@@ -16,7 +16,16 @@
 //! lediglich Kandidaten/Signale. Die tatsächliche Tombstone-Ausführung bleibt in der
 //! Verantwortung des Aufrufers.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Konsistenzprüfungen und Invarianten-Validierung im Graphen.
+// INVARIANTEN: Validierung von Kanten und Rollenbindungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 /// Opaker Zählertyp für DAG-Knoten (entkoppelt von session_dag).
+
+// SECTION Consistency Enforcement Core Implementation
 pub type NodeIdx = u64;
 
 use contextra_types::{EntityId, TxId};
@@ -481,3 +490,5 @@ mod tests {
         assert_eq!(deserialized.get_pattern(&hash), enforcer.get_pattern(&hash));
     }
 }
+
+// !SECTION Consistency Enforcement Core Implementation

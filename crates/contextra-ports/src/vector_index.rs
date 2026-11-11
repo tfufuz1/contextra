@@ -1,8 +1,16 @@
-//! Vector index trait definition and statistics.
-
-// FILE-CONTEXT
-// ZWECK: VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes.
-// INVARIANTEN: Rebuild-Triggering & Filtered Search Fallback.
+//! # Vector Index Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/text_index.rs
+//!
+//! Abstrakter Vertrag für hochperformante Vektor-Indizes (z. B. HNSW in `contextra-vector`).
+//!
+//! // ANCHOR[contextra-ports:VEC-001]
+//! // SECTION vector-index-contracts
+//! // NOTE: Verwendet AFIT / impl Future für null Overhead bei statischer Bindung.
+//! // Invarianten:
+//! // 1. INV-VEC-DETERMINISM: Gleiche Abfragevektoren liefern bei identischem Indexstand bit-gleiche Scores.
+//! // 2. INV-VEC-REBUILD: Rebuild-Triggering bei Akkumulation gelöschter Vektoren.
 
 use super::BoxFuture;
 use crate::types::{ContextChunk, DocId, ScoredDocument, TxId};
@@ -10,6 +18,7 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
+// ANCHOR[contextra-ports:VEC-STATS-001]
 /// Statistics for a vector index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VectorIndexStats {
@@ -30,11 +39,13 @@ pub struct VectorIndexStats {
 // INVARIANT: Implementor: HnswIndex (contextra-index/src/hnsw.rs)
 // Rebuild: Automatisch bei >20% bereinigten Nodes.
 
+// ANCHOR[contextra-ports:VEC-TRAIT-001]
 /// Vector Index Trait — abstrahiert die HNSW-Vektorsuche.
 ///
 /// # Dyn-Kompatibilität
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait VectorIndex: Send + Sync + 'static {
+    // ANCHOR[contextra-ports:VEC-MUT-001]
     /// Inserts a vector with an associated document ID.
     fn insert(
         &self,
@@ -67,6 +78,7 @@ pub trait VectorIndex: Send + Sync + 'static {
         }
     }
 
+    // ANCHOR[contextra-ports:VEC-SEARCH-001]
     /// Searches for the k nearest neighbors to a query vector.
     fn search(
         &self,
@@ -201,6 +213,7 @@ pub trait VectorIndex: Send + Sync + 'static {
         false
     }
 
+    // ANCHOR[contextra-ports:VEC-REBUILD-001]
     /// Triggers an asynchronous background rebuild of the index if supported.
     ///
     /// # Fehler
@@ -210,7 +223,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     fn trigger_rebuild_async(&self) {}
 }
 
-// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+// ANCHOR[contextra-ports:HYBRID-SEARCH-001]
 /// Contract for executing hybrid (vector + text) queries for profile routing.
 pub trait HybridSearchProvider: Send + Sync {
     /// Executes a hybrid query returning matched context chunks with relevance scores.
@@ -221,6 +234,7 @@ pub trait HybridSearchProvider: Send + Sync {
         top_k: usize,
     ) -> BoxFuture<'a, Result<Vec<ContextChunk>>>;
 }
+// !SECTION vector-index-contracts
 
 #[cfg(test)]
 mod tests {

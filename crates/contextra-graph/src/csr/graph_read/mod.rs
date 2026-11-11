@@ -3,6 +3,15 @@
 //! # Zweck
 //! Bündelt Nachbarschaftsabfragen, PageRank-Evaluation und Pfadfindungszugriffe.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+
+// SECTION Mod Core Implementation
 pub mod communities;
 pub mod pagerank;
 pub mod path_rag;
@@ -168,3 +177,5 @@ impl CsrGraph {
         GraphIndexExt::remove_entity(self, tx, entity).await
     }
 }
+
+// !SECTION Mod Core Implementation

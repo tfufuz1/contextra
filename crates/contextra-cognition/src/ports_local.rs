@@ -10,8 +10,8 @@
 pub use contextra_ports as ports;
 pub use ports::{
     BoxFuture, Clock, ContextSegment, GroundingValidator, IdGen, InMemoryMetricsSink, LayerScanner,
-    LayerWitness, LlmTextGenerator, MetricsSink, NoopMetricsSink, Purger,
-    ResponseGroundingValidator, Rng, SeededRng, SegmentSynthesizer, StorageEngine, StorageStats,
-    SystemClock, TextEmbeddingEngine, VectorIndex,
+    LayerWitness, LlmTextGenerator, MetricsSink, NoopMetricsSink, ResponseGroundingValidator, Rng,
+    SeededRng, SegmentSynthesizer, StorageEngine, StorageStats, SystemClock, TextEmbeddingEngine,
+    VectorIndex,
 };
 // !SECTION: Ports Re-Exports

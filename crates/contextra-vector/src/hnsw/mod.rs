@@ -3,6 +3,7 @@
 // INVARIANTEN: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes (HotState/ColdState).
 // NICHT-OFFENSICHTLICH: Multi-threaded Reads sperren nie write_mutex; background rebuild tauscht Core atomar via Swap.
 // HOTSPOTS: mod.rs (HnswIndex::insert, search, delete, rebuild, save)
+// STAND: TS:2026-11-11T02:00:00Z
 
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 //!
@@ -15,13 +16,32 @@
 //!
 //! Invariante: Kein Lock-Guard darf über I/O oder `.await`-Grenzen gehalten werden.
 
+// SECTION Öffentliche HNSW-Submodule
+
+// ANCHOR[contextra-vector:HNSW-MOD-ADAPTIVE-EF]
+// Dynamische Anpassung des ef-Search-Parameters basierend auf Selektivität und Latenz.
 pub mod adaptive_ef;
+// ANCHOR[contextra-vector:HNSW-MOD-ARENA]
+// Lock-freie und cache-effiziente Kanten-Arena für Graph-Nachbarschaften.
 pub mod arena;
+// ANCHOR[contextra-vector:HNSW-MOD-CLOCK]
+// Monotoner Zähler-Takt für deterministische Tests und Benchmarks.
 pub mod clock;
+// ANCHOR[contextra-vector:HNSW-MOD-DELETION]
+// Tombstone-Verwaltung, Slot-Nullung und GhostFreeVectorIndex.
 pub mod deletion;
+// ANCHOR[contextra-vector:HNSW-MOD-PURGE]
+// Deprecated Wartungs-Purger (Teil der Übergangsbrücke).
 pub mod purge;
+// ANCHOR[contextra-vector:HNSW-MOD-SCANNER]
+// Deprecated Wartungs-Scanner (Teil der Übergangsbrücke).
 pub mod scanner;
+// ANCHOR[contextra-vector:HNSW-MOD-SQ8-BIAS]
+// Asymmetrische Distanzkorrektur für quantisierte Vektoren.
 pub mod sq8_bias;
+// !SECTION
+
+// SECTION Kompatibilitäts-Exporte (Transitional Bridge)
 
 #[allow(deprecated)]
 #[cfg(feature = "ports-compat")]
@@ -29,6 +49,9 @@ pub use purge::{hnsw_purger, HnswPurger};
 #[allow(deprecated)]
 #[cfg(feature = "ports-compat")]
 pub use scanner::{hnsw_scanner, HnswScanner};
+// !SECTION
+
+// SECTION Private & Interne Module
 
 mod acorn_filtered;
 mod batch;
@@ -42,6 +65,9 @@ mod vector_index_impl;
 
 #[cfg(test)]
 mod tests;
+// !SECTION
+
+// SECTION Re-Exports der HNSW-Komponenten
 
 pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 pub use arena::{BacklinkTable, HnswArena};
@@ -58,3 +84,4 @@ pub use types::{
 pub use vector_index_impl::{HnswCompactStats, Index, Maintain};
 
 pub use staging::{VectorStagingOp, VectorTxBuffer};
+// !SECTION
