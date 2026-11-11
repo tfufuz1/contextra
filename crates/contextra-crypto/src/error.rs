@@ -10,6 +10,7 @@
 
 //! Error types for `contextra-crypto`.
 
+// SECTION [epic=crypto-error,seq=1] Imports
 use thiserror::Error;
 
 /// Result type alias for cryptographic operations in `contextra-crypto`.
@@ -18,6 +19,11 @@ pub type Result<T> = std::result::Result<T, CryptoError>;
 /// Standalone error type for all operations within `contextra-crypto`.
 #[derive(Debug, Error)]
 #[non_exhaustive]
+// !SECTION
+
+// SECTION [epic=crypto-error,seq=2] Kanonische Fehlerdefinition
+// ANCHOR[contextra-crypto:ERR-001] CryptoError Enum
+// NOTE: Typisierte Fehler ohne PII- oder Schlüssel-Lecks (TS:2026-11-11)
 pub enum CryptoError {
     #[error("key derivation failed: {0}")]
     KeyDerivation(String),
@@ -70,6 +76,9 @@ pub enum CryptoError {
     Storage(String),
 }
 
+// !SECTION
+
+// SECTION [epic=crypto-error,seq=3] Konstruktionshilfen
 impl CryptoError {
     /// Helper to construct a `WalCorruption` error.
     pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self {
@@ -84,3 +93,4 @@ impl CryptoError {
         Self::Storage(reason.into())
     }
 }
+// !SECTION
