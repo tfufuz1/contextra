@@ -1,6 +1,13 @@
+// FILE-CONTEXT
+// ZWECK: Monotoner Zeittakt für deterministische Tests und Benchmarks (B11).
+// INVARIANTEN: Zero-Panic; monoton steigend; thread-safe.
+// HOTSPOTS: MonotonicCounterClock::now_unix_nanos, MonotonicCounterClock::monotonic_nanos
+// STAND: 2026-11-12
+
 //! Clock implementation for HNSW vector index ensuring determinism (B11).
 
 use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::types::Clock;
 
 /// Deterministic monotonic counter clock for HNSW vector index.
