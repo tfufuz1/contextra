@@ -9,6 +9,12 @@
 
 //! Persistent Dead-Letter-Queue for failed agent step executions.
 
+// =========================================================================
+// SECTION: Persistent Dead-Letter Queue
+// =========================================================================
+// ANCHOR[contextra-agent:dlq-primitives]
+
+
 use crate::step::StepDeadLetter;
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, Result, TxId};
@@ -407,3 +413,5 @@ mod tests {
         Ok(())
     }
 }
+
+// !SECTION

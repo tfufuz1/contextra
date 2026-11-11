@@ -9,6 +9,12 @@
 //!
 //! Implements the core execution loop: checkpoint → execute → commit → audit → resolve-next.
 
+// =========================================================================
+// SECTION: Deterministic Orchestrator Engine Loop
+// =========================================================================
+// ANCHOR[contextra-agent:engine-core]
+
+
 use crate::context::{validate_node_id, AgentContext};
 use crate::dlq::DeadLetterQueue;
 use crate::graph::{AgentNode, NodeType, StateGraph};
@@ -848,3 +854,5 @@ mod fallback_tests {
         let _ = fallback.take_snapshot(contextra_types::TxId::new(1)).await;
     }
 }
+
+// !SECTION

@@ -1,5 +1,11 @@
 //! Adapter zur Anbindung von contextra-db Collections an das ContextStore-Port.
 
+// =========================================================================
+// SECTION: ContextStore Adapter for DbCollection
+// =========================================================================
+// ANCHOR[contextra-agent:compat-store-adapter]
+
+
 use crate::ports::ContextStore;
 use async_trait::async_trait;
 use contextra_types::Result;
@@ -30,3 +36,5 @@ impl<'a> ContextStore for DbCollectionStore<'a> {
         self.collection.delete_kv(key).await
     }
 }
+
+// !SECTION

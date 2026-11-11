@@ -10,6 +10,12 @@
 //! Provides append-only logging of every step an agent takes.
 //! Entries are stored via [`Collection`] and keyed `audit:{task_id}:step:{n}`.
 
+// =========================================================================
+// SECTION: Append-Only Immutable Audit Log
+// =========================================================================
+// ANCHOR[contextra-agent:audit-log]
+
+
 use crate::context::{validate_node_id, validate_task_id};
 use contextra_db::Collection;
 use contextra_ports::StorageEngine;
@@ -510,3 +516,5 @@ mod tests {
         Ok(())
     }
 }
+
+// !SECTION

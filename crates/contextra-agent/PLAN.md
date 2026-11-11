@@ -1,45 +1,35 @@
 # contextra-agent — Umsetzungsplan
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus docs/SPEC.md v3 §6.2 (S-63) und §3.1. Normativ gilt die Crate-Entkopplung und Modularisierung für Ebene E2.
 
-## 1. Vorbedingungen (global) [S]
+## 1. Status und Meilensteine
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+| Meilenstein | Beschreibung | Status |
+|---|---|---|
+| M-1: Inventar & Ports | Lokale Ports `ContextStore` und `ScratchpadStore` etabliert, `contextra-graph` aus Normal-Dependencies isoliert | Abgeschlossen |
+| M-2: Eigener Fehlertyp | `AgentError` mit `From`-Konvertierungen zu `ContextraError` etabliert | Abgeschlossen |
+| M-3: Systematische Inline-Kommentierung | Lückenlose Kommentierung nach Comment-Anchors-Schema, `FILE-CONTEXT`-Header, `ANCHOR`, `SECTION`/`!SECTION`, `NOTE` | In Arbeit |
+| M-4: S-63 Invertierung Vorbereitung | Vollständige Kapselung von `contextra-db`, `contextra-checkpoint`, `contextra-router` über Ports und optionale Features | Geplant |
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. Detaillierte Schritte dieses Crates
 
-## 2. Schritte dieses Crates [S]
+### Schritt S-63: Agent-Entkopplung & Invertierung
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-63 | `cognition` invertieren (Brücke in `db`), danach `agent` invertieren | S-37, S-50 | GL (`rg 'contextra_engine' src --glob '!compat/**'` leer; `cargo tree -p contextra-cognition -e normal` ohne `contextra-engine`) | Revert | ☐ offen |
+1. **Port-Abstraktion:**
+   - Alle Workflows nutzen `ContextStore` und `ScratchpadStore`.
+   - Direkte Zugriffe auf Storage (`contextra-db`, `contextra-checkpoint`) werden rein über Brückenmodule in `src/compat/` bereitgestellt.
 
-## 3. Reihenfolge-Zwang [S]
+2. **Feature-Closure Hygiene:**
+   - Feature `routing` isoliert die direkte Kopplung an `contextra-router`.
+   - Default-Features bleiben leer (`default = []`).
 
-Keine direkte Reihenfolgeregel im Zyklen-Absatz von §7. Gilt die globale Reihenfolge (S-00 → S-01 → S-02 → S-03).
+3. **Kommentierungs- und Dokumentationsstandard:**
+   - Alle Quelldateien erhalten standardisierte Header und Anker zur Navigation und Funktionserklärung.
+   - Bereinigung aller historischen Terminologien aus der Dokumentation.
 
-## 4. Definition of Done [S]
+## 3. Definition of Done
 
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+- Unveränderte Testkompatibilität über alle bestehenden 23 Testsuiten.
+- `#[forbid(unsafe_code)]` strikt eingehalten.
+- Keine neuen Panics oder nicht-deterministischen Pfade in Kern-Komponenten (`zero_panic_analyzer.py`, `determinism_guard.py`).
+- Quellcode vollständig nach verbindlichem Schema kommentiert.
