@@ -1,5 +1,12 @@
 //! Shadow comparison module comparing Forward-Push PPR against APPRH.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
+// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::diffusion::run_apprh_push;
 use super::error::ApprhError;
 use super::params::ApprhParams;
@@ -10,6 +17,8 @@ use std::cmp::Ordering;
 
 /// Formal default-flip gate trait evaluating whether APPRH can replace ForwardPush as default.
 // ANCHOR[contextra-graph:SRC-APPRH-SHADOW-001]
+
+// SECTION Shadow Core Implementation
 pub trait ApprhFlipGate {
     /// Evaluates whether APPRH meets default flip criteria.
     fn should_flip(&self, report: &ApprhShadowComparison) -> bool;
@@ -139,3 +148,5 @@ pub(crate) fn normalize_and_sort(map: &ahash::AHashMap<EntityId, f32>) -> Vec<(E
 
     vec
 }
+
+// !SECTION Shadow Core Implementation

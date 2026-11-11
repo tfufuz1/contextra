@@ -3,9 +3,18 @@
 //! # Zweck
 //! Testet Hinlänglichkeitsschwellen (`sufficiency_threshold`) und Hop-Begrenzungen.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Path-RAG und budgetierte K-Path Traversierung.
+// INVARIANTEN: Snapshot-Isolation bei Pfadsuche.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::*;
 
 // Einfacher Test-Graph
+
+// SECTION Tests Core Implementation
 struct TestGraph {
     edges: HashMap<EntityId, Vec<(EntityId, f32)>>,
 }
@@ -574,3 +583,5 @@ fn test_forward_push_ppr_self_participant_filtered() {
     // Only 'a' should be in scores (no panic or spurious nodes)
     assert!(scores.get(&a).is_some());
 }
+
+// !SECTION Tests Core Implementation

@@ -1,10 +1,19 @@
 //! Shadow mode hook for comparing TL-HFD PPR scores against baseline PPR scores (§12).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use ahash::AHashMap;
 use contextra_types::EntityId;
 
 /// Diskrepanz-Eintrag: Baseline-Ergebnis vs. Kandidaten-Ergebnis (§12).
 #[derive(Debug, Clone, PartialEq)]
+
+// SECTION Shadow Hook Core Implementation
 pub struct ShadowDiscrepancy<T> {
     /// Das Ergebnis des etablierten Baseline-Algorithmus.
     pub baseline: T,
@@ -109,3 +118,5 @@ mod tests {
         );
     }
 }
+
+// !SECTION Shadow Hook Core Implementation

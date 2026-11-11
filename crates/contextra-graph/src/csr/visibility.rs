@@ -3,6 +3,13 @@
 //! # Zweck
 //! Entscheidet, ob eine Kante oder ein Knoten zum Transaktionszeitpunkt `at_tx` sichtbar ist.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_types::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
@@ -14,6 +21,8 @@ use contextra_types::TxId;
 ///
 /// Wert gewählt als `1_400_000_000 * 1_000_000_000` (1. Jan 2014 UTC in ns).
 // ANCHOR[contextra-graph:SRC-CSR-VISIBILITY-001]
+
+// SECTION Visibility Core Implementation
 pub const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000;
 
 /// Prüft, ob `tx` aus einem verdächtigen (wall-clock-ähnlichen) Bereich stammt.
@@ -87,3 +96,5 @@ pub fn is_edge_visible_bitemporal(
     }
     true
 }
+
+// !SECTION Visibility Core Implementation

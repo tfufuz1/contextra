@@ -26,6 +26,8 @@ use parking_lot::Mutex;
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
 // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-001]
+
+// SECTION Edge Reinforcement Buffer Core Implementation
 pub struct CooccurrenceSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -216,3 +218,5 @@ mod tests {
         assert_eq!(buf.traversal_count(), 0);
     }
 }
+
+// !SECTION Edge Reinforcement Buffer Core Implementation

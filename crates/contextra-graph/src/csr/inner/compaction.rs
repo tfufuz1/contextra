@@ -3,11 +3,20 @@
 //! # Zweck
 //! Entfernt durch Tombstones als gelöscht markierte Kanten und konsolidiert Array-Offsets.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_types::{DocId, EntityId, TxId};
 
 use super::super::types::{EdgePayload, InternalIndex};
 use super::GraphInner;
 
+
+// SECTION Compaction Core Implementation
 impl GraphInner {
     // ANCHOR[contextra-graph:SRC-CSR-INNER-COMPACTION-001]
     pub fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
@@ -246,3 +255,5 @@ impl GraphInner {
         );
     }
 }
+
+// !SECTION Compaction Core Implementation
