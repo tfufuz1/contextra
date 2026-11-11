@@ -16,6 +16,13 @@ pub type Result<T> = core::result::Result<T, Error>;
 pub trait Clock: Send + Sync {
     fn now_unix_ms(&self) -> u64;
 }
+
+impl<T: contextra_env::Clock> Clock for T {
+    #[inline]
+    fn now_unix_ms(&self) -> u64 {
+        self.now_unix_nanos() / 1_000_000
+    }
+}
 pub trait Rng: Send {
     fn next_u64(&mut self) -> u64;
 }

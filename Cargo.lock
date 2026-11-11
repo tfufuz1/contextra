@@ -1407,6 +1407,8 @@ dependencies = [
  "bincode",
  "blake3",
  "bytes",
+ "contextra-env",
+ "contextra-ids",
  "contextra-ports",
  "contextra-types",
  "criterion",
