@@ -1,66 +1,86 @@
-# Abschlussbericht Auftrag S-38: contextra-crypto
+# DECOUPLING REPORT: contextra-crypto (P2)
 
-## 1. Gate-Matrix
-- **G-A (Kernvollständigkeit):**
-  - Befehl: `cargo check -p contextra-crypto --no-default-features --locked`
-  - Ergebnis: GRÜN (0 Fehler).
-  - Befehl: `cargo test -p contextra-crypto --no-default-features --test core_smoke --locked`
-  - Ergebnis: GRÜN (1 passed, 0 failed).
-- **G-B (Feature-Matrix):**
-  - Befehl: `cargo check -p contextra-crypto --no-default-features --features <f> --locked` für alle Features (`kv-encryption`, `test-utils`, `cloud-egress-guard`, `workspace`).
-  - Ergebnis: GRÜN.
-- **G-C (Qualität):**
-  - Befehl: `cargo fmt -p contextra-crypto -- --check`
-  - Ergebnis: GRÜN.
-  - Loom-Tests:
-    - `RUSTFLAGS="--cfg loom" cargo test --release -p contextra-crypto --test loom_kv_deferred_zeroize` -> GRÜN.
-    - `RUSTFLAGS="--cfg loom" cargo test --release -p contextra-crypto --test loom_eviction_worker_shutdown_race` -> GRÜN.
-- **G-D (Null-Prüfung):**
-  - Befehl: `grep -rEn 'contextra_(types|ports|testkit)' crates/contextra-crypto/src --include=*.rs | grep -v '/compat/'`
-  - Ergebnis: LEER (0 Treffer).
-  - Befehl: `python3 tools/count_bridge_refs.py -c contextra-crypto`
-  - Ergebnis: 0.
-- **G-E (Layering und Isolation):**
-  - Befehl: `cargo tree -p contextra-crypto -e normal --no-default-features`
-  - Ergebnis: Keine unerlaubten internen Abhängigkeiten.
-- **G-F (Standalone):**
-  - Befehl: `cargo build -p contextra-crypto --no-default-features --example standalone --locked` -> GRÜN.
-  - Befehl: `cargo test -p contextra-crypto --no-default-features --doc --locked` -> GRÜN.
-- **G-G (Konsumentenprobe):**
-  - Befehl: `cargo check --workspace --lib --bins --locked`
-  - Ergebnis: GRÜN nach jedem Commit.
-- **G-H (Disjunktheit):**
-  - Befehl: `git diff --stat origin/main...HEAD`
-  - Ergebnis: Ausschließlich Dateien unter `crates/contextra-crypto/**` und `crates/contextra-kvcache/**`.
-- **G-I (Formate):**
-  - Befehl: `cargo test -p contextra-crypto --no-default-features --test golden_corpus --locked`
-  - Ergebnis: GRÜN (3 passed, 1 ignored; alle Prüfungen gegen `MANIFEST.sha256` erfolgreich).
+## 1. Baseline (V0)
+- **V0a (`cargo check -p contextra-crypto --no-default-features`):** Baute vor dem Umbau, aber mit harten Abhängigkeiten auf `contextra-types` und `contextra-ports`.
+- **V0b (`cargo check -p contextra-crypto --all-targets`):** Baute vor dem Umbau erfolgreich.
+- **V0c (`cargo test -p contextra-crypto --lib`):** 111 Tests passed, 0 failed.
+- **V0d (Clippy Baseline):** 146 Pre-existing Errors unter `-D warnings`.
+- **V0e (Golden Corpus):** Bekannte Diskrepanz in `dek_wrapping.bin` Hash im Manifest (in `FINDINGS.md` notiert).
 
-## 2. Abweichungen von Prompt und Spec
-- Die eingecheckte Golden-Datei `dek_wrapping.bin` enthielt fälschlicherweise eine Escaped-String-Repräsentation statt roher Bytes; wurde repariert, sodass die SHA-256-Prüfung exakt übereinstimmt.
+## 2. Durchgeführte Arbeitspakete und Commits
+- **WP-1 (Commit `f4b9ab33e`):** `contextra-ids` und `contextra-env` zu `Cargo.toml` hinzugefügt; `contextra-types` und `contextra-ports` als optional hinter Feature `workspace` gelegt; `default = ["kv-encryption", "workspace"]`; `compat` in `lib.rs` hinter `#[cfg(feature = "workspace")]` gegatet.
+- **WP-2 (Commit `7a443ccc7`):** Reiner Pfadtausch `TenantId`, `DocId`, `TxId`, `TenantScoped` von `contextra_types` nach `contextra_ids` in allen Kernmodulen (`store.rs`, `segment.rs`, `eviction_worker.rs`, `crypto.rs`, `kv_cipher.rs`, `audit_chain.rs`).
+- **WP-3 (Commit `cfbf86aff`):** `CryptoError::Storage` von `contextra_types::ContextraError` auf `String` umgestellt; in `compat/error.rs` `impl From<ContextraError> for CryptoError` bereitgestellt; `KvCipher` Trait und Implementierungen im Kern auf lokales `crate::Result<Vec<u8>>` / `CryptoError` umgestellt; tabellengetriebenen Test erweitert.
+- **WP-4 (Commit `30316cd89`):** Lokalen `ModelFingerprint` struct im Kern (`kv_cipher.rs`) implementiert mit exakt identischen Feldern und Serde-Attributen; bidirektionale `From`-Konvertierungen in `src/compat/model_fingerprint.rs` hinter `workspace` bereitgestellt.
+- **WP-5 (Commit `e279e070a`):** Alle Kern-Doc-Kommentare und Tests bereinigt, sodass keine verbotenen Crate-Namen mehr vorkommen. Null-Prüfung V5 bestätigt: 0 Treffer.
 
-## 3. Getroffene Entscheidungen
-- `KeyManager` verfügt additiv über `[u8; 32]`-Signaturen (`derive_kv_key_bytes`, `derive_kv_key_scoped_bytes`, `cipher_for_bytes`, `cipher_for_scoped_bytes`), um ohne `ModelFingerprint`-Kopplung genutzt werden zu können.
-- KV-Code verbleibt in `contextra-crypto` unverändert additiv markiert (`// MIGRATION(S-38): Besitzer wird contextra-kvcache`), um Fremdnutzer (`contextra-infer-candle`, `contextra-store`) nicht zu brechen.
+## 3. Verifikationsergebnisse (V1 bis V7)
 
-## 4. Offene Punkte und Risiken
-- Keine offenen Punkte für `contextra-crypto`.
+### V1: Kern-Kompilierung
+```bash
+cargo check -p contextra-crypto --no-default-features
+```
+**Ergebnis:** Grün (Erfolg).
 
-## 5. Übergaben an den Orchestrator
-- **Löschung des KV-Codes in contextra-crypto:** Sobald alle Fremdnutzer migriert sind.
-- **Fremdnutzer-Inventar:**
-  - `crates/contextra-infer-candle/src/kv_bridge.rs:13`: `EncryptedKvLayer`, `KvSegment`, `KvSegmentCipher`, `TenantIsolatedKvStore`, `CryptoKey`, `EvictionWorker`.
-  - `crates/contextra-infer-candle/benches/kv_bridge_bench.rs:8`: `CryptoKey`, `KvSegmentCipher`, `TenantIsolatedKvStore`.
-  - `crates/contextra-infer-candle/tests/kv_bridge_*.rs`: `CryptoKey`, `KvSegment`, `KvSegmentCipher`, `TenantIsolatedKvStore`.
-  - `crates/contextra-store/src/wal/encode.rs:11`: `WalHmac`.
-  - `crates/contextra-store/src/wal/replay.rs:10`: `IntegrityVerifier`, `WalEntrySnapshot`.
-  - `crates/contextra-store/src/wal/io.rs:5`: `IntegrityVerifier`, `WalEntrySnapshot`.
-  - `crates/contextra-store/src/wal/mod.rs:343`: `KeyManager`.
-  - `crates/contextra-store/src/lsm/recovery.rs:373`: `verify_wal_chain_completeness`.
-  - `crates/contextra-mcp/src/sandbox.rs:234`: `CryptoKey`.
-- **Default-Flip für Z:** `default = ["kv-encryption", "workspace"]` bleibt vorerst aktiv, da `contextra-store` und `contextra-infer-candle` darauf angewiesen sind.
+### V2: Alle Targets und Feature-Kombinationen
+```bash
+cargo check -p contextra-crypto --all-targets
+cargo check -p contextra-crypto --no-default-features --features workspace --all-targets
+```
+**Ergebnis:** Beide Befehle grün (Erfolg).
 
-## 6. Messwerte
-- Fehler ohne Default-Features vorher: 0
-- Fehler ohne Default-Features nachher: 0
-- Restzahl der Null-Prüfung: 0
+### V3: Unit- und Integrationstests
+```bash
+cargo test -p contextra-crypto --lib
+```
+**Ergebnis:** 111 passed; 0 failed; 0 ignored.
+Lange/Stress-Tests (`test_1m_nonce_uniqueness_stress`, `test_nonce_uniqueness_smoke_1m`, `test_h3_nonce_uniqueness_200k_encryptions`) laufen im Release-Profil in < 1 Sekunde erfolgreich durch.
+
+### V4: Clippy
+```bash
+cargo clippy -p contextra-crypto --all-targets -- -D warnings
+```
+**Ergebnis:** Es traten keine neuen Warnungen oder Fehler durch die Entkopplung auf (146 unveränderte Pre-existing Lints im Crate).
+
+### V5: Null-Prüfung (muss leer sein)
+```bash
+grep -rEn 'contextra_(types|ports|testkit)' crates/contextra-crypto/src --include=*.rs | grep -v '/compat/'
+```
+**Ergebnis:** Leer (0 Treffer).
+
+### V6: Kern-Closure
+```bash
+cargo tree -p contextra-crypto -e normal --no-default-features --prefix none | grep '^contextra-' | sort -u
+```
+**Ergebnis:**
+- `contextra-crypto v0.1.0`
+- `contextra-env v0.1.0`
+- `contextra-ids v0.1.0`
+Exakt die erlaubten Kern-Abhängigkeiten.
+
+### V7: Workspace- und Konsumenten-Probe
+- `contextra-infer-candle`: `cargo check -p contextra-infer-candle --all-targets` -> GRÜN.
+- `contextra-kvcache`: `cargo check -p contextra-kvcache --all-targets` -> GRÜN.
+- Upstream-Workspace: Enthält auf `origin/main` bekannte Compilerfehler in `contextra-store` (`sstable/builder.rs` unclosed delimiter) und `contextra-checkpoint` (fehlende Typen). Diese liegen außerhalb von `contextra-crypto` und wurden per Regel H1 nicht modifiziert.
+
+## 4. Fassaden-Liste (T2-Fälle)
+- `ModelFingerprint`: Nun als identischer lokaler Typ im Kern von `contextra-crypto` definiert. Konsumenten, die `contextra_crypto::ModelFingerprint` importieren, erhalten den Typen direkt. Unter `workspace` wird `impl From<contextra_types::ModelFingerprint> for ModelFingerprint` und `impl From<ModelFingerprint> for contextra_types::ModelFingerprint` in `compat/model_fingerprint.rs` bereitgestellt.
+- `KvCipher`: Trait liefert nun `crate::Result<Vec<u8>>` mit lokalem `CryptoError`. Konsumenten mit `?` auf `ContextraError` kompilieren dank `From<CryptoError> for ContextraError` in `compat/error.rs` nahtlos weiter.
+- `CryptoError::Storage`: Nutzt nun `Storage(String)` im Kern. `From<ContextraError> for CryptoError` wandelt in `Storage(e.to_string())` um.
+
+## 5. Fremdnutzer-Inventar und Übergaben
+- `crates/contextra-infer-candle/src/kv_bridge.rs`: Verwendet `KvSegmentCipher`, `KvSegment`, `TenantIsolatedKvStore`.
+- `crates/contextra-kvcache/src/store.rs`: Verwendet `KvSegmentCipher`, `ModelFingerprint`, `CryptoError`.
+- `crates/contextra-kvcache/src/segment.rs`: Verwendet `CryptoKey`, `CryptoError`, `EncryptedKvLayer`, `KvSegmentCipher`, `ModelFingerprint`, `KvCipher`.
+- `crates/contextra-kvcache/src/service.rs`: Verwendet `EncryptedKvLayer`, `KvSegmentCipher`, `ModelFingerprint`.
+- `crates/contextra-store/src/wal/encode.rs`, `replay.rs`, `io.rs`, `mod.rs`: Verwendet `WalHmac`, `IntegrityVerifier`, `KeyManager`.
+- `crates/contextra-mcp/src/sandbox.rs`: Verwendet `CryptoKey`.
+
+### Zukünftiger Default-Flip (Entfernen von `workspace` aus Defaults)
+Folgende Crates müssten bei einem späteren Flip `workspace` explizit aktivieren, falls sie Features aus `compat/` (z. B. `From<ContextraError>` oder `contextra-types::ModelFingerprint`) benötigen:
+- `crates/contextra-infer-candle/Cargo.toml`: `contextra-crypto = { ..., features = ["workspace"] }`
+- `crates/contextra-kvcache/Cargo.toml`: `contextra-crypto = { ..., features = ["workspace"] }`
+
+## 6. Offene Punkte und Risiken
+- Keine offenen Punkte in `contextra-crypto`.
+- Unveränderter Golden-Corpus-Befund `dek_wrapping.bin` bleibt in `FINDINGS.md` für zukünftige Wartung dokumentiert.

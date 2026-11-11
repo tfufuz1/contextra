@@ -988,8 +988,7 @@ mod tests_cr42_differential {
     #[test]
     fn test_derive_kv_key_bytes_deterministic_and_matches_reference() -> Result<()> {
         let km = KeyManager::try_new("master-passphrase-differential!!", b"salt42")?;
-        let tenant =
-            TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant = TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
         let fp_bytes = [0x5Au8; 32];
 
         let key_1 = km.derive_kv_key_bytes(tenant, &fp_bytes)?;
@@ -1025,8 +1024,7 @@ mod tests_cr42_differential {
     #[test]
     fn test_derive_kv_key_preserves_bit_level_compatibility() -> Result<()> {
         let km = KeyManager::try_new("master-passphrase-differential!!", b"salt42")?;
-        let tenant =
-            TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
+        let tenant = TenantId::try_new(101).map_err(|e| CryptoError::InvalidInput(e.to_string()))?;
         let fp = crate::kv_cipher::ModelFingerprint {
             hash: [0x5Au8; 32],
             model_id: "test-model-llama".to_string(),

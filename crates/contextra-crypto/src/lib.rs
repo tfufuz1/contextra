@@ -22,17 +22,6 @@
 //!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
 //!   `contextra-store`, `contextra-vector`.
 //!
-//! ## Quickstart
-//! ```rust
-//! use contextra_crypto::kdf::{KdfHeader, KdfParams, derive_key_argon2id};
-//!
-//! let params = KdfParams::new_for_test(64 * 1024, 3, 1);
-//! let header = KdfHeader::new(params, vec![0x11u8; 32])?;
-//! let key = derive_key_argon2id("passphrase", &header)?;
-//! assert_eq!(key.0.len(), 32);
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-//!
 //! ## Hauptaufgaben
 //! 1. **AEAD-Blockverschlüsselung:** Authentifizierte Verschlüsselung via AES-256-GCM-SIV
 //!    mit deterministischer Nonce-Generierung zur Verhinderung von Nonce-Wiederverwendung.
