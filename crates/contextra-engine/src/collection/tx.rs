@@ -2,13 +2,24 @@
 //!
 //! **Zweck:** Transaktionskontext-Bindung für Lese- und Schreiboperationen auf Collections.
 //!
-//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
-//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 3, Klasse C).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation,
+//! streng monoton steigende `TxId`-Sequenzen.
+
+// FILE-CONTEXT
+// ZWECK: Monotone TxId-Allokation und Start neuer DbTransactions auf Collections.
+// INVARIANTEN: Monoton steigende TxId-Allokation via AtomicU64 (INV-TX-MONOTONIC-1); niemals aus der Uhr ableiten.
+// STAND: 2026-11-11
 
 use super::Collection;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{Result, TxId};
 use std::sync::atomic::Ordering;
+
+// SECTION Transaction-Allocation
+// ANCHOR[id=engine-tx-allocation,epic=transactions,seq=1]
+// NOTE: Allokation von Sequenznummern für MVCC-Transaktionen und SSI-Sichtbarkeitsfilterung.
+// LINK crates/contextra-engine/src/transaction/db_transaction.rs#engine-db-transaction
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Generates and returns the next sequential transaction ID for this collection.
@@ -20,7 +31,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.allocate_tx()
     }
 
+    // ANCHOR[id=engine-allocate-tx,epic=transactions,seq=2]
+    // NOTE: Allokiert eine eindeutige, atomar inkrementierte Transaction-ID.
     /// Allokiert eine eindeutige, atomar inkrementierte Transaction-ID.
+    ///
     /// Externe Crates verwenden diese Methode statt eigener TxId-Generierung.
     /// Verhindert TxId-Kollisionen bei paralleler Ingestion (EMBED_CONCURRENCY > 1).
     pub fn allocate_tx(&self) -> Result<TxId> {
@@ -33,6 +47,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(TxId::new(id))
     }
 
+    // ANCHOR[id=engine-begin-tx,epic=transactions,seq=3]
+    // NOTE: Startet eine atomare Transaktion mit isoliertem Puffer für Multi-Index-Mutationen.
     /// Begins a new atomic transaction for this collection.
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn begin_transaction(&self) -> Result<crate::transaction::DbTransaction<S, V>> {
@@ -40,3 +56,4 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(crate::transaction::DbTransaction::new(self.clone(), tx))
     }
 }
+// !SECTION Transaction-Allocation

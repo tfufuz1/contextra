@@ -215,6 +215,10 @@ pub enum TenantPolicy {
     Required,
 }
 
+// SECTION Engine-Configuration
+// ANCHOR[id=engine-config,epic=architecture,seq=1]
+// NOTE: Vorkonfigurierte Engine-Konfigurationsstruktur mit Parametern für Speicher, Indizes und Durability.
+// LINK crates/contextra-engine/src/backends.rs#engine-backends-trait
 #[cfg(not(loom))]
 #[derive(Clone)]
 // ANCHOR[contextra-engine:CFG-001]
@@ -353,6 +357,7 @@ impl Default for ContextraConfig {
         }
     }
 }
+// !SECTION Engine-Configuration
 
 #[cfg(not(loom))]
 // ANCHOR[contextra-engine:TCM-001]
