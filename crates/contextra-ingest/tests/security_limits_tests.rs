@@ -21,14 +21,14 @@ use contextra_ingest::pipeline::{ingest, IngestConfig, IngestRequest};
 use contextra_ingest::registry::ExtractorRegistry;
 use std::time::Instant;
 
+#[cfg(feature = "xml")]
+use contextra_ingest::extractor::ResourceBudget;
 #[cfg(feature = "zip-container")]
 use contextra_ingest::limits::IngestLimits;
 #[cfg(feature = "zip-container")]
 use contextra_ingest::safe::archive::{validate_archive_entry_path, validate_zip_archive};
 #[cfg(feature = "xml")]
 use contextra_ingest::safe::xml::parse_xml;
-#[cfg(feature = "xml")]
-use contextra_ingest::extractor::ResourceBudget;
 #[cfg(feature = "zip-container")]
 use std::io::Cursor;
 #[cfg(feature = "zip-container")]
@@ -53,10 +53,7 @@ fn test_security_zip_slip_rejection() {
 
     for path in malicious_paths {
         let res = validate_archive_entry_path(path, 1024);
-        assert!(
-            res.is_err(),
-            "Path traversal must be rejected: {path}"
-        );
+        assert!(res.is_err(), "Path traversal must be rejected: {path}");
     }
 }
 
