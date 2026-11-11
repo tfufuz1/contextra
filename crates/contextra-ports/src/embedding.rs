@@ -1,7 +1,20 @@
+//! # Embedding & Inference Ports (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/reranker.rs
+//! LINK crates/contextra-ports/src/query_rewriter.rs
+//!
+//! Abstrakte Verträge für ML-Embeddings und LLM-Textgenerierung (z. B. `contextra-infer-candle`, `contextra-infer-ollama`).
+//!
+//! // ANCHOR[contextra-ports:EMBED-001]
+//! // SECTION embedding-inference-contracts
+//! // NOTE: Vollständige Trennung von konkreten C-FFI / ONNX / Candle Laufzeiten.
+
 use super::BoxFuture;
 use crate::{ConfigFingerprint, ModelFingerprint, TenantId};
 use thiserror::Error;
 
+// ANCHOR[contextra-ports:CTX-SEGMENT-001]
 /// Representation of a context segment passed to context-aware text generation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ContextSegment<'a> {
@@ -60,6 +73,7 @@ pub trait TextEmbeddingEngine: Send + Sync + 'static {
     }
 }
 
+// ANCHOR[contextra-ports:EMBED-ERR-001]
 /// Error types encountered during embedding operations.
 #[derive(Debug, Error)]
 pub enum EmbeddingError {
@@ -79,6 +93,7 @@ pub enum EmbeddingError {
     },
 }
 
+// ANCHOR[contextra-ports:EMBED-PROVIDER-001]
 /// Abstraction for all embedding providers (e.g. OllamaEmbedder, OnnxEmbedder).
 pub trait EmbeddingProvider: Send + Sync + 'static {
     /// Returns the provider identifier/name (e.g. for logging/debugging).
@@ -124,6 +139,7 @@ pub trait TextGenerator: Send + Sync + 'static {
     fn generate_text<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, crate::Result<String>>;
 }
 
+// ANCHOR[contextra-ports:LLM-GEN-001]
 /// Abstract contract for LLM text generation (summarization, importance evaluation, query expansion).
 pub trait LlmTextGenerator: Send + Sync + 'static {
     /// Generates text for a given prompt using an LLM.
@@ -180,6 +196,7 @@ impl<T: EmbeddingProvider> TextEmbeddingEngine for T {
         })
     }
 }
+// !SECTION embedding-inference-contracts
 
 #[cfg(test)]
 mod tests {
