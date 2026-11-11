@@ -15,6 +15,7 @@
 #![forbid(unsafe_code)]
 
 pub mod calibrator;
+#[cfg(feature = "workspace")]
 pub mod compat;
 pub mod error;
 pub mod traits;
@@ -48,7 +49,7 @@ pub mod model_registry;
 pub mod gasp;
 
 #[cfg(feature = "kv-bridge")]
-pub mod kv_bridge;
+pub use compat::kv_bridge;
 
 #[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 pub mod kv_state;
@@ -66,7 +67,7 @@ pub use inference::QuantizedLlamaModel;
 #[cfg(feature = "candle")]
 pub use inference::*;
 #[cfg(feature = "kv-bridge")]
-pub use kv_bridge::KvBridgeAdapter;
+pub use compat::kv_bridge::KvBridgeAdapter;
 #[cfg(all(feature = "candle", feature = "kv-stage-b"))]
 pub use kv_state::{KvState, LayerKv};
 #[cfg(all(feature = "candle", feature = "kv-stage-b"))]

@@ -86,8 +86,8 @@ fn test_gguf_mutation_matrix() {
         (
             "zero_dim_count",
             Box::new(|b| {
-                // Letzte Dimension vor Payload manipulieren
-                for i in 0..b.len().saturating_sub(4) {
+                // n_dims in Tensor-Header (nach Metadaten) auf 0 setzen
+                for i in (60..b.len().saturating_sub(4)).rev() {
                     if &b[i..i + 4] == &1u32.to_le_bytes() {
                         b[i..i + 4].copy_from_slice(&0u32.to_le_bytes());
                         break;

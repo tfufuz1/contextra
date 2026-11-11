@@ -1,21 +1,24 @@
-//! Unit-Tests für das Candle-Inferenz-Modul (`inference`).
-//!
-//! # Zweck
-//! Prüft die Textgenerierung (Batch und Stream), Modell-Austausch mit Kalibrierungsinvalidierung
-//! (INV-CAL-2), Concurrency-Limits, Backpressure-Verhalten und Timeouts.
+use crate::error::Error;
+// Unit-Tests für das Candle-Inferenz-Modul (`inference`).
+//
+// # Zweck
+// Prüft die Textgenerierung (Batch und Stream), Modell-Austausch mit Kalibrierungsinvalidierung
+// (INV-CAL-2), Concurrency-Limits, Backpressure-Verhalten und Timeouts.
 
 // ANCHOR[contextra-infer-candle:TESTS-INFERENCE-MOD]
-use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
+use crate::inference::core::{CandleLlmClient, CandleModelInner};
 use candle_core::Device;
 #[cfg(feature = "kv-bridge")]
 use contextra_ports::ContextSegment;
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
-use contextra_types::{ConfigFingerprint, ContextraError, Result};
+use contextra_types::{ContextraError, Result};
+use crate::calibrator::ConfigFingerprint;
 use std::sync::Arc;
+use futures_util::StreamExt;
 
 struct MockCandleModel {
     response: String,
@@ -27,7 +30,7 @@ impl CandleModelInner for MockCandleModel {
         prompt: &str,
         _tokenizer: &tokenizers::Tokenizer,
         _device: &Device,
-    ) -> Result<String> {
+    ) -> crate::error::Result<String> {
         Ok(format!("{prompt} -> {}", self.response))
     }
 }
@@ -97,7 +100,7 @@ async fn test_candle_llm_client_generate_stream() {
         .unwrap();
 
     let client = CandleLlmClient::new(Device::Cpu, mock_model, fingerprint.clone(), tokenizer);
-    let cfg = ConfigFingerprint::new("mock_model.gguf", "Q4_K_M", "default", 0.0);
+    let cfg = contextra_types::ConfigFingerprint::new("mock_model.gguf", "Q4_K_M", "default", 0.0);
 
     let sync_resp = client.generate("Hello world").await.unwrap();
 
@@ -377,7 +380,7 @@ fn test_llm_from_dir_nonexistent() {
         std::path::Path::new("/nonexistent/model/dir"),
         crate::model_registry::CandleQuantization::Q4KM,
     );
-    assert!(matches!(res, Err(ContextraError::ModelLoad { .. })));
+    assert!(matches!(res, Err(Error::ModelLoad { .. })));
 }
 
 #[test]
@@ -390,8 +393,8 @@ fn test_llm_from_dir_missing_tokenizer() {
         crate::model_registry::CandleQuantization::Q4KM,
     );
     match res {
-        Err(ContextraError::ModelLoad { path, reason }) => {
-            assert!(path.contains("tokenizer.json"));
+        Err(Error::ModelLoad { reason }) => {
+            assert!(reason.contains("tokenizer.json") || reason.contains("Tokenizer"));
             assert!(reason.contains("missing"));
         }
         Err(err) => panic!(
@@ -425,7 +428,7 @@ fn test_llm_from_dir_empty_tokenizer() {
         crate::model_registry::CandleQuantization::Q4KM,
     );
     match res {
-        Err(ContextraError::ModelLoad { reason, .. }) => {
+        Err(Error::ModelLoad { reason }) => {
             assert!(reason.contains("empty"));
         }
         Err(err) => panic!(
@@ -457,7 +460,7 @@ fn test_llm_from_dir_missing_gguf() {
         crate::model_registry::CandleQuantization::Q4KM,
     );
     match res {
-        Err(ContextraError::ModelLoad { reason, .. }) => {
+        Err(Error::ModelLoad { reason }) => {
             assert!(reason.contains("No GGUF model file found"));
         }
         Err(err) => panic!(
@@ -490,7 +493,7 @@ fn test_llm_from_dir_corrupt_gguf() {
         crate::model_registry::CandleQuantization::Q4KM,
     );
     match res {
-        Err(ContextraError::ModelLoad { reason, .. }) => {
+        Err(Error::ModelLoad { reason }) => {
             assert!(
                 reason.contains("Failed to compute fingerprint")
                     || reason.contains("Failed to load")
@@ -557,14 +560,20 @@ async fn test_candle_llm_client_swap_model_invalidates_validator_calibration() {
         contextual_prefix: None,
         links: Vec::new(),
     };
+    let local_chunk = crate::gasp::ContextChunk {
+        doc_id: chunk.doc_id.0,
+        content: chunk.content,
+        relevance: chunk.relevance,
+        contextual_prefix: chunk.contextual_prefix,
+    };
     let res = validator
-        .validate_grounding(
+        .validate_grounding_local(
             "Im Jahr 2025 betrug der Umsatz 50 Millionen Euro.",
-            &[chunk],
+            &[local_chunk],
         )
         .await;
     assert!(res.is_ok());
-    validator.record_external_feedback(res.unwrap().score, true);
+    validator.record_external_feedback(res.unwrap(), true);
     assert_eq!(validator.observation_count(), 1);
 
     // Perform runtime model hot swap on CandleLlmClient with new ModelFingerprint
@@ -598,7 +607,7 @@ impl CandleModelInner for SlowCandleModel {
         prompt: &str,
         _tokenizer: &tokenizers::Tokenizer,
         _device: &Device,
-    ) -> Result<String> {
+    ) -> crate::error::Result<String> {
         std::thread::sleep(self.delay);
         Ok(format!("Slow response to: {prompt}"))
     }
