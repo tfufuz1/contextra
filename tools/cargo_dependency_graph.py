@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-cargo_dependency_graph.py — Multi-Crate Ring Boundary & Dependency Graph Auditor.
+cargo_dependency_graph.py — Architecture Layering & Dependency Graph Auditor.
 
-Analyzes Cargo manifests and architecture layering:
+Analyzes Cargo manifests and architecture layering per SPEC §1.1, §3.1, §8.1:
 - Extracts [dependencies] and [dev-dependencies] for all crates.
-- Compares against `capabilities.toml` (may_depend_on, ring layering 0..4).
-- Checks M1 (dependencies only point to equal or lower rings).
-- Checks M6 (no dev-dependencies on higher layers).
+- Compares against `capabilities.toml` (Schema v3: levels E0..E3, allowed_internal, feature_closure_allowed).
+- Checks INV-8 (dependencies only point downward or within allowed layer closures: E3 -> E2 -> E1 -> E0).
 - Checks for circular dependency chains.
-- Validates forbidden dependencies (e.g. core domain crates depending on FFI or ML frameworks).
+- Validates forbidden dependencies and produces dependency matrix.
 """
 
 from __future__ import annotations
@@ -96,7 +95,7 @@ def find_cycles(graph: Dict[str, Set[str]]) -> List[List[str]]:
 
 
 def main():
-    cli = create_standard_cli("Ring Boundary & Dependency Graph Auditor.")
+    cli = create_standard_cli("Architecture Layering & Dependency Graph Auditor.")
     args = cli.parse_args()
 
     repo_root = get_repo_root()
@@ -104,13 +103,13 @@ def main():
 
     report = DiagnosticReport(
         tool_name="cargo_dependency_graph.py",
-        title="Ring Boundary & Dependency Graph Architecture Audit",
-        description="Verifies the Ring model (Ring 4 -> 0), validates capabilities.toml may_depend_on compliance (M1), and prevents dev-dependency leaks (M6).",
+        title="Architecture Layering & Dependency Graph Audit",
+        description="Verifies the normative architecture layering (E0..E3), validates capabilities.toml Schema v3 compliance, and enforces INV-8.",
     )
 
     dep_graph: Dict[str, Set[str]] = defaultdict(set)
-    m1_violations = 0
-    m6_violations = 0
+    inv8_violations = 0
+    circular_cycles = 0
     internal_crate_names = set(crates.keys())
 
     crate_rows = []
@@ -125,44 +124,34 @@ def main():
         for idp in internal_deps:
             dep_graph[cname].add(idp)
 
-        c_ring = cmeta.ring
+        c_level = cmeta.level
 
-        # Check M1: dependency ring <= current ring
-        for dep_name in internal_deps:
-            dep_meta = crates[dep_name]
-            dep_ring = dep_meta.ring
-            if c_ring is not None and dep_ring is not None:
-                if dep_ring > c_ring:
-                    m1_violations += 1
+        # Check INV-8: normal dependency level <= current level
+        for dep_name, dep_val in internal_deps.items():
+            dep_meta = crates.get(dep_name)
+            if not dep_meta:
+                continue
+            dep_level = dep_meta.level
+            is_optional = "optional = true" in dep_val or "optional=true" in dep_val
+
+            if c_level is not None and dep_level is not None:
+                if dep_level > c_level:
+                    inv8_violations += 1
                     report.add_finding({
                         "crate": cname,
                         "file": str(cmeta.manifest_path.relative_to(repo_root)),
                         "line": 1,
-                        "kind": "M1_RING_VIOLATION",
-                        "severity": "CRITICAL",
-                        "description": f"M1 Ring violation: `{cname}` (Ring {c_ring}) depends on `{dep_name}` (Ring {dep_ring})",
+                        "kind": "INV8_LAYERING_VIOLATION",
+                        "severity": "CRITICAL" if not is_optional else "MEDIUM",
+                        "description": f"INV-8 Layering violation: `{cname}` (E{c_level}) depends on `{dep_name}` (E{dep_level}){' [optional]' if is_optional else ''}",
                     })
 
-        # Check M6: dev-dependencies on higher layers
-        for dev_dep in internal_dev:
-            dep_meta = crates[dev_dep]
-            dep_ring = dep_meta.ring
-            if c_ring is not None and dep_ring is not None:
-                if dep_ring > c_ring:
-                    m6_violations += 1
-                    report.add_finding({
-                        "crate": cname,
-                        "file": str(cmeta.manifest_path.relative_to(repo_root)),
-                        "line": 1,
-                        "kind": "M6_DEV_DEP_VIOLATION",
-                        "severity": "HIGH",
-                        "description": f"M6 Dev-dependency violation: `{cname}` (Ring {c_ring}) has dev-dep on higher Ring `{dev_dep}` (Ring {dep_ring})",
-                    })
-
-        crate_rows.append((cname, c_ring if c_ring is not None else "?", len(internal_deps), len(internal_dev)))
+        level_display = f"E{c_level}" if c_level is not None else "?"
+        crate_rows.append((cname, level_display, len(internal_deps), len(internal_dev)))
 
     cycles = find_cycles(dep_graph)
     for cycle in cycles:
+        circular_cycles += 1
         report.add_finding({
             "crate": cycle[0],
             "file": "Cargo.toml",
@@ -173,28 +162,27 @@ def main():
         })
 
     report.set_metric("total_crates", len(crates))
-    report.set_metric("m1_ring_violations", m1_violations)
-    report.set_metric("m6_dev_dep_violations", m6_violations)
+    report.set_metric("inv8_layering_violations", inv8_violations)
     report.set_metric("circular_dependency_cycles", len(cycles))
 
     matrix_table = [
-        "| Crate | Ring | Interne Abhängigkeiten | Dev-Abhängigkeiten |",
+        "| Crate | Ebene | Interne Abhängigkeiten | Dev-Abhängigkeiten |",
         "|---|---|---|---|",
     ]
-    for cname, ring, ndeps, ndev in crate_rows:
-        matrix_table.append(f"| `{cname}` | {ring} | {ndeps} | {ndev} |")
-    report.add_section("Crate-Ring-Matrix", "\n".join(matrix_table))
+    for cname, level_str, ndeps, ndev in crate_rows:
+        matrix_table.append(f"| `{cname}` | {level_str} | {ndeps} | {ndev} |")
+
+    report.add_section("Crate-Ebenen-Matrix", "\n".join(matrix_table))
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print(f"[*] Cargo Dependency Graph audit complete: {len(crates)} crates analyzed.")
-        print(f"    M1 Ring violations: {m1_violations}")
-        print(f"    M6 Dev-dependency violations: {m6_violations}")
+        print(f"    INV-8 Layering violations: {inv8_violations}")
         print(f"    Circular dependency cycles: {len(cycles)}")
 
     if not args.no_save:
-        out_name = "dependency_graph_workspace"
+        out_name = f"dependency_graph_{args.crate}" if args.crate else "dependency_graph_workspace"
         j_p, m_p = report.write_artifacts(out_name, Path(args.output_dir) if args.output_dir else None)
         if not args.json:
             print(f"[+] Saved artifacts:\n    {j_p}\n    {m_p}")

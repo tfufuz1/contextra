@@ -563,3 +563,368 @@ fn test_vfs_conformance_mutant_red() {
         Ok(_) => panic!("BuggyWriteAtomicVfs must fail Vfs conformance"),
     }
 }
+
+// ============================================================================
+// CONFORMANCE TESTS & MUTANTS (WP-TK-1.2 & WP-TK-1.3)
+// ============================================================================
+
+use contextra_testkit::conformance::kv_ports::{
+    run_attention_exporter_suite, run_kv_bridge_storage_suite, run_kv_prefix_store_suite,
+};
+use contextra_testkit::conformance::routing_ports::{
+    run_community_resolver_suite, run_context_preparer_suite, run_drift_status_provider_suite,
+    run_egress_policy_suite, run_hybrid_search_provider_suite,
+};
+use contextra_testkit::mocks::{
+    BudgetTruncatingContextPreparer, InMemoryKvBridgeStorage, InMemoryKvPrefixStore,
+    ScriptedAttentionExporter, ScriptedEgressPolicy, ScriptedHybridSearchProvider,
+    StaticCommunityResolver, StaticDriftStatusProvider,
+};
+use contextra_ports::{
+    policy::{EgressDecision, EgressPolicy},
+    AttentionExporter, CommunityResolver, ContextChunk, ContextPreparer, ContextWindow,
+    DriftStatusProvider, HybridSearchProvider, KvBlock, KvBridgeStorage, KvPrefixHit,
+    KvPrefixStore, PrefixKey, RequestId, TokenBudget,
+};
+use contextra_types::{RequestContext, TenantId};
+use bytes::Bytes;
+
+// --- KV PORTS ---
+
+#[test]
+fn test_kv_prefix_store_conformance_reference_green() {
+    let store = InMemoryKvPrefixStore::new();
+    let res = run_kv_prefix_store_suite(&store);
+    assert!(res.is_ok(), "InMemoryKvPrefixStore must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct LeakyTenantKvPrefixStore(InMemoryKvPrefixStore);
+
+impl KvPrefixStore for LeakyTenantKvPrefixStore {
+    fn lookup(&self, _tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit> {
+        let fixed_tenant = TenantId::try_new(101).unwrap();
+        self.0.lookup(fixed_tenant, key, tokens)
+    }
+
+    fn insert(
+        &self,
+        tenant: TenantId,
+        key: &PrefixKey,
+        tokens: &[u32],
+        blocks: Vec<KvBlock>,
+    ) -> Result<()> {
+        self.0.insert(tenant, key, tokens, blocks)
+    }
+
+    fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64> {
+        self.0.evict(tenant, key)
+    }
+}
+
+#[test]
+fn test_kv_prefix_store_conformance_mutant_red() {
+    let mutant = LeakyTenantKvPrefixStore::default();
+    let res = run_kv_prefix_store_suite(&mutant);
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "KvPrefixStore");
+            assert_eq!(failure.test_case, "isolation_tenant_and_key");
+        }
+        Ok(_) => panic!("LeakyTenantKvPrefixStore must fail conformance"),
+    }
+}
+
+#[tokio::test]
+async fn test_kv_bridge_storage_conformance_reference_green() {
+    let res = run_kv_bridge_storage_suite(|| async { InMemoryKvBridgeStorage::new() }).await;
+    assert!(res.is_ok(), "InMemoryKvBridgeStorage must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct ImmediateVisibilityKvBridgeStorage {
+    inner: InMemoryKvBridgeStorage,
+}
+
+impl KvBridgeStorage for ImmediateVisibilityKvBridgeStorage {
+    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, contextra_ports::Result<Option<Bytes>>> {
+        self.inner.get(key)
+    }
+
+    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, contextra_ports::Result<()>> {
+        Box::pin(async move {
+            self.inner.put(tx_id, key, value).await?;
+            self.inner.commit(tx_id).await?;
+            Ok(())
+        })
+    }
+
+    fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, contextra_ports::Result<()>> {
+        self.inner.commit(tx_id)
+    }
+}
+
+#[tokio::test]
+async fn test_kv_bridge_storage_conformance_mutant_red() {
+    let res = run_kv_bridge_storage_suite(|| async { ImmediateVisibilityKvBridgeStorage::default() }).await;
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "KvBridgeStorage");
+            assert_eq!(failure.test_case, "uncommitted_put_invisible");
+        }
+        Ok(_) => panic!("ImmediateVisibilityKvBridgeStorage must fail conformance"),
+    }
+}
+
+#[test]
+fn test_attention_exporter_conformance_reference_green() {
+    let exporter = ScriptedAttentionExporter::new();
+    let req = RequestId(42);
+    exporter.set_weights(req, vec![0.1, 0.4, 0.9]);
+    let res = run_attention_exporter_suite(&exporter, req);
+    assert!(res.is_ok(), "ScriptedAttentionExporter must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct InconsistentAttentionExporter {
+    call_count: std::sync::atomic::AtomicUsize,
+}
+
+impl AttentionExporter for InconsistentAttentionExporter {
+    fn export_attention_weights(&self, request_id: RequestId) -> Option<Vec<f32>> {
+        if request_id == RequestId(u64::MAX - 7) {
+            return None;
+        }
+        let count = self.call_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if count == 0 {
+            Some(vec![0.1, 0.2])
+        } else {
+            Some(vec![0.9, 0.8])
+        }
+    }
+}
+
+#[test]
+fn test_attention_exporter_conformance_mutant_red() {
+    let mutant = InconsistentAttentionExporter::default();
+    let res = run_attention_exporter_suite(&mutant, RequestId(10));
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "AttentionExporter");
+            assert_eq!(failure.test_case, "deterministic_repeated_export");
+        }
+        Ok(_) => panic!("InconsistentAttentionExporter must fail conformance"),
+    }
+}
+
+// --- ROUTING PORTS ---
+
+#[tokio::test]
+async fn test_hybrid_search_provider_conformance_reference_green() {
+    let provider = ScriptedHybridSearchProvider::new();
+    let chunks = vec![
+        ContextChunk {
+            doc_id: DocId::new(1),
+            content: "one".to_string(),
+            relevance: 0.9,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+        ContextChunk {
+            doc_id: DocId::new(2),
+            content: "two".to_string(),
+            relevance: 0.8,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+    ];
+    provider.set_chunks(chunks);
+    let res = run_hybrid_search_provider_suite(&provider).await;
+    assert!(res.is_ok(), "ScriptedHybridSearchProvider must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct BuggyTopKHybridSearchProvider(ScriptedHybridSearchProvider);
+
+impl HybridSearchProvider for BuggyTopKHybridSearchProvider {
+    fn search_hybrid<'a>(
+        &'a self,
+        query_text: &'a str,
+        query_embedding: &'a [f32],
+        _top_k: usize,
+    ) -> BoxFuture<'a, contextra_ports::Result<Vec<ContextChunk>>> {
+        self.0.search_hybrid(query_text, query_embedding, 10)
+    }
+}
+
+#[tokio::test]
+async fn test_hybrid_search_provider_conformance_mutant_red() {
+    let inner = ScriptedHybridSearchProvider::new();
+    let chunks = vec![
+        ContextChunk {
+            doc_id: DocId::new(1),
+            content: "one".to_string(),
+            relevance: 0.9,
+            token_count: 5,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+    ];
+    inner.set_chunks(chunks);
+    let mutant = BuggyTopKHybridSearchProvider(inner);
+    let res = run_hybrid_search_provider_suite(&mutant).await;
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "HybridSearchProvider");
+            assert_eq!(failure.test_case, "zero_top_k_empty");
+        }
+        Ok(_) => panic!("BuggyTopKHybridSearchProvider must fail conformance"),
+    }
+}
+
+#[tokio::test]
+async fn test_community_resolver_conformance_reference_green() {
+    let resolver = StaticCommunityResolver::new();
+    let entity = EntityId::new(42);
+    resolver.insert(entity, 100);
+    let res = run_community_resolver_suite(&resolver, entity).await;
+    assert!(res.is_ok(), "StaticCommunityResolver must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct LeakyCommunityResolver(StaticCommunityResolver);
+
+impl CommunityResolver for LeakyCommunityResolver {
+    fn get_community<'a>(&'a self, entity_id: EntityId) -> BoxFuture<'a, contextra_ports::Result<Option<u64>>> {
+        Box::pin(async move {
+            let res = self.0.get_community(entity_id).await?;
+            Ok(Some(res.unwrap_or(999)))
+        })
+    }
+}
+
+#[tokio::test]
+async fn test_community_resolver_conformance_mutant_red() {
+    let resolver = LeakyCommunityResolver::default();
+    let res = run_community_resolver_suite(&resolver, EntityId::new(1)).await;
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "CommunityResolver");
+            assert_eq!(failure.test_case, "unknown_entity_none");
+        }
+        Ok(_) => panic!("LeakyCommunityResolver must fail conformance"),
+    }
+}
+
+#[test]
+fn test_context_preparer_conformance_reference_green() {
+    let preparer = BudgetTruncatingContextPreparer::new();
+    let res = run_context_preparer_suite(&preparer);
+    assert!(res.is_ok(), "BudgetTruncatingContextPreparer must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct BudgetExceedingContextPreparer;
+
+impl ContextPreparer for BudgetExceedingContextPreparer {
+    fn prepare_context(
+        &self,
+        chunks: Vec<ContextChunk>,
+        _budget: &TokenBudget,
+        _relevance_threshold: f32,
+    ) -> contextra_ports::Result<ContextWindow> {
+        let total_tokens = chunks.iter().map(|c| c.token_count).sum();
+        Ok(ContextWindow {
+            chunks,
+            total_tokens,
+            truncated: false,
+        })
+    }
+}
+
+#[test]
+fn test_context_preparer_conformance_mutant_red() {
+    let mutant = BudgetExceedingContextPreparer;
+    let res = run_context_preparer_suite(&mutant);
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "ContextPreparer");
+            assert_eq!(failure.test_case, "relevance_threshold_filtering");
+        }
+        Ok(_) => panic!("BudgetExceedingContextPreparer must fail conformance"),
+    }
+}
+
+#[test]
+fn test_drift_status_provider_conformance_reference_green() {
+    let provider = StaticDriftStatusProvider::with_status("stabil");
+    let res = run_drift_status_provider_suite(&provider);
+    assert!(res.is_ok(), "StaticDriftStatusProvider must pass conformance: {res:?}");
+}
+
+#[derive(Debug)]
+struct InvalidDriftStatusProvider;
+
+impl DriftStatusProvider for InvalidDriftStatusProvider {
+    fn overall_drift_status(&self) -> String {
+        "sehr_kritisch".to_string()
+    }
+}
+
+#[test]
+fn test_drift_status_provider_conformance_mutant_red() {
+    let mutant = InvalidDriftStatusProvider;
+    let res = run_drift_status_provider_suite(&mutant);
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "DriftStatusProvider");
+            assert_eq!(failure.test_case, "valid_status_enum_values");
+        }
+        Ok(_) => panic!("InvalidDriftStatusProvider must fail conformance"),
+    }
+}
+
+#[test]
+fn test_egress_policy_conformance_reference_green() {
+    let policy = ScriptedEgressPolicy::new();
+    policy.add_deny_pattern("SECRET_KEY");
+    policy.add_redact_pattern("CONFIDENTIAL");
+
+    let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId::new(1));
+    let payloads = ["normal payload", "payload with SECRET_KEY", "CONFIDENTIAL data"];
+    let res = run_egress_policy_suite(&policy, &ctx, &payloads);
+    assert!(res.is_ok(), "ScriptedEgressPolicy must pass conformance: {res:?}");
+}
+
+#[derive(Debug, Default)]
+struct EmptyReasonEgressPolicy;
+
+impl EgressPolicy for EmptyReasonEgressPolicy {
+    fn evaluate(&self, _ctx: &RequestContext, payload: &str) -> EgressDecision {
+        if payload.contains("BAD") {
+            EgressDecision::Deny("   ".to_string())
+        } else {
+            EgressDecision::Allow
+        }
+    }
+}
+
+#[test]
+fn test_egress_policy_conformance_mutant_red() {
+    let mutant = EmptyReasonEgressPolicy;
+    let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId::new(1));
+    let payloads = ["some BAD word"];
+    let res = run_egress_policy_suite(&mutant, &ctx, &payloads);
+    match res {
+        Err(failure) => {
+            assert_eq!(failure.suite_name, "EgressPolicy");
+            assert_eq!(failure.test_case, "non_empty_reasons_on_deny_and_redact");
+        }
+        Ok(_) => panic!("EmptyReasonEgressPolicy must fail conformance"),
+    }
+}

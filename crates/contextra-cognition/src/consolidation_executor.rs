@@ -49,6 +49,7 @@ use crate::ports_local::{
 use crate::types_local::{DocId, Result};
 use ahash::{AHashMap, AHashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
+// TODO(baukasten): ConsolidationExecutor von contextra-engine entkoppeln (AD-8/S-63). Invertierung der Abhängigkeit über DocumentSource- und MemoryStore-Traits.
 use std::sync::Arc;
 
 /// RAII Guard zur Koordination des Konsolidierungslaufs.

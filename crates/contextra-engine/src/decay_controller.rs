@@ -49,8 +49,6 @@ pub struct DecayControllerConfig {
     pub kappa: f32,
     /// Basis-Halbwertszeit in Transaktionszyklen.
     pub base_half_life_tx: u64,
-    /// Basis-Halbwertszeit in Millisekunden für Wall-Clock-Decay.
-    pub base_half_life_ms: Option<u64>,
     /// Eviktionsschwelle.
     pub eviction_threshold: f32,
 }
@@ -60,7 +58,6 @@ impl Default for DecayControllerConfig {
         Self {
             kappa: 2.0,
             base_half_life_tx: 10_000,
-            base_half_life_ms: Some(86_400_000), // 24h
             eviction_threshold: 0.01,
         }
     }
@@ -71,6 +68,7 @@ impl Default for DecayControllerConfig {
 pub struct AdaptiveDecayController {
     config: DecayControllerConfig,
     clock: Option<Arc<dyn Clock>>,
+    base_half_life_ms: Option<u64>,
 }
 
 impl std::fmt::Debug for AdaptiveDecayController {
@@ -89,6 +87,7 @@ impl AdaptiveDecayController {
         Self {
             config,
             clock: None,
+            base_half_life_ms: None,
         }
     }
 
@@ -97,7 +96,14 @@ impl AdaptiveDecayController {
         Self {
             config,
             clock: Some(clock),
+            base_half_life_ms: None,
         }
+    }
+
+    /// Setzt die Basis-Halbwertszeit in Millisekunden für Wall-Clock-Decay.
+    pub fn with_base_half_life_ms(mut self, base_ms: u64) -> Self {
+        self.base_half_life_ms = Some(base_ms);
+        self
     }
 
     // ANCHOR[contextra-engine:DEC-002]
@@ -129,7 +135,7 @@ impl AdaptiveDecayController {
     /// Berechnet die temperaturangepasste effektive Halbwertszeit in Millisekunden.
     #[inline]
     pub fn effective_half_life_ms(&self, temperature: f32) -> f32 {
-        let base = self.config.base_half_life_ms.unwrap_or(86_400_000) as f32;
+        let base = self.base_half_life_ms.unwrap_or(86_400_000) as f32;
         base * (1.0 + self.config.kappa * (1.0 - temperature))
     }
 

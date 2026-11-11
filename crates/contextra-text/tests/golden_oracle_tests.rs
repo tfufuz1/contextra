@@ -5,10 +5,7 @@ use contextra_text::bm25::score_term;
 use contextra_text::contract::{Clock, DocKey};
 use contextra_text::posting_list::{Posting, PostingList};
 use contextra_text::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
-#[cfg(not(feature = "types-compat"))]
-use contextra_text::types::DocId;
-#[cfg(feature = "types-compat")]
-use contextra_types::DocId;
+use contextra_ids::DocId;
 use std::fs;
 use std::path::Path;
 

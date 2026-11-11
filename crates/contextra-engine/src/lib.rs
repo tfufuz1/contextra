@@ -14,7 +14,8 @@
 
 pub mod orchestration;
 
-use contextra_ports::license::LicenseGate;
+pub(crate) mod license_seam;
+use license_seam::LicenseGate;
 #[cfg(feature = "sandbox")]
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
@@ -241,7 +242,7 @@ pub struct ContextraConfig {
     /// Default: DurabilityMode::Full.
     pub durability_mode: DurabilityMode,
 
-    /// Controls whether deletion proof generation and HMAC integrity guarantees are active.
+    /// Legacy integrity verification flag (quarantined, default false).
     /// Default: false.
     pub deletion_proof_active: bool,
 

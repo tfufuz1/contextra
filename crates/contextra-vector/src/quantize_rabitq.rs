@@ -21,6 +21,7 @@
 //! 5. Asymmetric Euclidean distance estimation:
 //!    $$d(q, x) = \sqrt{\max\left(0, \|q\|^2 + \|x\|^2 - 2 \langle q', \hat{x}' \rangle\right)}$$
 
+// TODO(baukasten): RaBitQ-Kern entkoppeln (AD-4). Kontextfreie 1-Bit/RaBitQ-Quantisierung mit lokalem VectorError ohne Bindung an ContextraError.
 use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 

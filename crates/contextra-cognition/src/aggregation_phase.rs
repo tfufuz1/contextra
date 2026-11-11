@@ -29,6 +29,7 @@ use crate::graph_local::HyperEdgeId;
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
 use crate::ports_local::LlmTextGenerator;
 use crate::types_local::{EntityId, Result};
+// TODO(baukasten): LeanRAG Diagonal-GMM Clustering in autarken Algorithmen-Baustein extrahieren (AD-8). Reines mathematisches Denoising ohne Kognitions-Monolith-Bindung.
 use ahash::{AHashMap, AHashSet};
 
 /// Konfiguration für die Aggregation-Phase.

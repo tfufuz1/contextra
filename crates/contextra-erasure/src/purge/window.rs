@@ -10,6 +10,7 @@
 //!   g) Cache-Eviction
 
 use super::cx::PurgeCx;
+use super::phase::PurgePhase;
 use super::reserve::{check_disk_reserve, ReserveCheck};
 use crate::error::ErasureError;
 #[cfg(feature = "async")]
@@ -24,15 +25,18 @@ pub struct WindowOutcome {
     pub bytes_freed: u64,
     /// Verbleibende offene Löschungen.
     pub pending_count: u64,
+    /// Aktuelle oder erreichte Purge-Phase.
+    pub phase: PurgePhase,
 }
 
 impl WindowOutcome {
-    /// Erstellt ein leeres Ergebnis.
+    /// Erstellt ein leeres Ergebnis im Initialzustand `Admitted`.
     pub fn empty() -> Self {
         Self {
             purged_units: 0,
             bytes_freed: 0,
             pending_count: 0,
+            phase: PurgePhase::Admitted,
         }
     }
 
@@ -41,6 +45,9 @@ impl WindowOutcome {
         self.purged_units = self.purged_units.saturating_add(other.purged_units);
         self.bytes_freed = self.bytes_freed.saturating_add(other.bytes_freed);
         self.pending_count = self.pending_count.saturating_add(other.pending_count);
+        if other.phase > self.phase {
+            self.phase = other.phase;
+        }
     }
 }
 

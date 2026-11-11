@@ -395,7 +395,7 @@ def evaluate_crate_decoupling(inv: CrateInventory) -> Dict[str, Any]:
             high_coupling_deps.append((dep, len(syms)))
             findings.append(f"Starke direkte Kopplung an '{dep}' ({len(syms)} importierte Symbole).")
             recommendations.append(
-                f"Abhängigkeit von '{dep}' auflösen: Für Klasse A direkte Abhängigkeiten eliminieren (lokale Typen/Fehler, kein 'contextra-ports'). Für Klasse B/C generische Abstraktionen oder State-Passing nutzen."
+                f"Abhängigkeit von '{dep}' auflösen: Für Ebene E0/E1 direkte Abhängigkeiten eliminieren (lokale Typen/Fehler, kein 'contextra-ports'). Für Ebene E2 generische Abstraktionen oder State-Passing nutzen."
             )
 
     if inv.missing_port_abstractions:
@@ -403,16 +403,16 @@ def evaluate_crate_decoupling(inv: CrateInventory) -> Dict[str, Any]:
             f"{len(inv.missing_port_abstractions)} Stellen mit direkten Importen aus konkreten Speicherkernen."
         )
         recommendations.append(
-            f"Direkte Kernel-Importe für Klasse A vollständig eliminieren (autark); für Klasse C via Backends-Trait bündeln."
+            f"Direkte Kernel-Importe für Ebene E0/E1 vollständig eliminieren (autark); für Ebene E2 via Backends-Trait bündeln."
         )
 
     if inv.erasure_leaks:
         findings.append(
             f"{len(inv.erasure_leaks)} Referenzen auf DSGVO/Löschkette/Nachweise gefunden. "
-            f"Diese gehören in 'contextra-erasure' oder 'contextra-erasure-adapters' (SPEC v4.0 §6.3 / E-04)."
+            f"Diese gehören in 'contextra-erasure' (SPEC §3.1 / INV-7)."
         )
         recommendations.append(
-            f"Löschrelikte aus {inv.name} entfernen und in 'contextra-erasure-adapters' bzw. 'contextra-erasure' modularisieren; Indizes bieten nur neutrale Maintenance-Methoden."
+            f"Löschrelikte aus {inv.name} entfernen und in 'contextra-erasure' modularisieren; Indizes bieten nur neutrale Maintenance-Methoden."
         )
 
     if inv.dead_code_candidates:

@@ -12,8 +12,8 @@ ring = "3"
 
 [features]
 default = []
-subprocess-dispatch = ["dep:contextra-wire"]
-bandit-routing = ["egress-sherman-morrison"]
+subprocess-dispatch = ["dep:contextra-wire", "dep:tokio", "dep:shlex"]
+bandit-routing = ["egress-sherman-morrison", "contextra-adapt/bandit-routing"]
 cloud-egress-guard = []
 egress-sherman-morrison = []
 flow-corrected-thompson = ["contextra-adapt/flow-corrected-thompson"]
@@ -21,20 +21,21 @@ exp-fc-ts = ["flow-corrected-thompson"]
 exp-routing-strategy = ["bandit-routing"]
 
 [dependencies]
-shlex = "1"
+shlex = { version = "1", optional = true }
 contextra-types = { workspace = true }
 contextra-wire = { workspace = true, optional = true }
 contextra-ports = { workspace = true }
 contextra-adapt = { workspace = true }
 arc-swap = "1"
 parking_lot = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "time"] }
 tempfile = "3"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
