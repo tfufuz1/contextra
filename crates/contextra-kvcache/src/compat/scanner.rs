@@ -104,7 +104,7 @@ mod tests {
     use super::*;
     use crate::segment::KvSegment;
     use crate::store::TenantIsolatedKvStore;
-    use contextra_ids::TenantId;
+    use crate::types::TenantId;
     use contextra_ports::clock::SystemClock;
     use contextra_ports::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer};
     use contextra_types::{RequestContext, TxId};
@@ -118,7 +118,7 @@ mod tests {
         let pruner = KvCachePruner::new(Arc::clone(&store));
         let scanner = KvCacheScanner::new(Arc::clone(&store));
 
-        let ctx = RequestContext::new(tenant, TxId(101));
+        let ctx = RequestContext::new(tenant.into(), TxId(101));
         let target = ScanTarget::new("tenant_77", [0x77; 32]);
         let clock = SystemClock::new();
 

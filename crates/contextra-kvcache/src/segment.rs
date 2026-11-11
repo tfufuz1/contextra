@@ -22,14 +22,15 @@
 //!   Aktive Inferenz-Prozesse halten einen Guard. Ein Segment mit `active_refs > 0` darf unter
 //!   keinen Umständen verdrängt werden.
 
-use crate::error::Result;
-use contextra_ids::TenantId;
+use crate::error::{KvCacheError, Result};
+use crate::types::TenantId;
+use parking_lot::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use super::eviction_worker::EvictionWorker;
-#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+#[cfg(feature = "exp-kivi")]
 use super::quantize_kivi::{
     compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizeConfig,
     KiviQuantizedBlock, KvTensorView,
@@ -37,11 +38,7 @@ use super::quantize_kivi::{
 use super::radix::KvBlockGuard;
 
 #[cfg(feature = "kv-encryption")]
-use crate::error::KvCacheError;
-#[cfg(feature = "kv-encryption")]
-use parking_lot::RwLock;
-#[cfg(feature = "kv-encryption")]
-use contextra_crypto::{CryptoError, EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
+use crate::kv_encryption::EncryptedSegmentPayload;
 
 // ANCHOR[contextra-kvcache:SEG-002]
 /// Repräsentation des Inhalts eines KV-Segments.
@@ -52,7 +49,7 @@ pub enum KvSegmentContent {
     /// Rohe, unkomprimierte Tensor-Bytes im RAM.
     Raw(bytes::Bytes),
     /// 2-Bit-quantisierter KIVI-Block (spart bis zu 75% Speicher).
-    #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+    #[cfg(feature = "exp-kivi")]
     KiviQuantized(KiviQuantizedBlock),
 }
 
@@ -62,6 +59,17 @@ pub enum KvSegmentContent {
 /// Erhöhe diesen Wert, wenn sich der HKDF-Info-String oder der Salt-Aufbau ändert.
 pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
 
+// ANCHOR[contextra-kvcache:SEG-AEAD-001]
+/// Lokales Trait für AEAD-Segmentverschlüsselung (Authenticated Encryption with Associated Data).
+pub trait SegmentAead: Send + Sync {
+    /// Verschlüsselt Daten mit AEAD und liefert (Ciphertext, 12-Byte Nonce).
+    fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 12])>;
+    /// Entschlüsselt Daten mit AEAD unter Verwendung der 12-Byte Nonce.
+    fn decrypt(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>>;
+    /// Überschreibt das Schlüsselmaterial sicher im Speicher.
+    fn wipe(&mut self);
+}
+
 // ANCHOR[contextra-kvcache:SEG-004]
 /// Shred-fähiger Schlüssel für Tier-2 Segmentdateien (Crypto-Shredding).
 ///
@@ -70,34 +78,25 @@ pub const CURRENT_KV_KEY_DERIVATION_VERSION: u8 = 1;
 /// Ausgelagerte Segmentdateien auf Disk werden dadurch mathematisch dauerhaft unlesbar.
 #[derive(Clone)]
 pub struct ShreddableSegmentKey {
-    #[cfg(feature = "kv-encryption")]
-    /// Interner kryptographischer Schlüsselmanager in einem Thread-sicheren RwLock.
-    key_manager: Arc<RwLock<Option<contextra_crypto::CryptoKey>>>,
+    key_manager: Arc<RwLock<Option<Box<dyn SegmentAead>>>>,
 }
 
 impl ShreddableSegmentKey {
-    #[cfg(feature = "kv-encryption")]
-    /// Erstellt einen neuen shred-fähigen Schlüssel aus Passphrase und Salt.
-    pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self> {
-        let km = contextra_crypto::CryptoKey::try_new(passphrase, salt)
-            .map_err(|e| KvCacheError::CryptoError(e.to_string()))?;
-        Ok(Self {
-            key_manager: Arc::new(RwLock::new(Some(km))),
-        })
+    /// Erzeugt einen neuen `ShreddableSegmentKey` aus einer dynamischen `SegmentAead`-Implementierung.
+    pub fn from_aead(aead: Box<dyn SegmentAead>) -> Self {
+        Self {
+            key_manager: Arc::new(RwLock::new(Some(aead))),
+        }
     }
 
-    #[cfg(feature = "kv-encryption")]
-    /// Erstellt einen neuen shred-fähigen Schlüssel mit zufällig erzeugtem Salt.
-    pub fn try_new_random(passphrase: &str) -> Result<Self> {
-        let (km, _) = contextra_crypto::CryptoKey::try_new_random_salt(passphrase)
-            .map_err(|e| KvCacheError::CryptoError(e.to_string()))?;
-        Ok(Self {
-            key_manager: Arc::new(RwLock::new(Some(km))),
-        })
+    /// Erzeugt einen leeren oder bereits ge-shreddeten Schlüssel.
+    pub fn shredded() -> Self {
+        Self {
+            key_manager: Arc::new(RwLock::new(None)),
+        }
     }
 
-    #[cfg(feature = "kv-encryption")]
-    /// Verschlüsselt Daten mit AES-256-GCM-SIV und automatisch generiertem Nonce (Number used once).
+    /// Verschlüsselt Daten mit AEAD und automatisch generiertem Nonce.
     pub fn encrypt(&self, plaintext: &[u8]) -> Result<(Vec<u8>, [u8; 12])> {
         let guard = self.key_manager.read();
         let km = guard.as_ref().ok_or_else(|| {
@@ -105,12 +104,10 @@ impl ShreddableSegmentKey {
                 "Segment key has been shredded: decryption impossible".to_string(),
             )
         })?;
-        km.encrypt_auto_nonce(plaintext)
-            .map_err(|e| KvCacheError::CryptoError(e.to_string()))
+        km.encrypt(plaintext)
     }
 
-    #[cfg(feature = "kv-encryption")]
-    /// Entschlüsselt Daten mit AES-256-GCM-SIV unter Verwendung der 12-Byte-Nonce.
+    /// Entschlüsselt Daten mit AEAD unter Verwendung der 12-Byte-Nonce.
     pub fn decrypt(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>> {
         let guard = self.key_manager.read();
         let km = guard.as_ref().ok_or_else(|| {
@@ -118,19 +115,16 @@ impl ShreddableSegmentKey {
                 "Segment key has been shredded: decryption impossible".to_string(),
             )
         })?;
-        km.decrypt_auto_nonce(ciphertext, nonce)
-            .map_err(|e| KvCacheError::CryptoError(e.to_string()))
+        km.decrypt(ciphertext, nonce)
     }
 
-    #[cfg(feature = "kv-encryption")]
     /// Crypto-Shredding: Überschreibt den Schlüssel im Speicher mit Nullen.
     pub fn shred(&self) {
         if let Some(mut km) = self.key_manager.write().take() {
-            km.emergency_wipe();
+            km.wipe();
         }
     }
 
-    #[cfg(feature = "kv-encryption")]
     /// Prüft, ob der Schlüssel bereits ge-shredded (vernichtet) wurde.
     pub fn is_shredded(&self) -> bool {
         self.key_manager.read().is_none()
@@ -139,38 +133,24 @@ impl ShreddableSegmentKey {
 
 impl std::fmt::Debug for ShreddableSegmentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        #[cfg(feature = "kv-encryption")]
-        {
-            f.debug_struct("ShreddableSegmentKey")
-                .field("shredded", &self.is_shredded())
-                .finish()
-        }
-        #[cfg(not(feature = "kv-encryption"))]
-        {
-            f.debug_struct("ShreddableSegmentKey").finish()
-        }
+        f.debug_struct("ShreddableSegmentKey")
+            .field("shredded", &self.is_shredded())
+            .finish()
     }
 }
 
+
 // ANCHOR[contextra-kvcache:SEG-005]
 /// Verschlüsselte Tier-2 Segmentdatei (ausgelagerter KV-Block auf persistentem Speicher).
-///
-/// Hält den Ciphertext und die Nonce zusammen mit dem zugehörigen [`ShreddableSegmentKey`].
 pub struct Tier2EncryptedSegment {
-    /// Mandanten-Identifikator zur Durchsetzung strenger Mandantentrennung.
     pub tenant_id: TenantId,
-    /// Eindeutige Segment-ID innerhalb des Mandanten.
     pub segment_id: u64,
-    /// Verschlüsselte Tensor-Daten.
     pub ciphertext: Vec<u8>,
-    /// 12-Byte Initialisierungsvektor / Nonce.
     pub nonce: [u8; 12],
-    /// Schlüssel zur Entschlüsselung bzw. zum Crypto-Shredding.
     pub key: ShreddableSegmentKey,
 }
 
 impl Tier2EncryptedSegment {
-    #[cfg(feature = "kv-encryption")]
     /// Verschlüsselt Klartext-Tensor-Bytes und erstellt ein neues Tier-2 Segment.
     pub fn new(
         tenant_id: TenantId,
@@ -188,26 +168,12 @@ impl Tier2EncryptedSegment {
         })
     }
 
-    #[cfg(feature = "kv-encryption")]
     /// Liest und entschlüsselt das Segment.
     pub fn read_and_decrypt(&self) -> Result<Vec<u8>> {
         self.key.decrypt(&self.ciphertext, &self.nonce)
     }
 }
 
-/// Verschlüsselte Layer-Repräsentation innerhalb eines `KvSegment`, wenn Feature `kv-encryption` aktiv ist.
-#[cfg(feature = "kv-encryption")]
-#[derive(Zeroize, ZeroizeOnDrop)]
-pub struct EncryptedSegmentPayload {
-    /// Verschlüsselter KV-Layer-Container aus `contextra-crypto`. Wird beim Drop gezeroized.
-    pub layer: EncryptedKvLayer,
-    /// Gespeicherte Schlüsselableitungsversion zum Zeitpunkt der Verschlüsselung.
-    #[zeroize(skip)]
-    pub key_derivation_version: u8,
-    /// Gebundene segment_id zur Authenticated Additional Data (AAD) Verifikation.
-    #[zeroize(skip)]
-    pub bound_segment_id: Option<u64>,
-}
 
 // ANCHOR[contextra-kvcache:SEG-006]
 /// Ein KV-Cache-Segment im Hauptspeicher.
@@ -216,10 +182,8 @@ pub struct EncryptedSegmentPayload {
 /// Darf niemals unverschlüsselt auf Sekundärspeicher (Tier-2) geschrieben werden.
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct KvSegment {
-    /// Eindeutiger Mandanten-Identifikator.
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,
-    /// Eindeutige Segment-ID innerhalb des Mandanten.
     #[zeroize(skip)]
     pub segment_id: u64,
     /// Versionsnummer der HKDF-Schlüsselableitung.
@@ -228,10 +192,9 @@ pub struct KvSegment {
     /// Gibt an, ob der Inhalt im RAM verschlüsselt vorliegt.
     #[zeroize(skip)]
     pub encrypted: bool,
-    /// Optionaler Modell-Fingerabdruck bei Verschlüsselung.
     #[zeroize(skip)]
     #[cfg(feature = "kv-encryption")]
-    pub model_fingerprint: Option<ModelFingerprint>,
+    pub model_fingerprint: Option<crate::kv_encryption::ModelFingerprint>,
     /// RoPE-Offset (Rotary Position Embedding) für positionelle Konsistenz bei Aufmerksamkeitsberechnungen.
     #[zeroize(skip)]
     pub rope_offset: Option<usize>,
@@ -239,12 +202,11 @@ pub struct KvSegment {
     #[zeroize(skip)]
     pub active_refs: Arc<AtomicUsize>,
     /// Rohe Tensor-Bytes (Klartext oder Ciphertext). WIRD gezeroized beim Drop.
-    data: Vec<u8>,
-    /// Strukturierter oder roher Tensor-Inhalt des Segments.
+    pub(crate) data: Vec<u8>,
     #[zeroize(skip)]
     pub content: KvSegmentContent,
     #[cfg(feature = "kv-encryption")]
-    encrypted_payload: Option<EncryptedSegmentPayload>,
+    pub(crate) encrypted_payload: Option<EncryptedSegmentPayload>,
 }
 
 impl KvSegment {
@@ -254,8 +216,8 @@ impl KvSegment {
     /// - `tenant_id`: Zugehöriger Mandant.
     /// - `segment_id`: Eindeutige Kennung.
     /// - `data`: Rohe Tensor-Bytes.
-    pub fn new(tenant_id: TenantId, segment_id: u64, data: Vec<u8>) -> Self {
-        let content_bytes = bytes::Bytes::copy_from_slice(&data);
+    pub fn new(tenant_id: impl Into<TenantId>, segment_id: u64, data: Vec<u8>) -> Self {
+        let tenant_id = tenant_id.into(); let content_bytes = bytes::Bytes::copy_from_slice(&data);
         Self {
             tenant_id,
             segment_id,
@@ -279,10 +241,10 @@ impl KvSegment {
         tenant_id: TenantId,
         segment_id: u64,
         data: Vec<u8>,
-        #[cfg(feature = "kv-encryption")] model_fingerprint: Option<ModelFingerprint>,
+        #[cfg(feature = "kv-encryption")] model_fingerprint: Option<crate::kv_encryption::ModelFingerprint>,
         rope_offset: Option<usize>,
     ) -> Self {
-        let content_bytes = bytes::Bytes::copy_from_slice(&data);
+        let tenant_id = tenant_id.into(); let content_bytes = bytes::Bytes::copy_from_slice(&data);
         Self {
             tenant_id,
             segment_id,
@@ -299,101 +261,6 @@ impl KvSegment {
         }
     }
 
-    /// Schreibt quantisierte KV-Tensor-Daten in das Segment unter Beachtung von `INV-KIVI-AEAD-ORDER`.
-    ///
-    /// # Ablauf
-    /// 1. **Quantisierung ZUERST**: Reduktion auf 2-Bit Präzision.
-    /// 2. **Kompression**: Komprimierung der serialisierten Struktur.
-    /// 3. **AEAD-Verschlüsselung ZULETZT**: Versiegelung mit authentifizierter Verschlüsselung.
-    #[cfg(all(
-        any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"),
-        feature = "kv-encryption"
-    ))]
-    pub fn write_quantized(
-        &mut self,
-        raw_kv: &KvTensorView,
-        config: KiviQuantizeConfig,
-        cipher: &dyn contextra_crypto::KvCipher,
-    ) -> Result<()> {
-        // 1. Quantization FIRST
-        let quantized = kivi_quantize(raw_kv, config)?;
-        let serialized_quant = bincode::serialize(&quantized)
-            .map_err(|e| KvCacheError::Serialization(e.to_string()))?;
-
-        // 2. Compression
-        let compressed = compress_bytes(&serialized_quant);
-
-        // 3. AEAD Encryption SECOND
-        let encrypted = cipher
-            .seal(&compressed)
-            .map_err(|e| KvCacheError::CryptoError(e.to_string()))?;
-
-        self.data = encrypted;
-        self.encrypted = true;
-        self.content = KvSegmentContent::KiviQuantized(quantized);
-        Ok(())
-    }
-
-    #[cfg(all(
-        any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"),
-        feature = "kv-encryption"
-    ))]
-    pub fn read_dequantized(
-        &self,
-        cipher: &dyn contextra_crypto::KvCipher,
-    ) -> Result<KvTensorView> {
-        // 1. AEAD Decryption FIRST
-        let decrypted = cipher
-            .open(&self.data)
-            .map_err(|e| KvCacheError::CryptoError(e.to_string()))?;
-
-        // 2. Decompression
-        let decompressed = decompress_bytes(&decrypted)?;
-
-        // 3. Dequantization SECOND
-        match &self.content {
-            KvSegmentContent::KiviQuantized(block) => kivi_dequantize(&decompressed, &block.meta),
-            KvSegmentContent::Raw(_) => KvTensorView::from_bytes(&decompressed),
-        }
-    }
-
-    /// Erstellt ein verschlüsseltes KV-Cache-Segment aus einem Klartext-Tensor.
-    #[cfg(feature = "kv-encryption")]
-    pub fn new_encrypted(
-        cipher: &KvSegmentCipher,
-        tenant_id: TenantId,
-        segment_id: u64,
-        model_fingerprint: ModelFingerprint,
-        rope_offset: Option<usize>,
-        plaintext: &[u8],
-    ) -> std::result::Result<Self, CryptoError> {
-        let encrypted_layer = cipher.encrypt_with_version(
-            tenant_id,
-            segment_id,
-            CURRENT_KV_KEY_DERIVATION_VERSION,
-            model_fingerprint.clone(),
-            plaintext,
-        )?;
-        let ciphertext_copy = encrypted_layer.ciphertext.clone();
-        let content_bytes = bytes::Bytes::copy_from_slice(&ciphertext_copy);
-
-        Ok(Self {
-            tenant_id,
-            segment_id,
-            key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
-            encrypted: true,
-            model_fingerprint: Some(model_fingerprint),
-            rope_offset,
-            active_refs: Arc::new(AtomicUsize::new(0)),
-            data: ciphertext_copy,
-            content: KvSegmentContent::Raw(content_bytes),
-            encrypted_payload: Some(EncryptedSegmentPayload {
-                layer: encrypted_layer,
-                key_derivation_version: CURRENT_KV_KEY_DERIVATION_VERSION,
-                bound_segment_id: Some(segment_id),
-            }),
-        })
-    }
 
     /// Gibt die aktuelle Anzahl aktiver Referenzen (`KvBlockGuard`) zurück.
     pub fn active_refs(&self) -> usize {
@@ -410,53 +277,6 @@ impl KvSegment {
         )
     }
 
-    /// Entschlüsselt die Daten des Segments, falls es verschlüsselt ist.
-    #[cfg(feature = "kv-encryption")]
-    pub fn decrypt_data(
-        &self,
-        cipher: &KvSegmentCipher,
-    ) -> std::result::Result<Vec<u8>, CryptoError> {
-        if !self.encrypted {
-            return Ok(self.data.clone());
-        }
-
-        if self.key_derivation_version > CURRENT_KV_KEY_DERIVATION_VERSION {
-            return Err(CryptoError::Crypto(format!(
-                "Unsupported key derivation version: {}",
-                self.key_derivation_version
-            )));
-        }
-
-        if let Some(payload) = &self.encrypted_payload {
-            if payload.key_derivation_version != self.key_derivation_version {
-                return Err(CryptoError::Crypto(format!(
-                    "Key derivation version mismatch: segment key_derivation_version is {}, payload key_derivation_version is {}",
-                    self.key_derivation_version, payload.key_derivation_version
-                )));
-            }
-            if let Some(expected_seg_id) = payload.bound_segment_id {
-                if expected_seg_id != self.segment_id {
-                    return Err(CryptoError::Crypto(format!(
-                        "AAD verification failed: segment_id mismatch (expected {}, got {})",
-                        expected_seg_id, self.segment_id
-                    )));
-                }
-            }
-            cipher.decrypt_with_version(
-                &payload.layer,
-                self.segment_id,
-                self.key_derivation_version,
-            )
-        } else if self.model_fingerprint.is_some() {
-            Err(CryptoError::Crypto(
-                "Missing encrypted payload nonce for encrypted segment decryption".into(),
-            ))
-        } else {
-            Err(CryptoError::Crypto(
-                "Missing model fingerprint for encrypted segment decryption".into(),
-            ))
-        }
-    }
 
     /// Serialisiert das Segment bzw. dessen verschlüsselte Layer für Tier-2-LSM-Spill (Auslagerung).
     pub fn to_spill_bytes(&self) -> Vec<u8> {
@@ -503,7 +323,8 @@ impl std::fmt::Debug for KvSegment {
 mod tests {
     use super::*;
     #[cfg(feature = "kv-encryption")]
-    use contextra_crypto::CryptoKey;
+    #[cfg(feature = "kv-encryption")]
+        use crate::kv_encryption::CryptoKey;
 
     // Prüft, dass Daten im KvSegment beim Drop oder expliziten Zeroize genullt werden.
     #[test]

@@ -19,10 +19,10 @@ use contextra_ports::storage::StorageEngine;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result as ContextraResult, TxId};
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 use crate::radix::SemanticEmbedder;
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 fn block_on_simple<F: std::future::Future>(fut: F) -> F::Output {
     let waker = std::task::Waker::noop();
     let mut cx = std::task::Context::from_waker(waker);
@@ -90,7 +90,7 @@ impl EmbeddingProviderSemanticEmbedder {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder {
     /// Berechnet das Text-Embedding für eine Sequenz von Token-IDs.
     ///
@@ -98,9 +98,9 @@ impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder {
     /// 1. Validieren, dass Tokens nicht leer sind.
     /// 2. Tokens als String repräsentieren.
     /// 3. In separatem Thread asynchron über den Provider berechnen und auf Ergebnis warten.
-    fn embed(&self, tokens: &[u32]) -> ContextraResult<Vec<f32>> {
+    fn embed(&self, tokens: &[u32]) -> crate::error::Result<Vec<f32>> {
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(crate::error::KvCacheError::InvalidInput(
                 "Cannot compute embedding for empty token sequence".to_string(),
             ));
         }
@@ -118,9 +118,9 @@ impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder {
         });
 
         let result = handle.join().map_err(|_| {
-            ContextraError::Internal("Thread panic during embedding computation".to_string())
+            crate::error::KvCacheError::Internal("Thread panic during embedding computation".to_string())
         })?;
-        result.map_err(|e| ContextraError::Internal(e.to_string()))
+        result.map_err(|e| crate::error::KvCacheError::Internal(e.to_string()))
     }
 }
 
@@ -229,5 +229,31 @@ mod tests {
             assert_eq!(manifest.capability().ring, 1);
             assert!(manifest.activate().is_ok());
         }
+    }
+}
+
+impl<T: contextra_ports::kv_bridge_port::KvBridgeStorage + ?Sized> crate::spill::KvSpillStorage for T {
+    fn get<'a>(&'a self, key: &'a [u8]) -> crate::spill::BoxFuture<'a, crate::error::Result<Option<bytes::Bytes>>> {
+        Box::pin(async move {
+            self.get(key)
+                .await
+                .map_err(|e| crate::error::KvCacheError::Internal(e.to_string()))
+        })
+    }
+
+    fn put<'a>(&'a self, tx_id: crate::types::TxId, key: &'a [u8], value: &'a [u8]) -> crate::spill::BoxFuture<'a, crate::error::Result<()>> {
+        Box::pin(async move {
+            self.put(tx_id.into(), key, value)
+                .await
+                .map_err(|e| crate::error::KvCacheError::Internal(e.to_string()))
+        })
+    }
+
+    fn commit<'a>(&'a self, tx_id: crate::types::TxId) -> crate::spill::BoxFuture<'a, crate::error::Result<()>> {
+        Box::pin(async move {
+            self.commit(tx_id.into())
+                .await
+                .map_err(|e| crate::error::KvCacheError::Internal(e.to_string()))
+        })
     }
 }

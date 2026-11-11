@@ -265,11 +265,8 @@ impl Default for InvalidationBudget {
 
 /// Begrenzter Invalidator für Scratchpads mit deterministischer Schranke.
 pub struct BoundedScratchpadInvalidator<'a> {
-    /// Referenz auf den zugrundeliegenden Prefix-Store.
     pub store: &'a TenantPrefixKvStore,
-    /// Zu invalidierende Präfix-Schlüssel.
     pub keys: Vec<PrefixKey>,
-    /// Konfiguriertes Invalidation-Budget.
     pub budget: InvalidationBudget,
 }
 
@@ -306,5 +303,23 @@ impl<'a> BoundedScratchpadInvalidator<'a> {
         )?;
 
         Ok(invalidated.min(self.budget.max_entries))
+    }
+}
+
+impl From<crate::invalidation::ScratchpadCacheScope> for ScratchpadCacheScope {
+    fn from(s: crate::invalidation::ScratchpadCacheScope) -> Self {
+        Self {
+            tenant_id: s.tenant_id.into(),
+            scratchpad_key_prefix: s.scratchpad_key_prefix,
+        }
+    }
+}
+
+impl From<ScratchpadCacheScope> for crate::invalidation::ScratchpadCacheScope {
+    fn from(s: ScratchpadCacheScope) -> Self {
+        Self {
+            tenant_id: s.tenant_id.into(),
+            scratchpad_key_prefix: s.scratchpad_key_prefix,
+        }
     }
 }

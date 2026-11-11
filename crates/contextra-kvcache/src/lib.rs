@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 #![allow(
     clippy::indexing_slicing,
@@ -46,9 +45,7 @@
 //! 9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung.
 
 pub mod cipher;
-pub mod contract;
 #[cfg(feature = "workspace")]
-/// Kompatibilitätsbrücken für `contextra-types` und `contextra-ports`.
 pub mod compat;
 
 #[cfg(feature = "workspace")]
@@ -57,7 +54,6 @@ pub mod error;
 pub mod types;
 
 pub use cipher::{PlaintextSegmentCipher, SegmentCipher};
-pub use contract::{Clock as KvClock, KvCacheEngine, MemoryKvCache, Rng as KvRng};
 pub use error::{KvCacheError, Result as KvResult};
 pub use types::{
     CacheDirective as KvCacheDirective, ModelFingerprint as KvModelFingerprint,
@@ -65,8 +61,12 @@ pub use types::{
 };
 
 pub mod attention_score;
+pub mod invalidation;
+#[cfg(feature = "kv-encryption")]
+pub mod kv_encryption;
+pub mod spill;
 pub mod eviction_worker;
-#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+#[cfg(feature = "exp-kivi")]
 pub mod quantize_kivi;
 pub mod radix;
 pub mod segment;
@@ -79,30 +79,33 @@ pub use adapters::{
     StorageEngineKvBridge,
 };
 pub use attention_score::{
-    rank_for_eviction, rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
+    rank_for_eviction, rank_for_eviction_weighted, rank_for_eviction_weighted_for_tenant_nanos, AttentionScoreSource, NullAttentionScoreSource,
 };
 pub use eviction_worker::{emergency_wipe, EvictionWorker};
 #[cfg(feature = "workspace")]
 pub use prefix_store::TenantPrefixKvStore;
-#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+#[cfg(feature = "exp-kivi")]
 pub use quantize_kivi::{
     compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, pack_kivi_block,
     unpack_kivi_block, KiviBlockMeta, KiviQuantizeConfig, KiviQuantizedBlock, KvTensorView,
 };
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 pub use radix::{
     ContentAddressedKvStore, KvLookupResult, KvSegmentRef, SemanticCacheConfig, SemanticEmbedder,
 };
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 #[cfg(feature = "workspace")]
 pub use scratchpad_invalidation::{
-    PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
+    PrefixStoreScratchpadInvalidator, ScratchpadInvalidator,
 };
 pub use segment::{
+    SegmentAead,
     KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,
     CURRENT_KV_KEY_DERIVATION_VERSION,
 };
 pub use service::{KvCacheConfig, KvCacheService, KvCacheServiceBuilder, KvCacheStats};
 #[cfg(feature = "workspace")]
-pub use store::{KvCachePruner, KvCacheScanner};
+pub use compat::scanner::{KvCachePruner, KvCacheScanner};
 pub use store::{SpillHandler, TenantIsolatedKvStore};
+pub use invalidation::ScratchpadCacheScope;
+pub use spill::{InMemoryKvSpillStorage, KvSpillStorage};

@@ -20,7 +20,7 @@
 //! der Algorithmus streng deterministisch auf das Standard-LRU-Verfahren zurück.
 
 use crate::types::RequestId;
-use contextra_ids::TenantId;
+use crate::types::TenantId;
 use std::time::Instant;
 
 // ANCHOR[contextra-kvcache:ATTN-002]
@@ -125,34 +125,62 @@ pub fn rank_for_eviction_weighted_for_tenant(
         return vec![candidates[0].0];
     }
 
-    let weight = attention_weight.clamp(0.0, 1.0);
-
-    // Find min and max access instants for LRU normalization
     let min_instant = candidates
         .iter()
         .map(|(_, t)| *t)
         .min()
         .unwrap_or(candidates[0].1);
-    let max_instant = candidates
+
+    let nanos_candidates: Vec<(u64, u64)> = candidates
+        .iter()
+        .map(|&(id, instant)| {
+            let rel_nanos = instant.duration_since(min_instant).as_nanos() as u64;
+            (id, rel_nanos)
+        })
+        .collect();
+
+    rank_for_eviction_weighted_for_tenant_nanos(tenant_id, &nanos_candidates, scores, attention_weight)
+}
+
+/// Bewertet Verdrängungskandidaten mandantenspezifisch basierend auf monotonen Nanosekunden-Zeitstempeln.
+pub fn rank_for_eviction_weighted_for_tenant_nanos(
+    tenant_id: TenantId,
+    candidates: &[(u64, u64)],
+    scores: &dyn AttentionScoreSource,
+    attention_weight: f32,
+) -> Vec<u64> {
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+    if candidates.len() == 1 {
+        return vec![candidates[0].0];
+    }
+
+    let weight = attention_weight.clamp(0.0, 1.0);
+
+    let min_nanos = candidates
+        .iter()
+        .map(|(_, t)| *t)
+        .min()
+        .unwrap_or(candidates[0].1);
+    let max_nanos = candidates
         .iter()
         .map(|(_, t)| *t)
         .max()
         .unwrap_or(candidates[0].1);
-    let time_span_secs = max_instant.duration_since(min_instant).as_secs_f32();
+    let time_span_secs = (max_nanos.saturating_sub(min_nanos) as f64 / 1_000_000_000.0) as f32;
 
-    // Collect candidate importance scores and find min/max
-    let raw_scores: Vec<(u64, Instant, Option<f32>)> = candidates
+    let raw_scores: Vec<(u64, u64, Option<f32>)> = candidates
         .iter()
-        .map(|&(id, instant)| {
+        .map(|&(id, nanos)| {
             (
                 id,
-                instant,
+                nanos,
                 scores.importance_score_for_tenant(tenant_id, id),
             )
         })
         .collect();
 
-    // NAN-CHECK-OK: Eviction candidate ranking filters non-finite scores before compute
     let valid_scores: Vec<f32> = raw_scores
         .iter()
         .filter_map(|(_, _, s)| *s)
@@ -177,31 +205,26 @@ pub fn rank_for_eviction_weighted_for_tenant(
 
     let score_span = max_score - min_score;
 
-    let mut ranked: Vec<(u64, Instant, f32)> = raw_scores
+    let mut ranked: Vec<(u64, u64, f32)> = raw_scores
         .into_iter()
-        .map(|(id, instant, opt_score)| {
-            // Normalized LRU age: 0.0 = oldest access (most evictable), 1.0 = newest access
+        .map(|(id, nanos, opt_score)| {
             let norm_lru = if time_span_secs > 0.0 {
-                instant.duration_since(min_instant).as_secs_f32() / time_span_secs
+                (nanos.saturating_sub(min_nanos) as f64 / 1_000_000_000.0) as f32 / time_span_secs
             } else {
                 0.0
             };
 
-            // Normalized importance score: 0.0 = lowest importance (most evictable), 1.0 = highest importance
             let norm_importance = match opt_score {
                 Some(s) if s.is_finite() && score_span > 0.0 => (s - min_score) / score_span,
-                _ => norm_lru, // Fallback to LRU score if score is missing or uniform
+                _ => norm_lru,
             };
 
-            // Composite eviction score: lower = evicted first
             let composite_score = (1.0 - weight) * norm_lru + weight * norm_importance;
 
-            (id, instant, composite_score)
+            (id, nanos, composite_score)
         })
         .collect();
 
-    // Sort by composite score ascending (lowest score = evicted first).
-    // Tie-break by access instant ascending (oldest access first), then segment ID ascending.
     ranked.sort_by(|a, b| {
         a.2.total_cmp(&b.2)
             .then_with(|| a.1.cmp(&b.1))

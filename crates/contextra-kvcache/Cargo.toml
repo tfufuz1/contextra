@@ -6,35 +6,27 @@ name = "contextra-kvcache"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version = "1.89"
-description = "Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
-repository = "https://github.com/contextra/contextra"
-keywords = ["kv-cache", "radix-tree", "llm", "prompt-caching", "memory-store"]
-categories = ["data-structures", "caching", "algorithms"]
-readme = "README.md"
-include = ["src/**/*", "LICENSE-*", "README.md", "Cargo.toml"]
-publish = false # Internes Bausteinlager fuer Contextra-Komponenten
+rust-version.workspace = true
+description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
 
 [package.metadata.contextra]
-klasse = "A"
+ring = "1"
 
 [features]
 default = ["std", "workspace", "ports-compat", "crypto-compat", "kv-encryption"]
 std = []
-workspace = ["types-compat", "ports-compat"]
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+kv-encryption = ["dep:contextra-crypto", "contextra-crypto/kv-encryption"]
+exp-kivi = []
+exp-content-addressed = []
 ports-compat = ["workspace"]
-types-compat = ["dep:contextra-ports", "dep:contextra-types"]
+types-compat = ["workspace"]
 crypto-compat = ["dep:contextra-crypto"]
-kv-encryption = ["crypto-compat", "contextra-crypto/kv-encryption"]
-docid-128 = ["contextra-ids/docid-128"]
-content-addressed-kv-cache = []
-exp-content-addressed = ["content-addressed-kv-cache"]
-kvcache-kivi-quant = ["kivi-quantization"]
-kivi-quantization = []
-exp-kivi = ["kivi-quantization"]
+kivi-quantization = ["exp-kivi"]
+kvcache-kivi-quant = ["exp-kivi"]
+content-addressed-kv-cache = ["exp-content-addressed"]
 
 [dependencies]
-contextra-ids = { version = "0.1.0", path = "../contextra-ids" }
 contextra-env = { version = "0.1.0", path = "../contextra-env" }
 contextra-types = { version = "0.1.0", path = "../contextra-types", optional = true }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports", optional = true }
@@ -55,6 +47,7 @@ bytes = { workspace = true }
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
 contextra-crypto = { version = "0.1.0", path = "../contextra-crypto" }
+contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
 criterion = { workspace = true, features = ["async_tokio"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
@@ -62,3 +55,99 @@ proptest = "1.4"
 [[bench]]
 name = "kvcache_bench"
 harness = false
+[[test]]
+name = "cache_directive_differential_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "cache_directive_pin_survives_eviction"
+required-features = ["workspace"]
+
+[[test]]
+name = "cancellation"
+required-features = ["workspace"]
+
+[[test]]
+name = "clm_pinned_base_preserved"
+required-features = ["workspace"]
+
+[[test]]
+name = "content_addressed_cross_tenant_isolation"
+required-features = ["workspace", "exp-content-addressed"]
+
+[[test]]
+name = "content_hash_hit_rate_improvement"
+required-features = ["workspace", "exp-content-addressed"]
+
+[[test]]
+name = "decryption_negative_tests"
+required-features = ["workspace", "kv-encryption"]
+
+[[test]]
+name = "error_display_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "eviction_segment_mapping"
+required-features = ["workspace"]
+
+[[test]]
+name = "eviction_with_attention_exporter"
+required-features = ["workspace"]
+
+[[test]]
+name = "generate_golden_kvcache"
+required-features = ["workspace", "exp-kivi"]
+
+[[test]]
+name = "golden_corruption_negative_tests"
+required-features = ["exp-kivi"]
+
+[[test]]
+name = "golden_greedy_decode"
+required-features = ["workspace"]
+
+[[test]]
+name = "golden_test"
+
+[[test]]
+name = "kivi_aead_order_enforced"
+required-features = ["workspace", "kv-encryption", "exp-kivi"]
+
+[[test]]
+name = "kivi_quantize_dequantize_roundtrip"
+required-features = ["workspace", "exp-kivi"]
+
+[[test]]
+name = "prefix_isolation_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "prefix_store_port"
+required-features = ["workspace"]
+
+[[test]]
+name = "radix_differential_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "radix_prefix_sharing_test"
+
+[[test]]
+name = "scratchpad_invalidation_isolation"
+required-features = ["workspace"]
+
+[[test]]
+name = "segment_handle_pool_test"
+
+[[test]]
+name = "service_tests"
+required-features = ["workspace"]
+
+[[test]]
+name = "store_default_attention_source"
+required-features = ["workspace"]
+
+[[test]]
+name = "tenant_isolation"
+required-features = ["workspace"]

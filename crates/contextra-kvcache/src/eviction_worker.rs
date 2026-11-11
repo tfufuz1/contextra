@@ -18,7 +18,7 @@ use super::store::TenantIsolatedKvStore;
 #[cfg(feature = "workspace")]
 use crate::compat::adapters::AttentionExporter;
 use crate::types::RequestId;
-use contextra_ids::TenantId;
+use crate::types::TenantId;
 use parking_lot::RwLock;
 #[cfg(feature = "workspace")]
 use std::collections::BTreeMap;
@@ -162,20 +162,20 @@ impl EvictionWorker {
     /// Registriert eine Zuordnung von `(tenant_id, segment_id)` zu einer `request_id`.
     pub fn register_segment_request(
         &self,
-        tenant_id: TenantId,
+        tenant_id: impl Into<TenantId>,
         segment_id: u64,
         request_id: impl Into<RequestId>,
     ) {
         self.attention_source
             .read()
-            .register_segment(tenant_id, segment_id, request_id.into());
+            .register_segment(tenant_id.into(), segment_id, request_id.into());
     }
 
     /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.
-    pub fn unregister_segment_request(&self, tenant_id: TenantId, segment_id: u64) {
+    pub fn unregister_segment_request(&self, tenant_id: impl Into<TenantId>, segment_id: u64) {
         self.attention_source
             .read()
-            .unregister_segment(tenant_id, segment_id);
+            .unregister_segment(tenant_id.into(), segment_id);
     }
 
     /// Liefert die aktuell konfigurierte [`AttentionScoreSource`].
@@ -230,7 +230,7 @@ pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
 mod tests {
     use super::*;
     use crate::segment::KvSegment;
-    use contextra_ids::TenantId;
+    use crate::types::TenantId;
     use std::time::Duration;
 
     // Prüft, dass der Aufruf von trigger_eviction den aufrufenden Thread nicht blockiert.

@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod error;
 pub mod prefix_store;
 pub mod scanner;
 pub mod scratchpad_invalidation;
@@ -10,7 +11,35 @@ pub use scratchpad_invalidation::*;
 
 // Transitionale Typ-Konvertierungen für Workspace-Kompatibilität.
 
-use crate::types::{ModelFingerprint, RequestId};
+use crate::types::{ModelFingerprint, RequestId, TenantId, TxId};
+
+#[cfg(feature = "workspace")]
+impl From<TenantId> for contextra_types::TenantId {
+    fn from(t: TenantId) -> Self {
+        contextra_types::TenantId::new(t.0)
+    }
+}
+
+#[cfg(feature = "workspace")]
+impl From<contextra_types::TenantId> for TenantId {
+    fn from(t: contextra_types::TenantId) -> Self {
+        TenantId(t.as_u64())
+    }
+}
+
+#[cfg(feature = "workspace")]
+impl From<TxId> for contextra_types::TxId {
+    fn from(t: TxId) -> Self {
+        contextra_types::TxId::from(t.0)
+    }
+}
+
+#[cfg(feature = "workspace")]
+impl From<contextra_types::TxId> for TxId {
+    fn from(t: contextra_types::TxId) -> Self {
+        TxId(t.inner())
+    }
+}
 
 #[cfg(feature = "workspace")]
 impl From<RequestId> for contextra_ports::RequestId {
@@ -34,53 +63,9 @@ impl From<ModelFingerprint> for contextra_types::model_fingerprint::ModelFingerp
 }
 
 #[cfg(feature = "workspace")]
-impl From<crate::error::KvCacheError> for contextra_types::ContextraError {
-    fn from(err: crate::error::KvCacheError) -> Self {
-        match err {
-            crate::error::KvCacheError::InvalidInput(msg) => {
-                contextra_types::ContextraError::InvalidInput(msg)
-            }
-            crate::error::KvCacheError::CryptoError(msg) => {
-                contextra_types::ContextraError::Crypto(msg)
-            }
-            crate::error::KvCacheError::PinBudgetExceeded(msg) => {
-                contextra_types::ContextraError::PinBudgetExceeded(msg)
-            }
-            crate::error::KvCacheError::LimitExceeded { limit, context } => {
-                contextra_types::ContextraError::LimitExceeded { limit, context }
-            }
-            crate::error::KvCacheError::PolicyViolation(msg) => {
-                contextra_types::ContextraError::PolicyViolation(msg)
-            }
-            crate::error::KvCacheError::Serialization(msg) => {
-                contextra_types::ContextraError::Serialization(msg)
-            }
-            crate::error::KvCacheError::QuantizationError(msg) => {
-                contextra_types::ContextraError::KvQuantization(msg)
-            }
-            crate::error::KvCacheError::Internal(msg) => {
-                contextra_types::ContextraError::Internal(msg)
-            }
-            crate::error::KvCacheError::InvalidTenant(msg) => {
-                contextra_types::ContextraError::InvalidInput(format!("Ungültiger Mandant: {msg}"))
-            }
-            crate::error::KvCacheError::InvalidSegment(msg) => {
-                contextra_types::ContextraError::Internal(format!("Ungültiges Segment: {msg}"))
-            }
-            crate::error::KvCacheError::SegmentNotFound(id) => {
-                contextra_types::ContextraError::NotFound(format!("Segment nicht gefunden: {id}"))
-            }
-            crate::error::KvCacheError::SegmentKeyDestroyed => {
-                contextra_types::ContextraError::Internal("Segmentschlüssel ist zerstört".into())
-            }
-            crate::error::KvCacheError::BudgetExceeded(msg) => {
-                contextra_types::ContextraError::MemoryLimitExceeded(msg)
-            }
-            crate::error::KvCacheError::ConfigError(msg) => {
-                contextra_types::ContextraError::Internal(format!("Konfigurationsfehler: {msg}"))
-            }
-            crate::error::KvCacheError::IoError(err) => contextra_types::ContextraError::Io(err),
-        }
+impl From<contextra_types::model_fingerprint::ModelFingerprint> for ModelFingerprint {
+    fn from(m: contextra_types::model_fingerprint::ModelFingerprint) -> Self {
+        ModelFingerprint(m.hash)
     }
 }
 
@@ -129,7 +114,6 @@ mod tests {
     use contextra_types::ContextraError;
 
     #[test]
-    #[allow(clippy::type_complexity)]
     fn test_kv_cache_error_to_contextra_error_mapping() {
         let cases: Vec<(KvCacheError, fn(&ContextraError) -> bool)> = vec![
             (
@@ -208,5 +192,19 @@ mod tests {
                 contextra_err
             );
         }
+    }
+}
+
+#[cfg(feature = "workspace")]
+impl PartialEq<contextra_types::TenantId> for TenantId {
+    fn eq(&self, other: &contextra_types::TenantId) -> bool {
+        self.0 == other.as_u64()
+    }
+}
+
+#[cfg(feature = "workspace")]
+impl PartialEq<TenantId> for contextra_types::TenantId {
+    fn eq(&self, other: &TenantId) -> bool {
+        self.as_u64() == other.0
     }
 }

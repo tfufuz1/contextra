@@ -22,7 +22,7 @@
 //!   semantischer Ähnlichkeitssuche (unter Feature `content-addressed-kv-cache`).
 
 use crate::error::{KvCacheError, Result};
-use contextra_ids::TenantId;
+use crate::types::TenantId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -38,10 +38,7 @@ pub enum KvReusePolicy {
     /// Wiederverwendung aller Treffer mit `matched_len > 0`.
     Always,
     /// Kostenbasiert: Treffer erst ab Mindestpräfixlänge `min_prefix_len`.
-    CostBased {
-        /// Mindestlänge für Wiederverwendung.
-        min_prefix_len: usize,
-    },
+    CostBased { min_prefix_len: usize },
     /// Keinerlei Prefix-Reuse (immer Cache-Miss).
     Never,
 }
@@ -97,7 +94,7 @@ impl KvBlockGuard {
         ref_counter.fetch_add(1, Ordering::SeqCst);
         Self {
             block_id,
-            tenant_id,
+            tenant_id: tenant_id.into(),
             ref_counter,
             worker,
         }
@@ -198,9 +195,9 @@ pub struct PrefixRadixTree {
 
 impl PrefixRadixTree {
     /// Erstellt einen neuen Prefix-Radix-Baum für den angegebenen Mandanten.
-    pub fn new(tenant_id: TenantId) -> Self {
-        Self {
-            tenant_id,
+    pub fn new(tenant_id: impl Into<TenantId>) -> Self {
+        let tenant_id = tenant_id.into(); Self {
+            tenant_id: tenant_id.into(),
             children: Vec::new(),
             total_entries: 0,
         }
@@ -566,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "content-addressed-kv-cache")]
+    #[cfg(feature = "exp-content-addressed")]
     fn test_content_addressed_kv_store_lookup_cascade() {
         struct MockEmbedder;
         impl SemanticEmbedder for MockEmbedder {
@@ -634,10 +631,10 @@ mod tests {
 }
 
 // -----------------------------------------------------------------------------
-// Content-Addressed KV Cache Extension (feature = "content-addressed-kv-cache")
+// Content-Addressed KV Cache Extension (feature = "exp-content-addressed")
 // -----------------------------------------------------------------------------
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 // ANCHOR[contextra-kvcache:RADIX-006]
 /// Referenz auf ein gecachtes KV-Segment im content-adressierten Store.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -650,13 +647,13 @@ pub struct KvSegmentRef {
     pub matched_tokens: Vec<u32>,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl KvSegmentRef {
     /// Erstellt eine neue Segment-Referenz.
     pub fn new(segment_id: u64, tenant_id: TenantId, matched_tokens: Vec<u32>) -> Self {
         Self {
             segment_id,
-            tenant_id,
+            tenant_id: tenant_id.into(),
             matched_tokens,
         }
     }
@@ -667,7 +664,7 @@ impl KvSegmentRef {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 // ANCHOR[contextra-kvcache:RADIX-007]
 /// Ergebnis eines KV-Cache-Lookups mit [`ContentAddressedKvStore`].
 #[derive(Debug, Clone, PartialEq)]
@@ -685,7 +682,7 @@ pub enum KvLookupResult {
     Miss,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 // ANCHOR[contextra-kvcache:RADIX-008]
 /// Trait für semantische Embedding-Generierung auf KV-Cache-Keys.
 pub trait SemanticEmbedder: Send + Sync {
@@ -693,7 +690,7 @@ pub trait SemanticEmbedder: Send + Sync {
     fn embed(&self, tokens: &[u32]) -> Result<Vec<f32>>;
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 // ANCHOR[contextra-kvcache:RADIX-009]
 /// Konfiguration für opt-in semantische Vektor-Cache-Lookups.
 #[derive(Clone)]
@@ -704,7 +701,7 @@ pub struct SemanticCacheConfig {
     pub similarity_threshold: f32,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl SemanticCacheConfig {
     /// Erstellt eine neue Konfiguration mit Embedder und Mindestähnlichkeit.
     pub fn new(embedder: Arc<dyn SemanticEmbedder>, similarity_threshold: f32) -> Self {
@@ -715,7 +712,7 @@ impl SemanticCacheConfig {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 // ANCHOR[contextra-kvcache:RADIX-010]
 /// Content-adressierter KV-Store mit mehrstufiger Lookup-Kaskade.
 ///
@@ -732,7 +729,7 @@ pub struct ContentAddressedKvStore {
     semantic_entries: Vec<(TenantId, Vec<f32>, KvSegmentRef)>,
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 impl ContentAddressedKvStore {
     /// Erstellt einen neuen `ContentAddressedKvStore` für den primären Mandanten.
     pub fn new(primary_tenant: TenantId) -> Self {
@@ -909,7 +906,7 @@ impl ContentAddressedKvStore {
     }
 }
 
-#[cfg(feature = "content-addressed-kv-cache")]
+#[cfg(feature = "exp-content-addressed")]
 /// Berechnet die Kosinus-Ähnlichkeit zwischen zwei Vektoren.
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() || a.is_empty() {

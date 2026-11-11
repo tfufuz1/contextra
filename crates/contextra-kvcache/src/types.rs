@@ -2,15 +2,95 @@
 
 use serde::{Deserialize, Serialize};
 
-pub use contextra_ids::TenantId;
-pub use contextra_ids::TxId;
+/// Mandanten-Identifier (lokaler Typ).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct TenantId(pub u64);
+
+impl TenantId {
+    /// Reservierter System-Mandant.
+    pub const SYSTEM: Self = Self(0);
+
+    /// Erzeugt eine neue `TenantId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Validierte Erzeugung (Mandant 0 ist reserviert/ungültig für reguläre Mandanten).
+    pub fn try_new(id: u64) -> Result<Self, crate::error::KvCacheError> {
+        if id == 0 {
+            Err(crate::error::KvCacheError::InvalidTenant("0 ist kein gültiger Mandant".into()))
+        } else {
+            Ok(Self(id))
+        }
+    }
+
+    /// Gibt den inneren raw `u64`-Wert zurück.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+
+    /// Gibt den numerischen Wert zurück.
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
+
+    /// Gibt an, ob es sich um den System-Mandanten handelt.
+    pub const fn is_system(&self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl std::fmt::Display for TenantId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<u64> for TenantId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+/// Transaktions-Identifier (lokaler Newtype für Speicheroperationen).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct TxId(pub u64);
+
+impl TxId {
+    /// Erzeugt eine neue `TxId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Gibt den inneren raw `u64`-Wert zurück.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+
+    /// Gibt den numerischen Wert zurück.
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for TxId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TxId({})", self.0)
+    }
+}
+
+impl From<u64> for TxId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
 
 /// Sequenzschritt / Token-Offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct StepId(pub u64);
 
 impl StepId {
-    /// Erzeugt einen neuen StepId.
+    /// Erzeugt einen neuen `StepId`.
     pub const fn new(id: u64) -> Self {
         Self(id)
     }
@@ -43,7 +123,7 @@ impl From<u64> for StepId {
 pub struct RequestId(pub u64);
 
 impl RequestId {
-    /// Erzeugt eine RequestId aus einem `u64`.
+    /// Erzeugt eine `RequestId` aus einem `u64`.
     pub const fn new(id: u64) -> Self {
         Self(id)
     }
@@ -56,6 +136,12 @@ impl RequestId {
     /// Gibt den inneren `u64`-Wert zurück.
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+}
+
+impl std::fmt::Display for RequestId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RequestId({})", self.0)
     }
 }
 
