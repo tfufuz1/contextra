@@ -2,6 +2,7 @@
 // ZWECK: Crate-lokale Distanz-Abstraktion und skalare Referenzimplementierung ohne contextra-simd (WP-VEC-3, VEC-4).
 // INVARIANTEN: Zero unsafe code in distance.rs (#![forbid(unsafe_code)]); INV-SIMD-FINITE-1; INV-SIMD-ALIGN-1.
 // HOTSPOTS: compute_distance, compute_distance_trusted, compute_distance_f32_bytes_trusted, ScalarKernel, ScalarDistance
+// STAND: TS:2026-11-11T02:00:00Z
 
 //! # Distance Computation Module
 //!
@@ -15,6 +16,9 @@ pub mod contract;
 use contract::{DistanceFn, Error as ContractError, Metric as ContractMetric};
 use contextra_types::{ContextraError, DistanceMetric, Result};
 
+// SECTION Datentypen für SIMD- und Quantisierungs-Distanz
+
+// ANCHOR[contextra-vector:DIST-PARTS-U8]
 /// Raw integer sum components for u8 cosine similarity calculation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CosineSimilarityPartsU8 {
@@ -26,6 +30,7 @@ pub struct CosineSimilarityPartsU8 {
     pub norm_b_sq: u32,
 }
 
+// ANCHOR[contextra-vector:DIST-KERNEL-TRAIT]
 /// Distance kernel interface defining vector metrics and quantized distance operations.
 pub trait DistanceKernel: Send + Sync + 'static {
     /// Computes distance between two slices after validating finiteness.
@@ -78,7 +83,11 @@ pub trait DistanceKernel: Send + Sync + 'static {
     /// Normalizes a vector in-place to unit length.
     fn normalize_inplace(&self, v: &mut [f32]);
 }
+// !SECTION
 
+// SECTION Skalare Referenz-Implementierung (ScalarKernel)
+
+// ANCHOR[contextra-vector:DIST-SCALAR-KERNEL]
 /// Complete, safe, scalar reference implementation using safe iterators and chunking.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ScalarKernel;
@@ -355,11 +364,11 @@ impl DistanceKernel for ScalarKernel {
         }
     }
 }
+// !SECTION
 
-// ---------------------------------------------------------------------------
-// DistanceFn & Metric Crate-Local Adapter (Baukasten Contract Klasse A)
-// ---------------------------------------------------------------------------
+// SECTION Adapter für Contract- und Injected-Distanzfunktionen
 
+// ANCHOR[contextra-vector:DIST-SCALAR-DISTANCE]
 /// Crate-local scalar distance function implementing [`DistanceFn`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScalarDistance {
@@ -423,6 +432,7 @@ impl DistanceFn for ScalarDistance {
     }
 }
 
+// ANCHOR[contextra-vector:DIST-INJECTED-KERNEL]
 /// Dynamic adapter enabling any injected [`DistanceFn`] to be used as a [`DistanceKernel`].
 #[derive(Clone)]
 pub struct InjectedDistanceKernel<D: DistanceFn> {
@@ -518,11 +528,11 @@ impl<D: DistanceFn + 'static> DistanceKernel for InjectedDistanceKernel<D> {
         ScalarKernel.normalize_inplace(v);
     }
 }
+// !SECTION
 
-// ---------------------------------------------------------------------------
-// Standalone Functions & Backward Compatibility Helper
-// ---------------------------------------------------------------------------
+// SECTION Freistehende Berechnungsfunktionen & Validierung
 
+// ANCHOR[contextra-vector:DIST-VALIDATE-VECTOR]
 /// Validates that a vector does not contain NaN or infinite values (INV-SIMD-FINITE-1).
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> Result<()> {
@@ -534,6 +544,7 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-vector:DIST-COMPUTE-DISTANCE]
 #[inline]
 pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
     #[cfg(feature = "simd")]
@@ -548,6 +559,7 @@ pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<
     }
 }
 
+// ANCHOR[contextra-vector:DIST-COMPUTE-TRUSTED]
 #[inline]
 pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<f32> {
     #[cfg(feature = "simd")]
@@ -566,6 +578,7 @@ pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) ->
     }
 }
 
+// ANCHOR[contextra-vector:DIST-COMPUTE-BYTES-TRUSTED]
 #[inline]
 pub fn compute_distance_f32_bytes_trusted(
     a: &[f32],
@@ -647,6 +660,7 @@ pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
 pub fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
     ScalarKernel.euclidean_distance(a, b).unwrap_or(0.0)
 }
+// !SECTION
 
 #[cfg(test)]
 mod tests {

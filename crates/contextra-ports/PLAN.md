@@ -1,47 +1,26 @@
-# contextra-ports — Umsetzungsplan
+# contextra-ports — Umsetzungsplan (Baukasten-Architektur)
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus `docs/SPEC.md` v4.1 (Class B Storage-Bundle, Ring 0, Vertragsschicht).
 
-## 1. Vorbedingungen (global) [S]
+## 1. Status & Entkopplungshistorie
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+- **S-11 (`env` Extraktion):** Vollständig abgeschlossen. Grundlegende Umwelt-Ports (`Clock`, `Rng`, `IdGen`, `MetricsSink`) sind nach `contextra-env` migriert und werden hier für Rückwärtskompatibilität re-exportiert.
+- **S-00 / Baseline:** Statische Prüfung und Auditierung via `tools/` (Zero-Unsafe, Zero-Panic in Produktion bestätigt).
+- **Bereinigung von Compiler-Warnungen:** Behebung des doppelten Re-Exports von `KeyMaterialSource` in `src/lib.rs`.
+- **Systematische Code-Dokumentation & Kommentierung:** Etablierung des einheitlichen Inline-Kommentierungsschemas mit `ANCHOR`, `SECTION`/`!SECTION`, `NOTE`, `LINK` über alle Module hinweg, um die Wiederverwendbarkeit in Drittprojekten transparent zu machen.
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. Modulare Baukasten-Ziele für contextra-ports
 
-## 2. Schritte dieses Crates [S]
+1. **Vertragsintegrität:** Bereitstellung modularer Abstraktionsverträge für Storage-, Index-, Inference- und Lifecycle-Subsysteme ohne konkrete Engine-Abhängigkeiten.
+2. **Klares Kommentierungssystem:** Vollständige Nachvollziehbarkeit aller Traits, Methoden, Invarianten und Fail-Closed-Verhalten für Entwickler und Coding-Agenten.
+3. **Dyn-Kompatibilität:** Sicherstellung, dass alle Port-Traits objekt-sicher (`dyn-compatible`) bleiben, um dynamischen Polymorphismus in Satelliten- und Integrationscrates zu ermöglichen.
+4. **Keine unzulässigen Vorwärts- oder Rückwärtsabhängigkeiten:** Striktes Einhalten der Ring-0-Hierarchie (`contextra-types` und `contextra-env`).
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-11 | `env`: (A) Crate anlegen, Dateien aus `ports` kopieren; (B) `ports` → Re-Export; Konformitätssuite in `env` | S-02 | GF (Rng-Folgen), GD, GL | wie S-10 | ☐ offen |
-| S-24 | `erasure` Features + Typabgleich (die Typen-Übernahme aus `types`/`ports` folgt in S-50/S-51) | S-12 | `cargo check --no-default-features` + je Feature | Revert | ☐ offen |
-| S-50 | `ports` → `license` (Lizenz-Traits), `erasure` (Erasure-Familie), `testkit` (Conformance); Re-Exports bleiben (R9) | S-20, S-24 | GL; `rg 'FeatureRing|LicenseGate' crates/contextra-{store,vector,text,graph,kvcache,rank,checkpoint,mvcc}` leer | Revert | ☐ offen |
+## 3. Definition of Done
 
-## 3. Reihenfolge-Zwang [S]
-
-Keine direkte Reihenfolgeregel im Zyklen-Absatz von §7. Gilt die globale Reihenfolge (S-00 → S-01 → S-02 → S-03).
-
-## 4. Definition of Done [S]
-
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-| D-02 | `Vfs` bleibt in `ports`; `durable-fs` eigenständig (B08) |
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+- `cargo check -p contextra-ports --no-default-features --locked` kompiliert fehlerfrei.
+- `cargo test -p contextra-ports --locked` läuft erfolgreich durch.
+- `tools/zero_panic_analyzer.py --crate contextra-ports` meldet 0 Produktionsverstöße.
+- `tools/determinism_guard.py --crate contextra-ports` meldet 0 unzulässige Befunde.
+- `tools/unsafe_boundary_auditor.py --crate contextra-ports` bestätigt striktes `#![forbid(unsafe_code)]`.
+- `tools/decouple_inspector.py -c contextra-ports` dokumentiert den modularen Schnittstellenkatalog.
