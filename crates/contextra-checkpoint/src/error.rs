@@ -1,7 +1,7 @@
 //! # Lokaler Fehlertyp für contextra-checkpoint
 //!
 //! Bildet alle Fehlerfälle der Checkpoint-Registry und RAII-Guards typisiert ab,
-//! ohne harte Kopplung an `contextra_types::ContextraError`.
+//! ohne harte Kopplung an externe Fehlertypen.
 
 use thiserror::Error;
 
@@ -34,12 +34,14 @@ pub enum CheckpointError {
     /// Cross-Device Link Fehler beim Hardlinking über Mount-Punkte hinweg.
     #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
     CrossDeviceLink {
+        /// Quellpfad der Datei.
         source_path: String,
+        /// Zielpfad des Hardlinks.
         target_path: String,
     },
 
     /// I/O-Fehler beim Dateizugriff.
-    #[error("IO error: {0}")]
+    #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
     /// Gespeicherte ID-Breite passt nicht zur Build-Konfiguration (SPEC §5.2).

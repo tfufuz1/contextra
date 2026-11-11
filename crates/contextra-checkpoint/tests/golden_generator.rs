@@ -25,10 +25,8 @@ fn generate_golden_files() {
     .expect("Valid manifest creation");
 
     let meta_json = serde_json::to_string_pretty(&meta).expect("Serialization of meta");
-    let manifest_json =
-        serde_json::to_string_pretty(&manifest).expect("Serialization of manifest");
+    let manifest_json = serde_json::to_string_pretty(&manifest).expect("Serialization of manifest");
 
     fs::write("tests/golden/checkpoint_meta_v1.json", meta_json).expect("write meta");
-    fs::write("tests/golden/checkpoint_manifest_v1.json", manifest_json)
-        .expect("write manifest");
+    fs::write("tests/golden/checkpoint_manifest_v1.json", manifest_json).expect("write manifest");
 }

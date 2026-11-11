@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 #![deny(dead_code)]
 //! # Checkpoint-Registry für Time-Travel und MVCC-basiertes Snapshotting
 //!
@@ -10,7 +11,7 @@
 //!
 //! ## Öffentliche Checkpoint-Subsystem Architecture (gemäß ADR-011)
 //! `contextra-checkpoint` ist der **einzige öffentlich sichtbare Einstiegspunkt** für das Checkpoint-Konzept.
-//! Es stellt den Trait [`CheckpointCoordinator`], die Registry [`PersistentCheckpointStore`]
+//! Es stellt den Trait `CheckpointCoordinator` (unter `compat`), die Registry [`PersistentCheckpointStore`]
 //! sowie den RAII-Guard [`CheckpointGuard`] für automatisches Rollback bei Fehlern bereit.
 //!
 //! **Hinweis zur Abgrenzung:**
@@ -36,6 +37,7 @@
 
 #[cfg(feature = "workspace")]
 pub mod compat;
+pub mod contract;
 mod error;
 mod fs_seam;
 mod guard;

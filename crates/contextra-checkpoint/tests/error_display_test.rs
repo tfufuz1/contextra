@@ -35,8 +35,14 @@ fn test_checkpoint_error_display_parity_with_contextra_error() {
             },
         ),
         (
-            CheckpointError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "file not found")),
-            ContextraError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "file not found")),
+            CheckpointError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "file not found",
+            )),
+            ContextraError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "file not found",
+            )),
         ),
     ];
 

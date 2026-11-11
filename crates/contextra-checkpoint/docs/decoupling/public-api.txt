@@ -1,0 +1,194 @@
+# Public API Snapshot for contextra-checkpoint
+hardlink_cloner.rs: pub trait SnapshotPinner: Send + Sync {
+hardlink_cloner.rs: pub async fn create_dir_all<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {
+hardlink_cloner.rs: pub async fn read_dir<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomReadDir> {
+hardlink_cloner.rs: pub async fn metadata<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomMetadata> {
+hardlink_cloner.rs: pub async fn remove_file<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {
+hardlink_cloner.rs: pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(
+hardlink_cloner.rs: pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(_from: P, _to: Q) -> std::io::Result<u64> {
+hardlink_cloner.rs: pub struct LoomReadDir;
+hardlink_cloner.rs: pub async fn next_entry(&mut self) -> std::io::Result<Option<LoomDirEntry>> {
+hardlink_cloner.rs: pub struct LoomDirEntry;
+hardlink_cloner.rs: pub fn path(&self) -> std::path::PathBuf {
+hardlink_cloner.rs: pub struct LoomMetadata;
+hardlink_cloner.rs: pub struct HardlinkCloneResult {
+hardlink_cloner.rs: pub source_seq_no: u64,
+hardlink_cloner.rs: pub linked_files: Vec<PathBuf>,
+hardlink_cloner.rs: pub wal_tail_offset: Option<u64>,
+hardlink_cloner.rs: pub trait CheckpointHardlinkCloner: Send + Sync {
+hardlink_cloner.rs: pub struct DefaultHardlinkCloner;
+hardlink_cloner.rs: pub fn new() -> Self {
+fs_seam.rs: pub trait FsSeam: Send + Sync {
+fs_seam.rs: pub struct StdFsSeam;
+fs_seam.rs: pub fn new() -> Self {
+store.rs: pub trait CheckpointRegistry: Send + Sync {
+store.rs: pub high_water_mark: u64,
+store.rs: pub struct PersistentCheckpointStore<S: SnapshotSource> {
+store.rs: pub async fn open_and_recover(
+store.rs: pub async fn open_and_recover_with_orphan_registry(
+store.rs: pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {
+store.rs: pub async fn open_with_orphan_registry(
+store.rs: pub fn new(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {
+store.rs: pub fn new_with_orphan_registry(
+store.rs: pub async fn allocate_tx(&self) -> Result<TxId> {
+store.rs: pub fn skipped_rollback_count(&self) -> u64 {
+store.rs: pub fn checkpoint_guard_skipped_rollback_count(&self) -> u64 {
+store.rs: pub fn checkpoint_counter(&self) -> u64 {
+store.rs: pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+store.rs: pub fn clock(&self) -> &Arc<dyn Clock> {
+store.rs: pub fn set_metrics_sink(&mut self, sink: Arc<dyn MetricsSink>) {
+store.rs: pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
+store.rs: pub fn monotonic_timestamp_ms(&self) -> u64 {
+store.rs: pub fn create_guard(&self, tx_id: TxId) -> Result<CheckpointGuard<S>> {
+store.rs: pub async fn create_checkpoint(
+store.rs: pub async fn drop_checkpoint(&self, name: &str) -> Result<()> {
+store.rs: pub async fn list_checkpoints(&self) -> Result<Vec<CheckpointMeta>> {
+store.rs: pub async fn get_checkpoint(&self, name: &str) -> Result<Option<CheckpointMeta>> {
+store.rs: pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta> {
+store.rs: pub fn storage(&self) -> &Arc<S> {
+store.rs: pub fn orphan_registry(&self) -> &Arc<InstanceOrphanRegistry> {
+store.rs: pub async fn flush_orphan_registry(&self) -> Result<()> {
+store.rs: pub async fn shutdown(&self) -> Result<()> {
+store.rs: pub async fn close(&self) -> Result<()> {
+store.rs: pub fn register_pinned_seq_no_orphan(&self, orphan: PinnedSeqNoOrphan) {
+store.rs: pub fn register_orphaned_checkpoint(&self, cp: StateCheckpoint) {
+store.rs: pub fn get_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> {
+store.rs: pub fn clear_orphaned_checkpoint(&self, tx_id: TxId) {
+store.rs: pub fn clear_all_orphaned_checkpoints(&self) {
+store.rs: pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {
+store.rs: pub async fn recover_orphaned_checkpoints(&self) -> Result<Vec<TxId>> {
+store.rs: pub async fn create_hardlink_clone(
+vfs.rs: pub trait CheckpointVfs: Send + Sync {
+guard.rs: pub struct PinGuard<S: SnapshotSource> {
+guard.rs: pub async fn pin(
+guard.rs: pub async fn pin_with_clock(
+guard.rs: pub fn clock(&self) -> &Arc<dyn Clock> {
+guard.rs: pub fn defuse(mut self) {
+guard.rs: pub async fn unpin(mut self) -> Result<()> {
+guard.rs: pub struct CheckpointGuard<S: SnapshotSource> {
+guard.rs: pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
+guard.rs: pub fn with_clock(
+guard.rs: pub fn with_registry(
+guard.rs: pub fn with_registry_and_counter(
+guard.rs: pub fn with_registry_counter_and_clock(
+guard.rs: pub fn with_metrics_sink(mut self, sink: Arc<dyn MetricsSink>) -> Self {
+guard.rs: pub fn with_metrics_sink_opt(mut self, sink: Option<Arc<dyn MetricsSink>>) -> Self {
+guard.rs: pub fn clock(&self) -> &Arc<dyn Clock> {
+guard.rs: pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {
+guard.rs: pub async fn for_agent_step_with_registry(
+guard.rs: pub async fn for_agent_step_with_clock(
+guard.rs: pub fn checkpoint(&self) -> Result<&StateCheckpoint> {
+guard.rs: pub fn commit(mut self) -> Result<StateCheckpoint> {
+guard.rs: pub async fn rollback(mut self) -> Result<()> {
+guard.rs: pub fn rollback_blocking(mut self) -> Result<()> {
+manifest.rs: pub struct CheckpointManifest {
+manifest.rs: pub meta: CheckpointMeta,
+manifest.rs: pub components: Vec<String>,
+manifest.rs: pub checksum: String,
+manifest.rs: pub fn new(meta: CheckpointMeta, components: Vec<String>) -> Result<Self> {
+manifest.rs: pub fn verify(&self) -> Result<()> {
+orphan.rs: pub type PinId = u64;
+orphan.rs: pub struct RecoveryReport {
+orphan.rs: pub recovered_pins: Vec<PinId>,
+orphan.rs: pub recovered_checkpoints: Vec<TxId>,
+orphan.rs: pub fn is_empty(&self) -> bool {
+orphan.rs: pub fn total_recovered(&self) -> usize {
+orphan.rs: pub fn global_orphan_registry() -> &'static OrphanRegistry {
+orphan.rs: pub fn monotonic_timestamp_ms_with(clock: &dyn Clock) -> u64 {
+orphan.rs: pub fn monotonic_timestamp_ms() -> u64 {
+orphan.rs: pub struct OrphanRegistry {
+orphan.rs: pub fn new(file_path: impl Into<std::path::PathBuf>) -> Self {
+orphan.rs: pub fn register_orphan(&self, pin_id: PinId) -> std::io::Result<()> {
+orphan.rs: pub fn get_orphans(&self) -> Vec<PinId> {
+orphan.rs: pub fn clear_all(&self) {
+orphan.rs: pub async fn recover_and_clean<S: crate::snapshot_source::SnapshotSource>(
+orphan.rs: pub struct PinnedSeqNoOrphan {
+orphan.rs: pub seq_no: u64,
+orphan.rs: pub timestamp_ms: u64,
+orphan.rs: pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
+orphan.rs: pub struct OrphanState {
+orphan.rs: pub checkpoints: Vec<StateCheckpoint>,
+orphan.rs: pub pinned_seq_nos: Vec<PinnedSeqNoOrphan>,
+orphan.rs: pub persist_path: std::path::PathBuf,
+orphan.rs: pub fn persist_sync(&self) -> std::io::Result<()> {
+orphan.rs: pub fn persist_vfs(&self, vfs: &dyn crate::vfs::CheckpointVfs) -> std::io::Result<()> {
+orphan.rs: pub fn load_sync(path: &std::path::Path) -> Self {
+orphan.rs: pub fn load_vfs(vfs: &dyn crate::vfs::CheckpointVfs, path: &std::path::Path) -> Self {
+orphan.rs: pub struct InstanceOrphanRegistry {
+orphan.rs: pub fn new(persist_path: impl Into<std::path::PathBuf>) -> Self {
+orphan.rs: pub fn new_with_vfs(
+orphan.rs: pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+orphan.rs: pub fn with_vfs(mut self, vfs: Arc<dyn crate::vfs::CheckpointVfs>) -> Self {
+orphan.rs: pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
+orphan.rs: pub fn clock(&self) -> &Arc<dyn Clock> {
+orphan.rs: pub fn vfs(&self) -> Option<&Arc<dyn crate::vfs::CheckpointVfs>> {
+orphan.rs: pub fn load_sync(path: &std::path::Path) -> Self {
+orphan.rs: pub fn persist_sync(&self) -> std::io::Result<()> {
+orphan.rs: pub fn register_orphan_sync(&self, orphan: PinnedSeqNoOrphan) {
+orphan.rs: pub fn register_checkpoint_sync(&self, cp: StateCheckpoint) {
+orphan.rs: pub async fn flush_orphan_registry(&self) -> std::io::Result<()> {
+orphan.rs: pub fn drain_orphan_pins(&self) -> Vec<PinnedSeqNoOrphan> {
+orphan.rs: pub fn get_orphan_pins(&self) -> Vec<PinnedSeqNoOrphan> {
+orphan.rs: pub fn clear_orphan_pin(&self, seq_no: u64) {
+orphan.rs: pub fn drain_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> {
+orphan.rs: pub fn get_orphaned_checkpoints(&self) -> Vec<StateCheckpoint> {
+orphan.rs: pub fn clear_orphaned_checkpoint(&self, tx_id: TxId) {
+orphan.rs: pub fn clear_all(&self) {
+orphan.rs: pub fn register_orphaned_checkpoint(cp: StateCheckpoint) {
+orphan.rs: pub fn get_orphaned_checkpoints() -> Vec<StateCheckpoint> {
+orphan.rs: pub fn get_orphaned_checkpoints_for_namespace(ns: &str) -> Vec<StateCheckpoint> {
+orphan.rs: pub fn clear_orphaned_checkpoint(_tx_id: TxId) {}
+orphan.rs: pub fn clear_all_orphaned_checkpoints() {}
+orphan.rs: pub async fn await_pending_rollbacks() {}
+orphan.rs: pub fn pending_rollback_count() -> usize {
+orphan.rs: pub fn orphaned_checkpoint_count() -> usize {
+error.rs: pub type CheckpointResult<T> = std::result::Result<T, CheckpointError>;
+error.rs: pub type Result<T> = CheckpointResult<T>;
+error.rs: pub enum CheckpointError {
+error.rs: pub fn invalid_input(msg: impl Into<String>) -> Self {
+error.rs: pub fn internal(msg: impl Into<String>) -> Self {
+error.rs: pub fn cross_device_link(
+lib.rs: pub mod compat;
+lib.rs: pub mod contract;
+lib.rs: pub use vfs::CheckpointVfs;
+lib.rs: pub use error::{CheckpointError, CheckpointResult};
+lib.rs: pub use fs_seam::{FsSeam, StdFsSeam};
+lib.rs: pub use guard::{CheckpointGuard, PinGuard};
+lib.rs: pub use hardlink_cloner::{
+lib.rs: pub use manifest::CheckpointManifest;
+lib.rs: pub use meta::{CheckpointMeta, StateCheckpoint, CURRENT_ID_WIDTH_BITS};
+lib.rs: pub use orphan::{
+lib.rs: pub use snapshot_source::{BoxFuture as LocalBoxFuture, SnapshotSource};
+lib.rs: pub use store::{CheckpointRegistry, PersistentCheckpointStore};
+snapshot_source.rs: pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+snapshot_source.rs: pub trait SnapshotSource: Send + Sync + 'static {
+contract.rs: pub use crate::error::{CheckpointError, CheckpointResult};
+contract.rs: pub use crate::fs_seam::{FsSeam, StdFsSeam};
+contract.rs: pub use crate::meta::WorkflowState;
+contract.rs: pub use crate::snapshot_source::{BoxFuture, SnapshotSource};
+contract.rs: pub use crate::vfs::CheckpointVfs;
+contract.rs: pub struct InMemorySnapshotSource {
+contract.rs: pub fn new() -> Self {
+contract.rs: pub fn get_sync(&self, key: &[u8]) -> Option<Vec<u8>> {
+meta.rs: pub struct WorkflowState {
+meta.rs: pub tx: TxId,
+meta.rs: pub graph_hash: [u8; 32],
+meta.rs: pub struct CheckpointMeta {
+meta.rs: pub name: String,
+meta.rs: pub collection_id: String,
+meta.rs: pub seq_no: u64,
+meta.rs: pub tx_id: TxId,
+meta.rs: pub metadata: serde_json::Value,
+meta.rs: pub created_at: u64,
+meta.rs: pub id_width_bits: u16,
+meta.rs: pub const CURRENT_ID_WIDTH_BITS: u16 = if cfg!(feature = "docid-128") { 128 } else { 64 };
+meta.rs: pub fn validate_id_width(&self) -> Result<()> {
+meta.rs: pub fn into_workflow_state(&self) -> WorkflowState {
+meta.rs: pub fn to_workflow_state(&self) -> WorkflowState {
+meta.rs: pub struct StateCheckpoint {
+meta.rs: pub tx_id: TxId,
+meta.rs: pub timestamp_ms: u64,
+meta.rs: pub namespace: Option<String>,
+mod.rs: pub mod error;
+mod.rs: pub mod ports_impl;
+mod.rs: pub mod snapshot_bridge;
