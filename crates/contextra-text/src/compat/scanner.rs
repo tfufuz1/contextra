@@ -19,7 +19,7 @@
 use crate::inverted::InvertedIndex;
 use crate::posting_list::PostingList;
 use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTarget, WitnessLayer};
-use contextra_ports::{StorageEngine, TextIndex};
+use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, DocId, RequestContext, Result, TxId};
 use std::sync::Arc;
 
@@ -31,7 +31,9 @@ use std::sync::Arc;
     note = "Extracted to contextra-erasure-text satellite (Paket E2 / D-E1)"
 )]
 pub enum ParsedTextTarget {
+    /// Einzeldokument-Ziel.
     Document(DocId),
+    /// Kollektions-Namespace-Ziel.
     Collection(String),
 }
 

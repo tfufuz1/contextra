@@ -363,6 +363,7 @@ impl<S: PostingStore> InvertedIndex<S> {
         self.resolve_tombstones(tx).await
     }
 
+    /// Bereinigt Tombstones im Inverted Index für gegebene Transaktion.
     pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {
         let tbs_prefix = {
             let mut k = Vec::with_capacity(self.prefix.len() + 4);

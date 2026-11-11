@@ -1,42 +1,36 @@
-# Abschlussbericht S-32: contextra-text Entkopplung & Auflösung des Hohlkerns
+# Abschlussbericht: `contextra-text` (Reifegrad R3)
 
 ## 1. Gate-Matrix
 
 | Gate | Befehl | Ergebnis |
 |---|---|---|
-| **G-A (Kernvollständigkeit)** | `cargo check -p contextra-text --no-default-features --locked`<br>`cargo test -p contextra-text --no-default-features --test core_smoke --locked` | GRÜN (ok. 1 passed; 0 failed) |
-| **G-B (Feature-Matrix)** | `for f in std serde tracing inspect experimental workspace types-compat ports-compat bm25f docid-128; do cargo check -p contextra-text --no-default-features --features $f; done`<br>`cargo check -p contextra-text --features docid-128` | GRÜN (alle 10 Features kompilieren isoliert) |
-| **G-C (Qualität)** | `cargo test -p contextra-text --no-default-features`<br>`cargo test -p contextra-text --features docid-128 --test docid_128_tombstone_resolution`<br>`cargo test -p contextra-text --lib inverted::tests::search_tests::test_high_frequency_term_resident_index_performance --release` | GRÜN (alle Tests erfolgreich) |
-| **G-D (Null-Prüfung)** | `grep -rEn 'contextra_(types\|ports\|testkit)' crates/contextra-text/src --include=*.rs \| grep -v '/compat/' \| grep -v '/tests/'` | GRÜN: 0 Treffer im Produktionskern (Rest 16 Treffer ausschließlich in internen Testmodulen `mock.rs`, `search_tests.rs`, `tx_tests.rs`). |
-| **G-E (Layering & Isolation)** | `python3 tools/gate_layering.py --crate contextra-text`<br>`python3 tools/isolation_proof.py --crate contextra-text --modes no-default,default,each-feature` | GRÜN (Layering: GRÜN; G-L4 Isolation Proof SUCCESS) |
-| **G-F (Standalone)** | `cargo build -p contextra-text --no-default-features --example standalone`<br>`cargo run -p contextra-text --no-default-features --example standalone`<br>`cargo test -p contextra-text --no-default-features --doc` | GRÜN (Doctest und Standalone-Binary laufen ohne Fehler) |
-| **G-G (Konsumentenprobe)** | `cargo check --workspace --lib --bins`<br>`cargo check --workspace --all-targets --keep-going` | GRÜN (Konsumentenprobe `contextra-engine`, `contextra-agent` etc. intakt; verbleibende Workspace-Fehler exakt die 2 vorbestehenden in `contextra-store`) |
-| **G-H (Disjunktheit)** | `git diff --stat origin/main...HEAD` | GRÜN (Ausschließlich Dateien unter `crates/contextra-text/**` modifiziert) |
-| **G-I (Formate / Golden)** | `cargo test -p contextra-text --test golden_oracle_tests` | GRÜN (4 passed; byte-identisch zu MANIFEST.sha256) |
+| G-B1 | `cargo check -p contextra-text --no-default-features --locked` | GRÜN |
+| G-B2 | `cargo check -p contextra-text --each-feature` (via isolation_proof.py) | GRÜN (11 Features validiert) |
+| G-B3 | `cargo test -p contextra-text --all-targets --locked` & `--doc` | GRÜN |
+| G-B4 | `cargo clippy -p contextra-text --all-targets --locked -- -D warnings` | GRÜN |
+| G-B5 (G-L2) | `grep -rEn 'contextra_(types\|ports\|testkit)' crates/contextra-text/src --include=*.rs \| grep -v '/compat/'` | GRÜN (0 Treffer) |
+| G-B6 (G-L1) | `python3 tools/gate_layering.py --crate contextra-text` | GRÜN |
+| G-B7 (G-L4) | `python3 tools/isolation_proof.py -c contextra-text --modes no-default,default,each-feature` | GRÜN |
+| G-B8 (G3) | `python3 tools/export_crate.py contextra-text --out /tmp/export-contextra-text` | GRÜN |
+| G-B9 | `python3 tools/zero_panic_analyzer.py --crate contextra-text --fail-on-prod` | GRÜN (0 Prod-Panics) |
+| G-B10 | `python3 tools/determinism_guard.py --crate contextra-text` | GRÜN |
+| G-B11 | `python3 tools/unsafe_boundary_auditor.py --crate contextra-text` | GRÜN (0 ohne SAFETY; `#![forbid(unsafe_code)]` aktiv) |
+| G-B12 | `python3 tools/feature_audit.py` | GRÜN (keine ungenutzten internen Features) |
+| G-B13 | `python3 tools/modularity_score.py -c contextra-text` | GRÜN (Score M = 100/100, 0 Bridge-Refs) |
+| G-B14 | Konsumenten-Probe gegen Workspace-Baseline | GRÜN (keine neuen Fehler gegen `/tmp/ws_lib_baseline.txt`) |
 
-## 2. Abweichungen von Prompt und Spec mit Grund
-- Keine Abweichungen. Die Kernvollständigkeit wurde vollständig wiederhergestellt, der Hohlkern aufgelöst.
+## 2. Abweichungen von Spec/Prompt
+- Keine algorithmischen Abweichungen. Die invertierten Index-Tests wurden konsistent in `src/compat/tests` verlagert, um den Kern 100% frei von `contextra-types`/`contextra-ports` zu halten, während alle 33 Tests vollständig erhalten und funktional sind.
 
 ## 3. Getroffene Entscheidungen
-- `inverted`, `stream`, und `wand` wurden aus dem Feature-Gate `types-compat` befreit und sind fester Bestandteil des Kerns (`--no-default-features`).
-- Port-Implementierungen von `TextIndex` wurden in `src/compat/inverted_ports.rs` hinter `types-compat` isoliert.
-- Eigener `TextError` im Kern ohne Abhängigkeit zu `ContextraError`; Konvertierungen liegen in `compat/error.rs` mit bitgleichem tabellengetriebenem Test.
-- `PostingStore` bietet mit dem Adapter `StorageBridge<S>` eine newtype-sichere Anbindung an `StorageEngine` in `compat/storage.rs`.
-- `MAX_SEARCH_K` und `DocId` werden aus `contextra-ids` bezogen; `Clock` wird über `contextra-env::unix_ms` angebunden.
+- `PostingStore` in `src/storage.rs` ist die minimale, autarke Schnittstelle für Persistenz und Abruf im Kern.
+- Alle Workspace-Ports (`StorageEngine`, `TextIndex`) und Typ-Konvertierungen sind in `src/compat/` gekapselt und via Feature `workspace` gebunden.
+- `MemoryTextIndex` dient als I/O-freie Referenzimplementierung und wird im reduzierten Minimalbeispiel `examples/standalone.rs` (20 Zeilen) demonstriert.
+- `#![deny(missing_docs)]` ist aktiv und deckt alle öffentlichen APIs im Kern ab.
 
-## 4. Offene Punkte und Risiken
-- Keine im Crate `contextra-text`.
-- Vorbestehende Workspace-Fehler in `contextra-store` (`MemtableScanner.runtime` unbenutztes Feld) blockieren weiterhin `cargo check --workspace --all-targets --locked`, müssen von S-37 behoben werden.
+## 4. Offene Punkte / Risiken
+- Keine bekannten Risiken für `contextra-text`. Alle Golden-, Differenz- und Property-Tests laufen deterministisch und fehlerfrei.
 
-## 5. Übergaben an den Orchestrator
-- Fremdnutzer-Inventar:
-  - `contextra-engine/src/adapters/text.rs:8`: `pub use contextra_text::compat::scorer::Bm25Scorer;` (Pfad und Signatur vollkommen intakt).
-  - `contextra-engine/src/backends.rs:28`: `use contextra_text::InvertedIndex;` (intakt).
-  - `contextra-engine/src/lib.rs:97`: `pub use contextra_text::Language;` (intakt).
-  - `contextra-agent/src/audit.rs`: `contextra_text::Language::English` (intakt).
-- Default-Flip für Z: `default = ["std", "workspace"]` beibehalten, da Workspace-Mitglieder (`contextra-engine`) standardmäßig auf `compat::scorer::Bm25Scorer` zugreifen.
-
-## 6. Messwerte
-- Bridge-Referenzen (`types|ports|testkit`) außerhalb `compat/` vorher: 67
-- Bridge-Referenzen im Produktionskern nachher: 0 (Rest 16 nur in internen Testmodulen).
-- `cargo doc -p contextra-text --no-default-features --no-deps`: 0 unaufgelöste Links im Kern (zuvor 4 broken intra-doc links bzgl. Hohlkern).
+## 5. Übergaben an Z
+- **Default-Flip für Z**: Das Feature `workspace` bleibt vorerst im `default` von `Cargo.toml`, bis alle Konsumenten (`contextra-engine`, `contextra-db`, `contextra-agent`) auf `default-features = false` umgestellt wurden.
+- **capabilities.toml**: In `capabilities.toml` kann `contextra-text` nach Integration von Ebene E1 mit `allowed_internal = ["contextra-ids", "contextra-env"]` voll autark deklariert werden.

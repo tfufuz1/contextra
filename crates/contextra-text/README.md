@@ -1,74 +1,50 @@
 # contextra-text
 
-Autarker, thread-sicherer Volltextsuche- und Inverted-Index-Baustein (BM25 Engine).
+> Ring 0 / Klasse A · Reifegrad R3 · Ebene E1 · `#![forbid(unsafe_code)]`
 
-Normativitätsklasse: **Baustein Klasse A** (SPEC v4.0 §2, §5.1, §11.3).
-
-## Rolle & Zweck
 `contextra-text` ist ein autarker Klasse-A-Baustein des Contextra-Ökosystems. Er implementiert eine performante Inverted-Index-Engine mit BM25-Scoring, Copy-on-Write Snapshot-Isolation, Block-Max WAND dynamischem Pruning und konfigurierbarer Textanalyse inklusive deutscher Morphologie (Komposita-Zerlegung, Umlaut-Normalisierung, Stoppwort-Filterung).
 
-Der Baustein besitzt im autarken Standalone-Betrieb null interne Abhängigkeiten (`contextra-*`) und kann vollständig isoliert in Fremdprojekte eingebettet werden.
-
-## Baukasten-Einordnung & Status (Klasse A)
-- **Klasse:** A (0 interne Pflicht-Abhängigkeiten im Standalone-Build)
-- **Ring:** Ring 0 / Ring 1
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-- **Zero-Panic-Doktrin:** Kein `unwrap()`, `expect()`, `panic!` im Produktionspfad.
-- **Fehlermodell:** Eingefrorener Vertrag in `contract.rs` mit typisiertem `TextError` / `Error` (`#[non_exhaustive]`) und `Result<T>`.
-- **Index-Schnittstelle (SPEC §4.3):** Implementiert `Index<DocKey, str>` und `Maintain::compact()` auf `MemoryTextIndex`.
-- **Snapshot-Isolation:** Leser greifen auf unveränderliche `IndexSnapshot`-Instanzen zu. Leser blockieren Schreiber nicht länger als O(1).
-- **Löschung:** Neutral über Tombstones und physische Freigabe via `compact`.
+## Zweck & Abgrenzung
+- **Kernaufgabe:** Autarker Volltextindex, BM25 / BM25F Scoring, Block-Max WAND Pruning, Tokenizer und morphologische Zerlegung.
+- **Abgrenzung:** Enthält keine I/O- oder Storage-Bindung im Kern; Speicherzugriffe erfolgen über das lokale Minimal-Trait `PostingStore` (`contract.rs` / `storage.rs`). Referenzimplementierung im RAM ist `MemoryTextIndex`.
 
 ## Features
-- `std` (Default): Standardbibliotheksunterstützung.
-- `serde`: Serialisierung und Deserialisierung für Kernstrukturen.
-- `tracing`: Diagnostische Telemetrie.
-- `inspect`: Öffnet Rohsicht auf interne Posting-Listen, Segmentdaten und Schlüsselinspektion.
-- `experimental`: Experimentelle Such- und Indexierungsfeatures.
-- `bm25f`: Feldgewichtete BM25-Berechnung ([`BM25F`]).
-- `docid-128`: Aktiviert 128-Bit `DocId`-Unterstützung.
-- `types-compat`: Transitionale Konvertierungen zu `contextra-types` und `contextra-ports`.
-- `ports-compat`: Transitionale Anbindung an `contextra-ports`.
+| Feature | Beschreibung |
+|---|---|
+| `std` | Standardbibliothek (Default). |
+| `workspace` | Transitional-Feature für Ports-/Types-Kompatibilität (`src/compat/`). |
+| `types-compat` | Re-Export von Typenkonvertierungen zu `contextra-types`. |
+| `ports-compat` | Implementierung von `StorageEngine -> PostingStore` und `TextIndex`. |
+| `bm25f` | Feldgewichtetes BM25F Scoring. |
+| `docid-128` | 128-Bit Dokument-IDs via `contextra-ids`. |
 
-## Export & Standalone-Verifikation
-Der Crate kann mit dem Exporter-Tool vollständig isoliert exportiert und gebaut werden:
+## Tatsächliche interne Abhängigkeiten (autarker Kern)
+Erhoben via `cargo tree -p contextra-text -e normal --no-default-features`:
+- `contextra-ids`
+- `contextra-env`
 
-```bash
-python3 tools/export_crate.py contextra-text --out /tmp/export-contextra-text
-```
-
-## Copy-Paste-Anleitung für Fremdprojekte
-Füge `contextra-text` zu deiner `Cargo.toml` hinzu:
-
-```toml
-[dependencies]
-contextra-text = { version = "0.1", default-features = false, features = ["std"] }
-```
-
-## Minimalbeispiel (Klasse A / Autark)
-Ein vollständiges Beispiel befindet sich unter `examples/standalone_text.rs`:
+## Schnellstart
 
 ```rust
-use contextra_text::bm25::BM25;
 use contextra_text::contract::DocKey;
 use contextra_text::memory_index::MemoryTextIndex;
-use contextra_text::traits::{Index, Maintain};
+use contextra_text::traits::Index;
 
-// 1. Initialisiere den Index
-let mut index = MemoryTextIndex::new();
-let doc1 = DocKey::from(1u64);
-let doc2 = DocKey::from(2u64);
+fn main() {
+    let mut index = MemoryTextIndex::new();
+    let doc1 = DocKey::from(1u64);
+    let doc2 = DocKey::from(2u64);
 
-// 2. Dokumente einfügen
-Index::<DocKey, str>::insert(&mut index, doc1, b"Donaudampfschifffahrt und Volltextsuche").unwrap();
-Index::<DocKey, str>::insert(&mut index, doc2, b"Volltextsuche in Rust mit BM25").unwrap();
+    Index::<DocKey, str>::insert(&mut index, doc1, b"Donaudampfschifffahrt und Volltextsuche").unwrap();
+    Index::<DocKey, str>::insert(&mut index, doc2, b"Volltextsuche in Rust mit BM25").unwrap();
 
-// 3. Suche ausführen
-let hits = Index::<DocKey, str>::search(&index, "Volltextsuche", 10).unwrap();
-println!("Gefundene Treffer: {}", hits.len());
+    let hits = Index::<DocKey, str>::search(&index, "Volltextsuche", 5).unwrap();
+    assert_eq!(hits.len(), 2);
+}
+```
 
-// 4. Neutrale Löschung per Tombstone und physische Kompaktierung
-Index::<DocKey, str>::remove(&mut index, &doc1).unwrap();
-let stats = Maintain::compact(&mut index).unwrap();
-println!("Kompaktierung: {} bereinigt, {} aktiv.", stats.purged_docs, stats.active_docs);
+## Autarkes Bauen & Testen
+```bash
+cargo build -p contextra-text --no-default-features --locked
+cargo test  -p contextra-text --no-default-features --locked
 ```

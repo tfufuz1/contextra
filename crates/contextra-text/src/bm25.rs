@@ -34,7 +34,9 @@ pub const BM25_B: f32 = 0.75;
 /// - `b`: Steuert den Einfluss der Dokumentlänge auf die Bewertung. Standardwert: 0.75.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BM25 {
+    /// Sättigungsparameter für Termhäufigkeit (k1 >= 0).
     pub k1: f32,
+    /// Dämpfungsparameter für Dokumentenlänge (0.0 <= b <= 1.0).
     pub b: f32,
 }
 
@@ -136,8 +138,11 @@ pub type FieldId = u32;
 /// Feldgewichtungskonfiguration für ein bestimmtes Feld in BM25F.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FieldWeight {
+    /// Feld-Identifikator.
     pub field_id: FieldId,
+    /// Gewichtungsfaktor des Feldes.
     pub weight: f32,
+    /// Längendämpfungsparameter des Feldes.
     pub b: f32,
 }
 
@@ -165,7 +170,9 @@ impl FieldWeight {
 /// Konfiguration für feldgewichtetes BM25F-Scoring (§11.3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct BM25F {
+    /// Sättigungsparameter k1.
     pub k1: f32,
+    /// Konfigurierte Feldgewichtungen.
     pub field_weights: Vec<FieldWeight>,
     cached_weights: Vec<(FieldId, f32, f32)>,
 }
