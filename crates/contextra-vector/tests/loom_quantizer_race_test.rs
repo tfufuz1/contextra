@@ -1,4 +1,9 @@
 #![allow(unexpected_cfgs)]
+// FILE-CONTEXT
+// ZWECK: Loom-Modellprüfung für ScalarQuantizer unter nebenläufigem Training und Zugriff.
+// INVARIANTEN: Datenrassen-Freiheit in allen Permutationen.
+// HOTSPOTS: 25-100
+// STAND: 2026-11-12
 
 //! Loom-basierter Nebenläufigkeitsbeweis für AGT-INDEX-b2c3d4e5.
 //! Ausführung: RUSTFLAGS="--cfg loom" cargo test -p contextra-index -- loom
