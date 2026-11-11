@@ -1,0 +1,43 @@
+{
+  "source_file": "sample.csv",
+  "detected_format": "Csv",
+  "title": null,
+  "canonical_hash": "ffca815d61726f6c85d9ada722967c2ed38b00058812cf6e80c1b4bd4fd623fc",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Sheet: csv (Zeilen 1–3)\n| id | name | preis | kategorie |\n|---|---|---|---|\n| 1 | Schraube | 0.15 | Eisenwaren |\n| 2 | Mutter | 0.08 | Eisenwaren |\n| 3 | Dichtung | 0.45 | Sanitär |",
+      "token_count": 45,
+      "metadata": {
+        "breadcrumb": "csv > Tabelle 1",
+        "chunk_id": "c54e13df9f6db62b59bd4966218b8c0a",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "csv",
+        "header": [
+          "id",
+          "name",
+          "preis",
+          "kategorie"
+        ],
+        "locator": {
+          "range": "A1:D4",
+          "sheet": "csv"
+        },
+        "rows": {
+          "first": 1,
+          "last": 3
+        },
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 171,
+          "start": 65
+        },
+        "strategy": "tabular",
+        "synthesized": true
+      }
+    }
+  ]
+}

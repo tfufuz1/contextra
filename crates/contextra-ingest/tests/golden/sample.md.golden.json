@@ -1,0 +1,56 @@
+{
+  "source_file": "sample.md",
+  "detected_format": "Markdown",
+  "title": "Markdown Beispieldokument",
+  "canonical_hash": "395611ef53522811acebf0bb49aae8d5df6a4c36dee073e3d2ff383455ec9b1d",
+  "chunk_count": 2,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "---\ntitle: \"Markdown Beispieldokument\"\nauthor: \"Contextra Test\"\n---",
+      "token_count": 16,
+      "metadata": {
+        "chunk_id": "05c5b022a666ca944c434c7fdce1f516",
+        "chunk_index": 0,
+        "chunk_total": 2,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Markdown Beispieldokument",
+        "format": "markdown",
+        "front_matter": true,
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 67,
+          "start": 0
+        },
+        "strategy": "prose"
+      }
+    },
+    {
+      "index": 1,
+      "content": "# Hauptüberschrift\n\nDies ist ein einleitender Absatz in Markdown.\n\n## Unterabschnitt 1\n\n- Erstes Element\n- Zweites Element mit **Fettung** und *Kursivierung*.\n\n```rust\nfn main() {\n    println!(\"Hello World\");\n}\n```",
+      "token_count": 55,
+      "metadata": {
+        "breadcrumb": "# Hauptüberschrift",
+        "chunk_id": "221eada26efbb33419e8f5cf2d57faa7",
+        "chunk_index": 1,
+        "chunk_total": 2,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Markdown Beispieldokument",
+        "format": "markdown",
+        "heading_level": 1,
+        "locator": {},
+        "merged_breadcrumbs": [
+          "# Hauptüberschrift",
+          "# Hauptüberschrift > ## Unterabschnitt 1"
+        ],
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 284,
+          "start": 69
+        },
+        "strategy": "prose"
+      }
+    }
+  ]
+}

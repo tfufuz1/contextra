@@ -1,0 +1,42 @@
+{
+  "source_file": "sample.tsv",
+  "detected_format": "Tsv",
+  "title": null,
+  "canonical_hash": "116283822efb7f78514a557a36a33249e2bb482fbc2cb2ed34d3b7381a1d7434",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Sheet: csv (Zeilen 1–2)\n| id | kunde | umsatz |\n|---|---|---|\n| 101 | Müller GmbH | 12500 |\n| 102 | Schmidt AG | 8900 |",
+      "token_count": 29,
+      "metadata": {
+        "breadcrumb": "csv > Tabelle 1",
+        "chunk_id": "02284a6756eeb75d3bed677ea85185c1",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "tsv",
+        "header": [
+          "id",
+          "kunde",
+          "umsatz"
+        ],
+        "locator": {
+          "range": "A1:C3",
+          "sheet": "csv"
+        },
+        "rows": {
+          "first": 1,
+          "last": 2
+        },
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 109,
+          "start": 51
+        },
+        "strategy": "tabular",
+        "synthesized": true
+      }
+    }
+  ]
+}

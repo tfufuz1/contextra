@@ -1,0 +1,28 @@
+{
+  "source_file": "sample.toml",
+  "detected_format": "Toml",
+  "title": null,
+  "canonical_hash": "5a730c1ba866769a36951342db46ecd6bfe90a5693a9d92fdab113f769f44f21",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "dependencies.serde: 1.0\n\npackage.name: corpus-sample\n\npackage.version: 1.0.0",
+      "token_count": 22,
+      "metadata": {
+        "chunk_id": "a5c2223aa391dcc69526ed2d2706154a",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "toml",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 76,
+          "start": 0
+        },
+        "strategy": "structured"
+      }
+    }
+  ]
+}

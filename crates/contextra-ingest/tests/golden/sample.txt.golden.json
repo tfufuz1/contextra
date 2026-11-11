@@ -1,0 +1,28 @@
+{
+  "source_file": "sample.txt",
+  "detected_format": "Txt",
+  "title": null,
+  "canonical_hash": "3e9689bc568da07a3b9b864fee52fceb2578e3d1690fa7aa9736476d250cd896",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Erster Absatz mit deutschem Umlaut: Ä, Ö, Ü, ß.\n\nZweiter Absatz mit Zahlen 12345 und Text.",
+      "token_count": 21,
+      "metadata": {
+        "chunk_id": "c9cb812bfb1247bb956ad41e70ef9683",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "format": "txt",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 94,
+          "start": 0
+        },
+        "strategy": "prose"
+      }
+    }
+  ]
+}

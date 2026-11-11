@@ -1,0 +1,33 @@
+{
+  "source_file": "sample.eml",
+  "detected_format": "Eml",
+  "title": "Test E-Mail für Ingestion",
+  "canonical_hash": "1e3acb4602b9c9196bbcfbae7e0e45a1b7287fcc7a122b693cfb67aa5a1f4e52",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Test E-Mail für Ingestion | sender@example.com | 2026-11-11T10:00:00Z\n\nFrom: sender@example.com\nTo: receiver@example.com\nDate: 2026-11-11T10:00:00Z\nSubject: Test E-Mail für Ingestion\n\nHallo Kollegium,\n\ndies ist eine Test-E-Mail zur Verifikation der E-Mail-Extraktion.\n\nBeste Grüße,\nContextra Tester",
+      "token_count": 81,
+      "metadata": {
+        "breadcrumb": "Test E-Mail für Ingestion",
+        "chunk_id": "378eab4b5540bc15af2a0f82e087702f",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "Test E-Mail für Ingestion",
+        "format": "eml",
+        "locator": {
+          "message": 1
+        },
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 230,
+          "start": 0
+        },
+        "strategy": "email",
+        "synthesized": true
+      }
+    }
+  ]
+}

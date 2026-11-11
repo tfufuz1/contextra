@@ -1,0 +1,17 @@
+From sender@example.com Wed Nov 11 10:00:00 2026
+From: sender@example.com
+To: receiver@example.com
+Subject: Erste Nachricht in Mbox
+Date: Wed, 11 Nov 2026 10:00:00 +0100
+Content-Type: text/plain; charset=utf-8
+
+Erste Nachricht Inhalt.
+
+From sender2@example.com Wed Nov 11 10:05:00 2026
+From: sender2@example.com
+To: receiver@example.com
+Subject: Zweite Nachricht in Mbox
+Date: Wed, 11 Nov 2026 10:05:00 +0100
+Content-Type: text/plain; charset=utf-8
+
+Zweite Nachricht Inhalt.
