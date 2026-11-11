@@ -6,6 +6,13 @@ feature-depth = 1
 
 [advisories]
 ignore = [
+    "RUSTSEC-2026-0429", # zip,
+    "RUSTSEC-2026-0369", # zip,
+    "RUSTSEC-2026-0368", # zip,
+    "RUSTSEC-2026-0367", # zip,
+    "RUSTSEC-2026-0386", # tokio AsyncFd,
+    "RUSTSEC-2025-0119", # number_prefix,
+    "RUSTSEC-2026-0253", # lru,
     "RUSTSEC-2024-0384", # number_prefix
     "RUSTSEC-2024-0436", # paste
     "RUSTSEC-2026-0176", # pyo3
