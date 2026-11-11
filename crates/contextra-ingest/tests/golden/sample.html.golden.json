@@ -1,0 +1,29 @@
+{
+  "source_file": "sample.html",
+  "detected_format": "Html",
+  "title": "HTML Testseite",
+  "canonical_hash": "c2d0412605c097fa0f08e503e0e7204e0ac5bedea3dd0c05198aff842fbf8b47",
+  "chunk_count": 1,
+  "chunks_summary": [
+    {
+      "index": 0,
+      "content": "Dies ist der Hauptinhalt der Testseite mit ä, ö, ü.\n\n| Name | Wert |\n|---|---|\n| Sensor 1 | 42.5 |",
+      "token_count": 23,
+      "metadata": {
+        "chunk_id": "86234a72dd2c137893373fc54d7fc41a",
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "chunker_version": "ingest-chunk/1",
+        "doc_title": "HTML Testseite",
+        "format": "html",
+        "locator": {},
+        "schema": "contextra.chunk.v1",
+        "source_span": {
+          "end": 101,
+          "start": 0
+        },
+        "strategy": "prose"
+      }
+    }
+  ]
+}

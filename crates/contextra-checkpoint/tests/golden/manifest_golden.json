@@ -8,12 +8,13 @@
       "env": "golden_production",
       "retention_days": 30
     },
-    "created_at": 1700000000000
+    "created_at": 1700000000000,
+    "id_width_bits": 64
   },
   "components": [
     "lsm",
     "vector",
     "meta"
   ],
-  "checksum": "04f173a6b90d444d30cefd9b976e25a602641769980db06597f8cf686b176c9f"
+  "checksum": "a30ea7a57c0a86cd58428eb301908e2cd0875529fa821ef48748beb8f2512d0c"
 }

@@ -40,6 +40,8 @@ physio-percolation = ["graph-connectivity-health"]
 ppr-forward-push = []
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }

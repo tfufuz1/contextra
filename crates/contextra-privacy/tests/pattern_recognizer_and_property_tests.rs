@@ -287,7 +287,10 @@ fn test_inv_privacy_failclosed_1_limit_and_error_handling() {
     // 2. Text strictly exceeding limit -> Must return Err(CapacityExceeded) and never silent clean pass
     let exceeded_text = "a".repeat(257);
     let err_res = recognizer.recognize_bounded(&exceeded_text);
-    assert!(err_res.is_err(), "Exceeding limit must fail closed with error");
+    assert!(
+        err_res.is_err(),
+        "Exceeding limit must fail closed with error"
+    );
 
     // Detailed bounded variant
     let detailed_err = recognizer.recognize_detailed_bounded(&exceeded_text);
@@ -338,7 +341,8 @@ fn test_masking_idempotence_property() {
     let vault = EgressVault::try_default().expect("vault creates");
     let recognizer = PatternRecognizer::new();
 
-    let text = "Contact alice@example.com or bob@company.org regarding IBAN DE89370400440532013000.";
+    let text =
+        "Contact alice@example.com or bob@company.org regarding IBAN DE89370400440532013000.";
 
     // Pass 1: Sanitize
     let (sanitized_1, count_1) = vault
@@ -350,8 +354,14 @@ fn test_masking_idempotence_property() {
     let (sanitized_2, count_2) = vault
         .sanitize_and_vault(&sanitized_1, &recognizer)
         .expect("sanitization 2 succeeds");
-    assert_eq!(count_2, 0, "Already sanitized text must not yield new replacements");
-    assert_eq!(sanitized_1, sanitized_2, "Sanitized text must remain identical on subsequent passes");
+    assert_eq!(
+        count_2, 0,
+        "Already sanitized text must not yield new replacements"
+    );
+    assert_eq!(
+        sanitized_1, sanitized_2,
+        "Sanitized text must remain identical on subsequent passes"
+    );
 }
 
 #[test]
@@ -362,17 +372,26 @@ fn test_detailed_entity_matches_and_rule_ids() {
     let matches = recognizer.recognize_detailed(text);
     assert_eq!(matches.len(), 3);
 
-    let email_match = matches.iter().find(|m| m.entity_type == "EMAIL").expect("email found");
+    let email_match = matches
+        .iter()
+        .find(|m| m.entity_type == "EMAIL")
+        .expect("email found");
     assert_eq!(email_match.rule_id, "PII-EMAIL-01");
     assert!(email_match.confidence > 0.9);
     assert_eq!(&text[email_match.range.clone()], "test@example.com");
 
-    let iban_match = matches.iter().find(|m| m.entity_type == "IBAN").expect("iban found");
+    let iban_match = matches
+        .iter()
+        .find(|m| m.entity_type == "IBAN")
+        .expect("iban found");
     assert_eq!(iban_match.rule_id, "PII-IBAN-MOD97");
     assert_eq!(iban_match.confidence, 1.0);
     assert_eq!(&text[iban_match.range.clone()], "DE89370400440532013000");
 
-    let cc_match = matches.iter().find(|m| m.entity_type == "CREDIT_CARD").expect("cc found");
+    let cc_match = matches
+        .iter()
+        .find(|m| m.entity_type == "CREDIT_CARD")
+        .expect("cc found");
     assert_eq!(cc_match.rule_id, "PII-CC-LUHN");
     assert!(cc_match.confidence > 0.9);
     assert_eq!(&text[cc_match.range.clone()], "4532820011223344");

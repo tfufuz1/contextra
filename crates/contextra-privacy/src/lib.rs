@@ -1,5 +1,6 @@
+#![deny(missing_docs)]
 #![forbid(unsafe_code)]
-//! `contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection (Ring 3)
+//! `contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection
 //!
 //! # Zweck und Architektur
 //! Dieses Crate implementiert die Sicherheits- und Datenschutzschicht für ausgehende Datenströme
@@ -7,15 +8,15 @@
 //! Erkennung von Exfiltrationsversuchen, automatisierte Pseudonymisierung über Surrogat-Token
 //! sowie unveränderbare Audit-Protokolle bereitzustellen.
 //!
-//! # Ring-Zugehörigkeit
-//! Ring 3 (Domain / Application Services). Das Crate liegt oberhalb der Speicher- und Kryptokerne
-//! (Ring 1/2) und unterhalb der API- und Netzwerk-Fassaden (Ring 4).
+//! # Ebene und Rolle
+//! Ebene E0 (Autarker Baustein). Das Crate ist vollständig eigenständig kompilier- und testbar.
 //!
 //! # Einbindung und Abhängigkeiten
 //! - **Eingehend:** Wird eingebunden von `contextra-mcp`.
-//! - **Ausgehend:** Vollkommen autark (keine internen Abhängigkeiten zu `contextra-*`).
+//! - **Ausgehend:** Vollkommen autark (keine internen Pflichtabhängigkeiten).
 //!
 //! # Wichtigste Module
+//! - [`contract`]: Minimale Umwelt- und Port-Traits (`Clock`, `EgressPolicy`, `TextSearchEngine`, `EntityRecognizer`).
 //! - [`egress_vault`]: DLP-Prüfung, Regex-Klassifikation und `SurrogateVault`-Pseudonymisierung.
 //! - [`entity_recognizer`]: Erkennung personenbezogener Daten (PII) wie IBAN, E-Mail, Kreditkarten.
 //! - [`egress_guard`]: Semantische k-NN Vektorähnlichkeitsprüfung gegen Datenabfluss.
@@ -28,6 +29,7 @@
 pub mod audit_trace;
 pub mod bulk_exfiltration_detector;
 pub mod context_edit_audit;
+pub mod contract;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod egress_vault;
@@ -47,6 +49,7 @@ pub use context_edit_audit::{
     build_context_edit_audit_record, compute_record_hash, render_audit_line, verify_audit_chain,
     ContextEditAuditError, ContextEditAuditRecord, ContextEditKind,
 };
+pub use contract::{Clock, EgressDecision, EgressPolicy};
 #[allow(deprecated)]
 pub use egress_gateway::{
     handle_cloud_query, handle_cloud_query_with_bulk_detector, handle_cloud_query_with_guard,
@@ -68,12 +71,10 @@ pub use egress_vault::{
 pub use entity_recognizer::{
     EntityMatch, Gazetteer, PatternRecognizer, RuleBasedEntityRecognizer, DEFAULT_MAX_INPUT_LENGTH,
 };
-pub use error::{EgressError, Error, Result};
+pub use error::{EgressError, Error, PrivacyError, Result};
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use processing_registry::{
     generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistry,
     ProcessingRegistryExport, ProcessorRole,
 };
-pub use types::{
-    Clock, EgressDecision, EgressPolicy, SystemClock, TenantId, TenantScopeViolation, TenantScoped,
-};
+pub use types::{SystemClock, TenantId, TenantScopeViolation, TenantScoped};

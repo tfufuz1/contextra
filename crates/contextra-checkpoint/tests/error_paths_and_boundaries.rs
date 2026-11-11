@@ -13,9 +13,9 @@
 //!
 //! Prüft das Verhalten bei ungültigen Eingaben, Überläufen und Systemfehlern.
 
+use contextra_checkpoint::CheckpointError;
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_checkpoint::CheckpointError;
 use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
@@ -223,32 +223,50 @@ async fn test_identifier_input_boundary_validation() {
     let res = store
         .create_checkpoint("", "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(contextra_checkpoint::CheckpointError::InvalidInput(_))));
+    assert!(matches!(
+        res,
+        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
+    ));
 
     // 2. Whitespace-only checkpoint name
     let res = store
         .create_checkpoint("   \t  ", "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(contextra_checkpoint::CheckpointError::InvalidInput(_))));
+    assert!(matches!(
+        res,
+        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
+    ));
 
     // 3. Empty collection ID
     let res = store
         .create_checkpoint("cp1", "", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(contextra_checkpoint::CheckpointError::InvalidInput(_))));
+    assert!(matches!(
+        res,
+        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
+    ));
 
     // 4. Oversized checkpoint name (> 256 chars)
     let long_name = "x".repeat(257);
     let res = store
         .create_checkpoint(&long_name, "col1", 1, TxId::new(1), serde_json::json!({}))
         .await;
-    assert!(matches!(res, Err(contextra_checkpoint::CheckpointError::InvalidInput(_))));
+    assert!(matches!(
+        res,
+        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
+    ));
 
     // 5. Drop checkpoint with empty name
     let res = store.drop_checkpoint("").await;
-    assert!(matches!(res, Err(contextra_checkpoint::CheckpointError::InvalidInput(_))));
+    assert!(matches!(
+        res,
+        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
+    ));
 
     // 6. Get checkpoint with empty name
     let res = store.get_checkpoint("   ").await;
-    assert!(matches!(res, Err(contextra_checkpoint::CheckpointError::InvalidInput(_))));
+    assert!(matches!(
+        res,
+        Err(contextra_checkpoint::CheckpointError::InvalidInput(_))
+    ));
 }

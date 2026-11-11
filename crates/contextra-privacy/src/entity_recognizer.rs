@@ -164,10 +164,7 @@ impl RuleBasedEntityRecognizer {
     }
 
     /// Führt die detaillierte Erkennung mit strikter Längenprüfung aus.
-    pub fn recognize_detailed_bounded(
-        &self,
-        text: &str,
-    ) -> Result<Vec<EntityMatch>, EgressError> {
+    pub fn recognize_detailed_bounded(&self, text: &str) -> Result<Vec<EntityMatch>, EgressError> {
         if text.len() > self.max_input_length {
             return Err(EgressError::capacity_exceeded(format!(
                 "Payload size exceeds limit: {} > {}",
@@ -1323,11 +1320,7 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<EntityMatc
 /// Detects custom gazetteer terms in the text using character index alignment.
 // ANCHOR[contextra-privacy:ER-026]
 // Gleicht Wörterbuch-Begriffe des Gazetteers mit dem normalisierten Text ab.
-fn detect_gazetteer(
-    norm: &Normalizer,
-    gazetteer: &Gazetteer,
-    results: &mut Vec<EntityMatch>,
-) {
+fn detect_gazetteer(norm: &Normalizer, gazetteer: &Gazetteer, results: &mut Vec<EntityMatch>) {
     if gazetteer.is_empty() {
         return;
     }

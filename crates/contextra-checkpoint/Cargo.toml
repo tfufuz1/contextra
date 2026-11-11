@@ -8,6 +8,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 description = "Backup and snapshot management for Contextra storage"
+repository = "https://github.com/tfufuz1/contextra"
+readme = "README.md"
+keywords = ["checkpoint", "snapshot", "backup", "recovery", "persistence"]
+categories = ["database-implementations", "data-structures"]
+publish = false # Internes Contextra-Bausteinlager; kein crates.io-Release
 
 [package.metadata.contextra]
 ring = "1"

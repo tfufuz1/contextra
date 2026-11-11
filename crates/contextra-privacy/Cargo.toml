@@ -7,11 +7,17 @@ version.workspace = true
 edition.workspace = true
 license = "MIT OR Apache-2.0"
 rust-version.workspace = true
-description = "Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Klasse A)"
+description = "Cloud Egress Security, DLP and Exfiltration Protection for Contextra"
+repository = "https://github.com/contextra/contextra"
+readme = "README.md"
+keywords = ["privacy", "dlp", "egress", "zeroize", "sanitization"]
+categories = ["cryptography", "web-programming"]
+publish = false
+include = ["src/**/*", "tests/**/*", "benches/**/*", "examples/**/*", "Cargo.toml", "README.md", "LICENSE-*"]
 
 [package.metadata.contextra]
-ring = "3"
-class = "A"
+level = 0
+tier = "stable"
 
 [features]
 default = ["std"]

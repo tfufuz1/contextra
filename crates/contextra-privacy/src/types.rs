@@ -41,7 +41,9 @@ impl Clock for SystemClock {
 }
 
 /// Numerischer Mandanten-Identifikator (64-Bit).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
 

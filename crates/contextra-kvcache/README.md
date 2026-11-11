@@ -1,58 +1,57 @@
 # contextra-kvcache
 
+> Prefix-Radix-Baum, KV-Block-Cache, mandantengetrennter Speicher und Tiering fuer Contextra.
+
 ## Zweck
-Prefix-Cache-Verwaltung für KV-Segmente; keine Anbindung an eine konkrete Inferenz-Runtime im Repo.
-`contextra-kvcache` stellt deterministische Datenstrukturen (Radix-Baum, Segment-Store, LRU-/Attention-Eviction, KIVI-Quantisierung) zur Verwaltung und Wiederverwendung von Key-Value-Cache-Segmenten bei Prefill- und Decode-Workflows bereit.
+`contextra-kvcache` ist ein autarker, release-faehiger Baustein (Klasse A) fuer das Caching und die Wiederverwendung von Key-Value-Zustaenden (Attention-Matrizen) in LLM-Inferenz-Pipelines.
+Er implementiert:
+- Prefix-Radix-Baum zur schnellen Identifikation geteilter Token-Sequenzen (Prompt Caching).
+- Mandantengetrennte In-Memory-LRU-Speicher mit konfigurierbarer Kapazitaet und Sharding.
+- Zeroize-on-Drop und ShreddableSegmentKey fuer kryptografisches Shredden von KV-Segmenten.
+- Attention-gestuetzte Verdrängungsstrategien (SnapKV / H2O) mit deterministischem Fallback.
+- Optionale KIVI 2-Bit Quantisierung fuer maximale Speichereffizienz.
 
-## Reifegrad
-`beta` (Eigenständiger Baustein für KV-Prefix-Management; als `frozen`-Kandidat für Workspace-Default-Members gemeldet, da die Entflechtung von `crypto-compat` upstream in Vorbereitung ist).
+## Architektur & Abgrenzung
+- Reifegrad: **R3** (release-faehig, autark).
+- Keine juristischen Loeschketten- oder Compliance-Logiken im Speicherbaustein; Bereinigung erfolgt neutral ueber Eviction / Invalidation.
+- Reale interne Kernel-Abhaengigkeiten:
+  - `contextra-ids`: Domain-Identitaeten (`TenantId`).
+  - `contextra-env`: Kanonische Umwelt-Abstraktionen (`Clock`, `SystemClock`).
+  - `contextra-crypto` (optional hinter Feature `crypto-compat` / `kv-encryption`).
+  - `contextra-ports`, `contextra-types` (optional hinter Feature `workspace`).
 
-## Interne Abhängigkeiten
-- `contextra-types` (optional über Feature `ports-compat`)
-- `contextra-ports` (optional über Feature `ports-compat`)
-- `contextra-crypto` (optional über Feature `crypto-compat` / `kv-encryption`)
-
-Hinweis: Es bestehen keine Abhängigkeiten oder Importpfade zu Inferenz-Runtimes (`contextra-infer-*`) im Repository [V].
-
-## Features
-- `default = ["std", "ports-compat", "crypto-compat", "kv-encryption"]`
-- `std`: Standardbibliotheksunterstützung.
-- `ports-compat`: Anbindung an `contextra-ports` und `contextra-types`.
-- `crypto-compat`: Optionale Anbindung an `contextra-crypto` für Segmentverschlüsselung.
-- `kv-encryption`: Kryptografisches Sealing und Segmentverschlüsselung.
-- `content-addressed-kv-cache`: Inhaltsadressierte KV-Blöcke über Hash-Präfixe.
-- `kvcache-attention-eviction`: Attention-basierte Verdrängungsstrategien.
-- `kivi-quantization` / `kvcache-kivi-quant`: KIVI-Quantisierung für KV-Tensoren.
-
-## Minimalbeispiel
-
+## Quickstart
 ```rust
-use contextra_kvcache::{KvSegment, PrefixRadixTree, TenantIsolatedKvStore};
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
+use contextra_kvcache::contract::{KvCacheEngine, MemoryKvCache};
+use contextra_kvcache::radix::KvReusePolicy;
+use contextra_kvcache::segment::KvSegment;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let tenant = TenantId::try_new(42)?;
-    let store = TenantIsolatedKvStore::new();
+    let cache = MemoryKvCache::new();
+    let tenant = TenantId::try_new(1)?;
 
-    // Segment isoliert einfügen
-    let segment = KvSegment::new(tenant, 1, vec![0x11; 128]);
-    store.insert_segment(tenant, segment);
+    let segment = KvSegment::new(tenant, 100, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+    cache.insert(tenant, segment)?;
 
-    // Segment wieder abrufen
-    let data = store.get_segment_bytes(tenant, 1);
-    assert!(data.is_some());
+    let data = cache.get(tenant, 100).expect("segment 100 exists");
+    assert_eq!(data, vec![0xAA, 0xBB, 0xCC, 0xDD]);
 
+    let _prefix = cache.find_longest_prefix(tenant, &[101, 102], KvReusePolicy::Always);
     Ok(())
 }
 ```
 
-## Entnahme-Rezept
-Zur Verwendung als eigenständiger Baustein in externen Projekten:
-1. Verzeichnis `crates/contextra-kvcache` kopieren.
-2. Crate-Abhängigkeiten `contextra-types`, `contextra-ports` und `contextra-crypto` durch eigene Typdefinitionen ersetzen oder über die Features konfigurieren.
-3. `Cargo.toml` anpassen und Features wie gewünscht aktivieren.
+## Feature-Tabelle
 
-## Bekannte Grenzen
-- **Keine Inferenz-Runtime:** Enthält keine Anbindung an LLM-Laufzeitumgebungen wie Candle, ONNX Runtime oder Ollama.
-- **Kopplung an Krypto-Schicht:** Die Segment-Verschlüsselung stützt sich in den Standard-Features auf `contextra-crypto`.
-- **Async Runtime:** Benötigt für asynchrone Speicher-Adapter (`StorageEngineKvBridge`) eine Tokio-Runtime-Umgebung.
+| Feature | Beschreibung |
+|---|---|
+| `std` | Standardbibliothek-Integration (Default). |
+| `workspace` | Bindet `contextra-ports` und `contextra-types` ueber `src/compat/` ein. |
+| `ports-compat` | Rueckwaertskompatibler Alias fuer `workspace`. |
+| `types-compat` | Rueckwaertskompatibler Alias fuer `workspace`. |
+| `crypto-compat` | Bindet `contextra-crypto` ein. |
+| `kv-encryption` | Aktiviert AES-256-GCM-SIV Segment-Verschluesselung. |
+| `kivi-quantization` | Optionale KIVI 2-Bit Block-Quantisierung. |
+| `content-addressed-kv-cache` | Inhaltsadressierter Cache und semantisches Lookup. |
+| `docid-128` | 128-Bit Dokumenten-IDs via `contextra-ids`. |

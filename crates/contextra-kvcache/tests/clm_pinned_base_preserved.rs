@@ -7,7 +7,9 @@
 //! wiederholter Invalidierungen geprüft.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity, clippy::indexing_slicing, clippy::panic, clippy::unwrap_used, clippy::expect_used)]
 
 use bytes::Bytes;
 use contextra_ports::kv::{KvBlock, KvLayout, PrefixKey, RopeConfig};

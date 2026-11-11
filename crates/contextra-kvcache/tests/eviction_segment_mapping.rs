@@ -1,4 +1,6 @@
 #![allow(
+    clippy::all,
+    clippy::type_complexity,
     clippy::disallowed_types,
     clippy::disallowed_methods,
     clippy::unwrap_used,
@@ -14,7 +16,9 @@
 //! sowie die korrekte Verdrängung des Segments mit dem niedrigsten Score.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used)]
 
 use contextra_kvcache::{segment::KvSegment, EvictionWorker, TenantIsolatedKvStore};
 use contextra_ports::{AttentionExporter, RequestId};

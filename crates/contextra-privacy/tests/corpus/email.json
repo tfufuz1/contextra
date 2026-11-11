@@ -1,0 +1,35 @@
+{
+  "category": "EMAIL",
+  "cases": [
+    {
+      "input": "Kontakt: max.mustermann@example.com für Rückfragen",
+      "expected_match": true,
+      "expected_value": "max.mustermann@example.com"
+    },
+    {
+      "input": "Subdomain info@mail.corp.internal.net funktioniert",
+      "expected_match": true,
+      "expected_value": "info@mail.corp.internal.net"
+    },
+    {
+      "input": "Plus-Addressing: support+privacy@service.org anfragen",
+      "expected_match": true,
+      "expected_value": "support+privacy@service.org"
+    },
+    {
+      "input": "Kein At-Zeichen user.example.com",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "Ungültig: user@domain.x (TLD zu kurz)",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "Einfacher Text ohne E-Mail-Adressen",
+      "expected_match": false,
+      "expected_value": null
+    }
+  ]
+}

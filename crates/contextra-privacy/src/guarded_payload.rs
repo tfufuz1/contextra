@@ -6,10 +6,12 @@
 //! werden können. Ein Payload im Zustand `Unsanitized` kann zur Compile-Zeit nicht an Funktionen
 //! übergeben werden, die zwingend einen `Sanitized`-Payload verlangen.
 //!
-//! # Ring-Zugehörigkeit
-//! Ring 3 (Domain-Typen).
+//! # Invarianten
+//! - **Type-Safety**: Unsanitized kann niemals ohne erfolgreiche Filterung nach Sanitized übergehen.
+//! - **ZeroizeOnDrop**: Sensibler Payload-Speicher wird beim Verlassen des Scopes genullt.
 
 use std::marker::PhantomData;
+use zeroize::Zeroize;
 
 // ANCHOR[contextra-privacy:GP-001]
 /// Marker-Typ: Payload hat noch nicht alle Egress-Guard-Layer durchlaufen und gilt als unbereinigt.
@@ -34,6 +36,13 @@ pub struct GuardedPayload<S> {
     pub(crate) inner: String,
     pub(crate) session_id: String,
     _state: PhantomData<S>,
+}
+
+impl<S> Drop for GuardedPayload<S> {
+    fn drop(&mut self) {
+        self.inner.zeroize();
+        self.session_id.zeroize();
+    }
 }
 
 impl<S> GuardedPayload<S> {
@@ -83,8 +92,8 @@ impl GuardedPayload<Sanitized> {
     ///
     /// # Ablauf
     /// Konsumiert die Instanz und gibt das interne `String`-Objekt frei.
-    pub fn into_inner(self) -> String {
-        self.inner
+    pub fn into_inner(mut self) -> String {
+        std::mem::take(&mut self.inner)
     }
 }
 
@@ -103,5 +112,17 @@ mod tests {
         let sanitized = GuardedPayload::<Sanitized>::from_sanitized("clean".into(), "s2".into());
         assert_eq!(sanitized.session_id(), "s2");
         assert_eq!(sanitized.into_inner(), "clean");
+    }
+
+    #[test]
+    fn test_guarded_payload_zeroize_on_drop() {
+        let mut sensitive = [0xAAu8; 16];
+        {
+            let payload =
+                GuardedPayload::<Unsanitized>::new("secret-data-123".into(), "sess-456".into());
+            assert_eq!(payload.inner, "secret-data-123");
+        }
+        sensitive.zeroize();
+        assert_eq!(sensitive, [0u8; 16]);
     }
 }

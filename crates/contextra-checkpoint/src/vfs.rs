@@ -1,7 +1,7 @@
 //! Lokale schmale Dateisystem-Schnittstelle (Dateinaht nach B08).
 //!
 //! Kapselt die tatsächlich genutzten VFS-Operationen (atomic write, read).
-//! Die Bindung an `contextra_ports::Vfs` erfolgt in `src/compat/`.
+//! Die optionale Bindung an externe Ports erfolgt in `src/compat/`.
 
 use std::path::Path;
 

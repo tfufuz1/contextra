@@ -67,6 +67,7 @@ pub mod purger;
 #[cfg(feature = "experimental-graph")]
 pub mod session_dag;
 pub mod test_doubles;
+pub mod types;
 pub mod tl_hfd;
 pub mod types;
 pub mod storage;

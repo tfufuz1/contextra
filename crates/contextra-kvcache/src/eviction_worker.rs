@@ -20,7 +20,8 @@ use crate::compat::adapters::AttentionExporter;
 use crate::types::RequestId;
 use contextra_ids::TenantId;
 use parking_lot::RwLock;
-use std::collections::HashMap;
+#[cfg(feature = "workspace")]
+use std::collections::BTreeMap;
 use std::sync::mpsc;
 use std::sync::Arc;
 
@@ -35,7 +36,7 @@ enum EvictionCommand {
 /// in die segmentzentrierte Schnittstelle [`AttentionScoreSource`] (Ring 1).
 struct ExporterBackedScoreSource {
     exporter: Arc<dyn AttentionExporter>,
-    segment_map: RwLock<HashMap<(TenantId, u64), RequestId>>,
+    segment_map: RwLock<BTreeMap<(TenantId, u64), RequestId>>,
 }
 
 #[cfg(feature = "workspace")]
@@ -43,7 +44,7 @@ impl ExporterBackedScoreSource {
     fn new(exporter: Arc<dyn AttentionExporter>) -> Self {
         Self {
             exporter,
-            segment_map: RwLock::new(HashMap::new()),
+            segment_map: RwLock::new(BTreeMap::new()),
         }
     }
 }
@@ -91,6 +92,7 @@ pub struct EvictionWorker {
     attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
+    #[allow(dead_code)]
     store: Arc<TenantIsolatedKvStore>,
 }
 

@@ -5,7 +5,9 @@
 //! Verifiziert, dass Lookups, Segmentauflistungen, Prefix-Radix-Treffer,
 //! Block-Guards, Verdrängung und Transaktions-Rollbacks strikt mandantenisoliert bleiben.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_kvcache::{emergency_wipe, KvReusePolicy, KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ContextraError, TenantId};

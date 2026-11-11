@@ -1,3 +1,6 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::indexing_slicing)]
 //! # Golden-Test für Greedy-Decoding mit und ohne Prefix-Reuse
 //!
 //! ANCHOR[contextra-kvcache:TEST-GREEDY-001]
@@ -6,7 +9,9 @@
 //! Die durch Greedy-Decoding erzeugte Ausgabetokenfolge muss bei Prefix-Reuse
 //! zu 100% bit-identisch zur Generierung ohne Cache sein.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_kvcache::{KvReusePolicy, KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ContextraError, TenantId};

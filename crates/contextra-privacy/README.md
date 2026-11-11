@@ -1,40 +1,105 @@
 # contextra-privacy
 
-Autarker Baustein (**Klasse A**, SPEC v4.0 Welle 1) für Cloud-Egress-Sicherheit, Data Loss Prevention (DLP), PII-Erkennung, Surrogat-Token-Vaulting und Schutz vor Datenexfiltration. Schaltbar vor jedes LLM- oder Cloud-Gateway.
+Autarker Baustein für Cloud-Egress-Sicherheit, Data Loss Prevention (DLP), Erkennung sensibler Entitäten, Surrogat-Token-Vaulting und Schutz vor Datenexfiltration. Schaltbar vor jedes LLM- oder Cloud-Gateway.
 
-## Baukasten-Eigenschaften (Klasse A)
+## 1. Zweck und Rolle im Baukasten
 
-- **Vollkommen autark (B1, B2):** Keine internen Normal- oder Dev-Dependencies zu anderen Contextra-Crates.
-- **Eigene & Standardtypen (B3):** Alle Schnittstellen basieren auf Standardtypen oder crate-eigenen Typen (`Clock`, `TenantId`, `TenantScoped`, `EgressPolicy`, `EgressDecision`, `EntityMatch`).
-- **Typisierte Fehler (B4):** Hauptfehlertyp `EgressError` / `Error` (`thiserror`, `#[non_exhaustive]`) mit Standard-Varianten (`InvalidInput`, `CapacityExceeded`, `Io`, `StateConflict`, `Corrupt`).
-- **Autarker Export (B5):** Vollständig lauffähig außerhalb des Workspace-Repos via `tools/export_crate.py` und `tools/isolation_proof.py`.
-- **Feature-Minimalismus (B6):** Standard-Features sind minimal (`default = ["std"]`, `serde`, `tracing`).
-- **Keine Fremdfachlogik (B7):** Reine Maskierung und Egress-Sicherheit; keine Löschketten-, Saga- oder Shredding-Logik (gehört exklusiv in `contextra-erasure`).
-- **Zero-Panic & Sicherheit (B9, B10):** `#![forbid(unsafe_code)]`, striktes Fail-Closed, null Panics auf beliebigen UTF-8-Grenzen.
-- **P28-Determinismus (B11):** Zeitmessung über den `Clock`-Port; interne HashMaps nutzen deterministische BLAKE3-Hasher (`DeterministicBuildHasher`).
-- **Lizenz (B12):** Lizenziert unter MIT und Apache 2.0 (`LICENSE-MIT`, `LICENSE-APACHE`), MSRV 1.89.
+`contextra-privacy` ist ein autarker Baustein (Ebene E0, Tier `stable`) des Contextra-Ökosystems. Das Crate hat keine internen Abhängigkeiten zu anderen Contextra-Crates und kann isoliert gebaut, getestet und exportiert werden.
+
+### Abgrenzung zu Nachbarbausteinen
+
+- **`contextra-privacy` vs. `contextra-vault`:**
+  - `contextra-privacy`: Verantwortlich für Egress-Klassifikation, DLP-Regeln, Erkennung von Entitäten (IBAN, E-Mail, Telefon, Kreditkarten) und kurzlebige Surrogat-Ersetzung im Egress-Datenstrom.
+  - `contextra-vault`: Flüchiger, kryptografischer Schlüssel- und Geheimspeicher (Secret Management, ephemerer Key-Store). Enthält keine DLP-Erkenner oder Exfiltrationsprüfungen.
+- **`contextra-privacy` vs. `contextra-prompt-guard`:**
+  - `contextra-privacy`: Überwacht strukturierte Daten und Datenvolumina gegen Abfluss (DLP und Bulk-Exfiltration).
+  - `contextra-prompt-guard`: Analysiert Prompts auf semantische Jailbreaks, Injection-Muster und manipulative System-Anweisungen.
+- **`contextra-privacy` vs. `contextra-mcp`:**
+  - `contextra-privacy`: Stellt die domänenspezifischen Schutzprimitive bereit.
+  - `contextra-mcp`: Protokolladapter, der MCP-Serverfunktionen bereitstellt und `contextra-privacy` als Egress-Schutzschild einbindet.
 
 ---
 
-## Komponenten (aus `src/`)
+## 2. Tatsächliche Abhängigkeiten
+
+Ermittelt über `cargo tree -p contextra-privacy -e normal --no-default-features`:
+
+```text
+contextra-privacy v0.1.0
+├── blake3 v1.8.7
+├── parking_lot v0.12.5
+├── rand v0.8.8
+├── regex v1.13.1
+├── scc v2.4.0
+├── serde v1.0.229
+├── serde_json v1.0.151
+├── thiserror v2.0.20
+├── tokio v1.53.1
+├── tracing v0.1.44
+└── zeroize v1.9.0
+```
+
+Es existieren **keine internen Abhängigkeiten** im regulären Bausteinbetrieb (`allowed_internal = []`).
+
+---
+
+## 3. Feature-Matrix
+
+| Feature | Standard | Beschreibung |
+|---|---|---|
+| `std` | Ja | Aktiviert die Standardbibliothek. |
+| `serde` | Nein | Ermöglicht Serialisierung und Deserialisierung für Audit- und VVT-Datensätze. |
+| `tracing` | Nein | Aktiviert strukturierte Instrumentierung und Logging ohne Klartext-Leaks. |
+
+---
+
+## 4. Quickstart-Minimalbeispiel
+
+Das Beispiel ist autark und benötigt keine externen Workspace-Crates:
+
+```rust
+use contextra_privacy::{EgressVault, RuleBasedEntityRecognizer};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let recognizer = RuleBasedEntityRecognizer::new();
+    let vault = EgressVault::try_default()?;
+
+    let text = "Mitarbeiter Max (max@corp.de) nutzt IBAN DE89370400440532013000.";
+    let (sanitized, count) = vault.sanitize_and_vault(text, &recognizer)?;
+
+    println!("Ersetzungen: {count}");
+    println!("Sanitized: {sanitized}");
+    Ok(())
+}
+```
+
+Ausführung:
+```bash
+cargo run -p contextra-privacy --example standalone --no-default-features
+```
+
+---
+
+## 5. Komponenten & Modulübersicht
 
 | Modul | Datei | Hauptaufgabe |
 |---|---|---|
-| `egress_vault` | `src/egress_vault.rs` | DLP-Klassifikation über Regex-Sets und `SurrogateVault`-Pseudonymisierung (deterministische Surrogat-Token pro Session). |
-| `entity_recognizer` | `src/entity_recognizer.rs` | Regex-freier, regelbasierter Entitäten-Erkenner (`RuleBasedEntityRecognizer`) für PII-Kategorien und Wörterbücher (`Gazetteer`). |
-| `egress_guard` | `src/egress_guard.rs` | Semantische k-NN Vektorähnlichkeitsprüfung gegen Datenabfluss unter Nutzung indizierter Dokumente. |
-| `egress_gateway` | `src/egress_gateway.rs` | Zentrales Schutzgateway (`EgressGateway`), das alle Prüfstufen bündelt und Anfragen vor Weiterleitung in externe Cloud-Dienste säubert (`CloudResponseRehydrator`). |
-| `bulk_exfiltration_detector` | `src/bulk_exfiltration_detector.rs` | Sitzungsbasiertes Rate-Limiting und Sliding-Window-Volumenzähler zur Erkennung von Massendatenabflüssen. |
-| `context_edit_audit` | `src/context_edit_audit.rs` | Kryptografisch mit BLAKE3 verkettete Audit-Protokolle von Kontextmodifikationen (`ContextEditAuditRecord`). |
+| `contract` | `src/contract.rs` | Minimale Umwelt- und Port-Traits (`Clock`, `EgressPolicy`, `TextSearchEngine`, `EntityRecognizer`). |
+| `egress_vault` | `src/egress_vault.rs` | DLP-Klassifikation über Regex-Sets und `SurrogateVault`-Pseudonymisierung. |
+| `entity_recognizer` | `src/entity_recognizer.rs` | Regelbasierter Entitäten-Erkenner (`RuleBasedEntityRecognizer`) für PII-Kategorien und Wörterbücher (`Gazetteer`). |
+| `egress_guard` | `src/egress_guard.rs` | Semantische k-NN Vektorähnlichkeitsprüfung gegen Datenabfluss. |
+| `egress_gateway` | `src/egress_gateway.rs` | Schutzgateway (`EgressGateway`), das alle Prüfstufen bündelt (`CloudResponseRehydrator`). |
+| `bulk_exfiltration_detector` | `src/bulk_exfiltration_detector.rs` | Sitzungsbasiertes Rate-Limiting zur Erkennung von Massendatenabflüssen. |
+| `context_edit_audit` | `src/context_edit_audit.rs` | Kryptografisch mit BLAKE3 verkettete Audit-Protokolle von Kontextmodifikationen. |
 | `processing_registry` | `src/processing_registry.rs` | Verzeichnis von Verarbeitungstätigkeiten (VVT) und Export nach Markdown. |
-| `guarded_payload` | `src/guarded_payload.rs` | Type-State-Muster (`Unsanitized` -> `Sanitized`), das unbereinigte Egress-Weiterleitungen zur Compile-Zeit verhindert. |
+| `guarded_payload` | `src/guarded_payload.rs` | Type-State-Muster (`Unsanitized` -> `Sanitized`), das unbereinigte Egress-Weiterleitungen verhindert. |
 | `audit_trace` | `src/audit_trace.rs` | Deterministische BLAKE3-Prüfsummenbildung für Audit-Traces ohne Klartext-PII-Leckage. |
 
 ---
 
-## Datenfluss Egress & Surrogate Vault
+## 6. Datenfluss Egress & Surrogate Vault
 
-```
+```text
 Eingehende Abfrage (TenantScoped<CloudQueryRequest>)
    │
    ▼
@@ -62,67 +127,18 @@ Bereinigte Cloud-Abfrage (Sanitized Payload) -> Externe Cloud-Inferenz
 
 ---
 
-## Erkennungsqualität & Messung (RuleBasedEntityRecognizer)
+## 7. Export und Isolation
 
-Die Erkennungsqualität wurde mithilfe eines synthetischen Korpus (`tests/fixtures/pii_corpus_synthetic.jsonl`) mit **N = 600** Datensätzen (je Kategorie 25 positive und 25 negative Testfälle) im Regressionstest `tests/recognizer_quality.rs` gemessen.
-
-### Gemessene Werte (Span-genauer Exact Match)
-
-| Kategorie | TP | FP | FN | Precision | Recall | F1-Score |
-|---|---:|---:|---:|---:|---:|---:|
-| `BIC` | 25 | 2 | 0 | 92.59% | 100.00% | 0.96 |
-| `CREDIT_CARD` | 25 | 2 | 0 | 92.59% | 100.00% | 0.96 |
-| `EMAIL` | 25 | 0 | 0 | 100.00% | 100.00% | 1.00 |
-| `GAZETTEER` | 25 | 0 | 0 | 100.00% | 100.00% | 1.00 |
-| `IBAN` | 25 | 1 | 0 | 96.15% | 100.00% | 0.98 |
-| `IPV4` | 25 | 5 | 0 | 83.33% | 100.00% | 0.91 |
-| `IPV6` | 24 | 2 | 1 | 92.31% | 96.00% | 0.94 |
-| `LICENSE_PLATE` | 25 | 3 | 0 | 89.29% | 100.00% | 0.94 |
-| `PHONE` | 25 | 4 | 0 | 86.21% | 100.00% | 0.93 |
-| `PLZ` | 25 | 15 | 0 | 62.50% | 100.00% | 0.77 |
-| `PLZ_ORT` | 25 | 1 | 0 | 96.15% | 100.00% | 0.98 |
-| `STEUER_ID` | 25 | 1 | 0 | 96.15% | 100.00% | 0.98 |
-| **GESAMT** | **299** | **36** | **1** | **89.25%** | **99.67%** | **0.94** |
-
----
-
-## Minimalbeispiel (Eigenständig ohne Contextra-Workspace)
-
-```rust
-use contextra_privacy::{EgressVault, RuleBasedEntityRecognizer};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let vault = EgressVault::try_default()?;
-    let recognizer = RuleBasedEntityRecognizer::new();
-
-    let outbound_text = "Bitte überweisen an IBAN DE89370400440532013000 für max@example.com";
-    let (sanitized, count) = vault.sanitize_and_vault(outbound_text, &recognizer)?;
-
-    println!("Maskierter Text: {sanitized}");
-    println!("Ersetzte Entitäten: {count}");
-    Ok(())
-}
-```
-
-## Export in ein eigenständiges Projekt
+Das Crate kann jederzeit als eigenständiges Projekt exportiert werden:
 
 ```bash
-python3 tools/export_crate.py contextra-privacy --out /pfad/zu/deinem/projekt/libs/contextra-privacy
+python3 tools/export_crate.py contextra-privacy --out /tmp/export-contextra-privacy
 ```
 
 ---
 
-## Grenzen des Crates
+## 8. Hinweise & Grenzen
 
-1. **Synthetische Testdaten vs. Reale Daten:** Die Erkennungsqualität wurde ausschließlich auf einem synthetischen Korpus (N = 600) gemessen. Dies stellt **keine Aussage über reale Daten**, reale Sprachvarianz, Dialekte oder komplexe Formatierungsfehler dar.
-2. **Keine vollständige OCR-/Layout-Analyse:** `RuleBasedEntityRecognizer` operiert zeichen- und bytebasiert auf UTF-8-Strings. Formatierungen in Tabellen, PDFs oder Bildern werden nicht erfasst.
-3. **Mehrdeutigkeit kurzer Nummern:** Postleitzahlen (PLZ) und Teilabschnitte von Telefonnummern weisen systembedingt Überlappungen mit Bestellnummern, Versionsnummern oder Geldbeträgen auf.
-4. **Kein Echtzeit-Schutz gegen alle Inferenz-Modelle:** `EgressGuard` prüft semantische Vektorähnlichkeit gegen gespeicherte Schwellenwerte, schützt jedoch nicht lückenlos gegen Prompt-Injection-Evasion oder Steganographie.
-
----
-
-## Rechtliche Hinweise & Pflichtangaben
-
-- **Erkennungsqualität:** Heuristischer Erkennungskern; die Erkennungsleistung bei realen Daten kann variieren.
-- **Fachprüfung offen:** Verweise auf Datenschutzvorschriften in diesem Crate und seinen Begleitdokumenten sind **fachlich nicht geprüft ("Fachprüfung offen")**.
-- **Keine Rechtsberatung:** Die Software, die Dokumentation und die enthaltenen Vorlagen stellen keine Rechtsberatung dar und ersetzen keine juristische Prüfung im Einzelfall.
+- **Heuristischer Erkennungskern:** `RuleBasedEntityRecognizer` operiert zeichen- und musterorientiert auf UTF-8-Zeichenketten.
+- **Keine Rechtsberatung:** Diese Software, die Dokumentation und die Vorlagen stellen keine Rechts- oder Compliance-Beratung dar (INV-7).
+- **Entkopplung:** Löschketten-, Saga- oder Archiv-Funktionalitäten sind neutral über Schnittstellen angebunden und gehören funktional in `contextra-erasure`.

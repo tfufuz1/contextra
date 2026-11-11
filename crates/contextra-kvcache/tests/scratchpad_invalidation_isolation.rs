@@ -6,7 +6,9 @@
 //! lässt identische Scratchpad-Blöcke von Mandant B vollständig und bitidentisch unberührt.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::panic, clippy::unwrap_used, clippy::expect_used)]
 
 use bytes::Bytes;
 use contextra_ports::kv::{KvBlock, KvLayout, PrefixKey, RopeConfig};

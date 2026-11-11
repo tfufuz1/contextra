@@ -72,11 +72,17 @@ pub(crate) fn validate_identifier(field_name: &str, value: &str) -> Result<()> {
 /// - `created_at`: Unix-Zeitstempel der Erstellung in Millisekunden.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CheckpointMeta {
+    /// Eindeutiger Name des Checkpoints.
     pub name: String,
+    /// ID der zugeordneten Collection.
     pub collection_id: String,
+    /// LSM-Sequenznummer zum Erstellungszeitpunkt.
     pub seq_no: u64,
+    /// Transaktions-ID zum Erstellungszeitpunkt.
     pub tx_id: TxId,
+    /// Zusätzliche anwendungsspezifische Metadaten als JSON.
     pub metadata: serde_json::Value,
+    /// Erstellungszeitpunkt in Millisekunden seit der Epoche.
     pub created_at: u64,
     /// ID-Breite in Bits (SPEC §5.2). 64 oder 128 Bit.
     #[serde(default = "default_id_width_bits")]
@@ -141,8 +147,11 @@ impl CheckpointMeta {
 /// - `namespace`: Optionaler logischer Namensraum zur Isolation von Workflows.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StateCheckpoint {
+    /// Transaktions-ID des Zustands-Snapshots.
     pub tx_id: TxId,
+    /// Zeitstempel der Erstellung in Millisekunden.
     pub timestamp_ms: u64,
+    /// Optionaler Namespace bzw. Mandant des Checkpoints.
     #[serde(default)]
     pub namespace: Option<String>,
 }
