@@ -28,3 +28,5 @@ pub fn validate_collection_name(name: &str) -> Result<(), McpError> {
     }
     Ok(())
 }
+
+// !SECTION: validation

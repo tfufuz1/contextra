@@ -1,5 +1,9 @@
 #![forbid(unsafe_code)]
 //! Campaign J-27 MCP Server Test Suite — Prompt Injection Guard & Tool Dispatch Matrix
+// =========================================================================
+// SECTION: campaign_j27_mcp_test
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-CAMPAIGN-J-001]
 
 use contextra_mcp::prompt_injection::PromptInjectionGuard;
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy, TOOL_REGISTRY};
@@ -168,3 +172,5 @@ fn test_h9_destructive_tools_confirm_flag_strictness() {
         None
     );
 }
+
+// !SECTION: campaign_j27_mcp_test

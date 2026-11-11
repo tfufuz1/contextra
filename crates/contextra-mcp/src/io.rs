@@ -81,3 +81,5 @@ pub async fn read_line_bounded<R: tokio::io::AsyncBufRead + Unpin>(
         )),
     }
 }
+
+// !SECTION: io

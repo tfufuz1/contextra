@@ -1,4 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// =========================================================================
+// SECTION: dispatch_direct_tests
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-DISPATCH-D-001]
 
 use contextra::Contextra;
 use contextra_mcp::io::{read_line_bounded, MAX_RPC_BYTES};
@@ -368,3 +372,5 @@ async fn test_bounded_reader_exceeds_max_rpc_bytes() {
     // Standard MAX_RPC_BYTES limit check
     assert_eq!(MAX_RPC_BYTES, 4 * 1024 * 1024);
 }
+
+// !SECTION: dispatch_direct_tests

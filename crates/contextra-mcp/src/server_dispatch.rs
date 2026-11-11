@@ -357,3 +357,5 @@ impl McpServer {
         }
     }
 }
+
+// !SECTION: server_dispatch
