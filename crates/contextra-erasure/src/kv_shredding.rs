@@ -133,11 +133,97 @@ pub fn derive_subkey(master_key: &[u8; 32], group_id: u64, epoch: u64) -> SubKey
 }
 
 /// Thread-sichere Schlüssel-Registry für Envelope Encryption und O(1) Krypto-Shredding.
+/// Schlüsselbereich für Gruppen und Epochen (Entscheidung E5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct GroupEpochKey {
+    /// Gruppen- bzw. Mandanten-ID.
+    pub group_id: u64,
+    /// Epochen-Nummer für Rotation und isolierte Schlüsselvernichtung.
+    pub epoch: u64,
+}
+
+impl GroupEpochKey {
+    /// Erzeugt einen neuen `GroupEpochKey`.
+    pub const fn new(group_id: u64, epoch: u64) -> Self {
+        Self { group_id, epoch }
+    }
+}
+
+/// Vernichtungsergebnis nach `purge_keys` zur Verankerung im Ledger durch den Orchestrator.
+/// Herkunft: ffeb79555:crates/contextra-crypto/src/scope_keyring.rs:220 (DestructionReceipt)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeyPurgeReceipt {
+    /// Bereinigte Gruppen-ID.
+    pub group_id: u64,
+    /// Bereinigte Epoche (Entscheidung E5).
+    pub epoch: u64,
+    /// Anzahl physisch genullter DEK-Schlüssel-Handles dieser Epoche.
+    pub affected_deks: usize,
+    /// Zeitstempel der Vernichtung (Nanosekunden seit UNIX_EPOCH).
+    pub purged_at_nanos: u64,
+}
+
+/// Lokale Fehlertaxonomie für Schlüsseloperationen und Krypto-Shredding.
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum KeyShredError {
+    /// Gruppe nicht gefunden.
+    #[error("Gruppe nicht gefunden: {group_id}")]
+    GroupNotFound {
+        /// Betroffene Gruppen-ID.
+        group_id: u64,
+    },
+    /// Epoche nicht gefunden.
+    #[error("Epoche nicht gefunden für Gruppe {group_id}, Epoche {epoch}")]
+    EpochNotFound {
+        /// Betroffene Gruppen-ID.
+        group_id: u64,
+        /// Betroffene Epoche.
+        epoch: u64,
+    },
+    /// KEK wurde bereits vernichtet (Fail-Closed).
+    #[error("KEK für Gruppe {group_id}, Epoche {epoch} ist bereits vernichtet")]
+    KekAlreadyDestroyed {
+        /// Betroffene Gruppen-ID.
+        group_id: u64,
+        /// Betroffene Epoche.
+        epoch: u64,
+    },
+    /// Kryptographischer Fehler im Verschlüsselungs- oder Entschlüsselungspfad.
+    #[error("Kryptographischer Fehler: {0}")]
+    Crypto(String),
+    /// Ungültige Eingabeparameter.
+    #[error("Ungültige Eingabe: {0}")]
+    InvalidInput(String),
+}
+
+/// Serialisierbarer Container für einen mit Envelope Encryption und Epochenbindung geschützten Datensatz.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Zeroize)]
+#[zeroize(drop)]
+pub struct EncryptedEpochRecordPayload {
+    /// Numerische ID des Datensatzes.
+    pub record_id: u64,
+    /// Shredding-Gruppen-ID, zu der der Datensatz gehört.
+    pub group_id: u64,
+    /// Epoche, zu der der KEK gehört.
+    pub epoch: u64,
+    /// Mit AES-256-GCM-SIV verschlüsselte Nutzdaten.
+    pub ciphertext: Vec<u8>,
+    /// 12-Byte Nonce für die Nutzdatenentschlüsselung.
+    pub nonce: [u8; 12],
+    /// Mit dem Gruppen-Epochen-KEK gewrappter Datensatzschlüssel (DEK).
+    pub wrapped_dek: Vec<u8>,
+    /// 12-Byte Nonce für das DEK-Unwrapping.
+    pub dek_nonce: [u8; 12],
+}
+
+/// Thread-sichere Schlüssel-Registry für Envelope Encryption und O(1) Krypto-Shredding.
 pub struct KeyRegistry {
     groups: RwLock<BTreeMap<u64, GroupEntry>>,
+    epoch_groups: RwLock<BTreeMap<(u64, u64), GroupEntry>>,
     group_keks: RwLock<BTreeMap<u64, Vec<u8>>>,
     record_deks: RwLock<BTreeMap<String, Vec<u8>>>,
     revoked_groups: RwLock<BTreeSet<u64>>,
+    revoked_epoch_groups: RwLock<BTreeSet<(u64, u64)>>,
     #[allow(dead_code)]
     revoked_subkeys: RwLock<BTreeSet<String>>,
     revoked_records: RwLock<BTreeSet<String>>,
@@ -159,9 +245,11 @@ impl KeyRegistry {
         rand::rngs::OsRng.fill_bytes(&mut master_kek);
         Self {
             groups: RwLock::new(BTreeMap::new()),
+            epoch_groups: RwLock::new(BTreeMap::new()),
             group_keks: RwLock::new(BTreeMap::new()),
             record_deks: RwLock::new(BTreeMap::new()),
             revoked_groups: RwLock::new(BTreeSet::new()),
+            revoked_epoch_groups: RwLock::new(BTreeSet::new()),
             revoked_subkeys: RwLock::new(BTreeSet::new()),
             revoked_records: RwLock::new(BTreeSet::new()),
             #[cfg(feature = "signing")]
@@ -640,5 +728,255 @@ impl KeyRegistry {
         cipher
             .decrypt(nonce, ciphertext)
             .map_err(|e| ErasureError::Crypto(e.to_string()))
+    }
+
+    /// Prüft ob eine Gruppe in einer bestimmten Epoche widerrufen ist.
+    pub fn is_group_epoch_revoked(&self, group_id: u64, epoch: u64) -> bool {
+        if self.is_group_revoked(group_id) {
+            return true;
+        }
+        let lock = match self.revoked_epoch_groups.read() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
+        lock.contains(&(group_id, epoch))
+    }
+
+    /// Prüft ob eine Gruppe in einer bestimmten Epoche aktiv ist.
+    pub fn is_group_epoch_active(&self, group_id: u64, epoch: u64) -> bool {
+        !self.is_group_epoch_revoked(group_id, epoch)
+    }
+
+    /// Ermittelt oder erzeugt den Group-KEK für ein spezifisches `(group_id, epoch)`-Paar.
+    pub fn get_or_derive_epoch(&self, group_id: u64, epoch: u64) -> Result<SubKey, ErasureError> {
+        if self.is_group_epoch_revoked(group_id, epoch) {
+            return Err(ErasureError::Refused);
+        }
+
+        let key = (group_id, epoch);
+        {
+            let read_guard = match self.epoch_groups.read() {
+                Ok(guard) => guard,
+                Err(poison) => poison.into_inner(),
+            };
+            if let Some(entry) = read_guard.get(&key) {
+                return Ok(SubKey(entry.kek.0));
+            }
+        }
+
+        let mut write_guard = match self.epoch_groups.write() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
+
+        if self.is_group_epoch_revoked(group_id, epoch) {
+            return Err(ErasureError::Refused);
+        }
+
+        if let Some(entry) = write_guard.get(&key) {
+            return Ok(SubKey(entry.kek.0));
+        }
+
+        let mut kek_bytes = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut kek_bytes);
+
+        let master_cipher = Aes256GcmSiv::new_from_slice(&self.master_kek)
+            .map_err(|e| ErasureError::Crypto(e.to_string()))?;
+
+        let mut kek_nonce = [0u8; 12];
+        rand::rngs::OsRng.fill_bytes(&mut kek_nonce);
+        let wrapped_kek = master_cipher
+            .encrypt(Nonce::from_slice(&kek_nonce), kek_bytes.as_slice())
+            .map_err(|e| ErasureError::Crypto(e.to_string()))?;
+
+        let entry = GroupEntry {
+            kek: GroupKek(kek_bytes),
+            wrapped_kek,
+            kek_nonce,
+            record_deks: BTreeMap::new(),
+        };
+
+        write_guard.insert(key, entry);
+        Ok(SubKey(kek_bytes))
+    }
+
+    /// Verschlüsselt einen Datensatz unter Envelope Encryption gebunden an Gruppe und Epoche.
+    pub fn encrypt_envelope_record_epoch(
+        &self,
+        group_id: u64,
+        epoch: u64,
+        record_id: u64,
+        plaintext: &[u8],
+    ) -> Result<EncryptedEpochRecordPayload, ErasureError> {
+        if self.is_group_epoch_revoked(group_id, epoch) {
+            return Err(ErasureError::Refused);
+        }
+
+        let subkey = self.get_or_derive_epoch(group_id, epoch)?;
+        let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
+            .map_err(|e| ErasureError::Crypto(format!("KEK init: {e}")))?;
+
+        let mut dek_bytes = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut dek_bytes);
+
+        let mut dek_nonce = [0u8; 12];
+        rand::rngs::OsRng.fill_bytes(&mut dek_nonce);
+        let wrapped_dek = kek_cipher
+            .encrypt(Nonce::from_slice(&dek_nonce), dek_bytes.as_slice())
+            .map_err(|e| ErasureError::Crypto(format!("DEK wrap: {e}")))?;
+
+        let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
+            .map_err(|e| ErasureError::Crypto(format!("DEK cipher init: {e}")))?;
+        let mut nonce = [0u8; 12];
+        rand::rngs::OsRng.fill_bytes(&mut nonce);
+        let ciphertext = dek_cipher
+            .encrypt(Nonce::from_slice(&nonce), plaintext)
+            .map_err(|e| ErasureError::Crypto(format!("Payload encrypt: {e}")))?;
+
+        let mut groups = match self.epoch_groups.write() {
+            Ok(guard) => guard,
+            Err(poison) => poison.into_inner(),
+        };
+        if let Some(entry) = groups.get_mut(&(group_id, epoch)) {
+            entry.record_deks.insert(
+                record_id,
+                RecordDekEntry {
+                    wrapped_dek: wrapped_dek.clone(),
+                    dek_nonce,
+                    revoked: false,
+                },
+            );
+        }
+
+        dek_bytes.zeroize();
+
+        Ok(EncryptedEpochRecordPayload {
+            record_id,
+            group_id,
+            epoch,
+            ciphertext,
+            nonce,
+            wrapped_dek,
+            dek_nonce,
+        })
+    }
+
+    /// Entschlüsselt einen Datensatz unter Envelope Encryption mit Epochenprüfung.
+    pub fn decrypt_envelope_record_epoch(
+        &self,
+        payload: &EncryptedEpochRecordPayload,
+    ) -> Result<Vec<u8>, ErasureError> {
+        if self.is_group_epoch_revoked(payload.group_id, payload.epoch) {
+            return Err(ErasureError::Refused);
+        }
+
+        let (wrapped_dek, dek_nonce) = {
+            let groups = match self.epoch_groups.read() {
+                Ok(guard) => guard,
+                Err(poison) => poison.into_inner(),
+            };
+            let entry = groups
+                .get(&(payload.group_id, payload.epoch))
+                .ok_or(ErasureError::Refused)?;
+            let rec = entry
+                .record_deks
+                .get(&payload.record_id)
+                .ok_or(ErasureError::Refused)?;
+            if rec.revoked || rec.wrapped_dek != payload.wrapped_dek {
+                return Err(ErasureError::Refused);
+            }
+            (rec.wrapped_dek.clone(), rec.dek_nonce)
+        };
+
+        let subkey = self.get_or_derive_epoch(payload.group_id, payload.epoch)?;
+        let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
+            .map_err(|e| ErasureError::Crypto(format!("KEK init: {e}")))?;
+
+        let dek_bytes = kek_cipher
+            .decrypt(Nonce::from_slice(&dek_nonce), wrapped_dek.as_slice())
+            .map_err(|e| ErasureError::Crypto(format!("DEK unwrap: {e}")))?;
+
+        let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
+            .map_err(|e| ErasureError::Crypto(format!("DEK init: {e}")))?;
+
+        dek_cipher
+            .decrypt(
+                Nonce::from_slice(&payload.nonce),
+                payload.ciphertext.as_slice(),
+            )
+            .map_err(|e| ErasureError::Crypto(format!("Payload decrypt: {e}")))
+    }
+
+    /// Physische und kryptographische Schlüsselvernichtung (`purge_keys`) für eine Gruppe und Epoche.
+    ///
+    /// Herkunft: ffeb79555:crates/contextra-crypto/src/scope_keyring.rs:600 (ScopeKeyring::destroy)
+    ///
+    /// Vernichtet den KEK, nullt alle Rohschlüssel und gewrappten DEKs via Zeroize,
+    /// markiert die Epoche unwiderruflich als widerrufen (INV-NO-RESURRECTION-1)
+    /// und liefert ein `KeyPurgeReceipt` zur späteren Ledger-Verankerung zurück.
+    /// Bei wiederholtem Aufruf verhält sich die Funktion idempotent und liefert ein Quittungsobjekt
+    /// mit 0 betroffenen DEKs.
+    pub fn purge_keys(
+        &self,
+        group_id: u64,
+        epoch: u64,
+        clock: Option<&dyn crate::types_local::Clock>,
+    ) -> Result<KeyPurgeReceipt, KeyShredError> {
+        let now_nanos = clock.map(|c| c.now_unix_nanos()).unwrap_or(0);
+
+        let key = (group_id, epoch);
+
+        // Idempotenz-Prüfung nach INV-NO-RESURRECTION-1: Bereits widerrufen?
+        let is_already_revoked = {
+            let lock = match self.revoked_epoch_groups.read() {
+                Ok(guard) => guard,
+                Err(poison) => poison.into_inner(),
+            };
+            lock.contains(&key)
+        };
+
+        if is_already_revoked {
+            return Ok(KeyPurgeReceipt {
+                group_id,
+                epoch,
+                affected_deks: 0,
+                purged_at_nanos: now_nanos,
+            });
+        }
+
+        // Epoche in revoked_epoch_groups eintragen (Fail-Closed Vormerkung)
+        {
+            let mut lock = match self.revoked_epoch_groups.write() {
+                Ok(guard) => guard,
+                Err(poison) => poison.into_inner(),
+            };
+            lock.insert(key);
+        }
+
+        // KEK und alle DEKs physisch aus dem Speicher entfernen und nullen
+        let affected_deks = {
+            let mut groups = match self.epoch_groups.write() {
+                Ok(guard) => guard,
+                Err(poison) => poison.into_inner(),
+            };
+            if let Some(mut entry) = groups.remove(&key) {
+                entry.kek.0.zeroize();
+                entry.wrapped_kek.zeroize();
+                let count = entry.record_deks.len();
+                for (_, rec) in entry.record_deks.iter_mut() {
+                    rec.wrapped_dek.zeroize();
+                }
+                count
+            } else {
+                0
+            }
+        };
+
+        Ok(KeyPurgeReceipt {
+            group_id,
+            epoch,
+            affected_deks,
+            purged_at_nanos: now_nanos,
+        })
     }
 }

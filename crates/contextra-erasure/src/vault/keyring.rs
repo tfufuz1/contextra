@@ -149,3 +149,11 @@ impl FileKeyring for VaultKeyring {
 
 /// In-Memory-Keyring für Tests und abwärtskompatible Validierung.
 pub type InMemoryKeyring = VaultKeyring;
+
+// --- Port-Definitionen für WP-K (KeyStore, KeyStoreError, KeyPurgeReceipt) ---
+// Herkunft: ffeb79555:crates/contextra-crypto/src/scope_keyring.rs
+
+#[path = "key_store.rs"]
+pub mod key_store;
+
+pub use key_store::{KeyStore, KeyStoreError, LocalDek};
