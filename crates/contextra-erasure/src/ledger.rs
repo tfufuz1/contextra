@@ -4,15 +4,13 @@
 
 pub mod durable;
 pub mod entry;
-pub mod error;
-pub mod record;
+pub mod persistent;
 pub mod sink;
 pub mod storage;
 
 pub use durable::{BatchRecordItem, ErasureLedger, LedgerAnchorProof};
 pub use entry::{LedgerEntry as ChainedLedgerEntry, GENESIS_HASH};
-pub use error::LedgerError;
-pub use record::{FramedRecord, LedgerFileHeader, RecordType};
+pub use persistent::ErasureLedger;
 pub use sink::InMemoryLedger as FileLedger;
 pub use storage::{FileLedgerStorage, LedgerStorage, MemLedgerStorage};
 
