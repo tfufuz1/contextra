@@ -1,29 +1,22 @@
-//! Compatibility bridge for `contextra-graph` (SPEC-v2 §4.3, §6.2).
-//!
-//! Exposes ports- and types-dependent implementations behind the compat features.
+//! Compatibility bridge for  (SPEC-v2 §4.3, §6.2).
 
-// FILE-CONTEXT
-// STAND: 2026-11-15T12:00:00Z
-// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
-// INVARIANTEN: Isolierte Workspace-Konvertierungen.
-// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
-// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
-
-#[cfg(feature = "types-compat")]
-
-// SECTION Compat Core Implementation
+#[cfg(feature = "workspace")]
 pub mod error;
-
-#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
+#[cfg(feature = "workspace")]
 pub mod provider;
-
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub mod purger;
-
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub mod graph_index;
-
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub mod collection_mutation;
-
-// !SECTION Compat Core Implementation
+#[cfg(feature = "workspace")]
+pub mod storage_bridge;
+#[cfg(feature = "workspace")]
+pub mod graph_index_ext;
+#[cfg(feature = "workspace")]
+pub mod replay_hook;
+#[cfg(feature = "workspace")]
+pub mod algo_error_bridge;
+#[cfg(feature = "workspace")]
+pub mod llm_bridge;

@@ -301,3 +301,5 @@ impl GraphIndex for CsrGraph {
 }
 
 // !SECTION Mod Core Implementation
+
+pub mod inherent_shims;

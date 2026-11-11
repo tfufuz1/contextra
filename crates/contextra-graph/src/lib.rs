@@ -68,6 +68,10 @@ pub mod purger;
 pub mod session_dag;
 pub mod test_doubles;
 pub mod tl_hfd;
+pub mod types;
+pub mod storage;
+pub mod graph_view;
+pub mod text_gen;
 
 #[cfg(feature = "apprh-diffusion")]
 pub use apprh::{
@@ -110,7 +114,7 @@ pub use hyperedge_suggest::{
     compute_co_occurrence_candidates, validate_candidates_with_llm, HyperEdgeCandidate,
     HyperedgeSuggestError, ValidatedHyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
-pub use path_rag::{EntityId, GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
+pub use path_rag::{GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "k-path-diffusion")]
 pub use path_rag::{KPathConfig, KPathDiffusion, KPathResult};
 #[cfg(feature = "graph-connectivity-health")]
@@ -152,3 +156,8 @@ pub trait GraphIndexExt: contextra_ports::GraphIndex {
 }
 
 // !SECTION Lib Core Implementation
+
+pub use storage::{GraphFuture, GraphStorage, InMemoryGraphStorage};
+pub use graph_view::GraphView;
+pub use text_gen::TextGenerator;
+pub use types::EntityId;

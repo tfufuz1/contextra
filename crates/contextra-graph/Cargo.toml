@@ -7,28 +7,37 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)"
+description = "CSR-Graph for entity-relation traversal and graph algorithms"
 
 [package.metadata.contextra]
 ring = "1"
 klasse = "A"
 
 [features]
-default = ["workspace", "experimental-graph"]
-workspace = ["ports-compat", "types-compat"]
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-ports-compat = ["types-compat"]
-experimental-graph = []
-docid-128 = []
+default = [
+    "workspace",
+    "session-dag",
+    "entity-extraction",
+    "hyperedge-suggest",
+    "experimental-graph",
+]
+workspace = ["dep:contextra-types", "dep:contextra-ports", "types-compat", "ports-compat"]
+session-dag = []
+entity-extraction = []
+hyperedge-suggest = []
+apprh-diffusion = []
+k-path-diffusion = []
 graph-connectivity-health = []
 edge-reinforcement-learning = []
-# Retained for CI compatibility (.github/workflows/rust-ci.yml); PPR forward-push is baseline in ppr.rs
-ppr-forward-push = []
-k-path-diffusion = []
-apprh-diffusion = []
+docid-128 = []
+test-support = []
 
-# Deprecated alias features for backward compatibility with contextra-db
+# Deprecated alias features retained until G-92
+types-compat = ["dep:contextra-types", "dep:contextra-ports"]
+ports-compat = ["dep:contextra-types", "dep:contextra-ports"]
+experimental-graph = ["session-dag"]
 physio-percolation = ["graph-connectivity-health"]
+ppr-forward-push = []
 
 [dependencies]
 contextra-types = { workspace = true, optional = true }
@@ -46,6 +55,7 @@ scc = "2"
 thiserror = { workspace = true }
 
 [dev-dependencies]
+contextra-graph = { path = ".", features = ["test-support"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 proptest = "1.4"
