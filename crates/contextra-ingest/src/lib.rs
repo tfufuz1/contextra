@@ -15,6 +15,9 @@
 // INVARIANTEN: Zero-Panic, deterministisch, kein I/O nach außen, #![forbid(unsafe_code)].
 // STAND: TS:2026-10-31T00:00:00Z
 
+#[cfg(feature = "workspace")]
+pub mod compat;
+
 pub mod canonical;
 pub mod chunking;
 pub mod detect;
@@ -31,5 +34,6 @@ pub mod safe;
 pub use chunking::types::{ContextChunk, ContextChunkLink, DocId};
 pub use error::{IngestError, LimitKind};
 
+#[cfg(feature = "fuzz")]
 #[doc(hidden)]
 pub mod fuzz_support;

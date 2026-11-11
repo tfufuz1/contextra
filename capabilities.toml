@@ -280,7 +280,7 @@ path = "crates/contextra-ingest"
 unsafe_island = false
 allowed_internal = []
 [crates.contextra-ingest.feature_closure_allowed]
-workspace = ["contextra-types"]
+workspace = ["contextra-types", "contextra-ids"]
 [crates.contextra-ingest.dev_allowed]
 test = "cargo test -p contextra-ingest --locked"
 

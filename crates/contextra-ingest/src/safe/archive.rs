@@ -182,10 +182,11 @@ impl<'a> SafeArchive<'a> {
         let mut content = Vec::with_capacity(initial_cap);
         let mut chunk = [0u8; 8192];
         loop {
-            let n = std::io::Read::read(&mut file, &mut chunk).map_err(|e| IngestError::Corrupt {
-                format: None,
-                detail: format!("Fehler beim Dekomprimieren: {e}"),
-            })?;
+            let n =
+                std::io::Read::read(&mut file, &mut chunk).map_err(|e| IngestError::Corrupt {
+                    format: None,
+                    detail: format!("Fehler beim Dekomprimieren: {e}"),
+                })?;
             if n == 0 {
                 break;
             }
