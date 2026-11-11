@@ -1,6 +1,6 @@
 //! Ressourcen- und Token-Budgetverwaltung für Contextra.
 //!
-//! # Architektur-Rolle: Ring 0 (Budget- und Backpressure-Management)
+//! # Architektur-Rolle: Typen-Fundament (Budget- und Backpressure-Management)
 //!
 //! Dieses Modul überwacht und steuert den Ressourcenverbrauch:
 //! - `TokenBudget`: Atomares Tracking und RAII-Reservierung (`Reservation`) von LLM-Tokens

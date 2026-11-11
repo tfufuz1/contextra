@@ -1,5 +1,12 @@
 //! Configuration parameters for Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Adaptiver PageRank mit Hyperkanten-Expansion (APPRH).
+// INVARIANTEN: Deterministische Diffusion, budgetierte Iterationen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::error::ApprhError;
 use crate::path_rag::PprParams;
 
@@ -9,6 +16,8 @@ use crate::path_rag::PprParams;
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
 // ANCHOR[contextra-graph:SRC-APPRH-PARAMS-001]
+
+// SECTION Params Core Implementation
 pub struct ApprhParams {
     /// Base PPR parameters ($\alpha$ teleport, $\epsilon$ convergence threshold).
     pub ppr: PprParams,
@@ -114,3 +123,5 @@ mod tests {
         assert!(p.validate().is_err());
     }
 }
+
+// !SECTION Params Core Implementation

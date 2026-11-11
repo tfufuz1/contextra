@@ -26,6 +26,8 @@ use std::collections::HashMap;
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // ANCHOR[contextra-graph:SRC-COMMUNITY-001]
+
+// SECTION Community Core Implementation
 pub struct CommunityDetectionConfig {
     /// Maximum number of propagation / modularity optimization iterations.
     pub max_iterations: u32,
@@ -634,3 +636,5 @@ pub async fn detect_communities(
 
 #[cfg(test)]
 mod tests;
+
+// !SECTION Community Core Implementation

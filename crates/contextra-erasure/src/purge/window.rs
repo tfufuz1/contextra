@@ -12,6 +12,7 @@
 use super::cx::PurgeCx;
 use super::reserve::{check_disk_reserve, ReserveCheck};
 use crate::error::ErasureError;
+#[cfg(feature = "async")]
 use crate::saga::core::ErasureCore;
 
 /// Ergebnis eines Purge-Fensters.
@@ -61,6 +62,7 @@ pub fn run_window(cx: &PurgeCx) -> Result<WindowOutcome, ErasureError> {
 }
 
 /// Führt ein vollständiges Purge-Fenster über den `ErasureCore` aus (SPEC §11.2, §11.4).
+#[cfg(feature = "async")]
 pub async fn run_core_window(core: &ErasureCore) -> Result<WindowOutcome, ErasureError> {
     core.run_purge_window().await
 }

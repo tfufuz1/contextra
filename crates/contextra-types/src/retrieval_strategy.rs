@@ -1,6 +1,6 @@
 //! Semantische Retrieval-Strategie (Spec §9.5). Additiv, kein Breaking Change.
 //!
-//! # Zweck & Architektur-Rolle: Ring 0
+//! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
 //!
 //! Dieses Modul definiert, welches der vier Retrieval-Signale (Vektor, Text, Graph, Recency)
 //! bzw. welche Suchkombination bei einer Wissensabfrage priorisiert oder ausgewählt wird.

@@ -13,8 +13,15 @@ impl From<CryptoError> for ContextraError {
             CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
                 format!("KV cache format version mismatch: expected {expected}, found {found}"),
             ),
+            CryptoError::Storage(msg) => Self::Storage(msg),
             other => Self::Crypto(other.to_string()),
         }
+    }
+}
+
+impl From<ContextraError> for CryptoError {
+    fn from(e: ContextraError) -> Self {
+        CryptoError::Storage(e.to_string())
     }
 }
 
@@ -131,6 +138,15 @@ mod tests {
                     matches!(
                         err,
                         ContextraError::Crypto(ref msg) if msg.contains("key or group has been revoked: group_1")
+                    )
+                }),
+            ),
+            (
+                CryptoError::Storage("io error disk full".to_string()),
+                Box::new(|err| {
+                    matches!(
+                        err,
+                        ContextraError::Storage(ref msg) if msg == "io error disk full"
                     )
                 }),
             ),

@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
+// INVARIANTEN: Isolierte Workspace-Konvertierungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-CSR-GRAPH-INDEX-TRAVERSAL-001]
 //! Traversierungsmethoden des `GraphIndex`-Ports auf `CsrGraph`.
 //!
@@ -14,6 +21,8 @@ use crate::csr::inner::GraphInner;
 use crate::csr::types::{InternalIndex, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES, SCORE_DECAY};
 use crate::csr::visibility::is_edge_visible_bitemporal;
 
+
+// SECTION Traversal Core Implementation
 pub(crate) fn traverse_at_bitemporal_impl<'a>(
     graph: &'a CsrGraph,
     start: EntityId,
@@ -288,3 +297,5 @@ fn execute_bfs_unconditional(
 
     visited
 }
+
+// !SECTION Traversal Core Implementation

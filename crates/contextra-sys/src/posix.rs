@@ -1,7 +1,10 @@
-// STAND: 2026-11-08T00:00:00Z
-// ZWECK: Low-level POSIX syscall wrappers (Ring 0 / SPEC §10.1)
-// INVARIANTEN: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
+// =========================================================================
+// ANCHOR[id=sys-posix-main,epic=sys-posix,seq=0] POSIX Systemaufrufe & Limits
+// =========================================================================
+// LINK crates/contextra-sys/src/lib.rs
+// NOTE: Low-level POSIX syscall wrappers (Ring 0 / E0 / docs/SPEC.md §10.1).
+// Invariante: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls.
+// Keine unzulässigen Garantieversprechen (SPEC §6.4).
 
 //! # Modul: POSIX-Systemaufrufe (`posix`)
 //!
@@ -9,7 +12,7 @@
 //! und Prozess-Ressourcenlimits.
 //!
 //! ## Ring-Zugehörigkeit und Zweck
-//! - **Ring 0 (Kern / Unsafe-Insel):** Direkte FFI-Aufrufe an `libc` (`open`, `dup2`, `close`, `getrlimit`, `setrlimit`).
+//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Direkte FFI-Aufrufe an `libc` (`open`, `dup2`, `close`, `getrlimit`, `setrlimit`).
 //! - **Verwendung im System:**
 //!   - `ensure_fd_limit` / `set_fd_limit`: Datenbank- und Suchsysteme (wie LSM-Trees und Vektorindizes) halten
 //!     oft hunderte bis tausende SSTable- und WAL-Dateien gleichzeitig geöffnet. Diese Funktionen stellen
@@ -18,8 +21,18 @@
 
 use std::path::Path;
 
-// ANCHOR[contextra-sys:POSIX-DUP2-001]
+// SECTION Descriptor Redirection
+// ANCHOR[id=sys-posix-dup2,epic=sys-posix,seq=1] reopen_and_dup2
+
 /// Öffnet den Pfad `path` mit den angegebenen POSIX-Flags (z. B. `O_RDONLY`) und ersetzt atomar `target_fd` via `dup2`.
+///
+/// # Argumente
+/// * `path`: Pfad zur neu zu öffnenden Datei.
+/// * `target_fd`: Ziel-Dateideskriptor (muss >= 0 sein).
+/// * `flags`: POSIX-Öffnungsflags für `libc::open`.
+///
+/// # Fehler
+/// Liefert [`std::io::Error`], wenn der Pfad ein ungültiges Format aufweist oder Systemaufrufe fehlschlagen.
 #[cfg(target_os = "linux")]
 pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()> {
     use std::ffi::CString;
@@ -35,7 +48,8 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
     let path_c = CString::new(path.as_os_str().as_bytes())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-    // SAFETY: `path_c` ist ein gültiger nullterminierter C-String. `target_fd` ist validiert >= 0. `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
+    // SAFETY: `path_c` ist ein gültiger nullterminierter C-String. `target_fd` ist validiert >= 0.
+    // `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
     unsafe {
         let fd = libc::open(path_c.as_ptr(), flags);
         if fd < 0 {
@@ -50,7 +64,6 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
     Ok(())
 }
 
-// ANCHOR[contextra-sys:POSIX-DUP2-FALLBACK-001]
 /// Fallback für Nicht-Linux-Systeme, auf denen `reopen_and_dup2` nicht unterstützt wird.
 #[cfg(not(target_os = "linux"))]
 pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()> {
@@ -59,9 +72,15 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
         "reopen_and_dup2 is only supported on Linux target OS",
     ))
 }
+// !SECTION Descriptor Redirection
 
-// ANCHOR[contextra-sys:POSIX-ENSURE-FD-001]
+// SECTION Resource Limits
+// ANCHOR[id=sys-posix-rlimit,epic=sys-posix,seq=2] ensure_fd_limit und set_fd_limit
+
 /// Stellt sicher, dass das weiche Limit für offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` beträgt.
+///
+/// Versucht das Limit bis zum maximal erlaubten harten Limit (`rlim_max`) anzuheben.
+/// Liefert `true`, wenn das effektive Limit nach dem Aufruf mindestens `min_fds` beträgt.
 pub fn ensure_fd_limit(min_fds: u64) -> bool {
     #[cfg(unix)]
     {
@@ -94,8 +113,9 @@ pub fn ensure_fd_limit(min_fds: u64) -> bool {
     }
 }
 
-// ANCHOR[contextra-sys:POSIX-SET-FD-001]
 /// Setzt das weiche und harte Dateideskriptorlimit (`RLIMIT_NOFILE`) des aktuellen Prozesses exakt auf `limit`.
+///
+/// Liefert `true`, wenn das Limit erfolgreich gesetzt werden konnte.
 pub fn set_fd_limit(limit: u64) -> bool {
     #[cfg(unix)]
     {
@@ -103,7 +123,7 @@ pub fn set_fd_limit(limit: u64) -> bool {
             rlim_cur: limit as libc::rlim_t,
             rlim_max: limit as libc::rlim_t,
         };
-        // SAFETY: `rlim` ist eine vollständig initialisierte C-Struktur auf dem Stack. `setrlimit` liest diese sicher ein.
+        // SAFETY: `rlim` ist eine vollständig initialisierte C-Struktur auf dem Stack. `setrlimit` liest diese ein.
         let res = unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };
         res == 0
     }
@@ -113,8 +133,10 @@ pub fn set_fd_limit(limit: u64) -> bool {
         true
     }
 }
+// !SECTION Resource Limits
 
-// ANCHOR[contextra-sys:POSIX-TESTS-001]
+// SECTION Unit Tests
+// ANCHOR[id=sys-posix-tests,epic=sys-posix,seq=3] POSIX-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,7 +183,8 @@ mod tests {
             let target_fd = target_file.as_raw_fd();
             reopen_and_dup2(&path, target_fd, libc::O_RDONLY)?;
             let mut buf = Vec::new();
-            // SAFETY: `target_fd` wurde via `dup2` ersetzt und ist ein gültiger offener Deskriptor. `libc::dup` erzeugt ein neues dupliziertes Handle für die sichere Übergabe an Rusts `File::from_raw_fd`.
+            // SAFETY: `target_fd` wurde via `dup2` ersetzt und ist ein gültiger offener Deskriptor.
+            // `libc::dup` erzeugt ein neues dupliziertes Handle für die sichere Übergabe an Rusts `File::from_raw_fd`.
             let mut duped_file = unsafe {
                 <File as std::os::unix::io::FromRawFd>::from_raw_fd(libc::dup(target_fd))
             };
@@ -190,3 +213,4 @@ mod tests {
         assert!(neg_res.is_err());
     }
 }
+// !SECTION Unit Tests

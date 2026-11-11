@@ -31,7 +31,7 @@ pub enum QuarantinePolicy {
 }
 
 impl QuarantinePolicy {
-    #[cfg(feature = "std")]
+    #[cfg(any(feature = "std", feature = "file-audit"))]
     #[allow(clippy::disallowed_methods)]
     pub fn from_env() -> Self {
         if let Ok(val) = std::env::var("CONTEXTRA_MCP_QUARANTINE_POLICY") {

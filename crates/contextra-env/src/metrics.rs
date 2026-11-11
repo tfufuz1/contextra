@@ -12,6 +12,13 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
+// =========================================================================
+// SECTION: MetricsSink Port Trait
+// ANCHOR[id=metrics-root,epic=metrics,seq=1]
+// NOTE: Primäre Schnittstelle für Telemetrie und Performance-Monitoring.
+// LINK crates/contextra-env/SPEC.md#44-metricssink
+// =========================================================================
+
 /// Metrics sink port trait for recording system counters, gauges, and histograms.
 ///
 /// Implemented by observability backends to collect operational metrics from domain
@@ -42,17 +49,36 @@ pub trait MetricsSink: Send + Sync + 'static {
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]);
 }
 
+// !SECTION: MetricsSink Port Trait
+
+// =========================================================================
+// SECTION: NoopMetricsSink Null-Object Adapter
+// ANCHOR[id=metrics-noop,epic=metrics,seq=2]
+// NOTE: Discard-Implementierung ohne Overhead für Produktion ohne Metriken oder Tests.
+// =========================================================================
+
 /// A no-op implementation of [`MetricsSink`] that silently discards all metrics events.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoopMetricsSink;
 
 impl MetricsSink for NoopMetricsSink {
+    #[inline]
     fn record_counter(&self, _name: &str, _value: u64, _labels: &[(&str, &str)]) {}
 
+    #[inline]
     fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
 
+    #[inline]
     fn record_histogram(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
 }
+
+// !SECTION: NoopMetricsSink Null-Object Adapter
+
+// =========================================================================
+// SECTION: MetricKey Domain Model
+// ANCHOR[id=metrics-key,epic=metrics,seq=3]
+// NOTE: Eindeutiger Identifikator bestehend aus Name und normalisierten Labels.
+// =========================================================================
 
 /// Key identifying a metric by name and sorted key-value labels.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -65,6 +91,8 @@ pub struct MetricKey {
 
 impl MetricKey {
     /// Creates a new normalized [`MetricKey`].
+    ///
+    /// Sortiert Labels deterministisch lexikografisch, um Hash- und BTreeMap-Konsistenz zu wahren.
     pub fn new(name: impl Into<String>, labels: &[(&str, &str)]) -> Self {
         let mut sorted_labels: Vec<(String, String)> = labels
             .iter()
@@ -77,6 +105,14 @@ impl MetricKey {
         }
     }
 }
+
+// !SECTION: MetricKey Domain Model
+
+// =========================================================================
+// SECTION: Snapshots & Internal State
+// ANCHOR[id=metrics-snapshot,epic=metrics,seq=4]
+// NOTE: Unveränderliche Momentaufnahmen der Metriken für Tests und Assertionen.
+// =========================================================================
 
 /// Snapshot of a recorded histogram metric.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -105,6 +141,7 @@ pub struct MetricSnapshot {
     pub histograms: BTreeMap<MetricKey, HistogramSnapshot>,
 }
 
+/// Interner Akkumulator für Histogrammbeobachtungen.
 #[derive(Debug, Default)]
 struct HistogramState {
     sum: f64,
@@ -124,6 +161,7 @@ struct HistogramState {
 }
 
 impl HistogramState {
+    /// Aktualisiert Summe, Anzahl, Min/Max und inkrementiert das passende Bucket.
     fn observe(&mut self, val: f64) {
         self.sum += val;
         self.count += 1;
@@ -153,6 +191,7 @@ impl HistogramState {
         }
     }
 
+    /// Erzeugt einen lesbaren Snapshot mit beschrifteten Bucket-Grenzen.
     fn snapshot(&self) -> HistogramSnapshot {
         let mut buckets = BTreeMap::new();
         buckets.insert("<= 0.001s".to_string(), self.b_1ms);
@@ -176,6 +215,14 @@ impl HistogramState {
     }
 }
 
+// !SECTION: Snapshots & Internal State
+
+// =========================================================================
+// SECTION: InMemoryMetricsSink Implementation
+// ANCHOR[id=metrics-inmemory,epic=metrics,seq=5]
+// NOTE: Lokale threadsichere Senke ohne externe Netzwerk-Exports (Privacy-Preserving).
+// =========================================================================
+
 /// Production-ready local thread-safe implementation of [`MetricsSink`].
 ///
 /// Stores metrics strictly in-process with no external network exports (privacy-preserving).
@@ -194,6 +241,7 @@ impl InMemoryMetricsSink {
 
     /// Captures a point-in-time [`MetricSnapshot`] of all recorded counters, gauges, and histograms.
     pub fn snapshot(&self) -> MetricSnapshot {
+        // NOTE: Vergiftete Locks werden via `into_inner()` panikfrei entschärft
         let counters_guard = match self.counters.read() {
             Ok(g) => g,
             Err(p) => p.into_inner(),
@@ -229,6 +277,7 @@ impl InMemoryMetricsSink {
 impl MetricsSink for InMemoryMetricsSink {
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         let key = MetricKey::new(name, labels);
+        // Fast-Path: Existierenden Counter unter Read-Lock atomar inkrementieren
         {
             let guard = match self.counters.read() {
                 Ok(g) => g,
@@ -240,6 +289,7 @@ impl MetricsSink for InMemoryMetricsSink {
             }
         }
 
+        // Slow-Path: Write-Lock nur zur Erzeugung des neuen AtomicU64-Eintrags
         let mut guard = match self.counters.write() {
             Ok(g) => g,
             Err(p) => p.into_inner(),
@@ -269,19 +319,37 @@ impl MetricsSink for InMemoryMetricsSink {
     }
 }
 
+// !SECTION: InMemoryMetricsSink Implementation
+
+// =========================================================================
+// SECTION: Blanket Implementation for Arc<T>
+// ANCHOR[id=metrics-arc,epic=metrics,seq=6]
+// NOTE: Erlaubt direkte Nutzung von `Arc<dyn MetricsSink>` ohne Wrapper.
+// =========================================================================
+
 impl<T: MetricsSink + ?Sized> MetricsSink for Arc<T> {
+    #[inline]
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         (**self).record_counter(name, value, labels);
     }
 
+    #[inline]
     fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         (**self).record_gauge(name, value, labels);
     }
 
+    #[inline]
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         (**self).record_histogram(name, value, labels);
     }
 }
+
+// !SECTION: Blanket Implementation for Arc<T>
+
+// =========================================================================
+// SECTION: Unit Tests
+// ANCHOR[id=metrics-tests,epic=metrics,seq=7]
+// =========================================================================
 
 #[cfg(test)]
 mod tests {
@@ -289,6 +357,7 @@ mod tests {
 
     #[test]
     fn test_noop_metrics_sink() {
+        // NOTE: Verifiziert, dass NoopMetricsSink panikfrei ohne Seiteneffekte operiert
         let sink = NoopMetricsSink;
         sink.record_counter("test_counter", 10, &[("layer", "ring0")]);
         sink.record_gauge("test_gauge", 42.0, &[]);
@@ -297,6 +366,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_metrics_sink_counters_and_gauges() {
+        // NOTE: Verifiziert Akkumulation von Zählern und Überschreiben von Gauges
         let sink = InMemoryMetricsSink::new();
         sink.record_counter("commit_count", 1, &[("tenant", "t1")]);
         sink.record_counter("commit_count", 2, &[("tenant", "t1")]);
@@ -313,6 +383,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_metrics_sink_histograms() {
+        // NOTE: Verifiziert Verteilung auf Latenz-Buckets und Minimum/Maximum-Berechnung
         let sink = InMemoryMetricsSink::new();
         let key_labels = [("signal", "hnsw")];
         sink.record_histogram("search_latency", 0.002, &key_labels);
@@ -333,3 +404,5 @@ mod tests {
         assert_eq!(hist_snap.buckets.get("<= 0.050s"), Some(&1));
     }
 }
+
+// !SECTION: Unit Tests

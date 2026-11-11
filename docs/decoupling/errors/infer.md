@@ -1,28 +1,28 @@
-# Fehlerabbildungsmatrix: infer (INFER-3)
+# Fehlerabbildung: INFER (contextra-infer-ollama & contextra-infer-candle)
 
-## 1. contextra-infer-ollama: `OllamaError` ↔ `ContextraError`
+## 1. contextra-infer-ollama:  ->
 
-| OllamaError | ContextraError | Mapping-Art |
+|  Variante | Zugeordneter  | Begründung |
 |---|---|---|
-| `InvalidInput(msg)` | `ContextraError::InvalidInput(msg)` | Bitgleich / Direkt |
-| `ModelNotFound(msg)` | `ContextraError::NotFound(msg)` | Bitgleich / Direkt |
-| `Network(msg)` | `ContextraError::Io(ConnectionRefused, msg)` | Bitgleich / IO |
-| `Timeout(msg)` | `ContextraError::Io(TimedOut, msg)` | Bitgleich / IO |
-| `Server(msg)` | `ContextraError::Storage(msg)` | Bitgleich |
-| `Deserialization(msg)` | `ContextraError::Internal(msg)` | Bitgleich |
-| `EgressViolation(msg)` | `ContextraError::PolicyViolation(msg)` | Bitgleich |
-| `CircuitBreakerOpen` | `ContextraError::Internal("circuit breaker open")` | Bitgleich |
-| `Internal(msg)` | `ContextraError::Internal(msg)` | Bitgleich |
+|  |  | HTTP-Fehler vom Server |
+|  |  | Verbindungsfehler |
+|  |  | JSON-Fehler |
+|  |  | Parsingfehler |
+|  |  | Ungültiges Modell |
+|  |  | Eingabelimit |
+|  |  | Ungültige Parameter |
+|  |  | Timeout |
+|  |  | Interner Fehler |
 
-## 2. contextra-infer-candle: `Error` ↔ `ContextraError`
+## 2. contextra-infer-candle:  ->
 
-| Candle Error | ContextraError | Mapping-Art |
+|  Variante | Zugeordneter  | Begründung |
 |---|---|---|
-| `Io(e)` | `ContextraError::Io(e)` | Bitgleich / IO |
-| `ModelLoad { reason }` | `ContextraError::Internal(reason)` | Bitgleich |
-| `Tokenizer(msg)` | `ContextraError::Internal(msg)` | Bitgleich |
-| `Inference(msg)` | `ContextraError::Internal(msg)` | Bitgleich |
-| `InvalidInput(msg)` | `ContextraError::InvalidInput(msg)` | Bitgleich |
-| `ResourceExceeded(msg)` | `ContextraError::limit_exceeded(0, msg)` | Bitgleich |
-| `PolicyViolation(msg)` | `ContextraError::PolicyViolation(msg)` | Bitgleich |
-| `BackendUnavailable(msg)` | `ContextraError::NotFound(msg)` | Bitgleich |
+|  |  | Dateisystemfehler bei Modelldateien |
+|  |  | GGUF/Modell-Ladefehler |
+|  |  | Berechnungsfehler |
+|  |  | Tokenisierung |
+|  |  | Ungültige Eingabe |
+|  |  | Ressourcenerschöpfung |
+|  |  | GASP Policy Verletzung |
+|  |  | Backend nicht bereit |

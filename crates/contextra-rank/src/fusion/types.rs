@@ -15,7 +15,7 @@ pub fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
 }
 
 // ADR-098 (Token-Schätzung für ContextChunk: f64 -> usize Konvertierung)
-#[cfg(feature = "types-compat")]
+#[cfg(feature = "workspace")]
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 #[allow(dead_code)]
 pub(super) fn estimate_tokens(text: &str) -> usize {

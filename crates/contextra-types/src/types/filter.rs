@@ -1,6 +1,6 @@
 //! Metadaten-Filterausdruck-DSL und In-Memory-Evaluierungs-Engine.
 //!
-//! # Architektur-Rolle: Ring 0 (Prädikaten-Auswertung)
+//! # Architektur-Rolle: Typen-Fundament (Prädikaten-Auswertung)
 //!
 //! Bei der Vektor-, Text- oder Hybridsuche müssen Dokumente häufig nach Metadaten
 //! vor- oder nachgefiltert werden (z. B. Mandant, Kategorie, Datum, Preis, Tags).

@@ -27,7 +27,8 @@
 use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
-use contextra_adapt::{LyapunovDriftWatcher, LyapunovResult};
+use contextra_adapt::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
+use contextra_adapt::Rng;
 use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,

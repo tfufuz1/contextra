@@ -22,7 +22,7 @@ pub use ext::ResonanceModifier;
 #[cfg(not(feature = "exp-resonance"))]
 pub use ext::{apply_resonance_bonus, ResonanceConfig};
 pub use global::{GlobalFusionConfig, GlobalFusionStrategy};
-#[cfg(feature = "types-compat")]
+#[cfg(feature = "workspace")]
 pub use crate::compat::types::weights_to_signal_factors_types_compat;
 pub use normalized::{score_normalized_fusion_with_options, weights_to_signal_factors};
 pub use provenance::ProvenanceBuilder;
@@ -40,5 +40,5 @@ pub use types::{
     FusedScore, ProvenanceRecord, ScoredItem, SearchReport, SearchResult, Signal,
     SignalContribution, SignalFailurePolicy,
 };
-#[cfg(feature = "types-compat")]
+#[cfg(feature = "workspace")]
 pub use crate::compat::types::signal_contribution_synthesized_from_types;

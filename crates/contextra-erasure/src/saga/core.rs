@@ -41,7 +41,11 @@ use crate::types_local::{ErasureId, Timestamp};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
+#[cfg(feature = "async")]
 use tokio::sync::{oneshot, RwLock};
+
+#[cfg(not(feature = "async"))]
+use parking_lot::RwLock;
 
 /// Konfiguration für den Löschkern (SPEC §4, §11.2).
 #[derive(Clone, Debug)]

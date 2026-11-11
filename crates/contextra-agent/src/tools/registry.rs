@@ -5,6 +5,12 @@
 
 //! Registry managing validated tool manifests and execution dispatch for agent steps.
 
+// =========================================================================
+// SECTION: Validated Tool Registry & Dispatch
+// =========================================================================
+// ANCHOR[contextra-agent:tool-registry]
+
+
 use crate::context::AgentContext;
 use crate::step::AgentTool;
 use crate::tools::manifest::ToolManifest;
@@ -105,3 +111,5 @@ impl ToolRegistry {
         self.entries.is_empty()
     }
 }
+
+// !SECTION

@@ -1,6 +1,6 @@
 //! Gedächtnis-Relevanzbewertung (Importance Scoring) und zeitlicher Verfall (Recency Decay).
 //!
-//! # Architektur-Rolle: Ring 0 (Kognitive Gewichtung)
+//! # Architektur-Rolle: Typen-Fundament (Kognitive Gewichtung)
 //!
 //! In Agenten- und Gedächtnissystemen veralten episodische Informationen mit der Zeit,
 //! während semantische Fakten stabil bleiben sollen (ADR-025).

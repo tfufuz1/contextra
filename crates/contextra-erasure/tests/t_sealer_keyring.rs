@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Tests für Sealer und FileKeyring (T-VAULT-2, T-VAULT-4, T-FK-1..3).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

@@ -19,7 +19,7 @@ S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionier
 | Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
 |---|---|---|---|---|---|
 | S-61 | Chunker: Paritätstest in `engine` (`ingest` als Dev-Abhängigkeit) → `engine/chunker` als Adapter über `ingest::chunking` (`contextra::chunker::MarkdownChunker` API-stabil, `mcp/server_tools.rs:240`) | S-01 | GD (Chunk-Folge, Breadcrumbs); `mcp`-Tests unverändert | Revert | ☐ offen |
-| S-62 | `router`: `ports_local` weg (nach `mcp`-Umstellung), `wire` optional, `Vfs`-Stelle | S-01 | GL | Revert | ☐ offen |
+| S-62 | `router`: `ports_local` weg (nach `mcp`-Umstellung), `wire` optional, `Vfs`-Stelle | S-01 | GL | Revert | ☑ abgeschlossen (`routing.rs` auf `contextra_ports` umgestellt) |
 | S-64 | `engine` (Lizenz → `license`, `extraction` → `exp-extraction`), `db`, `contextra` (Feature `license`), `mcp`, `py`, `testkit` | S-50, S-51, S-33 | GL; `cargo public-api` ohne unbeabsichtigte Diffs | Revert | ☐ offen |
 
 ## 3. Reihenfolge-Zwang [S]

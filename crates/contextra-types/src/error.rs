@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 //! Fehlertypen für `Contextra`.
 //!
-//! # Architektur-Rolle: Ring 0 (Kanonische Fehlerdefinition)
+//! # Architektur-Rolle: Typen-Fundament (Kanonische Fehlerdefinition)
 //!
 //! Dieses Modul stellt das zentrale `ContextraError`-Enum bereit.
 //! In Übereinstimmung mit dem Zero-Panic-Prinzip werden Fehler strukturiert modelliert

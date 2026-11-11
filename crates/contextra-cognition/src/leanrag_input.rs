@@ -6,7 +6,7 @@
 //! und Kanten ([`AggregationEdge`]).
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3), greift auf `contextra-graph` und `contextra-engine` zu.
+//! Teil der Kognitionsschicht (Ebene E2), greift auf `contextra-graph` und `contextra-engine` zu.
 //!
 //! ## Invarianten
 //! - **Kein Unsafe-Code:** Vollständig sichere Rust-Implementierung.
@@ -38,6 +38,9 @@ pub const DEFAULT_MAX_LEANRAG_NODES: usize = 10_000;
 #[derive(Debug, Clone, PartialEq)]
 // ANCHOR[contextra-cognition:INPUT-002]
 /// Eingabepaket für die LeanRAG Stage-3-Aggregation.
+// =========================================================================
+// SECTION: LeanRagInputs Datenstruktur
+// =========================================================================
 pub struct LeanRagInputs {
     /// Liste der zugrundeliegenden Entitätsknoten.
     pub nodes: Vec<AggregationNode>,
@@ -134,3 +137,4 @@ pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
 
     LeanRagInputs { nodes, edges }
 }
+// !SECTION: Input-Aufbereitung

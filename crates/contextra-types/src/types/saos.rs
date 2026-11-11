@@ -1,6 +1,6 @@
 //! Query-Abstraktionen (wie `HybridQuery` und `HybridQueryBuilder`) sowie Signal-Fusionstypen.
 //!
-//! # Architektur-Rolle: Ring 0 (Hybride Multi-Signal-Suche)
+//! # Architektur-Rolle: Typen-Fundament (Hybride Multi-Signal-Suche)
 //!
 //! Contextra synthetisiert Antworten über vier Suchkanäle (Dense Vector, Sparse Text, Graph und Recency).
 //!
@@ -481,7 +481,7 @@ impl HybridQuery {
 /// Builder for HybridQuery to improve DX.
 ///
 /// # Abgrenzung
-/// `contextra_types::HybridQueryBuilder` ist ein speicherfreier, reiner Value-Builder in Ring 0,
+/// `contextra_types::HybridQueryBuilder` ist ein speicherfreier, reiner Value-Builder auf Vertragsebene,
 /// der eine unveränderliche `HybridQuery`-Value-Instanz erzeugt.
 /// Im Gegensatz dazu ist `contextra_engine::collection::query_builder::builder::HybridQueryBuilder`
 /// an eine aktive `Collection`-Instanz mit Storage- und Vektorindex-Handles gebunden und führt

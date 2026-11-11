@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! # Integrationstest: `deletion_proof_signature_version_serde.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_signature_version_serde`.

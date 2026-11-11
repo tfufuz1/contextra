@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 //! Restmessung und Kontexttypen für physische Löschnachweise (§4.2, §20.5).
 //!
-//! # Zweck & Architektur-Rolle: Ring 0
+//! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
 //!
 //! Für gesetzliche und regulatorische Nachweise muss nachgewiesen werden,
 //! dass gelöschte Daten weder im Speicher, noch im WAL oder in Vektor-/Text-Indizes
@@ -21,10 +21,10 @@
 // HOTSPOTS: [1-40]
 
 #![forbid(unsafe_code)]
-//!   Residual measurement and context types (§4.2, §20.5).
+//! Residual measurement and context types (§4.2, §20.5).
 //!
 //! # Architektur-Rolle
-//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
+//! Typen-Fundament (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
 //!
 //! # Zweck
 //! Stellt Grundtypen für Restmessungen (Residuen) und Anforderungskontexte für
@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 // ANCHOR[contextra-types:WITNESS-001]
 /// Scanner methodology applied during storage residue verification.
+// MIGRATION(S-70): ScanMethod gehört nach contextra-erasure
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:WIT-001]
 #[deprecated(

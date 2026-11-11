@@ -1,6 +1,6 @@
 //! Kern-Domänen-, Budget-, Filter-, Relevanz- und Suchabfragetypen.
 //!
-//! # Architektur-Rolle: Ring 0
+//! # Architektur-Rolle: Vertragsebene (contracts)
 //!
 //! Dieses Modul bündelt alle strukturellen Datentypen des Gesamtsystems:
 //! - `domain`: Fundamentale Identifikatoren (`DocId`, `TxId`, `TenantId`) und Wissensgraphen-Elemente.

@@ -57,7 +57,7 @@ impl BloomFilter {
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
             // Double Hashing: bit_idx = (h1 + i * h2) % num_bits
-            // Garantiert gleichmäßige Verteilung ohne Wiederholungen für i < num_bits
+            // Gleichmäßige Verteilung ohne Wiederholungen für i < num_bits
             let bit_idx = (h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize) % self.num_bits;
             if let Some(word) = self.bits.get_mut(bit_idx / 64) {
                 *word |= 1u64 << (bit_idx % 64);

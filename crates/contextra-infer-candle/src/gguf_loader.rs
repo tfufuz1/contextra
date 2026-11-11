@@ -59,7 +59,7 @@ pub fn parse_gguf_metadata_with_checksum(
         Error::Io(std::io::Error::new(
             e.kind(),
             format!(
-                "Failed to open GGUF model file at {}: {e}",
+                "Failed to open GGUF model file {}: {e}",
                 model_path.display()
             ),
         ))
@@ -81,6 +81,7 @@ pub fn parse_gguf_metadata_with_checksum(
     }
 
     let mut reader = BufReader::new(&file);
+    #[cfg_attr(not(feature = "candle"), allow(unused_variables))]
     let parsed_meta = validate_gguf_header_and_offsets(&mut reader, model_path, file_len)?;
 
     #[cfg(feature = "candle")]
@@ -112,7 +113,7 @@ pub fn parse_gguf_metadata_with_checksum(
 
     #[cfg(not(feature = "candle"))]
     {
-        Ok(parsed_meta)
+        Ok(_parsed_meta)
     }
 }
 
@@ -277,6 +278,11 @@ fn validate_gguf_header_and_offsets<R: Read>(
     }
 
     let tensor_count = read_u64(r)?;
+    if tensor_count == 0 {
+        return Err(Error::ModelLoad {
+            reason: "GGUF container contains 0 tensors".to_string(),
+        });
+    }
     if tensor_count > MAX_GGUF_TENSORS {
         return Err(Error::ModelLoad {
             reason: format!(

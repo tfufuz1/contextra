@@ -24,7 +24,7 @@
 //!   unmöglich, da salt unbekannt).
 
 use crate::error::{CryptoError, Result};
-use contextra_types::{DocId, TxId};
+use contextra_ids::{DocId, TxId};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 

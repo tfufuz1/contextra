@@ -14,19 +14,21 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat"]
+default = ["std", "workspace"]
 std = []
 serde = []
 tracing = []
 inspect = []
 experimental = []
-workspace = ["types-compat"]
+workspace = ["types-compat", "ports-compat"]
 types-compat = ["dep:contextra-types", "dep:contextra-ports"]
 ports-compat = ["types-compat"]
 bm25f = []
-docid-128 = []
+docid-128 = ["contextra-ids/docid-128"]
 
 [dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
 bytes = { workspace = true }

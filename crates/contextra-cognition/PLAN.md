@@ -1,45 +1,18 @@
 # contextra-cognition — Umsetzungsplan
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus `docs/SPEC.md` v3 §6 (Umsetzungsreihenfolge). Status-Stand: 2026-11-11.
 
-## 1. Vorbedingungen (global) [S]
+## 1. Einordnung im Gesamtsystem (docs/SPEC.md v3 §6.2) [S]
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+`contextra-cognition` ist der Ebene E2 (Integration) zugeordnet. Seine Invertierung (Entkopplung von `contextra-engine`, Delegation der konkreten Bindung an `contextra-db` hinter Feature `cognition`) ist im Hauptphasenplan unter Schritt **S-63** verankert.
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+| Schritt | Inhalt | Voraussetzung | Nachweis | Status |
+|---|---|---|---|---|
+| **S-03R** | Doku/Metadaten, Bereinigung veralteter Vorgaben und Vereinheitlichung der Spezifikationen | — | `AGENTS.md`, `SPEC.md`, `PLAN.md` aktuell | In Arbeit |
+| **S-63** | `cognition` invertieren (Brücke in `db`, Ports `DocumentSource`/`ConsolidationSink` nutzen) | S-37, S-50 | `cargo tree -p contextra-cognition -e normal` ohne `contextra-engine` | Vorgemerkt für S-63 |
 
-## 2. Schritte dieses Crates [S]
+## 2. Aktuelle Modulentkopplung und Code-Dokumentation
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-63 | `cognition` invertieren (Brücke in `db`), danach `agent` invertieren | S-37, S-50 | GL (`rg 'contextra_engine' src --glob '!compat/**'` leer; `cargo tree -p contextra-cognition -e normal` ohne `contextra-engine`) | Revert | ☐ offen |
-
-## 3. Reihenfolge-Zwang [S]
-
-> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
-
-## 4. Definition of Done [S]
-
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+- **Modul-Dokumentation:** Vollständige Rustdoc-Abdeckung (`//!` und `///`) ohne Panics oder unzureichende Erklärungen.
+- **Comment-Anchors Schema:** Durchgängige Etablierung des einheitlichen Kommentierungsschemas (`// SECTION`, `// !SECTION`, `// NOTE:`, `// TODO:`, `// FIXME:`, `// STUB:`, `// REVIEW:`, `// ANCHOR`, `// FILE-CONTEXT`).
+- **Verifikation:** Zero-Panic (`zero_panic_analyzer.py`), Unsafe-Verbot (`unsafe_boundary_auditor.py`), Determinismus (`determinism_guard.py`).

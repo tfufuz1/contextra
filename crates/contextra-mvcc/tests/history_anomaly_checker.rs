@@ -13,7 +13,7 @@
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::types::TOMBSTONE_BIT;
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Beschreibt eine Transaktion in der Ausführungshistorie für den Dependency-Checker.

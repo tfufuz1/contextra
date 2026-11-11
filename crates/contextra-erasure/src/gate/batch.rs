@@ -114,7 +114,7 @@ impl GateBatchCoordinator {
 
     /// Führt den Gruppen-Commit für die übergebenen Anfragen unter `CommitBarrier::exclusive` aus.
     ///
-    /// Garantiert:
+    /// Invarianten und Zusicherungen:
     /// - `gate_epoch += 1` vor Schlüsselvernichtung (I-21)
     /// - Gate-Log-Append mit `gated_seq` (D-58)
     /// - Genau EIN fsync / Persistierungsschritt je Gruppe (D-78, T-GATEGROUP-1)

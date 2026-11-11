@@ -10,7 +10,12 @@ use crate::types_local::ErasureId;
 use crate::types_local::GateDecision;
 use crate::types_local::{EraseTarget, LayerId, LayerWitness};
 use crate::types_local::{PendingReason, RetentionAttestation};
+#[cfg(feature = "async")]
 use futures_util::future::BoxFuture;
+
+#[cfg(not(feature = "async"))]
+/// Type-Alias für gepinnte ge-boxte Futures ohne Tokio/Futures-Util.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 /// Naht für das Intent-Journal (SPEC §11.6, ER-29).
 pub trait SagaJournal: Send + Sync {

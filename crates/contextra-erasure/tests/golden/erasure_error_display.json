@@ -1,0 +1,14 @@
+{
+  "Capacity": "erasure-capacity: vault load factor exceeded",
+  "Corrupt": "erasure-corrupt: vault slot MAC invalid",
+  "DiskReserve": "erasure-disk-reserve: insufficient free space",
+  "InvalidProofSignature": "invalid proof signature",
+  "KeyRevoked": "key revoked: key-xyz",
+  "Refused": "erasure-refused: retention obligation active",
+  "ReplacementMissing": "erasure-replace: replacement missing",
+  "RestrictedReadAuditRequired": "erasure-restricted: audit entry required before read",
+  "SameIdentity": "erasure-replace: old and new document share same identity",
+  "SlotMissing": "erasure-slot-missing: expected slot not present",
+  "UnsupportedProofVersion": "unsupported proof version: 99",
+  "UpdateMissing": "erasure-supersede: update missing"
+}

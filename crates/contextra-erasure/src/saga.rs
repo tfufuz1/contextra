@@ -2,6 +2,7 @@
 //!
 //! Definiert die Zustandsmaschine des Löschablaufs und deren Koordination.
 
+#[cfg(feature = "async")]
 pub mod core;
 pub mod driver;
 pub mod idempotency;
@@ -9,6 +10,7 @@ pub mod machine;
 pub mod retention;
 pub mod seams;
 
+#[cfg(feature = "async")]
 pub use core::{EraseExecutionRequest, ErasureConfig, ErasureCore, ErasureCoreStatus, ErasureDeps};
 pub use driver::{SagaDriver, SagaEvent, StepOutcome};
 pub use idempotency::{derive_open_key, is_same_request};

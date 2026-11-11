@@ -72,6 +72,13 @@ pub enum KvCacheError {
     IoError(#[source] std::io::Error),
 }
 
+impl KvCacheError {
+    /// Hilfskonstruktor für PinBudgetExceeded.
+    pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
+        Self::PinBudgetExceeded(msg.into())
+    }
+}
+
 impl From<std::io::Error> for KvCacheError {
     fn from(err: std::io::Error) -> Self {
         Self::IoError(err)

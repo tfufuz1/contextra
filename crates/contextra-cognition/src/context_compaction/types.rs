@@ -3,15 +3,23 @@
 //! Definiert Datenstrukturen, Strategie-Enums und Repräsentationen
 //! für die Reduktion des Token-Verbrauchs in Kontextfenstern.
 //!
-//! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Verwendet Basistypen aus `contextra-types`.
+//! ## Ebene und Einordnung
+//! Teil der Kognitionsschicht (Ebene E2). Verwendet Basistypen aus `contextra-types`.
+//
+// FILE-CONTEXT
+// ZWECK: Datenmodelle und Strategien für Token-Budgetierung und Kontext-Kompaktierung.
+// INVARIANTEN: Zero-Panic; deterministische Datenstrukturen; exakte Provenienz über source_doc_ids.
+// STAND: 2026-11-11
 
 use crate::types_local::{ContextChunk, DocId};
 
+// =========================================================================
+// SECTION: Strategie-Definitionen
+// =========================================================================
+
+// ANCHOR[contextra-cognition:COMP-TYPE-001]
 /// Strategie für Context Compaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[contextra-cognition:COMP-TYPE-001]
-/// Strategie für die Kontext-Kompaktierung.
 pub enum CompactionStrategy {
     /// Einfachste Strategie: Chunks über Token-Limit werden weggelassen.
     Truncate,
@@ -25,11 +33,15 @@ pub enum CompactionStrategy {
         max_input_chunks: usize,
     },
 }
+// !SECTION: Strategie-Definitionen
 
+// =========================================================================
+// SECTION: Kompaktierungsergebnis & Status-Token
+// =========================================================================
+
+// ANCHOR[contextra-cognition:COMP-TYPE-002]
 /// Kompaktierter Kontext für LLM-Übergabe.
 #[derive(Debug, Clone)]
-// ANCHOR[contextra-cognition:COMP-TYPE-002]
-/// Ergebnis eines Kompaktierungslaufs.
 pub struct CompactedContext {
     /// Beibehaltene Chunks (innerhalb Budget).
     pub retained_chunks: Vec<ContextChunk>,
@@ -37,14 +49,13 @@ pub struct CompactedContext {
     pub status_tokens: Vec<StatusToken>,
     /// Verbrauchte Tokens.
     pub tokens_used: usize,
-    /// Ursprüngliche Quell-Dokument-IDs.
+    /// Ursprüngliche Quell-Dokument-IDs zur Wahrung der Provenienz.
     pub source_doc_ids: Vec<DocId>,
 }
 
+// ANCHOR[contextra-cognition:COMP-TYPE-003]
 /// Kompakter Stellvertreter für einen oder mehrere kompaktierte Chunks.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[contextra-cognition:COMP-TYPE-003]
-/// Status-Token als kompakter Stellvertreter für komprimierte Chunks.
 pub struct StatusToken {
     /// Kompakter Beschreibungstext (z. B. "Tool-Output: DB-Abfrage lieferte 42 Ergebnisse").
     pub summary: String,
@@ -53,3 +64,4 @@ pub struct StatusToken {
     /// Referenz auf die ersetzten Chunk-IDs.
     pub replaced_doc_ids: Vec<DocId>,
 }
+// !SECTION: Kompaktierungsergebnis & Status-Token

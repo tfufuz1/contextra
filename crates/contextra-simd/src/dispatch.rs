@@ -25,6 +25,7 @@ use crate::error::Result;
 use crate::error::SimdError;
 use crate::kernels::*;
 
+// SECTION TARGET-CONFIG
 // ANCHOR[contextra-simd:DISP-TARGET-ENUM]
 /// Explicit hardware target configuration for the SIMD dispatcher.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -41,7 +42,9 @@ pub enum SimdTarget {
     /// Forces ARM NEON SIMD execution path on aarch64.
     Neon,
 }
+// !SECTION TARGET-CONFIG
 
+// SECTION OVERRIDES
 // ANCHOR[contextra-simd:DISP-OVERRIDE-ENUM]
 /// SIMD path override options for testing purposes.
 #[cfg(test)]
@@ -65,7 +68,9 @@ pub fn set_dispatch_override(path: Option<SimdPathOverride>) {
 pub fn get_dispatch_override() -> Option<SimdPathOverride> {
     OVERRIDE_PATH.with(|p| p.get())
 }
+// !SECTION OVERRIDES
 
+// SECTION DISPATCHER-CORE
 // ANCHOR[contextra-simd:DISP-STRUCT]
 /// Injectable and thread-safe SIMD dispatcher (Design by Contract).
 ///
@@ -85,6 +90,7 @@ pub fn detect_best_target() -> SimdTarget {
     #[cfg(feature = "std")]
     {
         *DETECTED_TARGET.get_or_init(|| {
+            // NOTE: Ermöglicht Umgebungsvariablen-Override zur gezielten Zwangs-Skalarisierung
             if std::env::var("CONTEXTRA_SIMD_SCALAR")
                 .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
                 .unwrap_or(false)
@@ -168,6 +174,7 @@ impl Dispatcher {
     /// Computes cosine distance ($1.0 - \text{cosine\_similarity}$) between two `f32` vectors.
     #[inline]
     pub fn cosine_distance(&self, a: &[f32], b: &[f32]) -> Result<f32> {
+        // Dimensionen vor dem Aufruf von Unsafe-Kernen strikt abgleichen
         if a.len() != b.len() {
             return Err(SimdError::DimensionMismatch {
                 left: a.len(),
@@ -625,7 +632,9 @@ impl Dispatcher {
         }
     }
 }
+// !SECTION DISPATCHER-CORE
 
+// SECTION STATIC-DISPATCH-FNS
 // ANCHOR[contextra-simd:DISP-COSINE-F32]
 /// Computes cosine distance ($1.0 - \text{cosine\_similarity}$) between two `f32` vectors.
 ///
@@ -905,8 +914,10 @@ pub fn cosine_similarity_parts_u8(a: &[u8], b: &[u8]) -> Result<CosineSimilarity
     }
     Dispatcher::auto().cosine_similarity_parts_u8(a, b)
 }
+// !SECTION STATIC-DISPATCH-FNS
 
 #[cfg(test)]
+// SECTION DISPATCH-TESTS
 mod tests {
     use super::*;
     use crate::metric::DistanceMetric;
@@ -1185,3 +1196,4 @@ mod tests {
         Ok(())
     }
 }
+// !SECTION DISPATCH-TESTS

@@ -17,7 +17,7 @@
 //!
 //! ## Ring-Zugehörigkeit und Einbindung
 //! - **Ring:** Ring 0 (Kern / Foundation)
-//! - **Abhängigkeiten (ausgehend):** `contextra-ports`, `contextra-types`
+//! - **Abhängigkeiten (ausgehend):** `contextra-ids`, `contextra-env`
 //! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
 //!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
 //!   `contextra-store`, `contextra-vector`.
@@ -38,9 +38,12 @@
 //! - **I/O- und Lock-Freiheit in `src/crypto`:** Reine Kryptographie-Routinen führen keine
 //!   Dateisystem- oder Netzwerk-I/O durch.
 
+// SECTION [epic=crypto-core,seq=1] Modul-Deklarationen (Ring 0 Bausteine)
+// NOTE: Autarke kryptographische Module ohne zyklische Abhängigkeiten (TS:2026-11-11)
 pub mod aead;
 pub mod anti_tamper;
 pub mod audit_chain;
+#[cfg(feature = "workspace")]
 pub mod compat;
 pub mod crypto;
 pub mod dek;
@@ -52,6 +55,10 @@ pub mod secret;
 pub mod wal_completeness;
 pub mod wal_crypto;
 
+// !SECTION
+
+// SECTION [epic=crypto-core,seq=2] Re-Exports & Primäre Schnittstellen
+// ANCHOR[contextra-crypto:LIB-001] Zentraler Einstiegspunkt für Baustein-Nutzer
 pub use aead::*;
 pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};
 pub use kdf::hkdf_expand;
@@ -82,3 +89,4 @@ pub use wal_crypto::CloudEgressGuard;
 pub use wal_crypto::{
     EncryptedWal, IntegrityVerifier, KmsProvider, LocalKeyManagerKms, WalEntrySnapshot, WalHmac,
 };
+// !SECTION

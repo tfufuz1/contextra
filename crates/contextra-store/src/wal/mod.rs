@@ -883,12 +883,12 @@ impl Wal {
         );
     }
 
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn poison_for_test(&self) {
         self.poison_with_cause(PoisonCause::WriteFailed);
     }
 
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn allow_legacy_fallback_for_test(&self) -> bool {
         self.allow_legacy_integrity_key_fallback
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -1047,9 +1047,4 @@ impl Wal {
         }
         wal
     }
-}
-
-pub(crate) fn next_temp_counter() -> u64 {
-    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-    COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }

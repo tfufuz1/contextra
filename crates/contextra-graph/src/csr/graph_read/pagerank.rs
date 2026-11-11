@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PAGERANK-001]
 //! PageRank-Berechnungsroutinen auf dem inneren CSR-Graphzustand.
 //!
@@ -8,6 +15,8 @@ use super::super::graph_write::CsrGraph;
 use contextra_types::EntityId;
 use std::collections::{HashMap, HashSet};
 
+
+// SECTION Pagerank Core Implementation
 impl CsrGraph {
     pub async fn pagerank(
         &self,
@@ -127,3 +136,5 @@ impl CsrGraph {
         crate::ppr::compute_ppr_with_context(&inner, seed_nodes, config, &deleted_view, ctx)
     }
 }
+
+// !SECTION Pagerank Core Implementation

@@ -1,3 +1,144 @@
+   Compiling zerocopy v0.8.56
+   Compiling getrandom v0.2.17
+   Compiling libm v0.2.16
+   Compiling typenum v1.20.1
+   Compiling rand_core v0.6.4
+   Compiling bytemuck v1.25.2
+   Compiling either v1.18.0
+   Compiling rayon v1.12.0
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
+   Compiling crypto-common v0.1.7
+   Compiling subtle v2.6.1
+   Compiling serde_json v1.0.151
+   Compiling num-complex v0.4.6
+   Compiling raw-cpuid v11.6.0
+   Compiling reborrow v0.5.5
+   Compiling pulp-wasm-simd-flag v0.1.1
+   Compiling dyn-stack v0.13.2
+   Compiling darling_core v0.20.11
+   Compiling block-buffer v0.10.4
+   Compiling aho-corasick v1.1.5
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.5
+   Compiling pulp v0.22.3
+   Compiling rand_distr v0.5.1
+   Compiling darling_macro v0.20.11
+   Compiling regex-automata v0.4.18
+   Compiling half v2.7.1
+   Compiling ahash v0.8.12
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling equivalent v1.0.2
+   Compiling darling v0.20.11
+   Compiling derive_builder_core v0.20.2
+   Compiling foldhash v0.2.0
+   Compiling minimal-lexical v0.2.1
+   Compiling futures-core v0.3.34
+   Compiling allocator-api2 v0.2.21
+   Compiling hashbrown v0.16.1
+   Compiling derive_builder_macro v0.20.2
+   Compiling nom v7.1.3
+   Compiling gemm-common v0.19.0
+   Compiling onig_sys v69.9.3
+   Compiling castaway v0.2.4
+   Compiling itertools v0.14.0
+   Compiling regex v1.13.1
+   Compiling base64 v0.13.1
+   Compiling ryu v1.0.23
+   Compiling unicode-segmentation v1.13.3
+   Compiling futures-task v0.3.34
+   Compiling static_assertions v1.1.0
+   Compiling cpufeatures v0.3.1
+   Compiling slab v0.4.12
+   Compiling arrayvec v0.7.8
+   Compiling constant_time_eq v0.4.2
+   Compiling spm_precompiled v0.1.4
+   Compiling blake3 v1.8.7
+   Compiling futures-util v0.3.34
+   Compiling rayon-cond v0.4.0
+   Compiling macro_rules_attribute v0.2.3
+   Compiling compact_str v0.9.1
+   Compiling monostate v0.1.18
+   Compiling gemm-f32 v0.19.0
+   Compiling onig v6.5.3
+   Compiling esaxx-rs v0.1.10
+   Compiling derive_builder v0.20.2
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling dary_heap v0.3.9
+   Compiling unicode_categories v0.1.1
+   Compiling log v0.4.34
+   Compiling hashbrown v0.17.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling zerofrom v0.1.8
+   Compiling gemm-f16 v0.19.0
+   Compiling contextra-ids v0.1.0 (/app/crates/contextra-ids)
+   Compiling crc32fast v1.5.1
+   Compiling gemm-c64 v0.19.0
+   Compiling gemm-f64 v0.19.0
+   Compiling indexmap v2.14.1
+   Compiling gemm-c32 v0.19.0
+   Compiling sha2 v0.10.9
+   Compiling inout v0.1.4
+   Compiling bincode v1.3.3
+   Compiling tracing-core v0.1.36
+   Compiling typed-path v0.12.3
+   Compiling tracing v0.1.44
+   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)
+   Compiling zip v8.6.0
+   Compiling gemm v0.19.0
+   Compiling cipher v0.4.4
+   Compiling yoke v0.8.3
+   Compiling memmap2 v0.9.11
+   Compiling tokenizers v0.22.2
+   Compiling safetensors v0.8.0
+   Compiling float8 v0.7.0
+   Compiling num_cpus v1.17.0
+   Compiling byteorder v1.5.0
+   Compiling unicode-width v0.2.2
+   Compiling contextra-env v0.1.0 (/app/crates/contextra-env)
+   Compiling portable-atomic v1.15.0
+   Compiling console v0.15.11
+   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)
+   Compiling universal-hash v0.5.1
+   Compiling zeroize_derive v1.5.0
+   Compiling opaque-debug v0.3.1
+   Compiling number_prefix v0.4.0
+   Compiling base64ct v1.8.3
+   Compiling ciborium-ll v0.2.2
+   Compiling password-hash v0.5.0
+   Compiling zeroize v1.9.0
+   Compiling indicatif v0.17.11
+   Compiling polyval v0.6.2
+   Compiling aes v0.8.4
+   Compiling ctr v0.9.2
+   Compiling fancy-regex v0.18.0
+   Compiling futures-channel v0.3.34
+   Compiling hmac v0.12.1
+   Compiling blake2 v0.10.6
+   Compiling rand_chacha v0.3.1
+   Compiling candle-core v0.11.0
+   Compiling aead v0.5.2
+   Compiling itertools v0.10.5
+   Compiling serde_plain v1.0.2
+   Compiling futures v0.3.34
+   Compiling aes-gcm-siv v0.11.1
+   Compiling criterion-plot v0.5.0
+   Compiling argon2 v0.5.3
+   Compiling rand v0.8.8
+   Compiling hkdf v0.12.4
+   Compiling tokenizers v0.21.4
+   Compiling plotters v0.3.7
+   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)
+   Compiling candle-nn v0.11.0
+   Compiling candle-transformers v0.11.0
+   Compiling ciborium v0.2.2
+   Compiling lru v0.16.4
+   Compiling tinytemplate v1.2.1
+   Compiling criterion v0.5.1
+   Compiling proptest v1.11.0
+   Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)
 warning: use of deprecated enum `kv_segment::delete_mode::KvDeleteMode`: KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden.
   --> crates/contextra-crypto/src/lib.rs:71:18
    |
@@ -741,199 +882,79 @@ warning: use of deprecated field `kv_segment::store::TenantIsolatedKvStore::shar
 512 |         for shard in self.shards.iter() {
     |                      ^^^^^^^^^^^
 
+warning: `contextra-crypto` (lib) generated 135 warnings (12 duplicates)
    Compiling contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
-warning: `contextra-crypto` (lib) generated 123 warnings
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 02s
-     Running unittests src/lib.rs (target/debug/deps/contextra_infer_candle-bc85b13ba2c7a8e6)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `thiserror`
+  --> crates/contextra-infer-candle/src/error.rs:10:17
+   |
+10 | #[derive(Debug, thiserror::Error)]
+   |                 ^^^^^^^^^ use of unresolved module or unlinked crate `thiserror`
 
-running 41 tests
-test attention_exporter::tests::test_export_attention_weights_internal ... ok
-test embedding::tests::test_bert_embed_model_load_nonexistent_weights_returns_io_error ... ok
-test embedding::tests::test_from_dir_nonexistent ... ok
-test embedding::tests::test_embed_zero_concurrency_limit_clamped_to_one ... ok
-test embedding::tests::test_from_dir_valid_temp_dir ... ok
-test embedding::tests::test_candle_embed_client_provider_and_engine ... ok
-test embedding_provider::tests::test_embed_batch_internal ... ok
-test gasp::tests::test_case_a_fully_supported_response_high_score_no_abstention ... ok
-test gasp::tests::test_case_b_hallucinated_number_low_score_triggers_abstention ... ok
-test embedding_provider::tests::test_verify_embedding_provider_in_current_thread_runtime ... ok
-test gasp::tests::test_case_c_empty_context_zero_shot_defined_explicit_error ... ok
-test gasp::tests::test_config_fingerprint_invalidation_resets_calibrator ... ok
-test gasp::tests::test_exact_word_match ... ok
-test gasp::tests::test_gasp_multibyte_german_and_emoji_word_boundary_matching ... ok
-test gasp::tests::test_exact_number_match ... ok
-test gasp::tests::test_gasp_nan_score_protection ... ok
-test gasp::tests::test_gasp_whitespace_or_punctuation_only_response_handling ... ok
-test gasp::tests::test_number_boundary_no_false_positive ... ok
-test gasp::tests::test_score_grounding_trait ... ok
-test gasp::tests::test_refresh_config_invalidates_calibration_on_fingerprint_change ... ok
-test embedding_provider::tests::test_verify_embedding_provider_valid ... ok
-test gasp::tests::test_validate_grounding_does_not_increment_observation_count ... ok
-test gguf_loader::tests::test_parse_gguf_metadata_invalid_header_bytes_returns_model_load_error ... ok
-test gasp::tests::test_word_boundary_no_false_positive ... ok
-test gguf_loader::tests::test_parse_gguf_metadata_nonexistent_path_returns_io_error ... ok
-test inference::tests::test_candle_llm_client_generate ... ok
-test inference::tests::test_candle_llm_client_generate_stream ... ok
-test inference::tests::test_inference_configurable_concurrency_limit ... ok
-test inference::tests::test_inference_backpressure_single_permit_awaits ... ok
-test inference::tests::test_inference_zero_concurrency_limit_clamped_to_one ... ok
-test inference::tests::test_inference_timeout_cancellation_releases_no_permit_leak ... ok
-test inference::tests::test_llm_from_dir_empty_tokenizer ... ok
-test inference::tests::test_llm_from_dir_missing_gguf ... ok
-test inference::tests::test_llm_from_dir_missing_tokenizer ... ok
-test inference::tests::test_llm_from_dir_nonexistent ... ok
-test model_registry::tests::test_candle_quantization_from_str ... ok
-test model_registry::tests::test_compute_fingerprint_differs_by_quantization ... ok
-test model_registry::tests::test_compute_fingerprint_nonexistent_file_returns_err ... ok
-test gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration ... FAILED
-test inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration ... FAILED
-test inference::tests::test_llm_from_dir_corrupt_gguf ... ok
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:14:7
+   |
+14 |     #[error("I/O error: {0}")]
+   |       ^^^^^
 
-failures:
+error: cannot find attribute `from` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:15:10
+   |
+15 |     Io(#[from] std::io::Error),
+   |          ^^^^
 
----- gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration stdout ----
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:18:7
+   |
+18 |     #[error("Model load error: {reason}")]
+   |       ^^^^^
 
-thread 'gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration' panicked at crates/contextra-infer-candle/src/gasp.rs:593:9:
-assertion `left == right` failed: observation_count must be reset to 0 after set_threshold
-  left: 1
- right: 0
-stack backtrace:
-   0: __rustc::rust_begin_unwind
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/panicking.rs:697:5
-   1: core::panicking::panic_fmt
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:75:14
-   2: core::panicking::assert_failed_inner
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:427:23
-   3: core::panicking::assert_failed
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:387:5
-   4: contextra_infer_candle::gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration::{{closure}}
-             at ./src/gasp.rs:593:9
-   5: <core::pin::Pin<P> as core::future::future::Future>::poll
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
-   6: <core::pin::Pin<P> as core::future::future::Future>::poll
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
-   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:70
-   8: tokio::task::coop::with_budget
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:167:5
-   9: tokio::task::coop::budget
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:133:5
-  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:25
-  11: tokio::runtime::scheduler::current_thread::Context::enter
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:488:19
-  12: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:829:44
-  13: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:68
-  14: tokio::runtime::context::scoped::Scoped<T>::set
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/scoped.rs:40:9
-  15: tokio::runtime::context::set_scheduler::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:38
-  16: std::thread::local::LocalKey<T>::try_with
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:315:12
-  17: std::thread::local::LocalKey<T>::with
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:279:20
-  18: tokio::runtime::context::set_scheduler
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:17
-  19: tokio::runtime::scheduler::current_thread::CoreGuard::enter
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:27
-  20: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:817:24
-  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:218:33
-  22: tokio::runtime::context::runtime::enter_runtime
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/runtime.rs:65:16
-  23: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:206:9
-  24: tokio::runtime::runtime::Runtime::block_on_inner
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:374:52
-  25: tokio::runtime::runtime::Runtime::block_on
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:343:18
-  26: contextra_infer_candle::gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration
-             at ./src/gasp.rs:597:10
-  27: contextra_infer_candle::gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration::{{closure}}
-             at ./src/gasp.rs:564:82
-  28: core::ops::function::FnOnce::call_once
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
-  29: core::ops::function::FnOnce::call_once
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:25:7
+   |
+25 |     #[error("Tokenizer error: {0}")]
+   |       ^^^^^
 
----- inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration stdout ----
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:29:7
+   |
+29 |     #[error("Inference execution error: {0}")]
+   |       ^^^^^
 
-thread 'inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration' panicked at crates/contextra-infer-candle/src/inference/tests.rs:584:5:
-assertion `left == right` failed: validator observation_count must be reset to 0 after client.swap_model
-  left: 1
- right: 0
-stack backtrace:
-   0: __rustc::rust_begin_unwind
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/panicking.rs:697:5
-   1: core::panicking::panic_fmt
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:75:14
-   2: core::panicking::assert_failed_inner
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:427:23
-   3: core::panicking::assert_failed
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:387:5
-   4: contextra_infer_candle::inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration::{{closure}}
-             at ./src/inference/tests.rs:584:5
-   5: <core::pin::Pin<P> as core::future::future::Future>::poll
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
-   6: <core::pin::Pin<P> as core::future::future::Future>::poll
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
-   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:70
-   8: tokio::task::coop::with_budget
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:167:5
-   9: tokio::task::coop::budget
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:133:5
-  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:830:25
-  11: tokio::runtime::scheduler::current_thread::Context::enter
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:488:19
-  12: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:829:44
-  13: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:68
-  14: tokio::runtime::context::scoped::Scoped<T>::set
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/scoped.rs:40:9
-  15: tokio::runtime::context::set_scheduler::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:38
-  16: std::thread::local::LocalKey<T>::try_with
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:315:12
-  17: std::thread::local::LocalKey<T>::with
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/thread/local.rs:279:20
-  18: tokio::runtime::context::set_scheduler
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context.rs:187:17
-  19: tokio::runtime::scheduler::current_thread::CoreGuard::enter
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:906:27
-  20: tokio::runtime::scheduler::current_thread::CoreGuard::block_on
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:817:24
-  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:218:33
-  22: tokio::runtime::context::runtime::enter_runtime
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/runtime.rs:65:16
-  23: tokio::runtime::scheduler::current_thread::CurrentThread::block_on
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/current_thread/mod.rs:206:9
-  24: tokio::runtime::runtime::Runtime::block_on_inner
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:374:52
-  25: tokio::runtime::runtime::Runtime::block_on
-             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:343:18
-  26: contextra_infer_candle::inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration
-             at ./src/inference/tests.rs:588:6
-  27: contextra_infer_candle::inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration::{{closure}}
-             at ./src/inference/tests.rs:510:79
-  28: core::ops::function::FnOnce::call_once
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
-  29: core::ops::function::FnOnce::call_once
-             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:33:7
+   |
+33 |     #[error("Invalid parameter: {0}")]
+   |       ^^^^^
 
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:37:7
+   |
+37 |     #[error("Resource limit exceeded: {0}")]
+   |       ^^^^^
 
-failures:
-    gasp::tests::test_set_threshold_updates_fingerprint_and_invalidates_calibration
-    inference::tests::test_candle_llm_client_swap_model_invalidates_validator_calibration
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:41:7
+   |
+41 |     #[error("Grounding policy violation: {0}")]
+   |       ^^^^^
 
-test result: FAILED. 39 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:45:7
+   |
+45 |     #[error("Backend unavailable: {0}")]
+   |       ^^^^^
 
-error: test failed, to rerun pass `-p contextra-infer-candle --lib`
+error[E0277]: `error::Error` doesn't implement `std::fmt::Display`
+   --> crates/contextra-infer-candle/src/gguf_loader.rs:268:58
+    |
+268 |         reason: format!("Failed to read version from {}: {e}", path.display()),
+    |                                                          ^^^ `error::Error` cannot be formatted with the default formatter
+    |
+    = help: the trait `std::fmt::Display` is not implemented for `error::Error`
+    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+    = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `format` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0433.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `contextra-infer-candle` (lib) due to 11 previous errors
+warning: build failed, waiting for other jobs to finish...

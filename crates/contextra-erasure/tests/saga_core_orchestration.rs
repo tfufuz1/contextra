@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Tests für ErasureCore Orchestrierung, Schritte 1–6, Cancel-Safety, Observer und Retention-Matrix.
 //!
 //! T-ID: T-CRASH-1, T-CANCEL-1, T-SLA-1, T-OBS-1, T-OBS-2, T-OBS-3, T-STATUS-1

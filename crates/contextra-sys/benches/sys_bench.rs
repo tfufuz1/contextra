@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Criterion benchmarks for contextra-sys low-level OS primitives (SPEC §10.1 / B8)
 // INVARIANTEN: Zero panic; reliable benchmarking of lock, flush, vault, and mmap operations.
 
