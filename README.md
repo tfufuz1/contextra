@@ -32,6 +32,9 @@ Steuert die Execution-Engine für mehrstufige Agentenprozesse und das langfristi
 <p align="center">
   <img src=".github/assets/routing.jpg" alt="Adaptive Routing" width="80%">
 </p>
+
+![Beschreibung des Bildes](.github/assets/routing.jpg)
+
 Nutzt Contextual Bandits und PID-Regler zur dynamischen Latenz- und Modellsteuerung.
 
 ---
