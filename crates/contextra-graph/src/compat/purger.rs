@@ -58,7 +58,7 @@ impl Purger for GraphPurger {
         let doc_id = target
             .target_id
             .parse::<u64>()
-            .map(DocId::new)
+            .map(|v| DocId::new(v as _))
             .or_else(|_| DocId::from_key(&target.target_id));
 
         if let Ok(doc) = doc_id {
