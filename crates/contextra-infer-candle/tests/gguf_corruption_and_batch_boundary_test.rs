@@ -11,9 +11,7 @@
 
 // ANCHOR[contextra-infer-candle:TEST-GGUF-MUTATION-MATRIX]
 use contextra_infer_candle::error::Error;
-use contextra_infer_candle::gguf_loader::{
-    parse_gguf_metadata, parse_gguf_metadata_with_checksum,
-};
+use contextra_infer_candle::gguf_loader::{parse_gguf_metadata, parse_gguf_metadata_with_checksum};
 use std::io::Write;
 use tempfile::NamedTempFile;
 
@@ -58,7 +56,9 @@ fn test_valid_minimal_gguf_parses_successfully() {
     let meta = parse_gguf_metadata(file.path()).expect("Valid GGUF header should parse");
     assert_eq!(meta.tensor_count, 1);
     assert_eq!(meta.architecture, "llama");
-    assert!(meta.metadata_keys.contains(&"general.architecture".to_string()));
+    assert!(meta
+        .metadata_keys
+        .contains(&"general.architecture".to_string()));
 }
 
 #[test]
@@ -69,23 +69,32 @@ fn test_gguf_mutation_matrix() {
     let mutations: Vec<(&str, Box<dyn Fn(&mut [u8])>)> = vec![
         ("corrupt_magic", Box::new(|b| b[0] = b'X')),
         ("unsupported_version", Box::new(|b| b[4] = 99)),
-        ("tensor_count_overflow", Box::new(|b| {
-            // Tensor count at bytes 8..16
-            b[8..16].copy_from_slice(&1_000_000u64.to_le_bytes());
-        })),
-        ("metadata_count_overflow", Box::new(|b| {
-            // Metadata count at bytes 16..24
-            b[16..24].copy_from_slice(&1_000_000u64.to_le_bytes());
-        })),
-        ("zero_dim_count", Box::new(|b| {
-            // Letzte Dimension vor Payload manipulieren
-            for i in 0..b.len().saturating_sub(4) {
-                if &b[i..i+4] == &1u32.to_le_bytes() {
-                    b[i..i+4].copy_from_slice(&0u32.to_le_bytes());
-                    break;
+        (
+            "tensor_count_overflow",
+            Box::new(|b| {
+                // Tensor count at bytes 8..16
+                b[8..16].copy_from_slice(&1_000_000u64.to_le_bytes());
+            }),
+        ),
+        (
+            "metadata_count_overflow",
+            Box::new(|b| {
+                // Metadata count at bytes 16..24
+                b[16..24].copy_from_slice(&1_000_000u64.to_le_bytes());
+            }),
+        ),
+        (
+            "zero_dim_count",
+            Box::new(|b| {
+                // Letzte Dimension vor Payload manipulieren
+                for i in 0..b.len().saturating_sub(4) {
+                    if &b[i..i + 4] == &1u32.to_le_bytes() {
+                        b[i..i + 4].copy_from_slice(&0u32.to_le_bytes());
+                        break;
+                    }
                 }
-            }
-        })),
+            }),
+        ),
     ];
 
     for (name, mutate) in mutations {

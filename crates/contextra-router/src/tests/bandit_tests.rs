@@ -54,7 +54,7 @@ async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::
         TokenBudget::new(1000, 100),
         0.01,
     );
-    profile.bandit_state = Some(crate::bandit::BanditProfileState::cold_start(4, 0.5));
+    profile.bandit_state = Some(contextra_adapt::BanditProfileState::cold_start(4, 0.5));
 
     let router = create_test_router(collection, vec![profile], None);
 
@@ -76,7 +76,7 @@ async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::
     let decision = router.route(&vec_data, "drift reaction content").await?;
     assert!(matches!(
         decision.drift_status,
-        Some(crate::lyapunov::LyapunovResult::DriftDetected { .. })
+        Some(contextra_adapt::LyapunovResult::DriftDetected { .. })
     ));
 
     // Verifiziere, dass drift_steps_remaining im Bandit-Zustand des Profils aktiviert wurde

@@ -13,7 +13,7 @@
 
 use contextra_mvcc::tx_buffer::{TxBuffer, TxBufferConfig};
 use contextra_testkit::ManualClock;
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use std::sync::Arc;
 use std::time::Duration;
 

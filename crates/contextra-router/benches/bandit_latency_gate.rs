@@ -10,7 +10,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 #[cfg(feature = "bandit-routing")]
-use contextra_router::{BanditImplementation, BanditProfileState};
+use contextra_adapt::{BanditImplementation, BanditProfileState};
 
 /// Standard-Dimension für Kontext-Embeddings (nomic-embed-text d=768).
 #[cfg(feature = "bandit-routing")]

@@ -329,6 +329,7 @@ impl CandleLlmClient {
                 0.0,
             )
             .with_threshold(new_config.threshold);
+            val.set_threshold(new_config.threshold);
             val.refresh_config(new_config);
         }
 
@@ -872,7 +873,7 @@ impl LlmTextGenerator for CandleLlmClient {
                     let fp = segment
                         .model_fingerprint
                         .cloned()
-                        .unwrap_or_else(|| self.fingerprint.clone());
+                        .unwrap_or_else(|| self.fingerprint.clone().into());
                     let key = crate::kv_bridge::KvCacheKey::new(
                         segment.chunk_id,
                         fp,

@@ -117,7 +117,12 @@ impl VaultChunk {
     /// - `content`: Rohe Nutzdaten (z. B. Text- oder Binärdaten).
     /// - `modality`: Art der Eingabedaten.
     /// - `captured_tx`: Transaktions-Sequenznummer zum Zeitpunkt der Aufnahme.
-    pub fn new(id: VaultDocId, content: Vec<u8>, modality: SignalModality, captured_tx: VaultTxId) -> Self {
+    pub fn new(
+        id: VaultDocId,
+        content: Vec<u8>,
+        modality: SignalModality,
+        captured_tx: VaultTxId,
+    ) -> Self {
         Self {
             id,
             content,
@@ -170,8 +175,7 @@ pub struct VolatileDrainReceipt {
     pub purged_at: Instant,
 }
 
-/// Kompatibilitätsalias für Quittungen flüchtiger Speicherbereinigung.
-pub type PurgeReceipt = VolatileDrainReceipt;
+include!("vault_compat.inc");
 
 /// Quittung nach Übergabe der Chunks an die persistente Datenbank via [`VolatileContextVault::commit()`].
 #[derive(Debug, Clone, PartialEq, Eq)]

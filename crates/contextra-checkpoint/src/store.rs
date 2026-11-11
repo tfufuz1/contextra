@@ -28,10 +28,8 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
-use crate::snapshot_source::{BoxFuture, SnapshotSource};
-use crate::error::{CheckpointError, Result};
-use contextra_env::{Clock, MetricsSink};
-use contextra_ids::TxId;
+use contextra_ports::BoxFuture;
+use contextra_types::{ContextraError, Result, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -785,6 +783,11 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     }
 
     /// Liefert eine Referenz auf die Orphan-Registry.
+    /// Liefert eine Referenz auf die zugrundeliegende Speicher-Engine.
+    pub fn storage(&self) -> &Arc<S> {
+        &self.storage
+    }
+
     pub fn orphan_registry(&self) -> &Arc<InstanceOrphanRegistry> {
         &self.orphan_registry
     }

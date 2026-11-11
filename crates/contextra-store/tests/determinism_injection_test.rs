@@ -136,7 +136,8 @@ async fn test_sstable_scanner_determinism_across_runs() {
     storage.commit(tx).await.unwrap();
     storage.flush().await.unwrap();
 
-    let scanner = SstableScanner::new(Arc::clone(&storage));
+    let view = storage.scan_view().await;
+    let scanner = SstableScanner::new(view);
 
     let ctx = RequestContext {
         tenant_id: TenantId::SYSTEM,

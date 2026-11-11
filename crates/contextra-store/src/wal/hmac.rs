@@ -1,6 +1,6 @@
 //! # HMAC-Integritaetskette fuer WAL (Ring 1)
 //!
-//! Garantiert kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
+//! Bietet kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
 
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
@@ -205,18 +205,18 @@ impl Wal {
     }
 
     /// Exposes the HMAC integrity key for testing.
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
     /// Exposes internal `last_hmac` lock for concurrency testing.
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {
         std::sync::Arc::clone(&self.last_hmac)
     }
 
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
         legacy_integrity_key()
     }

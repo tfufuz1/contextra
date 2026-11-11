@@ -85,6 +85,7 @@ cargo clippy -p contextra-mcp --all-targets -- -D warnings
 |---|---|
 | 3.7 | Löschwerkzeuge herauslösen, Lizenz-Gates entkoppeln |
 | 5.3 | Kanten auf Fassade reduzieren |
+| MCP-2 | `contextra-prompt-guard` herausgelöst, `routing.rs` auf `contextra_ports` umgestellt (abgeschlossen) |
 
 
 ---

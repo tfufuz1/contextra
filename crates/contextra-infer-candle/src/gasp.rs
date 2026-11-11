@@ -21,7 +21,6 @@
 use contextra_ports::{
     BoxFuture, GroundingAssessment, GroundingValidator, ResponseGroundingValidator,
 };
-use contextra_rank::IsotonicCalibrator;
 use contextra_types::{ConfigFingerprint, ContextChunk, ContextraError, Result};
 use std::sync::Mutex;
 
@@ -95,7 +94,7 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
 /// Post-Hoc-Halluzinations-Validator (GASP / TPA-Pattern).
 pub struct GaspValidator {
     config: GaspConfig,
-    calibrator: Mutex<IsotonicCalibrator>,
+    calibrator: Mutex<Box<dyn crate::traits::ConfidenceCalibrator>>,
 }
 
 impl GaspValidator {
@@ -106,11 +105,16 @@ impl GaspValidator {
 
     /// Erstellt einen `GaspValidator` mit angegebener Konfiguration.
     pub fn with_config(config: GaspConfig) -> Self {
-        let mut cal = IsotonicCalibrator::new(config.warmup_required, config.max_observations);
-        cal.invalidate_on_config_change(config.fingerprint.clone());
+        let adapter = Box::new(
+            crate::compat::calibrator::RankIsotonicCalibratorAdapter::new(
+                config.warmup_required,
+                config.max_observations,
+                config.fingerprint.clone(),
+            ),
+        );
         Self {
             config,
-            calibrator: Mutex::new(cal),
+            calibrator: Mutex::new(adapter),
         }
     }
 
@@ -119,7 +123,10 @@ impl GaspValidator {
         let mut new_config = self.config.clone();
         new_config.threshold = threshold;
         new_config.fingerprint = new_config.fingerprint.with_threshold(threshold);
-        self.refresh_config(new_config);
+        if let Ok(mut cal) = self.calibrator.lock() {
+            cal.reset();
+        }
+        self.config = new_config;
     }
 
     /// Zeichnet ein externes Ground-Truth-Signal (z. B. aus Nutzer-Feedback oder
@@ -146,7 +153,9 @@ impl GaspValidator {
     /// die Kalibrierung, falls sich der `ConfigFingerprint` geändert hat (INV-CAL-2).
     pub fn refresh_config(&mut self, config: GaspConfig) {
         if let Ok(mut cal) = self.calibrator.lock() {
-            cal.invalidate_on_config_change(config.fingerprint.clone());
+            if self.config.fingerprint != config.fingerprint {
+                cal.reset();
+            }
         }
         self.config = config;
     }

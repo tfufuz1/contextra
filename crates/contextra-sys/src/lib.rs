@@ -55,11 +55,10 @@ pub mod map {
     pub use crate::mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
 }
 
-// ANCHOR[contextra-sys:LIB-REEXPORT-001]
 // Öffentliche Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-vector, contextra-durable-fs).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use durability::{durable_flush_dir, durable_flush_file, write_all_durable, DurableFile};
-pub use error::{Error, Result};
+pub use error::{Error, Result, SysError};
 pub use mlock::{
     apply_dont_dump, mem_lock, mem_lock_typed, mem_lock_with_policy, mem_unlock, MemLockPolicy,
 };

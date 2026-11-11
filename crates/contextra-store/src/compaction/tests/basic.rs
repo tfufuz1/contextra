@@ -1129,17 +1129,17 @@ async fn test_compact_all_and_compact_range_neutral_maintenance() {
     let p2 = tmp.path().join("sst-test-02.sst");
     let p3 = tmp.path().join("sst-test-03.sst");
 
-    let mut b1 = SstableBuilder::new(create_block_cache(10));
-    b1.add(b"a", b"val_a", 1, 1).expect("add");
-    b1.build(&p1).await.expect("build sst1");
+    let mut b1 = SstableBuilder::create(&p1).await.expect("create sst1");
+    b1.add(b"a", b"val_a", 1, 1).await.expect("add");
+    b1.finish().await.expect("build sst1");
 
-    let mut b2 = SstableBuilder::new(create_block_cache(10));
-    b2.add(b"b", b"val_b", 2, 2).expect("add");
-    b2.build(&p2).await.expect("build sst2");
+    let mut b2 = SstableBuilder::create(&p2).await.expect("create sst2");
+    b2.add(b"b", b"val_b", 2, 2).await.expect("add");
+    b2.finish().await.expect("build sst2");
 
-    let mut b3 = SstableBuilder::new(create_block_cache(10));
-    b3.add(b"c", b"val_c", 3, 3).expect("add");
-    b3.build(&p3).await.expect("build sst3");
+    let mut b3 = SstableBuilder::create(&p3).await.expect("create sst3");
+    b3.add(b"c", b"val_c", 3, 3).await.expect("add");
+    b3.finish().await.expect("build sst3");
 
     let r1 = Arc::new(SstableReader::open(&p1, create_block_cache(10)).await.expect("open sst1"));
     let r2 = Arc::new(SstableReader::open(&p2, create_block_cache(10)).await.expect("open sst2"));

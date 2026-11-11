@@ -50,6 +50,8 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#[cfg(feature = "workspace")]
+pub mod compat;
 pub mod calibration;
 pub mod drift;
 pub mod error;
@@ -57,6 +59,7 @@ pub mod explain;
 pub mod fusion;
 pub mod local_types;
 pub mod metrics;
+pub mod temporal;
 
 pub use error::{RankError, Result};
 pub use local_types::{
@@ -79,12 +82,21 @@ pub use dibud::{
 pub use drift::{DriftDetector, DriftStatus};
 pub use explain::{explain, ExplanationEntry, RetrievalExplanation};
 pub use fusion::{
-    apply_resonance_bonus, fuse_search_results_with_strategy, g, modulate_and_renormalize_weights,
+    fuse_search_results_with_strategy, g, modulate_and_renormalize_weights,
     reciprocal_rank_fusion, rrf_fuse, score_normalized_fusion_with_options,
     weighted_reciprocal_rank_fusion, weighted_reciprocal_rank_fusion_mrrf,
     weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
     weights_to_signal_factors, BoundedTopK, GlobalFusionConfig, GlobalFusionStrategy,
-    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, ScoredItem,
+    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ScoredItem,
     SearchResult, SignalCalibrationContext, SignalContribution, SignalKind,
 };
 pub use metrics::{mean_reciprocal_rank, ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank};
+
+pub use temporal::{
+    apply_temporal_validity_filter, apply_temporal_validity_filter_at,
+    apply_temporal_validity_filter_with_clock, extract_validity_window,
+    sort_candidates_deterministic, FusionResult, ValidityWindow,
+};
+#[cfg(feature = "exp-resonance")]
+pub use fusion::{apply_resonance_bonus, fuse_signals, ResonanceConfig};
+pub use fusion::ResonanceModifier;

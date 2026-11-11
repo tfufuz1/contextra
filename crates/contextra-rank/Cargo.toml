@@ -14,15 +14,22 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "types-compat", "experimental-rank"]
+default = ["std", "workspace", "exp-dibud", "exp-resonance", "experimental-rank"]
 std = []
-types-compat = ["dep:contextra-types", "dep:contextra-ports"]
-dibud = []
-experimental-rank = ["dibud"]
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
+
+# Experimente
+dibud = ["exp-dibud"]
+exp-dibud = []
+exp-resonance = []
+experimental-all = ["exp-dibud", "exp-resonance"]
+experimental-rank = ["experimental-all"]
 
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
+contextra-types = { path = "../contextra-types", version = "0.1.0", default-features = false, optional = true }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { workspace = true }
 ahash = { version = "0.8", features = ["serde"] }
@@ -30,6 +37,8 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+contextra-types = { path = "../contextra-types", version = "0.1.0" }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
 proptest = "1"
 criterion = { workspace = true }
 tokio = { version = "1", features = ["rt", "macros"] }

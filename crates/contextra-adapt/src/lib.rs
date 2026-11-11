@@ -79,8 +79,6 @@ pub mod drift;
 pub mod flow_thompson;
 pub mod homeostat;
 pub mod lyapunov;
-#[deprecated(note = "Verwende crate::offpolicy statt des veralteten crate::off_policy")]
-pub mod off_policy;
 pub mod offpolicy;
 pub mod pid;
 pub mod pid_latency_controller;
@@ -96,8 +94,7 @@ pub use drift::*;
 pub use flow_thompson::*;
 pub use homeostat::*;
 pub use lyapunov::*;
-#[allow(deprecated)]
-pub use off_policy::*;
+pub use offpolicy::*;
 pub use pid::*;
 pub use pid_latency_controller::*;
 #[cfg(feature = "rie-greedy-personalization")]

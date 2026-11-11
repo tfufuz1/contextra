@@ -1,4 +1,3 @@
-// STAND: 2026-11-08T00:00:00Z
 // ZWECK: Low-level POSIX syscall wrappers (Ring 0 / SPEC §10.1)
 // INVARIANTEN: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7, §10.1
@@ -18,7 +17,6 @@
 
 use std::path::Path;
 
-// ANCHOR[contextra-sys:POSIX-DUP2-001]
 /// Öffnet den Pfad `path` mit den angegebenen POSIX-Flags (z. B. `O_RDONLY`) und ersetzt atomar `target_fd` via `dup2`.
 #[cfg(target_os = "linux")]
 pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()> {
@@ -50,7 +48,6 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
     Ok(())
 }
 
-// ANCHOR[contextra-sys:POSIX-DUP2-FALLBACK-001]
 /// Fallback für Nicht-Linux-Systeme, auf denen `reopen_and_dup2` nicht unterstützt wird.
 #[cfg(not(target_os = "linux"))]
 pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()> {
@@ -60,7 +57,6 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
     ))
 }
 
-// ANCHOR[contextra-sys:POSIX-ENSURE-FD-001]
 /// Stellt sicher, dass das weiche Limit für offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` beträgt.
 pub fn ensure_fd_limit(min_fds: u64) -> bool {
     #[cfg(unix)]
@@ -94,7 +90,6 @@ pub fn ensure_fd_limit(min_fds: u64) -> bool {
     }
 }
 
-// ANCHOR[contextra-sys:POSIX-SET-FD-001]
 /// Setzt das weiche und harte Dateideskriptorlimit (`RLIMIT_NOFILE`) des aktuellen Prozesses exakt auf `limit`.
 pub fn set_fd_limit(limit: u64) -> bool {
     #[cfg(unix)]
@@ -114,7 +109,6 @@ pub fn set_fd_limit(limit: u64) -> bool {
     }
 }
 
-// ANCHOR[contextra-sys:POSIX-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;

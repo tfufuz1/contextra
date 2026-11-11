@@ -11,7 +11,7 @@ use std::sync::Arc;
 use contextra_mvcc::{
     IndexOp, ReadSet, SequenceLogSsiValidator, SnapshotRegistry, SsiValidator, TxBuffer,
 };
-use contextra_types::types::{DocId, TxId};
+use contextra_ids::{DocId, TxId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Contextra MVCC Standalone-Beispiel ===");

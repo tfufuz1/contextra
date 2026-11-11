@@ -41,7 +41,7 @@
 //!    Guards von `parking_lot` und `std::sync` dürfen niemals über ein `.await` gehalten werden.
 //! 2. **Tokio-Guards mit Zeitschranke:**
 //!    Asynchrone `tokio::sync`-Guards dürfen nur gehalten werden, solange strikte Deadlock-Freiheit
-//!    durch Einhaltung obiger Rangordnung garantiert ist.
+//!    durch Einhaltung obiger Rangordnung sichergestellt ist.
 
 /// Rang 100: Transaktionale Absichtssperren auf Dokument-/Schlüsselebene (`intent_locks`).
 pub const RANK_DOCUMENT_INTENT: u32 = 100;

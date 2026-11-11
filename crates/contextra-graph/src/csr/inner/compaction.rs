@@ -35,7 +35,7 @@ impl GraphInner {
         }
     }
 
-    pub(crate) fn recompute_node_out_weight_sum(&mut self, node_idx: usize) {
+    pub fn recompute_node_out_weight_sum(&mut self, node_idx: usize) {
         let num_nodes = self.reverse_map.len();
         if node_idx >= num_nodes {
             return;

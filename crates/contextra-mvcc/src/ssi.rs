@@ -32,7 +32,7 @@ use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
-use contextra_ports::{Clock, SystemClock};
+use contextra_env::{Clock, MetricsSink, SystemClock};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;
@@ -509,7 +509,7 @@ pub struct SequenceLogSsiValidator {
     pruned_through: Arc<AtomicU64>,
     max_tracked_keys: usize,
     max_pin_duration: Duration,
-    metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+    metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>>,
     clock: Arc<dyn Clock>,
 }
 
@@ -634,10 +634,10 @@ impl SequenceLogSsiValidator {
         self.snapshot_registry = Some(registry);
     }
 
-    /// Bindet einen Metrik-Empfänger ([`contextra_ports::MetricsSink`]) für Monitoring an.
+    /// Bindet einen Metrik-Empfänger ([`MetricsSink`]) für Monitoring an.
     pub fn with_metrics_sink(
         mut self,
-        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+        sink: Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>,
     ) -> Self {
         self.metrics_sink = Some(sink);
         self
@@ -646,7 +646,7 @@ impl SequenceLogSsiValidator {
     /// Aktualisiert den Metrik-Empfänger.
     pub fn set_metrics_sink(
         &mut self,
-        sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+        sink: Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>,
     ) {
         self.metrics_sink = Some(sink);
     }

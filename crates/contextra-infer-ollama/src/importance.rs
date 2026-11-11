@@ -9,9 +9,9 @@
 
 #[cfg(feature = "client")]
 use crate::client::xml_escape;
+use crate::error::{LocalImportanceScore, OllamaError, Result};
 #[cfg(feature = "client")]
 use crate::OllamaClient;
-use crate::error::{LocalImportanceScore, OllamaError, Result};
 use parking_lot::Mutex;
 use regex::Regex;
 use std::sync::{Arc, OnceLock};
@@ -264,7 +264,10 @@ pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessme
     if let Some(m) = re.find(trimmed) {
         let matched = m.as_str();
         if let Ok(parsed) = matched.parse::<f32>() {
-            return ImportanceAssessment::new(LocalImportanceScore(parsed.clamp(0.0, 1.0)), Confidence::Parsed);
+            return ImportanceAssessment::new(
+                LocalImportanceScore(parsed.clamp(0.0, 1.0)),
+                Confidence::Parsed,
+            );
         }
     }
 
@@ -279,9 +282,9 @@ pub fn parse_importance_score_response(raw_response: &str) -> ImportanceAssessme
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
+    use super::*;
     #[cfg(feature = "client")]
     use crate::OllamaClient;
-    use super::*;
 
     #[cfg(feature = "client")]
     #[tokio::test]

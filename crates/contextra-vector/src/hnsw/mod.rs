@@ -24,8 +24,10 @@ pub mod scanner;
 pub mod sq8_bias;
 
 #[allow(deprecated)]
+#[cfg(feature = "ports-compat")]
 pub use purge::{hnsw_purger, HnswPurger};
 #[allow(deprecated)]
+#[cfg(feature = "ports-compat")]
 pub use scanner::{hnsw_scanner, HnswScanner};
 
 mod acorn_filtered;

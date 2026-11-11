@@ -7,7 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Testpflicht AK-15 (docs/specs/CONTEXTRA_SPEC_v2.md)
 
-use contextra_router::OffPolicyEvaluator;
+use contextra_adapt::OffPolicyEvaluator;
 
 // ANCHOR[contextra-router:IT-IPS-T01]
 // Test `test_propensity_lower_bound_clamping_and_discard`: Prüft das erwartete Verhalten und Invarianten für integrationstest: ips (inverse propensity scoring) benötigt propensity.

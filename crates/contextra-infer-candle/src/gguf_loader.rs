@@ -55,7 +55,15 @@ pub fn parse_gguf_metadata_with_checksum(
     model_path: &Path,
     expected_sha256: Option<&[u8; 32]>,
 ) -> Result<GgufMetadata> {
-    let mut file = File::open(model_path).map_err(Error::Io)?;
+    let mut file = File::open(model_path).map_err(|e| {
+        Error::Io(std::io::Error::new(
+            e.kind(),
+            format!(
+                "Failed to open GGUF model file {}: {e}",
+                model_path.display()
+            ),
+        ))
+    })?;
 
     let file_len = file.metadata().map_err(Error::Io)?.len();
     if file_len < 24 {
@@ -73,10 +81,11 @@ pub fn parse_gguf_metadata_with_checksum(
     }
 
     let mut reader = BufReader::new(&file);
-    let parsed_meta = validate_gguf_header_and_offsets(&mut reader, model_path, file_len)?;
+    let _parsed_meta = validate_gguf_header_and_offsets(&mut reader, model_path, file_len)?;
 
     #[cfg(feature = "candle")]
     {
+        let _ = parsed_meta;
         file.seek(SeekFrom::Start(0)).map_err(Error::Io)?;
         let content = candle_core::quantized::gguf_file::Content::read(&mut file).map_err(|e| {
             Error::ModelLoad {
@@ -103,15 +112,11 @@ pub fn parse_gguf_metadata_with_checksum(
 
     #[cfg(not(feature = "candle"))]
     {
-        Ok(parsed_meta)
+        Ok(_parsed_meta)
     }
 }
 
-fn verify_file_sha256(
-    file: &mut File,
-    path: &Path,
-    expected: &[u8; 32],
-) -> Result<()> {
+fn verify_file_sha256(file: &mut File, path: &Path, expected: &[u8; 32]) -> Result<()> {
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 65536];
 
@@ -224,11 +229,9 @@ fn skip_value_data<R: Read>(
             }
             Ok(None)
         }
-        other => {
-            Err(Error::ModelLoad {
-                reason: format!("Unknown metadata GGUF value type: {other}"),
-            })
-        }
+        other => Err(Error::ModelLoad {
+            reason: format!("Unknown metadata GGUF value type: {other}"),
+        }),
     }
 }
 
@@ -249,10 +252,9 @@ fn validate_gguf_header_and_offsets<R: Read>(
     file_len: u64,
 ) -> Result<GgufMetadata> {
     let mut magic = [0u8; 4];
-    r.read_exact(&mut magic)
-        .map_err(|e| Error::ModelLoad {
-            reason: format!("Failed to read magic bytes from {}: {e}", path.display()),
-        })?;
+    r.read_exact(&mut magic).map_err(|e| Error::ModelLoad {
+        reason: format!("Failed to read magic bytes from {}: {e}", path.display()),
+    })?;
 
     if &magic != b"GGUF" {
         return Err(Error::ModelLoad {
@@ -275,6 +277,11 @@ fn validate_gguf_header_and_offsets<R: Read>(
     }
 
     let tensor_count = read_u64(r)?;
+    if tensor_count == 0 {
+        return Err(Error::ModelLoad {
+            reason: "GGUF container contains 0 tensors".to_string(),
+        });
+    }
     if tensor_count > MAX_GGUF_TENSORS {
         return Err(Error::ModelLoad {
             reason: format!(
@@ -348,8 +355,8 @@ fn validate_gguf_header_and_offsets<R: Read>(
         }
     }
 
-    let tensor_count_usize = usize::try_from(tensor_count)
-        .map_err(|e| Error::InvalidInput(e.to_string()))?;
+    let tensor_count_usize =
+        usize::try_from(tensor_count).map_err(|e| Error::InvalidInput(e.to_string()))?;
 
     Ok(GgufMetadata {
         architecture,

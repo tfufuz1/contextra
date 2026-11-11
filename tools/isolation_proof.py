@@ -64,6 +64,10 @@ def run_isolation_proof(
     allowed_internal = set(c_spec.get("allowed_internal", []))
     if not allowed_internal and "may_depend_on" in c_spec:
         allowed_internal = set(c_spec.get("may_depend_on", []))
+    feature_closure_allowed: Dict[str, list[str]] = c_spec.get("feature_closure_allowed", {})
+    all_allowed = set(allowed_internal)
+    for feats in feature_closure_allowed.values():
+        all_allowed.update(feats)
 
     meta = get_metadata(repo_root)
     packages = {p["name"]: p for p in meta["packages"]}
@@ -92,11 +96,11 @@ def run_isolation_proof(
                     to_visit.append(dep_name)
 
     internal_deps = closure - {crate_name}
-    forbidden_deps = internal_deps - allowed_internal
+    forbidden_deps = internal_deps - all_allowed
     if forbidden_deps:
         print(
             f"FEHLER: Crate '{crate_name}' benötigt interne Abhängigkeiten {sorted(forbidden_deps)}, "
-            f"die nicht in allowed_internal ({sorted(allowed_internal)}) liegen!",
+            f"die nicht in allowed_internal/feature_closure_allowed ({sorted(all_allowed)}) liegen!",
             file=sys.stderr,
         )
         return False
@@ -115,6 +119,38 @@ def run_isolation_proof(
             shutil.copytree(src_c, tmp_crates / c)
 
         members_str = ",\n    ".join([f'"crates/{c}"' for c in sorted(closure)])
+
+        with open(repo_root / "Cargo.toml", "r", encoding="utf-8") as rf:
+            root_manifest = rf.read()
+
+        start_marker = "[workspace.dependencies]\n"
+        start_idx = root_manifest.find(start_marker)
+        if start_idx != -1:
+            end_idx = root_manifest.find("\n[workspace.lints", start_idx)
+            if end_idx == -1:
+                end_idx = root_manifest.find("\n[lints", start_idx)
+            raw_deps_lines = root_manifest[start_idx + len(start_marker):end_idx].splitlines()
+        else:
+            raw_deps_lines = []
+
+        filtered_deps = []
+        for line in raw_deps_lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                filtered_deps.append(line)
+                continue
+            if 'path = "crates/' in stripped or "path = 'crates/" in stripped:
+                pkg = stripped.split("=")[0].strip()
+                if pkg in closure:
+                    filtered_deps.append(line)
+                else:
+                    # Nicht in der erlaubten Closure enthaltene Workspace-Crates auslassen
+                    continue
+            else:
+                filtered_deps.append(line)
+
+        ws_deps_block = "\n".join(filtered_deps)
+
         manifest_content = f"""[workspace]
 resolver = "2"
 members = [
@@ -134,12 +170,16 @@ unsafe_code = "deny"
 all = "warn"
 
 [workspace.dependencies]
+{ws_deps_block}
 """
         with open(tmp_dir / "Cargo.toml", "w", encoding="utf-8") as f:
             f.write(manifest_content)
 
-        # Neues Lock-File generieren via cargo generate-lockfile / check
-        subprocess.run(["cargo", "generate-lockfile", "--offline"], cwd=tmp_dir, capture_output=True)
+        # Cargo.lock aus dem Haupt-Workspace kopieren, um dieselben gecachten Versionen zu nutzen
+        if (repo_root / "Cargo.lock").exists():
+            shutil.copy(repo_root / "Cargo.lock", tmp_dir / "Cargo.lock")
+        else:
+            subprocess.run(["cargo", "generate-lockfile", "--offline"], cwd=tmp_dir, capture_output=True)
 
         crate_features = get_crate_features(tmp_crates / crate_name)
 

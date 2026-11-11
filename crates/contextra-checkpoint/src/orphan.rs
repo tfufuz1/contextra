@@ -439,7 +439,7 @@ impl InstanceOrphanRegistry {
             let seq_no = orphan.seq_no;
             lock.push(orphan);
             drop(lock);
-            // NOTE: Ordering::Release garantiert, dass der Vector-Eintrag vor dem Dirty-Flag sichtbar ist
+            // NOTE: Ordering::Release stellt sicher, dass der Vector-Eintrag vor dem Dirty-Flag sichtbar ist
             self.is_dirty.store(true, Ordering::Release);
             tracing::debug!(
                 seq = seq_no,

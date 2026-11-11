@@ -13,18 +13,20 @@ description = "Native Candle GGUF ML inference backend for Contextra"
 ring = "2"
 
 [dependencies]
-candle-core = "0.11"
-candle-nn = "0.11"
-candle-transformers = "0.11"
-tokenizers = "0.21"
+candle-core = { version = "0.11", optional = true }
+candle-nn = { version = "0.11", optional = true }
+candle-transformers = { version = "0.11", optional = true }
+tokenizers = { version = "0.21", optional = true }
 bytes = { workspace = true }
 sha2 = "0.10"
 tokio = { workspace = true }
 futures-util = "0.3"
 serde = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 bincode = { workspace = true, optional = true }
-half = "2.4"
+half = { version = "2.4", optional = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-rank = { workspace = true }
@@ -43,11 +45,19 @@ harness = false
 required-features = ["kv-bridge"]
 
 [features]
-default = []
-candle = []
+default = ["candle"]
+candle = [
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:candle-transformers",
+    "dep:tokenizers",
+    "dep:half"
+]
 kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
 kv-stage-b = ["dep:bincode"]
-cuda = ["candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
+exp-kv-stage-b = ["kv-stage-b"]
+exp-gasp = []
+cuda = ["candle-core?/cuda", "candle-nn?/cuda", "candle-transformers?/cuda"]
 test-utils = []
 
 [target.'cfg(target_os = "macos")'.dependencies]

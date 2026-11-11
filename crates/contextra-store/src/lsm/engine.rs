@@ -160,21 +160,21 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub async fn simulate_wal_append_failure_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(_tx_id, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub async fn restore_wal_file_handle_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -329,7 +329,7 @@ impl LsmStorage {
 
     /// Returns the current `next_seq_no` value for testing verification.
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub fn next_seq_no_for_test(&self) -> u64 {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
@@ -343,31 +343,31 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub fn block_cache_for_test(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
         Arc::clone(&self.budget)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {
         Arc::clone(&self.manifest)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
+    
     pub async fn maybe_compact_for_test(&self) -> Result<bool> {
         self.compaction_engine
             .maybe_compact(&self.sstables, &self.config.path)

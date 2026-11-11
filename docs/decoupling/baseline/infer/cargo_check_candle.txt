@@ -1,0 +1,232 @@
+   Compiling version_check v0.9.5
+   Compiling getrandom v0.3.4
+   Compiling syn v2.0.119
+   Compiling syn v3.0.4
+   Compiling zerocopy v0.8.56
+   Compiling serde_core v1.0.229
+   Compiling find-msvc-tools v0.1.11
+   Compiling shlex v2.0.1
+   Compiling cc v1.4.4
+   Compiling crossbeam-utils v0.8.22
+   Compiling serde v1.0.229
+   Compiling libm v0.2.16
+    Checking bitflags v2.13.1
+   Compiling crossbeam-epoch v0.9.20
+   Compiling autocfg v1.5.1
+    Checking rand_core v0.9.5
+   Compiling num-traits v0.2.19
+    Checking memchr v2.8.3
+   Compiling crossbeam-deque v0.8.7
+   Compiling serde_derive v1.0.229
+   Compiling bytemuck_derive v1.12.0
+   Compiling rayon-core v1.13.0
+   Compiling zerocopy-derive v0.8.56
+    Checking bytemuck v1.25.2
+    Checking either v1.18.0
+   Compiling paste v1.0.15
+    Checking rayon v1.12.0
+   Compiling pulp v0.22.3
+    Checking num-complex v0.4.6
+    Checking raw-cpuid v11.6.0
+   Compiling ident_case v1.0.1
+   Compiling serde_json v1.0.151
+   Compiling dyn-stack-macros v0.1.3
+   Compiling strsim v0.11.1
+   Compiling fnv v1.0.7
+    Checking pulp-wasm-simd-flag v0.1.1
+    Checking reborrow v0.5.5
+   Compiling darling_core v0.20.11
+    Checking dyn-stack v0.13.2
+   Compiling thiserror-impl v2.0.20
+   Compiling ahash v0.8.12
+   Compiling seq-macro v0.3.6
+   Compiling darling_macro v0.20.11
+    Checking thiserror v2.0.20
+    Checking ppv-lite86 v0.2.21
+   Compiling generic-array v0.14.7
+    Checking rand_chacha v0.9.0
+   Compiling pkg-config v0.3.34
+    Checking rand v0.9.5
+   Compiling rustversion v1.0.23
+   Compiling darling v0.20.11
+    Checking aho-corasick v1.1.5
+    Checking typenum v1.20.1
+   Compiling onig_sys v69.9.3
+    Checking rand_distr v0.5.1
+    Checking half v2.7.1
+    Checking regex-automata v0.4.18
+    Checking gemm-common v0.19.0
+   Compiling derive_builder_core v0.20.2
+   Compiling synstructure v0.13.2
+   Compiling esaxx-rs v0.1.10
+    Checking minimal-lexical v0.2.1
+   Compiling getrandom v0.4.3
+   Compiling rustix v1.1.4
+    Checking equivalent v1.0.2
+    Checking nom v7.1.3
+   Compiling derive_builder_macro v0.20.2
+    Checking castaway v0.2.4
+    Checking itertools v0.14.0
+   Compiling monostate-impl v0.1.18
+   Compiling blake3 v1.8.7
+    Checking linux-raw-sys v0.12.1
+   Compiling macro_rules_attribute-proc_macro v0.2.3
+   Compiling crc32fast v1.5.1
+   Compiling pastey v0.2.3
+    Checking static_assertions v1.1.0
+    Checking ryu v1.0.23
+    Checking base64 v0.13.1
+    Checking unicode-segmentation v1.13.3
+    Checking macro_rules_attribute v0.2.3
+    Checking compact_str v0.9.1
+    Checking spm_precompiled v0.1.4
+    Checking rayon-cond v0.4.0
+    Checking monostate v0.1.18
+    Checking derive_builder v0.20.2
+    Checking onig v6.5.3
+    Checking regex v1.13.1
+   Compiling zerofrom-derive v0.1.7
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking gemm-f32 v0.19.0
+    Checking unicode-normalization-alignments v0.1.12
+    Checking dary_heap v0.3.9
+    Checking cpufeatures v0.3.1
+    Checking log v0.4.34
+    Checking fastrand v2.5.0
+    Checking arrayvec v0.7.8
+    Checking foldhash v0.2.0
+    Checking stable_deref_trait v1.2.1
+    Checking hashbrown v0.17.1
+    Checking unicode_categories v0.1.1
+    Checking allocator-api2 v0.2.21
+    Checking constant_time_eq v0.4.2
+    Checking hashbrown v0.16.1
+    Checking tempfile v3.27.0
+    Checking indexmap v2.14.1
+    Checking gemm-f16 v0.19.0
+    Checking digest v0.10.7
+    Checking zerofrom v0.1.8
+   Compiling yoke-derive v0.8.2
+    Checking gemm-f64 v0.19.0
+    Checking gemm-c64 v0.19.0
+    Checking gemm-c32 v0.19.0
+    Checking bytes v1.12.1
+   Compiling portable-atomic v1.15.0
+    Checking typed-path v0.12.3
+    Checking cpufeatures v0.2.17
+    Checking sha2 v0.10.9
+    Checking gemm v0.19.0
+    Checking safetensors v0.8.0
+    Checking contextra-ids v0.1.0 (/app/crates/contextra-ids)
+    Checking yoke v0.8.3
+    Checking tokenizers v0.22.2
+    Checking memmap2 v0.9.11
+    Checking float8 v0.7.0
+    Checking bincode v1.3.3
+    Checking zip v8.6.0
+   Compiling tracing-attributes v0.1.31
+   Compiling futures-macro v0.3.34
+    Checking num_cpus v1.17.0
+    Checking slab v0.4.12
+    Checking unicode-width v0.2.2
+    Checking byteorder v1.5.0
+    Checking futures-core v0.3.34
+    Checking futures-task v0.3.34
+    Checking bit-vec v0.8.0
+    Checking futures-util v0.3.34
+    Checking bit-set v0.8.0
+    Checking console v0.15.11
+    Checking tracing v0.1.44
+    Checking contextra-types v0.1.0 (/app/crates/contextra-types)
+    Checking errno v0.3.14
+    Checking contextra-env v0.1.0 (/app/crates/contextra-env)
+    Checking number_prefix v0.4.0
+    Checking indicatif v0.17.11
+    Checking signal-hook-registry v1.4.8
+    Checking fancy-regex v0.18.0
+    Checking serde_plain v1.0.2
+   Compiling tokio-macros v2.7.2
+    Checking candle-core v0.11.0
+    Checking mio v1.2.2
+    Checking contextra-ports v0.1.0 (/app/crates/contextra-ports)
+    Checking socket2 v0.6.5
+    Checking tokenizers v0.21.4
+    Checking tokio v1.53.1
+    Checking contextra-rank v0.1.0 (/app/crates/contextra-rank)
+    Checking candle-nn v0.11.0
+    Checking candle-transformers v0.11.0
+    Checking contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `thiserror`
+  --> crates/contextra-infer-candle/src/error.rs:10:17
+   |
+10 | #[derive(Debug, thiserror::Error)]
+   |                 ^^^^^^^^^ use of unresolved module or unlinked crate `thiserror`
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:14:7
+   |
+14 |     #[error("I/O error: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `from` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:15:10
+   |
+15 |     Io(#[from] std::io::Error),
+   |          ^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:18:7
+   |
+18 |     #[error("Model load error: {reason}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:25:7
+   |
+25 |     #[error("Tokenizer error: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:29:7
+   |
+29 |     #[error("Inference execution error: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:33:7
+   |
+33 |     #[error("Invalid parameter: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:37:7
+   |
+37 |     #[error("Resource limit exceeded: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:41:7
+   |
+41 |     #[error("Grounding policy violation: {0}")]
+   |       ^^^^^
+
+error: cannot find attribute `error` in this scope
+  --> crates/contextra-infer-candle/src/error.rs:45:7
+   |
+45 |     #[error("Backend unavailable: {0}")]
+   |       ^^^^^
+
+error[E0277]: `error::Error` doesn't implement `std::fmt::Display`
+   --> crates/contextra-infer-candle/src/gguf_loader.rs:268:58
+    |
+268 |         reason: format!("Failed to read version from {}: {e}", path.display()),
+    |                                                          ^^^ `error::Error` cannot be formatted with the default formatter
+    |
+    = help: the trait `std::fmt::Display` is not implemented for `error::Error`
+    = note: in format strings you may be able to use `{:?}` (or {:#?} for pretty-print) instead
+    = note: this error originates in the macro `$crate::__export::format_args` which comes from the expansion of the macro `format` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+Some errors have detailed explanations: E0277, E0433.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `contextra-infer-candle` (lib) due to 11 previous errors

@@ -19,6 +19,7 @@ inspect = []
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
+sieve-cache = []
 docid-128 = ["contextra-types/docid-128"]
 legacy-wal-key = []
 
@@ -59,6 +60,81 @@ proptest = "1.4"
 loom = "0.7"
 futures = "0.3"
 redb = "2"
+
+[[test]]
+name = "wal_key_lifecycle"
+path = "tests/wal_key_lifecycle.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "commit_core_batch_rollback"
+path = "tests/commit_core_batch_rollback.rs"
+required-features = ["test-hooks", "fault-injection"]
+
+[[test]]
+name = "commit_rollback_batch_scoped"
+path = "tests/commit_rollback_batch_scoped.rs"
+required-features = ["test-hooks", "fault-injection"]
+
+[[test]]
+name = "fault_injection_durability_points"
+path = "tests/fault_injection_durability_points.rs"
+required-features = ["test-hooks", "fault-injection"]
+
+[[test]]
+name = "group_commit_fault_injection"
+path = "tests/group_commit_fault_injection.rs"
+required-features = ["test-hooks", "fault-injection"]
+
+[[test]]
+name = "ssi_write_skew_integration"
+path = "tests/ssi_write_skew_integration.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "flush_recovery_lifecycle"
+path = "tests/flush_recovery_lifecycle.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "compaction_contiguous_selection"
+path = "tests/compaction_contiguous_selection.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "group_commit_overlapping_batch_rollback"
+path = "tests/group_commit_overlapping_batch_rollback.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "metrics_sink_test"
+path = "tests/metrics_sink_test.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "no_test_hooks_in_release_api"
+path = "tests/no_test_hooks_in_release_api.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "spec_invariants_agents_sec4"
+path = "tests/spec_invariants_agents_sec4.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "wal_legacy_key_migration_store"
+path = "tests/wal_legacy_key_migration_store.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "wal_poison_causes"
+path = "tests/wal_poison_causes.rs"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "wal_truncate_ordering"
+path = "tests/wal_truncate_ordering.rs"
+required-features = ["test-hooks"]
 
 [[test]]
 name = "differential_redb"

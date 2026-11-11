@@ -10,21 +10,23 @@ Multi-Version Concurrency Control (MVCC) und Serializable Snapshot Isolation (SS
 - **Sicherheitsstufe:** `#![forbid(unsafe_code)]`, Zero-Panic in Nicht-Test-Code.
 
 ## Interne Abhängigkeiten
-`contextra-mvcc` hängt ausschließlich von minimalen Basis-Crates ab:
-- `contextra-types`: Domänentypen wie `TxId`, `DocId`, `TenantId`, `ContextraError`.
-- `contextra-ports`: Zeitabstraktion (`Clock`).
+`contextra-mvcc` hängt im Kern ausschließlich von minimalen Micro-Kernel-Crates ab:
+- `contextra-ids`: Kanonische ID-Typen wie `TxId`, `DocId`, `TenantId`, `TOMBSTONE_BIT`.
+- `contextra-env`: Zeitabstraktion (`Clock`, `SystemClock`, `MetricsSink`).
+- Optionale Workspace-Brücke (`workspace`, `ports-compat`, `types-compat`): `contextra-types`, `contextra-ports`.
 - Externe Abhängigkeiten: `ahash`, `bytes`, `parking_lot`, `serde`, `thiserror`, `tracing`.
 Keine Abhängigkeiten zu höheren Schichten (`store`, `vector`, `graph`, `engine`, `db`).
 
 ## Features
-- `default = []`: Vollständig synchron nutzbar ohne Runtimes.
-- Keine versteckten I/O- oder Async-Feature-Flags.
+- `default = ["workspace"]`: Kompatibilitätsbrücke für bestehende Workspace-Konsumenten.
+- `workspace`: Aktiviert `contextra-types` und `contextra-ports` unter `compat/`.
+- Für Standalone-Nutzung: `--no-default-features`.
 
 ## Doctest
 ```rust
 use std::sync::Arc;
 use contextra_mvcc::{SnapshotRegistry, TxBuffer, ReadSet, SequenceLogSsiValidator, SsiValidator, IndexOp};
-use contextra_types::types::{TxId, DocId};
+use contextra_mvcc::types::{TxId, DocId};
 
 let registry = Arc::new(SnapshotRegistry::new());
 let ssi = SequenceLogSsiValidator::new();
@@ -49,13 +51,13 @@ Zur isolierten Nutzung in externen Projekten:
 ```bash
 # Kopieren des Crates zusammen mit seinen Basis-Abhängigkeiten
 cp -r crates/contextra-mvcc /path/to/target/
-cp -r crates/contextra-types /path/to/target/
-cp -r crates/contextra-ports /path/to/target/
+cp -r crates/contextra-ids /path/to/target/
+cp -r crates/contextra-env /path/to/target/
 ```
 In `Cargo.toml` des Zielprojekts:
 ```toml
 [dependencies]
-contextra-mvcc = { path = "./contextra-mvcc" }
+contextra-mvcc = { path = "./contextra-mvcc", default-features = false }
 ```
 
 ## Bekannte Grenzen
