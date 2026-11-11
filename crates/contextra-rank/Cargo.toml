@@ -6,8 +6,14 @@ name = "contextra-rank"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
+readme = "README.md"
+repository = "https://github.com/tfufuz1/contextra"
+keywords = ["ranking", "rrf", "fusion", "calibration", "retrieval"]
+categories = ["algorithms", "science"]
+include = ["src/**/*", "Cargo.toml", "README.md", "CHANGELOG.md", "LICENSE-*"]
+publish = false # Interner modularer Baustein des Contextra-Systems (AD-1)
 
 [package.metadata.contextra]
 ring = "0"
