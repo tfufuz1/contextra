@@ -1,8 +1,6 @@
+<img width="3168" height="1344" alt="banner" src="https://github.com/user-attachments/assets/443fa9d1-7b8f-4ffe-aa61-46e85f5a414a" />
 # <p align="center">CONTEXTRA</p>
 <p align="center"><b>Local Knowledge & Memory Engine in Rust</b></p>
-
-<img width="3168" height="1344" alt="banner" src="https://github.com/user-attachments/assets/443fa9d1-7b8f-4ffe-aa61-46e85f5a414a" />
-
 ---
 
 ## Contextra Komponenten
