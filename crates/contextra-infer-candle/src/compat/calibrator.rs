@@ -2,7 +2,6 @@
 
 use crate::traits::ConfidenceCalibrator;
 use contextra_rank::IsotonicCalibrator;
-use contextra_types::ConfigFingerprint;
 
 /// Adapter um `IsotonicCalibrator` als `ConfidenceCalibrator` zu verwenden.
 pub struct RankIsotonicCalibratorAdapter {
