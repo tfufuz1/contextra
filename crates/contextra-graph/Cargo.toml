@@ -10,14 +10,15 @@ rust-version.workspace = true
 description = "CSR-Graph for entity-relation traversal (Signal 3 in 4-Signal Fusion)"
 
 [package.metadata.contextra]
-ring = "0"
+ring = "1"
 klasse = "A"
 
 [features]
-default = ["types-compat", "ports-compat", "experimental-graph"]
-experimental-graph = []
+default = ["workspace", "experimental-graph"]
+workspace = ["ports-compat", "types-compat"]
 types-compat = ["dep:contextra-types", "dep:contextra-ports"]
 ports-compat = ["types-compat"]
+experimental-graph = []
 docid-128 = []
 graph-connectivity-health = []
 edge-reinforcement-learning = []
