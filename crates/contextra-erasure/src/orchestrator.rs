@@ -29,6 +29,12 @@ pub trait ProofKeyProvider: Send + Sync {
     fn resolve_proof_key(&self, tenant_id: TenantId) -> Result<Vec<u8>, ErasureError>;
 }
 
+impl<T: ProofKeyProvider + ?Sized> ProofKeyProvider for std::sync::Arc<T> {
+    fn resolve_proof_key(&self, tenant_id: TenantId) -> Result<Vec<u8>, ErasureError> {
+        (**self).resolve_proof_key(tenant_id)
+    }
+}
+
 /// Summary of a single storage layer's scan result.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LayerSummary {
@@ -109,4 +115,33 @@ pub fn compute_collection_id(name: &str) -> CollectionId {
         other => other,
     };
     CollectionId::new(id_u64)
+}
+
+/// Kanonischer einheitlicher Koordinator der Löschkette (INV-ERA-1 / WP-10).
+/// Stellt sicher, dass es genau einen koordinierten Löschpfad im Crate gibt.
+pub struct ErasureCoordinator {
+    single_flight: crate::scope::SingleFlightCoordinator,
+}
+
+impl Default for ErasureCoordinator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ErasureCoordinator {
+    /// Erstellt eine neue Instanz des einheitlichen Koordinators.
+    pub fn new() -> Self {
+        Self {
+            single_flight: crate::scope::SingleFlightCoordinator::new(),
+        }
+    }
+
+    /// Einheitlicher Einstiegspunkt für die Ausführung einer Lösch-Pipeline (INV-ERA-1).
+    pub fn coordinate_erasure(
+        &self,
+        scope: crate::types_local::KeyScope,
+    ) -> Result<crate::scope::ActiveScopeFlight, ErasureError> {
+        self.single_flight.try_acquire(scope)
+    }
 }
