@@ -2,6 +2,7 @@
 //!
 //! Enforces strict zeroization on drop for all key structures (`INV-CRYPTO-ZEROIZE-1`).
 
+// SECTION [epic=crypto-dek,seq=1] Imports
 use crate::error::{CryptoError, Result};
 use crate::kdf::hkdf_expand;
 use crate::secret::SecretKey;
@@ -12,6 +13,10 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Key representing a storage or tenant unit.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
+// !SECTION
+
+// SECTION [epic=crypto-dek,seq=2] Typdefinitionen & KEK/DEK-Strukturen
+// ANCHOR[contextra-crypto:DEK-001] UnitKey / KEK Container
 pub struct UnitKey(pub SecretKey<32>);
 
 impl UnitKey {
@@ -26,6 +31,7 @@ impl UnitKey {
 
 /// Data Encryption Key for per-record / per-block encryption.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
+// ANCHOR[contextra-crypto:DEK-002] Data Encryption Key (DEK)
 pub struct Dek(pub SecretKey<32>);
 
 impl Dek {
@@ -54,6 +60,11 @@ pub const DEK_SALT_LABEL: &[u8] = b"ctx/dek-salt/v2";
 pub const WRAP_AAD: &[u8] = b"ctx/dek-wrap/v1";
 
 /// Derives a DEK using AncestorSalts and DocTag.
+// !SECTION
+
+// SECTION [epic=crypto-dek,seq=3] Hierarchische Schlüsselableitung
+// ANCHOR[contextra-crypto:DEK-003] Deterministische DEK-Ableitung nach D-79
+// NOTE: Hash der Vorfahren-Salts garantiert Mandanten- und Dokumentenisolierung (TS:2026-11-11)
 pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
     let mut hasher = Sha256::new();
     hasher.update(DEK_SALT_LABEL);
@@ -78,6 +89,7 @@ pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
 }
 
 /// Wraps a DEK using a Key Encryption Key (KEK / UnitKey) and AES-256-GCM-SIV.
+// ANCHOR[contextra-crypto:DEK-004] Key Wrapping via AES-256-GCM-SIV
 pub fn wrap_dek(kek: &UnitKey, dek: &Dek, nonce: [u8; 12]) -> Result<Vec<u8>> {
     let cipher = Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(kek.0.as_bytes()));
     let payload = Payload {
@@ -95,6 +107,7 @@ pub fn wrap_dek(kek: &UnitKey, dek: &Dek, nonce: [u8; 12]) -> Result<Vec<u8>> {
 }
 
 /// Unwraps a wrapped DEK using a Key Encryption Key (KEK / UnitKey).
+// ANCHOR[contextra-crypto:DEK-005] Key Unwrapping mit Tag-Verifikation
 pub fn unwrap_dek(kek: &UnitKey, wrapped: &[u8]) -> Result<Dek> {
     if wrapped.len() < 12 + 16 {
         return Err(CryptoError::Aead("wrapped DEK payload too short".into()));
@@ -121,6 +134,9 @@ pub fn unwrap_dek(kek: &UnitKey, wrapped: &[u8]) -> Result<Dek> {
     Ok(Dek(SecretKey::new(key_bytes)))
 }
 
+// !SECTION
+
+// SECTION [epic=crypto-dek,seq=4] Tests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,3 +167,4 @@ mod tests {
         assert!(matches!(res, Err(CryptoError::Aead(_))));
     }
 }
+// !SECTION
