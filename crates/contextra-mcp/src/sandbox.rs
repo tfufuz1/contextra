@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: sandbox
+// =========================================================================
+// ANCHOR[contextra-mcp:SANDBOX-001]
 // FILE-CONTEXT
 // STAND:       2026-09-10T19:25:24Z (SESSION: ae8c2fb9)
 // ZWECK:       MCP Sandbox & Zero-Trust Tool Isolation Layer
@@ -755,3 +759,5 @@ mod tests {
             .contains("limit reached"));
     }
 }
+
+// !SECTION: sandbox
