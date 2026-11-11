@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// ZWECK: Lokale Typ- und Traitabstraktionen für Vektorsuche und Indexierung (Klasse A).
+// INVARIANTEN: Zero-Panic, DocId-Breite konfigurierbar (64/128-Bit), deterministischer RNG.
+// HOTSPOTS: DocId::from_key, SeededRng, SystemClock
+// STAND: TS:2026-11-11T02:00:00Z
+
 //! `types` — Lokale Typ- und Traitabstraktionen für Vektorsuche und Indexierung (Klasse A).
 //!
 //! # Zweck
@@ -9,7 +15,12 @@
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+// SECTION Identifikatoren (DocId, TxId)
+
+// ANCHOR[contextra-vector:TYPES-DOCID]
 /// Dokumenten-Identifikator (64-Bit oder 128-Bit).
+///
+/// Unter dem Feature `docid-128` wird eine 128-Bit-ID verwendet, standardmäßig 64-Bit.
 #[cfg(not(feature = "docid-128"))]
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -50,7 +61,8 @@ impl DocId {
         self.0
     }
 
-    /// Erzeugt eine DocId aus einem Schlüssel-String via Hashing.
+    /// Erzeugt eine DocId aus einem Schlüssel-String via BLAKE3-Hashing.
+    // ANCHOR[contextra-vector:TYPES-DOCID-FROM-KEY]
     pub fn from_key(key: &str) -> Result<Self, crate::error::VectorError> {
         let hash = blake3::hash(key.as_bytes());
         let bytes = hash.as_bytes();
@@ -89,6 +101,7 @@ impl From<u128> for DocId {
     }
 }
 
+// ANCHOR[contextra-vector:TYPES-TXID]
 /// Transaktions-Identifikator (64-Bit).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -122,7 +135,11 @@ impl From<u64> for TxId {
         Self(val)
     }
 }
+// !SECTION
 
+// SECTION Metriken & Suchergebnisse
+
+// ANCHOR[contextra-vector:TYPES-METRIC]
 /// Unterstützte Distanzmetriken für Vektorräume.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, Default,
@@ -137,6 +154,7 @@ pub enum DistanceMetric {
     DotProduct,
 }
 
+// ANCHOR[contextra-vector:TYPES-SCORED-DOC]
 /// Suchergebnis mit Dokument-ID und Relevanz-Score / Distanz.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ScoredDocument {
@@ -164,7 +182,11 @@ pub const MAX_SEARCH_K: usize = 10_000;
 
 /// Bitmaske für Tombstone-Markierung in Sequenznummern.
 pub const TOMBSTONE_BIT: u64 = 1 << 63;
+// !SECTION
 
+// SECTION Umwelt-Abstraktionen (Clock, Rng, Metrics, Maintain)
+
+// ANCHOR[contextra-vector:TYPES-CLOCK]
 /// Trait für Zeitabfragen ohne Abhängigkeit von `contextra-ports`.
 pub trait Clock: Send + Sync {
     /// Liefert die aktuelle Zeit in Unix-Nanosekunden.
@@ -199,6 +221,7 @@ impl Clock for SystemClock {
     }
 }
 
+// ANCHOR[contextra-vector:TYPES-RNG]
 /// Trait für deterministische Zufallszahlen im Vektorindex.
 pub trait Rng: Send + Sync {
     /// Liefert ein zufälliges `u64`.
@@ -241,6 +264,7 @@ impl Rng for SeededRng {
     }
 }
 
+// ANCHOR[contextra-vector:TYPES-METRICS-SINK]
 /// Trait zur Metrik-Erfassung.
 pub trait MetricsSink: Send + Sync {
     /// Zählt ein Ereignis hoch.
@@ -268,6 +292,7 @@ impl MetricsSink for NoopMetricsSink {
     fn record_histogram(&self, _: &'static str, _: f64, _: &[(&'static str, &'static str)]) {}
 }
 
+// ANCHOR[contextra-vector:TYPES-MAINTAIN]
 /// Neutraler Wartungs-Trait für Speicherfreigaben und Kompaktierung (SPEC §6.1).
 pub trait Maintain: Send + Sync {
     /// Führt physische Bereinigung und Slot-Freigaben durch.
@@ -275,3 +300,4 @@ pub trait Maintain: Send + Sync {
     /// Prüft den Rebuild- bzw. Reorganisationsbedarf.
     fn is_rebuild_required(&self) -> bool;
 }
+// !SECTION
