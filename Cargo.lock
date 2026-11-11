@@ -1355,8 +1355,6 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-crypto",
- "contextra-env",
- "contextra-ids",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-sys",
