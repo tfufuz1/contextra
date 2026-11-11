@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: ACORN Filtered Recall Vergleich gegen naiven Referenz-Scan.
+// INVARIANTEN: Recall@10 >= 0.95; Datensatz: 500 Vektoren, Dim: 32, Seed: deterministisch.
+// HOTSPOTS: 20-80
+// STAND: 2026-11-12
 use contextra_types::DocId;
 use contextra_vector::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};
 

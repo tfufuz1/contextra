@@ -1,3 +1,12 @@
+// FILE-CONTEXT
+// ZWECK: Criterion-Benchmark zur Messung des Durchsatzes bei NaN-Prüfungen in Vektordistanzen
+// INVARIANTEN: Deterministische Eingaben, keine Rand-Allokationen im Messbereich
+// HOTSPOTS: 20-40
+// STAND: 2026-11-11
+// BEREICH: AGENTS §6, SPEC §11.4 — NaN/Inf-Validierung und Distanzberechnung
+
+// ANCHOR[contextra-vector:W11-BENCH-007]
+
 use contextra_types::DistanceMetric;
 use contextra_vector::distance::{compute_distance, cosine_distance};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

@@ -1,4 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
+// FILE-CONTEXT
+// ZWECK: Recall-Verbesserung durch 2-Stufen-Suche (SQ8 Vorfilterung + f32 Reranking).
+// INVARIANTEN: Rerank Recall@10 erreicht >= 0.98 des reinen f32-Index.
+// HOTSPOTS: 30-120
+// STAND: 2026-11-12
 
 use contextra_ports::SeededRng;
 use contextra_ports::VectorIndex;

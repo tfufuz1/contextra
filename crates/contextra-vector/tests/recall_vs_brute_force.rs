@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: HNSW-Recall-Validierung gegen Brute-Force-Oracle für alle Metriken.
+// INVARIANTEN: Recall@10 >= 0.95 für Cosine, Euclidean und DotProduct.
+// HOTSPOTS: 30-140
+// STAND: 2026-11-12
 use std::collections::HashSet;
 use std::error::Error;
 

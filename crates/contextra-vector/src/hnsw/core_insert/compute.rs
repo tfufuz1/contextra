@@ -1,25 +1,24 @@
 // FILE-CONTEXT
-// ZWECK: Einfüge-Logik und Konnektivitätsprüfung für den HNSW-Index (Heuristik, Backlinks, Arena).
-// INVARIANTEN: INV-VEC-CONNECTIVITY-1 (BFS-Konnektivität auf Layer 0); Zero-Panic Invariante.
-// HOTSPOTS: compute_insert_with_context, apply_insert, check_connectivity
-// STAND: TS:2026-11-11T02:00:00Z
+// ZWECK: Vorberechnung von HNSW-Einfügungen (Greedy Search, Nachbarwahl, Heuristik).
+// INVARIANTEN: Zero-Panic; Dimension-Check; keine direkte Mutation vor apply_insert.
+// HOTSPOTS: compute_insert_with_context
+// STAND: 2026-11-12
+
+//! Berechnung von Verbindungen und Schichten für neue HNSW-Knoten.
 
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
+use crate::distance::validate_vector;
 use crate::error::{Result, VectorError};
 use crate::types::DocId;
 
-use super::batch::{
+use super::super::batch::{
     get_neighbor_conns_in_batch, BatchContext, NeighborBacklink, PreparedInsert, SearchContext,
 };
-use super::config::validate_vector;
-use super::types::{Candidate, HnswIndexCore, HnswNode, VectorData};
-
-// SECTION HNSW Einfüge-Pipeline (Compute & Apply)
+use super::super::types::{HnswIndexCore, VectorData};
 
 impl HnswIndexCore {
-    // ANCHOR[contextra-vector:HNSW-RESOLVE-CONNS]
     pub(super) fn resolve_connections<'a>(
         &self,
         idx: usize,
@@ -374,165 +373,4 @@ impl HnswIndexCore {
             should_update_ram_entry_point,
         })
     }
-
-    // ANCHOR[contextra-vector:HNSW-APPLY-INSERT]
-    pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) {
-        let node = HnswNode {
-            doc_id: prepared.doc_id,
-            vector: prepared.vector_data,
-            max_layer: prepared.new_layer,
-            committed_tx: tx_id,
-        };
-
-        let m = self.cold.config.m;
-        self.hot
-            .arena
-            .allocate_node(prepared.new_layer, m, &prepared.final_connections)
-            .ok();
-
-        for backlink in prepared.neighbor_backlinks {
-            self.hot
-                .arena
-                .update_backlink(
-                    backlink.neighbor_ram_idx,
-                    backlink.layer,
-                    m,
-                    &backlink.updated_connections,
-                )
-                .ok();
-        }
-
-        self.hot.nodes.write().push(node);
-        self.hot
-            .doc_to_node
-            .write()
-            .insert(prepared.doc_id.inner(), prepared.new_idx);
-
-        let current_ep = self.hot.get_entry_point();
-        if prepared.should_update_entry_point || current_ep.is_none() {
-            self.hot.set_entry_point(Some(prepared.new_idx));
-            let current_max = self.hot.max_layer.load(Ordering::Acquire) as usize;
-            if prepared.new_layer > current_max || current_ep.is_none() {
-                self.hot
-                    .max_layer
-                    .store(prepared.new_layer as u64, Ordering::Release);
-            }
-        }
-
-        if prepared.should_update_ram_entry_point || self.hot.get_ram_entry_point().is_none() {
-            self.hot.set_ram_entry_point(Some(prepared.new_idx));
-        }
-    }
-
-    pub(crate) fn do_insert(&self, id: DocId, vector: &[f32], tx_id: u64) -> Result<()> {
-        let prepared = self.compute_insert(id, vector)?;
-        self.apply_insert(prepared, tx_id);
-        Ok(())
-    }
 }
-// !SECTION
-
-// SECTION Konnektivitäts-Prüfung & Invarianten-Wächter
-
-impl HnswIndexCore {
-    // ANCHOR[contextra-vector:HNSW-CONNECTIVITY-SCORE]
-    pub fn connectivity_score(&self) -> f64 {
-        let deleted = self.hot.deleted_count.load(Ordering::SeqCst);
-        let mmap_count = self
-            .cold
-            .mmap_index
-            .read()
-            .as_ref()
-            .map(|m| m.header.node_count() as usize)
-            .unwrap_or(0);
-        let total = mmap_count + self.hot.nodes.read().len();
-        if total == 0 {
-            return 1.0;
-        }
-        (1.0 - deleted as f64 / total as f64).max(0.0)
-    }
-
-    /// Prüft die Graph-Konnektivität (`INV-VEC-CONNECTIVITY-1`):
-    /// Verifiziert mittels BFS auf Layer 0, dass alle aktiven (nicht gelöschten) Knoten
-    /// vom aktuellen Entry-Point aus erreichbar sind.
-    ///
-    /// # Errors
-    /// Gibt [`VectorError::Conflict`][crate::error::VectorError::Conflict]
-    /// mit Fehlermeldung `"connectivity"` zurück, falls der Graph isolierte aktive Knoten
-    /// aufweist oder kein Einstiegspunkt für vorhandene Knoten existiert.
-    // ANCHOR[contextra-vector:HNSW-CHECK-CONNECTIVITY]
-    pub fn check_connectivity(&self) -> crate::error::Result<()> {
-        let deleted = self.cold.deleted_nodes.read();
-        let doc_map = self.hot.doc_to_node.read();
-
-        let active_nodes: ahash::AHashSet<usize> = doc_map
-            .values()
-            .copied()
-            .filter(|&idx| !deleted.contains(idx as u64))
-            .collect();
-
-        if active_nodes.is_empty() {
-            return Ok(());
-        }
-
-        let ep = match self.hot.get_entry_point() {
-            Some(ep) if !deleted.contains(ep as u64) => ep,
-            _ => {
-                return Err(crate::error::VectorError::Conflict(
-                    "connectivity: no valid entry point found for active nodes".to_string(),
-                ));
-            }
-        };
-
-        let mmap_count = self
-            .cold
-            .mmap_index
-            .read()
-            .as_ref()
-            .map(|m| m.header.node_count() as usize)
-            .unwrap_or(0);
-        let m = self.cold.config.m;
-
-        let mut reachable = ahash::AHashSet::with_capacity(active_nodes.len());
-        let mut queue = std::collections::VecDeque::new();
-
-        reachable.insert(ep);
-        queue.push_back(ep);
-
-        while let Some(current) = queue.pop_front() {
-            let conns = if current < mmap_count {
-                let mmap_guard = self.cold.mmap_index.read();
-                if let Some(mmap) = mmap_guard.as_ref() {
-                    if let Ok(rec) = mmap.get_node_record(current) {
-                        mmap.get_connections(&rec, 0).unwrap_or_default()
-                    } else {
-                        Vec::new()
-                    }
-                } else {
-                    Vec::new()
-                }
-            } else {
-                let ram_idx = current - mmap_count;
-                self.hot.arena.get_ram_node_connections(ram_idx, 0, m)
-            };
-
-            for n in conns {
-                let n_usize = n as usize;
-                if reachable.insert(n_usize) {
-                    queue.push_back(n_usize);
-                }
-            }
-        }
-
-        for &node_idx in &active_nodes {
-            if !reachable.contains(&node_idx) {
-                return Err(crate::error::VectorError::Conflict(
-                    "connectivity: isolated active node unreachable from entry point".to_string(),
-                ));
-            }
-        }
-
-        Ok(())
-    }
-}
-// !SECTION

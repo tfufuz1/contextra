@@ -12,6 +12,8 @@ use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
 use contextra_vector::quantize::ScalarQuantizer;
 use rand::Rng;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 /// Independently computes Kendall-Tau rank correlation between two distance rankings.
 /// Tau = (C - D) / (0.5 * n * (n - 1))
@@ -64,7 +66,7 @@ fn kendall_tau_correlation(rank_f32: &[DocId], rank_sq8: &[DocId]) -> f64 {
 fn test_sq8_kendall_tau_rank_correlation() {
     let dim = 128;
     let num_vectors = 200;
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0x9876_5432_10FE_DCBA);
 
     // 1. Uniform Distribution Data
     let mut uniform_vectors = Vec::with_capacity(num_vectors);
@@ -190,7 +192,7 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
 
     let dim = 32;
     let n = 100;
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0x9876_5432_10FE_DCBA);
 
     let mut vectors = Vec::with_capacity(n);
     let mut ids = Vec::with_capacity(n);
