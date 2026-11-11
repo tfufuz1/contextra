@@ -20,10 +20,11 @@
 //! - **Deterministische Sortierung:** Alle Knoten und Kanten werden kanonisch sortiert, um identische
 //!   Ergebnisse bei gleichen Ausgangsdaten zu garantieren.
 
+use crate::error::CognitionError;
 use crate::graph_local::HyperEdgeId;
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
 use crate::ports_local::LlmTextGenerator;
-use crate::types_local::{ContextraError, EntityId, Result};
+use crate::types_local::{EntityId, Result};
 use ahash::{AHashMap, AHashSet};
 
 /// Konfiguration für die Aggregation-Phase.
@@ -74,45 +75,45 @@ impl AggregationConfig {
     /// Validiert die Konfigurationseinstellungen.
     pub fn validate(&self) -> Result<()> {
         if self.max_compaction_peak_memory_mb == 0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "max_compaction_peak_memory_mb must be > 0".into(),
-            ));
+            )
+            .into());
         }
         if !self.clustering_tau_threshold.is_finite()
             || self.clustering_tau_threshold < 0.0
             || self.clustering_tau_threshold > 1.0
         {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "clustering_tau_threshold must be finite and in [0.0, 1.0]".into(),
-            ));
+            )
+            .into());
         }
         if self.max_clusters == 0 {
-            return Err(ContextraError::InvalidInput(
-                "max_clusters must be > 0".into(),
-            ));
+            return Err(CognitionError::InvalidInput("max_clusters must be > 0".into()).into());
         }
         if self.min_cluster_size == 0 {
-            return Err(ContextraError::InvalidInput(
-                "min_cluster_size must be > 0".into(),
-            ));
+            return Err(CognitionError::InvalidInput("min_cluster_size must be > 0".into()).into());
         }
         if self.em_max_iterations == 0 {
-            return Err(ContextraError::InvalidInput(
-                "em_max_iterations must be > 0".into(),
-            ));
+            return Err(
+                CognitionError::InvalidInput("em_max_iterations must be > 0".into()).into(),
+            );
         }
         if !self.em_tolerance.is_finite() || self.em_tolerance <= 0.0 {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "em_tolerance must be finite and > 0.0".into(),
-            ));
+            )
+            .into());
         }
         if !self.min_type_compat_score.is_finite()
             || self.min_type_compat_score < 0.0
             || self.min_type_compat_score > 1.0
         {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "min_type_compat_score must be finite and in [0.0, 1.0]".into(),
-            ));
+            )
+            .into());
         }
         Ok(())
     }
@@ -218,10 +219,11 @@ pub trait SuperEdgeSink {
 pub fn check_compaction_budget(peak_bytes: usize, cfg: &AggregationConfig) -> Result<()> {
     let used_mb = peak_bytes.div_ceil(1024 * 1024);
     if used_mb > cfg.max_compaction_peak_memory_mb {
-        return Err(ContextraError::MemoryBudgetExceeded {
-            used_mb: used_mb as u64,
-            limit_mb: cfg.max_compaction_peak_memory_mb as u64,
-        });
+        return Err(CognitionError::BudgetExceeded {
+            peak_bytes,
+            max_bytes: cfg.max_compaction_peak_memory_mb * 1024 * 1024,
+        }
+        .into());
     }
     Ok(())
 }
@@ -286,9 +288,9 @@ fn validate_and_sort_aggregation_inputs(
 
     let dim = sorted_nodes.first().map(|n| n.embedding.len()).unwrap_or(0);
     if dim == 0 {
-        return Err(ContextraError::InvalidInput(
-            "Node embedding dimension must be > 0".into(),
-        ));
+        return Err(
+            CognitionError::InvalidInput("Node embedding dimension must be > 0".into()).into(),
+        );
     }
 
     let node_type_map: AHashMap<EntityId, u32> =
@@ -296,15 +298,17 @@ fn validate_and_sort_aggregation_inputs(
 
     for node in &sorted_nodes {
         if node.embedding.len() != dim {
-            return Err(ContextraError::InvalidInput(
+            return Err(CognitionError::InvalidInput(
                 "Inconsistent embedding dimensions across nodes".into(),
-            ));
+            )
+            .into());
         }
         for &val in &node.embedding {
             if !val.is_finite() {
-                return Err(ContextraError::InvalidInput(
+                return Err(CognitionError::InvalidInput(
                     "NaN or Infinity detected in node embedding".into(),
-                ));
+                )
+                .into());
             }
         }
     }

@@ -42,6 +42,7 @@
 //! - `synthesis_phase::run_synthesis_pass()` in `synthesis_phase.rs` ist der LLM-basierte Generative Synthesis Pass über Segmenten (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait).
 
 use crate::context_compaction::{CompactedContext, ContextCompactor};
+use crate::error::CognitionError;
 use crate::ports_local::{LlmTextGenerator, ResponseGroundingValidator};
 use crate::types_local::{ContextChunk, DocId, TxId};
 use ahash::{AHashMap, AHashSet};
@@ -668,35 +669,38 @@ fn validate_pre_condensed_input_bounds(
     input: &PreCondensedInput,
 ) -> contextra_types::Result<()> {
     if &input.tenant_id != target_tenant_id {
-        return Err(contextra_types::ContextraError::PolicyViolation(format!(
+        return Err(CognitionError::PolicyViolation(format!(
             "VETO-F10: Tenant boundary violation. Input tenant_id '{}' does not match target tenant_id '{}'",
             input.tenant_id,
             target_tenant_id
-        )));
+        )).into());
     }
 
     if input.text_digest.len() > MAX_PRE_CONDENSED_DIGEST_LEN {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput text_digest length {} exceeds limit {}",
             input.text_digest.len(),
             MAX_PRE_CONDENSED_DIGEST_LEN
-        )));
+        ))
+        .into());
     }
 
     if input.source_label.len() > MAX_PRE_CONDENSED_LABEL_LEN {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput source_label length {} exceeds limit {}",
             input.source_label.len(),
             MAX_PRE_CONDENSED_LABEL_LEN
-        )));
+        ))
+        .into());
     }
 
     if input.provenance.len() > MAX_PRE_CONDENSED_PROVENANCE_COUNT {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput provenance count {} exceeds limit {}",
             input.provenance.len(),
             MAX_PRE_CONDENSED_PROVENANCE_COUNT
-        )));
+        ))
+        .into());
     }
 
     Ok(())
@@ -1062,9 +1066,7 @@ mod tests {
             Box::pin(async move {
                 if let Some(ref fail_str) = self.fail_community_contains {
                     if prompt.contains(fail_str) {
-                        return Err(contextra_types::ContextraError::Internal(
-                            "Simulated LLM error".into(),
-                        ));
+                        return Err(CognitionError::Internal("Simulated LLM error".into()).into());
                     }
                 }
                 Ok("Summary of community memories.".to_string())

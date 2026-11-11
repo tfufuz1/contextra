@@ -26,6 +26,22 @@ pub enum CognitionError {
         /// Maximal konfiguriertes Budget.
         max_bytes: usize,
     },
+
+    /// Veralteter Zustand oder OCC-Konflikt.
+    #[error("Veralteter Zustand oder Konflikt bei Konsolidierung: {0}")]
+    StaleRead(String),
+
+    /// Nicht gefunden.
+    #[error("Ressource nicht gefunden: {0}")]
+    NotFound(String),
+
+    /// Serialisierungsfehler.
+    #[error("Serialisierungsfehler bei Kognition: {0}")]
+    Serialization(String),
+
+    /// Transaktionsfehler.
+    #[error("Transaktionsfehler bei Konsolidierung: {0}")]
+    Transaction(String),
 }
 
 impl From<CognitionError> for contextra_types::ContextraError {
@@ -42,6 +58,12 @@ impl From<CognitionError> for contextra_types::ContextraError {
             } => contextra_types::ContextraError::MemoryLimitExceeded(format!(
                 "Speicherbudget für Konsolidierung überschritten: {peak_bytes} > {max_bytes} Bytes"
             )),
+            CognitionError::StaleRead(msg) => contextra_types::ContextraError::StaleRead(msg),
+            CognitionError::NotFound(msg) => contextra_types::ContextraError::NotFound(msg),
+            CognitionError::Serialization(msg) => {
+                contextra_types::ContextraError::Serialization(msg)
+            }
+            CognitionError::Transaction(msg) => contextra_types::ContextraError::Transaction(msg),
         }
     }
 }
