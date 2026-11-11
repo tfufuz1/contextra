@@ -6,13 +6,18 @@
 //! Konsolidierung mit automatischem Backoff-Retry bei Nebenläufigkeitskonflikten (OCC).
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Greift auf `Collection` und die Ports `Rng` und `LlmTextGenerator` zu.
+//! Teil der Kognitionsschicht (Ebene E2). Greift auf `Collection` und die Ports `Rng` und `LlmTextGenerator` zu.
 //!
 //! ## Invarianten
 //! - **Zufall (Regel 3):** Nicht-kryptographischer Zufall über `Arc<dyn Rng>` für Backoff-Jitter.
 //! - **OCC-Konflikt-Behandlung:** Optimistic Concurrency Control mit exponentiellem Backoff und Jitter.
 //! - **Priorisierung:** Gepinnte Chunks (`is_pinned`) werden bevorzugt behalten,
 //!   Tool-Outputs zuerst kompaktiert.
+
+// FILE-CONTEXT
+// ZWECK: Chunk-Filterung, Token-Budget-Kompaktierung und OCC-gestuetzte LLM-Konsolidierung.
+// INVARIANTEN: Pinned Chunks prioritaer; Backoff-Jitter via Rng; deterministische Tie-Breaks.
+// STAND: 2026-11-11
 
 use crate::engine_local::collection::Collection;
 use crate::engine_local::ProvenanceRecord;
@@ -25,6 +30,9 @@ use std::sync::Arc;
 use super::session::ConsolidationSession;
 use super::types::{CompactedContext, CompactionStrategy, StatusToken};
 
+// =========================================================================
+// SECTION: ContextCompactor Definition & Konstruktoren
+// =========================================================================
 /// Context Compaction Engine.
 #[derive(Clone)]
 // ANCHOR[contextra-cognition:COMP-001]
@@ -44,7 +52,11 @@ impl std::fmt::Debug for ContextCompactor {
             .finish()
     }
 }
+// !SECTION: ContextCompactor Definition & Konstruktoren
 
+// =========================================================================
+// SECTION: Chunk-Erzeugung
+// =========================================================================
 fn build_consolidated_chunk_from_summary(
     summary_text: String,
     chunks: &[ContextChunk],
@@ -135,6 +147,11 @@ impl ContextCompactor {
         self
     }
 
+// !SECTION: ContextCompactor Definition & Konstruktoren
+
+// =========================================================================
+// SECTION: Kompaktierungs-Ausfuehrung
+// =========================================================================
     /// Kompaktiert eine Liste von Chunks auf das Token-Budget.
     ///
     /// Priorisiert nach Relevanz-Score. Tool-Output-Chunks (erkennbar an Metadata-Key "tool_output")
@@ -205,6 +222,11 @@ impl ContextCompactor {
         }
     }
 
+// !SECTION: Kompaktierungs-Ausfuehrung
+
+// =========================================================================
+// SECTION: LLM-Konsolidierung & OCC-Retry
+// =========================================================================
     /// Consolidates multiple context chunks into a single summarized chunk using an external LLM via Ollama.
     ///
     /// Preserves strict provenance tracking in `source_doc_ids`. If the LLM call fails, the error is
@@ -252,6 +274,11 @@ impl ContextCompactor {
         })
     }
 
+// !SECTION: LLM-Konsolidierung & OCC-Retry
+
+// =========================================================================
+// SECTION: Private Hilfsfunktionen
+// =========================================================================
     fn is_pinned(chunk: &ContextChunk) -> bool {
         chunk
             .metadata
@@ -359,3 +386,4 @@ impl ContextCompactor {
         }
     }
 }
+// !SECTION: Chunk-Erzeugung

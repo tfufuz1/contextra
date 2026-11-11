@@ -3,7 +3,7 @@
 //! Implementiert die semantische Aggregationsphase (Consolidation Stage 3) nach Spezifikation §21.4.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Koordiniert Entitäten, GMM-Clustering und Wissenssynthese.
+//! Teil der Kognitionsschicht (Ebene E2). Koordiniert Entitäten, GMM-Clustering und Wissenssynthese.
 //!
 //! ## Kernfunktionen
 //! - **Typ-Denoising:** Selbstüberwachte Bereinigung inkompatibler Kanten-Prädikate.
@@ -20,6 +20,11 @@
 //! - **Deterministische Sortierung:** Alle Knoten und Kanten werden kanonisch sortiert, um identische
 //!   Ergebnisse bei gleichen Ausgangsdaten zu garantieren.
 
+// FILE-CONTEXT
+// ZWECK: LeanRAG Stage 3 semantische Aggregation, deterministisches GMM-Clustering und Alpha-Knoten-Synthese.
+// INVARIANTEN: P12 LLM-Kostenschutz; Speicherbudget-Vorabpruefung; deterministische Sortierung via SplitMix64.
+// STAND: 2026-11-11
+
 use crate::graph_local::HyperEdgeId;
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
 use crate::ports_local::LlmTextGenerator;
@@ -30,6 +35,9 @@ use ahash::{AHashMap, AHashSet};
 #[derive(Debug, Clone)]
 // ANCHOR[contextra-cognition:AGG-001]
 /// Konfiguration für die Aggregationsphase (LeanRAG Stage 3).
+// =========================================================================
+// SECTION: Aggregations-Konfiguration & Datenstrukturen
+// =========================================================================
 pub struct AggregationConfig {
     /// Maximal zulässiger Speicherverbrauch für Compaction/Aggregation in MB (Default: 512).
     pub max_compaction_peak_memory_mb: usize,
@@ -255,6 +263,11 @@ impl SplitMix64 {
 /// `EntityId`s, da in Stage 3 Entitäts-Knoten verarbeitet werden.
 // ANCHOR[contextra-cognition:AGG-010]
 /// Berechnet einen deterministischen Hash über eine Liste von EntityIds.
+// !SECTION: Aggregations-Konfiguration & Datenstrukturen
+
+// =========================================================================
+// SECTION: Community-Hashing & Budgetierung
+// =========================================================================
 pub fn compute_entity_community_hash(members: &[EntityId]) -> u64 {
     let mut sorted_ids: Vec<u64> = members.iter().map(|e| e.inner()).collect();
     sorted_ids.sort_unstable();
@@ -558,6 +571,11 @@ fn build_and_write_super_edges(
 /// Führt die Aggregation (Consolidation Stage 3) aus.
 // ANCHOR[contextra-cognition:AGG-011]
 /// Führt den vollständigen Aggregationspass aus.
+// !SECTION: Community-Hashing & Budgetierung
+
+// =========================================================================
+// SECTION: Phasen-Ausfuehrung
+// =========================================================================
 pub async fn run_aggregation_pass(
     nodes: &[AggregationNode],
     edges: &[AggregationEdge],
@@ -904,3 +922,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Hash- & Budget-Hilfsfunktionen

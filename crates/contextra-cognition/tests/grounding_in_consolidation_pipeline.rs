@@ -3,6 +3,15 @@
 //! Validiert die Faktentreue-Prüfung (Grounding Validation) während der generativen Synthese
 //! in der Konsolidierungs-Pipeline sowohl mit Standard- als auch mit Rich-Grounding-Validatoren.
 
+
+// FILE-CONTEXT
+// ZWECK: Integrationstests fuer Grounding-Validierung in der Konsolidierung.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Grounding-Consolidation Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -230,3 +239,4 @@ async fn test_consolidation_pipeline_rich_validator_wiring() {
         "Rich GroundingValidator returning PolicyViolation/LowScore must cause synthesis chunk rejection"
     );
 }
+// !SECTION: Grounding-Consolidation Tests
