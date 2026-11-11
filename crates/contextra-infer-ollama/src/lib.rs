@@ -1,7 +1,7 @@
 #![deny(dead_code)]
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "ports-compat")]
+#[cfg(feature = "workspace")]
 pub mod compat;
 
 pub mod client;
@@ -11,7 +11,7 @@ mod embedding;
 pub mod error;
 pub mod importance;
 pub mod model_info;
-#[cfg(all(feature = "client", feature = "ports-compat"))]
+#[cfg(feature = "client")]
 pub mod query_rewriter;
 pub mod traits;
 
@@ -36,6 +36,6 @@ pub use importance::{
 #[cfg(feature = "client")]
 pub use importance::{score_importance, score_importance_batch, score_importance_with_calibrator};
 pub use model_info::{known_dimension, ModelInfo};
-#[cfg(all(feature = "client", feature = "ports-compat"))]
+#[cfg(feature = "client")]
 pub use query_rewriter::{OllamaQueryRewriter, OllamaQueryRewriterConfig};
 pub use traits::{AsyncEmbedder, BoxFuture, Embedder, TextGenerator};

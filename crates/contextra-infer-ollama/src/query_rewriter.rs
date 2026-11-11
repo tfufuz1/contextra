@@ -1,4 +1,3 @@
-#![cfg(feature = "ports-compat")]
 // FILE-CONTEXT
 // STAND: 2026-11-08
 // ZWECK: LLM-gestütztes Multi-Signal Query-Rewriting für Ollama (Text, Semantik, Graph-Anker)
@@ -15,10 +14,6 @@ use crate::error::LocalQueryRewriteOutput;
 use crate::error::Result;
 #[cfg(feature = "client")]
 use crate::OllamaClient;
-#[cfg(feature = "ports-compat")]
-use contextra_ports::{BoxFuture, QueryRewriter};
-#[cfg(feature = "ports-compat")]
-use contextra_types::{QueryRewriteOutput, ScoredEntry};
 use serde::Deserialize;
 
 /// Maximum number of anchor entities to parse from LLM response.
@@ -51,7 +46,6 @@ impl Default for OllamaQueryRewriterConfig {
 /// LLM-basierter Multi-Signal Query Rewriter über Ollama.
 pub struct OllamaQueryRewriter {
     #[cfg(feature = "client")]
-    #[cfg(feature = "client")]
     client: OllamaClient,
     config: OllamaQueryRewriterConfig,
 }
@@ -59,10 +53,7 @@ pub struct OllamaQueryRewriter {
 impl OllamaQueryRewriter {
     /// Erstellt einen neuen `OllamaQueryRewriter` mit dem angegebenen Client und der Konfiguration.
     #[cfg(feature = "client")]
-    pub fn new(
-        #[cfg(feature = "client")] client: OllamaClient,
-        config: OllamaQueryRewriterConfig,
-    ) -> Self {
+    pub fn new(client: OllamaClient, config: OllamaQueryRewriterConfig) -> Self {
         Self { client, config }
     }
 
@@ -72,7 +63,6 @@ impl OllamaQueryRewriter {
     }
 
     /// Rewrites a query using plain text context snippets.
-    #[cfg(feature = "client")]
     #[cfg(feature = "client")]
     pub async fn rewrite(
         &self,
@@ -106,58 +96,6 @@ impl OllamaQueryRewriter {
             }
         }
     }
-
-    /// Rewrites a query structured according to contextra-ports QueryRewriter contract.
-    #[cfg(all(feature = "client", feature = "ports-compat"))]
-    pub fn rewrite_structured<'a>(
-        &'a self,
-        original_query: &'a str,
-        current_results: &'a [ScoredEntry],
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<QueryRewriteOutput>>> {
-        QueryRewriter::rewrite_structured(self, original_query, current_results)
-    }
-}
-
-#[cfg(all(feature = "client", feature = "ports-compat"))]
-impl QueryRewriter for OllamaQueryRewriter {
-    fn rewrite_structured<'a>(
-        &'a self,
-        original_query: &'a str,
-        current_results: &'a [ScoredEntry],
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<QueryRewriteOutput>>> {
-        Box::pin(async move {
-            let snippets: Vec<String> = current_results
-                .iter()
-                .take(self.config.max_context_results)
-                .map(extract_snippet)
-                .collect();
-            let snippet_refs: Vec<&str> = snippets.iter().map(|s| s.as_str()).collect();
-
-            let outputs = self
-                .rewrite(original_query, &snippet_refs)
-                .await
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
-
-            Ok(outputs.into_iter().map(Into::into).collect())
-        })
-    }
-}
-
-#[cfg(feature = "ports-compat")]
-fn extract_snippet(entry: &ScoredEntry) -> String {
-    if let Some(meta) = &entry.metadata {
-        if let Some(text) = meta
-            .get("text")
-            .or_else(|| meta.get("content"))
-            .and_then(|v| v.as_str())
-        {
-            return text.to_string();
-        }
-        if let Ok(json_str) = serde_json::to_string(meta) {
-            return json_str;
-        }
-    }
-    String::new()
 }
 
 pub fn truncate_chars(s: &str, max_chars: usize) -> &str {
