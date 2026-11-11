@@ -23,6 +23,7 @@ use std::arch::x86_64::*;
 
 use crate::kernels::scalar::CosineSimilarityPartsU8;
 
+// SECTION AVX2-F32-KERNELS
 // ANCHOR[contextra-simd:AVX2-COSINE-F32]
 /// Calculates cosine distance between two float vectors using AVX2 and FMA instructions.
 ///
@@ -192,7 +193,9 @@ pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 
     -dot
 }
+// !SECTION AVX2-F32-KERNELS
 
+// SECTION AVX2-BYTES-KERNELS
 // ANCHOR[contextra-simd:AVX2-COSINE-F32-BYTES]
 /// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
 ///
@@ -420,7 +423,9 @@ pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
     // SAFETY: Target feature `avx2` is enabled and `v32` contains a valid scalar float at lane 0.
     unsafe { _mm_cvtss_f32(v32) }
 }
+// !SECTION AVX2-BYTES-KERNELS
 
+// SECTION AVX2-U8-KERNELS
 // ANCHOR[contextra-simd:AVX2-DOT-U8]
 /// Calculates dot product between two byte vectors using AVX2 instructions.
 ///
@@ -662,3 +667,4 @@ pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: Target feature `avx2` is enabled and `v32` contains a valid 32-bit int at lane 0.
     unsafe { _mm_cvtsi128_si32(v32) }
 }
+// !SECTION AVX2-U8-KERNELS

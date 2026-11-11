@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! # Integrationstest: `deletion_proof_hash_collision.rs`
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_hash_collision`.

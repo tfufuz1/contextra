@@ -47,19 +47,19 @@ impl FromStr for CandleQuantization {
     }
 }
 
-/// Eigener Newtype ModelFingerprint zur Entkopplung (SPEC §6.2, B16).
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Eigener Newtype für Modell-Fingerabdrücke in contextra-infer-candle.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ModelFingerprint {
-    /// SHA-256 Hash des Modellinhalts und der Quantisierung.
+    /// SHA-256 Hashwert über die Modellgewichte und Quantisierungsgrad.
     pub hash: [u8; 32],
-    /// Modellbezeichner oder Dateiname.
+    /// Bezeichner des Modells oder Dateiname.
     pub model_id: String,
-    /// Quantisierungsstufe (z.B. "Q4_K_M", "Q8_0", "F16").
+    /// Quantisierungsstufe als String.
     pub quantization: String,
 }
 
 impl ModelFingerprint {
-    /// Erstellt einen neuen `ModelFingerprint`.
+    /// Erstellt einen neuen ModelFingerprint.
     pub fn new(
         hash: [u8; 32],
         model_id: impl Into<String>,

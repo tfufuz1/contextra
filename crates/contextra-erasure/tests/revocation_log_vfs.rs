@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! # Integrationstest: `revocation_log_vfs.rs`
 //!
 //! Validiert Persistenz, Neustart, Fehler-Injektion und Tamper-Detection für `RevocationLog`.

@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! Spezifikationstests für Report (T-REPORT-1, T-PROOF-1, F.10, SPEC §11.7, Anhang D).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

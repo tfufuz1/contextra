@@ -4,6 +4,15 @@
 //! Eingaben (`PreCondensedInput`), inklusive Mandantentrennung (VETO-F10),
 //! Provenienzerhalt, Längenbeschränkungen, deterministischer Sortierung und Grounding.
 
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer die agentenunabhaengige Vorverdichtungs-Schnittstelle.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Pre-Condensed Intake Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -274,3 +283,4 @@ fn test_pre_condensed_input_grounding_rejection() {
         "Missing validator when threshold is active must reject ungrounded input"
     );
 }
+// !SECTION: Pre-Condensed Intake Tests

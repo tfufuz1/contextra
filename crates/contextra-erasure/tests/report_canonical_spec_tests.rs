@@ -1,3 +1,5 @@
+#![cfg(all(feature = "async", feature = "signing"))]
+
 //! Tests für kanonische Löschberichte nach SPEC §11.7, §12.5, F.10, Anhang D.
 //!
 //! SPEC: T-REPORT-1, T-PROOF-1, T-CLASS-1, T-LINT-1

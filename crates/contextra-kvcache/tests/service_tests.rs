@@ -17,6 +17,7 @@ use contextra_kvcache::adapters::{
     StorageEngineKvBridge,
 };
 use contextra_kvcache::attention_score::{rank_for_eviction, NullAttentionScoreSource};
+use contextra_kvcache::error::KvCacheError;
 use contextra_kvcache::radix::KvReusePolicy;
 use contextra_kvcache::service::{KvCacheService, KvCacheServiceBuilder};
 use contextra_ports::embedding::{EmbeddingError, EmbeddingProvider};
@@ -25,7 +26,7 @@ use contextra_ports::license::FeatureRing;
 use contextra_ports::plugin::PluginManifest;
 use contextra_ports::storage::{StorageEngine, StorageStats};
 use contextra_ports::BoxFuture;
-use contextra_types::{ContextraError, Result as ContextraResult, TenantId, TxId};
+use contextra_types::{Result as ContextraResult, TenantId, TxId};
 use parking_lot::Mutex;
 
 struct MockStorageEngine {
@@ -286,7 +287,7 @@ fn test_memory_limit_and_budget_eviction() {
         .get_or_insert_prefix(tenant, &[1, 2, 3], &oversized_payload)
         .unwrap_err();
     match err {
-        ContextraError::InvalidInput(msg) => {
+        KvCacheError::InvalidInput(msg) => {
             assert!(msg.contains("exceeds total service memory budget"));
         }
         other => panic!("Expected InvalidInput error, got {:?}", other),
@@ -296,7 +297,7 @@ fn test_memory_limit_and_budget_eviction() {
     let empty_err = service
         .get_or_insert_prefix(tenant, &[1, 2, 3], &[])
         .unwrap_err();
-    assert!(matches!(empty_err, ContextraError::InvalidInput(_)));
+    assert!(matches!(empty_err, KvCacheError::InvalidInput(_)));
 
     // 3. Valid insertion within budget
     let valid_payload = vec![0xbb; 100_000];

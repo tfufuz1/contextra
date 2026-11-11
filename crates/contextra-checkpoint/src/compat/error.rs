@@ -18,6 +18,9 @@ impl From<CheckpointError> for ContextraError {
             } => ContextraError::cross_device_link(source_path, target_path),
             CheckpointError::Io(e) => ContextraError::Io(e),
             CheckpointError::Internal(msg) => ContextraError::Internal(msg),
+            CheckpointError::IdWidthMismatch { stored, build } => ContextraError::InvalidInput(
+                format!("ID width mismatch: stored {stored} bits, build {build} bits"),
+            ),
         }
     }
 }

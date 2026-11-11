@@ -1,9 +1,17 @@
 //! Kompatibilitätsbrücken für `contextra-ports` und `contextra-types`.
 //!
-//! Wird nur kompiliert, wenn das Feature `ports-compat` aktiviert ist.
-
-pub mod error;
-pub mod types;
+//! Wird nur kompiliert, wenn das Feature `workspace` aktiviert ist.
 
 #[cfg(feature = "client")]
-pub use crate::client::trait_impls;
+pub mod client;
+#[cfg(feature = "client")]
+pub mod embedding;
+pub mod error;
+#[cfg(feature = "client")]
+pub mod query_rewriter;
+#[cfg(feature = "client")]
+pub mod trait_impls;
+pub mod types;
+
+#[cfg(all(test, feature = "client"))]
+mod client_tests;

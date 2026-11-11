@@ -65,6 +65,6 @@ impl OrphanCleanupIndex for contextra_vector::hnsw::HnswIndex {
         &self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>>
     {
-        Box::pin(async move { self.rebuild().await })
+        Box::pin(async move { self.rebuild() })
     }
 }

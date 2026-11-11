@@ -3,6 +3,13 @@
 //! Hard node-budgeted bidirectional Dijkstra path discovery to prevent memory explosion
 //! when traversing hub entities with high out-degree.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Path-RAG und budgetierte K-Path Traversierung.
+// INVARIANTEN: Snapshot-Isolation bei Pfadsuche.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::path_rag::{PathGraph, PathRAGEngine};
 use ahash::AHashSet;
 use contextra_types::EntityId;
@@ -12,6 +19,8 @@ use std::collections::{BinaryHeap, HashMap};
 /// Configuration parameters for [`KPathDiffusion`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 // ANCHOR[contextra-graph:SRC-PATH-RAG-K-PATH-001]
+
+// SECTION K Path Core Implementation
 pub struct KPathConfig {
     /// Target number of paths to discover.
     pub k: usize,
@@ -322,3 +331,5 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
         })
     }
 }
+
+// !SECTION K Path Core Implementation

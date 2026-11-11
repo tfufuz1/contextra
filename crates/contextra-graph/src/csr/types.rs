@@ -3,9 +3,18 @@
 //! # Zweck
 //! Definiert `CsrEdge`, `CsrGraphConfig`, `InternalIndex` und zugehörige Konstanten.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_types::{DocId, EntityId, ResourceTracker, TxId};
 use serde::{Deserialize, Serialize};
 
+
+// SECTION Types Core Implementation
 pub(crate) const GRAPH_ENTITY_PREFIX: &[u8] = b"__graph:entity:";
 pub(crate) const GRAPH_EDGE_PREFIX: &[u8] = b"__graph:edge:";
 pub(crate) const GRAPH_ENTITY_DELETED_PREFIX: &[u8] = b"graph:entity:deleted:";
@@ -119,3 +128,5 @@ pub(crate) struct StagedEdgePayload {
     pub(crate) business_valid_to: Option<i64>,
     pub(crate) source_doc_id: Option<DocId>,
 }
+
+// !SECTION Types Core Implementation

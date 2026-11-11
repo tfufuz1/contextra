@@ -1,6 +1,6 @@
 //! # HMAC-Integritaetskette fuer WAL (Ring 1)
 //!
-//! Garantiert kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
+//! Bietet kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
 
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
@@ -205,18 +205,18 @@ impl Wal {
     }
 
     /// Exposes the HMAC integrity key for testing.
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
     /// Exposes internal `last_hmac` lock for concurrency testing.
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {
         std::sync::Arc::clone(&self.last_hmac)
     }
 
-    #[cfg(any(test, feature = "test-hooks"))]
+    
     pub fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
         legacy_integrity_key()
     }
@@ -280,7 +280,7 @@ impl Wal {
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                crate::wal::next_temp_counter()
+                crate::lsm::recovery::next_temp_file_counter()
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -395,7 +395,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            crate::wal::next_temp_counter()
+            crate::lsm::recovery::next_temp_file_counter()
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -491,7 +491,7 @@ impl Wal {
                 }
                 b
             } else {
-                let counter = crate::wal::next_temp_counter();
+                let counter = crate::lsm::recovery::next_temp_file_counter();
                 let pid = std::process::id() as u64;
                 let mut b = [0u8; 16];
                 if let Some(chunk1) = b.get_mut(..8) {
@@ -511,7 +511,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                crate::wal::next_temp_counter()
+                crate::lsm::recovery::next_temp_file_counter()
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));

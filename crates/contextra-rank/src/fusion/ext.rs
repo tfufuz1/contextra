@@ -1,7 +1,7 @@
 //! # Erweiterte Fusions-Schnittstellen (`fusion/ext`)
 //!
 //! **Zweck:** Definiert Abstraktionen für experimentelle Fusions- und Bonusmechanismen
-//! (wie z. B. Resonanz-Kohärenz-Bonus), ohne Kopplung an `contextra_types` oder `contextra_ports`.
+//! (wie z. B. Resonanz-Kohärenz-Bonus), ohne Kopplung an externe Workspace-Abhängigkeiten.
 
 use crate::fusion::SearchResult;
 

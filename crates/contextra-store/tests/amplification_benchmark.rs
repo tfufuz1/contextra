@@ -70,7 +70,7 @@ fn test_bloom_filter_fpr_100k() -> (usize, usize, usize, f64, f64) {
         bf.insert(key);
     }
 
-    // Check true positives (must be 100%)
+    // Check true positives (must match all keys)
     let mut true_positives = 0;
     for key in &inserted_keys {
         if bf.may_contain(key) {
@@ -114,7 +114,7 @@ async fn run_amplification_benchmark() {
         target_fpr * 100.0
     );
     println!(
-        "- True Positives count: {} / {} (100% accuracy required)",
+        "- True Positives count: {} / {} (full accuracy required)",
         tp, n_keys
     );
     println!("- False Positives count: {} / {}", fp, n_keys);
@@ -123,7 +123,7 @@ async fn run_amplification_benchmark() {
         empirical_fpr,
         empirical_fpr * 100.0
     );
-    assert_eq!(tp, n_keys, "Bloom filter true positive rate must be 100%");
+    assert_eq!(tp, n_keys, "Bloom filter true positive rate must match all keys");
 
     // STEP 3: Real Workload Simulator & Write Amplification
     println!("\n[2] REALISTIC LSM WORKLOAD SIMULATOR & WRITE AMPLIFICATION");

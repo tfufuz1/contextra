@@ -19,8 +19,8 @@
 //! Fehlen Attention-Informationen (z. B. bei Verwendung von [`NullAttentionScoreSource`]), fällt
 //! der Algorithmus streng deterministisch auf das Standard-LRU-Verfahren zurück.
 
-use contextra_ports::RequestId;
-use contextra_types::TenantId;
+use crate::types::RequestId;
+use contextra_ids::TenantId;
 use std::time::Instant;
 
 // ANCHOR[contextra-kvcache:ATTN-002]

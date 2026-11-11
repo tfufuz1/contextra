@@ -3,6 +3,13 @@
 //! # Zweck
 //! Testet das Replay von Transaktionslogs und die Wiederherstellung persistierter Zustände.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_edge_visible;
@@ -12,6 +19,8 @@ use std::sync::Arc;
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-001]
 #[tokio::test]
+
+// SECTION Persistence Tests Core Implementation
 async fn test_remove_edge_uncompacted_and_compacted() {
     let graph = CsrGraph::new();
     let tx1 = TxId::new(1);
@@ -261,7 +270,7 @@ async fn test_multi_traverse_keeps_highest_score_per_entity() {
     );
 }
 
-// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-006]
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-PERSISTENCE-TESTS-019]
 #[tokio::test]
 async fn test_concurrent_add_edge() {
     let graph = Arc::new(CsrGraph::new());
@@ -818,3 +827,5 @@ async fn test_compact_async_CASE_dirty_and_clean_states() {
     graph.compact_async().await.unwrap(); // unwrap allowed
     assert!(!graph.inner_read().is_dirty);
 }
+
+// !SECTION Persistence Tests Core Implementation

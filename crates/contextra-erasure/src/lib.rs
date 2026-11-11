@@ -12,6 +12,7 @@
 
 pub mod backend;
 pub mod crypto_local;
+#[cfg(feature = "signing")]
 pub mod deletion_proof;
 pub mod error;
 pub mod gate;
@@ -32,7 +33,11 @@ pub mod test_mocks;
 pub mod types_local;
 pub mod vault;
 
+#[cfg(feature = "signing")]
 pub mod ed25519_proof;
+#[cfg(feature = "vault")]
 pub mod kv_shredding;
+#[cfg(feature = "signing")]
 pub mod orchestrator;
+#[cfg(feature = "signing")]
 pub mod revocation_log;

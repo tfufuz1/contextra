@@ -156,5 +156,4 @@ async fn test_confirm_required_semantics_table_test() {
             );
         }
     }
-
 }

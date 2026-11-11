@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (dispatch.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Tests für den Dispatch-Vorgang an SLMs
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

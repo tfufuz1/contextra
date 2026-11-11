@@ -1,3 +1,5 @@
+#![cfg(feature = "signing")]
+
 //! Tests für Report, Ledger und Restore-Guard (T-REPORT-1, T-PROOF-1, T-RESTORE-1..3).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

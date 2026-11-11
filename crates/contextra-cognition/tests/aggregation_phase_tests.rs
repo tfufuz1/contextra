@@ -4,6 +4,15 @@
 //! bit-exakten Seed-Determinismus und Permutationsinvarianz sowie
 //! Property-ähnliche Invarianzprüfungen mit `contextra_ports::SeededRng`.
 
+
+// FILE-CONTEXT
+// ZWECK: Tests fuer LeanRAG Stage 3 semantische Aggregationsphase.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Aggregation-Phase Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -420,3 +429,4 @@ fn test_entity_community_hash_permutation_invariance() {
         "Hash must be permutation invariant over entity order"
     );
 }
+// !SECTION: Aggregation-Phase Tests

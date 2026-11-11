@@ -14,7 +14,7 @@
 use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator};
 use contextra_mvcc::SsiValidator;
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use std::sync::Arc;
 
 // Prüft das Auslösen der Vergröberung (Coarsening) bei 80 % Füllstand und die Diagnose des blockierenden Snapshots.

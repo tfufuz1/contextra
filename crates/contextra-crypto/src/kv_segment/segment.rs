@@ -10,7 +10,7 @@
 // ZWECK: KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk).
 // STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)
 
-use contextra_types::TenantId;
+use contextra_ids::TenantId;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(feature = "kv-encryption")]

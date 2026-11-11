@@ -1,31 +1,81 @@
-//! Fehlertransformation und Brückenkonvertierungen zwischen Candle Error und ContextraError.
+//! Fehlerabbildung und Typkonvertierungen zwischen CandleError / ModelFingerprint und `contextra_types`.
 
-use crate::error::Error;
+use crate::error::CandleError;
+use crate::model_registry::ModelFingerprint;
 
-impl From<Error> for contextra_types::ContextraError {
-    fn from(err: Error) -> Self {
+impl From<CandleError> for contextra_types::ContextraError {
+    fn from(err: CandleError) -> Self {
         match err {
-            Error::Io(io_err) => contextra_types::ContextraError::Io(io_err),
-            Error::ModelLoad { reason } => contextra_types::ContextraError::Internal(reason),
-            Error::Tokenizer(msg) => contextra_types::ContextraError::Internal(msg),
-            Error::Inference(msg) => contextra_types::ContextraError::Internal(msg),
-            Error::InvalidInput(msg) => contextra_types::ContextraError::InvalidInput(msg),
-            Error::ResourceExceeded(msg) => contextra_types::ContextraError::limit_exceeded(0, msg),
-            Error::PolicyViolation(msg) => contextra_types::ContextraError::PolicyViolation(msg),
-            Error::BackendUnavailable(msg) => contextra_types::ContextraError::NotFound(msg),
+            CandleError::Io(e) => contextra_types::ContextraError::Io(e),
+            CandleError::ModelLoad { reason } => contextra_types::ContextraError::ModelLoad {
+                path: "unknown".to_string(),
+                reason,
+            },
+            CandleError::Tokenizer(msg) => {
+                contextra_types::ContextraError::Internal(format!("Tokenizer error: {msg}"))
+            }
+            CandleError::Inference(msg) => contextra_types::ContextraError::Internal(format!(
+                "Inference execution error: {msg}"
+            )),
+            CandleError::InvalidInput(msg) => contextra_types::ContextraError::InvalidInput(msg),
+            CandleError::ResourceExceeded(_msg) => {
+                contextra_types::ContextraError::MemoryBudgetExceeded {
+                    used_mb: 0,
+                    limit_mb: 0,
+                }
+            }
+            CandleError::PolicyViolation(msg) => {
+                contextra_types::ContextraError::PolicyViolation(msg)
+            }
+            CandleError::BackendUnavailable(msg) => {
+                contextra_types::ContextraError::CapabilityUnsupported {
+                    capability: "candle".to_string(),
+                    reason: msg,
+                }
+            }
         }
     }
 }
 
-impl From<contextra_types::ContextraError> for Error {
+impl From<contextra_types::ContextraError> for CandleError {
     fn from(err: contextra_types::ContextraError) -> Self {
         match err {
-            contextra_types::ContextraError::Io(io_err) => Error::Io(io_err),
-            contextra_types::ContextraError::ModelLoad { reason, .. } => Error::ModelLoad { reason },
-            contextra_types::ContextraError::InvalidInput(msg) => Error::InvalidInput(msg),
-            contextra_types::ContextraError::PolicyViolation(msg) => Error::PolicyViolation(msg),
-            contextra_types::ContextraError::NotFound(msg) => Error::BackendUnavailable(msg),
-            other => Error::Inference(other.to_string()),
+            contextra_types::ContextraError::Io(e) => CandleError::Io(e),
+            contextra_types::ContextraError::ModelLoad { path: _, reason } => {
+                CandleError::ModelLoad { reason }
+            }
+            contextra_types::ContextraError::InvalidInput(msg) => CandleError::InvalidInput(msg),
+            contextra_types::ContextraError::PolicyViolation(msg) => {
+                CandleError::PolicyViolation(msg)
+            }
+            contextra_types::ContextraError::CapabilityUnsupported {
+                capability: _,
+                reason,
+            } => CandleError::BackendUnavailable(reason),
+            contextra_types::ContextraError::MemoryBudgetExceeded { .. } => {
+                CandleError::ResourceExceeded("Memory budget exceeded".to_string())
+            }
+            other => CandleError::Inference(other.to_string()),
+        }
+    }
+}
+
+impl From<ModelFingerprint> for contextra_types::ModelFingerprint {
+    fn from(fp: ModelFingerprint) -> Self {
+        contextra_types::ModelFingerprint {
+            hash: fp.hash,
+            model_id: fp.model_id,
+            quantization: fp.quantization,
+        }
+    }
+}
+
+impl From<contextra_types::ModelFingerprint> for ModelFingerprint {
+    fn from(fp: contextra_types::ModelFingerprint) -> Self {
+        ModelFingerprint {
+            hash: fp.hash,
+            model_id: fp.model_id,
+            quantization: fp.quantization,
         }
     }
 }

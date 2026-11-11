@@ -7,7 +7,11 @@
 use crate::error::SimdError;
 use crate::metric::DistanceMetric;
 
+// SECTION COMPAT-METRIC
+// ANCHOR[contextra-simd:COMPAT-METRIC-FROM-SIMD]
+// Konvertierung von lokalem DistanceMetric in contextra_types::DistanceMetric
 impl From<DistanceMetric> for contextra_types::DistanceMetric {
+    #[inline]
     fn from(m: DistanceMetric) -> Self {
         match m {
             DistanceMetric::Cosine => contextra_types::DistanceMetric::Cosine,
@@ -17,7 +21,10 @@ impl From<DistanceMetric> for contextra_types::DistanceMetric {
     }
 }
 
+// ANCHOR[contextra-simd:COMPAT-METRIC-FROM-TYPES]
+// Konvertierung von contextra_types::DistanceMetric in lokales DistanceMetric
 impl From<contextra_types::DistanceMetric> for DistanceMetric {
+    #[inline]
     fn from(m: contextra_types::DistanceMetric) -> Self {
         match m {
             contextra_types::DistanceMetric::Cosine => DistanceMetric::Cosine,
@@ -27,8 +34,13 @@ impl From<contextra_types::DistanceMetric> for DistanceMetric {
         }
     }
 }
+// !SECTION COMPAT-METRIC
 
+// SECTION COMPAT-ERROR
+// ANCHOR[contextra-simd:COMPAT-ERROR-FROM-SIMD]
+// Konvertierung von SimdError in contextra_types::ContextraError
 impl From<SimdError> for contextra_types::ContextraError {
+    #[inline]
     fn from(err: SimdError) -> Self {
         match err {
             SimdError::InvalidInput(msg) => contextra_types::ContextraError::invalid_input(msg),
@@ -44,9 +56,11 @@ impl From<SimdError> for contextra_types::ContextraError {
         }
     }
 }
+// !SECTION COMPAT-ERROR
 
 #[cfg(test)]
 #[allow(clippy::indexing_slicing, clippy::expect_used)]
+// SECTION COMPAT-TESTS
 mod tests {
     use super::*;
 
@@ -127,3 +141,4 @@ mod tests {
         );
     }
 }
+// !SECTION COMPAT-TESTS

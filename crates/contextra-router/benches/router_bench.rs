@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Benchmark / Beispiel für contextra-router (router_bench.rs).
+// INVARIANTEN: Deterministische Ausführung, Latenz- und Budgetüberwachung.
+
 //! # Benchmark für den Durchsatz der RouterEngine
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

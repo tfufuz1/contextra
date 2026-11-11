@@ -1,3 +1,9 @@
+// FILE-CONTEXT
+// ZWECK: Einfüge-Logik und Konnektivitätsprüfung für den HNSW-Index (Heuristik, Backlinks, Arena).
+// INVARIANTEN: INV-VEC-CONNECTIVITY-1 (BFS-Konnektivität auf Layer 0); Zero-Panic Invariante.
+// HOTSPOTS: compute_insert_with_context, apply_insert, check_connectivity
+// STAND: TS:2026-11-11T02:00:00Z
+
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
@@ -9,7 +15,10 @@ use super::batch::{
 use super::config::validate_vector;
 use super::types::{Candidate, HnswIndexCore, HnswNode, VectorData};
 
+// SECTION HNSW Einfüge-Pipeline (Compute & Apply)
+
 impl HnswIndexCore {
+    // ANCHOR[contextra-vector:HNSW-RESOLVE-CONNS]
     pub(super) fn resolve_connections<'a>(
         &self,
         idx: usize,
@@ -57,11 +66,13 @@ impl HnswIndexCore {
         Ok(Cow::Owned(conns))
     }
 
+    // ANCHOR[contextra-vector:HNSW-COMPUTE-INSERT]
     pub fn compute_insert(&self, id: DocId, vector: &[f32]) -> Result<PreparedInsert> {
         let mut batch_ctx = BatchContext::new(self);
         self.compute_insert_with_context(id, vector, 0, &mut [], &mut batch_ctx)
     }
 
+    // ANCHOR[contextra-vector:HNSW-COMPUTE-INSERT-CTX]
     pub fn compute_insert_with_context(
         &self,
         id: DocId,
@@ -363,6 +374,7 @@ impl HnswIndexCore {
         })
     }
 
+    // ANCHOR[contextra-vector:HNSW-APPLY-INSERT]
     pub fn apply_insert(&self, prepared: PreparedInsert, tx_id: u64) {
         let node = HnswNode {
             doc_id: prepared.doc_id,
@@ -416,7 +428,13 @@ impl HnswIndexCore {
         self.apply_insert(prepared, tx_id);
         Ok(())
     }
+}
+// !SECTION
 
+// SECTION Konnektivitäts-Prüfung & Invarianten-Wächter
+
+impl HnswIndexCore {
+    // ANCHOR[contextra-vector:HNSW-CONNECTIVITY-SCORE]
     pub fn connectivity_score(&self) -> f64 {
         let deleted = self.hot.deleted_count.load(Ordering::SeqCst);
         let mmap_count = self
@@ -441,6 +459,7 @@ impl HnswIndexCore {
     /// Gibt [`ContextraError::Conflict`][contextra_types::ContextraError::Conflict]
     /// mit Fehlermeldung `"connectivity"` zurück, falls der Graph isolierte aktive Knoten
     /// aufweist oder kein Einstiegspunkt für vorhandene Knoten existiert.
+    // ANCHOR[contextra-vector:HNSW-CHECK-CONNECTIVITY]
     pub fn check_connectivity(&self) -> contextra_types::Result<()> {
         let deleted = self.cold.deleted_nodes.read();
         let doc_map = self.hot.doc_to_node.read();
@@ -515,3 +534,4 @@ impl HnswIndexCore {
         Ok(())
     }
 }
+// !SECTION

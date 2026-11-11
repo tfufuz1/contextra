@@ -1,3 +1,6 @@
+#![cfg_attr(test, allow(clippy::disallowed_methods))]
+#![allow(clippy::indexing_slicing)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 #![deny(dead_code)]
 // FILE-CONTEXT
 // STAND: 2026-11-09T00:00:00Z
@@ -14,8 +17,6 @@
 
 #![forbid(unsafe_code)]
 
-pub mod calibrator;
-#[cfg(feature = "workspace")]
 pub mod compat;
 pub mod error;
 pub mod traits;
@@ -26,8 +27,7 @@ pub mod fake;
 #[cfg(feature = "candle")]
 pub mod gguf_loader;
 
-pub use calibrator::ConfidenceCalibrator;
-pub use error::{Error, Result};
+pub use error::{CandleError, Error, Result};
 #[cfg(feature = "test-utils")]
 pub use fake::{FakeEmbedder, FakeTextGenerator};
 #[cfg(feature = "candle")]
@@ -35,7 +35,10 @@ pub use gguf_loader::{
     parse_gguf_metadata, parse_gguf_metadata_with_checksum, GgufMetadata, MAX_GGUF_METADATA_KVS,
     MAX_GGUF_STRING_LEN, MAX_GGUF_TENSORS,
 };
-pub use traits::{Embedder, GenerationConfig, KvStateSink, KvStateSource, TextGenerator};
+pub use traits::{
+    ConfidenceCalibrator, Embedder, GenerationConfig, IdentityCalibrator, KvStateSink,
+    KvStateSource, TextGenerator,
+};
 
 pub mod attention_exporter;
 #[cfg(feature = "candle")]

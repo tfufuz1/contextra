@@ -1,4 +1,5 @@
 [crates.contextra-ingest]
 klasse = "A"
 may_depend_on = []          # Soll nach Abschluss dieses Auftrags (interne Crates, nur Namen)
-transitional = []           # Features/Kanten mit internen Deps, Entfernung in Welle 6
+transitional = ["workspace"] # Features/Kanten mit internen Deps, Entfernung in Welle 6
+feature_closure_allowed = { workspace = ["contextra-types", "contextra-ids"] }

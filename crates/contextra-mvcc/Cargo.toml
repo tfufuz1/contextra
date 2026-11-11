@@ -12,9 +12,18 @@ description = "Multi-Version Concurrency Control (MVCC), sequence log, and trans
 [package.metadata.contextra]
 ring = "0"
 
+[features]
+default = ["workspace"]
+workspace = ["dep:contextra-types", "dep:contextra-ports"]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
+docid-128 = ["contextra-ids/docid-128"]
+
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-ids = { version = "0.1.0", path = "../contextra-ids" }
+contextra-env = { version = "0.1.0", path = "../contextra-env" }
+contextra-types = { version = "0.1.0", path = "../contextra-types", optional = true }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports", optional = true }
 parking_lot = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
@@ -32,6 +41,9 @@ tokio = { workspace = true, features = ["full", "test-util"] }
 serde_json = { workspace = true }
 bincode = { workspace = true }
 loom = "0.7"
+contextra-env = { version = "0.1.0", path = "../contextra-env", features = ["test-utils"] }
+contextra-types = { version = "0.1.0", path = "../contextra-types" }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
 contextra-testkit = { workspace = true }
 
 [[bench]]

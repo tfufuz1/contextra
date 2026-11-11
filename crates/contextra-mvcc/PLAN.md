@@ -1,46 +1,31 @@
-# contextra-mvcc — Umsetzungsplan
+# contextra-mvcc — Umsetzungsplan (v3)
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus docs/SPEC.md v3 §6 (Umsetzungsreihenfolge) und §6.2 (Schritt S-30B).
 
-## 1. Vorbedingungen (global) [S]
+## 1. Statusübersicht
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+| Schritt | Inhalt | Voraussetzung | Nachweis | Status |
+|---|---|---|---|---|
+| S-30A | `tombstone.rs` aus `types` nach `mvcc` übernehmen | S-10, S-11 | Diff-Test, G-F1 | ✅ erledigt |
+| S-30B | Kern auf `ids`/`env`/`MvccError`; `types`/`ports` hinter `workspace` optionalisieren; Brücke in `compat/`; Bereinigung von Re-Exports und Duplikaten | S-10, S-11 | GL, GF, GC, GE, G-L2 (0 Refs) | ✅ erledigt |
+| S-30C | Vollständiges "Comment-Anchors"-Kommentierungssystem etablieren | S-30B | `pattern_diagnostic.py`, vollständige Inline-Dokumentation | ✅ erledigt |
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. Abnahmekriterien (Definition of Done)
 
-## 2. Schritte dieses Crates [S]
+- [x] **G-L1:** Kern-Closure enthält ausschließlich E0-Crates (`contextra-ids`, `contextra-env`).
+- [x] **G-L2:** `tools/count_bridge_refs.py -c contextra-mvcc` meldet 0 ungegatete Referenzen auf `types`/`ports`/`testkit`.
+- [x] **G-L3:** Erfolgreicher Build für `contextra-mvcc` mit `--no-default-features` und Default (`workspace`).
+- [x] **G-L4:** Isolationsnachweis und Testdurchlauf in autarker Umgebung ohne zyklische Workspace-Kopplung.
+- [x] **R3:** Eigener lokaler Fehlertyp `MvccError` mit bitgleicher Abbildung auf `ContextraError` in `compat/error.rs`.
+- [x] **R8:** Zero-Panic-Invariante im Produktionscode (kein `unwrap()`, `expect()` oder `panic!()` in Nicht-Test-Pfaden).
+- [x] **Comment-Anchors:** Vollständige semantische Kommentierung aller Komponenten mit `SECTION`, `!SECTION`, `ANCHOR`, `LINK` und `NOTE`.
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-30 | `mvcc`: Loom-Modell (B11) → (A) `tombstone.rs` verschieben → (B) auf `ids`/`env`/`MvccError`; Brücke | S-10, S-11 | GL, GF, GC, GD (Tombstone-Semantik), GE | Revert B, A | ☐ offen |
-| S-36 | `vector`: Kern auf `ids`/`env`/`mvcc`/`VectorError`; `contract.rs` vereinen; `VectorDeleteMode`; Feature `simd`; **ohne** DiskANN-Umzug | S-30, S-10, S-11 | GL, GF (HNSW), GD (Distanz, Rng, ms), GC, GE | Revert | ☐ offen |
+## 3. Entnahmerezept für externe Projekte
 
-## 3. Reihenfolge-Zwang [S]
-
-> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
-
-## 4. Definition of Done [S]
-
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+Um `contextra-mvcc` als autarken Baustein in einem externen Projekt einzubinden:
+```toml
+[dependencies]
+contextra-mvcc = { path = "./crates/contextra-mvcc", default-features = false }
+contextra-ids = { path = "./crates/contextra-ids" }
+contextra-env = { path = "./crates/contextra-env" }
+```

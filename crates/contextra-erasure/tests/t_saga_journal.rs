@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Tests für Saga State Machine und Journal (T-CRASH-1..6, T-CANCEL-1, T-FSYNC-1).
 
 #![allow(

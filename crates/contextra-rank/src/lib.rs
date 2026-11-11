@@ -50,7 +50,7 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#[cfg(feature = "types-compat")]
+#[cfg(feature = "workspace")]
 pub mod compat;
 pub mod calibration;
 pub mod drift;

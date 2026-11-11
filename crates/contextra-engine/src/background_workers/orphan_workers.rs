@@ -24,7 +24,7 @@ pub const MAX_ORPHANS_PER_TICK: usize = 100;
 pub fn reap_orphans_step<T: Clone + Send + Sync + 'static>(
     buffer: &TxBuffer<T>,
     limit: usize,
-) -> Vec<T> {
+) -> Vec<contextra_types::TxId> {
     buffer.reap_orphans_bounded(limit)
 }
 

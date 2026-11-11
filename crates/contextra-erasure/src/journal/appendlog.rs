@@ -299,7 +299,7 @@ impl DurableJournal {
             new_chain = next_arr;
         }
 
-        // write_atomic garantiert tmp + fsync + rename + dir-fsync
+        // write_atomic sichert tmp + fsync + rename + dir-fsync
         self.vfs
             .write_atomic(&self.path, &new_bytes)
             .map_err(vfs_err)?;

@@ -13,6 +13,7 @@
 
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
+// SECTION [epic=crypto-tamper,seq=1] Imports
 use crate::error::{CryptoError, Result};
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
@@ -21,6 +22,11 @@ use zeroize::{Zeroize, Zeroizing};
 /// or when an emergency trigger is activated, protecting against cold-boot attacks.
 #[derive(Zeroize)]
 #[zeroize(drop)]
+// !SECTION
+
+// SECTION [epic=crypto-tamper,seq=2] Volatiler Schlüssel & Notfall-Wipe
+// ANCHOR[contextra-crypto:TAMPER-001] VolatileEncryptionKey mit Emergency Trigger
+// NOTE: Schützt vor Cold-Boot Angriffen durch sofortiges Nullen des Speichers (TS:2026-11-11)
 pub struct VolatileEncryptionKey {
     key_bytes: Zeroizing<[u8; 32]>, // AES-256 Key
 }
@@ -74,6 +80,10 @@ impl Eq for VolatileEncryptionKey {}
 ///
 /// Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen.
 #[inline]
+// !SECTION
+
+// SECTION [epic=crypto-tamper,seq=3] Konstantzeit-Operationen
+// ANCHOR[contextra-crypto:TAMPER-002] Konstantzeit-Vergleich zweier Slices
 pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
@@ -83,6 +93,7 @@ pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool {
 
 /// Verifiziert ein Authentifizierungs-Tag in konstanter Zeit und liefert `Result<()>`.
 #[inline]
+// ANCHOR[contextra-crypto:TAMPER-003] Tag-Validierung ohne Timing-Lecks
 pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()> {
     if constant_time_compare(expected, actual) {
         Ok(())
@@ -93,6 +104,10 @@ pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()> {
 
 /// BLAKE3-basierte Integritätskette für sequentielle Log- oder Datenblöcke.
 #[derive(Debug, Clone)]
+// !SECTION
+
+// SECTION [epic=crypto-tamper,seq=4] BLAKE3 Integritätskette
+// ANCHOR[contextra-crypto:TAMPER-004] Blake3Chain Zustandsmaschine
 pub struct Blake3Chain {
     current_hash: [u8; 32],
     step_count: u64,
@@ -139,6 +154,9 @@ impl Blake3Chain {
     }
 }
 
+// !SECTION
+
+// SECTION [epic=crypto-tamper,seq=5] Tests
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,3 +207,4 @@ mod tests {
         assert_eq!(key.as_bytes(), &[0x00; 32]);
     }
 }
+// !SECTION

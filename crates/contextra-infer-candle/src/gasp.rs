@@ -88,7 +88,7 @@ fn contains_at_word_boundary(text: &str, target: &str) -> bool {
 
 pub struct GaspValidator {
     config: GaspConfig,
-    calibrator: Mutex<Box<dyn ConfidenceCalibrator>>,
+    calibrator: Mutex<Box<dyn crate::traits::ConfidenceCalibrator>>,
 }
 
 impl GaspValidator {
@@ -97,38 +97,16 @@ impl GaspValidator {
     }
 
     pub fn with_config(config: GaspConfig) -> Self {
-        #[cfg(feature = "workspace")]
-        {
-            let rank_cal = contextra_rank::IsotonicCalibrator::new(
+        let adapter = Box::new(
+            crate::compat::calibrator::RankIsotonicCalibratorAdapter::new(
                 config.warmup_required,
                 config.max_observations,
-            );
-            let mut cal: Box<dyn ConfidenceCalibrator> = Box::new(rank_cal);
-            cal.invalidate_on_config_change(config.fingerprint.clone());
-            Self {
-                config,
-                calibrator: Mutex::new(cal),
-            }
-        }
-        #[cfg(not(feature = "workspace"))]
-        {
-            let mut cal = Box::new(IdentityCalibrator::default());
-            cal.invalidate_on_config_change(config.fingerprint.clone());
-            Self {
-                config,
-                calibrator: Mutex::new(cal),
-            }
-        }
-    }
-
-    pub fn with_calibrator(
-        config: GaspConfig,
-        mut calibrator: Box<dyn ConfidenceCalibrator>,
-    ) -> Self {
-        calibrator.invalidate_on_config_change(config.fingerprint.clone());
+                config.fingerprint.clone(),
+            ),
+        );
         Self {
             config,
-            calibrator: Mutex::new(calibrator),
+            calibrator: Mutex::new(adapter),
         }
     }
 
@@ -136,7 +114,10 @@ impl GaspValidator {
         let mut new_config = self.config.clone();
         new_config.threshold = threshold;
         new_config.fingerprint = new_config.fingerprint.with_threshold(threshold);
-        self.refresh_config(new_config);
+        if let Ok(mut cal) = self.calibrator.lock() {
+            cal.reset();
+        }
+        self.config = new_config;
     }
 
     pub fn record_external_feedback(&self, raw_score: f32, ground_truth_grounded: bool) {
@@ -155,7 +136,9 @@ impl GaspValidator {
 
     pub fn refresh_config(&mut self, config: GaspConfig) {
         if let Ok(mut cal) = self.calibrator.lock() {
-            cal.invalidate_on_config_change(config.fingerprint.clone());
+            if self.config.fingerprint != config.fingerprint {
+                cal.reset();
+            }
         }
         self.config = config;
     }

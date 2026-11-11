@@ -25,7 +25,7 @@ fn test_table_driven_error_conversion() {
         ),
     ];
 
-    #[cfg(feature = "types-compat")]
+    #[cfg(feature = "workspace")]
     for (err, msg) in cases {
         let converted: contextra_types::ContextraError = err.into();
         match converted {
@@ -36,7 +36,7 @@ fn test_table_driven_error_conversion() {
         }
     }
 
-    #[cfg(not(feature = "types-compat"))]
+    #[cfg(not(feature = "workspace"))]
     for (err, msg) in cases {
         assert!(err.to_string().contains(msg));
     }

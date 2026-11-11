@@ -1,9 +1,18 @@
 //! Lightweight, standalone storage abstraction for `contextra-graph` persistence.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Neutrale Speicher-Abstraktionen für Persistenz.
+// INVARIANTEN: Atomare Writes und robuste Deserialisierung.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use std::future::Future;
 use std::pin::Pin;
 
 /// Boxed future for async storage methods.
+
+// SECTION Storage Core Implementation
 pub type StorageFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Standalone key-value storage interface for persisting graph data.
@@ -79,3 +88,5 @@ impl GraphStorage for InMemoryGraphStorage {
         })
     }
 }
+
+// !SECTION Storage Core Implementation

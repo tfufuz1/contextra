@@ -111,8 +111,8 @@ async fn test_ssi_scan_prefix_tracked_via_tenant_scoped_storage() {
 struct ForcedConflictValidator;
 
 impl SsiValidator for ForcedConflictValidator {
-    fn validate(&self, _tx_id: TxId, _read_set: &ReadSet) -> Result<()> {
-        Err(ContextraError::Conflict(
+    fn validate(&self, _tx_id: TxId, _read_set: &ReadSet) -> std::result::Result<(), contextra_mvcc::MvccError> {
+        Err(contextra_mvcc::MvccError::Conflict(
             "Forced conflict from fake validator".into(),
         ))
     }
