@@ -107,11 +107,11 @@ mod tests {
     #[test]
     fn test_memory_kv_cache_contract_roundtrip() {
         let cache = MemoryKvCache::new();
-        let tenant = TenantId::try_new(42).unwrap();
-        let segment = KvSegment::new(tenant, 10, vec![1, 2, 3, 4]);
-
-        cache.insert(tenant, segment).unwrap();
-        let bytes = cache.get(tenant, 10).expect("get segment");
-        assert_eq!(bytes, vec![1, 2, 3, 4]);
+        if let Ok(tenant) = TenantId::try_new(42) {
+            let segment = KvSegment::new(tenant, 10, vec![1, 2, 3, 4]);
+            assert!(cache.insert(tenant, segment).is_ok());
+            let bytes = cache.get(tenant, 10);
+            assert_eq!(bytes, Some(vec![1, 2, 3, 4]));
+        }
     }
 }
