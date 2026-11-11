@@ -1,19 +1,20 @@
 //! # KeyMaterialSource — Port-Trait für kryptografisches Schlüsselmaterial (Ring 0)
 //!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/rng.rs
+//!
 //! Trennt kryptografische Schlüssel- und Saltquellen von nicht-geheimem Pseudo-Zufall
 //! (vgl. `RngPort`). Fail-closed: Entropieerschöpfung oder OS-Fehler werden als
 //! harter Fehler propagiert, nie durch einen Fallback ersetzt.
 //!
-//! **Migration:** Dieser Trait wurde aus `contextra-store/src/key_source.rs` hierher verschoben,
-//! damit er crate-übergreifend verwendet werden kann (WAL-HMAC-Schlüssel, Salt-Generierung,
-//! deterministisches Testen). Die Implementierungen `OsKeyMaterialSource` und
-//! `StaticKeyMaterialSource` verbleiben in `contextra-store` und werden über
-//! `contextra-store::key_source` re-exportiert; `contextra-store` re-exportiert den Trait
-//! ebenfalls aus `contextra-ports` für Rückwärtskompatibilität.
+//! // ANCHOR[contextra-ports:KEY-MAT-001]
+//! // SECTION key-material-contracts
+//! // NOTE: Fail-Closed: Keine unsicheren Fallbacks bei Entropiemangel (ADR-098).
 
 use contextra_types::Result;
 use std::fmt::Debug;
 
+// ANCHOR[contextra-ports:KEY-MAT-TRAIT-001]
 /// Port-Trait für kryptografisch sichere Schlüssel- und Salt-Generierung.
 ///
 /// Implementierungen **müssen** fail-closed sein: Bei Entropieerschöpfung oder
@@ -35,3 +36,4 @@ pub trait KeyMaterialSource: Send + Sync + Debug + 'static {
     /// Kein Fallback auf schwächere Quellen.
     fn fill_key_bytes(&self, dest: &mut [u8]) -> Result<()>;
 }
+// !SECTION key-material-contracts

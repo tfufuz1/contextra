@@ -2,6 +2,7 @@
 // ZWECK: Begrenzter ComputePool für CPU-intensive Tasks (z. B. HNSW-Index-Rebuild).
 // INVARIANTEN: Zero-Panic Doctrine; feste Obergrenze an Worker-Threads (Resource Protection).
 // HOTSPOTS: compute_pool.rs (Job-Queue & Task-Dispatch)
+// STAND: TS:2026-11-11T02:00:00Z
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -10,6 +11,9 @@ use std::thread;
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
+// SECTION TaskHandle
+
+// ANCHOR[contextra-vector:POOL-TASK-HANDLE]
 /// Handle to await the outcome of a task submitted to [`ComputePool`].
 pub struct TaskHandle<T> {
     rx: Receiver<T>,
@@ -21,6 +25,9 @@ impl<T> TaskHandle<T> {
         self.rx.recv()
     }
 }
+// !SECTION
+
+// SECTION Pool-Zustand & Implementierung
 
 struct PoolState {
     job_tx: Sender<Job>,
@@ -31,6 +38,7 @@ struct PoolState {
     is_shutdown: AtomicBool,
 }
 
+// ANCHOR[contextra-vector:POOL-COMPUTE-POOL]
 /// Bounded compute thread pool for background index rebuilds and heavy CPU tasks.
 /// Enforces a hard ceiling on concurrent worker threads to prevent thread contention.
 #[derive(Clone)]
@@ -40,6 +48,7 @@ pub struct ComputePool {
 
 impl ComputePool {
     /// Creates a new [`ComputePool`] with a fixed worker thread ceiling.
+    // ANCHOR[contextra-vector:POOL-NEW]
     pub fn new(max_workers: usize) -> Self {
         let workers = max_workers.max(1);
         let (job_tx, job_rx) = channel::<Job>();
@@ -156,6 +165,7 @@ impl std::fmt::Debug for ComputePool {
             .finish()
     }
 }
+// !SECTION
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

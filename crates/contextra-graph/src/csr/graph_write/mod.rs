@@ -3,6 +3,15 @@
 //! # Zweck
 //! Definiert den Haupttyp `CsrGraph` und synchronisiert parallele Modifikationen über Mutexe.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+
+// SECTION Mod Core Implementation
 pub mod edge_mutation;
 pub mod entity;
 pub mod hyperedge;
@@ -218,3 +227,5 @@ impl CsrGraph {
         edges.into_iter().collect()
     }
 }
+
+// !SECTION Mod Core Implementation

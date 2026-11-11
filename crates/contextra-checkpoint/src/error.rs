@@ -8,6 +8,9 @@ use thiserror::Error;
 /// Typalias für Resultate mit [`CheckpointError`].
 pub type CheckpointResult<T> = std::result::Result<T, CheckpointError>;
 
+/// Kurzform für interne Module, identisch zu [`CheckpointResult`].
+pub type Result<T> = CheckpointResult<T>;
+
 /// Fehlerzustände im Checkpoint-Subsystem.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -38,6 +41,15 @@ pub enum CheckpointError {
     /// I/O-Fehler beim Dateizugriff.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Gespeicherte ID-Breite passt nicht zur Build-Konfiguration (SPEC §5.2).
+    #[error("ID width mismatch: stored {stored} bits, build {build} bits")]
+    IdWidthMismatch {
+        /// Im Checkpoint gespeicherte Breite.
+        stored: u16,
+        /// Breite dieses Builds.
+        build: u16,
+    },
 
     /// Interner System- oder Synchronisationsfehler.
     #[error("Internal error: {0}")]

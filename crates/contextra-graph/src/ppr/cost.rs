@@ -1,5 +1,12 @@
 //! PPR Cost Model, Strategy Selection, and ShadowMode Calibration.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_types::{PprAlgorithm, PprConfig};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -7,6 +14,8 @@ use std::sync::Arc;
 /// CSR Graph structural statistics used for PPR cost estimation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 // ANCHOR[contextra-graph:SRC-PPR-COST-001]
+
+// SECTION Cost Core Implementation
 pub struct GraphStats {
     /// Number of active/committed nodes |V|.
     pub node_count: usize,
@@ -260,3 +269,5 @@ mod tests {
         assert!((mult - 1.0).abs() < 1e-6);
     }
 }
+
+// !SECTION Cost Core Implementation

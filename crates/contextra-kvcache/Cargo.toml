@@ -12,10 +12,27 @@ description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory 
 [package.metadata.contextra]
 ring = "1"
 
+[features]
+default = ["std", "workspace", "ports-compat", "crypto-compat", "kv-encryption"]
+std = []
+workspace = ["dep:contextra-ports", "dep:contextra-types"]
+ports-compat = ["workspace"]
+types-compat = ["workspace"]
+crypto-compat = ["dep:contextra-crypto"]
+kv-encryption = ["crypto-compat", "contextra-crypto/kv-encryption"]
+docid-128 = ["contextra-ids/docid-128"]
+content-addressed-kv-cache = []
+exp-content-addressed = ["content-addressed-kv-cache"]
+kvcache-kivi-quant = []
+kivi-quantization = []
+exp-kivi = ["kivi-quantization"]
+
 [dependencies]
-contextra-types = { workspace = true, optional = true }
-contextra-ports = { workspace = true, optional = true }
-contextra-crypto = { workspace = true, optional = true }
+contextra-ids = { version = "0.1.0", path = "../contextra-ids" }
+contextra-env = { version = "0.1.0", path = "../contextra-env" }
+contextra-types = { version = "0.1.0", path = "../contextra-types", optional = true }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports", optional = true }
+contextra-crypto = { version = "0.1.0", path = "../contextra-crypto", optional = true }
 ahash = { workspace = true }
 blake3 = { workspace = true }
 lru = "0.16.4"
@@ -28,19 +45,11 @@ serde_json = { workspace = true }
 bincode = { workspace = true }
 bytes = { workspace = true }
 
-[features]
-default = ["std", "ports-compat", "crypto-compat", "kv-encryption"]
-std = []
-ports-compat = ["dep:contextra-ports", "dep:contextra-types"]
-crypto-compat = ["dep:contextra-crypto"]
-kv-encryption = ["crypto-compat", "contextra-crypto/kv-encryption"]
-content-addressed-kv-cache = []
-exp-content-addressed = ["content-addressed-kv-cache"]
-kvcache-kivi-quant = []
-kivi-quantization = []
-exp-kivi = ["kivi-quantization"]
-
 [dev-dependencies]
+contextra-types = { version = "0.1.0", path = "../contextra-types" }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
+contextra-crypto = { version = "0.1.0", path = "../contextra-crypto" }
+contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
 criterion = { workspace = true, features = ["async_tokio"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"

@@ -57,9 +57,7 @@ impl CognitiveInputChannel for InMemoryCognitiveChannel {
             self.tx
                 .send((target_tenant, input_vec))
                 .await
-                .map_err(|e| {
-                    contextra_types::ContextraError::Internal(format!("channel closed: {e}"))
-                })?;
+                .map_err(|e| CognitionError::Internal(format!("channel closed: {e}")).into())?;
             Ok(segments)
         })
     }

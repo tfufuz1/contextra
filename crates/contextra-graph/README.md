@@ -2,29 +2,33 @@
 
 CSR Graph-Engine, Path Graphing, Hyperkanten und GraphRAG Community Detection.
 
-## Rolle & Zweck
-`contextra-graph` ist der Graph-Baustein von Contextra. Er stellt speichereffiziente Graph-Datenstrukturen im Compressed Sparse Row (CSR) Format, Graph-Traversierung, Personalized PageRank (PPR), Hyperkanten, regelbasierte Entitätsextraktion und Community Detection für GraphRAG bereit.
+## Rolle & Zweck (Klasse A Baustein)
+`contextra-graph` ist der eigenständige, hochperformante Graph-Baustein von Contextra. Er stellt speichereffiziente Graph-Datenstrukturen im Compressed Sparse Row (CSR) Format, Graph-Traversierung, Personalized PageRank (PPR), Hyperkanten, regelbasierte Entitätsextraktion und Community Detection für GraphRAG bereit.
 
-Der Baustein kann für Graph-Algorithmen und semantische Relationen eingesetzt werden.
+Entwickelt nach den Grundsätzen modularer Baukastensysteme (SPEC v2 / Klasse A), kann dieser Crate mit minimalem Aufwand in beliebig strukturierte Fremdsysteme und standalone Rust-Anwendungen integriert werden.
 
-## Profil
-- **Datenstrukturen & Typen:** Der Kern operiert auf Standardtypen sowie Typen wie `DocId`, `EntityId`, `TxId`, `Entity`, `Edge`, `HyperEdgeId`, `RoleBinding`.
-- **Fehlerbehandlung:** Kanonischer Fehlertyp `GraphError` und Subtyp `GraphMutationError`.
-- **Vertrag:** Crate-Vertrag in `src/contract.rs` mit neutralen Traits `Clock`, `Rng`, `NodeId`, `Weight`.
-- **Sicherheit & Unsafe-Freiheit:** `#![forbid(unsafe_code)]` in allen Produktionsmodulen, keine unkontrollierten Panics.
-- **Determinismus:** Deterministische Datenstrukturen (`BTreeMap`, `BTreeSet`), injizierbare Zeit- und Zufalls-Traits (`Clock`, `Rng`).
-- **Autarkie:** Eigene `LICENSE-MIT` und `LICENSE-APACHE`.
+## Profil & Architektur-Garantien
+- **Datenstrukturen & Typen:** Autonome, neutrale Typen in `src/types.rs` (`EntityId`, `DocId`, `TxId`, `Entity`, `Edge`, `HyperEdgeId`, `RoleBinding`).
+- **Fehlerbehandlung:** Kanonische Fehlertaxonomie `GraphError` und `GraphMutationError` (`thiserror`, `#[non_exhaustive]`) ohne unkontrollierte Panics (Zero-Panic-Disziplin).
+- **Vertrag & Entkopplung:** Neutraler Baustein-Vertrag in `src/contract.rs` mit abstrakten Traits `Clock`, `Rng`, `NodeId`, `Weight`. Keine harten Workspace-Abhängigkeiten im Kern.
+- **Kompatibilitätsbrücke:** Sämtliche Workspace-Adapter (`contextra-types`, `contextra-ports`) liegen strikt gekapselt im Untermodul `src/compat/` hinter optionalen Feature-Flags (`types-compat`, `ports-compat`).
+- **Sicherheit & Korrektheit:** `#![forbid(unsafe_code)]` in allen Produktionsmodulen.
+- **Determinismus:** Deterministische Datenstrukturen und garantierter Tie-Break bei gleichen Scores nach EntityId aufsteigend.
+- **Bitemporale Sichtbarkeit:** Transaktionale Snapshot-Isolation über `born_seq` und `died_seq` zur Vermeidung von Dirty Reads oder Phantoms.
+- **Lock-Disziplin:** Typisierte Lock-Akquise (`NodesGuard` in `session_dag.rs`), keine Locks über `.await`-Punkte (`deny(clippy::await_holding_lock)`).
 
 ## Features
-- `default = ["types-compat", "ports-compat", "experimental-graph"]`
+- `default = ["workspace", "experimental-graph"]`
+- `workspace`: Aktiviert die Kompatibilitätsbrücke für den Einsatz im Monorepo (`types-compat`, `ports-compat`).
+- `types-compat`: Konvertierung zwischen lokalen Typen und `contextra-types`.
+- `ports-compat`: Implementierung von Trait-Schnittstellen aus `contextra-ports` (`GraphIndex`, `Purger`).
 - `experimental-graph`: Bündelt experimentelle Erweiterungen.
-- `types-compat`: Typ-Kompatibilität zu Workspace-Typen.
-- `ports-compat`: Port-Kompatibilität zu Workspace-Traits.
 - `ppr-forward-push`: Schneller Andersen-Chung-Lang Forward-Push PPR.
-- `k-path-diffusion`: K-Path Traversal und Pfad-Diffusionssuche.
+- `k-path-diffusion`: K-Path Traversal und Pfad-Diffusionssuche für GraphRAG.
 - `apprh-diffusion`: Adaptiver PageRank mit Hyperkanten-Expansion.
 - `graph-connectivity-health`: Perkolations- und Resilienzmetriken für Netze.
 - `edge-reinforcement-learning`: Dynamisches Kanten-Reinforcement.
+- `docid-128`: Unterstützung für 128-Bit Dokument-IDs.
 
 ## Minimalbeispiel (Doctest)
 

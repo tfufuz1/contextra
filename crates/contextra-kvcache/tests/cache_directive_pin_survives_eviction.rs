@@ -9,7 +9,7 @@ use contextra_kvcache::store::{
     CacheDirective, StepId, TenantIsolatedKvStore, MAX_PINNED_BYTES_PER_TENANT,
 };
 use contextra_kvcache::KvSegment;
-use contextra_types::{ContextraError, TenantId};
+use contextra_types::TenantId;
 use std::time::Duration;
 
 // Prüft, dass gepinnte Segmente bei Speicherverdrängung (Eviction) niemals verdrängt werden.
@@ -106,16 +106,13 @@ fn test_cache_directive_pin_budget_exceeded() {
     );
 
     match res {
-        Err(ContextraError::PinBudgetExceeded(msg)) => {
+        Err(contextra_kvcache::error::KvCacheError::PinBudgetExceeded(msg)) => {
             assert!(
                 msg.contains("exceeding limit"),
                 "Error message must indicate exceeding limit: {msg}"
             );
         }
-        other => panic!(
-            "Expected ContextraError::PinBudgetExceeded, got {:?}",
-            other
-        ),
+        other => panic!("Expected KvCacheError::PinBudgetExceeded, got {:?}", other),
     }
 
     assert_eq!(

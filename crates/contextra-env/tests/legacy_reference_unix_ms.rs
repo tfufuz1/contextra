@@ -2,6 +2,13 @@
 
 use contextra_env::{unix_ms, Clock, ManualClock};
 
+// =========================================================================
+// SECTION: Legacy Reference Traits & Adapters
+// ANCHOR[id=differential-legacy-contracts,epic=clock,seq=10]
+// NOTE: Eingefrorene Legacy-Schnittstellen zur Sicherstellung exakter Bit-Parität (B02).
+// LINK crates/contextra-env/SPEC.md#41-clock
+// =========================================================================
+
 // text/contract.rs:16
 pub trait TextClock: Send + Sync {
     fn now_unix_ms(&self) -> u64;
@@ -39,8 +46,16 @@ impl<C: Clock> VectorClock for VectorAdapter<C> {
     }
 }
 
+// !SECTION: Legacy Reference Traits & Adapters
+
+// =========================================================================
+// SECTION: Differential Parity Test
+// ANCHOR[id=differential-test-run,epic=clock,seq=11]
+// =========================================================================
+
 #[test]
 fn test_unix_ms_differential_parity() {
+    // NOTE: Edge-Cases: 0, knapp unter 1ms, exakt 1ms, knapp über 1ms, 1.5s, u64::MAX Truncation
     let test_nanos = vec![
         0u64,
         999_999u64,
@@ -63,3 +78,5 @@ fn test_unix_ms_differential_parity() {
         assert_eq!(actual, vector_res, "Mismatch with vector at {} ns", nanos);
     }
 }
+
+// !SECTION: Differential Parity Test

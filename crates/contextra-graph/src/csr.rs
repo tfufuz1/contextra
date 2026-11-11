@@ -1,6 +1,15 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-CSR-001]
 //! CSR-Graph-Implementierung für Entity-Relation-Traversal.
 
+
+// SECTION Csr Core Implementation
 pub(crate) mod graph_index;
 pub(crate) mod graph_persist;
 pub(crate) mod graph_read;
@@ -22,3 +31,5 @@ pub use types::{
 pub use visibility::{
     is_edge_visible, is_edge_visible_bitemporal, is_edge_visible_business, is_suspicious_tx_id,
 };
+
+// !SECTION Csr Core Implementation

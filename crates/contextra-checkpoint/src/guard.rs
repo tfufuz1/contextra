@@ -17,11 +17,11 @@
 //! Stattdessen wird der betroffene Zustand synchron in der [`InstanceOrphanRegistry`] vorgemerkt,
 //! sodass spätere Recovery-Durchläufe die Ressourcen gefahrlos freigeben können.
 
+use crate::error::{CheckpointError, Result};
 use crate::meta::StateCheckpoint;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinnedSeqNoOrphan};
-use contextra_env::{Clock, MetricsSink, SystemClock};
-use crate::error::{CheckpointError, Result};
 use crate::snapshot_source::SnapshotSource;
+use contextra_env::{Clock, MetricsSink, SystemClock};
 use contextra_ids::TxId;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -257,10 +257,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     }
 
     /// Ergänzt den Guard optional um eine Metrik-Senke.
-    pub fn with_metrics_sink_opt(
-        mut self,
-        sink: Option<Arc<dyn MetricsSink>>,
-    ) -> Self {
+    pub fn with_metrics_sink_opt(mut self, sink: Option<Arc<dyn MetricsSink>>) -> Self {
         self.metrics_sink = sink;
         self
     }
@@ -602,7 +599,6 @@ mod tests {
                     .collect())
             })
         }
-
     }
 
     // Prüft, dass ein PinGuard beim Droppen ohne unpin/defuse automatisch als verwaist in der Registry registriert wird.
@@ -820,7 +816,10 @@ mod tests {
         assert_eq!(key.name, "checkpoint_duration_seconds");
         assert_eq!(hist.count, 1);
         assert!(hist.sum >= 0.0);
-        assert_eq!(key.labels, vec![("status".to_string(), "commit".to_string())]);
+        assert_eq!(
+            key.labels,
+            vec![("status".to_string(), "commit".to_string())]
+        );
     }
 
     // Prüft die Erfassung von Rollback-Metriken, wenn ein Guard ohne Commit gedroppt wird.
@@ -848,6 +847,9 @@ mod tests {
         assert_eq!(key.name, "checkpoint_duration_seconds");
         assert_eq!(hist.count, 1);
         assert!(hist.sum >= 0.0);
-        assert_eq!(key.labels, vec![("status".to_string(), "rollback".to_string())]);
+        assert_eq!(
+            key.labels,
+            vec![("status".to_string(), "rollback".to_string())]
+        );
     }
 }

@@ -3,6 +3,13 @@
 //! # Zweck
 //! Sichert die Einhaltung der Schnittstellenvereinbarungen gegen funktionale Regressionen ab.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::super::*;
 use super::basic_tests::setup_test_graph;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
@@ -13,6 +20,8 @@ use std::sync::Arc;
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-001]
 #[tokio::test]
 #[allow(non_snake_case)]
+
+// SECTION Graph Index Tests Core Implementation
 async fn test_set_storage_and_with_config_and_storage_CASE_initialization() {
     use crate::test_doubles::InMemoryStorageEngine;
 
@@ -683,3 +692,5 @@ fn test_edge_store_invalidated_after_compact() {
             "edge_store must be cleared by compact() so deleted/tombstoned edges are no longer returned"
         );
 }
+
+// !SECTION Graph Index Tests Core Implementation

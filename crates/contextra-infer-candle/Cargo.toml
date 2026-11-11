@@ -24,7 +24,6 @@ futures-util = "0.3"
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-thiserror = { workspace = true }
 bincode = { workspace = true, optional = true }
 half = { version = "2.4", optional = true }
 contextra-types = { workspace = true }
@@ -64,3 +63,9 @@ test-utils = []
 candle-core = { version = "0.11", features = ["metal"] }
 candle-nn = { version = "0.11", features = ["metal"] }
 candle-transformers = { version = "0.11", features = ["metal"] }
+
+# Golden-Test nutzt Fakes aus `fake.rs`, die nur mit Feature `test-utils` existieren.
+[[test]]
+name = "golden_test"
+path = "tests/golden_test.rs"
+required-features = ["test-utils"]

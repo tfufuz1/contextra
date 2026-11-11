@@ -22,7 +22,7 @@ use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
 use contextra_checkpoint::{
     CheckpointGuard, CheckpointMeta, CheckpointRegistry, PersistentCheckpointStore,
 };
-use contextra_ports::{Clock, StorageEngine, SystemClock};
+use contextra_ports::{Checkpoint, Clock, StorageEngine, SystemClock};
 use contextra_types::{ContextraError, Result};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -40,11 +40,19 @@ pub enum EventLoopExitReason {
 pub const MAX_WORKFLOW_STEPS: u64 = 10_000;
 
 /// Async executor engine applying nodes in sequence.
+/// Checkpoint-Naht des Agenten: Registry-Operationen plus Zustands-Restore.
+///
+/// Der Blanket-Impl macht jede Implementierung beider Traits verwendbar. So kann
+/// `dyn AgentCheckpointStore` beide Schnittstellen aufrufen.
+pub trait AgentCheckpointStore: CheckpointRegistry + Checkpoint + Send + Sync {}
+
+impl<T: CheckpointRegistry + Checkpoint + Send + Sync> AgentCheckpointStore for T {}
+
 pub struct OrchestratorEngine {
     /// Registry managing tool manifests, availability, and authorization checks.
     pub registry: crate::tools::ToolRegistry,
     /// Store managing workflow state checkpoint persistence and restoration.
-    pub checkpoint_store: Arc<dyn CheckpointRegistry>,
+    pub checkpoint_store: Arc<dyn AgentCheckpointStore>,
     /// Optional queue for recording failed workflow steps for post-mortem analysis.
     pub dead_letter_queue: Option<DeadLetterQueue>,
     /// Clock port for deterministic time management.
@@ -574,9 +582,13 @@ impl OrchestratorEngine {
         let checkpoints = self.checkpoint_store.list_checkpoints().await?;
         let checkpoint = self.find_matching_checkpoint(&checkpoints, &ctx.task_id, identifier)?;
         self.restore_context_state_from_meta(ctx, checkpoint);
-        self.checkpoint_store
-            .restore(&checkpoint.clone().into_workflow_state())
-            .await
+        // Checkpoint-eigener und Workspace-WorkflowState haben identische Felder.
+        let local = checkpoint.into_workflow_state();
+        let state = contextra_types::WorkflowState {
+            tx: local.tx,
+            graph_hash: local.graph_hash,
+        };
+        self.checkpoint_store.restore(&state).await
     }
 
     /// Persists a workflow execution state checkpoint for the active context step.
@@ -603,9 +615,13 @@ impl OrchestratorEngine {
             tx_id,
             metadata,
             created_at: self.now_millis(),
+            id_width_bits: contextra_checkpoint::CURRENT_ID_WIDTH_BITS,
         };
 
-        self.checkpoint_store.save_checkpoint(meta).await
+        self.checkpoint_store
+            .save_checkpoint(meta)
+            .await
+            .map_err(Into::into)
     }
 
     /// Continuous event loop reading telemetry events from an `EventSource`,
@@ -807,18 +823,22 @@ impl CheckpointRegistry for FallbackRegistry {
     fn save_checkpoint<'a>(
         &'a self,
         _meta: CheckpointMeta,
-    ) -> contextra_ports::BoxFuture<'a, Result<()>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_checkpoint::CheckpointResult<()>> {
         Box::pin(async move { Ok(()) })
     }
     fn load_checkpoint<'a>(
         &'a self,
         _seq_no: u64,
-    ) -> contextra_ports::BoxFuture<'a, Result<Option<CheckpointMeta>>> {
+    ) -> contextra_ports::BoxFuture<
+        'a,
+        contextra_checkpoint::CheckpointResult<Option<CheckpointMeta>>,
+    > {
         Box::pin(async move { Ok(None) })
     }
     fn list_checkpoints<'a>(
         &'a self,
-    ) -> contextra_ports::BoxFuture<'a, Result<Vec<CheckpointMeta>>> {
+    ) -> contextra_ports::BoxFuture<'a, contextra_checkpoint::CheckpointResult<Vec<CheckpointMeta>>>
+    {
         Box::pin(async move { Ok(Vec::new()) })
     }
 }

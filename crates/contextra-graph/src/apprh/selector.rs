@@ -22,6 +22,8 @@ use std::sync::Arc;
 /// Operating mode for [`ApprhSelector`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 // ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-001]
+
+// SECTION Selector Core Implementation
 pub enum ApprhMode {
     /// APPRH disabled; authoritative Forward-Push PPR is returned.
     Off,
@@ -220,3 +222,5 @@ impl std::fmt::Debug for ApprhSelector {
             .finish()
     }
 }
+
+// !SECTION Selector Core Implementation

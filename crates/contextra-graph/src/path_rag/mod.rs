@@ -10,7 +10,16 @@
 //! INTEGRATION: PathRAG liefert ein RRF-Signal neben Vektor- und BM25-Signal.
 //! Resultat von to_rrf_signal() wird in FusionEngine als drittes Signal eingespeist.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Path-RAG und budgetierte K-Path Traversierung.
+// INVARIANTEN: Snapshot-Isolation bei Pfadsuche.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 #[cfg(feature = "k-path-diffusion")]
+
+// SECTION Mod Core Implementation
 pub mod k_path;
 
 #[cfg(feature = "k-path-diffusion")]
@@ -478,3 +487,5 @@ impl<G: PathGraph> PathRAGEngine<G> {
 
 #[cfg(test)]
 mod tests;
+
+// !SECTION Mod Core Implementation

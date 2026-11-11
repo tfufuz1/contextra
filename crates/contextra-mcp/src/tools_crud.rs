@@ -125,7 +125,7 @@ impl McpServer {
 
         let _ = self
             .db
-            .drop_collection(col_name, tenant_id, &[])
+            .drop_collection(col_name, tenant_id)
             .await
             .map_err(McpError::from)?;
 

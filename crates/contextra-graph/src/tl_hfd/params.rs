@@ -1,5 +1,12 @@
 //! Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
+// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::error::TlHfdError;
 
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD).
@@ -8,6 +15,8 @@ use super::error::TlHfdError;
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
 // ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-001]
+
+// SECTION Params Core Implementation
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     pub sigma: f32,
@@ -137,3 +146,5 @@ mod tests {
         assert!(p.validate().is_err());
     }
 }
+
+// !SECTION Params Core Implementation

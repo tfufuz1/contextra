@@ -1,4 +1,13 @@
-//! KV prefix store port trait definitions and types (Spec §9.2).
+//! # Key-Value Prefix Store Port (Ring 0 / Class B)
+//!
+//! LINK crates/contextra-ports/src/lib.rs
+//! LINK crates/contextra-ports/src/kv_bridge_port.rs
+//!
+//! Definiert Verträge für Modell-KV-Cache-Präfix-Wiederverwendung und Block-Eviction (SPEC §9.2).
+//!
+//! // ANCHOR[contextra-ports:KV-001]
+//! // SECTION kv-prefix-contracts
+//! // NOTE: Vollständige Trennung von konkreten KV-Caches (`contextra-kvcache`).
 
 use crate::model_fingerprint::ModelFingerprint;
 use crate::types::domain::TenantId;
@@ -6,6 +15,7 @@ use crate::ContextraError;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-ports:KV-LAYOUT-001]
 /// KV cache layer and dimensions layout configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct KvLayout {
@@ -39,6 +49,7 @@ impl std::hash::Hash for RopeConfig {
     }
 }
 
+// ANCHOR[contextra-ports:PREFIX-KEY-001]
 /// Key identifying a model KV cache prefix structure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrefixKey {
@@ -132,6 +143,7 @@ pub struct KvPrefixHit {
     pub blocks: Vec<KvBlock>,
 }
 
+// ANCHOR[contextra-ports:KV-STORE-TRAIT-001]
 /// Trait defining the contract for KV prefix caching and block reuse (Spec §9.2).
 ///
 /// # Dyn-Kompatibilität
@@ -163,6 +175,7 @@ pub trait KvPrefixStore: Send + Sync + 'static {
     /// Idempotente Eviction; Teilausfall hinterlässt entweder alten oder eviktierten Zustand.
     fn evict(&self, tenant: TenantId, key: &PrefixKey) -> Result<u64, ContextraError>;
 }
+// !SECTION kv-prefix-contracts
 
 #[cfg(test)]
 #[allow(clippy::disallowed_types, clippy::indexing_slicing)]

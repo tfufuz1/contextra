@@ -158,6 +158,7 @@ fn regen_golden_corpus() {
             "retention_days": 30
         }),
         created_at: 1700000000000,
+        id_width_bits: contextra_checkpoint::CURRENT_ID_WIDTH_BITS,
     };
     let meta_json = serde_json::to_string_pretty(&meta).expect("serialize meta");
     fs::write(dir.join("meta_golden.json"), format!("{}\n", meta_json)).expect("write meta");

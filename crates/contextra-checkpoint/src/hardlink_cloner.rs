@@ -212,7 +212,9 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                 .map_err(CheckpointError::Io)?;
 
             // 3. Scan source directory for SSTable files (.sst)
-            let mut read_dir = fs::read_dir(source_dir).await.map_err(CheckpointError::Io)?;
+            let mut read_dir = fs::read_dir(source_dir)
+                .await
+                .map_err(CheckpointError::Io)?;
 
             let mut linked_files = Vec::new();
 

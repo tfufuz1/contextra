@@ -3,10 +3,19 @@
 //! # Zweck
 //! Definiert `PprContext` und `DeletedView` zur effizienten Wiederverwendung von Arbeitsvektoren.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 // ANCHOR[contextra-graph:SRC-PPR-TYPES-001]
+
+// SECTION Types Core Implementation
 pub struct DeletedView {
     deleted_nodes: HashSet<usize>,
 }
@@ -76,3 +85,5 @@ impl PprContext {
         }
     }
 }
+
+// !SECTION Types Core Implementation

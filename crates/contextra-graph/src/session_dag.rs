@@ -29,6 +29,8 @@ use std::sync::Arc;
 /// let _ = tree.edges.read(); // Field `edges` is private
 /// ```
 // ANCHOR[contextra-graph:SRC-SESSION-DAG-001]
+
+// SECTION Session Dag Core Implementation
 pub struct NodesGuard<'a> {
     tree: &'a SessionBranchTree,
     _nodes_guard: RwLockReadGuard<'a, HashMap<NodeIdx, AgentStateNode>>,
@@ -1009,3 +1011,5 @@ mod tests {
         assert_eq!(path.last().map(|node| node.step_id), Some(active_head));
     }
 }
+
+// !SECTION Session Dag Core Implementation
