@@ -7,6 +7,7 @@
 
 pub mod field;
 pub mod positive_control;
+pub mod residue;
 pub mod scanner_flow;
 pub mod witness;
 
@@ -16,6 +17,12 @@ pub use field::{
 };
 #[allow(deprecated)]
 pub use scanner_flow::{run_scanner_flow, scan_with_control};
+pub use residue::{
+    IndexCorruptionKind, InMemoryVectorIndexStub, OffsetClass, ResidueFinding,
+    ResidueMeasurementCoordinator, ResidueMeasurementError, ResidueMeasurementReport,
+    ResiduePhase, ResidueQuery, ResidueScanResult, ResidueScanner, ResidueWitnessDigest,
+    ScannerFaultKind,
+};
 pub use witness::{arm_scanner, finish_scan};
 
 // Re-Export der Typen aus `types` für Aufrufer innerhalb dieses Moduls
