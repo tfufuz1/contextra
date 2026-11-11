@@ -1,4 +1,3 @@
-// MIGRATION(S-38): Besitzer wird contextra-kvcache
 pub mod delete_mode;
 pub mod eviction_worker;
 pub mod manager;

@@ -168,6 +168,8 @@ pub struct EncryptedCommitmentSalt {
     pub nonce: [u8; 12],
 }
 
+
+
 /// Berechnet das Commitment `Blake3(salt || attr)`.
 pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
@@ -341,7 +343,10 @@ impl AuditChain {
     /// 2. Der Hash an der Ankerposition `anchor.seq_no` nicht konstant-zeitlich mit `anchor.head_hash` übereinstimmt.
     /// 3. Eine optionale Anker-Signatur nicht gegen den bereitgestellten `verifying_key` verifiziert werden kann.
     /// 4. Die interne Hash-Ketten-Struktur bis zum Ankerpunkt ungültig ist.
-    pub fn verify_chain_with_anchor(&self, anchor: &AuditHeadAnchor) -> Result<bool> {
+    pub fn verify_chain_with_anchor(
+        &self,
+        anchor: &AuditHeadAnchor,
+    ) -> Result<bool> {
         // Rollback-Prüfung: Kette muss mindestens bis zum Anker-Index gefüllt sein
         let anchor_idx = anchor.seq_no as usize;
         if self.entries.len() <= anchor_idx {

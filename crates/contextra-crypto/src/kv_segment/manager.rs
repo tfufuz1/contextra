@@ -1,4 +1,3 @@
-// MIGRATION(S-38): Besitzer wird contextra-kvcache
 //! # Segmentierte KV-Verwaltung
 //!
 //! Ermöglicht granulare Schlüsselverwaltung für KV-Segmente.
@@ -48,8 +47,14 @@ pub struct KvSegmentManager {
 
 impl KvSegmentManager {
     /// Creates a new manager with specified config and master key.
-    pub fn new(config: KvSegmentConfig, master_key: Option<Arc<KeyManager>>) -> Self {
-        Self { config, master_key }
+    pub fn new(
+        config: KvSegmentConfig,
+        master_key: Option<Arc<KeyManager>>,
+    ) -> Self {
+        Self {
+            config,
+            master_key,
+        }
     }
 
     /// Returns the current delete mode.
@@ -70,7 +75,9 @@ impl KvSegmentManager {
                 })?;
                 let (ciphertext, nonce) = master_key
                     .encrypt_auto_nonce(plaintext)
-                    .map_err(|e| CryptoError::Crypto(format!("Encryption failed: {e}")))?;
+                    .map_err(|e| {
+                        CryptoError::Crypto(format!("Encryption failed: {e}"))
+                    })?;
 
                 Ok(KvSegmentPayload {
                     group_id,
@@ -130,4 +137,5 @@ impl KvSegmentManager {
     pub fn delete_segment(&self, _group_id: u64) -> Result<bool, CryptoError> {
         Ok(false)
     }
+
 }

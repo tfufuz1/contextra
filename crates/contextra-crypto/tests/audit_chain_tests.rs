@@ -6,7 +6,9 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::audit_chain::AuditHeadAnchor;
-use contextra_crypto::{compute_record_commitment, AuditChain, DataClass};
+use contextra_crypto::{
+    compute_record_commitment, AuditChain, DataClass,
+};
 use contextra_types::{DocId, TxId};
 
 #[test]

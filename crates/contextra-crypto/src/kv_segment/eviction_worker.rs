@@ -1,4 +1,3 @@
-// MIGRATION(S-38): Besitzer wird contextra-kvcache
 //! # Eviction Worker (`kv_segment/eviction_worker.rs`)
 //!
 //! Asynchroner Hintergrund-Task, der bei Speicherdruck Segmente nach LRU-Strategie freigibt.
