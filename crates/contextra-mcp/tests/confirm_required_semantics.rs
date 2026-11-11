@@ -1,4 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// =========================================================================
+// SECTION: confirm_required_semantics
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-CONFIRM-RE-001]
 
 use contextra_mcp::sandbox::{McpSandbox, SandboxPolicy};
 use contextra_mcp::McpServer;
@@ -157,3 +161,5 @@ async fn test_confirm_required_semantics_table_test() {
         }
     }
 }
+
+// !SECTION: confirm_required_semantics

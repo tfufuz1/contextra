@@ -1,4 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// =========================================================================
+// SECTION: tests
+// =========================================================================
+// ANCHOR[contextra-mcp:TESTS-001]
 
 #[cfg(test)]
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};
@@ -972,3 +976,5 @@ async fn test_unregistered_tools_rejected_fail_closed() {
         );
     }
 }
+
+// !SECTION: tests
