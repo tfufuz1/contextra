@@ -1,6 +1,6 @@
 # contextra-mcp — Spezifikation
 
-> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (v2, 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
+> **Geltung:** Crate-lokale Spezifikation. Normativ bleibt `docs/SPEC.md` (Fassung 4.1, Stand 10.11.2026). Dieses Dokument überträgt die Anforderungen für dieses Crate, ergänzt sie um verifizierte Ist-Fakten und markiert Abweichungen.
 > **Faktenbasis:** statische Analyse mit `tools/` am geklonten Repo-Stand (`main`, HEAD `f0eda1cb9`). `cargo` ist in der Analyseumgebung nicht verfügbar. **Es wurde nichts gebaut, getestet oder ausgeführt.**
 > **Beleg-Marken:** *[V]* am Quelltext/Manifest verifiziert, *[T]* aus einem tools/-Bericht, *[S]* aus docs/SPEC.md übernommen, *[E]* Festlegung dieser Spezifikation.
 
@@ -49,8 +49,9 @@ Ebenen (SPEC §1.1): E0 = Kern-Closure leer · E1 = Kern-Closure ⊆ E0, höchst
 
 - **Ist-Kanten, die das Ziel vorsieht:** `contextra`, `types`, `ports`, `wire`, `rank`, `crypto`, `privacy`, `router`, `prompt-guard` (optional: `infer-candle`, `infer-ollama`, `infer-onnx`).
 - **Prompt-Guard:** Erfolgreich herausgelöst als autarker E0-Sicherheitsbaustein `contextra-prompt-guard` (MCP-2).
-- **Ports-Entkopplung:** `ports_local`-Importe in `routing.rs` vollständig auf `contextra_ports` umgestellt (S-62).
+- **Ports-Entkopplung:** `ports_local`-Importe in `routing.rs` vollständig auf kanonische `contextra_ports` Traits umgestellt (S-62).
 - **Default-Features:** Ist = Ziel (leer).
+- **Baustein-Entkopplung:** Klare Trennung zwischen Protokoll (stdio JSON-RPC), Sandbox-Policy, Security-Guards und Speicherschicht.
 
 ## 5. Verifizierte Befunde und Abweichungen zu docs/SPEC.md [V]
 

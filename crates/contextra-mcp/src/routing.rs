@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: routing
+// =========================================================================
+// ANCHOR[contextra-mcp:ROUTING-001]
 use crate::config::RouterConfig;
 use contextra::Contextra;
 use contextra_types::{ContextChunk, ContextWindow, ContextraError, EntityId, TokenBudget};
@@ -117,3 +121,5 @@ pub async fn setup_routing(
         _drift_adapter: drift_adapter,
     })))
 }
+
+// !SECTION: routing

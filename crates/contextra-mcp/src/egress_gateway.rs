@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: egress_gateway
+// =========================================================================
+// ANCHOR[contextra-mcp:EGRESS-GAT-001]
 // FILE-CONTEXT
 // ZWECK:       Egress Security Gateway & Classifier Enforcement for Cloud MCP Queries (Re-export from contextra-privacy)
 
@@ -26,3 +30,5 @@ impl contextra_privacy::InjectionDetector for PromptInjectionGuard {
         self.detect(text)
     }
 }
+
+// !SECTION: egress_gateway
