@@ -1,5 +1,6 @@
 //! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
 
+// TODO(baukasten): WAL und Integritätskette modularisieren (AD-8). Abstraktion der kryptografischen Verkettung über ChainSigner-Trait; Trennung von Store-LSM und Store-WAL.
 pub mod encode;
 pub mod flusher;
 pub mod hmac;

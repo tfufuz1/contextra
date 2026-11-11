@@ -1,3 +1,4 @@
+// TODO(baukasten): IO-Transport als autarken stdio/sse Server-Baustein auf Basis von contextra-wire isolieren (AD-8).
 use tokio::io::AsyncBufReadExt;
 
 /// Maximum allowed single JSON-RPC message size via stdio (4 MB).

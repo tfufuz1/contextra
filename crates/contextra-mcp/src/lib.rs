@@ -17,6 +17,7 @@
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
 //! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
 
+// TODO(baukasten): MCP-Crate in mcp-core (Protokoll/IO/Dispatch) und mcp-contextra (Tool-Bindung) aufteilen (AD-8). mcp-core darf keine Abhängigkeit zur Facade contextra besitzen.
 pub mod bulk_exfiltration_detector;
 pub mod config;
 pub mod egress_gateway;

@@ -9,6 +9,7 @@ use super::config::validate_vector;
 use super::sq8_bias::Sq8Bias;
 use super::types::{HnswIndex, HnswNode, SnapshotPinGuard, VectorData};
 
+// TODO(baukasten): Port-Implementierung VectorIndex gehört nach src/compat/ (AD-6). Der HNSW-Kern darf keine direkte Abhängigkeit zu contextra-ports aufweisen.
 #[cfg(feature = "ports-compat")]
 impl VectorIndex for HnswIndex {
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {

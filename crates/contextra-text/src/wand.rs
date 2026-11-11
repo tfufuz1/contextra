@@ -16,6 +16,7 @@
 use crate::bm25::score_term;
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
 use crate::storage::PostingStore;
+// TODO(baukasten): Block-Max WAND Kern entkoppeln (AD-4/AD-5). WAND muss ohne types-compat kompilieren; DocId aus contextra-ids, lokaler TextError und MAX_SEARCH_K als Crate-Konstante.
 use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
 use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;

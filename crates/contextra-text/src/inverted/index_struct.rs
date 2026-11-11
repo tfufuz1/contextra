@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crate::storage::PostingStore;
+// TODO(baukasten): InvertedIndex Kernlogik vom TextIndex-Port trennen (AD-3/AD-6). Kern implementiert PostingStore / MemoryIndex; TextIndex-Port-Brücke gehört nach compat/.
 use contextra_ports::{TextIndex, TextIndexStats};
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
 // ANCHOR[contextra-text:INV-008]

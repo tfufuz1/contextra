@@ -16,6 +16,7 @@
 
 
 use crate::context::{validate_node_id, AgentContext};
+// TODO(baukasten): StateGraph-Engine von contextra-db entkoppeln (AD-8/S-63). Harte Kopplung an Contextra/Collection invertieren: Engine konsumiert generische AgentCheckpointStore- und Tool-Traits.
 use crate::dlq::DeadLetterQueue;
 use crate::graph::{AgentNode, NodeType, StateGraph};
 use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
