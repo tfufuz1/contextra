@@ -17,6 +17,18 @@
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
 //! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection |
 
+// =========================================================================
+// SECTION: Modul-Deklaration & Sicherheits-Attribute
+// =========================================================================
+// FILE-CONTEXT
+// STAND:       2026-11-11
+// ZWECK:       stdio JSON-RPC 2.0 MCP-Server (kein HTTP! ADR-010)
+// INVARIANTEN: Transport ist ausschließlich stdin/stdout — niemals TCP/axum, bounded RPC message size
+// HOTSPOTS:    run_stdio_loop(), handle_request(), read_line_bounded()
+// SIEHE AUCH:  ADR-010, rules/async-io.md
+
+// ANCHOR[contextra-mcp:MOD-001]
+
 pub mod bulk_exfiltration_detector;
 pub mod config;
 pub mod egress_gateway;
@@ -66,3 +78,5 @@ pub use validation::{is_write_allowed_by_env, validate_collection_name};
 // INVARIANTEN: Transport ist ausschließlich stdin/stdout — niemals TCP/axum, bounded RPC message size
 // HOTSPOTS:    run_stdio_loop(), handle_request(), read_line_bounded()
 // SIEHE AUCH:  ADR-010, rules/async-io.md
+
+// !SECTION: Modul-Deklaration & Sicherheits-Attribute
