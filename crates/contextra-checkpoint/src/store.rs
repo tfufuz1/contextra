@@ -29,9 +29,9 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
+use crate::snapshot_source::BoxFuture;
 use crate::snapshot_source::SnapshotSource;
 use contextra_env::{Clock, MetricsSink};
-use crate::snapshot_source::BoxFuture;
 use contextra_ids::TxId;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
