@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used)]
 //! Numerische und verhaltensbasierte Testfälle für den RIE-Greedy-Personalismus-Mechanismus (§10.4.1).
 
 #![cfg(feature = "rie-greedy-personalization")]

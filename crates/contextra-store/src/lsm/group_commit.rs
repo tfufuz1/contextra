@@ -4,7 +4,8 @@
 
 use crate::lsm::config::DurabilityMode;
 use crate::wal::{PreparedBatch, Wal, WalOp};
-use contextra_types::{Result, TxId};
+use crate::error::StoreResult as Result;
+use contextra_ids::TxId;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 

@@ -8,8 +8,8 @@ use super::config::{DiskAnnFallbackPolicy, VectorData};
 use super::format::DiskAnnHeader;
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
-use contextra_ports::VectorIndex;
-use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
+use crate::error::{Result, VectorError};
+use crate::types::{DistanceMetric, DocId, ScoredDocument};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, BTreeSet};
 
@@ -24,7 +24,7 @@ impl DiskAnnIndex {
                 let q_guard = self.inner.quantizer.read();
                 let q = q_guard
                     .as_ref()
-                    .ok_or_else(|| ContextraError::Index("Quantizer missing".into()))?;
+                    .ok_or_else(|| VectorError::Index("Quantizer missing".into()))?;
                 q.asymmetric_dist(query, v, self.inner.config.distance_metric)
             }
         }
@@ -53,7 +53,7 @@ impl DiskAnnIndex {
                 entry_point = entry_point,
                 "DiskANN search_in_memory: non-finite distance for entry point"
             );
-            return Err(ContextraError::Index(
+            return Err(VectorError::Index(
                 "Non-finite distance encountered for entry point in search_in_memory".into(),
             ));
         }
@@ -142,7 +142,7 @@ impl DiskAnnIndex {
                     let q_guard = self.inner.quantizer.read();
                     let q = q_guard
                         .as_ref()
-                        .ok_or_else(|| ContextraError::Index("Quantizer missing".into()))?;
+                        .ok_or_else(|| VectorError::Index("Quantizer missing".into()))?;
                     q.dequantize(&v)
                 }
             }
@@ -171,7 +171,7 @@ impl DiskAnnIndex {
                 entry_point = entry_point,
                 "DiskANN search_streaming: non-finite distance for entry point"
             );
-            return Err(ContextraError::Index(
+            return Err(VectorError::Index(
                 "Non-finite distance encountered for entry point in search_streaming".into(),
             ));
         }
@@ -224,16 +224,16 @@ impl DiskAnnIndex {
     }
 
     pub async fn search_internal(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
-        if k > contextra_types::MAX_SEARCH_K {
-            return Err(ContextraError::invalid_input(format!(
+        if k > crate::types::MAX_SEARCH_K {
+            return Err(VectorError::invalid_input(format!(
                 "Requested k ({}) exceeds maximum allowed search limit ({})",
                 k,
-                contextra_types::MAX_SEARCH_K
+                crate::types::MAX_SEARCH_K
             )));
         }
 
         if !query.iter().all(|v| v.is_finite()) {
-            return Err(ContextraError::invalid_input(
+            return Err(VectorError::invalid_input(
                 "Query vector contains non-finite (NaN or Infinity) components".to_string(),
             ));
         }
@@ -255,7 +255,7 @@ impl DiskAnnIndex {
                     let hnsw = self.init_hnsw_fallback()?;
                     return hnsw.search(query, k).await;
                 } else {
-                    return Err(ContextraError::Index("Index not loaded".into()));
+                    return Err(VectorError::Index("Index not loaded".into()));
                 }
             }
         };
@@ -308,7 +308,7 @@ impl DiskAnnIndex {
                 entry_point = ep,
                 "DiskANN search: non-finite distance for entry point"
             );
-            return Err(ContextraError::Index(
+            return Err(VectorError::Index(
                 "Non-finite distance encountered for entry point in search".into(),
             ));
         }

@@ -6,13 +6,13 @@ Crash-sichere Dateisystem-Operationen, synchrone Disk-Flushes und synchrones VFS
 `contextra-durable-fs` ist ein vollständig autarker Baustein für crash-konsistente Dateisystem-Operationen (`vfs`), deterministisches Append-only Logging mit Prüfsummen (`journal`) und unumkehrbares Handle-Poisoning bei `fsync`-Fehlern (`DurableHandle`).
 
 ## Reifegrad
-- **Status:** Stabil / Produktionsreif (P1–P6 erfüllt)
+- **Status:** Vorbereitung zur R3-Heraufstufung (Klasse A)
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` – 100 % sicheres Rust ohne `unsafe`.
 - **Zero-Panic-Doktrin:** Typisierte Fehlercodes via `DurableFsError`.
-- **Durability-Invariante:** Strikter Fail-Closed-Zustandsautomat (`AtomicHealthState`).
+- **Durability-Invariante:** Strikter Fail-Closed-Zustandsautomat (`AtomicHealthState`) und unumkehrbares Handle-Poisoning (`INV-FSYNC-1`).
 
 ## Interne Abhängigkeiten
-`contextra-durable-fs` ist ein vollständig eigenständiger Baustein:
+`contextra-durable-fs` ist ein vollständig eigenständiger Baustein (Ring 0, Ebene 0):
 - **0 interne Workspace-Abhängigkeiten** (keine Abhängigkeit zu `contextra-store`, `contextra-types`, `contextra-ports` oder anderen Crates).
 - Externe Abhängigkeiten: `thiserror`, optional: `crc32fast`, `serde`, `tracing`.
 
@@ -29,13 +29,13 @@ Crash-sichere Dateisystem-Operationen, synchrone Disk-Flushes und synchrones VFS
 use contextra_durable_fs::vfs::{StdVfs, Vfs};
 use tempfile::tempdir;
 
-let dir = tempdir().unwrap();
+let dir = tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
 let test_file = dir.path().join("durable_test.txt");
 
-let vfs = StdVfs::new();
-vfs.write_atomic(&test_file, b"crash-consistent-data").unwrap();
+let vfs = StdVfs;
+vfs.write_atomic(&test_file, b"crash-consistent-data").unwrap_or_else(|e| panic!("write: {e}"));
 
-let read_back = vfs.read(&test_file).unwrap();
+let read_back = vfs.read(&test_file).unwrap_or_else(|e| panic!("read: {e}"));
 assert_eq!(read_back, b"crash-consistent-data");
 ```
 

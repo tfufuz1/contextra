@@ -13,8 +13,9 @@ use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
-use contextra_ports::{ResourceTracker, StorageEngine};
-use contextra_types::{Result, TxId};
+use crate::budget::ResourceTracker;
+use crate::error::StoreResult as Result;
+use contextra_ids::TxId;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -37,7 +38,7 @@ pub struct LsmStorage {
     /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
     pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
-    pub(super) budget: Arc<ResourceTracker>,
+    pub(super) budget: Arc<crate::budget::ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
     pub(super) wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
@@ -68,10 +69,10 @@ pub struct LsmStorage {
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
-    pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>,
+    pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_env::Clock>>,
     pub ssi_validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
     pub(super) sequence_log_ssi_validator: Option<Arc<contextra_mvcc::SequenceLogSsiValidator>>,
-    pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
+    pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_env::MetricsSink>>>,
 }
 
 impl Drop for LsmStorage {
@@ -211,35 +212,35 @@ impl LsmStorage {
         self.observer_registry.max_observer_latency()
     }
 
-    /// Returns the currently configured [`contextra_ports::MetricsSink`].
-    pub fn metrics_sink(&self) -> Arc<dyn contextra_ports::MetricsSink> {
+    /// Returns the currently configured [`contextra_env::MetricsSink`].
+    pub fn metrics_sink(&self) -> Arc<dyn contextra_env::MetricsSink> {
         self.metrics_sink.read().clone()
     }
 
-    /// Sets the [`contextra_ports::MetricsSink`] for recording operational metrics.
-    pub fn set_metrics_sink(&self, sink: Arc<dyn contextra_ports::MetricsSink>) {
+    /// Sets the [`contextra_env::MetricsSink`] for recording operational metrics.
+    pub fn set_metrics_sink(&self, sink: Arc<dyn contextra_env::MetricsSink>) {
         *self.metrics_sink.write() = sink;
     }
 
-    /// Configures the [`contextra_ports::MetricsSink`] fluently on `self` and returns `self`.
-    pub fn with_metrics_sink(self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
+    /// Configures the [`contextra_env::MetricsSink`] fluently on `self` and returns `self`.
+    pub fn with_metrics_sink(self, sink: Arc<dyn contextra_env::MetricsSink>) -> Self {
         *self.metrics_sink.write() = sink;
         self
     }
 
     /// Returns the currently configured clock port.
-    pub fn clock(&self) -> Arc<dyn contextra_ports::Clock> {
+    pub fn clock(&self) -> Arc<dyn contextra_env::Clock> {
         self.clock.read().clone()
     }
 
     /// Sets the injected clock port for deterministic execution timing (P28).
-    pub fn set_clock(&self, clock: Arc<dyn contextra_ports::Clock>) {
+    pub fn set_clock(&self, clock: Arc<dyn contextra_env::Clock>) {
         *self.clock.write() = Arc::clone(&clock);
         self.observer_registry.set_clock(clock);
     }
 
     /// Configures the clock port fluently on `self` and returns `self`.
-    pub fn with_clock(self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(self, clock: Arc<dyn contextra_env::Clock>) -> Self {
         self.set_clock(clock);
         self
     }
@@ -356,7 +357,7 @@ impl LsmStorage {
 
     #[doc(hidden)]
     
-    pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
+    pub fn budget_for_test(&self) -> Arc<crate::budget::ResourceTracker> {
         Arc::clone(&self.budget)
     }
 
@@ -384,14 +385,14 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(e) => {
-                return Err(contextra_types::ContextraError::Storage(format!(
+                return Err(crate::error::StoreError::Storage(format!(
                     "Failed to read directory for legacy WAL check: {e}"
-                )))
+                )).into())
             }
         };
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_types::ContextraError::Storage(format!(
+            crate::error::StoreError::Storage(format!(
                 "Failed to read directory entry for legacy WAL check: {e}"
             ))
         })? {
@@ -443,15 +444,15 @@ impl LsmStorage {
     /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
     pub async fn migrate_legacy_wal_keys(
         config: &LsmConfig,
-        clock: Arc<dyn contextra_ports::Clock>,
+        clock: Arc<dyn contextra_env::Clock>,
     ) -> Result<usize> {
         let mut entries = match tokio::fs::read_dir(&config.path).await {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
             Err(e) => {
-                return Err(contextra_types::ContextraError::Storage(format!(
+                return Err(crate::error::StoreError::Storage(format!(
                     "Failed to read directory for legacy WAL migration: {e}"
-                )))
+                )).into())
             }
         };
 
@@ -462,7 +463,7 @@ impl LsmStorage {
         }
 
         let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
-            contextra_types::ContextraError::Storage(format!(
+            crate::error::StoreError::Storage(format!(
                 "SALT file read failed during migration: {e}"
             ))
         })?;
@@ -478,7 +479,7 @@ impl LsmStorage {
         let mut migrated_count = 0usize;
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_types::ContextraError::Storage(format!(
+            crate::error::StoreError::Storage(format!(
                 "Failed to read directory entry for legacy WAL migration: {e}"
             ))
         })? {
@@ -535,7 +536,7 @@ impl LsmStorage {
     }
 
     /// Returns the VFS instance.
-    pub fn vfs(&self) -> &std::sync::Arc<dyn contextra_ports::Vfs> {
+    pub fn vfs(&self) -> &std::sync::Arc<dyn crate::io_seam::Vfs> {
         &self.compaction_engine.vfs
     }
 
@@ -543,9 +544,10 @@ impl LsmStorage {
     ///
     /// Dies ist die einzige erlaubte Stelle, an der `LsmStorage` seine Interna
     /// an Scanner weitergibt. Scanner halten danach keine `Arc<LsmStorage>` mehr.
-    pub async fn scan_view(self: &Arc<Self>) -> crate::scanner::StoreScanView {
+    #[cfg(feature = "workspace")]
+    pub async fn scan_view(self: &Arc<Self>) -> crate::compat::scanner::StoreScanView {
         let (active_memtable, immutable_memtables) = self.memtables_for_scanner().await;
-        crate::scanner::StoreScanView {
+        crate::compat::scanner::StoreScanView {
             active_memtable,
             immutable_memtables,
             sstables: Arc::clone(&self.sstables),
@@ -554,5 +556,90 @@ impl LsmStorage {
             vfs: Arc::clone(self.vfs()),
             snapshot_registry: Arc::clone(&self.snapshot_registry),
         }
+    }
+}
+
+
+impl LsmStorage {
+    /// Inherent read operations for standalone usage.
+    pub async fn get<'a>(&'a self, key: &'a [u8]) -> Result<Option<bytes::Bytes>> {
+        crate::lsm::ops::read::get(self, key).await
+    }
+
+    pub async fn get_at_seq<'a>(&'a self, key: &'a [u8], seq_no: u64) -> Result<Option<bytes::Bytes>> {
+        crate::lsm::ops::read::get_at_seq(self, key, seq_no).await
+    }
+
+    pub async fn scan_prefix<'a>(&'a self, prefix: &'a [u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        crate::lsm::ops::read::scan_prefix(self, prefix).await
+    }
+
+    pub async fn scan_prefix_bounded<'a>(&'a self, prefix: &'a [u8], limit: usize, cursor: Option<&'a [u8]>) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
+        crate::lsm::ops::read::scan_prefix_bounded(self, prefix, limit, cursor).await
+    }
+
+    pub async fn scan_prefix_at<'a>(&'a self, prefix: &'a [u8], seq_no: u64) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        crate::lsm::ops::read::scan_prefix_at(self, prefix, seq_no).await
+    }
+
+    pub async fn scan_bounded<'a>(&'a self, start: std::ops::Bound<&'a [u8]>, end: std::ops::Bound<&'a [u8]>, limit: usize, cursor: Option<&'a [u8]>) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
+        crate::lsm::ops::read::scan_bounded(self, start, end, limit, cursor).await
+    }
+
+    pub async fn scan<'a>(&'a self, start: std::ops::Bound<&'a [u8]>, end: std::ops::Bound<&'a [u8]>, limit: Option<usize>) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        crate::lsm::ops::read::scan(self, start, end, limit).await
+    }
+
+    /// Inherent write and maintenance operations.
+    pub async fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> Result<()> {
+        crate::lsm::ops::write::put(self, tx_id, key, value).await
+    }
+
+    pub async fn put_if_absent<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> Result<bool> {
+        crate::lsm::ops::write::put_if_absent(self, tx_id, key, value).await
+    }
+
+    pub async fn delete_many<'a>(&'a self, tx_id: TxId, keys: Vec<Vec<u8>>) -> Result<u64> {
+        crate::lsm::ops::write::delete_many(self, tx_id, keys).await
+    }
+
+    pub async fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> Result<u64> {
+        crate::lsm::ops::write::delete_prefix(self, tx_id, prefix).await
+    }
+
+    pub async fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> Result<()> {
+        crate::lsm::ops::write::delete(self, tx_id, key).await
+    }
+
+    pub async fn commit<'a>(&'a self, tx_id: TxId) -> Result<()> {
+        crate::lsm::ops::write::commit(self, tx_id).await
+    }
+
+    pub async fn rollback<'a>(&'a self, tx_id: TxId) -> Result<()> {
+        crate::lsm::ops::maintenance::rollback(self, tx_id).await
+    }
+
+    pub async fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> Result<()> {
+        crate::lsm::ops::maintenance::pin_checkpoint(self, seq_no).await
+    }
+
+    pub async fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> Result<()> {
+        crate::lsm::ops::maintenance::unpin_checkpoint(self, seq_no).await
+    }
+
+    pub async fn flush<'a>(&'a self) -> Result<()> {
+        crate::lsm::ops::compaction::flush(self).await
+    }
+
+    pub async fn stats<'a>(&'a self) -> Result<crate::stats::StorageStats> {
+        crate::lsm::ops::maintenance::stats(self).await
+    }
+
+    pub async fn last_seq_no<'a>(&'a self) -> Result<u64> {
+        crate::lsm::ops::maintenance::last_seq_no(self).await
+    }
+
+    pub async fn last_tx_id<'a>(&'a self) -> Result<TxId> {
+        crate::lsm::ops::maintenance::last_tx_id(self).await
     }
 }

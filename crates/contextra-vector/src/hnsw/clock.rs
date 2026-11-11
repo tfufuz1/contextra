@@ -3,17 +3,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use crate::types::Clock;
 
-#[cfg(feature = "ports-compat")]
-impl contextra_ports::Clock for MonotonicCounterClock {
-    fn now_unix_nanos(&self) -> u64 {
-        self.nanos.load(Ordering::SeqCst)
-    }
-
-    fn monotonic_nanos(&self) -> u64 {
-        self.nanos.load(Ordering::SeqCst)
-    }
-}
-
 /// Deterministic monotonic counter clock for HNSW vector index.
 ///
 /// Implements [`Clock`] without any reference to system wall-clock or non-deterministic OS time sources.

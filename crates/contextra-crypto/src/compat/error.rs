@@ -30,6 +30,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::type_complexity)]
     fn test_table_driven_from_crypto_error() {
         let cases: Vec<(CryptoError, Box<dyn Fn(&ContextraError) -> bool>)> = vec![
             (

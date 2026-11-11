@@ -8,10 +8,9 @@
 //! - **INV-WAL-CRC-1:** Jedes Frame trägt eine CRC32C-Prüfsumme über den Nutzdaten-Payload.
 //! - **INV-WAL-HMAC-1:** Sequenzielle Hash-Kette bindet vorherigen HMAC (`prev_hmac`), Sequenznummer und Operation.
 
-// TODO(baukasten): WAL-Encoding von konkretem KeyManager entkoppeln (AD-8). Verwendet generische Byte-Schlüssel oder Kdf-Trait statt direkter Krypto-Crate-Verdrahtung.
 use contextra_crypto::wal_crypto::WalHmac;
 use crate::error::{StoreError, StoreResult};
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use std::result::Result;
 
 use super::MAX_WAL_ENTRY_SIZE;

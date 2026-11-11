@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::wal::{Wal, WAL_V3_HEADER};
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;

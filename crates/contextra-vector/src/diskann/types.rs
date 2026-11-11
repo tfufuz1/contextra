@@ -8,7 +8,8 @@ use super::config::{CachedNode, DiskAnnConfig};
 use super::format::DiskAnnHeader;
 use crate::ComputePool;
 use ahash::AHashMap;
-use contextra_types::{ContextraError, DocId, Result};
+use crate::error::{Result, VectorError};
+use crate::types::DocId;
 use memmap2::Mmap;
 use parking_lot::RwLock;
 use std::io::Read;
@@ -98,7 +99,7 @@ mod tests {
         assert!(res.is_err());
         let err = res.err().unwrap();
         match err {
-            ContextraError::Storage(msg) => assert!(
+            VectorError::Storage(msg) => assert!(
                 msg.contains("bad magic"),
                 "Expected bad magic error, got: {msg}"
             ),
@@ -125,7 +126,7 @@ mod tests {
         assert!(res.is_err());
         let err = res.err().unwrap();
         match err {
-            ContextraError::Storage(msg) => assert!(
+            VectorError::Storage(msg) => assert!(
                 msg.contains("Header too small") || msg.contains("too small for header"),
                 "Expected Header too small error, got: {msg}"
             ),
@@ -185,7 +186,7 @@ impl Ord for SearchCandidate {
 impl DiskAnnIndex {
     pub fn try_new(config: DiskAnnConfig) -> Result<Self> {
         if !config.sector_size.is_power_of_two() {
-            return Err(ContextraError::InvalidInput(
+            return Err(VectorError::InvalidInput(
                 "Sector size must be a power of 2".to_string(),
             ));
         }
@@ -203,24 +204,24 @@ impl DiskAnnIndex {
         let node_size_bytes = raw_node_size.div_ceil(config.sector_size) * config.sector_size;
 
         if config.index_path.exists() {
-            let mut file = std::fs::File::open(&config.index_path).map_err(ContextraError::Io)?;
-            let metadata = file.metadata().map_err(ContextraError::Io)?;
+            let mut file = std::fs::File::open(&config.index_path).map_err(VectorError::Io)?;
+            let metadata = file.metadata().map_err(VectorError::Io)?;
             let file_len = metadata.len() as usize;
 
             if file_len < DiskAnnHeader::SIZE {
-                return Err(ContextraError::Storage(
+                return Err(VectorError::Storage(
                     "DiskANN file too small for header".into(),
                 ));
             }
 
             let mut header_buf = [0u8; DiskAnnHeader::SIZE];
             file.read_exact(&mut header_buf)
-                .map_err(ContextraError::Io)?;
+                .map_err(VectorError::Io)?;
 
             let header = DiskAnnHeader::try_from_bytes(&header_buf)?;
 
             if config.sector_size != header.sector_size as usize {
-                return Err(ContextraError::Index(format!(
+                return Err(VectorError::Index(format!(
                     "DiskANN-Index inkompatibel: Config-sector_size={} stimmt nicht mit \
                      Header-sector_size={} überein. Index muss neu aufgebaut werden.",
                     config.sector_size, header.sector_size
@@ -229,7 +230,7 @@ impl DiskAnnIndex {
 
             let header_sector_size = header.sector_size as usize;
             if header_sector_size == 0 {
-                return Err(ContextraError::Storage(
+                return Err(VectorError::Storage(
                     "DiskANN header corrupt: sector_size is 0".into(),
                 ));
             }
@@ -249,7 +250,7 @@ impl DiskAnnIndex {
                 (header.node_count as usize).saturating_mul(header_node_size_bytes),
             );
             if file_len < expected_min_size {
-                return Err(ContextraError::Storage(format!(
+                return Err(VectorError::Storage(format!(
                     "DiskANN file truncated or corrupt node_count: file len {}, expected at least {}",
                     file_len, expected_min_size
                 )));

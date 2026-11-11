@@ -1,3 +1,4 @@
+#![allow(clippy::field_reassign_with_default, clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing, clippy::cast_sign_loss)]
 #![cfg(all(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
 #![allow(clippy::field_reassign_with_default)]
 //! # Deterministische Eigenschafts- und Konvergenztests für Regler

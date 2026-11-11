@@ -32,10 +32,10 @@ pub mod clock;
 pub mod deletion;
 // ANCHOR[contextra-vector:HNSW-MOD-PURGE]
 // Deprecated Wartungs-Purger (Teil der Übergangsbrücke).
-pub mod purge;
+
 // ANCHOR[contextra-vector:HNSW-MOD-SCANNER]
 // Deprecated Wartungs-Scanner (Teil der Übergangsbrücke).
-pub mod scanner;
+
 // ANCHOR[contextra-vector:HNSW-MOD-SQ8-BIAS]
 // Asymmetrische Distanzkorrektur für quantisierte Vektoren.
 pub mod sq8_bias;
@@ -45,23 +45,25 @@ pub mod sq8_bias;
 
 #[allow(deprecated)]
 #[cfg(feature = "ports-compat")]
-pub use purge::{hnsw_purger, HnswPurger};
+#[cfg(feature = "ports-compat")]
+pub use crate::compat::purge::{hnsw_purger, HnswPurger};
 #[allow(deprecated)]
 #[cfg(feature = "ports-compat")]
-pub use scanner::{hnsw_scanner, HnswScanner};
+#[cfg(feature = "ports-compat")]
+pub use crate::compat::scanner::{hnsw_scanner, HnswScanner};
 // !SECTION
 
 // SECTION Private & Interne Module
 
 mod acorn_filtered;
-mod batch;
-mod config;
+pub(crate) mod batch;
+pub(crate) mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
 pub mod staging;
-mod types;
-mod vector_index_impl;
+pub(crate) mod types;
+
 
 #[cfg(test)]
 mod tests;
@@ -81,7 +83,8 @@ pub use types::{
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
-pub use vector_index_impl::{HnswCompactStats, Index, Maintain};
+#[cfg(feature = "ports-compat")]
+pub use crate::compat::hnsw_vector_index::{HnswCompactStats, Index, Maintain};
 
 pub use staging::{VectorStagingOp, VectorTxBuffer};
 // !SECTION

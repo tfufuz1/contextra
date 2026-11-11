@@ -1,3 +1,4 @@
+#![allow(clippy::indexing_slicing)]
 #![cfg(feature = "flow-corrected-thompson")]
 //! Property-Tests und Unit-Tests für Off-Policy-Kompatibilität und Bandit-Default-Flip-Gate (§B.3.2).
 

@@ -8,7 +8,8 @@ use roaring::RoaringTreemap;
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
 
-use contextra_types::{ContextraError, DocId, Result};
+use crate::error::{Result, VectorError};
+use crate::types::DocId;
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
@@ -48,7 +49,7 @@ impl HnswIndexCore {
     pub fn wait_for_rebuild_blocking(
         &self,
         timeout: std::time::Duration,
-        _clock: &dyn contextra_ports::Clock,
+        _clock: &dyn crate::types::Clock,
     ) -> bool {
         if !self.hot.rebuilding.load(Ordering::Acquire) {
             return true;
@@ -68,7 +69,7 @@ impl HnswIndexCore {
         self.wait_for_rebuild_with_clock(clock.as_ref())
     }
 
-    pub fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {
+    pub fn wait_for_rebuild_with_clock(&self, clock: &dyn crate::types::Clock) -> bool {
         self.wait_for_rebuild_blocking(std::time::Duration::from_secs(60), clock)
     }
 
@@ -80,7 +81,7 @@ impl HnswIndexCore {
     pub fn wait_for_rebuild_with_timeout_and_clock(
         &self,
         timeout: std::time::Duration,
-        clock: &dyn contextra_ports::Clock,
+        clock: &dyn crate::types::Clock,
     ) -> bool {
         self.wait_for_rebuild_blocking(timeout, clock)
     }
@@ -122,7 +123,7 @@ impl HnswIndexCore {
                 } else {
                     guard = self.cold.quantizer.read();
                     guard.as_ref().ok_or_else(|| {
-                        contextra_types::ContextraError::Index("Quantizer not trained".into())
+                        crate::error::VectorError::Index("Quantizer not trained".into())
                     })?
                 };
                 if let Some(qq) = query_quantized {
@@ -150,7 +151,7 @@ impl HnswIndexCore {
             } else {
                 guard = self.cold.quantizer.read();
                 guard.as_ref().ok_or_else(|| {
-                    contextra_types::ContextraError::Index("Quantizer not trained".into())
+                    crate::error::VectorError::Index("Quantizer not trained".into())
                 })?
             };
             if let Some(qq) = query_quantized {
@@ -177,17 +178,17 @@ impl HnswIndexCore {
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_types::ContextraError::Index("Quantizer not trained".into())
+                        crate::error::VectorError::Index("Quantizer not trained".into())
                     })?
                     .symmetric_dist(a, b, self.cold.config.distance_metric)
             }
-            _ => Err(ContextraError::Index(
+            _ => Err(VectorError::Index(
                 "Mixed vector representations (F32/U8) are not supported".into(),
             )),
         }
     }
 
-    pub(super) fn resolve_dist(
+    pub(crate) fn resolve_dist(
         &self,
         idx: usize,
         query: &[f32],
@@ -220,7 +221,7 @@ impl HnswIndexCore {
         Ok(f32::MAX)
     }
 
-    pub(super) fn resolve_doc_id(&self, idx: usize, ctx: &SearchContext) -> Result<DocId> {
+    pub(crate) fn resolve_doc_id(&self, idx: usize, ctx: &SearchContext) -> Result<DocId> {
         let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
@@ -238,7 +239,7 @@ impl HnswIndexCore {
         if let Some(node) = ctx.nodes.get(ram_idx) {
             return Ok(node.doc_id);
         }
-        Err(ContextraError::Index(format!(
+        Err(VectorError::Index(format!(
             "Node doc_id not found for index {idx}"
         )))
     }
@@ -275,7 +276,7 @@ impl HnswIndexCore {
                     let mut v = vec![0.0f32; self.cold.config.dimension];
                     for i in 0..self.cold.config.dimension {
                         v[i] = f32::from_le_bytes(bytes[i * 4..(i + 1) * 4].try_into().map_err(
-                            |_| ContextraError::Index("Corrupt f32 in mmap vector".into()),
+                            |_| VectorError::Index("Corrupt f32 in mmap vector".into()),
                         )?);
                     }
                     Ok(VectorData::F32(v))
@@ -288,7 +289,7 @@ impl HnswIndexCore {
             return Ok(ctx.nodes[idx].vector.clone());
         }
 
-        Err(ContextraError::Index(format!(
+        Err(VectorError::Index(format!(
             "Invalid node index {} in resolve_vector_data_with_batch",
             idx
         )))
@@ -408,7 +409,7 @@ impl HnswIndexCore {
         Ok(result.iter().map(|c| c.index as u32).collect())
     }
 
-    pub(super) fn do_delete(&self, id: DocId) -> Result<()> {
+    pub(crate) fn do_delete(&self, id: DocId) -> Result<()> {
         let node_idx = self.hot.doc_to_node.write().remove(&id.inner());
         if let Some(idx) = node_idx {
             self.cold.deleted_nodes.write().insert(idx as u64);
@@ -534,7 +535,7 @@ impl HnswIndexCore {
         self.rebuild_sync()
     }
 
-    pub fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+    pub fn rebuild_with_clock(&self, clock: &dyn crate::types::Clock) -> Result<()> {
         self.rebuild_sync_with_clock(clock)
     }
 
@@ -544,7 +545,7 @@ impl HnswIndexCore {
     }
 
     // ANCHOR[contextra-vector:REBUILD-SYNC-WITH-CLOCK]
-    pub fn rebuild_sync_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+    pub fn rebuild_sync_with_clock(&self, clock: &dyn crate::types::Clock) -> Result<()> {
         let now_nanos = clock.monotonic_nanos();
         {
             if let Some(last_nanos) = get_last_rebuild_nanos(self) {
@@ -596,7 +597,7 @@ impl HnswIndexCore {
                         );
                     }
 
-                    return Err(ContextraError::Index(format!(
+                    return Err(VectorError::Index(format!(
                         "Rebuild rate limited by backoff cooldown ({:?})",
                         cooldown
                     )));
@@ -852,7 +853,7 @@ impl HnswIndexCore {
                 VectorData::U8(v) => {
                     let dequantized = {
                         let q = quantizer_guard.as_ref().ok_or_else(|| {
-                            ContextraError::Index("Quantizer missing during rebuild".into())
+                            VectorError::Index("Quantizer missing during rebuild".into())
                         })?;
                         q.dequantize(&v)?
                     };
@@ -917,7 +918,7 @@ impl HnswIndexCore {
                             VectorData::U8(v) => {
                                 let q_guard = self.cold.quantizer.read();
                                 let q = q_guard.as_ref().ok_or_else(|| {
-                                    ContextraError::Index(
+                                    VectorError::Index(
                                         "Quantizer missing during rebuild phase 2 delta replay"
                                             .into(),
                                     )
@@ -1120,7 +1121,7 @@ impl crate::types::Maintain for HnswIndex {
 mod tests {
     use super::*;
     use crate::hnsw::config::HnswConfig;
-    use contextra_ports::{Clock, SeededRng};
+    use crate::types::{Clock, SeededRng};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
@@ -1159,7 +1160,7 @@ mod tests {
             config.dimension = 4;
             config.m = 8;
             config.ef_construction = 16;
-            let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(seed));
+            let rng: Arc<dyn crate::types::Rng> = Arc::new(SeededRng::new(seed));
             let index = HnswIndex::try_new_with_rng(config, rng)?;
 
             for i in 1..=20 {
@@ -1209,7 +1210,7 @@ mod tests {
         let mut config = HnswConfig::default();
         config.dimension = 4;
         config.backoff_base_delay = std::time::Duration::from_millis(500);
-        let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(42));
+        let rng: Arc<dyn crate::types::Rng> = Arc::new(SeededRng::new(42));
         let index = HnswIndex::try_new_with_rng_and_clock(config, rng, clock.clone())
             .expect("index creation succeeds");
 

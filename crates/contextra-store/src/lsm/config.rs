@@ -31,11 +31,7 @@ pub enum DurabilityConfigError {
     },
 }
 
-impl From<DurabilityConfigError> for contextra_types::ContextraError {
-    fn from(err: DurabilityConfigError) -> Self {
-        contextra_types::ContextraError::DurabilityConfig(err.to_string())
-    }
-}
+
 
 impl DurabilityMode {
     /// Validates the durability mode against required integrity guarantees and persistence constraints.
@@ -65,39 +61,7 @@ impl DurabilityMode {
         }
     }
 
-    /// Legacy-Validierung gegen Feature-Flags und Feature-Ringe.
-    #[deprecated(
-        since = "0.1.0",
-        note = "use validate_durability(integrity_chain_required, require_persistence) instead (DEBT-01)"
-    )]
-    pub fn validate_against_features(
-        self,
-        deletion_proof_active: bool,
-        feature_ring: contextra_ports::license::FeatureRing,
-    ) -> Result<(), DurabilityConfigError> {
-        let require_persistence =
-            feature_ring == contextra_ports::license::FeatureRing::Sovereign;
-        self.validate_durability(deletion_proof_active, require_persistence)
-            .map_err(|err| match err {
-                DurabilityConfigError::IncompatibleCombination { mode, feature, reason } => {
-                    if feature == "integrity-chain" {
-                        DurabilityConfigError::IncompatibleCombination {
-                            mode,
-                            feature: "deletion-proof",
-                            reason: "no HMAC integrity chain to anchor the proof",
-                        }
-                    } else if feature == "persistence-required" {
-                        DurabilityConfigError::IncompatibleCombination {
-                            mode,
-                            feature: "deletion-proof / FeatureRing::Sovereign",
-                            reason: "no persistence layer exists to prove deletion from",
-                        }
-                    } else {
-                        DurabilityConfigError::IncompatibleCombination { mode, feature, reason }
-                    }
-                }
-            })
-    }
+
 }
 
 /// LSM storage configuration.
@@ -135,7 +99,7 @@ pub struct LsmConfig {
     pub vfs: Option<crate::io_seam::StoreIo>,
     /// Injected clock port for deterministic execution timing (P28).
     #[serde(skip, default = "default_clock")]
-    pub clock: std::sync::Arc<dyn contextra_ports::Clock>,
+    pub clock: std::sync::Arc<dyn contextra_env::Clock>,
     /// Injected source for cryptographic key and salt material (P28).
     #[serde(skip, default = "default_key_source")]
     pub key_source: std::sync::Arc<dyn crate::key_source::KeyMaterialSource>,
@@ -161,8 +125,8 @@ impl Default for LsmConfig {
     }
 }
 
-fn default_clock() -> std::sync::Arc<dyn contextra_ports::Clock> {
-    std::sync::Arc::new(contextra_ports::SystemClock::new())
+fn default_clock() -> std::sync::Arc<dyn contextra_env::Clock> {
+    std::sync::Arc::new(contextra_env::SystemClock::new())
 }
 
 fn default_key_source() -> std::sync::Arc<dyn crate::key_source::KeyMaterialSource> {
@@ -171,7 +135,7 @@ fn default_key_source() -> std::sync::Arc<dyn crate::key_source::KeyMaterialSour
 
 impl LsmConfig {
     /// Attaches an injected clock port fluently to `LsmConfig`.
-    pub fn with_clock(mut self, clock: std::sync::Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(mut self, clock: std::sync::Arc<dyn contextra_env::Clock>) -> Self {
         self.clock = clock;
         self
     }
@@ -185,3 +149,7 @@ impl LsmConfig {
         self
     }
 }
+
+// MIGRATION(S-70): validate_against_features moved to crate::compat::license
+#[cfg(feature = "workspace")]
+pub use crate::compat::license::*;

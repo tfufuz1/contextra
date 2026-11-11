@@ -68,20 +68,20 @@ pub struct SystemPressureMonitor {
     pressure_tx: tokio::sync::watch::Sender<SystemPressure>,
     pub pressure_rx: tokio::sync::watch::Receiver<SystemPressure>,
     sampling_interval: Duration,
-    pub(crate) clock: Arc<dyn contextra_ports::Clock>,
+    pub(crate) clock: Arc<dyn contextra_env::Clock>,
 }
 
 impl SystemPressureMonitor {
     pub fn new(sampling_interval: Duration) -> Self {
         Self::new_with_clock(
             sampling_interval,
-            Arc::new(contextra_ports::SystemClock::new()),
+            Arc::new(contextra_env::SystemClock::new()),
         )
     }
 
     pub fn new_with_clock(
         sampling_interval: Duration,
-        clock: Arc<dyn contextra_ports::Clock>,
+        clock: Arc<dyn contextra_env::Clock>,
     ) -> Self {
         let default_pressure = SystemPressure {
             wal_queue_depth: 0,
@@ -99,7 +99,7 @@ impl SystemPressureMonitor {
         }
     }
 
-    pub fn with_clock(mut self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+    pub fn with_clock(mut self, clock: Arc<dyn contextra_env::Clock>) -> Self {
         self.clock = clock;
         self
     }
@@ -159,7 +159,7 @@ impl SystemPressureMonitor {
         wal_queue_depth_fn: impl Fn() -> usize + Send + 'static,
         embedding_permits_fn: impl Fn() -> usize + Send + 'static,
         max_embedding_permits: usize,
-        metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+        metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_env::MetricsSink>>>>,
     ) {
         let mut last_level = PressureLevel::Normal;
 

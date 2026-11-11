@@ -2,7 +2,7 @@
 //!
 //! Schreibt periodisch kompakte Manifest-Snapshots, um Logdateien klein zu halten.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult as Result};
 use tokio::io::AsyncWriteExt;
 
 use super::core::Manifest;
@@ -49,7 +49,7 @@ impl Manifest {
     ) -> Result<bool> {
         let mut file = self.file.lock().await;
         let metadata = file.metadata().await.map_err(|e| {
-            ContextraError::Storage(format!("Failed to get MANIFEST file metadata: {e}"))
+            StoreError::Storage(format!("Failed to get MANIFEST file metadata: {e}"))
         })?;
 
         if metadata.len() < threshold_bytes {
@@ -65,7 +65,7 @@ impl Manifest {
         let parent = self
             .path
             .parent()
-            .ok_or_else(|| ContextraError::Storage("Invalid MANIFEST parent directory".into()))?;
+            .ok_or_else(|| StoreError::Storage("Invalid MANIFEST parent directory".into()))?;
 
         let pid = std::process::id();
 
@@ -86,7 +86,7 @@ impl Manifest {
                 Ok(f) => break f,
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                     if attempt >= MAX_ATTEMPTS {
-                        return Err(ContextraError::Storage(format!(
+                        return Err(StoreError::Storage(format!(
                             "Exhausted {} attempts trying to create temporary MANIFEST file {:?}",
                             MAX_ATTEMPTS, tmp_path
                         )));
@@ -94,7 +94,7 @@ impl Manifest {
                     continue;
                 }
                 Err(e) => {
-                    return Err(ContextraError::Storage(format!(
+                    return Err(StoreError::Storage(format!(
                         "Failed to create temporary MANIFEST file {:?}: {e}",
                         tmp_path
                     )));
@@ -107,7 +107,7 @@ impl Manifest {
             header.extend_from_slice(super::core::MANIFEST_HEADER_MAGIC);
             header.push(super::core::CURRENT_MANIFEST_VERSION);
             new_file.write_all(&header).await.map_err(|e| {
-                ContextraError::Storage(format!(
+                StoreError::Storage(format!(
                     "Failed to write header to temporary MANIFEST {:?}: {e}",
                     tmp_path
                 ))
@@ -116,7 +116,7 @@ impl Manifest {
             for entry in live_entries {
                 let bytes = entry.to_bytes()?;
                 new_file.write_all(&bytes).await.map_err(|e| {
-                    ContextraError::Storage(format!(
+                    StoreError::Storage(format!(
                         "Failed to write entry to temporary MANIFEST {:?}: {e}",
                         tmp_path
                     ))
@@ -124,13 +124,13 @@ impl Manifest {
             }
 
             new_file.flush().await.map_err(|e| {
-                ContextraError::Storage(format!(
+                StoreError::Storage(format!(
                     "Failed to flush temporary MANIFEST {:?}: {e}",
                     tmp_path
                 ))
             })?;
             new_file.sync_all().await.map_err(|e| {
-                ContextraError::Storage(format!(
+                StoreError::Storage(format!(
                     "Failed to fsync temporary MANIFEST {:?}: {e}",
                     tmp_path
                 ))
@@ -141,7 +141,7 @@ impl Manifest {
             tokio::fs::rename(&tmp_path, &self.path)
                 .await
                 .map_err(|e| {
-                    ContextraError::Storage(format!(
+                    StoreError::Storage(format!(
                         "Failed to rename temporary MANIFEST from {:?} to {:?}: {e}",
                         tmp_path, self.path
                     ))
@@ -156,7 +156,7 @@ impl Manifest {
                 .open(&self.path)
                 .await
                 .map_err(|e| {
-                    ContextraError::Storage(format!(
+                    StoreError::Storage(format!(
                         "Failed to reopen MANIFEST after rollover {:?}: {e}",
                         self.path
                     ))

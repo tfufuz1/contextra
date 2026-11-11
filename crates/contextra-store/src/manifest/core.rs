@@ -10,7 +10,7 @@
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
 use crate::error::{StoreError, StoreResult};
-use contextra_types::Result;
+use crate::error::StoreResult as Result;
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -20,7 +20,11 @@ use super::MAX_MANIFEST_ENTRY_SIZE;
 use crate::util::DirLock;
 
 pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
-pub const CURRENT_MANIFEST_VERSION: u8 = 1;
+pub const CURRENT_MANIFEST_VERSION: u8 = 2;
+#[allow(dead_code)]
+pub const MANIFEST_VERSION_V1: u8 = 1;
+#[allow(dead_code)]
+pub const MANIFEST_VERSION_V2: u8 = 2;
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
 // ANCHOR[contextra-store:MAN-CORE-001]

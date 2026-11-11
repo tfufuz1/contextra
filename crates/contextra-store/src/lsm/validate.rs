@@ -3,7 +3,8 @@
 //! Prueft interne Datenstrukturen auf Konsistenz und Korrektheit.
 
 use super::{MAX_KEY_SIZE, MAX_VALUE_SIZE};
-use contextra_types::{ContextraError, DocId, Result};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_ids::DocId;
 
 pub fn validate_key(key: &[u8]) -> Result<()> {
     if key.is_empty() {

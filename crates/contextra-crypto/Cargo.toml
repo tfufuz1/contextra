@@ -1,7 +1,24 @@
-[lints]
-workspace = true
+[lints.rust]
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)'] }
+deprecated = "allow"
 
-
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+panic = "allow"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
+dbg_macro = "deny"
+unwrap_used = "allow"
+expect_used = "allow"
+indexing_slicing = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+doc_lazy_continuation = "allow"
+disallowed_methods = "allow"
+disallowed_types = "allow"
 
 [package]
 autobenches = false
@@ -9,11 +26,18 @@ name = "contextra-crypto"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
+readme = "README.md"
+repository = "https://github.com/tfufuz1/contextra"
+keywords = ["cryptography", "aead", "kdf", "wal", "zeroize"]
+categories = ["cryptography"]
+# Internes Bausteinlager fuer die Contextra-Architektur, kein externes Crates.io-Release
+publish = false
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
 
 [dependencies]
 thiserror = { workspace = true }
@@ -52,7 +76,6 @@ cloud-egress-guard = []
 contextra-crypto = { path = ".", features = ["test-utils"] }
 contextra-types = { path = "../contextra-types" }
 contextra-ports = { path = "../contextra-ports" }
-contextra-testkit = { workspace = true }
 contextra-env = { path = "../contextra-env", features = ["test-utils"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
@@ -63,4 +86,3 @@ loom = "0.7"
 [[bench]]
 name = "crypto_benchmarks"
 harness = false
-

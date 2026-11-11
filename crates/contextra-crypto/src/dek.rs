@@ -59,12 +59,12 @@ pub const DEK_LABEL: &[u8] = b"ctx/dek/v2";
 pub const DEK_SALT_LABEL: &[u8] = b"ctx/dek-salt/v2";
 pub const WRAP_AAD: &[u8] = b"ctx/dek-wrap/v1";
 
-/// Derives a DEK using AncestorSalts and DocTag.
 // !SECTION
 
 // SECTION [epic=crypto-dek,seq=3] Hierarchische Schlüsselableitung
 // ANCHOR[contextra-crypto:DEK-003] Deterministische DEK-Ableitung nach D-79
 // NOTE: Hash der Vorfahren-Salts garantiert Mandanten- und Dokumentenisolierung (TS:2026-11-11)
+/// Derives a DEK using AncestorSalts and DocTag.
 pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
     let mut hasher = Sha256::new();
     hasher.update(DEK_SALT_LABEL);

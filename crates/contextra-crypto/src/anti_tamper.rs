@@ -20,13 +20,13 @@ use zeroize::{Zeroize, Zeroizing};
 
 /// Defines a cryptographic key that is explicitly zeroed out when dropped
 /// or when an emergency trigger is activated, protecting against cold-boot attacks.
-#[derive(Zeroize)]
-#[zeroize(drop)]
 // !SECTION
 
 // SECTION [epic=crypto-tamper,seq=2] Volatiler Schlüssel & Notfall-Wipe
 // ANCHOR[contextra-crypto:TAMPER-001] VolatileEncryptionKey mit Emergency Trigger
 // NOTE: Schützt vor Cold-Boot Angriffen durch sofortiges Nullen des Speichers (TS:2026-11-11)
+#[derive(Zeroize)]
+#[zeroize(drop)]
 pub struct VolatileEncryptionKey {
     key_bytes: Zeroizing<[u8; 32]>, // AES-256 Key
 }
@@ -76,14 +76,14 @@ impl PartialEq for VolatileEncryptionKey {
 
 impl Eq for VolatileEncryptionKey {}
 
-/// Konstantzeit-Verifikation zweier Byte-Slices (`INV-CRYPTO-CONSTANT-TIME-1`).
-///
-/// Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen.
-#[inline]
 // !SECTION
 
 // SECTION [epic=crypto-tamper,seq=3] Konstantzeit-Operationen
 // ANCHOR[contextra-crypto:TAMPER-002] Konstantzeit-Vergleich zweier Slices
+/// Konstantzeit-Verifikation zweier Byte-Slices (`INV-CRYPTO-CONSTANT-TIME-1`).
+///
+/// Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen.
+#[inline]
 pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;

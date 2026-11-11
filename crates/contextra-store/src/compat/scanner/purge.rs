@@ -9,7 +9,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::scanner::runtime::ScannerRuntime;
+use crate::compat::scanner::runtime::ScannerRuntime;
 use crate::lsm::LsmStorage;
 use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;

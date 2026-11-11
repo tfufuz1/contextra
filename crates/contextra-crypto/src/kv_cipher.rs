@@ -124,8 +124,6 @@ impl KvCipher for KeyManager {
     }
 }
 
-#[cfg(feature = "kv-encryption")]
-
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
 // ANCHOR[contextra-crypto:KV-001]

@@ -2,9 +2,11 @@
 //!
 //! Merged Iteratoren ueber MemTable und SSTables mit Snapshot-Sichtbarkeit.
 
+pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;
 use super::*;
 use crate::memtable::is_valid_range_bounds;
-use contextra_types::{Result, TOMBSTONE_BIT};
+use crate::error::StoreResult as Result;
+use contextra_ids::TOMBSTONE_BIT;
 
 pub(super) enum SstableScanMode<'a> {
     Prefix(&'a [u8]),
@@ -139,10 +141,10 @@ impl LsmStorage {
                     if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (v, seq);
                     }
-                    if check_accumulator && map.len() > contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR
+                    if check_accumulator && map.len() > MAX_SCAN_MERGE_ACCUMULATOR
                     {
-                        return Err(ContextraError::LimitExceeded {
-                            limit: contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR,
+                        return Err(crate::error::StoreError::LimitExceeded {
+                            limit: MAX_SCAN_MERGE_ACCUMULATOR,
                             context: format!(
                                 "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                             ),
@@ -181,9 +183,9 @@ impl LsmStorage {
         // 2. Immutable memtables (older -> newer)
         for mt in &state.immutable_memtables {
             scan_memtable(mt, &mut map);
-            if check_accumulator && map.len() > contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR {
-                return Err(ContextraError::LimitExceeded {
-                    limit: contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR,
+            if check_accumulator && map.len() > MAX_SCAN_MERGE_ACCUMULATOR {
+                return Err(crate::error::StoreError::LimitExceeded {
+                    limit: MAX_SCAN_MERGE_ACCUMULATOR,
                     context: format!(
                         "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                     ),
@@ -193,9 +195,9 @@ impl LsmStorage {
 
         // 3. Active memtable
         scan_memtable(&state.memtable, &mut map);
-        if check_accumulator && map.len() > contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR {
-            return Err(ContextraError::LimitExceeded {
-                limit: contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR,
+        if check_accumulator && map.len() > MAX_SCAN_MERGE_ACCUMULATOR {
+            return Err(crate::error::StoreError::LimitExceeded {
+                limit: MAX_SCAN_MERGE_ACCUMULATOR,
                 context: format!(
                     "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                 ),

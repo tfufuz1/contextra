@@ -2,7 +2,7 @@
 //!
 //! Koordiniert Flush- und fsync-Aufrufe mit Timeout und Batching-Strategien.
 
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError, StoreResult as Result};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -59,7 +59,7 @@ fn encode_encrypted_rewrite_chunks(
     for entry in v3_entries {
         let entry_bytes = entry.to_bytes()?;
         if OVERHEAD + entry_bytes.len() > max_frame_size {
-            return Err(ContextraError::Storage(format!(
+            return Err(StoreError::Storage(format!(
                 "Single WAL entry size {} exceeds MAX_WAL_ENTRY_SIZE frame limit {}",
                 entry_bytes.len(),
                 max_frame_size
@@ -69,7 +69,7 @@ fn encode_encrypted_rewrite_chunks(
         if OVERHEAD + current_batch_plaintext.len() + entry_bytes.len() > max_frame_size {
             let (encrypted, nonce) = km.encrypt_auto_nonce(&current_batch_plaintext)?;
             let chunk_len = u32::try_from(12 + encrypted.len())
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                .map_err(|e| StoreError::Storage(e.to_string()))?;
 
             total_bytes.extend_from_slice(&chunk_len.to_le_bytes());
             total_bytes.extend_from_slice(&nonce);
@@ -84,7 +84,7 @@ fn encode_encrypted_rewrite_chunks(
     if !current_batch_plaintext.is_empty() {
         let (encrypted, nonce) = km.encrypt_auto_nonce(&current_batch_plaintext)?;
         let chunk_len = u32::try_from(12 + encrypted.len())
-            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+            .map_err(|e| StoreError::Storage(e.to_string()))?;
 
         total_bytes.extend_from_slice(&chunk_len.to_le_bytes());
         total_bytes.extend_from_slice(&nonce);
@@ -102,7 +102,7 @@ impl Wal {
         config: WalFlusherConfig,
     ) -> Result<()> {
         if config.queue_capacity == 0 {
-            return Err(ContextraError::invalid_input(
+            return Err(StoreError::invalid_input(
                 "WAL queue_capacity must be greater than 0",
             ));
         }
@@ -149,10 +149,10 @@ impl Wal {
                             let err_msg = format!(
                                 "WAL handle poisoned ({cause_enum:?}); requires explicit recovery or reload before further appends"
                             );
-                            let _ = ack.send(Err(ContextraError::Storage(err_msg.clone())));
+                            let _ = ack.send(Err(StoreError::Storage(err_msg.clone())));
                             while let Ok(next_cmd) = rx.try_recv() {
                                 if let WalCommand::Append { ack, .. } = next_cmd {
-                                    let _ = ack.send(Err(ContextraError::Storage(err_msg.clone())));
+                                    let _ = ack.send(Err(StoreError::Storage(err_msg.clone())));
                                 }
                             }
                             continue;
@@ -238,7 +238,7 @@ impl Wal {
                         let write_res: Result<()> = async {
                             if write_header {
                                 file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL flusher header write failed for {}: {}",
                                         path.display(),
                                         e
@@ -277,20 +277,20 @@ impl Wal {
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
                                 crate::wal::FAIL_APPEND_PARTIAL_ONCE
                                     .store(false, std::sync::atomic::Ordering::SeqCst);
-                                return Err(ContextraError::Storage(
+                                return Err(StoreError::Storage(
                                     "Simulated WAL append partial write failure (FAIL_APPEND_PARTIAL_ONCE)".into(),
                                 ));
                             }
 
                             file.write_all(&batch_payload).await.map_err(|e| {
-                                ContextraError::Storage(format!(
+                                StoreError::Storage(format!(
                                     "WAL flusher write failed for {}: {}",
                                     path.display(),
                                     e
                                 ))
                             })?;
                             file.flush().await.map_err(|e| {
-                                ContextraError::Storage(format!(
+                                StoreError::Storage(format!(
                                     "WAL flusher flush failed for {}: {}",
                                     path.display(),
                                     e
@@ -317,7 +317,7 @@ impl Wal {
 
                             for ack in acks {
                                 let _ =
-                                    ack.send(Err(ContextraError::Storage(write_err.to_string())));
+                                    ack.send(Err(StoreError::Storage(write_err.to_string())));
                             }
                             continue;
                         }
@@ -333,13 +333,13 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                return Err(ContextraError::Storage(
+                                return Err(StoreError::Storage(
                                     "WAL fsync failed, outcome unknown: simulated fsync failure (FAIL_SYNC_ONCE)".into(),
                                 ));
                             }
 
                             file.sync_all().await.map_err(|e| {
-                                ContextraError::Storage(format!(
+                                StoreError::Storage(format!(
                                     "WAL fsync failed, outcome unknown: {}",
                                     e
                                 ))
@@ -357,7 +357,7 @@ impl Wal {
                             );
                             for ack in acks {
                                 let _ =
-                                    ack.send(Err(ContextraError::Storage(sync_err.to_string())));
+                                    ack.send(Err(StoreError::Storage(sync_err.to_string())));
                             }
                             continue;
                         }
@@ -388,7 +388,7 @@ impl Wal {
                         let current_cause = poison_state.load(std::sync::atomic::Ordering::SeqCst);
                         if current_cause != 0 {
                             let cause_enum = PoisonCause::from_u8(current_cause);
-                            let _ = ack.send(Err(ContextraError::Storage(format!(
+                            let _ = ack.send(Err(StoreError::Storage(format!(
                                 "WAL handle poisoned ({cause_enum:?}); requires explicit recovery or reload before further appends"
                             ))));
                             continue;
@@ -411,7 +411,7 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(ContextraError::Storage(
+                                return Err(StoreError::Storage(
                                     "Simulated WAL truncate I/O failure (FAIL_TRUNCATE_ONCE)"
                                         .into(),
                                 ));
@@ -426,7 +426,7 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(ContextraError::Storage(format!(
+                                return Err(StoreError::Storage(format!(
                                     "WAL truncate failed for {}: {}",
                                     path.display(),
                                     e
@@ -440,7 +440,7 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(ContextraError::Storage(format!(
+                                return Err(StoreError::Storage(format!(
                                     "WAL truncate fsync failed for {}: {}",
                                     path.display(),
                                     e
@@ -454,7 +454,7 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(ContextraError::Storage(format!(
+                                return Err(StoreError::Storage(format!(
                                     "WAL seek after truncate failed for {}: {}",
                                     path.display(),
                                     e
@@ -495,7 +495,7 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(ContextraError::Storage(
+                                return Err(StoreError::Storage(
                                     "WAL fsync failed, outcome unknown: simulated fsync failure in seal".into(),
                                 ));
                             }
@@ -507,7 +507,7 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(ContextraError::Storage(format!(
+                                return Err(StoreError::Storage(format!(
                                     "WAL fsync failed, outcome unknown: vor rotate_and_seal fehlgeschlagen: {}",
                                     e
                                 )));
@@ -528,7 +528,7 @@ impl Wal {
                                     }
                                     Ok(false) => break candidate_path,
                                     Err(e) => {
-                                        return Err(ContextraError::Storage(format!(
+                                        return Err(StoreError::Storage(format!(
                                             "WAL try_exists check failed during rotate_and_seal for {}: {}",
                                             candidate_path.display(),
                                             e
@@ -540,7 +540,7 @@ impl Wal {
                             crate::wal::fs::rename(&path, &sealed_path)
                                 .await
                                 .map_err(|e| {
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
                                         path.display(),
                                         sealed_path.display(),
@@ -555,13 +555,13 @@ impl Wal {
                                     std::sync::atomic::Ordering::SeqCst,
                                     std::sync::atomic::Ordering::SeqCst,
                                 );
-                                return Err(e);
+                                return Err(StoreError::Storage(e.to_string()));
                             }
 
                             let mut perms = crate::wal::fs::metadata(&sealed_path)
                                 .await
                                 .map_err(|e| {
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL metadata nach seal fehlgeschlagen: {}",
                                         e
                                     ))
@@ -571,7 +571,7 @@ impl Wal {
                             crate::wal::fs::set_permissions(&sealed_path, perms)
                                 .await
                                 .map_err(|e| {
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL set_readonly fehlgeschlagen: {}",
                                         e
                                     ))
@@ -631,7 +631,7 @@ impl Wal {
                                         std::sync::atomic::Ordering::SeqCst,
                                         std::sync::atomic::Ordering::SeqCst,
                                     );
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL seek failed during migration for {}: {}",
                                         path.display(),
                                         e
@@ -644,7 +644,7 @@ impl Wal {
                                         std::sync::atomic::Ordering::SeqCst,
                                         std::sync::atomic::Ordering::SeqCst,
                                     );
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL truncate failed during migration for {}: {}",
                                         path.display(),
                                         e
@@ -658,7 +658,7 @@ impl Wal {
                                         std::sync::atomic::Ordering::SeqCst,
                                         std::sync::atomic::Ordering::SeqCst,
                                     );
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL migration write failed for {}: {}",
                                         path.display(),
                                         e
@@ -671,7 +671,7 @@ impl Wal {
                                         std::sync::atomic::Ordering::SeqCst,
                                         std::sync::atomic::Ordering::SeqCst,
                                     );
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL migration flush failed for {}: {}",
                                         path.display(),
                                         e
@@ -694,7 +694,7 @@ impl Wal {
                                         std::sync::atomic::Ordering::SeqCst,
                                         std::sync::atomic::Ordering::SeqCst,
                                     );
-                                    return Err(ContextraError::Storage(
+                                    return Err(StoreError::Storage(
                                         "WAL fsync failed, outcome unknown: simulated fsync failure in migration".into(),
                                     ));
                                 }
@@ -706,7 +706,7 @@ impl Wal {
                                         std::sync::atomic::Ordering::SeqCst,
                                         std::sync::atomic::Ordering::SeqCst,
                                     );
-                                    ContextraError::Storage(format!(
+                                    StoreError::Storage(format!(
                                         "WAL migration fsync failed for {}: {}",
                                         path.display(),
                                         e
@@ -722,7 +722,7 @@ impl Wal {
                             }
 
                             let total_len_u64 = u64::try_from(total_bytes.len())
-                                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+                                .map_err(|e| StoreError::Storage(e.to_string()))?;
                             size.store(total_len_u64, std::sync::atomic::Ordering::SeqCst);
                             header_written.store(true, std::sync::atomic::Ordering::Release);
                             flusher_last_hmac = last_hmac_val;

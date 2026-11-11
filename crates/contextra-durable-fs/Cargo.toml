@@ -8,9 +8,18 @@ edition.workspace = true
 license = "MIT OR Apache-2.0"
 rust-version = "1.89"
 description = "Crash-sichere Dateisystem-Operationen und synchrones Disk-Flushing für Contextra"
+repository = "https://github.com/contextra/contextra"
+readme = "README.md"
+keywords = ["fsync", "durability", "vfs", "crash-consistency", "storage"]
+categories = ["filesystem"]
+publish = false # Internes Bausteinlager
 
 [package.metadata.contextra]
 ring = "0"
+klasse = "A"
+group = "foundation"
+level = 0
+tier = "experimental"
 
 [dependencies]
 thiserror = { workspace = true }

@@ -79,7 +79,6 @@ pub mod quantize;
 pub mod acorn;
 // ANCHOR[contextra-vector:ROOT-MOD-STREAM]
 // Zero-Allocation Streaming von Such-Kandidaten.
-pub mod candidate_stream;
 // ANCHOR[contextra-vector:ROOT-MOD-POOL]
 // Thread-Pool für rechenintensive Distanz- und Rebuild-Operationen.
 pub mod compute_pool;
@@ -97,7 +96,9 @@ pub mod quantize_rabitq;
 // !SECTION
 
 // SECTION Öffentliche Re-Exports
-pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
+// MIGRATION(S-70): neuer Pfad crate::compat::candidate_stream
+#[cfg(any(feature = "ports-compat", feature = "workspace"))]
+pub use compat::candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
 pub use contract::{
     BlockTransform, Clock as ContractClock, DistanceFn, Error as ContractError, ExternalId,

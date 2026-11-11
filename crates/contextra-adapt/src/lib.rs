@@ -1,7 +1,7 @@
 //! Adaptive controllers, PID regulators, bandits, and Lyapunov drift watchers for Contextra.
 
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 #![allow(
     clippy::indexing_slicing,
     clippy::cast_possible_truncation,
@@ -22,7 +22,12 @@
 
 // --- Lokale Grundabstraktionen (B3, B4, B11) ---
 
+#[cfg(feature = "std")]
 pub mod clock;
+#[cfg(not(feature = "std"))]
+pub mod clock;
+#[cfg(feature = "workspace")]
+pub mod compat;
 pub mod contract;
 pub mod error;
 pub mod rng;

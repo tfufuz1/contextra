@@ -4,7 +4,7 @@
 //! innerhalb eines SSTable-Datenblocks bereit.
 
 use crate::error::{StoreError, StoreResult};
-use contextra_types::Result;
+use crate::error::StoreResult as Result;
 
 /// Entry offset accessor supporting both 16-bit (legacy v0..v2) and 32-bit (v3+) block formats.
 pub fn get_entry_at_index(

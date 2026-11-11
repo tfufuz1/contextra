@@ -1,4 +1,16 @@
+[version]
+schema = "3"
+
 [crates.contextra-adapt]
-klasse = "A"
-may_depend_on = []          # Soll nach Abschluss dieses Auftrags (interne Crates, nur Namen)
-transitional = []           # Vollständig entkoppelt (MISSION ADAPT-1)
+group = "llm"
+level = 0
+tier = "beta"
+path = "crates/contextra-adapt"
+unsafe_island = false
+allowed_internal = []
+dev_allowed = []
+
+[crates.contextra-adapt.feature_closure_allowed]
+workspace = ["contextra-types", "contextra-ports"]
+types-compat = ["contextra-types"]
+ports-compat = ["contextra-ports"]

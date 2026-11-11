@@ -201,7 +201,6 @@ async fn test_partial_rebuild_recall_regression() {
         // rebuild_region() ausführen
         index
             .rebuild_region(tombstone_ids.clone())
-            .await
             .expect("rebuild_region failed");
 
         // Recall@10 NACH rebuild_region()
@@ -251,7 +250,6 @@ async fn test_partial_rebuild_recall_regression() {
         // rebuild_region() ausführen
         index
             .rebuild_region(tombstone_ids.clone())
-            .await
             .expect("rebuild_region failed");
 
         // Recall@10 NACH rebuild_region()
@@ -304,7 +302,6 @@ async fn test_partial_rebuild_node_degree_no_isolation() {
     // rebuild_region() ausführen
     index
         .rebuild_region(tombstone_ids)
-        .await
         .expect("rebuild_region failed");
 
     // Nachbarlisten NACH rebuild_region() sichern

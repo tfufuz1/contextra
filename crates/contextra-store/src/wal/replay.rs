@@ -8,7 +8,7 @@
 //! - **INV-WAL-REPLAY-3:** Clean Torn Write Tail Cutoff: Unvollständige Schreibabbrüche am Dateiende werden deterministisch abgeschnitten.
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
 use std::path::PathBuf;
 
 use super::{legacy_integrity_key, WalOp};

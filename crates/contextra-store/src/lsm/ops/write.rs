@@ -12,18 +12,18 @@ use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
 use crate::wal::PoisonCause;
 use contextra_mvcc::IndexOp;
-use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
+use crate::error::{StoreError, StoreResult as Result};
+use contextra_ids::{TxId, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {
+pub(crate) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {
     validate_key(key)?;
     validate_value(value)?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage(
+        return Err(crate::error::StoreError::Storage(
             "Memory budget exceeded (95%)".into(),
         ));
     }
@@ -39,7 +39,7 @@ pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[
     Ok(())
 }
 
-pub(super) async fn put_if_absent(
+pub(crate) async fn put_if_absent(
     storage: &LsmStorage,
     tx_id: TxId,
     key: &[u8],
@@ -49,7 +49,7 @@ pub(super) async fn put_if_absent(
     validate_value(value)?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage(
+        return Err(crate::error::StoreError::Storage(
             "Memory budget exceeded (95%)".into(),
         ));
     }
@@ -88,7 +88,7 @@ pub(super) async fn put_if_absent(
             if locks.get(key) == Some(&tx_id) {
                 locks.remove(key);
             }
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -126,11 +126,11 @@ pub(super) async fn put_if_absent(
     Ok(true)
 }
 
-pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {
+pub(crate) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {
     validate_key(key)?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage(
+        return Err(crate::error::StoreError::Storage(
             "Memory budget exceeded (95%) — delete staging rejected".into(),
         ));
     }
@@ -146,13 +146,13 @@ pub(super) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Res
     Ok(())
 }
 
-pub(super) async fn delete_many(
+pub(crate) async fn delete_many(
     storage: &LsmStorage,
     tx_id: TxId,
     keys: Vec<Vec<u8>>,
 ) -> Result<u64> {
     if keys.len() > MAX_BATCH_SIZE {
-        return Err(ContextraError::InvalidInput(format!(
+        return Err(StoreError::InvalidInput(format!(
             "Batch size ({} items) exceeds limit of {} items",
             keys.len(),
             MAX_BATCH_SIZE
@@ -163,7 +163,7 @@ pub(super) async fn delete_many(
     }
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage(
+        return Err(crate::error::StoreError::Storage(
             "Memory budget exceeded (95%) — delete staging rejected".into(),
         ));
     }
@@ -187,7 +187,7 @@ pub(super) async fn delete_many(
     Ok(count)
 }
 
-pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {
+pub(crate) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {
     let matching_keys: Vec<Vec<u8>> = storage
         .scan_prefix(prefix)
         .await?
@@ -215,7 +215,7 @@ pub(super) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u
 /// Deadlock Analysis: Flush pre-allocates immutable memtables under `state.write()`, and takes `commit_mutex`
 /// only during final SST registration. The Leader holding `commit_mutex` never blocks or waits on Flush completion,
 /// avoiding circular lock dependencies.
-pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
+pub(crate) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     let clock = storage.clock();
     let start_nanos = clock.monotonic_nanos();
     let res = commit_internal(storage, tx_id).await;
@@ -237,7 +237,7 @@ pub(super) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
-        return Err(ContextraError::Storage(
+        return Err(crate::error::StoreError::Storage(
             "Memory budget exceeded (95%)".into(),
         ));
     }
@@ -334,7 +334,7 @@ fn prepare_commit_ops(
             }
             _ => {
                 storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(ContextraError::InvalidInput(
+                return Err(StoreError::InvalidInput(
                     "Unsupported operation type staged in LSM commit".to_string(),
                 ));
             }
@@ -450,7 +450,7 @@ async fn single_commit_path(
     };
 
     if let Err(e) = single_append_res {
-        return Err(ContextraError::Storage(format!(
+        return Err(crate::error::StoreError::Storage(format!(
             "Commit failed (at WAL append), WAL anchor rollback executed: {e}"
         )));
     }
@@ -495,7 +495,7 @@ async fn follower_commit_path(
     let queue = match queue_guard.as_mut() {
         Some(q) => q,
         None => {
-            return Err(ContextraError::Internal(
+            return Err(StoreError::Internal(
                 "Group commit queue missing".into(),
             ));
         }
@@ -537,7 +537,7 @@ async fn follower_commit_path(
                     }
                 }
                 storage.cleanup_intent_locks_for_tx(tx_id);
-                Err(ContextraError::Storage(
+                Err(crate::error::StoreError::Storage(
                     "Commit failed at WAL append after leader cancellation".into(),
                 ))
             }
@@ -560,7 +560,7 @@ async fn follower_commit_path(
                     }
                 }
                 storage.cleanup_intent_locks_for_tx(tx_id);
-                Err(ContextraError::CommitTimeout {
+                Err(crate::error::StoreError::CommitTimeout {
                     tx_id: tx_id.inner(),
                 })
             } else {
@@ -577,7 +577,7 @@ async fn follower_commit_path(
                                 }
                             }
                             storage.cleanup_intent_locks_for_tx(tx_id);
-                            Err(ContextraError::Storage(
+                            Err(crate::error::StoreError::Storage(
                                 "Commit failed at WAL append after leader cancellation".into(),
                             ))
                         }
@@ -650,7 +650,7 @@ async fn leader_commit_path(
                         } else {
                             "Leader cancelled group commit"
                         };
-                        let _ = r.sender.send(Err(ContextraError::Storage(err_msg.into())));
+                        let _ = r.sender.send(Err(crate::error::StoreError::Storage(err_msg.into())));
                     }
                 } else if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
                     if let Some(pending_queue) = queue_guard.take() {
@@ -671,7 +671,7 @@ async fn leader_commit_path(
                             } else {
                                 "Leader cancelled group commit"
                             };
-                            let _ = r.sender.send(Err(ContextraError::Storage(err_msg.into())));
+                            let _ = r.sender.send(Err(crate::error::StoreError::Storage(err_msg.into())));
                         }
                     }
                 }
@@ -709,7 +709,7 @@ async fn leader_commit_path(
         Some(q) => q,
         None => {
             tracing::error!("Group commit leader: pending_commit_queue unexpectedly missing.");
-            return Err(ContextraError::Internal(
+            return Err(StoreError::Internal(
                 "Group commit queue invariant violated".into(),
             ));
         }
@@ -728,7 +728,7 @@ async fn leader_commit_path(
     let (all_wal_entries, prev_hmac) = match wal.prepare_batch(all_wal_ops).await {
         Ok(res) => res,
         Err(e) => {
-            return Err(e);
+            return Err(e.into());
         }
     };
     leader_guard.prev_hmac = Some(prev_hmac);
@@ -764,14 +764,14 @@ async fn leader_commit_path(
         let err_msg = format!(
             "Commit failed (at WAL append), WAL anchor rollback executed: WAL append failed: {e}"
         );
-        return Err(ContextraError::Storage(err_msg));
+        return Err(crate::error::StoreError::Storage(err_msg));
     }
 
     leader_guard.committed = true;
     let pending_queue = match leader_guard.pending_queue.take() {
         Some(pq) => pq,
         None => {
-            return Err(ContextraError::Internal(
+            return Err(StoreError::Internal(
                 "Group commit pending_queue unexpectedly missing after durability".into(),
             ));
         }

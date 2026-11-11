@@ -3,7 +3,7 @@
 //! Prueft deterministisches Replay ueber Sequenzgrenzen hinweg.
 
 use super::*;
-use contextra_types::TxId;
+use contextra_ids::TxId;
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

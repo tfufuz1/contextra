@@ -3,7 +3,7 @@
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
-use contextra_types::{ContextraError, Result};
+use crate::error::{Result, VectorError};
 
 pub(crate) const DISKANN_MAGIC: &[u8; 4] = b"DANN";
 pub(crate) const DISKANN_VERSION: u16 = 1;
@@ -66,25 +66,25 @@ impl DiskAnnHeader {
 
     pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < Self::SIZE {
-            return Err(ContextraError::Index("Header too small".into()));
+            return Err(VectorError::Index("Header too small".into()));
         }
         let magic_bytes = bytes
             .get(0..4)
-            .ok_or_else(|| ContextraError::Storage("DiskANN header magic out of bounds".into()))?;
+            .ok_or_else(|| VectorError::Storage("DiskANN header magic out of bounds".into()))?;
         if magic_bytes != DISKANN_MAGIC {
-            return Err(ContextraError::Storage(
+            return Err(VectorError::Storage(
                 "Invalid DiskANN file: bad magic".into(),
             ));
         }
         let version = u16::from_le_bytes(
             bytes
                 .get(4..6)
-                .ok_or_else(|| ContextraError::Index("Invalid version offset".into()))?
+                .ok_or_else(|| VectorError::Index("Invalid version offset".into()))?
                 .try_into()
-                .map_err(|_| ContextraError::Index("Invalid version".into()))?,
+                .map_err(|_| VectorError::Index("Invalid version".into()))?,
         );
         if version != DISKANN_VERSION {
-            return Err(ContextraError::Storage(format!(
+            return Err(VectorError::Storage(format!(
                 "DiskANN version mismatch: expected {}, got {}",
                 DISKANN_VERSION, version
             )));
@@ -95,57 +95,57 @@ impl DiskAnnHeader {
             node_count: u64::from_le_bytes(
                 bytes
                     .get(6..14)
-                    .ok_or_else(|| ContextraError::Index("Invalid node_count offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid node_count offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid node_count".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid node_count".into()))?,
             ),
             dimension: u32::from_le_bytes(
                 bytes
                     .get(14..18)
-                    .ok_or_else(|| ContextraError::Index("Invalid dimension offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid dimension offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid dimension".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid dimension".into()))?,
             ),
             max_degree: u32::from_le_bytes(
                 bytes
                     .get(18..22)
-                    .ok_or_else(|| ContextraError::Index("Invalid max_degree offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid max_degree offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid max_degree".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid max_degree".into()))?,
             ),
             sector_size: u32::from_le_bytes(
                 bytes
                     .get(22..26)
-                    .ok_or_else(|| ContextraError::Index("Invalid sector_size offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid sector_size offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid sector_size".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid sector_size".into()))?,
             ),
             entry_point: u32::from_le_bytes(
                 bytes
                     .get(26..30)
-                    .ok_or_else(|| ContextraError::Index("Invalid entry_point offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid entry_point offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid entry_point".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid entry_point".into()))?,
             ),
             metric: *bytes
                 .get(30)
-                .ok_or_else(|| ContextraError::Index("Invalid metric offset".into()))?,
+                .ok_or_else(|| VectorError::Index("Invalid metric offset".into()))?,
             quantized: *bytes
                 .get(31)
-                .ok_or_else(|| ContextraError::Index("Invalid quantized offset".into()))?,
+                .ok_or_else(|| VectorError::Index("Invalid quantized offset".into()))?,
             q_min: f32::from_le_bytes(
                 bytes
                     .get(32..36)
-                    .ok_or_else(|| ContextraError::Index("Invalid q_min offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid q_min offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid q_min".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid q_min".into()))?,
             ),
             q_max: f32::from_le_bytes(
                 bytes
                     .get(36..40)
-                    .ok_or_else(|| ContextraError::Index("Invalid q_max offset".into()))?
+                    .ok_or_else(|| VectorError::Index("Invalid q_max offset".into()))?
                     .try_into()
-                    .map_err(|_| ContextraError::Index("Invalid q_max".into()))?,
+                    .map_err(|_| VectorError::Index("Invalid q_max".into()))?,
             ),
         })
     }
@@ -171,21 +171,21 @@ impl DiskAnnFooter {
     #[cfg(feature = "experimental-diskann")]
     pub(crate) fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < Self::SIZE {
-            return Err(ContextraError::Storage("DiskANN footer too small".into()));
+            return Err(VectorError::Storage("DiskANN footer too small".into()));
         }
         let magic_bytes = bytes
             .get(0..4)
-            .ok_or_else(|| ContextraError::Storage("DiskANN footer magic out of bounds".into()))?;
+            .ok_or_else(|| VectorError::Storage("DiskANN footer magic out of bounds".into()))?;
         if magic_bytes != DISKANN_FOOTER_MAGIC {
-            return Err(ContextraError::Storage(
+            return Err(VectorError::Storage(
                 "Invalid DiskANN file: missing or incomplete build_complete footer".into(),
             ));
         }
         let hmac: [u8; 32] = bytes
             .get(4..36)
-            .ok_or_else(|| ContextraError::Storage("DiskANN footer HMAC out of bounds".into()))?
+            .ok_or_else(|| VectorError::Storage("DiskANN footer HMAC out of bounds".into()))?
             .try_into()
-            .map_err(|_| ContextraError::Storage("Invalid DiskANN footer HMAC length".into()))?;
+            .map_err(|_| VectorError::Storage("Invalid DiskANN footer HMAC length".into()))?;
         Ok(Self {
             magic: *DISKANN_FOOTER_MAGIC,
             hmac,

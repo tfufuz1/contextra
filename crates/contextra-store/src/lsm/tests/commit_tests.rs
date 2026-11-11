@@ -3,7 +3,7 @@
 //! Prueft Rollbacks, Timeouts und Batch-Sicherheit.
 
 use super::*;
-use contextra_testkit::ManualClock;
+use contextra_env::ManualClock;
 use std::sync::atomic::Ordering;
 use tempfile::TempDir;
 
@@ -18,7 +18,7 @@ async fn test_clock_port_integration_with_manual_clock() {
     let storage = LsmStorage::new(config)
         .await
         .expect("create storage")
-        .with_clock(Arc::clone(&clock) as Arc<dyn contextra_ports::Clock>);
+        .with_clock(Arc::clone(&clock) as Arc<dyn contextra_env::Clock>);
 
     assert_eq!(storage.clock().now_unix_nanos(), 100_000);
 

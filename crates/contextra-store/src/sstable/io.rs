@@ -1,9 +1,9 @@
 //! # SSTable I/O-Routinen (Ring 1)
 //!
-//! Kapselt Low-Level Datei- und Lesevorgänge über [`contextra_ports::VfsFile`]
+//! Kapselt Low-Level Datei- und Lesevorgänge über [`crate::io_seam::VfsFile`]
 //! innerhalb von Block-Level I/O-Grenzen.
 
-use contextra_ports::VfsFile;
+use crate::io_seam::VfsFile;
 
 pub(super) fn pread_exact(
     file: &dyn VfsFile,

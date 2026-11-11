@@ -4,8 +4,7 @@
 //! um unnoetige Plattenzugriffe fuer nicht existente Schluessel abzuwenden.
 
 use bytes::BufMut;
-// TODO(baukasten): Bloom-Filter entkoppeln (AD-4/AD-8). 2-Stufen-Bloomfilter ist ein reiner Speicher-Baustein und darf nicht an ContextraError gebunden sein.
-use contextra_types::{ContextraError, Result};
+use crate::error::{StoreError as ContextraError, StoreResult as Result};
 
 /// SPECCED: Speichereffizienter Bloom-Filter für SSTable-Pre-Checks.
 /// Ziel: False-Positive-Rate p ≤ 0.01.

@@ -61,6 +61,7 @@ impl WalSink for MemoryWalSink {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::types_local::{TenantId, TxId};

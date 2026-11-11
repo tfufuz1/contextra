@@ -2,7 +2,7 @@
 //!
 //! Bestimmt anhand aktiver Snapshots, welche invalidierten Schluessel physisch verworfen werden duerfen.
 
-use contextra_types::TOMBSTONE_BIT;
+use contextra_ids::TOMBSTONE_BIT;
 
 /// Filters a sequence of entries for a SINGLE key (sorted by raw sequence DESCENDING)
 /// according to MVCC retention rules given a `floor` sequence number.
