@@ -1,4 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// =========================================================================
+// SECTION: server_lifecycle_tests
+// =========================================================================
+// ANCHOR[contextra-mcp:ITEST-SERVER-LIF-001]
 
 use contextra::Contextra;
 use contextra_mcp::egress_gateway::DefaultEgressClassifier;
@@ -196,3 +200,5 @@ async fn test_server_idempotency_multiple_calls() {
         assert_eq!(resp["result"]["protocolVersion"], "2024-11-05");
     }
 }
+
+// !SECTION: server_lifecycle_tests
