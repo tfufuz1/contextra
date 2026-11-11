@@ -1,7 +1,7 @@
 # AGENTS.md — `contextra-erasure`
 
 > **Ebene 0 (compliance)** · Klasse `A` (Baustein) · Reifegrad `stable` · Unsafe: nein (`#![forbid(unsafe_code)]`) · Rolle: Eigenständiger, entkoppelter Löschkern: Saga, Vault, ReadGate/GateLog, Journal, Ledger, Messung/Witness, signierte Berichte, RestoreGuard.
-> Gemeinsame Regeln stehen in der Root-`AGENTS.md`. Stand 2026-11-11, verifiziert.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`. Spezifikation der Löschkette: `docs/erasure/Loeschkette_Implementierungsspezifikation.md`. Stand 2026-11-11, verifiziert.
 
 ## 1. Baukasten-Profil
 
