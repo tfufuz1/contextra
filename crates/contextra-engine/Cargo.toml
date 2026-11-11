@@ -21,7 +21,6 @@ contextra-sandbox = { workspace = true, optional = true }
 contextra-infer-onnx = { workspace = true, optional = true }
 contextra-adapt = { workspace = true, optional = true }
 contextra-store = { workspace = true }
-blake3 = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-checkpoint = { workspace = true }
@@ -34,11 +33,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 parking_lot = { workspace = true }
 tokio-util = { version = "0.7.18", features = ["rt"] }
-zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
-thiserror = { workspace = true }
-bincode = { workspace = true }
-hmac = "0.12"
-sha2 = "0.10"
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"
@@ -52,6 +46,7 @@ proptest = "1.4"
 loom = "0.7"
 wat = "1"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
+sha2 = "0.10"
 
 [features]
 default = []
