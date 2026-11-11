@@ -6,24 +6,30 @@ name = "contextra-kvcache"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
-description = "Ring 1 Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
+rust-version = "1.89"
+description = "Prefix-Radix tree, KV-Block cache, tenant-isolated memory store and tiering for Contextra"
+repository = "https://github.com/contextra/contextra"
+keywords = ["kv-cache", "radix-tree", "llm", "prompt-caching", "memory-store"]
+categories = ["data-structures", "caching", "algorithms"]
+readme = "README.md"
+include = ["src/**/*", "LICENSE-*", "README.md", "Cargo.toml"]
+publish = false # Internes Bausteinlager fuer Contextra-Komponenten
 
 [package.metadata.contextra]
-ring = "1"
+klasse = "A"
 
 [features]
 default = ["std", "workspace", "ports-compat", "crypto-compat", "kv-encryption"]
 std = []
-workspace = ["dep:contextra-ports", "dep:contextra-types"]
+workspace = ["types-compat", "ports-compat"]
 ports-compat = ["workspace"]
-types-compat = ["workspace"]
+types-compat = ["dep:contextra-ports", "dep:contextra-types"]
 crypto-compat = ["dep:contextra-crypto"]
 kv-encryption = ["crypto-compat", "contextra-crypto/kv-encryption"]
 docid-128 = ["contextra-ids/docid-128"]
 content-addressed-kv-cache = []
 exp-content-addressed = ["content-addressed-kv-cache"]
-kvcache-kivi-quant = []
+kvcache-kivi-quant = ["kivi-quantization"]
 kivi-quantization = []
 exp-kivi = ["kivi-quantization"]
 
@@ -49,7 +55,6 @@ bytes = { workspace = true }
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
 contextra-crypto = { version = "0.1.0", path = "../contextra-crypto" }
-contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
 criterion = { workspace = true, features = ["async_tokio"] }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"

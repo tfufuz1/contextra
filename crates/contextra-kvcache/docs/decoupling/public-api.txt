@@ -1,0 +1,13 @@
+# public-api snapshot for contextra-kvcache (derived from crate index)
+pub mod cipher;
+pub mod contract;
+pub mod error;
+pub mod types;
+pub mod attention_score;
+pub mod eviction_worker;
+pub mod radix;
+pub mod segment;
+pub mod service;
+pub mod store;
+pub mod quantize_kivi; // cfg(kivi-quantization)
+pub mod compat; // cfg(workspace)

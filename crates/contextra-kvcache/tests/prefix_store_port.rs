@@ -1,3 +1,6 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 //! # Port- und Isolationstests für TenantPrefixKvStore
 //!
 //! ANCHOR[contextra-kvcache:TEST-PREFIX-PORT-001]
@@ -5,7 +8,9 @@
 //! Verifiziert die Implementierung des `KvPrefixStore`-Ports, inklusive LCP-Präfixauflösung,
 //! Kosten-Policy, Mandantentrennung, Budget-Verdrängung und Nebenläufigkeit über 8 Threads.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_kvcache::{KvReusePolicy, TenantPrefixKvStore};
 use contextra_ports::kv::{KvBlock, KvLayout, KvPrefixStore, PrefixKey, RopeConfig};

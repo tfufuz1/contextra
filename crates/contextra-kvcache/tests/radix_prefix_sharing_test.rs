@@ -1,3 +1,6 @@
+#![allow(
+    clippy::all,
+    clippy::type_complexity,clippy::unwrap_used)]
 //! Invariant INV-KV-PREFIX-1 Test: Identical prompt prefixes share physical segments via refcounting
 
 use contextra_kvcache::radix::NamespaceRadixTree;

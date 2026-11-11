@@ -38,7 +38,10 @@ pub enum KvReusePolicy {
     /// Wiederverwendung aller Treffer mit `matched_len > 0`.
     Always,
     /// Kostenbasiert: Treffer erst ab Mindestpräfixlänge `min_prefix_len`.
-    CostBased { min_prefix_len: usize },
+    CostBased {
+        /// Mindestlänge für Wiederverwendung.
+        min_prefix_len: usize,
+    },
     /// Keinerlei Prefix-Reuse (immer Cache-Miss).
     Never,
 }

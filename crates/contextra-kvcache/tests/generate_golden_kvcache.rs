@@ -1,4 +1,6 @@
 #![allow(
+    clippy::all,
+    clippy::type_complexity,
     clippy::disallowed_types,
     clippy::disallowed_methods,
     clippy::unwrap_used,
