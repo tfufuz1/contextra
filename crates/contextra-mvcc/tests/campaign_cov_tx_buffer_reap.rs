@@ -12,7 +12,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::tx_buffer::{TxBuffer, TxBufferConfig};
-use contextra_testkit::ManualClock;
+use contextra_env::{Clock, ManualClock};
 use contextra_ids::TxId;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,7 +20,7 @@ use std::time::Duration;
 // Prüft die exakte Begrenzung der abgeräumten verwaisten Transaktionen auf die vorgegebene Obergrenze.
 #[test]
 fn test_tx_buffer_reap_orphans_bounded_exact_capping_and_time_injection() {
-    let clock = Arc::new(ManualClock::new(100_000_000_000));
+    let clock = Arc::new(ManualClock::new(100_000_000_000, 100_000_000_000));
     let timeout = Duration::from_secs(10);
     let config = TxBufferConfig {
         tx_timeout: timeout,
@@ -28,7 +28,7 @@ fn test_tx_buffer_reap_orphans_bounded_exact_capping_and_time_injection() {
     };
     let buffer = TxBuffer::<Vec<u8>>::new_with_clock_and_config(clock.clone(), 4, config);
 
-    let start_nanos = clock.now_nanos();
+    let start_nanos = clock.now_unix_nanos();
     let past_nanos = start_nanos.saturating_sub(20_000_000_000);
 
     // Stage 10 orphan transactions in the past

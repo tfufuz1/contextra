@@ -6,8 +6,14 @@ name = "contextra-mvcc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 description = "Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra"
+readme = "README.md"
+repository = "https://github.com/tfufuz1/contextra"
+keywords = ["mvcc", "concurrency", "ssi", "transactions", "database"]
+categories = ["database-implementations", "concurrency"]
+# Internes Bausteinlager: Veröffentlichung in crates.io ist deaktiviert
+publish = false
 
 [package.metadata.contextra]
 ring = "0"
@@ -44,7 +50,6 @@ loom = "0.7"
 contextra-env = { version = "0.1.0", path = "../contextra-env", features = ["test-utils"] }
 contextra-types = { version = "0.1.0", path = "../contextra-types" }
 contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
-contextra-testkit = { workspace = true }
 
 [[bench]]
 name = "mvcc_bench"

@@ -20,7 +20,7 @@ use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator};
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig};
 use contextra_mvcc::MvccError;
 use contextra_mvcc::SsiValidator;
-use contextra_testkit::ManualClock;
+use contextra_env::ManualClock;
 use contextra_ids::{DocId, TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -270,7 +270,7 @@ fn test_isolation_read_only_snapshot_empty_read_set_always_valid() {
 // Prüft das zeitgesteuerte Ablaufen und Bereinigen veralteter Snapshot-Pins im SequenceLog.
 #[test]
 fn test_isolation_pin_expiration_sequence_log_manual_clock() {
-    let clock = Arc::new(ManualClock::new(1_000_000_000));
+    let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
     let mut log =
         SequenceLog::with_clock(clock.clone()).with_max_pin_duration(Duration::from_secs(300));
 
@@ -280,11 +280,11 @@ fn test_isolation_pin_expiration_sequence_log_manual_clock() {
     assert!(log.expired_pins().is_empty());
 
     // Advance time by 200 seconds (not expired yet)
-    clock.advance(Duration::from_secs(200));
+    clock.advance_nanos(200_000_000_000);
     assert!(log.expired_pins().is_empty());
 
     // Advance time by 105 more seconds (total 305s > 300s max_pin_duration)
-    clock.advance(Duration::from_secs(105));
+    clock.advance_nanos(105_000_000_000);
     assert_eq!(log.expired_pins(), vec![100]);
 
     // Explicitly reap expired pins
@@ -296,7 +296,7 @@ fn test_isolation_pin_expiration_sequence_log_manual_clock() {
 // Prüft das Ablaufen und Bereinigen veralteter Pins in der SnapshotRegistry mittels ManualClock.
 #[test]
 fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
-    let clock = Arc::new(ManualClock::new(10_000_000_000));
+    let clock = Arc::new(ManualClock::new(10_000_000_000, 10_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
 
     registry.pin(50);
@@ -304,7 +304,7 @@ fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
     assert_eq!(registry.min_active_seqno(), 50);
 
     // Advance time by 310 seconds
-    clock.advance(Duration::from_secs(310));
+    clock.advance_nanos(310_000_000_000);
 
     // Both pins expired relative to max_pin_duration 300s
     let reaped = registry.reap_expired_pins(Duration::from_secs(300));
@@ -315,11 +315,11 @@ fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
 // Prüft die Diagnoseabfrage des am längsten gehaltenen aktiven Snapshot-Pins.
 #[test]
 fn test_isolation_longest_active_pin_diagnostics_manual_clock() {
-    let clock = Arc::new(ManualClock::new(1_000_000_000));
+    let clock = Arc::new(ManualClock::new(1_000_000_000, 1_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
 
     let g1 = registry.register(200);
-    clock.advance(Duration::from_secs(50));
+    clock.advance_nanos(50_000_000_000);
     let _g2 = registry.register(300);
 
     // Longest pin should be g1 at seq 200 with 50s duration
@@ -593,7 +593,7 @@ fn test_isolation_tx_buffer_tx_staged_bytes_budget() {
 // Prüft das Abräumen verwaister Transaktionen im TxBuffer mit ManualClock.
 #[test]
 fn test_isolation_tx_buffer_orphan_reaping_manual_clock() {
-    let clock = Arc::new(ManualClock::new(10_000_000_000));
+    let clock = Arc::new(ManualClock::new(10_000_000_000, 10_000_000_000));
     let config = TxBufferConfig {
         tx_timeout: Duration::from_secs(10),
         ..Default::default()
@@ -604,11 +604,11 @@ fn test_isolation_tx_buffer_orphan_reaping_manual_clock() {
     let tx2 = TxId::new(2);
 
     buffer.begin(tx1);
-    clock.advance(Duration::from_secs(5));
+    clock.advance_nanos(5_000_000_000);
     buffer.begin(tx2);
 
     // Advance clock past tx1 timeout (total elapsed for tx1: 12s > 10s)
-    clock.advance(Duration::from_secs(7));
+    clock.advance_nanos(7_000_000_000);
 
     let reaped = buffer.reap_orphans();
     assert_eq!(reaped, vec![tx1]);

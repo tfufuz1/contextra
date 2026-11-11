@@ -1,0 +1,85 @@
+// Public API snapshot for contextra-mvcc
+// Generated from cargo doc and crate structure
+
+pub mod contextra_mvcc {
+    pub mod contract {
+        pub use contextra_env::{Clock, MetricsSink, SystemClock};
+    }
+
+    pub mod types {
+        pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
+    }
+
+    pub mod mvcc_error {
+        pub enum MvccError {
+            Conflict(String),
+            LimitExceeded { limit: usize, context: String },
+            Transaction(String),
+            Storage(String),
+            InvalidInput(String),
+            Internal(String),
+        }
+        pub type Result<T, E = MvccError> = Result<T, E>;
+    }
+
+    pub mod seq_log {
+        pub struct SequenceLog { ... }
+        pub struct SeqLogEntry { ... }
+        pub enum SeqLogChange {
+            Insert { doc_id: DocId, seq: u64 },
+            Delete { doc_id: DocId, seq: u64 },
+        }
+    }
+
+    pub mod snapshot {
+        pub struct SnapshotRegistry { ... }
+        pub struct SnapshotGuard { ... }
+        pub struct SnapshotRegistryConfig { ... }
+    }
+
+    pub mod tx_buffer {
+        pub struct TxBuffer<T> { ... }
+        pub struct TxBufferConfig { ... }
+        pub enum IndexOp<T> {
+            Insert { doc_id: DocId, data: T },
+            Delete { doc_id: DocId, data: T },
+        }
+        pub const DEFAULT_TX_BUFFER_SHARDS: usize = 64;
+        pub const STAGING_ENTRY_OVERHEAD_BYTES: usize = 128;
+    }
+
+    pub mod ssi {
+        pub trait SsiValidator: Send + Sync {
+            fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<(), MvccError>;
+            fn validate_and_record<'a>(
+                &self,
+                tx_id: TxId,
+                read_set: &ReadSet,
+                write_keys: impl IntoIterator<Item = &'a [u8]>,
+                commit_seq: u64,
+            ) -> Result<(), MvccError>;
+        }
+        pub struct SequenceLogSsiValidator { ... }
+        pub struct ReadSet { ... }
+        pub struct PruningBlockerInfo { ... }
+    }
+
+    pub mod tombstone {
+        pub trait TombstoneSemanticsCheck { ... }
+        pub struct SeqBitTombstone;
+    }
+
+    #[cfg(feature = "workspace")]
+    pub mod compat {
+        pub use contextra_types::ContextraError;
+    }
+
+    pub use crate::contract::*;
+    pub use crate::mvcc_error::{MvccError, Result as MvccResult};
+    pub use crate::seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
+    pub use crate::snapshot::{SnapshotGuard, SnapshotRegistry};
+    pub use crate::ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};
+    pub use crate::tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
+    pub use crate::tx_buffer::{IndexOp, TxBuffer};
+    pub use contextra_ids::{DocId, TenantId, TxId, TOMBSTONE_BIT};
+}
