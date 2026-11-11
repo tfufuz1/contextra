@@ -62,8 +62,6 @@ def run_isolation_proof(
 
     c_spec = crates_spec.get(crate_name, {})
     allowed_internal = set(c_spec.get("allowed_internal", []))
-    if not allowed_internal and "may_depend_on" in c_spec:
-        allowed_internal = set(c_spec.get("may_depend_on", []))
     feature_closure_allowed: Dict[str, list[str]] = c_spec.get("feature_closure_allowed", {})
     all_allowed = set(allowed_internal)
     for feats in feature_closure_allowed.values():
