@@ -1,8 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Deterministischer Fixed-Hasher für Hot-Path Mengen/Maps mit reproduzierbarer Traversierung (P28/INV-5).
 // INVARIANTEN: Konstante Seeds, deterministische Iteration, Schutzschicht gegen HashMap-Drift.
-// HOTSPOTS: fixed_hasher, new_fixed_hashset, new_fixed_hashmap
-// STAND: TS:2026-11-11T02:00:00Z
+// HOTSPOTS: fixed_hasher.rs:25-30 (fixed_hasher), fixed_hasher.rs:40-50 (new_fixed_hash*)
+// STAND: 2026-11-11
 
 //! Deterministischer Fixed Hasher für Hot-Path sets/maps where ordering or reproducible traversal is critical.
 //!
