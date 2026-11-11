@@ -11,6 +11,14 @@
     clippy::unreachable
 )]
 
+// FILE-CONTEXT
+// ZWECK: Unit- und Integrationstests fuer context_compaction (Kompaktor, Sessions, StatusToken).
+// INVARIANTEN: Zero-Panic; deterministische Budget- und OCC-Simulationen.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Context-Compaction Tests
+// =========================================================================
 use super::*;
 use crate::engine_local::collection::Collection;
 use crate::engine_local::transaction::CommitIntent;
@@ -646,3 +654,4 @@ async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
 
     Ok(())
 }
+// !SECTION: Context-Compaction Tests

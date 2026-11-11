@@ -18,6 +18,8 @@ use crate::path_rag::PathGraph;
 
 /// Snapshot-isolated wrapper around `GraphInner` at a specific transaction sequence number (`as_of_tx`).
 // ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-001]
+
+// SECTION Snapshot Core Implementation
 pub struct SnapshotPathGraph<'a> {
     inner: &'a GraphInner,
     as_of_tx: TxId,
@@ -221,3 +223,5 @@ impl<'a> PathGraph for SnapshotPathGraph<'a> {
         }
     }
 }
+
+// !SECTION Snapshot Core Implementation

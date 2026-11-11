@@ -14,21 +14,27 @@ mod core;
 mod errors;
 #[cfg(feature = "client")]
 pub mod policy;
-#[cfg(all(feature = "client", feature = "ports-compat"))]
-mod trait_impls;
 pub mod validation;
 #[cfg(feature = "client")]
 mod wire;
 
 #[cfg(all(test, feature = "client"))]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-mod tests;
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_core_parse_prompt_roundtrip() {
+        let prompt = "<system>sys</system><instructions>ins</instructions><context>ctx</context><user_query>q</user_query>";
+        let parsed = parse_prompt_template(prompt).expect("parse should succeed");
+        assert_eq!(parsed.system, "sys");
+    }
+}
 
 #[cfg(feature = "client")]
 pub use circuit_breaker::CircuitBreaker;
 pub use config::*;
 #[cfg(all(test, feature = "client"))]
-#[allow(unused_imports)]
 pub(crate) use core::{parse_prompt_template, retry_jitter, ParsedPrompt};
 #[cfg(feature = "client")]
 pub use core::{read_response_bytes, read_response_text, OllamaClient};

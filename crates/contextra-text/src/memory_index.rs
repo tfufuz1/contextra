@@ -7,7 +7,7 @@
 //!   erzeugen atomar einen neuen Snapshot mit monoton inkrementierter [`Epoch`].
 //! - **Statistikkonsistenz**: Wörterbuch, Posting-Listen und Korpusstatistiken (`N`, `avgdl`, `df`)
 //!   sind in jedem Snapshot strikt konsistent und synchronisiert.
-//! - **Neutrale Löschung**: `remove` markiert das Dokument per Tombstone; `compact` bereinigt Postings
+//! - **Neutrale Bereinigung**: `remove` markiert das Dokument per Tombstone; `compact` bereinigt Postings
 //!   und Wörterbuch physisch; `vacuum` reorganisiert Speicherstrukturen.
 
 use crate::bm25::BM25;

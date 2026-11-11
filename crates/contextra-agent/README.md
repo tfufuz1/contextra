@@ -2,7 +2,7 @@
 
 Autonome Agent-Workflow-Engine und Audit-Pipeline für Contextra.
 
-Normativitätsklasse: **Rand `[R]`** (Ring 3, `beta`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Ebene E2 (Integration)** (Gruppe `agentic`, `beta`; `capabilities.fragment.toml`).
 
 ## 1. Rolle & Zweck (Baukasten-Prinzip)
 `contextra-agent` ist die autarke Agenten-Workflow-Engine des Contextra-Ökosystems. Sie steuert mehrstufige KI-Agenten-Prozesse entlang der Kernschleife `checkpoint → execute → commit → audit`.
@@ -11,7 +11,7 @@ Im Baukastensystem funktioniert `contextra-agent` völlig unabhängig von extern
 
 ## 2. Baukasten-Einordnung & Status
 
-- **Ring:** Ring 3 (Anwendungskern / Workflow Engine)
+- **Ebene:** Ebene E2 (Integration / Workflow Engine)
 - **Status:** 🟢 Autarker Baustein
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
 

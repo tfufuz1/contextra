@@ -1,5 +1,12 @@
 //! Shadow comparison module comparing Forward-Push PPR against TL-HFD (AK-16).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Topologisches Lovász-High-Order-Diffusionsverfahren.
+// INVARIANTEN: Submodulare Optimierung, schattenmodus-fähig.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::diffusion::run_diffusion;
 use super::error::TlHfdError;
 use super::params::TlHfdParams;
@@ -10,6 +17,8 @@ use std::cmp::Ordering;
 
 /// Minimum required sample count for shadow mode default flip evaluation.
 // ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-001]
+
+// SECTION Shadow Core Implementation
 pub const MIN_SHADOW_SAMPLES: u64 = 10_000;
 
 /// Minimum required mean top-k Jaccard agreement threshold for shadow mode default flip evaluation.
@@ -157,3 +166,5 @@ fn normalize_and_sort(map: &ahash::AHashMap<EntityId, f32>) -> Vec<(EntityId, f3
 
     vec
 }
+
+// !SECTION Shadow Core Implementation

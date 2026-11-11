@@ -4,7 +4,7 @@
 //! mathematisch-statistische Bereinigung) sowie Schnittstellen zur Aufnahme vorverdichteter Eingaben.
 //!
 //! ## Ring-Zugehörigkeit
-//! Teil der Kognitionsschicht (Ring 3). Keine direkte Abhängigkeit zu `contextra-graph`
+//! Teil der Kognitionsschicht (Ebene E2). Keine direkte Abhängigkeit zu `contextra-graph`
 //! im strukturellen Durchlauf (P1-DAG-Integrität).
 //!
 //! ## Kernkonzepte
@@ -42,6 +42,7 @@
 //! - `synthesis_phase::run_synthesis_pass()` in `synthesis_phase.rs` ist der LLM-basierte Generative Synthesis Pass über Segmenten (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait).
 
 use crate::context_compaction::{CompactedContext, ContextCompactor};
+use crate::error::CognitionError;
 use crate::ports_local::{LlmTextGenerator, ResponseGroundingValidator};
 use crate::types_local::{ContextChunk, DocId, TxId};
 use ahash::{AHashMap, AHashSet};
@@ -271,6 +272,11 @@ pub fn group_turns_into_segments(
 /// RÜCKGABE: `Vec<(DocId /* zu superseden: älterer Turn */, DocId /* Original: neuerer/wichtigerer Turn */)>`
 // ANCHOR[contextra-cognition:MEM-005]
 /// Führt segmentlokale Duplikatserkennung via Cosine-Similarity durch.
+// !SECTION: Konsolidierungs-Pass & Segmentierung
+
+// =========================================================================
+// SECTION: Near-Duplicate-Erkennung & Cosine-Aehnlichkeit
+// =========================================================================
 pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Vec<(DocId, DocId)> {
     let mut pairs = Vec::new();
     let n = turns.len();
@@ -655,6 +661,9 @@ pub const MAX_PRE_CONDENSED_PROVENANCE_COUNT: usize = 256;
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-cognition:MEM-016]
 /// Struktur für vorverdichtete externe Eingabeknoten.
+// =========================================================================
+// SECTION: PreCondensedInput & Eingangsstrukturen
+// =========================================================================
 pub struct PreCondensedInput {
     pub tenant_id: contextra_types::TenantId,
     pub source_label: String,
@@ -668,35 +677,38 @@ fn validate_pre_condensed_input_bounds(
     input: &PreCondensedInput,
 ) -> contextra_types::Result<()> {
     if &input.tenant_id != target_tenant_id {
-        return Err(contextra_types::ContextraError::PolicyViolation(format!(
+        return Err(CognitionError::PolicyViolation(format!(
             "VETO-F10: Tenant boundary violation. Input tenant_id '{}' does not match target tenant_id '{}'",
             input.tenant_id,
             target_tenant_id
-        )));
+        )).into());
     }
 
     if input.text_digest.len() > MAX_PRE_CONDENSED_DIGEST_LEN {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput text_digest length {} exceeds limit {}",
             input.text_digest.len(),
             MAX_PRE_CONDENSED_DIGEST_LEN
-        )));
+        ))
+        .into());
     }
 
     if input.source_label.len() > MAX_PRE_CONDENSED_LABEL_LEN {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput source_label length {} exceeds limit {}",
             input.source_label.len(),
             MAX_PRE_CONDENSED_LABEL_LEN
-        )));
+        ))
+        .into());
     }
 
     if input.provenance.len() > MAX_PRE_CONDENSED_PROVENANCE_COUNT {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(CognitionError::InvalidInput(format!(
             "PreCondensedInput provenance count {} exceeds limit {}",
             input.provenance.len(),
             MAX_PRE_CONDENSED_PROVENANCE_COUNT
-        )));
+        ))
+        .into());
     }
 
     Ok(())
@@ -787,6 +799,11 @@ fn process_pre_condensed_input_node(
 /// - **Deterministic Ordering**: Inputs are sorted canonically by `tenant_id`, then `text_digest`, then `source_label`.
 // ANCHOR[contextra-cognition:MEM-017]
 /// Nimmt vorverdichtete Eingabeknoten mandantengeschützt in die Pipeline auf.
+// !SECTION: PreCondensedInput & Eingangsstrukturen
+
+// =========================================================================
+// SECTION: Vorverdichtungs-Intake & Validierung
+// =========================================================================
 pub fn intake_pre_condensed_inputs(
     target_tenant_id: &contextra_types::TenantId,
     inputs: &[PreCondensedInput],
@@ -1062,9 +1079,7 @@ mod tests {
             Box::pin(async move {
                 if let Some(ref fail_str) = self.fail_community_contains {
                     if prompt.contains(fail_str) {
-                        return Err(contextra_types::ContextraError::Internal(
-                            "Simulated LLM error".into(),
-                        ));
+                        return Err(CognitionError::Internal("Simulated LLM error".into()).into());
                     }
                 }
                 Ok("Summary of community memories.".to_string())
@@ -1296,3 +1311,4 @@ mod tests {
         );
     }
 }
+// !SECTION: Near-Duplicate-Erkennung & Cosine-Aehnlichkeit

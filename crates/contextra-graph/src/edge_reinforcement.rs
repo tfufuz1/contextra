@@ -1,10 +1,19 @@
 //! F-03: Co-Occurrence- und Traversal-basierte Kantenverstärkung (Edge Weight Reinforcement Learning).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Dynamisches Kanten-Reinforcement-Lernen.
+// INVARIANTEN: Gewichts-Updates innerhalb definierter Schranken.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::csr::CsrEdge;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-001]
+
+// SECTION Edge Reinforcement Core Implementation
 pub struct EdgeReinforcementConfig {
     pub eta: f32,
     pub delta: f32,
@@ -168,3 +177,5 @@ pub fn apply_weight_normalization(outgoing_edges: &mut [CsrEdge], w_max: f32) {
         }
     }
 }
+
+// !SECTION Edge Reinforcement Core Implementation

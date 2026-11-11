@@ -1,9 +1,18 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
+// INVARIANTEN: Isolierte Workspace-Konvertierungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-CSR-GRAPH-INDEX-MOD-001]
 //! Port-Implementierung des `GraphIndex`-Traits für den CSR-Graphen.
 //!
 //! # Zweck
 //! Trennt Lese- (Traversierungs-) und Schreib- (Mutations-) Methoden der Schnittstelle logisch auf.
 
+
+// SECTION Mod Core Implementation
 pub mod mutations;
 pub mod traversal;
 
@@ -290,3 +299,5 @@ impl GraphIndex for CsrGraph {
         })
     }
 }
+
+// !SECTION Mod Core Implementation

@@ -1,14 +1,25 @@
 //! Standalone domain types and identifiers for `contextra-graph` (Klasse A, SPEC §5).
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Autonome Domänentypen (EntityId, TxId, DocId, Edge, Entity).
+// INVARIANTEN: Deterministische Hashing- und Identitätsregeln.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
 
 /// Maximum candidates in search results.
+
+// SECTION Types Core Implementation
+// ANCHOR[contextra-graph:SRC-TYPES-001]
 pub const MAX_SEARCH_K: usize = 1_000;
 
 /// Identifier of an entity node in the graph.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-002]
 pub struct EntityId(pub u64);
 
 impl EntityId {
@@ -55,6 +66,7 @@ impl From<EntityId> for u64 {
 
 /// Document identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-003]
 pub struct DocId(pub u64);
 
 impl DocId {
@@ -101,6 +113,7 @@ impl From<DocId> for u64 {
 
 /// Transaction or sequence identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-004]
 pub struct TxId(pub u64);
 
 impl TxId {
@@ -135,6 +148,7 @@ impl From<TxId> for u64 {
 
 /// Entity node.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:SRC-TYPES-005]
 pub struct Entity {
     /// Unique entity ID.
     pub id: EntityId,
@@ -157,6 +171,7 @@ impl Entity {
 
 /// Directed edge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:SRC-TYPES-006]
 pub struct Edge {
     /// Source entity ID.
     pub from: EntityId,
@@ -197,6 +212,7 @@ impl Edge {
 
 /// Hyperedge identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-007]
 pub struct HyperEdgeId(pub u64);
 
 impl HyperEdgeId {
@@ -219,6 +235,7 @@ impl fmt::Display for HyperEdgeId {
 
 /// Role identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-008]
 pub struct RoleId(pub u32);
 
 impl RoleId {
@@ -241,6 +258,7 @@ impl fmt::Display for RoleId {
 
 /// Role binding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:SRC-TYPES-009]
 pub struct RoleBinding {
     /// Role identifier.
     pub role: RoleId,
@@ -257,6 +275,7 @@ impl RoleBinding {
 
 /// Thresholded local high-frequency diffusion parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:SRC-TYPES-010]
 pub struct TlHfdParams {
     /// Regularization scale.
     pub sigma: f32,
@@ -288,6 +307,7 @@ impl Default for TlHfdParams {
 /// Execution algorithm variant for Personalized PageRank.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
+// ANCHOR[contextra-graph:SRC-TYPES-011]
 pub enum PprAlgorithm {
     /// Auto heuristic dispatch.
     #[default]
@@ -306,6 +326,7 @@ pub enum PprAlgorithm {
 
 /// Configuration parameters for Personalized PageRank execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:SRC-TYPES-012]
 pub struct PprConfig {
     /// Damping factor.
     pub damping_factor: f32,
@@ -333,6 +354,7 @@ impl Default for PprConfig {
 
 /// Resource tracker.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-013]
 pub struct ResourceTracker {
     consumed_bytes: usize,
     max_bytes: usize,
@@ -368,6 +390,7 @@ impl ResourceTracker {
 
 /// Request context placeholder.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-graph:SRC-TYPES-014]
 pub struct RequestContext {
     /// Optional tenant identifier.
     pub tenant_id: Option<String>,
@@ -386,3 +409,5 @@ impl RequestContext {
         }
     }
 }
+
+// !SECTION Types Core Implementation

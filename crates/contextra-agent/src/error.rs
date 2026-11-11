@@ -1,7 +1,19 @@
-//! Lokaler Fehlertyp für contextra-agent (SPEC-v2 §6.3).
+// FILE-CONTEXT Header (Format v3)
+// ZWECK: Crate-lokaler Fehlertyp `AgentError` zur Entkopplung von Workspace-weiten Fehlertypen.
+// INVARIANTEN: Non-exhaustive Enum; bitgleiche Konvertierung nach ContextraError für Rückwärtskompatibilität.
+// NICHT-OFFENSICHTLICH: Keine Sammelvariante `Other(String)` ohne Kontext; jede Variante entspricht einer klaren Fehlerursache.
+// HOTSPOTS: AgentError Enum-Varianten (ll. 20-45), From-Implementierung (ll. 50-70).
+// STAND: TS:2026-11-11T00:25:00Z (SESSION: mod-decouple-agent)
+
+//! Lokaler Fehlertyp für contextra-agent (SPEC §6.2, §6.5).
 
 use thiserror::Error;
 
+// =========================================================================
+// SECTION: AgentError Definition
+// =========================================================================
+
+// ANCHOR[contextra-agent:error-enum]
 /// Lokaler Fehlertyp für Workflow-, Zustands- und Tool-Operationen.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -32,6 +44,13 @@ pub enum AgentError {
     Internal(String),
 }
 
+// !SECTION
+
+// =========================================================================
+// SECTION: Fehlerkonvertierung
+// =========================================================================
+
+// ANCHOR[contextra-agent:error-conversion]
 impl From<AgentError> for contextra_types::ContextraError {
     fn from(err: AgentError) -> Self {
         match err {
@@ -49,3 +68,5 @@ impl From<AgentError> for contextra_types::ContextraError {
         }
     }
 }
+
+// !SECTION

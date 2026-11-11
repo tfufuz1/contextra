@@ -1,5 +1,12 @@
 //! Test-Modul fuer Community-Detection
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Community Detection via Leiden und Louvain Algorithmen für GraphRAG.
+// INVARIANTEN: Deterministischer Tie-Break nach EntityId.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
@@ -7,6 +14,8 @@ use contextra_types::{Edge, Entity, EntityId, TxId};
 
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-001]
 #[tokio::test]
+
+// SECTION Tests Core Implementation
 async fn test_community_detection_determinism() {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -825,3 +834,5 @@ async fn test_community_detection_with_star_expansion_hyperedges() {
     // Cluster 1 and Cluster 2 must be in distinct communities
     assert_ne!(c1_comm, c2_comm);
 }
+
+// !SECTION Tests Core Implementation

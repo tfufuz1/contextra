@@ -1,3 +1,9 @@
+
+// =========================================================================
+// SECTION: Decision Condition Parser & Evaluator
+// =========================================================================
+// ANCHOR[contextra-agent:condition-evaluator]
+
 use super::*;
 /// Helper to look up a key or dot-notation path in [`AgentContext`].
 fn get_context_value<'a>(
@@ -147,3 +153,5 @@ pub fn evaluate_condition_expr(expr: &str, ctx: &AgentContext) -> bool {
     tracing::warn!("Unparseable condition expression: '{}'", expr);
     false
 }
+
+// !SECTION

@@ -1,9 +1,20 @@
-// ANCHOR[contextra-mvcc:COMPAT-ERR-001]
+// ANCHOR[id=compat-error-root]
+//! # Workspace-Kompatibilitätsabbildung für Fehler
+//!
+//! LINK crates/contextra-mvcc/src/mvcc_error.rs
+//! LINK crates/contextra-mvcc/src/compat/mod.rs
+//!
+//! Dieses Modul implementiert die tabellengesteuerte Konvertierung des lokalen `MvccError`
+//! in den globalen `contextra_types::ContextraError`.
+
 use crate::mvcc_error::MvccError;
 use contextra_types::ContextraError;
 
+// SECTION Error Conversion
+// ANCHOR[id=from-mvcc-error-for-contextra-error]
 impl From<MvccError> for ContextraError {
     fn from(err: MvccError) -> Self {
+        // NOTE: Bit- und stringgleiche Abbildung gemäß SPEC-v2 §5.3 / SPEC-v3 §5.3
         match err {
             MvccError::Conflict(msg) => ContextraError::Conflict(msg),
             MvccError::LimitExceeded { limit, context } => {
@@ -16,6 +27,7 @@ impl From<MvccError> for ContextraError {
         }
     }
 }
+// !SECTION Error Conversion
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,12 @@
 //! Port-Implementierung des `GraphCollectionMutation`-Traits für den CSR-Graphen.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Kompatibilitätsbrücke für Ports und Types (SPEC-v2 §4.3).
+// INVARIANTEN: Isolierte Workspace-Konvertierungen.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_ports::graph::{GraphMutationError as PortsGraphMutationError, HyperEdgeId as PortsHyperEdgeId, RoleBinding as PortsRoleBinding};
 use contextra_ports::GraphCollectionMutation;
 use contextra_types::DocId;
@@ -7,6 +14,8 @@ use contextra_types::DocId;
 use crate::csr::graph_write::CsrGraph;
 use crate::error::GraphMutationError;
 
+
+// SECTION Collection Mutation Core Implementation
 impl GraphCollectionMutation for CsrGraph {
     fn relate_n_ary(
         &self,
@@ -66,3 +75,5 @@ pub(crate) fn mutation_error_to_ports(err: GraphMutationError) -> PortsGraphMuta
         }
     }
 }
+
+// !SECTION Collection Mutation Core Implementation

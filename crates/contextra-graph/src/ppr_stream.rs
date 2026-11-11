@@ -10,12 +10,21 @@
 //!
 //! The performance gain (P24) stems from seed-local forward-push calculation in the underlying PPR engine, rather than incremental batching.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).
 // ANCHOR[contextra-graph:SRC-PPR-STREAM-001]
+
+// SECTION Ppr Stream Core Implementation
 pub const DEFAULT_PPR_STREAM_BATCH_SIZE: usize = 16;
 
 /// On-demand loading async candidate stream for Personalized PageRank search.
@@ -157,3 +166,5 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
         }
     }
 }
+
+// !SECTION Ppr Stream Core Implementation

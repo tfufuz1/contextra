@@ -5,6 +5,12 @@
 
 //! Declarative tool manifest specification.
 
+// =========================================================================
+// SECTION: Declarative Tool Manifests
+// =========================================================================
+// ANCHOR[contextra-agent:tool-manifest]
+
+
 use crate::context::MAX_ID_LEN;
 use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
@@ -133,3 +139,5 @@ impl ToolManifest {
         Ok(())
     }
 }
+
+// !SECTION

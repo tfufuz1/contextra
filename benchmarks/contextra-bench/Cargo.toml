@@ -17,9 +17,12 @@ ring = "tooling"
 name = "contextra_bench"
 path = "src/lib.rs"
 
+# Die Dataset-Module `locomo` und `long_mem_eval` fehlen im Repository (nur Fixtures
+# vorhanden). Binary und PathRAG-Sweep sind daher hinter Feature `datasets` gestellt.
 [[bin]]
 name = "contextra-bench"
 path = "src/main.rs"
+required-features = ["datasets"]
 
 [[bin]]
 name = "compare-baseline"
@@ -43,6 +46,8 @@ tracing-subscriber = { workspace = true }
 anyhow = "1"
 hdrhistogram = "7"
 rand = { workspace = true }
+contextra-rank = { workspace = true }
+contextra-types = { workspace = true }
 
 [[bench]]
 name = "competitive_kv"
@@ -56,5 +61,7 @@ redb = "2"
 sled = "0.34"
 
 [features]
+# Aktiviert Dataset-Harnesses (benötigt src/locomo.rs und src/long_mem_eval.rs).
+datasets = []
 default = []
 external-benchmarks = []

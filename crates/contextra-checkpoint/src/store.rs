@@ -18,6 +18,7 @@
 //!   um Deadlocks durch invertierte Sperr-Reihenfolgen auszuschließen.
 //! - `hwm_lock`: Schützt das Nachführen des High-Water-Marks für transaktionale Zähler.
 
+use crate::error::{CheckpointError, CheckpointResult as Result};
 use crate::guard::{CheckpointGuard, PinGuard};
 use crate::hardlink_cloner::SnapshotPinner;
 use crate::hardlink_cloner::{
@@ -28,8 +29,10 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 use crate::orphan::{
     clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
 };
+use crate::snapshot_source::SnapshotSource;
+use contextra_env::{Clock, MetricsSink};
 use contextra_ports::BoxFuture;
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_types::TxId;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

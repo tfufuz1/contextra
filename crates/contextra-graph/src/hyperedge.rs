@@ -3,6 +3,13 @@
 //! Implementiert n-äre Hyperkanten für komplexe Wissensrepräsentation (IP-20 / ADR-064).
 //! Persistenz erfolgt serde/bincode-kompatibel analog zu `PersistedEdgePayload`.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Hyperkanten-Datenstrukturen und n-äre Rollenbindungen.
+// INVARIANTEN: Valide Rollen und minimale Teilnehmeranzahl.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
 use crate::error::GraphMutationError;
@@ -15,6 +22,8 @@ use std::sync::Arc;
 
 /// LSM-Key-Präfix für Hyperkanten.
 // ANCHOR[contextra-graph:SRC-HYPEREDGE-001]
+
+// SECTION Hyperedge Core Implementation
 pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
 
 /// LSM-Key-Präfix für Hyperkanten-Index nach Entity.
@@ -794,3 +803,5 @@ mod tests {
         }
     }
 }
+
+// !SECTION Hyperedge Core Implementation

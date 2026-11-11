@@ -23,18 +23,19 @@ impl<S: contextra_ports::StorageEngine> contextra_ports::CheckpointCoordinator
     ) -> Result<Self::Meta> {
         self.create_checkpoint(name, collection_id, seq_no, tx_id, metadata)
             .await
+            .map_err(Into::into)
     }
 
     async fn restore_named_checkpoint(&self, name: &str) -> Result<Self::Meta> {
-        self.restore_checkpoint(name).await
+        self.restore_checkpoint(name).await.map_err(Into::into)
     }
 
     async fn drop_named_checkpoint(&self, name: &str) -> Result<()> {
-        self.drop_checkpoint(name).await
+        self.drop_checkpoint(name).await.map_err(Into::into)
     }
 
     async fn list_named_checkpoints(&self) -> Result<Vec<Self::Meta>> {
-        self.list_checkpoints().await
+        self.list_checkpoints().await.map_err(Into::into)
     }
 }
 

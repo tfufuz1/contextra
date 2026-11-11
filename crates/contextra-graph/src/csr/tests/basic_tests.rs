@@ -3,6 +3,13 @@
 //! # Zweck
 //! Testet Kantenhinzufügung, Gewichtsberechnung und Kantenentfernung in Standardfällen.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
@@ -10,6 +17,8 @@ use contextra_ports::GraphIndex;
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
+
+// SECTION Basic Tests Core Implementation
 pub(super) async fn setup_test_graph() -> CsrGraph {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);
@@ -779,3 +788,5 @@ async fn test_neighbors_hub_node_dedup() {
         "Neighbors returned must not contain duplicate EntityIds"
     );
 }
+
+// !SECTION Basic Tests Core Implementation
