@@ -1,6 +1,6 @@
 # Contextra Modularisierungs- & Entkopplungs-Audit
 
-> **Datum:** 2026-11-11 21:39:51 | **Analysierte Crates:** 39 | **Gesamtumfang:** 210,380 LOC
+> **Datum:** 2026-11-11 21:26:28 | **Analysierte Crates:** 39 | **Gesamtumfang:** 210,380 LOC
 
 ## 1. Strategische Zielsetzung & Architekturvision
 Dieses Dokument dient als zentrale Orientierung für Architekten und Coding-Agenten zur Transformation des Contextra-Ökosystems von einem fest verdrahteten Monolithen zu einem **vollständig modularen Baukastensystem (Building Blocks)**.
@@ -400,8 +400,8 @@ Dieses Dokument dient als zentrale Orientierung für Architekten und Coding-Agen
 - **Funktionsinventar:** 55 pub-Funktionen von 170 gesamt
 - **Schnittstellen:** 0 Traits, 22 Structs, 2 Enums
 - **Schnittstellen-Kopplung (importierte Fremdsymbole):**
-  - `contextra`: 53 Symbole
   - `contextra-privacy`: 8 Symbole
+  - `contextra`: 53 Symbole
   - `contextra-wire`: 3 Symbole
   - `contextra-types`: 8 Symbole
   - `contextra-ports`: 3 Symbole
@@ -460,8 +460,8 @@ Dieses Dokument dient als zentrale Orientierung für Architekten und Coding-Agen
 - **Funktionsinventar:** 61 pub-Funktionen von 161 gesamt
 - **Schnittstellen:** 0 Traits, 8 Structs, 0 Enums
 - **Schnittstellen-Kopplung (importierte Fremdsymbole):**
-  - `contextra-types`: 3 Symbole
   - `contextra`: 9 Symbole
+  - `contextra-types`: 3 Symbole
 - **Befunde:**
   - Starke direkte Kopplung an 'contextra' (9 importierte Symbole).
 - **Handlungsschritte für Coding-Agenten:**

@@ -1,9 +1,19 @@
+// FILE-CONTEXT
+// ZWECK: Fuzz-Target für SQ8 Skalar-Quantisierer (Training, Quantize, Dequantize)
+// INVARIANTEN: Reines fuzz_one ohne direkte libfuzzer-Laufzeitabhängigkeit für Smoke-Treiber
+// HOTSPOTS: 20-55
+// STAND: 2026-11-11
+// BEREICH: AGENTS §8, SPEC §11.4 — SQ8-Quantisierung und Outlier-Stabilität
+
+// ANCHOR[contextra-vector:W11-FUZZ-005]
+
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
 use contextra_vector::quantize::ScalarQuantizer;
+use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: &[u8]| {
+/// Reines Fuzz-Primitiv zur Entkopplung für Smoke-Treiber ohne libFuzzer.
+pub fn fuzz_one(data: &[u8]) {
     if data.len() < 16 {
         return;
     }
@@ -26,4 +36,8 @@ fuzz_target!(|data: &[u8]| {
             }
         }
     }
+}
+
+fuzz_target!(|data: &[u8]| {
+    fuzz_one(data);
 });
