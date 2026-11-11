@@ -449,7 +449,10 @@ mod tests {
         let h1 = hasher1.finish();
         let h2 = hasher2.finish();
 
-        assert_eq!(h1, h2, "DeterministicBlake3Hasher must yield identical hashes for identical inputs");
+        assert_eq!(
+            h1, h2,
+            "DeterministicBlake3Hasher must yield identical hashes for identical inputs"
+        );
         assert_ne!(h1, 0, "Hash state should not be 0 for non-empty input");
     }
 }

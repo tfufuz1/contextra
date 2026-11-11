@@ -8,7 +8,7 @@
 /// Unterstützte Distanzmetriken für Vektorberechnungen.
 ///
 /// Definiert als geschlossenes Wert-Enum (B09-Entscheidung).
-/// Besitzt bitidentische Serialisierung zu `contextra_types::DistanceMetric`.
+/// Besitzt bitidentische Serialisierung zum Workspace-Typ `DistanceMetric`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DistanceMetric {

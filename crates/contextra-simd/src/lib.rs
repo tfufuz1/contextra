@@ -25,11 +25,13 @@
 
 #![allow(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![deny(missing_docs)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
 
 // SECTION MODULE-DECLARATIONS
 // ANCHOR[contextra-simd:CORE-MOD-DISPATCH]
+pub mod contract;
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
 pub mod dispatch;
 pub mod error;
@@ -44,6 +46,7 @@ pub mod compat;
 
 // SECTION RE-EXPORTS
 // ANCHOR[contextra-simd:RE-EXPORTS]
+pub use contract::{DistanceFn, MetricDistanceFn};
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
     dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,

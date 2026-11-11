@@ -25,13 +25,16 @@ use std::time::Duration;
 /// Vereinfachtes Kandidaten-Ergebnis einer Text- bzw. Vektorähnlichkeitssuche.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextSearchResult {
+    /// Treffer-Identifikator.
     pub id: String,
+    /// Relevanz-Score.
     pub score: f32,
 }
 
 // ANCHOR[contextra-privacy:EG-002]
 /// Abstraktions-Trait für die Textähnlichkeitssuche zur Entkopplung von konkreten Datenbank-Engines.
 pub trait TextSearchEngine: Send + Sync {
+    /// Führt eine Textsuche nach relevanten Dokumenten durch.
     fn search_text<'a>(
         &'a self,
         text: &'a str,
@@ -102,7 +105,7 @@ impl EgressGuard {
     }
 
     // ANCHOR[contextra-privacy:EG-012]
-    /// Prüft einen an einen Mandanten gebundenen Payload ([`TenantScoped`]) mit Mandantenisolationsprüfung.
+    /// Prüft einen an einen Mandanten gebundenen Payload ([`crate::types::TenantScoped`]) mit Mandantenisolationsprüfung.
     ///
     /// Liefert `Block(BlockReason::PolicyDenied(...))` bei Mandantenkonflikten.
     pub async fn check_scoped(
@@ -200,6 +203,7 @@ mod tests {
     }
 
     impl TextSearchEngine for MockSearchEngine {
+        /// Führt eine Textsuche nach relevanten Dokumenten durch.
         fn search_text<'a>(
             &'a self,
             _text: &'a str,
@@ -334,6 +338,7 @@ mod tests {
     }
 
     impl TextSearchEngine for FailingSearchEngine {
+        /// Führt eine Textsuche nach relevanten Dokumenten durch.
         fn search_text<'a>(
             &'a self,
             _text: &'a str,

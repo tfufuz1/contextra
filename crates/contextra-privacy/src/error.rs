@@ -1,28 +1,29 @@
 //! `error` — Zentrale Fehlertypen für das Cloud Egress Gateway und Privacy-Subsystem.
 //!
 //! # Zweck
-//! Definiert typisierte Fehlerstrukturen für Fehlschläge bei der DLP-Prüfung (Data Loss Prevention),
+//! Definiert typisierte Fehlerstrukturen für Fehlschläge bei der DLP-Prüfung,
 //! Richtlinienverstößen, ungültigen Parametern sowie Surrogat-Token-Kollisionen.
-//! Erfüllt B4 für Klasse-A-Bausteine (ein primärer `Error` / `EgressError`, `#[non_exhaustive]`).
+//! Erfüllt Invariante I3 (`PrivacyError`, `#[non_exhaustive]`, `thiserror`).
 
 use thiserror::Error;
 
 // ANCHOR[contextra-privacy:ERR-001]
-/// Fehlertypen des Egress-Gateways und der DLP-Prüfung (Klasse A).
+/// Primärer Fehlertyp des Privacy- und Egress-Subsystems.
 ///
-/// Signalisiert spezifische Fehlerzustände bei der Analyse und Weiterleitung von Daten an externe Cloud-Dienste.
+/// Signalisiert spezifische Fehlerzustände bei der Analyse, Filterung und Weiterleitung
+/// von Daten an externe Dienste.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum EgressError {
+pub enum PrivacyError {
     /// Ungültige Eingabeparameter oder Konfiguration.
     #[error("Invalid parameter: {0}")]
     InvalidParams(String),
 
-    /// Ungültige Eingabe (Klasse A Standardfehler).
+    /// Ungültige Eingabe.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    /// Kapazitäts- oder Größenlimit überschritten (Klasse A Standardfehler).
+    /// Kapazitäts- oder Größenlimit überschritten.
     #[error("Capacity exceeded: {0}")]
     CapacityExceeded(String),
 
@@ -34,15 +35,15 @@ pub enum EgressError {
     #[error("Internal egress error: {0}")]
     InternalError(String),
 
-    /// I/O-Fehler (Klasse A Standardfehler).
+    /// I/O-Fehler.
     #[error("I/O error: {0}")]
     Io(String),
 
-    /// Zustandskonflikt (Klasse A Standardfehler).
+    /// Zustandskonflikt.
     #[error("State conflict: {0}")]
     StateConflict(String),
 
-    /// Korrumpierte Daten (Klasse A Standardfehler).
+    /// Korrumpierte Daten.
     #[error("Corrupt data: {0}")]
     Corrupt(String),
 
@@ -58,19 +59,18 @@ pub enum EgressError {
     },
 }
 
-/// Primärer Crate-Fehlertyp-Alias für Klasse-A-Konformität (B4).
-pub type Error = EgressError;
+/// Abwärtskompatibler Alias für `PrivacyError`.
+pub type EgressError = PrivacyError;
+
+/// Primärer Crate-Fehlertyp-Alias.
+pub type Error = PrivacyError;
 
 /// Result-Typ für contextra-privacy.
-pub type Result<T> = std::result::Result<T, EgressError>;
+pub type Result<T> = std::result::Result<T, PrivacyError>;
 
 // ANCHOR[contextra-privacy:ERR-002]
-// Konvertierung von EgressVaultError in EgressError zur feingranularen Fehlerweitergabe.
-// 1. InvalidPattern -> EgressError::InvalidParams
-// 2. PayloadTooLarge -> EgressError::CapacityExceeded / InvalidParams
-// 3. TenantScopeViolation -> EgressError::PolicyViolation
-// 4. SurrogateCollision -> EgressError::SurrogateCollision
-impl From<crate::egress_vault::EgressVaultError> for EgressError {
+// Konvertierung von EgressVaultError in PrivacyError zur feingranularen Fehlerweitergabe.
+impl From<crate::egress_vault::EgressVaultError> for PrivacyError {
     fn from(err: crate::egress_vault::EgressVaultError) -> Self {
         match err {
             crate::egress_vault::EgressVaultError::InvalidPattern { pattern, reason } => {
@@ -95,47 +95,96 @@ impl From<crate::egress_vault::EgressVaultError> for EgressError {
     }
 }
 
-impl EgressError {
+impl PrivacyError {
     // ANCHOR[contextra-privacy:ERR-003]
-    /// Konstruiert einen `EgressError::InvalidParams`.
+    /// Konstruiert einen `PrivacyError::InvalidParams`.
     pub fn invalid_params(msg: impl Into<String>) -> Self {
         Self::InvalidParams(msg.into())
     }
 
-    /// Konstruiert einen `EgressError::InvalidInput`.
+    /// Konstruiert einen `PrivacyError::InvalidInput`.
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
 
-    /// Konstruiert einen `EgressError::CapacityExceeded`.
+    /// Konstruiert einen `PrivacyError::CapacityExceeded`.
     pub fn capacity_exceeded(msg: impl Into<String>) -> Self {
         Self::CapacityExceeded(msg.into())
     }
 
     // ANCHOR[contextra-privacy:ERR-004]
-    /// Konstruiert einen `EgressError::PolicyViolation`.
+    /// Konstruiert einen `PrivacyError::PolicyViolation`.
     pub fn policy_violation(msg: impl Into<String>) -> Self {
         Self::PolicyViolation(msg.into())
     }
 
     // ANCHOR[contextra-privacy:ERR-005]
-    /// Konstruiert einen `EgressError::InternalError`.
+    /// Konstruiert einen `PrivacyError::InternalError`.
     pub fn internal_error(msg: impl Into<String>) -> Self {
         Self::InternalError(msg.into())
     }
 
-    /// Konstruiert einen `EgressError::Io`.
+    /// Konstruiert einen `PrivacyError::Io`.
     pub fn io(msg: impl Into<String>) -> Self {
         Self::Io(msg.into())
     }
 
-    /// Konstruiert einen `EgressError::StateConflict`.
+    /// Konstruiert einen `PrivacyError::StateConflict`.
     pub fn state_conflict(msg: impl Into<String>) -> Self {
         Self::StateConflict(msg.into())
     }
 
-    /// Konstruiert einen `EgressError::Corrupt`.
+    /// Konstruiert einen `PrivacyError::Corrupt`.
     pub fn corrupt(msg: impl Into<String>) -> Self {
         Self::Corrupt(msg.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_privacy_error_display_and_conversion() {
+        let cases: Vec<(PrivacyError, &str)> = vec![
+            (
+                PrivacyError::invalid_params("p1"),
+                "Invalid parameter: p1",
+            ),
+            (
+                PrivacyError::invalid_input("i1"),
+                "Invalid input: i1",
+            ),
+            (
+                PrivacyError::capacity_exceeded("c1"),
+                "Capacity exceeded: c1",
+            ),
+            (
+                PrivacyError::policy_violation("pv1"),
+                "Policy violation: pv1",
+            ),
+            (
+                PrivacyError::internal_error("ie1"),
+                "Internal egress error: ie1",
+            ),
+            (PrivacyError::io("io1"), "I/O error: io1"),
+            (
+                PrivacyError::state_conflict("sc1"),
+                "State conflict: sc1",
+            ),
+            (PrivacyError::corrupt("co1"), "Corrupt data: co1"),
+            (
+                PrivacyError::SurrogateCollision {
+                    surrogate: "tok1".into(),
+                    existing_plaintext: "old".into(),
+                    new_plaintext: "new".into(),
+                },
+                "Surrogate token collision detected for token 'tok1': existing plaintext 'old' != new plaintext 'new'",
+            ),
+        ];
+
+        for (err, expected_display) in cases {
+            assert_eq!(err.to_string(), expected_display);
+        }
     }
 }

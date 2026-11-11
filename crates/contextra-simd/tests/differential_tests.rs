@@ -506,3 +506,68 @@ fn test_unaligned_f32_bytes_slice_windows() {
         }
     }
 }
+
+#[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SPECIAL-VALUES-R3]
+// Differenztests für Sonderwerte und R3-Dimensionen (1, 4, 17, 128, 768, 1536)
+fn test_differential_special_values_and_r3_dimensions() {
+    let dims = [1, 4, 17, 128, 768, 1536];
+
+    for &dim in &dims {
+        // 1. Zeros (+0.0)
+        let zeros_a = vec![0.0f32; dim];
+        let zeros_b = vec![0.0f32; dim];
+
+        // Euclidean: dist(0, 0) == 0.0
+        let euc_scalar = euclidean_distance_scalar(&zeros_a, &zeros_b);
+        let euc_simd = euclidean_distance(&zeros_a, &zeros_b).unwrap();
+        assert_eq!(euc_scalar, 0.0);
+        assert_eq!(euc_simd, 0.0);
+
+        // DotProduct: - (0 * 0) = -0.0 or 0.0
+        let dot_scalar = dot_product_scalar(&zeros_a, &zeros_b);
+        let dot_simd = dot_product_distance(&zeros_a, &zeros_b).unwrap();
+        assert_eq!(dot_scalar, 0.0);
+        assert_eq!(dot_simd, 0.0);
+
+        // Cosine: dist(0, 0) gives fallback 1.0
+        let cos_scalar = cosine_distance_scalar(&zeros_a, &zeros_b);
+        let cos_simd = cosine_distance(&zeros_a, &zeros_b).unwrap();
+        assert_eq!(cos_scalar, 1.0);
+        assert_eq!(cos_simd, 1.0);
+
+        // 2. Negative zeros (-0.0)
+        let neg_zeros_a = vec![-0.0f32; dim];
+        let neg_zeros_b = vec![0.0f32; dim];
+        let euc_neg = euclidean_distance(&neg_zeros_a, &neg_zeros_b).unwrap();
+        assert_eq!(euc_neg, 0.0);
+
+        // 3. Subnormal / Denormal values
+        let denorm_val = f32::from_bits(0x0000_0001); // smallest positive subnormal
+        assert!(denorm_val.is_subnormal());
+        let denorm_a = vec![denorm_val; dim];
+        let denorm_b = vec![denorm_val * 2.0; dim];
+
+        let denorm_euc_s = euclidean_distance_scalar(&denorm_a, &denorm_b);
+        let denorm_euc_simd = euclidean_distance(&denorm_a, &denorm_b).unwrap();
+        assert!((denorm_euc_s - denorm_euc_simd).abs() <= 1e-5 * denorm_euc_s.abs().max(1e-12));
+
+        let denorm_dot_s = dot_product_scalar(&denorm_a, &denorm_b);
+        let denorm_dot_simd = dot_product_distance(&denorm_a, &denorm_b).unwrap();
+        assert!((denorm_dot_s - denorm_dot_simd).abs() <= 1e-5 * denorm_dot_s.abs().max(1e-12));
+
+        // 4. Large magnitudes safely within f32 range across 1536 dims (e.g. 1e16, 1536 * 1e32 = 1.5e35 < 3.4e38)
+        let large_a = vec![1e16f32; dim];
+        let large_b = vec![1.00001e16f32; dim];
+        let large_cos_s = cosine_distance_scalar(&large_a, &large_b);
+        let large_cos_simd = cosine_distance(&large_a, &large_b).unwrap();
+        assert!((large_cos_s - large_cos_simd).abs() <= 1e-5);
+
+        // 5. Very small magnitudes (e.g. 1e-18)
+        let small_a = vec![1e-18f32; dim];
+        let small_b = vec![2e-18f32; dim];
+        let small_cos_s = cosine_distance_scalar(&small_a, &small_b);
+        let small_cos_simd = cosine_distance(&small_a, &small_b).unwrap();
+        assert!((small_cos_s - small_cos_simd).abs() <= 1e-5);
+    }
+}

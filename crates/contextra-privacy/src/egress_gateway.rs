@@ -61,6 +61,7 @@ impl EgressGuardCheck for DefaultEgressGuard {
 // ANCHOR[contextra-privacy:EGW-005]
 /// Trait zur Prüfung auf Prompt-Injection in eingehenden Cloud-Antworten.
 pub trait InjectionDetector: Send + Sync {
+    /// Prüft den Text auf Muster.
     fn detect(&self, text: &str) -> Option<String>;
 }
 
@@ -101,35 +102,42 @@ pub struct EgressGatewayBuilder {
 }
 
 impl EgressGatewayBuilder {
+    /// Erzeugt eine neue Builder-Instanz.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Setzt den Klassifikator.
     pub fn with_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {
         self.classifier = Some(classifier);
         self
     }
 
+    /// Setzt den Egress-Guard.
     pub fn with_egress_guard(mut self, guard: Arc<dyn EgressGuardCheck>) -> Self {
         self.egress_guard = Some(guard);
         self
     }
 
+    /// Setzt den Entitätserkenner.
     pub fn with_recognizer(mut self, recognizer: Arc<dyn EntityRecognizer>) -> Self {
         self.recognizer = Some(recognizer);
         self
     }
 
+    /// Setzt den Egress-Tresor.
     pub fn with_egress_vault(mut self, vault: Arc<EgressVault>) -> Self {
         self.egress_vault = Some(vault);
         self
     }
 
+    /// Setzt den Surrogat-Tresor.
     pub fn with_surrogate_vault(mut self, surrogate_vault: Arc<SurrogateVault>) -> Self {
         self.surrogate_vault = Some(surrogate_vault);
         self
     }
 
+    /// Setzt den Massenabfluss-Detektor.
     pub fn with_bulk_detector(
         mut self,
         detector: Arc<BulkExfiltrationDetector>,
@@ -139,6 +147,7 @@ impl EgressGatewayBuilder {
         self
     }
 
+    /// Setzt die Uhr-Quelle.
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = Some(clock);
         self
@@ -192,6 +201,7 @@ impl EgressGatewayBuilder {
 }
 
 impl EgressGateway {
+    /// Erzeugt einen neuen EgressGatewayBuilder.
     pub fn builder() -> EgressGatewayBuilder {
         EgressGatewayBuilder::new()
     }
@@ -439,8 +449,11 @@ where
 // ANCHOR[contextra-privacy:EGW-011]
 /// Anfrage-Struktur für ausgehende Cloud-Queries.
 pub struct CloudQueryRequest {
+    /// Die ausgehende Anfrage.
     pub query: String,
+    /// Optionale Kollektion.
     pub collection: Option<String>,
+    /// Maximale Ergebnisanzahl.
     pub max_results: Option<usize>,
 }
 
@@ -448,10 +461,15 @@ pub struct CloudQueryRequest {
 // ANCHOR[contextra-privacy:EGW-012]
 /// Antwort-Struktur nach erfolgreicher Bereinigung und Durchlauf der Egress-Pipeline.
 pub struct CloudQueryResponse {
+    /// Status der Ausführung.
     pub status: String,
+    /// Verarbeitete Anfrage.
     pub query: String,
+    /// Gibt an, ob sensible Daten abstrahiert wurden.
     pub abstracted: bool,
+    /// Ergebnisliste.
     pub results: Vec<Value>,
+    /// Optionaler Abstraktionshinweis.
     pub abstraction_notice: Option<String>,
 }
 

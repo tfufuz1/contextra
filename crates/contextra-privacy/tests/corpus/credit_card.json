@@ -1,0 +1,35 @@
+{
+  "category": "CREDIT_CARD",
+  "cases": [
+    {
+      "input": "Zahlung mit 4532820011223344 bestätigen",
+      "expected_match": true,
+      "expected_value": "4532820011223344"
+    },
+    {
+      "input": "Karte: 5412 7512 3456 7898 verwendet",
+      "expected_match": true,
+      "expected_value": "5412 7512 3456 7898"
+    },
+    {
+      "input": "Amex: 3782-822463-10005 verarbeiten",
+      "expected_match": true,
+      "expected_value": "3782-822463-10005"
+    },
+    {
+      "input": "Ungültige Karte: 4532820011223345 sollte fehlschlagen",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "Zahlung 123456789012 (12 Stellen)",
+      "expected_match": false,
+      "expected_value": null
+    },
+    {
+      "input": "Harmloser Text ohne Kartennummern",
+      "expected_match": false,
+      "expected_value": null
+    }
+  ]
+}
