@@ -3,6 +3,15 @@
 //! # Zweck
 //! Orchestriert Dense-, Forward-Push- und Schattenmodus-Verfahren zur Relevanzbewertung.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
+
+// SECTION Mod Core Implementation
 pub mod cost;
 pub mod dense;
 pub mod forward_push;
@@ -372,3 +381,5 @@ impl crate::path_rag::PathGraph for GraphInner {
 
 #[cfg(test)]
 mod tests;
+
+// !SECTION Mod Core Implementation

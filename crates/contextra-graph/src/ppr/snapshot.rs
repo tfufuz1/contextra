@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-PPR-SNAPSHOT-001]
 //! Snapshot-Isolation und historische Abfragen für PPR-Berechnungen.
 //!
@@ -11,6 +18,8 @@ use crate::ppr::{compute_ppr_with_context, DeletedView, PprContext};
 use contextra_types::{EntityId, PprConfig, TxId};
 use std::collections::HashMap;
 
+
+// SECTION Snapshot Core Implementation
 fn filter_node_visible_edges(inner: &GraphInner, i: usize, as_of_tx: TxId) -> Vec<EdgePayload> {
     let mut visible_edges = Vec::new();
 
@@ -134,3 +143,5 @@ pub fn compute_ppr_at(
     let mut ctx = PprContext::new();
     compute_ppr_with_context(&snapshot, seed_nodes, config, deleted_nodes, &mut ctx)
 }
+
+// !SECTION Snapshot Core Implementation

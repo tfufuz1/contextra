@@ -3,6 +3,13 @@
 //! # Zweck
 //! Validiert Zeitreise-Abfragen und MVCC-Snapshot-Isolation basierend auf `TxId`.
 
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
+// INVARIANTEN: Bitemporale Sichtbarkeit, lock-freie Lesepfade.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 use super::super::*;
 use crate::csr::inner::GraphInner;
 use crate::csr::types::{CsrGraphConfig, EdgeType};
@@ -13,6 +20,8 @@ use std::sync::Arc;
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-BITEMPORAL-TESTS-001]
 #[tokio::test]
+
+// SECTION Bitemporal Tests Core Implementation
 async fn test_rcu_snapshot_isolation_no_torn_reads() {
     let graph = Arc::new(CsrGraph::new());
     let tx = TxId::new(1);
@@ -567,3 +576,5 @@ async fn test_hyperedge_doc_and_entity_rcu_atomicity() {
     assert!(graph.hyperedges_for_entity(e1).is_empty());
     assert!(graph.get_hyperedge(he_id).is_none());
 }
+
+// !SECTION Bitemporal Tests Core Implementation

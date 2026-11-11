@@ -1,3 +1,4 @@
+// SECTION Lib Core Implementation
 #![deny(dead_code)]
 //! Contextra Graph — CSR-Graph for Entity-Relation Traversal & Session DAG.
 //!
@@ -22,6 +23,13 @@
 //!   independently using `parking_lot::RwLock`. When acquiring multiple locks concurrently,
 //!   `nodes` MUST be acquired before `edges` or `active_head` to prevent deadlocks. No locks are
 //!   held across `.await` storage calls.
+
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Crate-Wurzel und öffentliche Schnittstellen von contextra-graph.
+// INVARIANTEN: #![forbid(unsafe_code)], Zero-Panic Invariante.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 // INVARIANT: CSR-Graph für 5-Signal Fusion (WP-6.1)
 
@@ -142,3 +150,5 @@ pub trait GraphIndexExt: contextra_ports::GraphIndex {
         entity: EntityId,
     ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>>;
 }
+
+// !SECTION Lib Core Implementation

@@ -1,3 +1,10 @@
+// FILE-CONTEXT
+// STAND: 2026-11-15T12:00:00Z
+// ZWECK: Personalized PageRank (Forward-Push und dichte Matrix-Berechnung).
+// INVARIANTEN: Massenerhaltung der Residuen, Konvergenzgarantie.
+// HOTSPOTS: Keine kritischen Bottlenecks identifiziert
+// SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
+
 // ANCHOR[contextra-graph:SRC-PPR-DENSE-001]
 //! Dichte Matrix-/Vektorberechnung für personalisierten PageRank (PPR).
 //!
@@ -9,6 +16,8 @@ use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprConfig};
 use std::collections::HashSet;
 
+
+// SECTION Dense Core Implementation
 pub(crate) fn collect_valid_seeds(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
@@ -398,3 +407,5 @@ pub(crate) fn compute_ppr_dense(
     run_dense_power_iteration(inner, n, config, deleted_nodes, ctx);
     extract_dense_results(inner, n, deleted_nodes, ctx)
 }
+
+// !SECTION Dense Core Implementation
