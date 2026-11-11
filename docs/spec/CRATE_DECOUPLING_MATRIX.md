@@ -1,7 +1,7 @@
 # Contextra Baukasten: Crate-Entkopplungs- und Entscheidungsmatrix
 
-> **Dokument-Status:** Normativ & Verbindlich  
-> **Rolle:** Principal Rust Systems Engineer  
+> **Dokument-Status:** Normativ & Verbindlich
+> **Rolle:** Principal Rust Systems Engineer
 > **Gültigkeit:** Workspace `tfufuz1/contextra`
 
 ---

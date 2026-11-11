@@ -1,8 +1,8 @@
 # Contextra Baukasten: Systemdesign- & Architektur-Spezifikation
 
-> **Dokument-Status:** Normativ & Verbindlich  
-> **Rolle:** Principal Rust Systems Engineer & Software-Architekt  
-> **Zielgruppe:** Zukünftige Entwickler, Modul-Implementierer, Drittanwender  
+> **Dokument-Status:** Normativ & Verbindlich
+> **Rolle:** Principal Rust Systems Engineer & Software-Architekt
+> **Zielgruppe:** Zukünftige Entwickler, Modul-Implementierer, Drittanwender
 > **Gültigkeit:** Gesamtes Repository `contextra`
 
 ---
