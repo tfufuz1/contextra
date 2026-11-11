@@ -12,6 +12,12 @@
 
 #![forbid(unsafe_code)]
 
+// =========================================================================
+// SECTION: GoalCondition & Deterministic Evaluation
+// =========================================================================
+// ANCHOR[contextra-agent:goal-condition-primitives]
+
+
 use crate::step::StepResult;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -494,3 +500,5 @@ mod tests {
         assert_eq!(parse_legacy_condition_string("   "), None);
     }
 }
+
+// !SECTION

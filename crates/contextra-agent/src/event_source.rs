@@ -9,6 +9,12 @@
 //!
 //! Provides `EventSource` trait and concrete implementations (`PollingDocumentEventSource`, `VecEventSource`).
 
+// =========================================================================
+// SECTION: Continuous Event Sources & Telemetry
+// =========================================================================
+// ANCHOR[contextra-agent:event-source-primitives]
+
+
 use crate::context::MAX_ID_LEN;
 use contextra_db::Collection;
 use contextra_ports::{BoxFuture, StorageEngine};
@@ -294,3 +300,5 @@ mod tests {
         ));
     }
 }
+
+// !SECTION

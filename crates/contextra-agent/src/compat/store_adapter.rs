@@ -4,6 +4,12 @@
 //! als JSON-Array von `u8` abgebildet. Diese Kodierung ist verlustfrei und ohne Zusatz-
 //! abhängigkeit umkehrbar.
 
+// =========================================================================
+// SECTION: ContextStore Adapter for DbCollection
+// =========================================================================
+// ANCHOR[contextra-agent:compat-store-adapter]
+
+
 use crate::ports::ContextStore;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result};
@@ -49,3 +55,5 @@ impl<'a> ContextStore for DbCollectionStore<'a> {
         })
     }
 }
+
+// !SECTION
