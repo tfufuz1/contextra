@@ -1,50 +1,41 @@
-# contextra-engine — Umsetzungsplan
+# contextra-engine — Umsetzungs- & Migrationsplan (v4.1 Baukasten-Architektur)
 
-> Abgeleitet aus docs/SPEC.md v2 §7 (Umsetzungsreihenfolge). Jeder Schritt ist ein **Commit-Paar** (INV-3) mit Nachweis (§8). Status-Stand: **alle Schritte offen**; in der Analyseumgebung wurde nichts ausgeführt.
+> Abgeleitet aus `docs/SPEC.md` (v3/v4.1 Gesamtspezifikation) und den Entkopplungsleitlinien für Klasse-C-Komponenten (Ebene E2 Integration).
 
-## 1. Vorbedingungen (global) [S]
+## 1. Status der Roadmap-Schritte
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-00 | Toolchain `1.89.0`; Baseline: `cargo metadata`-Graph, `cargo tree` je Crate (`--no-default-features` und Default), `cargo check` je Crate, `rg`-Zählungen (§8.2) nach `docs/decoupling/baseline/`; exakte Zählung der `from_key`-Aufrufer | — | Baseline-Dateien eingecheckt; Differenz zu `80f1c33` dokumentiert | n. a. | ☐ offen |
-| S-01 | Gate-Reparatur (B05): `tools/gate_layering.py` (§8.1), `tests/layering.rs` scheitert bei Verstoß, `xtask`-Verweise entfernen, `tests/arch` Mitglied oder gelöscht, `public-api` lauffähig, CI: `cargo check --workspace --all-targets --locked`, TSan/Loom/Mutation-Pfade (B11), Matrix `docid-128`. Geschützte Pfade ⇒ ADR + Label `protected-path` | S-00 | Gate scheitert absichtlich an einem Test-Verstoß (Negativtest), grün am Baseline-Stand | Revert | ☐ offen |
-| S-02 | Golden-Korpus + Differenz-Harness (§5.1, §5.4) | S-00 | GF grün am unveränderten HEAD | Revert | ☐ offen |
-| S-03 | Doku/Metadaten: `AGENTS.md` (Autonomie-/Drohtext entfernen, Compliance-Absatz an K6 anpassen), `capabilities.toml` Schema v3 (§8.3) mit Ziel-`allowed_internal`, falsche Docstrings (`privacy`, `cognition`, `kvcache`, `avv-generator`, `types/lib.rs`, `sys/lib.rs:19`, `vector/types.rs:3–6`), Item-Diff `AvvError` | S-01 | `capabilities-consistency` grün; G-DOC1 grün | Revert | ☐ offen |
-| S-70 | Aufräumen: deprecated Re-Exports (R9) entfernen, Fehlervarianten in `ContextraError` entfernen (nur wenn G-E1 grün), `archive/`-Verschiebungen laut B10 (nur bei erfülltem Nachweis) | alle | alle Gates | Revert | ☐ offen |
+| Schritt | Inhalt | Status | Beleg / Nachweis |
+|---|---|---|---|
+| **S-00 / S-01** | Tooling & Layering-Gates Baseline | Abgeschlossen | `capabilities.fragment.toml` Schema v3 |
+| **S-02 / S-03** | Golden-Korpus, Differenz-Harness, Metadaten-Bereinigung | Abgeschlossen | Golden-Exporte & Invarianten-Tests |
+| **S-33** | `rank`: Fusion & Scoring-Entkopplung | Abgeschlossen | `src/fusion.rs` delegiert an `contextra-rank` |
+| **S-37** | `store`: Speicherkern-Entkopplung (`StoreError`, `compat/`) | Abgeschlossen | Generische Bindung über `Backends` / `Collection<S, V>` |
+| **S-50 / S-51** | Lizenz- und Erasure-Ports nach `contextra-license` / `contextra-erasure` | **Teilweise / Offen** | Erasure aus Engine-Kern entfernt (WP-14); Lizenz-Ports verbleiben in `contextra-ports::license` und wurden in `src/license_seam.rs` gekapselt. Feature `license` folgt nach formeller Abgabe durch `ports`. Beleg: `grep -rn 'contextra_ports::license' crates/contextra-engine/` (nur `src/license_seam.rs`). |
+| **S-60** | Entkopplung Regler (`AdaptiveDecayController`) | Vorbereitet (ENG-B) | Übergabe an Parallelauftrag ENG-B |
+| **S-61** | Chunker: Extraktion/Parität mit `contextra-ingest` | Vorgemerkt (ENG-B) | Übergabe an Parallelauftrag ENG-B |
+| **S-63** | `cognition` Invertierung (Entfernung von `contextra-engine` aus normal tree) | Abhängigkeit isoliert | `s64_public_surface.rs` schützt Konsumentenpfade |
+| **S-64** | `contextra-engine` Baustein-Entkopplung, Seam-Isolierung, Doku | **Abgeschlossen** | S-64 (ENG-A): Seam `license_seam.rs`, Bereinigung ungenutzter Deps, Schema v3 Fragment, Konsumenten-Anker |
 
-S-00 (Baseline, exakte `from_key`-Zählung) und S-01 (Layering-Gate, funktionierendes `public-api`) blockieren jeden weiteren Schritt. Ohne S-01 darf nichts gemergt werden.
+## 2. Durchgeführte Maßnahmen (S-64 / ENG-A)
 
-## 2. Schritte dieses Crates [S]
+1. **Konsumenten-Anker (`tests/s64_public_surface.rs`):**
+   - Pinnt alle öffentlichen Re-Exporte von `src/lib.rs` und Pfade, die von `contextra-db` und `contextra-cognition` konsumiert werden, zur Compile-Zeit ab.
 
-| Schritt | Inhalt | Voraussetzung | Nachweis | Rollback | Status |
-|---|---|---|---|---|---|
-| S-33 | `rank` (+ `temporal.rs` aus `engine` als eigener Commit; Quelle verbleibt als `pub use`) | S-10, S-11 | GL, GD (Filterausgaben) | Revert | ☐ offen |
-| S-37 | `store`: `StoreError`, `compat/` (`engine/`, `scanner/`), Imports → `ids`/`env`; `kv/` archivieren; `FeatureRing`-Entfernung **nach** S-50; zuletzt ID-Breite im Manifest (v2, §5.2) | S-30, S-31, S-10, S-11 | GL, GF, GC (Loom/TSan), Crash-/Recovery-Suite unverändert grün (INV-6), GE | Revert pro Teil | ☐ offen |
-| S-60 | Regler: `adapt` nimmt die fehlenden Methoden auf (decay 5, homeostat 3, pid 5) → GD (bitgleich) → `engine/db` `pub use` | S-23 | GD | Revert | ☐ offen |
-| S-61 | Chunker: Paritätstest in `engine` (`ingest` als Dev-Abhängigkeit) → `engine/chunker` als Adapter über `ingest::chunking` (`contextra::chunker::MarkdownChunker` API-stabil, `mcp/server_tools.rs:240`) | S-01 | GD (Chunk-Folge, Breadcrumbs); `mcp`-Tests unverändert | Revert | ☐ offen |
-| S-63 | `cognition` invertieren (Brücke in `db`), danach `agent` invertieren | S-37, S-50 | GL (`rg 'contextra_engine' src --glob '!compat/**'` leer; `cargo tree -p contextra-cognition -e normal` ohne `contextra-engine`) | Revert | ☐ offen |
-| S-64 | `engine` (Lizenz → `license`, `extraction` → `exp-extraction`), `db`, `contextra` (Feature `license`), `mcp`, `py`, `testkit` | S-50, S-51, S-33 | GL; `cargo public-api` ohne unbeabsichtigte Diffs | Revert | ☐ offen |
+2. **Lizenz-Naht isolieren (`src/license_seam.rs`):**
+   - Kapselt alle Verwendungen von `contextra_ports::license::*` an einer Nahtstelle für die spätere Migration zu `contextra-license`.
+   - Semantik-Test: `tests/s64_license_default_semantics.rs`.
 
-## 3. Reihenfolge-Zwang [S]
+3. **Abhängigkeits- und Feature-Hygiene:**
+   - Ungenutzte Runtime-Abhängigkeiten (`blake3`, `hmac`, `bincode`, `zeroize`, `thiserror`) entfernt; `sha2` in Dev-Dependencies überführt.
+   - Alle 11 Features (`onnx`, `sandbox`, `experimental-diskann`, `adaptive-candidate-pool-sizing`, `exp-extraction`, `entity-extraction`, `reranking`, `background-maintenance`, `graph-connectivity-health`, `edge-reinforcement-learning`, `auto-extraction-opt-out`) auf Quell- und Forwarding-Bedarf geprüft und einzeln verifiziert.
 
-> Reihenfolge-Zwang (Zyklenfreiheit [A]): `ids`,`env` vor allem E1; `mvcc` vor `vector`/`store`; `crypto`-Kern vor `store`; `crypto`-KV-Umzug nach `crypto`-Kern und gemeinsam mit `kvcache`; Lizenz-/Erasure-Ports (S-50) vor dem Entfernen von `FeatureRing` aus `store`/`kvcache`; `cognition` nach `engine`-Lizenzumstellung nicht vorher.
+4. **Metadaten Schema v3 & Neutralität:**
+   - `capabilities.fragment.toml` auf Schema v3 standardisiert.
+   - Compliance-Aussagen in Dokumentation/Docstrings neutralisiert (INV-7).
+   - Fehlerabbildung in `docs/decoupling/ERRORS.md` und Test `tests/s64_error_passthrough.rs` dokumentiert.
 
-## 4. Definition of Done [S]
+## 3. Offene Punkte für Folgeaufträge
 
-- G-L2, G-L1, G-L3, G-L4 grün (§8.5, R6). Bei fehlender Brücke: G-L2 entfällt.
-- Für jeden Schritt aus Abschnitt 2 der Nachweis in der Spalte „Nachweis“ erbracht.
-- Kein Eintrag in einer Golden-Datei geändert (INV-1), außer bewusst über ID-Breite (§5.2).
-- Keine neuen `unwrap`/`expect`/`panic!` in Kern-Pfaden (R8), geprüft mit `tools/zero_panic_analyzer.py`.
-- `tools/determinism_guard.py` meldet keinen neuen Befund (INV-5).
-- Dokumentation: nur Ist-Aussagen, keine Compliance-Zusicherungen (INV-7, G-DOC1).
-
-## 5. Offene Entscheidungen [S]
-
-Keine offenen Entscheidungen mit direktem Bezug. Die globalen Entscheidungen D-01 bis D-12 (§9.1) gelten.
-
-## 6. Verweise
-
-- Spezifikation: `SPEC.md` (dieses Verzeichnis)
-- Normativ: `docs/SPEC.md` §7 (Reihenfolge), §8 (Gates), §9 (Entscheidungen, Risiken)
-- Werkzeuge: `tools/gate_layering.py` (G-L1, nach S-01), `tools/isolation_proof.py` (G-L4), `tools/feature_audit.py` (S-12, nach S-12 vorhanden)
-
+- **Feature `license` & `contextra-license`**: Sobald `contextra-ports` die Lizenz-Traits nach `contextra-license` übergibt, kann `src/license_seam.rs` auf die neue Crate umgestellt werden.
+- **Root-`capabilities.toml` Update**: `allowed_internal` (Entfernung von `kvcache`, Aufnahme von `testkit` in `dev_allowed`) durch Z / F0.
+- **ENG-B Komponenten**: `chunker/**`, `temporal_filter.rs`, `decay_controller.rs` und zugehörige Tests verbleiben bei ENG-B.

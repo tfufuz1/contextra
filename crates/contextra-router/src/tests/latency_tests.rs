@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// STAND: 2026-11-10
+// ZWECK: Interne Testsuite für contextra-router (latency_tests.rs).
+// INVARIANTEN: Deterministische Ausführung, Abdeckung von Routing- & Kalibrierungslogik.
+
 //! # Latenz- und Performance-Tests für Routing-Pfade
 //!
 //! **Ring:** Ring 3 (Applikations- und Testschicht).

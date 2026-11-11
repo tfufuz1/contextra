@@ -4,8 +4,10 @@ pub mod appendlog;
 pub mod epoch;
 pub mod record;
 pub mod reduce;
+pub mod wal;
 
 pub use crate::saga::SagaState;
+pub use wal::MemoryWalSink;
 pub use appendlog::{AppendLog, DurableJournal};
 pub use epoch::{compute_commitment, Epoch, EpochKeys};
 pub use record::{JournalEntry, JournalRecord, RecordCode, TargetType};

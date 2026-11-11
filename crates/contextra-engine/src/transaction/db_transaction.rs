@@ -14,6 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
+// SECTION Transaction-Management
+// ANCHOR[id=engine-db-transaction,epic=transactions,seq=4]
+// NOTE: Multi-Index-Transaktion mit Staging von Forward/Reverse-Keys, Text-, Vektor- und Graph-Mutationen.
+// LINK crates/contextra-engine/src/collection/tx.rs#engine-begin-tx
 /// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, Text-Index, and Graph-Index.
 pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
     pub tx_id: TxId,
@@ -193,3 +197,5 @@ impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
         }
     }
 }
+
+// !SECTION Transaction-Management

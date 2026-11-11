@@ -1,7 +1,7 @@
 # AGENTS.md — `contextra-agent`
 
-> **Ring 3** · Klasse Rand `[R]` (SPEC-Katalog: Archiv, Root-§10 K5) · Reifegrad `beta` · Unsafe: nein · Rolle: Workflow-Engine für Agenten: Zustandsgraph, Event-Quellen, Tools, Audit, DLQ.
-> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-10.
+> Ebene E2 · Gruppe `agentic` · Reifegrad `beta` · Unsafe: nein (`#![forbid(unsafe_code)]`) · Rolle: Workflow-Engine für Agenten: Zustandsgraph, Event-Quellen, Tools, Audit, DLQ.
+> Gemeinsame Regeln stehen in der Root-`AGENTS.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-11.
 
 ## 1. Baukasten-Profil
 
@@ -13,10 +13,10 @@
 | Features | `storage-bindings`, `workspace`, `test-utils` |
 | Lints | `#![forbid(unsafe_code)]` |
 
-## 2. Abhängigkeiten & Schulden
+## 2. Abhängigkeiten & Architektur
 
 - `contextra-graph` ist vollständig aus den Normal-Dependencies entfernt und in `[dev-dependencies]` isoliert.
-- Optionale Speicherbindungen (`db`, `checkpoint`, `router`) sind über das Feature `storage-bindings` gekapselt.
+- Optionale Speicherbindungen (`db`, `checkpoint`, `router`) sind über das Feature `storage-bindings` bzw. Brücken gekapselt.
 - Kern-Abstraktionen: `ContextStore` und `ScratchpadStore` definieren lokale Port-Abstraktionen.
 
 ## 3. Modul-Karte (am Code verifiziert)

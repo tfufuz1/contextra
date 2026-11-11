@@ -19,10 +19,7 @@
 //! Aktualisierungen erfolgen über RCU (Read-Copy-Update) für sperrenfreie Lesezugriffe.
 
 use crate::error::TextError;
-#[cfg(not(feature = "types-compat"))]
-use crate::types::DocId;
-#[cfg(feature = "types-compat")]
-use contextra_types::DocId;
+use contextra_ids::DocId;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

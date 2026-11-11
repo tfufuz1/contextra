@@ -26,16 +26,24 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 bincode = { workspace = true, optional = true }
 half = { version = "2.4", optional = true }
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-crypto = { workspace = true, optional = true }
 parking_lot = { workspace = true }
+
+# Erlaubte Kern-AbhÃ¤ngigkeiten
+contextra-env = { path = "../contextra-env", version = "0.1.0" }
+
+# Optionale BrÃ¼cken-AbhÃ¤ngigkeiten (hinter workspace)
+contextra-types = { path = "../contextra-types", version = "0.1.0", default-features = false, optional = true }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0", default-features = false, optional = true }
+contextra-rank = { path = "../contextra-rank", version = "0.1.0", default-features = false, optional = true }
+contextra-crypto = { path = "../contextra-crypto", version = "0.1.0", optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { workspace = true }
+contextra-types = { path = "../contextra-types", version = "0.1.0" }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
+contextra-rank = { path = "../contextra-rank", version = "0.1.0" }
 contextra-crypto = { workspace = true, features = ["kv-encryption"] }
 
 [[bench]]

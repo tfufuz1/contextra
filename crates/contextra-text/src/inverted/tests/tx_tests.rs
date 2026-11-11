@@ -303,10 +303,10 @@ async fn test_upsert_document_oversized_text_returns_error() -> Result<()> {
         .unwrap_err();
 
     match err {
-        ContextraError::InvalidInput(msg) => {
+        crate::error::TextError::InvalidInput(msg) => {
             assert!(msg.contains("exceeds maximum allowed size"));
         }
-        _ => panic!("Expected ContextraError::InvalidInput, got {:?}", err),
+        _ => panic!("Expected TextError::InvalidInput, got {:?}", err),
     }
 
     Ok(())
@@ -452,7 +452,7 @@ async fn test_staged_stats_limit_exceeded() -> Result<()> {
         .upsert_document(overflow_tx, overflow_doc, "overflow text")
         .await
         .unwrap_err(); // unwrap allowed
-    assert!(matches!(err, ContextraError::InvalidInput(_)));
+    assert!(matches!(err, crate::error::TextError::InvalidInput(_)));
 
     Ok(())
 }

@@ -56,20 +56,8 @@ async fn test_tenant_isolation_cross_tenant_document_and_collection_operations(
         "Delete operation on Tenant Y must NOT delete document from Tenant X"
     );
 
-    // 4. Drop collection for Tenant X and verify DeletionProof
-    let proof = db
-        .drop_collection(
-            "tenant_x_collection",
-            tenant_x_id,
-            b"secret_proof_key_32bytes_1234567",
-        )
-        .await?;
-
-    assert_eq!(
-        proof.tenant_id(),
-        tenant_x_id,
-        "DeletionProof tenant_id must match requested tenant"
-    );
+    // 4. Drop collection for Tenant X
+    db.drop_collection("tenant_x_collection", tenant_x_id).await?;
 
     // Tenant Y collection remains intact
     col_y
@@ -88,7 +76,7 @@ async fn test_tenant_isolation_cross_tenant_document_and_collection_operations(
 
     // 5. Error path: Dropping "default" collection MUST return typed ContextraError::InvalidInput
     let drop_default_res = db
-        .drop_collection("default", tenant_x_id, b"secret_proof_key_32bytes_1234567")
+        .drop_collection("default", tenant_x_id)
         .await;
 
     match drop_default_res {

@@ -9,7 +9,7 @@ use crate::model_registry::ModelFingerprint;
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config, DTYPE};
-use contextra_types::{ContextraError, Result};
+use crate::error::{Error, Result};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -84,13 +84,65 @@ impl CandleEmbedClient {
         &self.fingerprint
     }
 
+    /// Returns the dimensionality of embeddings.
+    pub fn embedding_dim(&self) -> usize {
+        self.dim
+    }
+
+    /// Generates an embedding vector for the provided text.
+    pub async fn embed(&self, text: &str) -> Result<Vec<f32>> {
+        let text_owned = text.to_string();
+        let model = Arc::clone(&self.model);
+        let tokenizer = self.tokenizer.clone();
+        let device = self.device.clone();
+
+        let _permit = self.semaphore.acquire().await.map_err(|_| {
+            Error::Inference("Candle embed semaphore closed".into())
+        })?;
+
+        tokio::task::spawn_blocking(move || {
+            let mut guard = model.blocking_lock();
+            guard.embed(&text_owned, &tokenizer, &device)
+        })
+        .await
+        .map_err(|e| {
+            Error::Inference(format!("Candle embedding task join error: {e}"))
+        })?
+    }
+
+    /// Generates embedding vectors for a batch of input texts.
+    pub async fn embed_batch<S: AsRef<str>>(&self, texts: &[S]) -> Result<Vec<Vec<f32>>> {
+        let _permit = self.semaphore.acquire().await.map_err(|_| {
+            Error::Inference("Candle embed semaphore closed".into())
+        })?;
+
+        let model = Arc::clone(&self.model);
+        let tokenizer = self.tokenizer.clone();
+        let device = self.device.clone();
+        let texts_owned: Vec<String> = texts.iter().map(|s| s.as_ref().to_string()).collect();
+
+        tokio::task::spawn_blocking(move || {
+            let mut guard = model.blocking_lock();
+            let mut results = Vec::with_capacity(texts_owned.len());
+            for text in &texts_owned {
+                let vec = guard.embed(text, &tokenizer, &device)?;
+                results.push(vec);
+            }
+            Ok(results)
+        })
+        .await
+        .map_err(|e| {
+            Error::Inference(format!("Candle embedding batch task join error: {e}"))
+        })?
+    }
+
     /// Loads a `CandleEmbedClient` from a model directory.
     pub fn from_dir(
         model_dir: &std::path::Path,
         quantization: crate::model_registry::CandleQuantization,
     ) -> Result<Self> {
         if !model_dir.exists() {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(Error::InvalidInput(format!(
                 "Candle model directory does not exist: {}",
                 model_dir.display()
             )));
@@ -99,7 +151,7 @@ impl CandleEmbedClient {
         let tokenizer_path = model_dir.join("tokenizer.json");
         let tokenizer = if tokenizer_path.exists() {
             tokenizers::Tokenizer::from_file(&tokenizer_path).map_err(|e| {
-                ContextraError::InvalidInput(format!(
+                Error::InvalidInput(format!(
                     "Failed to load tokenizer from {}: {e}",
                     tokenizer_path.display()
                 ))
@@ -117,7 +169,7 @@ impl CandleEmbedClient {
                 "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
             }"#;
             tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).map_err(|e| {
-                ContextraError::Internal(format!("Failed to parse default tokenizer: {e}"))
+                Error::Inference(format!("Failed to parse default tokenizer: {e}"))
             })?
         };
 
@@ -184,7 +236,7 @@ impl BertEmbedModel {
     pub fn load(weights_path: &Path, _config_path: &Path, device: &Device) -> Result<Self> {
         // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         let weights_bytes = std::fs::read(weights_path).map_err(|e| {
-            ContextraError::Io(std::io::Error::new(
+            Error::Io(std::io::Error::new(
                 e.kind(),
                 format!(
                     "Failed to read BERT safetensors weights file {}: {e}",
@@ -194,7 +246,7 @@ impl BertEmbedModel {
         })?;
         let vb =
             VarBuilder::from_buffered_safetensors(weights_bytes, DTYPE, device).map_err(|e| {
-                ContextraError::Internal(format!(
+                Error::Inference(format!(
                     "Failed to load BERT safetensors weights from {}: {e}",
                     weights_path.display()
                 ))
@@ -204,7 +256,7 @@ impl BertEmbedModel {
 
         let dim = config.hidden_size;
         let model = BertModel::load(vb, &config).map_err(|e| {
-            ContextraError::Internal(format!("Failed to initialize BERT model: {e}"))
+            Error::Inference(format!("Failed to initialize BERT model: {e}"))
         })?;
 
         Ok(Self { model, dim })
@@ -220,49 +272,49 @@ impl CandleEmbedInner for BertEmbedModel {
     ) -> Result<Vec<f32>> {
         let encoding = tokenizer
             .encode(text, true)
-            .map_err(|e| ContextraError::InvalidInput(format!("Tokenizer encoding error: {e}")))?;
+            .map_err(|e| Error::InvalidInput(format!("Tokenizer encoding error: {e}")))?;
 
         let tokens = encoding.get_ids();
         if tokens.is_empty() {
-            return Err(ContextraError::InvalidInput(
+            return Err(Error::InvalidInput(
                 "Cannot embed empty token sequence".to_string(),
             ));
         }
 
         let token_ids = Tensor::new(tokens, device)
             .map_err(|e| {
-                ContextraError::Internal(format!("Failed to create token_ids tensor: {e}"))
+                Error::Inference(format!("Failed to create token_ids tensor: {e}"))
             })?
             .unsqueeze(0)
-            .map_err(|e| ContextraError::Internal(format!("Failed to unsqueeze token_ids: {e}")))?;
+            .map_err(|e| Error::Inference(format!("Failed to unsqueeze token_ids: {e}")))?;
 
         let token_type_ids = token_ids.zeros_like().map_err(|e| {
-            ContextraError::Internal(format!("Failed to create token_type_ids: {e}"))
+            Error::Inference(format!("Failed to create token_type_ids: {e}"))
         })?;
 
         // Forward pass through BERT model
         let embeddings = self
             .model
             .forward(&token_ids, &token_type_ids, None)
-            .map_err(|e| ContextraError::Internal(format!("BERT forward pass error: {e}")))?;
+            .map_err(|e| Error::Inference(format!("BERT forward pass error: {e}")))?;
 
         // Mean pooling over token sequence dimension (dim 1)
         let (_b_sz, seq_len, _hidden_dim) = embeddings
             .dims3()
-            .map_err(|e| ContextraError::Internal(format!("Expected 3D embeddings tensor: {e}")))?;
+            .map_err(|e| Error::Inference(format!("Expected 3D embeddings tensor: {e}")))?;
 
         let sum_embeddings = embeddings
             .sum(1)
-            .map_err(|e| ContextraError::Internal(format!("Failed to sum embeddings: {e}")))?;
+            .map_err(|e| Error::Inference(format!("Failed to sum embeddings: {e}")))?;
         let pooled = (sum_embeddings / (seq_len as f64))
-            .map_err(|e| ContextraError::Internal(format!("Failed to mean pool embeddings: {e}")))?
+            .map_err(|e| Error::Inference(format!("Failed to mean pool embeddings: {e}")))?
             .squeeze(0)
             .map_err(|e| {
-                ContextraError::Internal(format!("Failed to squeeze pooled tensor: {e}"))
+                Error::Inference(format!("Failed to squeeze pooled tensor: {e}"))
             })?;
 
         let vec: Vec<f32> = pooled.to_vec1().map_err(|e| {
-            ContextraError::Internal(format!("Failed to convert tensor to vec: {e}"))
+            Error::Inference(format!("Failed to convert tensor to vec: {e}"))
         })?;
 
         // L2 normalization and zero/NaN check (APM-4)
@@ -270,7 +322,7 @@ impl CandleEmbedInner for BertEmbedModel {
         let norm = norm_sq.sqrt();
 
         if norm < 1e-12 || norm.is_nan() || !norm.is_finite() {
-            return Err(ContextraError::Internal(format!(
+            return Err(Error::Inference(format!(
                 "Invalid or zero L2 vector norm ({norm}) produced during embedding forward pass"
             )));
         }
@@ -316,7 +368,7 @@ impl CandleEmbedInner for DefaultCandleEmbedModel {
         let norm_sq: f32 = raw_vec.iter().map(|v| v * v).sum();
         let norm = norm_sq.sqrt();
         if norm < 1e-12 {
-            return Err(ContextraError::Internal(
+            return Err(Error::Inference(
                 "Zero norm in mock embedder".to_string(),
             ));
         }
@@ -332,7 +384,6 @@ impl CandleEmbedInner for DefaultCandleEmbedModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_ports::{EmbeddingProvider, TextEmbeddingEngine};
 
     struct MockEmbedModel {
         dim: usize,
@@ -379,19 +430,10 @@ mod tests {
         let client =
             CandleEmbedClient::new(Device::Cpu, mock_model, fingerprint.clone(), tokenizer);
 
-        assert_eq!(client.provider_name(), "candle");
         assert_eq!(client.embedding_dim(), 4);
         assert_eq!(client.fingerprint(), &fingerprint);
-
-        let vec = EmbeddingProvider::embed(&client, "test sentence")
-            .await
-            .unwrap();
+        let vec = client.embed("test sentence").await.unwrap();
         assert_eq!(vec, vec![0.5f32, 0.5f32, 0.5f32, 0.5f32]);
-
-        // Test blanket TextEmbeddingEngine
-        let engine: &dyn TextEmbeddingEngine = &client;
-        let vec_engine = engine.embed("another test").await.unwrap();
-        assert_eq!(vec_engine, vec![0.5f32; 4]);
     }
 
     #[test]
@@ -449,10 +491,10 @@ mod tests {
 
         let res = BertEmbedModel::load(path, cfg_path, &device);
         assert!(res.is_err());
-        if let Err(ContextraError::Io(e)) = res {
+        if let Err(Error::Io(e)) = res {
             assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
         } else {
-            panic!("Expected ContextraError::Io");
+            panic!("Expected Error::Io");
         }
     }
 }

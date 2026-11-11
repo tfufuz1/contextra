@@ -11,7 +11,7 @@ use candle_core::Device;
 use candle_transformers::generation::LogitsProcessor;
 #[cfg(not(feature = "kv-stage-b"))]
 use candle_transformers::models::quantized_llama::ModelWeights;
-use contextra_types::{ContextraError, Result};
+use crate::error::{Error, Result};
 use std::fs::File;
 use std::path::Path;
 
@@ -83,17 +83,17 @@ impl CandleModelInner for QuantizedLlamaModel {
     fn kv_layout(
         &self,
     ) -> Option<(
-        contextra_ports::kv::KvLayout,
-        contextra_ports::kv::RopeConfig,
+        crate::kv_state::KvLayout,
+        crate::kv_state::RopeConfig,
     )> {
         if let Some(layer) = self.weights.layers.first() {
-            let layout = contextra_ports::kv::KvLayout {
+            let layout = crate::kv_state::KvLayout {
                 n_layer: self.weights.layers.len() as u32,
                 n_kv_head: layer.n_kv_head as u32,
                 head_dim: layer.head_dim as u32,
                 dtype: "f16".to_string(),
             };
-            let rope = contextra_ports::kv::RopeConfig {
+            let rope = crate::kv_state::RopeConfig {
                 base: 10000.0,
                 scaling: None,
             };

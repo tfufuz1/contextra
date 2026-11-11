@@ -3,6 +3,15 @@
 //! Validiert GMM-Clusterung, Permutationsinvarianz, Typ-Denoising, LLM-Budgetierung
 //! und Superkanten-Erzeugung in Stage 3.
 
+
+// FILE-CONTEXT
+// ZWECK: Umfassende Tests fuer LeanRAG GMM-Clustering und Aggregation.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: LeanRAG Aggregation Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -452,3 +461,4 @@ fn test_type_renaming_and_deprecation() {
     };
     assert!(root_res.synthesized.is_empty());
 }
+// !SECTION: LeanRAG Aggregation Tests

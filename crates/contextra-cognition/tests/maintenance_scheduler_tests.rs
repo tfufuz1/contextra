@@ -3,6 +3,15 @@
 //! Validiert die Auslösebedingungen, Planungslogik mit `ManualClock`,
 //! Fehlerisolation (Zero-Panic), Grenzwerte und den sauberen Shutdown des Schedulers.
 
+
+// FILE-CONTEXT
+// ZWECK: Zyklus- und Intervalltests fuer den MaintenanceScheduler.
+// INVARIANTEN: Zero-Panic; deterministische Testausfuehrung; saubere Isolation.
+// STAND: 2026-11-11
+
+// =========================================================================
+// SECTION: Maintenance Scheduler Tests
+// =========================================================================
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -242,3 +251,4 @@ async fn test_session_gating_blocks_consolidation_when_active() {
     scheduler.decrement_active_sessions();
     assert_eq!(scheduler.active_agent_sessions(), 0);
 }
+// !SECTION: Maintenance Scheduler Tests

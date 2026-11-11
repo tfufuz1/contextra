@@ -1,8 +1,20 @@
-//! Lokale Ports für contextra-agent (SPEC-v2 §6.3, S-63).
+// FILE-CONTEXT Header (Format v3)
+// ZWECK: Definition lokaler Ports für Zustandsspeicherung (ContextStore) und ephemeren Scratchpad-Speicher (ScratchpadStore).
+// INVARIANTEN: Zeroize-Anforderung bei Purge; Thread-Safe Trait-Definitionen (Send + Sync).
+// NICHT-OFFENSICHTLICH: Entkoppelt den Agenten-Workflow vollständig von physischen Speicher-Implementierungen.
+// HOTSPOTS: ContextStore-Methoden (ll. 20-35), ScratchpadStore (ll. 40-55).
+// STAND: TS:2026-11-11T00:25:00Z (SESSION: mod-decouple-agent)
+
+//! Lokale Ports für contextra-agent (SPEC §6.2, S-63).
 
 use contextra_ports::BoxFuture;
 use contextra_types::{DocId, Result};
 
+// =========================================================================
+// SECTION: ContextStore Port
+// =========================================================================
+
+// ANCHOR[contextra-agent:port-context-store]
 /// Abstraktion über persistente Agenten-Zustände und Retrieval-Quellen.
 pub trait ContextStore: Send + Sync {
     /// Speichert einen Key-Value-Zustand.
@@ -13,6 +25,13 @@ pub trait ContextStore: Send + Sync {
     fn delete_state<'a>(&'a self, key: &'a str) -> BoxFuture<'a, Result<bool>>;
 }
 
+// !SECTION
+
+// =========================================================================
+// SECTION: ScratchpadStore Port
+// =========================================================================
+
+// ANCHOR[contextra-agent:port-scratchpad-store]
 /// Abstraktion für ephemere Scratchpad-Puffer im RAM.
 pub trait ScratchpadStore: Send + Sync {
     /// Fügt dem flüchtigen Speicher einen Chunk hinzu.
@@ -23,6 +42,7 @@ pub trait ScratchpadStore: Send + Sync {
     fn total_bytes(&self) -> usize;
 }
 
+// ANCHOR[contextra-agent:in-memory-scratchpad-store]
 /// In-Memory-Referenzimplementierung von [`ScratchpadStore`] für Tests und entkoppelte Ausführung.
 #[derive(Debug, Default)]
 pub struct InMemoryScratchpadStore {
@@ -50,3 +70,5 @@ impl ScratchpadStore for InMemoryScratchpadStore {
         self.chunks.iter().map(|(_, c)| c.len()).sum()
     }
 }
+
+// !SECTION

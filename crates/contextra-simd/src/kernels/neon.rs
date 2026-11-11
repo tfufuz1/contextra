@@ -21,6 +21,7 @@
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
+// SECTION NEON-F32-KERNELS
 // ANCHOR[contextra-simd:NEON-COSINE-F32]
 /// Computes the cosine distance between two `f32` slices using ARM NEON intrinsics.
 ///
@@ -172,3 +173,4 @@ pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
 
     -dot
 }
+// !SECTION NEON-F32-KERNELS

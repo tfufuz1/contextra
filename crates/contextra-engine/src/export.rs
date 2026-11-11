@@ -49,7 +49,7 @@ pub struct ExportMemoryV1 {
     /// Eindeutiger Memory-Schlüssel / ID
     pub id: String,
     /// Kognitiver Gedächtnistyp (episodic, semantic, procedural, working)
-    #[serde(rename = "type")]
+    #[serde(rename = "type", alias = "memory_type")]
     pub memory_type: MemoryType,
     /// Textinhalt des Memory-Eintrags
     #[serde(default, skip_serializing_if = "Option::is_none")]

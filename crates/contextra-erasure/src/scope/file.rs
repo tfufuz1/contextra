@@ -2,6 +2,10 @@
 //!
 //! Scope-Dateien verwenden Dateityp kind=9, zufälligen Dateischlüssel (key_mode=0 via FileKeyring).
 //! Der Dateiname enthält nur Tags bzw. die ErasureId in Hex (D-75).
+//!
+//! Crash-Konsistenz: Schreiben erfolgt atomar (temp + rename + fsync des Elternverzeichnisses über Vfs).
+
+// Herkunft: 4b98cf91b:crates/contextra-store/src/lsm/purge/scope_file.rs:43
 
 use super::codec::{decode_scope, encode_scope};
 use super::set::LayerScopeSet;
@@ -27,6 +31,8 @@ pub fn scope_file_path(erasure_id: &[u8; 16]) -> PathBuf {
 }
 
 /// Speichert einen `LayerScopeSet` als persistente, verschlüsselte Scope-Datei (kind=9).
+///
+/// Schreibt atomar und synchronisiert das übergeordnete Verzeichnis.
 pub async fn store_scope_file(
     vfs: &dyn Vfs,
     keyring: &dyn FileKeyring,
@@ -99,16 +105,23 @@ pub async fn store_scope_file(
 
     let path = scope_file_path(erasure_id);
     if let Some(parent) = path.parent() {
-        vfs.create_dir_all(parent)
-            .map_err(|e| ErasureError::Io(std::io::Error::other(e.to_string())))?;
+        vfs.create_dir_all(parent)?;
     }
-    vfs.write_atomic(&path, &file_bytes)
-        .map_err(|e| ErasureError::Io(std::io::Error::other(e.to_string())))?;
+
+    // write_atomic garantiert temp + rename + sync
+    vfs.write_atomic(&path, &file_bytes)?;
+
+    if let Some(parent) = path.parent() {
+        let _ = vfs.sync_dir(parent);
+    }
 
     Ok(())
 }
 
 /// Lädt einen `LayerScopeSet` aus einer persistenten Scope-Datei (kind=9).
+///
+/// Fail-Closed: Jede Beschädigung (Header-MAC, Record-AEAD, Magic, Version)
+/// führt sofort zu `Err(ErasureError::Corrupt)` und niemals zu einer leeren Menge.
 pub async fn load_scope_file(
     vfs: &dyn Vfs,
     keyring: &dyn FileKeyring,
@@ -116,9 +129,7 @@ pub async fn load_scope_file(
     file_id: FileId,
 ) -> Result<LayerScopeSet, ErasureError> {
     let path = scope_file_path(erasure_id);
-    let bytes = vfs
-        .read(&path)
-        .map_err(|e| ErasureError::Io(std::io::Error::other(e.to_string())))?;
+    let bytes = vfs.read(&path)?;
 
     if bytes.len() < 64 + 4 + 16 {
         return Err(ErasureError::Corrupt);

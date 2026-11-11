@@ -1,3 +1,7 @@
+// =========================================================================
+// SECTION: server_dispatch
+// =========================================================================
+// ANCHOR[contextra-mcp:SERVER-DIS-001]
 use crate::protocol::{response_from_error, JsonRpcRequest, JsonRpcResponse};
 use crate::server::McpServer;
 use serde_json::{json, Value};
@@ -356,3 +360,5 @@ impl McpServer {
         }
     }
 }
+
+// !SECTION: server_dispatch

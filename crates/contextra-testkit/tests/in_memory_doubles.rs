@@ -736,3 +736,188 @@ async fn test_reference_model_vs_in_memory_store_equivalence() {
         }
     }
 }
+
+// ============================================================================
+// IN-MEMORY DOUBLES TESTS (WP-TK-1.2 & WP-TK-1.3)
+// ============================================================================
+
+use contextra_testkit::mocks::{
+    BudgetTruncatingContextPreparer, InMemoryKvBridgeStorage, InMemoryKvPrefixStore,
+    ScriptedAttentionExporter, ScriptedEgressPolicy, ScriptedHybridSearchProvider,
+    StaticCommunityResolver, StaticDriftStatusProvider,
+};
+use contextra_ports::{
+    policy::{EgressDecision, EgressPolicy},
+    AttentionExporter, CommunityResolver, ContextChunk, ContextPreparer, DriftStatusProvider,
+    HybridSearchProvider, KvBlock, KvBridgeStorage, KvLayout, KvPrefixStore, ModelFingerprint,
+    PrefixKey, RequestId, RopeConfig, TokenBudget,
+};
+use contextra_types::RequestContext;
+
+#[tokio::test]
+async fn test_in_memory_kv_bridge_storage_basic_flow() {
+    let storage = InMemoryKvBridgeStorage::new();
+    assert!(storage.is_empty());
+    assert_eq!(storage.len(), 0);
+
+    let tx = TxId::new(50);
+    storage.put(tx, b"k1", b"val1").await.unwrap();
+    assert_eq!(storage.get(b"k1").await.unwrap(), None);
+
+    storage.commit(tx).await.unwrap();
+    assert_eq!(storage.get(b"k1").await.unwrap(), Some(Bytes::from_static(b"val1")));
+    assert_eq!(storage.len(), 1);
+    assert!(!storage.is_empty());
+}
+
+#[test]
+fn test_in_memory_kv_prefix_store_basic_flow() {
+    let store = InMemoryKvPrefixStore::new();
+    let tenant = contextra_types::TenantId::try_new(1).unwrap();
+    let key = PrefixKey {
+        model: ModelFingerprint::new([1u8; 32], "test", "q4"),
+        tokenizer_hash: [2u8; 32],
+        layout: KvLayout {
+            n_layer: 16,
+            n_kv_head: 4,
+            head_dim: 64,
+            dtype: "f16".into(),
+        },
+        rope: RopeConfig {
+            base: 10000.0,
+            scaling: None,
+        },
+    };
+
+    let tokens = vec![1, 2, 3];
+    let blocks = vec![KvBlock {
+        block_id: 1,
+        data: Bytes::from_static(b"block"),
+    }];
+
+    store.insert(tenant, &key, &tokens, blocks.clone()).unwrap();
+    let hit = store.lookup(tenant, &key, &tokens).unwrap();
+    assert_eq!(hit.matched_tokens, 3);
+    assert_eq!(hit.blocks, blocks);
+
+    let evicted = store.evict(tenant, &key).unwrap();
+    assert_eq!(evicted, 1);
+    assert!(store.lookup(tenant, &key, &tokens).is_none());
+}
+
+#[test]
+fn test_scripted_attention_exporter_basic_flow() {
+    let exporter = ScriptedAttentionExporter::new();
+    let req = RequestId(123);
+    assert_eq!(exporter.export_attention_weights(req), None);
+
+    exporter.set_weights(req, vec![0.5, 0.25]);
+    assert_eq!(exporter.export_attention_weights(req), Some(vec![0.5, 0.25]));
+
+    let removed = exporter.remove_weights(req);
+    assert_eq!(removed, Some(vec![0.5, 0.25]));
+    assert_eq!(exporter.export_attention_weights(req), None);
+}
+
+#[tokio::test]
+async fn test_scripted_hybrid_search_provider_basic_flow() {
+    let provider = ScriptedHybridSearchProvider::new();
+    let res = provider.search_hybrid("q", &[0.0; 4], 5).await.unwrap();
+    assert!(res.is_empty());
+
+    let chunks = vec![
+        ContextChunk {
+            doc_id: DocId::new(2),
+            content: "doc2".to_string(),
+            relevance: 0.5,
+            token_count: 10,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+        ContextChunk {
+            doc_id: DocId::new(1),
+            content: "doc1".to_string(),
+            relevance: 0.9,
+            token_count: 10,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+    ];
+    provider.set_chunks(chunks);
+
+    let res = provider.search_hybrid("q", &[0.0; 4], 1).await.unwrap();
+    assert_eq!(res.len(), 1);
+    assert_eq!(res.first().map(|c| c.doc_id), Some(DocId::new(1)));
+}
+
+#[tokio::test]
+async fn test_static_community_resolver_basic_flow() {
+    let resolver = StaticCommunityResolver::new();
+    let ent = EntityId::new(10);
+    assert_eq!(resolver.get_community(ent).await.unwrap(), None);
+
+    resolver.insert(ent, 55);
+    assert_eq!(resolver.get_community(ent).await.unwrap(), Some(55));
+}
+
+#[test]
+fn test_budget_truncating_context_preparer_basic_flow() {
+    let preparer = BudgetTruncatingContextPreparer::new();
+    let budget = TokenBudget::new(25, 0);
+    let chunks = vec![
+        ContextChunk {
+            doc_id: DocId::new(1),
+            content: "c1".to_string(),
+            relevance: 0.9,
+            token_count: 15,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+        ContextChunk {
+            doc_id: DocId::new(2),
+            content: "c2".to_string(),
+            relevance: 0.8,
+            token_count: 15,
+            metadata: None,
+            contextual_prefix: None,
+            links: Vec::new(),
+        },
+    ];
+
+    let window = preparer.prepare_context(chunks, &budget, 0.5).unwrap();
+    assert_eq!(window.chunks.len(), 1);
+    assert_eq!(window.total_tokens, 15);
+    assert!(window.truncated);
+}
+
+#[test]
+fn test_static_drift_status_provider_basic_flow() {
+    let provider = StaticDriftStatusProvider::new();
+    assert_eq!(provider.overall_drift_status(), "stabil");
+
+    provider.set_status("warnung");
+    assert_eq!(provider.overall_drift_status(), "warnung");
+}
+
+#[test]
+fn test_scripted_egress_policy_basic_flow() {
+    let policy = ScriptedEgressPolicy::new();
+    let ctx = RequestContext::new(contextra_types::TenantId::try_new(1).unwrap(), TxId::new(1));
+
+    assert_eq!(policy.evaluate(&ctx, "clean text"), EgressDecision::Allow);
+
+    policy.add_redact_pattern("SSN");
+    match policy.evaluate(&ctx, "my SSN is 123") {
+        EgressDecision::Redact(r) => assert!(r.contains("SSN")),
+        other => panic!("expected Redact, got {other:?}"),
+    }
+
+    policy.add_deny_pattern("DROP TABLE");
+    match policy.evaluate(&ctx, "payload DROP TABLE users") {
+        EgressDecision::Deny(r) => assert!(r.contains("DROP TABLE")),
+        other => panic!("expected Deny, got {other:?}"),
+    }
+}

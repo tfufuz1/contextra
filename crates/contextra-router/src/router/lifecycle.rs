@@ -22,31 +22,22 @@
 use super::*;
 
 // ANCHOR[contextra-router:LCF-009]
-/// Liest Kalibrierungsdaten über den VFS-Port, falls vorhanden; Fallback auf `std::fs`.
+/// Liest Kalibrierungsdaten über die injizierte Kalibrierungs-Naht ([`crate::CalibrationSource`]).
 ///
 /// # Ablauf
-/// 1. Wenn `vfs` gesetzt ist: `vfs.read(path)` aufrufen und Bytes zurückliefern.
-/// 2. Sonst: direkter `std::fs::read`-Zugriff (nur für die `new`/`try_new`-Varianten ohne VFS).
+/// Delegiert den Lesevorgang an die übergebene `CalibrationSource`.
 ///
 /// # Vorbedingungen
 /// Keine — ein nicht existierender Pfad liefert `None` statt eines Fehlers.
 ///
 /// # Nachbedingungen
 /// Liefert die rohen Bytes der Kalibrierungsdatei oder `None`, wenn nicht lesbar.
-///
-/// # Nebenwirkungen
-/// Lese-I/O auf dem Dateisystem oder VFS.
-// NOTE: std::fs-Fallback ist bewusst nur im `new`-Pfad vorhanden.
-// Alle neuen Aufrufer sollen `new_with_vfs` oder `try_new_with_vfs` verwenden und einen VFS injizieren.
-fn read_calibration_bytes(
+#[allow(dead_code)]
+pub(crate) fn read_calibration_bytes(
     path: &std::path::Path,
-    vfs: Option<&dyn contextra_ports::vfs::Vfs>,
+    source: &dyn crate::CalibrationSource,
 ) -> Option<Vec<u8>> {
-    if let Some(vfs) = vfs {
-        vfs.read(path).ok()
-    } else {
-        std::fs::read(path).ok()
-    }
+    source.read_calibration(path)
 }
 
 impl RouterEngine {
@@ -93,58 +84,21 @@ impl RouterEngine {
         calibration_store_path: Option<std::path::PathBuf>,
         vfs: Option<Arc<dyn contextra_ports::vfs::Vfs>>,
     ) -> Self {
-        let mut calibration: BTreeMap<String, ProfileCalibrationState> = profiles
-            .iter()
-            .map(|p| {
-                (
-                    p.name.clone(),
-                    ProfileCalibrationState::new(p.min_relevance_score),
-                )
-            })
-            .collect();
+        let mut builder = crate::builder::RouterEngineBuilder::new()
+            .search_provider(search_provider.clone())
+            .community_resolver(community_resolver.clone())
+            .context_preparer(context_preparer.clone())
+            .profiles(profiles);
 
-        let lyapunov_watchers: BTreeMap<String, LyapunovDriftWatcher> = profiles
-            .iter()
-            .map(|p| (p.name.clone(), LyapunovDriftWatcher::default()))
-            .collect();
-
-        if let Some(ref path) = calibration_store_path {
-            // NOTE: VFS-Port wird genutzt, wenn injiziert; Fallback auf std::fs nur ohne VFS.
-            let bytes_opt = read_calibration_bytes(path, vfs.as_deref());
-            if let Some(bytes) = bytes_opt {
-                if let Ok(persisted) =
-                    serde_json::from_slice::<BTreeMap<String, ProfileCalibrationState>>(&bytes)
-                {
-                    for (name, state) in persisted {
-                        if calibration.contains_key(&name) {
-                            calibration.insert(name, state);
-                        }
-                    }
-                }
+        if let Some(v) = vfs {
+            if let Some(p) = calibration_store_path {
+                builder = builder.calibration_vfs(v, p);
             }
+        } else if let Some(p) = calibration_store_path {
+            builder = builder.calibration_file(p);
         }
 
-        let router_state = RouterState {
-            profiles,
-            calibration,
-            lyapunov_watchers,
-        };
-
-        Self {
-            search_provider,
-            community_resolver,
-            context_preparer,
-            clock: Arc::new(SystemClock::new()),
-            state: ArcSwap::from(Arc::new(router_state)),
-            pending_decisions: RwLock::new(BTreeMap::new()),
-            decision_ids: DecisionIdGenerator::new(0),
-            #[cfg(feature = "bandit-routing")]
-            routing_strategy: RoutingStrategy::Cascade,
-            #[cfg(feature = "bandit-routing")]
-            bandit_exploration: BanditExploration::new(0.1, 0x1234_5678_9abc_def0),
-            #[cfg(feature = "bandit-routing")]
-            pending_bandit: RwLock::new(BTreeMap::new()),
-        }
+        builder.build_internal(search_provider, community_resolver, context_preparer)
     }
 
     /// Configures an injected Vfs implementation for virtualized/decoupled file I/O (M4).
@@ -153,10 +107,11 @@ impl RouterEngine {
     /// Der VFS-Port wird aktiv genutzt, wenn dieser Builder **vor** dem Laden von
     /// Kalibrierungsdaten aufgerufen wird. Da `RouterEngine::new` keinen VFS-Parameter
     /// akzeptiert, ist `with_vfs` nur für nachträgliche Konfiguration vorgesehen.
-    /// Für VFS-gestütztes Initialisierungs-Laden bitte `new_with_vfs` verwenden.
+    /// Für VFS-gestütztes Initialisierungs-Laden bitte `new_with_vfs` verwenden oder
+    /// [`crate::RouterEngineBuilder`] nutzen.
     // NOTE: Diese Methode gibt `self` unverändert zurück, da der VFS nach dem Laden der
     // Initialkalibrierung keinen weiteren Effekt auf den unveränderlichen RouterState hat.
-    // Der Parameter ist für zukünftige persistierte Kalibrierungs-Writes reserviert.
+    // Bitte für flexible Konfiguration RouterEngineBuilder nutzen.
     pub fn with_vfs(self, _vfs: Arc<dyn contextra_ports::vfs::Vfs>) -> Self {
         self
     }

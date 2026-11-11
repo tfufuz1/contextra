@@ -129,8 +129,6 @@ mod tests {
     use crate::error::OllamaError;
     #[cfg(feature = "client")]
     use crate::OllamaClient;
-    #[cfg(feature = "client")]
-    use crate::OllamaClient;
 
     #[cfg(feature = "client")]
     #[tokio::test]

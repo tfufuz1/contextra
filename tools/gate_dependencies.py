@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-tools/gate_dependencies.py — Gate G1 (Isolation & Layering Enforcement per SPEC v4.1 §8 / Gate G1).
+tools/gate_dependencies.py — Gate G1 (Isolation & Dependency Enforcement per SPEC §8.1 / capabilities.toml Schema v3).
 
-Normative Kriterien (SPEC §2 B1, B2, §5, §8):
-- Klasse A (Autarke Bausteine): 0 interne Abhängigkeiten zu anderen `contextra-*`-Crates in [dependencies] und [build-dependencies].
-- Klasse A Dev-Deps: 0 Dev-Abhängigkeiten zu `contextra-*`. `contextra-testkit` ist strikt verboten.
-- Klasse B (Storage-Bundle): Nur Kanten innerhalb Klasse B.
-- Klasse C (Kompositions- & Integrationsschicht): Kanten gemäß capabilities.toml `may_depend_on`.
-- Klasse T (Test & Benchmark): Nur als dev-dependency in Klasse B/C.
-- transitional: Erlaubte Übergangskanten melden Warnungen mit Verfallsdatum "Welle 6".
+Normative Kriterien (SPEC §1.1, §3.1, §8.1):
+- Ebene E0 (Autarke Bausteine): Kern-Closure leer.
+- Ebene E1a/E1b: Kern-Closure beschränkt auf E0 / E1a gemäß Tabelle §3.1 und allowed_internal.
+- Ebene E2 (Integration): Verwendet E0, E1, E2, nie E3.
+- Ebene E3 (Anwendungen/Testwerkzeuge).
+- INV-8: Keine Aufwärtsabhängigkeiten (E3 -> E2 -> E1b -> E1a -> E0, nie umgekehrt).
+- Jedes Crate darf als interne Abhängigkeiten nur deklarierte `allowed_internal` bzw. `feature_closure_allowed` einbinden.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def run_gate_dependencies(caps_path: Path, root: Path) -> Tuple[List[str], List[
 
     crates_spec: Dict[str, dict] = caps_data.get("crates", {})
 
-    cmd = ["cargo", "metadata", "--format-version", "1"]
+    cmd = ["cargo", "metadata", "--format-version", "1", "--no-deps"]
     res = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
     if res.returncode != 0:
         return [f"cargo metadata fehlgeschlagen: {res.stderr}"], [], {}
@@ -43,13 +43,9 @@ def run_gate_dependencies(caps_path: Path, root: Path) -> Tuple[List[str], List[
     violations: List[str] = []
     warnings: List[str] = []
 
-    klasse_b_crates: Set[str] = {
-        name for name, spec in crates_spec.items() if spec.get("klasse") == "B"
-    }
-
     report_details: Dict[str, Any] = {
         "crates_checked": 0,
-        "class_counts": {},
+        "level_counts": {},
         "violations": [],
         "warnings": [],
     }
@@ -64,57 +60,58 @@ def run_gate_dependencies(caps_path: Path, root: Path) -> Tuple[List[str], List[
             continue
 
         report_details["crates_checked"] += 1
-        klasse = spec.get("klasse", "")
-        report_details["class_counts"][klasse] = report_details["class_counts"].get(klasse, 0) + 1
-        allowed = set(spec.get("may_depend_on", []))
-        transitional = set(spec.get("transitional", []))
+        level = spec.get("level")
+        if level is not None:
+            report_details["level_counts"][f"E{level}"] = report_details["level_counts"].get(f"E{level}", 0) + 1
 
-        for dep in pkg["dependencies"]:
+        allowed_internal = set(spec.get("allowed_internal", []))
+        dev_allowed = spec.get("dev_allowed", {})
+        dev_allowed_crates = set()
+        for k, v in dev_allowed.items():
+            if isinstance(v, list):
+                dev_allowed_crates.update(v)
+
+        # Features closures
+        feature_closures = spec.get("feature_closure_allowed", {})
+        all_feature_allowed = set()
+        for f_name, f_deps in feature_closures.items():
+            all_feature_allowed.update(f_deps)
+
+        for dep in pkg.get("dependencies", []):
             dep_name = dep["name"]
             # Nur interne Workspace-Abhängigkeiten prüfen
             if dep_name in packages and packages[dep_name]["id"] in workspace_members:
                 kind = dep.get("kind") or "normal"
+                is_optional = dep.get("optional", False)
+                dep_spec = crates_spec.get(dep_name, {})
+                dep_level = dep_spec.get("level")
 
-                # Klasse A: Darf laut SPEC §8.1 / §5.1 keine internen Abhängigkeiten haben; testkit strikt verboten
-                if klasse == "A":
-                    if dep_name == "contextra-testkit":
+                # Prüfe INV-8: Keine Aufwärtsabhängigkeit für normale Abhängigkeiten
+                if kind == "normal" and level is not None and dep_level is not None:
+                    if dep_level > level:
                         violations.append(
-                            f"[G1-VIOLATION] Klasse-A-Crate `{pkg_name}` hat verbotene Dev-Abhängigkeit auf `contextra-testkit` (E-12)."
+                            f"[G1-VIOLATION] Ebenen-Verstoß (INV-8): `{pkg_name}` (E{level}) hängt ab von `{dep_name}` (E{dep_level}) ({kind})."
                         )
-                    elif dep_name in transitional:
-                        warnings.append(
-                            f"[G1-WARN-TRANSITIONAL] Klasse-A `{pkg_name}` -> `{dep_name}` ({kind}) ist transitional (Ablauf: Welle 6)."
-                        )
+
+                # Prüfe allowed_internal
+                if kind == "normal":
+                    if not is_optional:
+                        if dep_name not in allowed_internal:
+                            violations.append(
+                                f"[G1-VIOLATION] Crate `{pkg_name}` (E{level}) hat unzulässige Kern-Abhängigkeit auf `{dep_name}` (nicht in allowed_internal)."
+                            )
                     else:
+                        # Optionale Abhängigkeit muss in allowed_internal oder in feature_closure_allowed sein
+                        if dep_name not in allowed_internal and dep_name not in all_feature_allowed:
+                            violations.append(
+                                f"[G1-VIOLATION] Crate `{pkg_name}` (E{level}) hat optionale Abhängigkeit auf `{dep_name}`, die in keinem feature_closure_allowed deklariert ist."
+                            )
+                elif kind == "dev":
+                    # Wenn dev_allowed spezifiziert ist
+                    if dev_allowed_crates and dep_name not in dev_allowed_crates and dep_name not in allowed_internal:
                         violations.append(
-                            f"[G1-VIOLATION] Klasse-A-Crate `{pkg_name}` hat unzulässige interne Abhängigkeit auf `{dep_name}` ({kind})."
+                            f"[G1-VIOLATION] Crate `{pkg_name}` hat unzulässige dev-Abhängigkeit auf `{dep_name}` (nicht in dev_allowed)."
                         )
-                elif klasse == "B":
-                    if dep_name in transitional:
-                        warnings.append(
-                            f"[G1-WARN-TRANSITIONAL] Klasse-B `{pkg_name}` -> `{dep_name}` ({kind}) ist transitional (Ablauf: Welle 6)."
-                        )
-                    elif dep_name not in allowed and dep_name not in klasse_b_crates:
-                        violations.append(
-                            f"[G1-VIOLATION] Klasse-B-Crate `{pkg_name}` hängt von `{dep_name}` ({kind}) ab (nicht in may_depend_on und nicht in Klasse B)."
-                        )
-                    elif dep_name not in allowed:
-                        violations.append(
-                            f"[G1-VIOLATION] Klasse-B-Crate `{pkg_name}` hängt von `{dep_name}` ({kind}) ab (nicht in may_depend_on)."
-                        )
-                elif klasse in ("C", "T"):
-                    if dep_name in transitional:
-                        warnings.append(
-                            f"[G1-WARN-TRANSITIONAL] Klasse-{klasse} `{pkg_name}` -> `{dep_name}` ({kind}) ist transitional (Ablauf: Welle 6)."
-                        )
-                    elif dep_name not in allowed:
-                        violations.append(
-                            f"[G1-VIOLATION] Klasse-{klasse}-Crate `{pkg_name}` hängt von `{dep_name}` ({kind}) ab (nicht in may_depend_on)."
-                        )
-                else:
-                    violations.append(
-                        f"[G1-VIOLATION] Crate `{pkg_name}` hat ungültige Klasse '{klasse}' in capabilities.toml."
-                    )
 
     report_details["violations"] = violations
     report_details["warnings"] = warnings
@@ -122,11 +119,11 @@ def run_gate_dependencies(caps_path: Path, root: Path) -> Tuple[List[str], List[
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Gate G1 Crate-Klassen & Dependencies Validator (SPEC v4.1 §8 / G1)")
+    parser = argparse.ArgumentParser(description="Gate G1 Dependencies & Layering Validator (SPEC §8.1 / G1)")
     parser.add_argument("--capabilities", default="capabilities.toml", help="Pfad zu capabilities.toml")
     parser.add_argument("--root", default=".", help="Workspace-Root")
     parser.add_argument("--json", action="store_true", help="JSON-Format für CI/Agent-Pipelines ausgeben")
-    parser.add_argument("--strict", action="store_true", help="Failt auch bei Warnungen/Transitional-Kanten")
+    parser.add_argument("--strict", action="store_true", help="Failt auch bei Warnungen")
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
@@ -150,9 +147,9 @@ def main() -> int:
             return 1
         return 0
 
-    print("=== GATE G1: Crate-Klassen & Layering-Report (SPEC v4.1 §8) ===")
+    print("=== GATE G1: Crate-Ebenen & Layering-Report (SPEC §8.1 / capabilities.toml v3) ===")
     if warnings:
-        print(f"\n⚠️  {len(warnings)} Übergangskanten (transitional, Ablauf Welle 6):")
+        print(f"\n⚠️  {len(warnings)} Warnungen:")
         for w in warnings:
             print(f"  - {w}")
 
@@ -162,7 +159,7 @@ def main() -> int:
             print(f"  - {v}")
         return 1
 
-    print("\n✅ Gate G1 bestanden: Alle internen Abhängigkeiten entsprechen capabilities.toml und SPEC v4.1.")
+    print("\n✅ Gate G1 bestanden: Alle internen Abhängigkeiten entsprechen capabilities.toml und SPEC.")
     return 0
 
 

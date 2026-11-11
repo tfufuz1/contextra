@@ -14,6 +14,7 @@
 use super::dense::{collect_valid_seeds, compute_out_weight_sums};
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
+// TODO(baukasten): Personalized PageRank Algorithmus entkoppeln (AD-5). PprConfig muss lokal in contextra-graph definiert sein; EntityId aus contextra-ids beziehen.
 use contextra_types::{EntityId, PprConfig};
 use std::collections::BTreeMap;
 

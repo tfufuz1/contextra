@@ -256,6 +256,11 @@ pub(super) fn extract_text(metadata: &Option<serde_json::Value>) -> Option<Strin
     }
 }
 
+// SECTION Collection-Core
+// ANCHOR[id=engine-collection-definition,epic=architecture,seq=3]
+// NOTE: Logisch isolierte Collection (Namespace) mit integrierter Vektor-, Text- und Graph-Indizierung.
+// LINK crates/contextra-engine/src/backends.rs#engine-backends-trait
+// LINK crates/contextra-engine/src/collection/tx.rs#engine-tx-allocation
 /// # Concurrency & Lock Hierarchy
 ///
 /// Lock acquisition within `Collection` follows strict ordering to prevent deadlocks:
@@ -717,3 +722,4 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
     }
 }
+// !SECTION Collection-Core
