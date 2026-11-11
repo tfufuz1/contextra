@@ -3,9 +3,11 @@
 //! Ledger-Einträge, Hash-Kette und In-Memory/Datei-Sink außerhalb des Datenverzeichnisses.
 
 pub mod entry;
+pub mod persistent;
 pub mod sink;
 
 pub use entry::{LedgerEntry as ChainedLedgerEntry, GENESIS_HASH};
+pub use persistent::ErasureLedger;
 pub use sink::InMemoryLedger as FileLedger;
 
 use crate::error::ErasureError;
