@@ -11,7 +11,12 @@ use crate::types_local::{Envelope, RecordSealer, SealCtx};
 use crate::types_local::{KeyBuf, KeyRange};
 use crate::vault::slot::SlotType;
 use crate::vault::FileVault;
+#[cfg(feature = "async")]
 use futures_util::future::BoxFuture;
+
+#[cfg(not(feature = "async"))]
+/// Type-Alias für gepinnte ge-boxte Futures ohne Tokio/Futures-Util.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;

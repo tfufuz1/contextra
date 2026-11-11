@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Zusätzliche Konformitäts- und Eigenschaftstests für den Tresor (T-VAULT-1..9, T-FK-1..3).
 //!
 //! Validiert:

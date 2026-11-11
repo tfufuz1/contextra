@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Tests für Scope-Codec und persistente Scope-Dateien (SPEC §11.1, D-75, D-85, Anhang F.1, F.9).
 //!
 //! T-ID: T-CRASH-1, T-ERID-1

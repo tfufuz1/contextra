@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Integrationstests für Lesesperre/Gate (SPEC §11.3, D-57, D-58, D-78, D-120, D-123, I-1, I-2, I-21, I-22).
 //!
 //! Test-IDs:

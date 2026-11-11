@@ -3,7 +3,12 @@
 use crate::backend::{ErasureTarget, StorageBackend};
 use crate::error::ErasureError;
 use crate::types_local::{LayerId, PurgeCx, PurgeOutcome};
+#[cfg(feature = "async")]
 use futures_util::future::BoxFuture;
+
+#[cfg(not(feature = "async"))]
+/// Type-Alias für BoxFuture ohne tokio/futures-util.
+pub type BoxFuture<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

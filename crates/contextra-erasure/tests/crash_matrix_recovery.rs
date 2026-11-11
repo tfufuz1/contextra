@@ -1,3 +1,5 @@
+#![cfg(feature = "async")]
+
 //! Crash-Matrix Tests FM-1 bis FM-14 und Wiederanlauf (SPEC §11.2, §15.1, FM-1..14, T-CRASH-1..6).
 //!
 //! T-ID: T-CRASH-1, T-CRASH-2, T-CRASH-3, T-CRASH-4, T-CRASH-5, T-CRASH-6
