@@ -20,3 +20,6 @@ hex = "0.4"
 default = ["std"]
 std = ["blake3/std", "serde/std"]
 docid-128 = []
+
+[[test]]
+name = "golden_tombstone_bit"
