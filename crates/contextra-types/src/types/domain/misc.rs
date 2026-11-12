@@ -68,8 +68,16 @@ pub struct WorkflowState {
 
 // INVARIANT: Bit 63 der SeqNo markiert Tombstones.
 /// Bit mask for identifying tombstones in sequence numbers.
+///
+/// # Deprecation
+/// Moved to [`contextra_ids::TOMBSTONE_BIT`] per ADR-0120.
+/// This re-export remains until S-70 (INV-2 / R9).
 // ANCHOR[contextra-types:MISC-TOMBSTONE-BIT]
-pub const TOMBSTONE_BIT: u64 = 1 << 63;
+#[deprecated(
+    since = "0.2.0",
+    note = "Use `contextra_ids::TOMBSTONE_BIT` per ADR-0120. This re-export will be removed in S-70."
+)]
+pub use contextra_ids::TOMBSTONE_BIT;
 
 /// Reserved metadata key for sequence-based document TTL expiration.
 // ANCHOR[contextra-types:MISC-EXPIRY-KEY]

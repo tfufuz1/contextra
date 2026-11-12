@@ -70,7 +70,9 @@ impl ScoredDocument {
 pub const MAX_SEARCH_K: usize = 10_000;
 
 /// Bitmaske für Tombstone-Markierung in Sequenznummern.
-pub const TOMBSTONE_BIT: u64 = 1 << 63;
+/// Moved to contextra_ids::TOMBSTONE_BIT per ADR-0120.
+/// This re-export remains until S-70 (INV-2).
+pub use contextra_ids::TOMBSTONE_BIT;
 // !SECTION
 
 // SECTION Umwelt-Abstraktionen (Clock, Rng, Metrics, Maintain)

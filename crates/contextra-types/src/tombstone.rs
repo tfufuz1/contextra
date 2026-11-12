@@ -15,6 +15,7 @@
 // ZWECK: Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ADR-041).
 // INVARIANTEN: Bit 63 der SeqNo kennzeichnet Tombstones (TOMBSTONE_BIT). Trait-Methoden paniken niemals.
 
+#[allow(deprecated)]
 use crate::types::TOMBSTONE_BIT;
 
 // ANCHOR[contextra-types:TOMB-001]

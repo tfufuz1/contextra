@@ -31,7 +31,7 @@
 // NICHT-OFFENSICHTLICH: Lock-freie Reads von min_active_seqno() via AtomicU64 (Acquire/Release).
 
 use crate::mvcc_error::{MvccError, Result};
-use crate::types::{TenantId, TOMBSTONE_BIT};
+use contextra_ids::{TenantId, TOMBSTONE_BIT};
 use contextra_env::{Clock, SystemClock};
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
