@@ -1,16 +1,25 @@
-//! Local abstractions for engine components to decouple contextra-cognition.
+//! Local abstractions for engine components to decouple contextra-cognition (SPEC S-63).
 //
 // FILE-CONTEXT
-// ZWECK: Lokale Re-Exports und Typ-Aliase für engine-Subsysteme vor der Invertierung (S-63).
-// INVARIANTEN: Strikt temporär bis zur Delegation an contextra-db; keine zirkulären Pfade.
-// STAND: 2026-11-11
+// ZWECK: Lokale Re-Exports und Typ-Aliase vor der Invertierung (S-63).
+// INVARIANTEN: Keine Abhängigkeit mehr zu contextra-engine!
 
-// SECTION: Engine Re-Exports
-// ANCHOR[contextra-cognition:LOC-ENG-001]
-pub use contextra_engine as engine;
-pub use engine::collection::{self, Collection, StoredDocument, StoredDocumentMeta};
-pub use engine::decay_controller::{self, AdaptiveDecayController, DecayControllerConfig};
-pub use engine::transaction::{self, CommitIntent};
-pub use engine::ProvenanceRecord;
-pub use engine::SearchResult;
-// !SECTION: Engine Re-Exports
+pub use crate::collection::{Collection, DbTransaction};
+pub use crate::collection_types::{StoredDocument, StoredDocumentMeta};
+pub use crate::decay::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
+pub use crate::ports::{CollectionOps, CommitIntent};
+pub use contextra_rank::fusion::{ProvenanceRecord, SearchResult};
+pub use contextra_text::Language;
+
+pub mod collection {
+    pub use crate::collection::{Collection, DbTransaction};
+    pub use crate::collection_types::{StoredDocument, StoredDocumentMeta};
+}
+
+pub mod decay_controller {
+    pub use crate::decay::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
+}
+
+pub mod transaction {
+    pub use crate::ports::CommitIntent;
+}

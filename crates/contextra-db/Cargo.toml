@@ -15,9 +15,18 @@ ring = "3"
 [dependencies]
 contextra-vault = { path = "../contextra-vault" }
 contextra-cognition = { path = "../contextra-cognition", optional = true }
-contextra-engine = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-mvcc = { workspace = true }
+contextra-store = { workspace = true, features = ["workspace"] }
+contextra-vector = { workspace = true, features = ["workspace"] }
+contextra-text = { workspace = true }
+contextra-checkpoint = { workspace = true }
+contextra-rank = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-sandbox = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
+contextra-adapt = { workspace = true, optional = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 ahash = { workspace = true }
@@ -35,28 +44,35 @@ tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
-contextra-vector = { workspace = true, features = ["experimental-diskann"] }
+contextra-vector = { workspace = true }
 contextra-testkit = { workspace = true }
 contextra-store = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-text = { workspace = true }
 contextra-adapt = { workspace = true }
 contextra-checkpoint = { workspace = true }
+contextra-ingest = { workspace = true }
+wat = "1"
+sha2 = "0.10"
 
 [features]
 cognition = ["dep:contextra-cognition"]
 default = []
 bench = []
-sandbox = ["contextra-engine/sandbox"]
+sandbox = ["dep:contextra-sandbox"]
 reranking = []
-onnx = ["contextra-engine/onnx"]
+onnx = ["dep:contextra-infer-onnx", "contextra-infer-onnx/onnx"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
-background-maintenance = ["contextra-engine/background-maintenance"]
-graph-connectivity-health = ["contextra-engine/graph-connectivity-health"]
+background-maintenance = []
+graph-connectivity-health = ["contextra-graph/graph-connectivity-health"]
 coherence-bonus-fusion = []
-adaptive-candidate-pool-sizing = ["contextra-engine/adaptive-candidate-pool-sizing"]
+adaptive-candidate-pool-sizing = ["dep:contextra-adapt"]
 volatile-vault = []
 edge-reinforcement-learning = []
+exp-extraction = []
+entity-extraction = ["exp-extraction"]
+auto-extraction-opt-out = []
+license = []
 
 [[example]]
 name = "quickstart"

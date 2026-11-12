@@ -572,8 +572,8 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
         "next_tx counter must increment monotonically by the number of cleaned intents"
     );
 
-    let remaining1 = lsm.get(b"consolidation_intent:1").await?;
-    let remaining2 = lsm.get(b"consolidation_intent:2").await?;
+    let remaining1 = storage.get(b"consolidation_intent:1").await?;
+    let remaining2 = storage.get(b"consolidation_intent:2").await?;
     assert!(remaining1.is_none());
     assert!(remaining2.is_none());
 

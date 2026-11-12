@@ -13,10 +13,11 @@ description = "Contextra — Memory consolidation, compaction, and context manag
 ring = "3"
 
 [dependencies]
-contextra-engine = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-graph = { workspace = true }
+contextra-rank = { workspace = true }
+contextra-text = { workspace = true }
 bytes = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
@@ -31,10 +32,11 @@ blake3 = { workspace = true }
 
 [features]
 default = []
-graph-connectivity-health = ["contextra-graph/physio-percolation", "contextra-engine/graph-connectivity-health"]
-edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "contextra-engine/edge-reinforcement-learning"]
+graph-connectivity-health = ["contextra-graph/physio-percolation"]
+edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 contextra-testkit = { workspace = true }
+contextra-db = { workspace = true }

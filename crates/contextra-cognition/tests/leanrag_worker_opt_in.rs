@@ -28,7 +28,7 @@ use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidation_executor::ConsolidationEngine;
 use contextra_cognition::leanrag_input::build_leanrag_inputs;
 use contextra_cognition::memory_consolidation::{ConsolidationConfig, SynthesisConfig};
-use contextra_engine::collection::Collection;
+use contextra_cognition::collection::Collection;
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_graph::CsrGraph;
@@ -77,7 +77,7 @@ async fn create_test_collection() -> (
 ) {
     let dir = tempdir().expect("tempdir");
     let storage = Arc::new(InMemoryStorageEngine::new());
-    let index = Arc::new(InMemoryVectorIndex::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
@@ -88,7 +88,7 @@ async fn create_test_collection() -> (
         graph,
         next_tx,
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ));
     (col, dir)
 }

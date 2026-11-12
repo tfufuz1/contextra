@@ -7,57 +7,24 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Contextra — Core storage, index, and transaction orchestrator engine"
+description = "Contextra — Core storage, index, and transaction orchestrator engine (Deprecated Façade)"
 
 [package.metadata.contextra]
 ring = "3"
 
 [dependencies]
-contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-mvcc = { workspace = true }
-bytes = { workspace = true }
-contextra-sandbox = { workspace = true, optional = true }
-contextra-infer-onnx = { workspace = true, optional = true }
-contextra-adapt = { workspace = true, optional = true }
-contextra-store = { workspace = true, features = ["workspace"] }
-contextra-vector = { workspace = true, features = ["workspace"] }
-contextra-text = { workspace = true }
-contextra-checkpoint = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-graph = { workspace = true }
-ahash = { workspace = true }
-serde_json = { workspace = true }
-serde = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-parking_lot = { workspace = true }
-tokio-util = { version = "0.7.18", features = ["rt"] }
-
-[target.'cfg(loom)'.dependencies]
-loom = "0.7"
-
-[dev-dependencies]
-contextra-ingest = { workspace = true }
-contextra-testkit = { workspace = true }
-tokio = { workspace = true, features = ["full", "test-util"] }
-tempfile = { workspace = true }
-proptest = "1.4"
-loom = "0.7"
-wat = "1"
-contextra-vector = { workspace = true, features = ["experimental-diskann"] }
-sha2 = "0.10"
+contextra-db = { workspace = true }
 
 [features]
 default = []
-onnx = ["dep:contextra-infer-onnx", "contextra-infer-onnx/onnx"]
-reranking = []
-sandbox = ["dep:contextra-sandbox"]
-experimental-diskann = ["contextra-vector/experimental-diskann"]
-background-maintenance = []
-graph-connectivity-health = ["contextra-graph/graph-connectivity-health"]
-edge-reinforcement-learning = []
-adaptive-candidate-pool-sizing = ["dep:contextra-adapt"]
-exp-extraction = []
-entity-extraction = ["exp-extraction"]
-auto-extraction-opt-out = []
+onnx = ["contextra-db/onnx"]
+sandbox = ["contextra-db/sandbox"]
+reranking = ["contextra-db/reranking"]
+experimental-diskann = ["contextra-db/experimental-diskann"]
+background-maintenance = ["contextra-db/background-maintenance"]
+graph-connectivity-health = ["contextra-db/graph-connectivity-health"]
+edge-reinforcement-learning = ["contextra-db/edge-reinforcement-learning"]
+adaptive-candidate-pool-sizing = ["contextra-db/adaptive-candidate-pool-sizing"]
+exp-extraction = ["contextra-db/exp-extraction"]
+entity-extraction = ["contextra-db/entity-extraction"]
+auto-extraction-opt-out = ["contextra-db/auto-extraction-opt-out"]

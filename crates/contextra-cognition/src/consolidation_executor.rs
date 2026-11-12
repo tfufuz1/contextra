@@ -932,7 +932,8 @@ mod tests {
                     (angle * 2.0).sin(),
                 ];
                 let _ = col_clone.insert(&id, &vec, Some(json!({"fg": true}))).await;
-                let _ = col_clone.query().embedding(&vec).k(5).execute().await;
+                // query() nicht in cognition::Collection verfügbar — Vektornäherung über Index-Direktaufruf
+                let _ = col_clone.index().search(&vec, 5).await;
             }));
         }
 
@@ -949,8 +950,10 @@ mod tests {
         cancel_token.cancel();
         let _ = engine_handle.await;
 
-        // Confirm foreground docs exist
-        assert_eq!(col.len().await, 20);
+        // Confirm foreground docs exist — len() nicht verfügbar, Scan als Ersatz
+        let prefix = col.user_key_prefix();
+        let doc_count = col.storage().scan_prefix(&prefix).await.map(|v| v.len()).unwrap_or(0);
+        assert_eq!(doc_count, 20);
     }
 
     // ANCHOR[contextra-cognition:TEST-CONSOLID-041]

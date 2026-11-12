@@ -57,6 +57,9 @@ pub mod consolidation_locks;
 pub mod context;
 /// Modul für Kontext-Kompaktierung.
 pub mod context_compaction;
+pub mod collection;
+pub mod collection_types;
+pub mod decay;
 mod engine_local;
 mod graph_local;
 /// Modul für Graph-Senken (Super-Hyperkanten).

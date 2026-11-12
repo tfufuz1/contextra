@@ -162,18 +162,18 @@ async fn test_grounding_validation_pass_and_fail_modes() {
 async fn test_consolidation_pipeline_rich_validator_wiring() {
     let dir = tempdir().unwrap();
     let storage = Arc::new(InMemoryStorageEngine::new());
-    let index = Arc::new(InMemoryVectorIndex::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let collection = Arc::new(contextra_engine::collection::Collection::new(
+    let collection = Arc::new(contextra_cognition::collection::Collection::new(
         "test_grounding_pipeline".to_string(),
         storage,
         index,
         graph,
         next_tx,
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ));
 
     collection

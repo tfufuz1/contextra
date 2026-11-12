@@ -17,14 +17,30 @@ use contextra_types::{DocId, Result, TxId};
 ///
 /// Hält die für atomare Transaktionsabschlüsse notwendigen Metadaten
 /// isoliert von der physischen Speicher-Engine.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommitIntent {
-    /// Eindeutiger Intent-Key oder Bezeichner.
-    pub intent_id: String,
-    /// Transaktions-ID des Commits.
-    pub tx_id: TxId,
-    /// Betroffene Dokumente.
-    pub target_docs: Vec<DocId>,
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CommitIntent {
+    /// Transaction is in the "Prepared" state. Stored DocIds assist recovery.
+    Pending {
+        doc_ids: std::sync::Arc<Vec<DocId>>,
+        #[serde(default)]
+        has_text: bool,
+        #[serde(default)]
+        has_graph: bool,
+        #[serde(default)]
+        stages_completed: u8,
+    },
+    /// Transaction is committed across all indices.
+    Committed,
+    /// Transaction was aborted and compensated.
+    Aborted,
+    /// Memory consolidation intent (Sleep-Cycle OCC).
+    Consolidation {
+        source_docs: Vec<(DocId, TxId)>,
+        target_id: DocId,
+        base_tx: TxId,
+    },
+    /// Transaction failed during forward recovery or commit.
+    Failed { reason: String },
 }
 // !SECTION: Commit-Intent Abstraktion
 
@@ -75,5 +91,46 @@ pub trait HyperedgeSink: Send + Sync {
 pub trait DecayPolicy: Send + Sync {
     /// Berechnet den aktuellen Dämpfungsfaktor für ein Dokument.
     fn compute_decay(&self, elapsed_secs: u64, access_count: u64) -> f32;
+}
+
+// ANCHOR[contextra-cognition:PORT-006]
+/// Abstrakte Port-Schnittstelle für Collection-Operationen (SPEC S-63).
+///
+/// Entkoppelt contextra-cognition von konkreten Storage- und Index-Engines.
+#[async_trait]
+pub trait CollectionOps: Send + Sync {
+    /// Gibt den Namen der Collection zurück.
+    fn name(&self) -> &str;
+
+    /// Erzeugt einen namensraumisolierten Schlüssel für den physischen Speicher.
+    fn namespaced_key(&self, raw: &[u8], key_type: u8) -> Vec<u8>;
+
+    /// Gibt das Schlüsselpräfix für reguläre Benutzerdaten zurück.
+    fn user_key_prefix(&self) -> Vec<u8>;
+
+    /// Prüft, ob aktuell eine Konsolidierung läuft.
+    fn consolidation_in_progress(&self) -> bool;
+
+    /// Ermittelt die Vektordimension der Collection.
+    fn dimension(&self) -> usize;
+
+    /// Allokiert eine monoton steigende Transaktions-ID.
+    fn allocate_tx(&self) -> Result<TxId>;
+
+    /// Ruft ein Dokument anhand seines Bezeichners ab.
+    async fn get(&self, id: &str) -> Result<Option<crate::collection_types::StoredDocument>>;
+
+    /// Löscht ein Dokument anhand seines Bezeichners.
+    async fn delete(&self, id: &str) -> Result<()>;
+
+    /// Schreibt einen Schlüssel-Wert-Eintrag.
+    async fn put_kv(&self, key: &str, value: &serde_json::Value) -> Result<()>;
+
+    /// Führt die zeitliche Abwertung und Bereinigung verfallener Chunks durch.
+    async fn evict_decayed_chunks(
+        &self,
+        controller: &crate::decay::AdaptiveDecayController,
+        limit: usize,
+    ) -> Result<usize>;
 }
 // !SECTION: Port-Traits

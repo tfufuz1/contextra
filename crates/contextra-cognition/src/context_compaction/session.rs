@@ -326,11 +326,12 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
                             .delete_op(&mut db_tx, &meta.id)
                             .await
                             .map_err(|e| {
-                                CognitionError::Internal(format!(
-                                    "Consolidation commit: failed to delete source doc {:?}: {}",
-                                    src_id, e
+                                contextra_types::ContextraError::from(CognitionError::Internal(
+                                    format!(
+                                        "Consolidation commit: failed to delete source doc {:?}: {}",
+                                        src_id, e
+                                    ),
                                 ))
-                                .into()
                             })?;
                     }
                     Err(e) => {

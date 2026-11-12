@@ -66,11 +66,9 @@ impl GroundingValidator for MockRichValidator {
                 ))
             } else {
                 Ok(contextra_ports::GroundingAssessment {
-                    calibrated_probability: 0.70,
-                    raw_score: 0.70,
-                    claim_results: Vec::new(),
-                    confidence_interval: (0.65, 0.75),
-                    verdict: contextra_ports::GroundingVerdict::Pass,
+                    score: 0.70,
+                    is_grounded: true,
+                    reason: None,
                 })
             }
         })
@@ -94,18 +92,18 @@ impl LlmTextGenerator for TestLlmGenerator {
 async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_violation() {
     let dir = tempdir().unwrap();
     let storage = Arc::new(InMemoryStorageEngine::new());
-    let index = Arc::new(InMemoryVectorIndex::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let collection = Arc::new(contextra_engine::collection::Collection::new(
+    let collection = Arc::new(contextra_cognition::collection::Collection::new(
         "test_gasp".to_string(),
         storage,
         index,
         graph,
         next_tx,
         4,
-        contextra_engine::Language::German,
+        contextra_text::Language::German,
     ));
 
     // Insert source documents with context text containing year 2025
@@ -159,7 +157,7 @@ async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_vio
     // 1. Evaluate using ONLY ResponseGroundingValidator (uncalibrated score_grounding).
     // score_grounding returns the raw score ~0.70.
     // Since ~0.70 >= min_grounding_score (0.65), ResponseGroundingValidator alone WOULD ACCEPT the summary!
-    let raw_score = gasp_validator
+    let raw_score = mock_validator
         .score_grounding(test_response, &[test_source])
         .unwrap();
     assert!(

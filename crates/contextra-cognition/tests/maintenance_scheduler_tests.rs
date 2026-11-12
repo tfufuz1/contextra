@@ -24,7 +24,7 @@
 use contextra_cognition::maintenance_config::MaintenanceConfig;
 use contextra_cognition::maintenance_scheduler::MaintenanceScheduler;
 use contextra_cognition::memory_consolidation::ConsolidationConfig;
-use contextra_engine::collection::Collection;
+use contextra_cognition::collection::Collection;
 use contextra_graph::CsrGraph;
 use contextra_ports::StorageEngine;
 use contextra_testkit::ManualClock;
@@ -40,7 +40,7 @@ use tokio_util::sync::CancellationToken;
 async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMemoryVectorIndex>> {
     let dir = tempdir().unwrap();
     let storage = Arc::new(InMemoryStorageEngine::new());
-    let index = Arc::new(InMemoryVectorIndex::new());
+    let index = Arc::new(InMemoryVectorIndex::new(4));
     Arc::new(Collection::new(
         "test-scheduler".to_string(),
         storage,
@@ -48,7 +48,7 @@ async fn create_test_collection() -> Arc<Collection<InMemoryStorageEngine, InMem
         Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
-        contextra_engine::Language::English,
+        contextra_text::Language::English,
     ))
 }
 
