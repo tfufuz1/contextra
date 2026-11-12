@@ -240,11 +240,12 @@ mod tests {
         };
         assert!(policy.validate().is_ok());
 
-        let mut sm = AdaptiveEfStateMachine::new(policy.clone());
+        let mut sm = AdaptiveEfStateMachine::new(policy.clone(), 5);
         let mut prev_ef = 0;
         let mut steps = 0;
 
-        while let Some(ef) = sm.next_ef() {
+        while !sm.is_terminated() {
+            let ef = sm.current_ef();
             steps += 1;
             assert!(
                 ef >= policy.min_ef,
@@ -266,12 +267,12 @@ mod tests {
 
             // Instabile Ergebnisse provozieren
             let fake_ids: Vec<DocId> = (0..5).map(|i| DocId::from(i + steps * 10)).collect();
-            if sm.observe_round(&fake_ids) {
+            if sm.step(&fake_ids) {
                 break;
             }
         }
 
-        let stats = sm.finish();
+        let stats = sm.stats();
         assert_eq!(stats.final_ef, policy.max_ef);
         assert!(!stats.converged);
     }
@@ -286,13 +287,14 @@ mod tests {
             convergence_window: 2,
         };
 
-        let mut sm = AdaptiveEfStateMachine::new(policy);
+        let mut sm = AdaptiveEfStateMachine::new(policy, 5);
         let stable_ids: Vec<DocId> = (0..5).map(|i| DocId::from(i as u64)).collect();
 
         let mut converged = false;
-        while let Some(_ef) = sm.next_ef() {
-            if sm.observe_round(&stable_ids) {
-                converged = true;
+        while !sm.is_terminated() {
+            let _ef = sm.current_ef();
+            if sm.step(&stable_ids) {
+                converged = sm.stats().converged;
                 break;
             }
         }
@@ -301,7 +303,7 @@ mod tests {
             converged,
             "State machine should converge on identical results"
         );
-        let stats = sm.finish();
+        let stats = sm.stats();
         assert!(stats.converged);
         assert_eq!(stats.rounds, 3);
     }

@@ -6,6 +6,7 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
 
 use crate::*;
+use contextra_ports::StorageEngine;
 use contextra_types::Result;
 use std::sync::Arc;
 
@@ -17,7 +18,7 @@ impl Contextra {
         let default_col = self.default_col().await?;
         let active_memory_count = default_col.len().await;
         let index_stats = default_col.stats().await?;
-        let storage_stats = self.storage.stats().await?;
+        let storage_stats = StorageEngine::stats(&*self.storage).await?;
 
         let drift_status = self
             .router

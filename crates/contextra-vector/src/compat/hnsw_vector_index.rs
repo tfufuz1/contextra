@@ -11,7 +11,7 @@ use crate::distance::validate_vector;
 use crate::hnsw::sq8_bias::Sq8Bias;
 use crate::hnsw::types::{HnswIndex, HnswNode, SnapshotPinGuard, VectorData};
 
-#[cfg(feature = "ports-compat")]
+#[cfg(any(feature = "ports-compat", feature = "workspace"))]
 impl VectorIndex for HnswIndex {
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
         if let Some(ref err) = self.inner.cold.validation_error {

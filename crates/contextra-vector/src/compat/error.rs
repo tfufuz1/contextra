@@ -1,4 +1,6 @@
 //! Fehler-Abbildung für `contextra-vector` (SPEC-v2 §5.3, compat/).
+// Nur aktiv wenn das workspace-Feature (oder das ältere ports-compat-Alias) eingeschaltet ist.
+#![cfg(any(feature = "ports-compat", feature = "workspace"))]
 
 use crate::error::VectorError;
 

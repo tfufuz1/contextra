@@ -12,11 +12,13 @@ use crate::distance::DistanceKernel;
 use crate::error::{Result, VectorError};
 
 impl<K: DistanceKernel> GenericHnswIndex<K> {
+    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub fn load_mmap_sync(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         let mmap_index = crate::persistence::MmapIndex::open(path)?;
         self.load_mmap_from_instance(mmap_index)
     }
 
+    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub fn load_mmap(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         self.load_mmap_sync(path)
     }

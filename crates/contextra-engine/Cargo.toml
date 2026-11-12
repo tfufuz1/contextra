@@ -20,8 +20,8 @@ bytes = { workspace = true }
 contextra-sandbox = { workspace = true, optional = true }
 contextra-infer-onnx = { workspace = true, optional = true }
 contextra-adapt = { workspace = true, optional = true }
-contextra-store = { workspace = true }
-contextra-vector = { workspace = true }
+contextra-store = { workspace = true, features = ["workspace"] }
+contextra-vector = { workspace = true, features = ["workspace"] }
 contextra-text = { workspace = true }
 contextra-checkpoint = { workspace = true }
 contextra-rank = { workspace = true }

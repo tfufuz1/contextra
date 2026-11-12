@@ -17,6 +17,7 @@ pub struct MmapIndex {
 }
 
 impl MmapIndex {
+    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
         let file = crate::persistence::io::open_readonly(&path_buf)
@@ -129,6 +130,7 @@ impl MmapIndex {
     }
 
     /// Opens an HNSW file without requiring external runtime blocking task spawns.
+    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub async fn open_async(path: impl AsRef<std::path::Path> + Send) -> Result<Self> {
         Self::open(path)
     }

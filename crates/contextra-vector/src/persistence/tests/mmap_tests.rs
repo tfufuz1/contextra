@@ -17,9 +17,6 @@ use crate::persistence::header::HnswHeader;
 use crate::persistence::mmap::MmapIndex;
 use crate::persistence::node::NodeRecord;
 
-#[cfg(feature = "ports-compat")]
-use contextra_ports::VectorIndex;
-
 #[tokio::test]
 async fn test_mmap_index_boundary_checks() -> Result<()> {
     #[cfg(feature = "ports-compat")]

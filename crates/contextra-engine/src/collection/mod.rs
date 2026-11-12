@@ -659,7 +659,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Loads text index statistics from storage.
     pub async fn load_text_stats(&self) -> Result<()> {
-        self.text_index.load_stats().await
+        self.text_index.load_stats().await.map_err(Into::into)
     }
 
     /// Sets the mutation threshold for auto-triggered community detection (0 = disabled).

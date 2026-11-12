@@ -4,13 +4,12 @@
     clippy::panic,
     clippy::await_holding_lock
 )]
-use super::*;
-use crate::error::VectorError;
-use crate::types::MetricsSink;
-use crate::types::Rng;
-use crate::types::{DistanceMetric, DocId, TxId};
-#[cfg(feature = "ports-compat")]
 use contextra_ports::VectorIndex;
+use contextra_vector::error::VectorError;
+use contextra_vector::hnsw::*;
+use contextra_vector::types::MetricsSink;
+use contextra_vector::types::Rng;
+use contextra_vector::types::{DistanceMetric, DocId, TxId};
 use parking_lot::Mutex;
 
 fn test_config(dim: usize) -> HnswConfig {
@@ -41,13 +40,13 @@ async fn test_hnsw_topology_and_search_determinism() {
         .build()
         .expect("valid config");
 
-    let rng1 = std::sync::Arc::new(crate::types::SeededRng::new(seed));
-    let rng2 = std::sync::Arc::new(crate::types::SeededRng::new(seed));
+    let rng1 = std::sync::Arc::new(contextra_vector::types::SeededRng::new(seed));
+    let rng2 = std::sync::Arc::new(contextra_vector::types::SeededRng::new(seed));
 
     let idx1 = HnswIndex::try_new_with_rng(config.clone(), rng1).expect("idx1 creation");
     let idx2 = HnswIndex::try_new_with_rng(config, rng2).expect("idx2 creation");
 
-    let sm = crate::types::SeededRng::new(1001);
+    let sm = contextra_vector::types::SeededRng::new(1001);
     let mut vecs = Vec::with_capacity(n);
     for _ in 0..n {
         let v: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
@@ -79,19 +78,15 @@ async fn test_hnsw_topology_and_search_determinism() {
 
     // 2. Verify search results are bitwise/identical
     let query: Vec<f32> = (0..dim).map(|_| sm.next_unit_f64() as f32).collect();
-    #[cfg(feature = "ports-compat")]
-    let res1 = VectorIndex::search(&idx1, &query, 10)
+    let res1 = idx1
+        .search_adaptive(&query, 10, &AdaptiveEfPolicy::default())
         .await
         .expect("idx1 search");
-    #[cfg(not(feature = "ports-compat"))]
-    let res1 = idx1.search_adaptive(&query, 10).await.expect("idx1 search");
 
-    #[cfg(feature = "ports-compat")]
-    let res2 = VectorIndex::search(&idx2, &query, 10)
+    let res2 = idx2
+        .search_adaptive(&query, 10, &AdaptiveEfPolicy::default())
         .await
         .expect("idx2 search");
-    #[cfg(not(feature = "ports-compat"))]
-    let res2 = idx2.search_adaptive(&query, 10).await.expect("idx2 search");
 
     assert_eq!(res1.len(), res2.len());
     for (r1, r2) in res1.iter().zip(res2.iter()) {
@@ -214,13 +209,8 @@ async fn test_insert_and_search() {
         .expect("insert 3");
     index.commit(tx).await.expect("commit");
 
-    #[cfg(feature = "ports-compat")]
-    let results = VectorIndex::search(&index, &[1.0, 0.0, 0.0, 0.0], 2)
-        .await
-        .expect("search");
-    #[cfg(not(feature = "ports-compat"))]
     let results = index
-        .search_adaptive(&[1.0, 0.0, 0.0, 0.0], 2)
+        .search_adaptive(&[1.0, 0.0, 0.0, 0.0], 2, &AdaptiveEfPolicy::default())
         .await
         .expect("search");
     assert!(!results.is_empty());
@@ -253,7 +243,7 @@ struct TestMetricsSink {
     histograms: Mutex<Vec<(String, f64, Vec<(String, String)>)>>,
 }
 
-impl crate::types::MetricsSink for TestMetricsSink {
+impl contextra_vector::types::MetricsSink for TestMetricsSink {
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         let label_vec = labels
             .iter()
@@ -327,7 +317,7 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
         .build()
         .expect("valid config");
 
-    let clock = std::sync::Arc::new(crate::hnsw::MonotonicCounterClock::default());
+    let clock = std::sync::Arc::new(contextra_vector::hnsw::MonotonicCounterClock::default());
     let index = HnswIndex::try_new(config)
         .expect("valid index")
         .with_metrics_sink(sink.clone())
@@ -401,8 +391,8 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 #[test]
 #[cfg(feature = "ports-compat")]
 fn test_hnsw_klasse_a_index_and_maintain_trait() {
-    use crate::contract::ExternalId;
-    use crate::hnsw::{Index, Maintain};
+    use contextra_vector::contract::ExternalId;
+    use contextra_vector::hnsw::{Index, Maintain};
 
     let config = HnswConfig {
         dimension: 4,

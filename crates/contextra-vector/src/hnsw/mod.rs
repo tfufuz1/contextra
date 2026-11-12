@@ -56,8 +56,6 @@ mod core_search;
 pub mod staging;
 pub(crate) mod types;
 
-#[cfg(test)]
-mod tests;
 // !SECTION
 
 // SECTION Re-Exports der HNSW-Komponenten

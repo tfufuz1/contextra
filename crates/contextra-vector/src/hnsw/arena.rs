@@ -421,7 +421,7 @@ mod tests {
 
         let retrieved = backlinks.get(5, 0);
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.as_slice(), &[10, 20, 30]);
+        assert_eq!(retrieved.unwrap().as_slice(), &[10, 20, 30]);
 
         assert!(backlinks.get(5, 1).is_none());
         assert!(backlinks.get(99, 0).is_none());

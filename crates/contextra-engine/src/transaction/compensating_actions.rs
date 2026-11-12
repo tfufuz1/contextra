@@ -359,7 +359,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateTextActi
             }
             if let Err(e) = self.collection.text_index.commit(comp_tx).await {
                 tracing::error!("[INV-DB-3] Compensating text commit failed: {}", e);
-                return Err(e);
+                return Err(e.into());
             }
             Ok(())
         })

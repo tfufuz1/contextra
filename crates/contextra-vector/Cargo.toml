@@ -34,20 +34,21 @@ thiserror = { workspace = true }
 blake3 = { workspace = true }
 
 [features]
-default = ["std", "ports-compat"]
+default = ["std"]
 std = []
 simd = ["dep:contextra-simd", "contextra-simd?/serde"]
 serde = []
 tracing = []
 inspect = []
 experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
-mmap = []
+mmap = ["dep:contextra-sys"]
 diskann = ["experimental-diskann"]
 quantize-rabitq = ["experimental-rabitq"]
 workspace = [
     "dep:contextra-ports",
     "dep:contextra-types",
     "dep:contextra-sys",
+    "mmap",
 ]
 ports-compat = ["workspace"]
 docid-128 = ["contextra-ids/docid-128"]
@@ -111,6 +112,10 @@ harness = false
 name = "filtered_search_selectivity_bench"
 harness = false
 required-features = ["experimental-diskann"]
+
+[[test]]
+name = "hnsw_tests"
+required-features = ["workspace"]
 
 [[test]]
 name = "simd_differential_test"
