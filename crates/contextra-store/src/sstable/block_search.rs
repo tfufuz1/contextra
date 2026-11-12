@@ -3,8 +3,8 @@
 //! Stellt hochoptimierte Binaersuchroutinen ueber geordnete Schluessel-Offsets
 //! innerhalb eines SSTable-Datenblocks bereit.
 
-use crate::error::{StoreError, StoreResult};
 use crate::error::StoreResult as Result;
+use crate::error::{StoreError, StoreResult};
 
 /// Entry offset accessor supporting both 16-bit (legacy v0..v2) and 32-bit (v3+) block formats.
 pub fn get_entry_at_index(
@@ -18,17 +18,15 @@ pub fn get_entry_at_index(
             .checked_add(idx.checked_mul(4).ok_or_else(|| {
                 StoreError::Storage("overflow calculating offset position".into())
             })?)
-            .ok_or_else(|| {
-                StoreError::Storage("overflow calculating offset position".into())
-            })?;
+            .ok_or_else(|| StoreError::Storage("overflow calculating offset position".into()))?;
 
         let end_pos = off_pos.checked_add(4).ok_or_else(|| {
             StoreError::Storage("overflow calculating end offset position".into())
         })?;
 
-        let slice = block_data.get(off_pos..end_pos).ok_or_else(|| {
-            StoreError::Storage("malformed block: off_pos out of bounds".into())
-        })?;
+        let slice = block_data
+            .get(off_pos..end_pos)
+            .ok_or_else(|| StoreError::Storage("malformed block: off_pos out of bounds".into()))?;
 
         usize::try_from(u32::from_le_bytes(
             slice
@@ -41,17 +39,15 @@ pub fn get_entry_at_index(
             .checked_add(idx.checked_mul(2).ok_or_else(|| {
                 StoreError::Storage("overflow calculating offset position".into())
             })?)
-            .ok_or_else(|| {
-                StoreError::Storage("overflow calculating offset position".into())
-            })?;
+            .ok_or_else(|| StoreError::Storage("overflow calculating offset position".into()))?;
 
         let end_pos = off_pos.checked_add(2).ok_or_else(|| {
             StoreError::Storage("overflow calculating end offset position".into())
         })?;
 
-        let slice = block_data.get(off_pos..end_pos).ok_or_else(|| {
-            StoreError::Storage("malformed block: off_pos out of bounds".into())
-        })?;
+        let slice = block_data
+            .get(off_pos..end_pos)
+            .ok_or_else(|| StoreError::Storage("malformed block: off_pos out of bounds".into()))?;
 
         usize::from(u16::from_le_bytes(
             slice

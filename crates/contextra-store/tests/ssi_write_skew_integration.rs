@@ -4,7 +4,8 @@
 
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, TxId};
+use contextra_store::StoreError as ContextraError;
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::Barrier;

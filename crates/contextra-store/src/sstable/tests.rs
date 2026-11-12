@@ -3,8 +3,8 @@
 //! Testet Serialisierung, Deserialisierung, Block-Caching und Filter-Korrektheit.
 
 use super::*;
-use bytes::Bytes;
 use crate::error::StoreError;
+use bytes::Bytes;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 
@@ -502,12 +502,12 @@ async fn test_sstable_block_crc_corruption() {
             );
             assert!(matches!(
                 res.unwrap_err(),
-                ContextraError::ChecksumMismatch { .. }
+                StoreError::ChecksumMismatch { .. }
             ));
         }
         Err(e) => {
             assert!(
-                matches!(e, ContextraError::ChecksumMismatch { .. }),
+                matches!(e, StoreError::ChecksumMismatch { .. }),
                 "Expected ChecksumMismatch, got {:?}",
                 e
             );
@@ -648,7 +648,7 @@ fn test_bloom_filter_roundtrip_and_too_short_bytes() {
 
     let short_bytes = vec![0u8; 15];
     let err = BloomFilter::from_bytes(&short_bytes);
-    assert!(matches!(err, Err(ContextraError::Storage(_))));
+    assert!(matches!(err, Err(StoreError::Storage(_))));
 }
 
 #[test]
@@ -674,15 +674,15 @@ async fn test_sstable_builder_rejects_empty_and_oversized_inputs() {
     let mut builder = SstableBuilder::create(&path).await.expect("create"); // #[cfg(test)]
 
     let err_empty = builder.add(b"", b"val", 1, 1).await;
-    assert!(matches!(err_empty, Err(ContextraError::InvalidInput(_))));
+    assert!(matches!(err_empty, Err(StoreError::InvalidInput(_))));
 
     let oversized_key = vec![0xAA; 65536];
     let err_key = builder.add(&oversized_key, b"val", 1, 1).await;
-    assert!(matches!(err_key, Err(ContextraError::InvalidInput(_))));
+    assert!(matches!(err_key, Err(StoreError::InvalidInput(_))));
 
     let oversized_val = vec![0xBB; crate::lsm::MAX_VALUE_SIZE + 1];
     let err_val = builder.add(b"valid_key", &oversized_val, 1, 1).await;
-    assert!(matches!(err_val, Err(ContextraError::InvalidInput(_))));
+    assert!(matches!(err_val, Err(StoreError::InvalidInput(_))));
 }
 
 #[test]

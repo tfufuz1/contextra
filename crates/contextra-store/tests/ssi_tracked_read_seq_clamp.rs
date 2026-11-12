@@ -4,7 +4,8 @@
 
 use contextra_ports::StorageEngine;
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, TxId};
+use contextra_store::StoreError;
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -12,7 +13,7 @@ use tempfile::TempDir;
 /// tx1 calls get_at_seq_tracked(tx1, b"k1", u64::MAX).
 /// tx2 concurrently updates k1 and commits.
 /// tx1 writes k2 and commits.
-/// Expected: commit(tx1) returns Err(ContextraError::Conflict(_)).
+/// Expected: commit(tx1) returns Err(StoreError::Conflict(_)).
 #[tokio::test]
 async fn test_scenario_a_get_at_seq_tracked_u64_max_conflict() {
     let tmp = TempDir::new().expect("temp dir");
@@ -47,7 +48,7 @@ async fn test_scenario_a_get_at_seq_tracked_u64_max_conflict() {
     let res1 = lsm.commit(tx1).await;
 
     assert!(
-        matches!(res1, Err(ContextraError::Conflict(_))),
+        matches!(res1, Err(StoreError::Conflict(_))),
         "Expected Conflict on get_at_seq_tracked(u64::MAX) after concurrent write to k1, got: {:?}",
         res1
     );
@@ -140,7 +141,7 @@ async fn test_scenario_c_get_at_seq_tracked_explicit_lower_seq() {
     let res1 = lsm.commit(tx1).await;
 
     assert!(
-        matches!(res1, Err(ContextraError::Conflict(_))),
+        matches!(res1, Err(StoreError::Conflict(_))),
         "Expected Conflict on get_at_seq_tracked(seq_v0) after concurrent write to k1, got: {:?}",
         res1
     );

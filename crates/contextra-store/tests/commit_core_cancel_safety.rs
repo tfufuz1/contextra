@@ -49,6 +49,7 @@ async fn test_commit_cancel_safety_future_dropped_leaves_chain_or_state_corrupt(
     // Inspect if tx3 commit succeeds or fails due to HMAC chain mismatch
     tracing::info!("commit_tx3_res after cancellation: {:?}", commit_tx3_res);
 
+    let _ = storage.close().await;
     drop(storage);
 
     // 4. Reopen and verify WAL replay integrity

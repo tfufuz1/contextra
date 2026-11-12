@@ -51,7 +51,13 @@ pub trait Vfs: Send + Sync + 'static {
     fn list_dir(&self, path: &Path) -> Result<Vec<String>>;
     fn sync_dir(&self, path: &Path) -> Result<()>;
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
-        std::fs::read(path).map_err(StoreError::from)
+        std::fs::read(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                StoreError::NotFound(path.display().to_string())
+            } else {
+                StoreError::from(e)
+            }
+        })
     }
 }
 

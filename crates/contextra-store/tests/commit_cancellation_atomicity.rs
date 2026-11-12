@@ -69,6 +69,7 @@ async fn run_cancellation_atomicity_suite(group_commit_window_micros: u64) {
         let _ = timeout(Duration::from_micros(micros), storage.commit(tx_cancel)).await;
 
         // Simulate crash / restart: drop existing storage handle and reopen
+        let _ = storage.close().await;
         drop(storage);
 
         let storage_reopen = LsmStorage::new(config.clone()).await.unwrap_or_else(|e| {
@@ -144,6 +145,7 @@ async fn run_cancellation_atomicity_suite(group_commit_window_micros: u64) {
     }
 
     // Final reopen check
+    let _ = storage.close().await;
     drop(storage);
     let final_storage = LsmStorage::new(config.clone())
         .await

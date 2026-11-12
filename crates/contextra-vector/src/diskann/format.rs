@@ -89,64 +89,80 @@ impl DiskAnnHeader {
                 DISKANN_VERSION, version
             )));
         }
+        let node_count = u64::from_le_bytes(
+            bytes
+                .get(6..14)
+                .ok_or_else(|| VectorError::Index("Invalid node_count offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid node_count".into()))?,
+        );
+        let dimension = u32::from_le_bytes(
+            bytes
+                .get(14..18)
+                .ok_or_else(|| VectorError::Index("Invalid dimension offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid dimension".into()))?,
+        );
+        let max_degree = u32::from_le_bytes(
+            bytes
+                .get(18..22)
+                .ok_or_else(|| VectorError::Index("Invalid max_degree offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid max_degree".into()))?,
+        );
+        let sector_size = u32::from_le_bytes(
+            bytes
+                .get(22..26)
+                .ok_or_else(|| VectorError::Index("Invalid sector_size offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid sector_size".into()))?,
+        );
+        let entry_point = u32::from_le_bytes(
+            bytes
+                .get(26..30)
+                .ok_or_else(|| VectorError::Index("Invalid entry_point offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid entry_point".into()))?,
+        );
+        let metric = *bytes
+            .get(30)
+            .ok_or_else(|| VectorError::Index("Invalid metric offset".into()))?;
+        let quantized = *bytes
+            .get(31)
+            .ok_or_else(|| VectorError::Index("Invalid quantized offset".into()))?;
+        let q_min = f32::from_le_bytes(
+            bytes
+                .get(32..36)
+                .ok_or_else(|| VectorError::Index("Invalid q_min offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid q_min".into()))?,
+        );
+        let q_max = f32::from_le_bytes(
+            bytes
+                .get(36..40)
+                .ok_or_else(|| VectorError::Index("Invalid q_max offset".into()))?
+                .try_into()
+                .map_err(|_| VectorError::Index("Invalid q_max".into()))?,
+        );
+
+        if !q_min.is_finite() || !q_max.is_finite() {
+            return Err(VectorError::Storage(
+                "DiskANN header quantizer bounds non-finite".into(),
+            ));
+        }
+
         Ok(Self {
             magic: *DISKANN_MAGIC,
             version,
-            node_count: u64::from_le_bytes(
-                bytes
-                    .get(6..14)
-                    .ok_or_else(|| VectorError::Index("Invalid node_count offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid node_count".into()))?,
-            ),
-            dimension: u32::from_le_bytes(
-                bytes
-                    .get(14..18)
-                    .ok_or_else(|| VectorError::Index("Invalid dimension offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid dimension".into()))?,
-            ),
-            max_degree: u32::from_le_bytes(
-                bytes
-                    .get(18..22)
-                    .ok_or_else(|| VectorError::Index("Invalid max_degree offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid max_degree".into()))?,
-            ),
-            sector_size: u32::from_le_bytes(
-                bytes
-                    .get(22..26)
-                    .ok_or_else(|| VectorError::Index("Invalid sector_size offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid sector_size".into()))?,
-            ),
-            entry_point: u32::from_le_bytes(
-                bytes
-                    .get(26..30)
-                    .ok_or_else(|| VectorError::Index("Invalid entry_point offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid entry_point".into()))?,
-            ),
-            metric: *bytes
-                .get(30)
-                .ok_or_else(|| VectorError::Index("Invalid metric offset".into()))?,
-            quantized: *bytes
-                .get(31)
-                .ok_or_else(|| VectorError::Index("Invalid quantized offset".into()))?,
-            q_min: f32::from_le_bytes(
-                bytes
-                    .get(32..36)
-                    .ok_or_else(|| VectorError::Index("Invalid q_min offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid q_min".into()))?,
-            ),
-            q_max: f32::from_le_bytes(
-                bytes
-                    .get(36..40)
-                    .ok_or_else(|| VectorError::Index("Invalid q_max offset".into()))?
-                    .try_into()
-                    .map_err(|_| VectorError::Index("Invalid q_max".into()))?,
-            ),
+            node_count,
+            dimension,
+            max_degree,
+            sector_size,
+            entry_point,
+            metric,
+            quantized,
+            q_min,
+            q_max,
         })
     }
 }

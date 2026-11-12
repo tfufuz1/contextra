@@ -112,6 +112,7 @@ async fn test_k2_k3_64_parallel_writers_with_repeated_flushes() {
     }
     let _ = flush_handle.await;
 
+    let _ = storage.close().await;
     drop(storage);
 
     let reopened = LsmStorage::open(config).await.unwrap();
@@ -202,6 +203,7 @@ async fn test_batch_append_error_recovery() {
     let ok_res = storage.commit(tx_ok).await;
     assert!(ok_res.is_ok(), "Subsequent commit should succeed");
 
+    let _ = storage.close().await;
     drop(storage);
 
     // Reopen & verify consistency

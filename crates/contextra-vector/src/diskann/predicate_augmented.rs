@@ -149,8 +149,7 @@ impl DiskAnnIndex {
         }
 
         // Deduplicate matching results by DocId, retaining best distance
-        let mut best_matching: BTreeMap<DocId, f32> =
-            BTreeMap::new();
+        let mut best_matching: BTreeMap<DocId, f32> = BTreeMap::new();
         for (doc_id, dist) in matching_results {
             best_matching
                 .entry(doc_id)
@@ -191,7 +190,7 @@ impl DiskAnnIndex {
 mod tests {
     use super::*;
     use crate::diskann::config::DiskAnnConfig;
-        use crate::types::{DistanceMetric, DocId};
+    use crate::types::{DistanceMetric, DocId};
 
     #[tokio::test]
     async fn test_gamma_zero_regression_reduction() -> Result<()> {

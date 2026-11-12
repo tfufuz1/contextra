@@ -1,12 +1,15 @@
 //! # Commit-Pfade & Transaktionsabschluss (Ring 1)
 //!
-//! Verwaltet atomare Batch-Commits und Rollbacks im LSM-Speicher.
+//! // FILE-CONTEXT
+//! // STAND: 2026-11-11
+//! // ZWECK: Hilfsroutinen fuer Commit-Zustand, Intent-Locks, Backpressure und Sichtbarkeit
+//! // INVARIANTEN: ADR-0XX-P0A, INV-STORE-1, INV-LOCK-ORDER-1
 
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;
-use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 use contextra_ids::{TxId, TOMBSTONE_BIT};
+use contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
 
 impl LsmStorage {
     /// Notifies registered observers of committed WAL entries for a transaction.
@@ -36,6 +39,7 @@ impl LsmStorage {
         locks.retain(|_, locked_tx| !predicate(*locked_tx));
     }
 
+    /// Clears intent locks for a specific transaction ID.
     pub fn clear_intent_locks_for_tx(&self, tx_id: TxId) {
         self.cleanup_intent_locks_where(|t| t == tx_id);
     }

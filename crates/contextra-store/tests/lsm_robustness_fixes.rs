@@ -121,6 +121,7 @@ async fn test_multi_cycle_crash_recovery_wal_cleanup() {
             // Simulate ungraceful shutdown by dropping storage without flush or close
             drop(storage);
         }
+        tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Inspect pre-replay state
         let mut entries = tokio::fs::read_dir(tmp.path()).await.unwrap();
@@ -161,5 +162,6 @@ async fn test_multi_cycle_crash_recovery_wal_cleanup() {
         }
 
         drop(storage);
+        tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }

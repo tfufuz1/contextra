@@ -4,8 +4,8 @@
 //! Speicher-Footprint.
 
 use super::reader::SstableReader;
-use bytes::Bytes;
 use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use bytes::Bytes;
 use std::sync::Arc;
 
 pub struct SstableStream {
