@@ -4,8 +4,8 @@
 
 use super::block_search::{binary_search_index_in_block, get_entry_at_index};
 use super::reader::{parse_block_trailer, SstableReader};
-use bytes::Bytes;
 use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use bytes::Bytes;
 
 impl SstableReader {
     /// Scans the SSTable for keys starting with the given prefix.

@@ -1,15 +1,18 @@
+//! Verbatim reference copy of SstableBuilder from origin/main (commit b51ed7d9a).
+//! Used strictly for byte-for-byte identity differential testing (Gate 11).
+
 //! # SSTable-Builder (Ring 1)
 //!
 //! Konstruiert neue SSTable-Dateien aus sortierten Sequenzen von Key-Value-Paaren,
 //! generiert Datenbloecke, Block-Indizes und Bloom-Filter.
 
-use super::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
-use super::bloom::BloomFilter;
-use crate::io_seam::RealFs;
-use crate::wal::KeyManager;
 use bytes::{BufMut, Bytes, BytesMut};
-use crate::io_seam::{Vfs, VfsFile, VfsOpenOptions};
-use crate::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_store::error::{StoreError as ContextraError, StoreResult as Result};
+use contextra_store::io_seam::RealFs;
+use contextra_store::io_seam::{Vfs, VfsFile, VfsOpenOptions};
+use contextra_store::sstable::BloomFilter;
+use contextra_store::sstable::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
+use contextra_store::wal::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -330,13 +333,13 @@ impl SstableBuilder {
                 "SstableBuilder handle is poisoned after IO failure (INV-FSYNC-1)".into(),
             ));
         }
-        let file = self.file.as_mut().ok_or_else(|| {
-            ContextraError::Storage("SstableBuilder file already closed".into())
-        })?;
+        let file = self
+            .file
+            .as_mut()
+            .ok_or_else(|| ContextraError::Storage("SstableBuilder file already closed".into()))?;
         let mut written = 0;
         while written < buf.len() {
-            let res = file
-                .write_at(&buf[written..], offset.saturating_add(written as u64));
+            let res = file.write_at(&buf[written..], offset.saturating_add(written as u64));
             match res {
                 Ok(0) => {
                     self.poisoned = true;
@@ -372,7 +375,7 @@ impl SstableBuilder {
                 "SSTable key cannot be empty".to_string(),
             ));
         }
-        if key.len() > 65535 || value.len() > crate::lsm::MAX_VALUE_SIZE {
+        if key.len() > 65535 || value.len() > contextra_store::lsm::MAX_VALUE_SIZE {
             return Err(ContextraError::InvalidInput(format!(
                 "Key ({} bytes) exceeds 65535 limit or value ({} bytes) exceeds MAX_VALUE_SIZE limit",
                 key.len(),
@@ -556,9 +559,10 @@ impl SstableBuilder {
         self.offset += 54;
 
         // 1. sync_all on written handle
-        let file_handle = self.file.take().ok_or_else(|| {
-            ContextraError::Storage("SstableBuilder file already closed".into())
-        })?;
+        let file_handle = self
+            .file
+            .take()
+            .ok_or_else(|| ContextraError::Storage("SstableBuilder file already closed".into()))?;
         if let Err(e) = file_handle.sync_all() {
             self.poisoned = true;
             let _ = self.vfs.remove_file(&self.tmp_path);
