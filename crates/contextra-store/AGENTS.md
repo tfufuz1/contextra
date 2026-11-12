@@ -1,15 +1,14 @@
 // FILE-CONTEXT: Entwicklerhandbuch und Governance-Vertrag für contextra-store
 // ZWECK: Regeln, Invarianten, Abhängigkeiten und Modulkarte für Coding-Agenten
 // INVARIANTEN: #![forbid(unsafe_code)], Zero-Panic, Fail-Closed bei fsync, INV-STORE-1 bis INV-STORE-5
-// STAND: 2026-11-08
+// STAND: 2026-11-11
 
 # contextra-store — Entwicklerhandbuch & Governance
 
 ---
 
-
-> **Crate:** `contextra-store` | **Ring:** 1 | **Klasse:** B (Storage Bundle)
-> **Normative Vorgabe:** `docs/CONTEXTRA_IMPLEMENTIERUNGS_SPEC.md` v4.1, `crates/contextra-store/SPEC.md`
+> **Crate:** `contextra-store` | **Zweck:** Autarker LSM-Speicherkern
+> **Normative Vorgabe:** `docs/CONTEXTRA_IMPLEMENTIERUNGS_SPEC.md`, `crates/contextra-store/SPEC.md`
 
 ---
 
@@ -17,20 +16,19 @@
 
 | Merkmal | Wert |
 |---|---|
-| Ring | Ring 1 (Speicherkern) |
-| Klasse | Klasse B (Storage Bundle: `types`, `ports`, `mvcc`, `crypto`, `sys`, `store`) |
-| Abhängigkeiten (`Cargo.toml`) | `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-mvcc`, `contextra-crypto` |
-| Features | `default`, `inspect`, `block-cache-v2`, `memory-only-storage`, `docid-128`, `legacy-wal-key`, `fault-injection`, `test-hooks`, `sieve-cache` |
+| Zweck | Autarker LSM-Speicherkern für persistente Schlüssel-Wert-Speicherung |
+| Abhängigkeiten (`Cargo.toml`) | `contextra-ids`, `contextra-env`, `contextra-sys`, `contextra-mvcc`, `contextra-crypto` (optional: `contextra-types`, `contextra-ports`) |
+| Features | `default`, `workspace`, `inspect`, `block-cache-v2`, `memory-only-storage`, `docid-128`, `legacy-wal-key`, `fault-injection`, `test-hooks`, `sieve-cache` |
 | Lints | `#![forbid(unsafe_code)]`, `deny(dead_code)` |
 
 ---
 
-## 2. Abhängigkeiten & Schulden
+## 2. Architektur & Modularisierung
 
-- **Keine Dev-Kanten auf höhere Ringe:** Frühere Dev-Kanten zu `contextra-graph`, `contextra-sandbox` und `contextra-vector` wurden vollständig entfernt (M6-Konformität).
-- **Dateisystem-I/O (Soll: Vfs-Port):** Derzeitige Datei-I/O verwendet `std::fs` (innerhalb blockierender Tasks via `spawn_blocking`) und `tokio::fs`. Die vollständige Migration auf den `Vfs`-Port (`contextra-ports`) ist für WP 4.4 geplant.
-- **Archiviertes kv/:** `kv/` wurde unter ST6.4 nach `archive/contextra-store-kv` archiviert.
-- **Brücke compat/:** `engine/` und portgebundene `scanner/purge`-Anteile liegen unter `src/compat/` mit Quellkompatibilitaet an alten Pfaden.
+- **Entkopplung:** Der Kern von `contextra-store` hängt direkt nur an Micro-Cores (`contextra-ids`, `contextra-env`) und Systemschichten (`contextra-sys`, `contextra-crypto`, `contextra-mvcc`).
+- **Optionale Workspace-Brücken:** Integrationen mit `contextra-types` und `contextra-ports` liegen isoliert im Feature `workspace` (`src/compat/`).
+- **Autarke I/O-Naht:** `src/io_seam/` (`types.rs`, `real_fs.rs`, `store_io.rs`) und `src/traits.rs` stellen lokale Abstraktionen für Dateisysteminteraktionen bereit.
+- **Berichte der Modularisierung:** Verweise auf die Abschlussberichte der Teilkomponenten liegen unter `crates/contextra-store/docs/modularization/<KOMPONENTE>/REPORT.md` (z. B. Komponente G unter `docs/modularization/G/REPORT.md`).
 
 ---
 
@@ -38,18 +36,23 @@
 
 | Pfad | Verantwortung |
 |---|---|
+| `error.rs` | Lokaler Fehlertyp `StoreError` (`#[non_exhaustive]`) und `StoreResult<T>` |
+| `traits.rs` | Autarke Speicher- und Dateisystem-Traits (`StoreFs`, `StoreFile`) |
+| `io_seam/` (`types`, `real_fs`, `store_io`) | Modulare VFS-Naht und atomare I/O-Hülle (`Vfs`, `RealFs`, `StoreIo`) |
+| `fsync.rs` | Zentrale Datei- und Verzeichnis-Sync-Stelle (INV-FSYNC-1) |
+| `key_source.rs` | Schlüsselmaterial-Quellen für WAL und Chiffrierung |
+| `budget.rs` | Ressourcen- und Speicherbudget-Tracker (`ResourceTracker`) |
+| `stats.rs` | Speicherstatistiken (`StorageStats`) |
+| `util.rs` | Siegel- und Authentifizierungs-Envelope (`RecordSealer`, `SealedEnvelope`) |
 | `wal/` (`encode`, `flusher`, `hmac`, `io`, `replay`) | Append-Only WAL, HMAC-Kette, asynchroner Flusher-Actor, Replay, Open-Heal |
-| `lsm/` (`engine`, `commit`, `flush`, `group_commit`, `guard`, `recovery`, `scan`, `ops/*`, `validate`, `observer`) | Orchestrierung, Transaktions-Commit, Group-Commit Leader/Follower, Recovery |
 | `memtable.rs` | Nebenläufige, geschardete BTreeMap mit Sequenznummern und Tombstones |
 | `sstable/` (`builder`, `reader`, `block_cache`, `bloom`, `stream`, `block_search`, `reader_ext`, `io`) | Sortierte Segmente auf Platte (Format V4 Standard), Block-Cache, Bloom-Filter |
 | `manifest/` (`core`, `entry`, `recovery`, `rollover`) | Transaktionales Manifest für SSTable-Generationen und Versionierung (`MFMN`) |
 | `compaction/` (`engine`, `adaptive`, `config`, `merge_operator`, `retention`) | Leveled und Adaptive Compaction-Engine, `MergeOperator` |
-| `scanner/` (`memtable`, `sstable`, `wal`, `purge`) | Übergangsweise Port-Implementierungen `LayerScanner` und `Purger` |
-| `fsync.rs` | Zentrale Datei- und Verzeichnis-Sync-Stelle (INV-FSYNC-1) |
-| `tenant_codec.rs` | Mandanten-Präfixierung (`TenantId`) und Schlüssel-Isolation |
 | `system_pressure.rs` | Systemdruck-Monitoring für adaptive Compaction |
-| `engine/` (`memory_only.rs`) | In-Memory-Double (`InMemoryStorageEngine`) für schnelle Tests |
-| `kv/` (`delete_mode.rs`, `segment.rs`) | Deprecated Debt DEBT-01 (historische KV-Segment-Verschlüsselung) |
+| `tenant_codec.rs` | Mandanten-Präfixierung (`TenantId`) und Schlüssel-Isolation |
+| `lsm/` (`engine`, `commit`, `flush`, `group_commit`, `guard`, `recovery`, `scan`, `ops/*`, `validate`, `observer`) | Orchestrierung, Transaktions-Commit, Group-Commit Leader/Follower, Recovery |
+| `compat/` (`engine`, `scanner`, `error`, `license`) | Optionale Brücke zu Workspace-Typen und -Ports (Feature `workspace`) |
 
 ---
 
@@ -61,67 +64,37 @@
 4. **Single-Load-Regel:** `last_committed_tx` in `get_at_seq`/`scan_prefix_at` genau einmal zu Beginn der Operation laden (INV-STORE-5). **Flush-before-Visible:** Manifest-Commit muss vor Sichtbarkeit der SSTable abgeschlossen sein.
 5. **WAL-HMAC-Schlüssel** nur über `load_or_create_integrity_key` (`wal/hmac.rs`), nie hartcodiert; `legacy-wal-key` nur für Migration.
 6. **Lock-Handoff Invariante (P06 / ADR-0XX-P0A):** Beim Group-Commit wird `truncate_lock` akquiriert, **bevor** `commit_mutex` freigegeben wird.
-7. **Keine Rechts- oder Löschsagas:** Deletion-Proofs, juristische Begrifflichkeiten und DSGVO-Art.-17-Sagas liegen exklusiv in `contextra-erasure` (M7).
+7. **Modulare Isolation:** Multi-Layer Deletion, DSGVO- und Deletion-Proof-Logik liegen exklusiv in `contextra-erasure`.
 
 ---
 
 ## 5. Ports
 
-- **Implementiert:** `StorageEngine`, `Purger`, `LayerScanner`, `BlockCache`, `MergeOperator`.
-- **Konsumiert:** `Clock`, `Vfs` (Soll-Zustand), `MetricsSink`.
+- **Implementiert:** `StorageEngine`, `MergeOperator`.
+- **Konsumiert:** `Clock`, `Vfs`, `MetricsSink`.
 
 ---
 
-## 6. Nebenläufigkeit & Performance
+## 6. Nebenläufigkeit & Sperrenordnung
 
 - **Sperrenordnung:**
   `commit_mutex` → `wal.truncate_lock` → `memtable_shard_lock` → `sstable_manifest_lock`.
   Niemals `parking_lot`-Guards über `.await`-Punkte halten (`clippy::await_holding_lock`).
 - **Group-Commit:** Message-Passing und Leader/Follower-Batching über Flusher-Actor.
-- **Komplexität:** Punktlesen $O(\log n)$ pro SSTable-Ebene + Bloom-Filter-Filterung.
 
 ---
 
 ## 7. ANCHOR-Ids (Kollisionsschutz)
 
-Workspace-weit eindeutige Anchors nach dem Muster `ANCHOR[contextra-store:<BEREICH>-<NNN>]`. Stand der maximalen Nummern:
-
-| Bereich | Höchste bestehende Nr. | Nächste freie Id |
-|---|---:|---|
-| `WAL-CORE` | 3 | `ANCHOR[contextra-store:WAL-CORE-004]` |
-| `COMP-ENG` | 2 | `ANCHOR[contextra-store:COMP-ENG-003]` |
-| `KV-SEG` | 2 | `ANCHOR[contextra-store:KV-SEG-003]` |
-| `LSM-ENG` | 2 | `ANCHOR[contextra-store:LSM-ENG-003]` |
-| `MAN-CORE` | 2 | `ANCHOR[contextra-store:MAN-CORE-003]` |
-| `SST-BLD` | 2 | `ANCHOR[contextra-store:SST-BLD-003]` |
-| `SST-RDR` | 2 | `ANCHOR[contextra-store:SST-RDR-003]` |
-| `ROOT-UTIL` | 2 | `ANCHOR[contextra-store:ROOT-UTIL-003]` |
-| `PUT` | 1 | `ANCHOR[contextra-store:PUT-002]` |
+Workspace-weit eindeutige Anchors nach dem Muster `ANCHOR[contextra-store:<BEREICH>-<NNN>]`. Komponente G vergibt IDs im reservierten Bereich:
+`ANCHOR[contextra-store:ROOT-UTIL-100]` bis `ANCHOR[contextra-store:ROOT-UTIL-199]`.
 
 ---
 
-## 8. Tests & Messung
+## 8. Verifikationsbefehle
 
 ```bash
-cargo test -p contextra-store --locked
-cargo clippy -p contextra-store --all-targets --all-features -- -D warnings
-cargo bench -p contextra-store
+cargo check -p contextra-store --locked
+cargo test -p contextra-store --test golden_corpus
+cargo test -p contextra-store --test mz_g_golden_invariants
 ```
-
-Vorhandene Testsuiten:
-- Chaos-Tests (`tests/chaos_*`): Bitflip, Memory Pressure, Dropped Writes, Power Cut.
-- Concurrency- & Loom-Tests: `tests/loom_group_commit.rs`, `tests/loom_commit_flush_visibility.rs`.
-- Durability- & Fsync-Tests: `tests/fsync_syscall_verification.rs`, `tests/flush_durability.rs`.
-- Fuzzing: `crates/contextra-store/fuzz/` (`wal_mutation_chaos`, `fuzz_wal_replay`, `fuzz_manifest_load`).
-
----
-
-## 9. Offene Arbeit
-
-| WP | Inhalt | Status |
-|---|---|---|
-| WP-STO-1 | Bereinigung von Löschketten- und Shredding-Relikten (`src/kv/`) | In Arbeit (DEBT-01) |
-| WP-STO-2 | Auslagerung von `Purger` und `LayerScanner` nach `contextra-erasure-adapters` | Geplant (Welle 4) |
-| WP-STO-3 | Flusher prüft geschlossene Acks vor Disk-Sync und HMAC-Rollback bei Timeout | Abgeschlossen (P01/P03) |
-| WP-STO-4 / D4 | Vollständige Umstellung der Dateisystem-I/O auf den `Vfs`-Port | Geplant (WP 4.4) |
-| WP-STO-5 | Lock-Handoff Invariante und Dekker-Write-Fencing | Abgeschlossen (ADR-0XX-P0A) |

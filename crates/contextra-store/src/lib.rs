@@ -1,4 +1,4 @@
-//! # contextra-store (Ring 1)
+//! # contextra-store
 //!
 //! Die Crate `contextra-store` implementiert das persistente LSM-Tree-Speichertriebwerk
 //! (Log-Structured Merge-tree) für die Contextra-Plattform. Sie stellt die primäre
@@ -20,12 +20,10 @@
 //! Die gesamte Crate erzwingt `#![forbid(unsafe_code)]` in Produktion. Es existieren keinerlei
 //! `unsafe`-Blöcke im Produktionscode.
 //!
-//! ## Ring-Hierarchie & Abhängigkeiten
-//! - **Ring 1 / Klasse B:** Kernkomponente des Storage-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`).
-//! - **Eingehende Abhängigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`,
-//!   `contextra-checkpoint`, `contextra-agent` und der übergeordneten Fassade `contextra`.
-//! - **Ausgehende Abhängigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
-//!   `contextra-sys`, `contextra-mvcc`.
+//! ## Modularisierung & Schichtenarchitektur
+//! - **Basis-Module:** `error`, `traits`, `io_seam`, `fsync`, `key_source`, `util`, `budget`, `stats`, `tenant_codec`.
+//! - **Speicherkern:** `wal`, `memtable`, `sstable`, `manifest`, `compaction`, `system_pressure`, `lsm`.
+//! - **Brücken:** `compat` (optionale Integration mit `contextra-types` und `contextra-ports`).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -50,36 +48,54 @@
     )
 )]
 
+// --- 1. Basis-Module und Infrastruktur ---
 pub mod error;
 pub mod traits;
-pub mod compat;
-pub use error::{StoreError, StoreResult};
+pub mod io_seam;
+pub mod fsync;
+pub mod key_source;
+pub mod util;
+pub mod budget;
+pub mod stats;
+
+// --- 2. Speicherkern (LSM-Subsysteme) ---
+pub mod wal;
+
+#[cfg(not(loom))]
+pub mod memtable;
+
+#[cfg(not(loom))]
+pub mod sstable;
+
+#[cfg(not(loom))]
+pub mod manifest;
 
 #[cfg(not(loom))]
 pub mod compaction;
+
+#[cfg(not(loom))]
+pub mod system_pressure;
+
+#[cfg(not(loom))]
+pub mod tenant_codec;
+
+#[cfg(not(loom))]
+pub mod lsm;
+
+// --- 3. Kompatibilität und Brücken ---
+pub mod compat;
+
 #[cfg(not(loom))]
 #[cfg(feature = "workspace")]
 pub mod engine;
-pub mod fsync;
-pub mod key_source;
-#[cfg(not(loom))]
-pub mod lsm;
-#[cfg(not(loom))]
-pub mod manifest;
-#[cfg(not(loom))]
-pub mod memtable;
+
 #[cfg(not(loom))]
 #[cfg(feature = "workspace")]
 pub mod scanner;
-#[cfg(not(loom))]
-pub mod sstable;
-#[cfg(not(loom))]
-pub mod system_pressure;
-#[cfg(not(loom))]
-pub mod tenant_codec;
-pub mod util;
-pub mod wal;
 
+// --- 4. Öffentliche Re-Exporte (Außenfläche eingefroren) ---
+pub use error::{StoreError, StoreResult};
+pub use io_seam::{RealFs, RealFsFile, StoreIo, Vfs, VfsFile, VfsOpenOptions};
 pub use util::{RecordAuthenticator, RecordSealer, SealedEnvelope};
 
 #[cfg(not(loom))]
@@ -90,19 +106,21 @@ pub use compaction::{
     },
     CompactionConfig, CompactionEngine, MergeOperator, TtlMetadata,
 };
+
 #[cfg(not(loom))]
 pub use key_source::{KeyMaterialSource, OsKeyMaterialSource, StaticKeyMaterialSource};
+
 #[cfg(not(loom))]
 pub use lsm::{
     CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
     DEFAULT_MAX_OBSERVER_LATENCY,
 };
+
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
+
 #[cfg(not(loom))]
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
+
 #[cfg(not(loom))]
 pub use tenant_codec::{TenantKeyCodec, TenantScopedStorage};
-
-pub mod io_seam;
-pub use io_seam::{RealFs, RealFsFile, StoreIo, Vfs, VfsFile, VfsOpenOptions};
