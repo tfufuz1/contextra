@@ -160,4 +160,4 @@ pub trait GraphIndexExt: contextra_ports::GraphIndex {
 pub use storage::{GraphFuture, GraphStorage, InMemoryGraphStorage};
 pub use graph_view::GraphView;
 pub use text_gen::TextGenerator;
-pub use types::EntityId;
+pub use types::{EntityId, PprAlgorithm, PprConfig};

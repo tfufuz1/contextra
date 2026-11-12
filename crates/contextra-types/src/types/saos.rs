@@ -19,6 +19,7 @@
 // NICHT-OFFENSICHTLICH: metadata signal weight ist in FusionWeights reserviert und liefert via pub fn metadata() 0.0 zurück.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-021)
 
+#[allow(deprecated)]
 use super::domain::{DocId, EntityId, MemoryType, PprConfig};
 use super::filter::FilterExpr;
 use crate::error::{ContextraError, Result};
@@ -130,6 +131,7 @@ pub enum GraphTraversalStrategy {
         max_hops: usize,
     },
     /// Personalized PageRank power iteration starting from seed nodes.
+    #[allow(deprecated)]
     PersonalizedPageRank(PprConfig),
     /// PathRAG bidirectional Dijkstra traversal with sufficiency filtering.
     PathRag {

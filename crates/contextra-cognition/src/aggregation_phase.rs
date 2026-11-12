@@ -25,6 +25,7 @@
 // INVARIANTEN: P12 LLM-Kostenschutz; Speicherbudget-Vorabpruefung; deterministische Sortierung via SplitMix64.
 // STAND: 2026-11-11
 
+use crate::error::CognitionError;
 use crate::graph_local::HyperEdgeId;
 use crate::memory_consolidation::{CommunityStabilityTracker, ConsolidationPhaseResult};
 use crate::ports_local::LlmTextGenerator;

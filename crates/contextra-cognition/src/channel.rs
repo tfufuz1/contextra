@@ -9,6 +9,7 @@
 // INVARIANTEN: Zero-Panic; Send + Sync für asynchrone Pipelines; saubere Fehlerkapselung.
 // STAND: 2026-11-11
 
+use crate::error::CognitionError;
 use crate::memory_consolidation::{PreCondensedInput, TurnSegment};
 use crate::ports_local::BoxFuture;
 use crate::types_local::{Result, TenantId};

@@ -13,7 +13,7 @@
 
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
-use contextra_types::{EntityId, PprConfig};
+use crate::types::{EntityId, PprConfig};
 use std::collections::HashSet;
 
 

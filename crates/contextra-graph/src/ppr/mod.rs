@@ -25,7 +25,7 @@ use self::forward_push::forward_push_ppr;
 pub use self::snapshot::compute_ppr_at;
 pub use self::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
-use contextra_types::{EntityId, PprAlgorithm, PprConfig};
+use crate::types::{EntityId, PprAlgorithm, PprConfig};
 
 pub fn compute_ppr(
     inner: &GraphInner,
@@ -148,7 +148,7 @@ fn execute_tl_hfd(
     config: &PprConfig,
     deleted_nodes: &DeletedView,
     ctx: &mut PprContext,
-    params: &contextra_types::TlHfdParams,
+    params: &crate::types::TlHfdParams,
 ) -> Vec<(EntityId, f32)> {
     let g_params = crate::tl_hfd::TlHfdParams {
         sigma: params.sigma,

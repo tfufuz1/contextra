@@ -378,16 +378,12 @@ impl MemoryType {
 
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
-/// # Modulare Architektur
-/// Definiert in `contextra-types` (Vertragsebene), um Abhängigkeiten von `contextra-graph` zu vermeiden.
-/// Graph-Algorithmen in `contextra-graph` bilden diese Konfiguration auf `contextra_graph::TlHfdParams` ab.
-///
-/// # Abgrenzung
-/// Dieser Typ `contextra_types::TlHfdParams` ist die Konfigurationsstruktur auf Vertragsebene
-/// (`sigma`, `delta`, `gamma`, `max_iterations`, `max_top_k_expansion`, `max_hyperedge_sort_size`),
-/// die über API-Parameter und JSON-Optionen übergeben wird.
-/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-spezifische
-/// Parameterstruktur mit Ausführungs- und Diffusionsmatrix-Validierungen.
+/// # Deprecation
+/// In S-51 nach `contextra-graph` migriert. Bleibt bis S-70 (INV-2).
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_graph::TlHfdParams` per S-51. This re-export will be removed in S-70."
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {
@@ -430,6 +426,7 @@ fn default_tl_hfd_max_hyperedge_sort_size() -> usize {
     64
 }
 
+#[allow(deprecated)]
 impl Default for TlHfdParams {
     fn default() -> Self {
         Self {
@@ -444,6 +441,14 @@ impl Default for TlHfdParams {
 }
 
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
+///
+/// # Deprecation
+/// In S-51 nach `contextra-graph` migriert. Bleibt bis S-70 (INV-2).
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_graph::PprAlgorithm` per S-51. This re-export will be removed in S-70."
+)]
+#[allow(deprecated)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 // ANCHOR[contextra-types:MISC-PPRALG]
@@ -466,6 +471,14 @@ pub enum PprAlgorithm {
 }
 
 /// Configuration parameters for Personalized PageRank (PPR).
+///
+/// # Deprecation
+/// In S-51 nach `contextra-graph` migriert. Bleibt bis S-70 (INV-2).
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_graph::PprConfig` per S-51. This re-export will be removed in S-70."
+)]
+#[allow(deprecated)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:MISC-PPRCFG]
 pub struct PprConfig {
@@ -490,6 +503,7 @@ fn default_warn_on_non_convergence() -> bool {
     true
 }
 
+#[allow(deprecated)]
 impl Default for PprConfig {
     fn default() -> Self {
         Self {

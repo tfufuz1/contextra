@@ -32,7 +32,7 @@ BRIDGE_PATTERNS = [
 ]
 
 CFG_WORKSPACE_PATTERNS = [
-    re.compile(r'#\[cfg\([^)]*(?:workspace|types-compat|ports-compat)[^)]*\)\]'),
+    re.compile(r'#!?\[cfg\([^)]*(?:workspace|types-compat|ports-compat)[^)]*\)\]'),
 ]
 
 
@@ -100,7 +100,7 @@ def audit_file_for_bridges(file_path: Path, crate_root: Path) -> List[Dict[str, 
     findings = []
 
     # Dateiweiter cfg-Check (z.B. ganz oben `#![cfg(feature = "workspace")]`)
-    for line in clean_lines[:15]:
+    for line in raw_lines[:15]:
         if any(pat.search(line) for pat in CFG_WORKSPACE_PATTERNS):
             return []
 
@@ -108,8 +108,8 @@ def audit_file_for_bridges(file_path: Path, crate_root: Path) -> List[Dict[str, 
         for b_pat in BRIDGE_PATTERNS:
             if b_pat.search(c_line):
                 # Prüfe, ob vorherige Zeile ein cfg(feature = "workspace" / ...-compat) Attribut hat
-                prev_line = clean_lines[idx - 2] if idx >= 2 else ""
-                prev_prev = clean_lines[idx - 3] if idx >= 3 else ""
+                prev_line = raw_lines[idx - 2] if idx >= 2 else ""
+                prev_prev = raw_lines[idx - 3] if idx >= 3 else ""
                 if any(pat.search(prev_line) or pat.search(prev_prev) for pat in CFG_WORKSPACE_PATTERNS):
                     continue
 

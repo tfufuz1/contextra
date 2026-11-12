@@ -14,6 +14,7 @@ pub mod backend;
 pub mod crypto_local;
 #[cfg(feature = "signing")]
 pub mod deletion_proof;
+pub mod erasure_domain;
 pub mod error;
 pub mod gate;
 pub mod io;
