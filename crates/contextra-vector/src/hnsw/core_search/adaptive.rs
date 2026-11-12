@@ -196,13 +196,14 @@ impl HnswIndex {
             }
         }
 
-        let mut sm = AdaptiveEfStateMachine::new(policy.clone());
+        let mut sm = AdaptiveEfStateMachine::new(policy.clone(), k);
         let mut final_results = Vec::new();
 
         let nodes = self.inner.hot.nodes.read();
         let deleted = self.inner.cold.deleted_nodes.read();
 
-        while let Some(current_ef) = sm.next_ef() {
+        while !sm.is_terminated() {
+            let current_ef = sm.current_ef();
             let candidates =
                 self.inner
                     .search_layer(query, query_quantized.as_deref(), &ep, current_ef, 0)?;
@@ -251,12 +252,12 @@ impl HnswIndex {
             let top_k_ids: Vec<DocId> = results.iter().map(|sd| sd.doc_id).collect();
             final_results = results;
 
-            if sm.observe_round(&top_k_ids) {
+            if sm.step(&top_k_ids) {
                 break;
             }
         }
 
-        let stats = sm.finish();
+        let stats = sm.stats();
         Ok((final_results, stats))
     }
 }

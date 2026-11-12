@@ -16,6 +16,7 @@ use crate::wal::{
 #[cfg(feature = "fault-injection")]
 use crate::wal::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
 
+impl Wal {
     pub(crate) async fn prepare_append_payload(
         &self,
         batch: &PreparedBatch,
@@ -313,3 +314,4 @@ use crate::wal::{DELAY_APPEND_FOR_TX, DELAY_APPEND_MS, FAIL_APPEND_FOR_TX};
             .map_err(|_| StoreError::Storage("WAL flusher dropped".into()))??;
         Ok(())
     }
+}

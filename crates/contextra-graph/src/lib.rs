@@ -69,7 +69,6 @@ pub mod session_dag;
 pub mod test_doubles;
 pub mod types;
 pub mod tl_hfd;
-pub mod types;
 pub mod storage;
 pub mod graph_view;
 pub mod text_gen;

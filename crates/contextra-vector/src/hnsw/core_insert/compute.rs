@@ -16,10 +16,10 @@ use crate::types::DocId;
 use super::super::batch::{
     get_neighbor_conns_in_batch, BatchContext, NeighborBacklink, PreparedInsert, SearchContext,
 };
-use super::super::types::{HnswIndexCore, VectorData};
+use super::super::types::{Candidate, HnswIndexCore, VectorData};
 
 impl HnswIndexCore {
-    pub(super) fn resolve_connections<'a>(
+    pub(crate) fn resolve_connections<'a>(
         &self,
         idx: usize,
         layer: usize,

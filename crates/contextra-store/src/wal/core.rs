@@ -7,8 +7,9 @@
 use super::config::WalConfig;
 use super::flusher::{WalCommand, WalFlusherConfig};
 use super::poison::PoisonCause;
-use super::replay::WalVersion;
+use super::replay::recover_from_bak_if_present;
 use super::encode::*;
+use super::fs;
 use super::hmac::*;
 use crate::error::{StoreError, StoreResult as Result};
 use contextra_crypto::crypto::KeyManager;
@@ -246,7 +247,7 @@ impl Wal {
             (None, Some(key))
         };
 
-        let file_len = self::fs::metadata(&path)
+        let file_len = fs::metadata(&path)
             .await
             .map(|m| m.len())
             .unwrap_or(0);
@@ -307,7 +308,7 @@ impl Wal {
             (None, Some(key))
         };
 
-        let (file, is_new) = match self::fs::OpenOptions::new()
+        let (file, is_new) = match fs::OpenOptions::new()
             .create_new(true)
             .append(true)
             .read(true)
@@ -316,7 +317,7 @@ impl Wal {
         {
             Ok(file) => (file, true),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                let file = self::fs::OpenOptions::new()
+                let file = fs::OpenOptions::new()
                     .create(true)
                     .append(true)
                     .read(true)
@@ -393,10 +394,10 @@ impl Wal {
                     WalVersion::V3 => "v3.bak",
                 };
                 let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
-                let copy_res = self::fs::copy(&wal.path, &bak_path).await;
+                let copy_res = fs::copy(&wal.path, &bak_path).await;
                 if copy_res.is_ok() {
                     // Backup-Datei fsyncen: Recovery-Sicherheit VOR der Truncation der Original-WAL.
-                    let bak_file = self::fs::OpenOptions::new()
+                    let bak_file = fs::OpenOptions::new()
                         .write(true)
                         .open(&bak_path)
                         .await
@@ -585,7 +586,7 @@ impl Wal {
         // Replay all entries up to the last valid HMAC-verified entry
         let entries = self.replay().await?;
 
-        let metadata = self::fs::metadata(&self.path).await.map_err(|e| {
+        let metadata = fs::metadata(&self.path).await.map_err(|e| {
             StoreError::Storage(format!("Failed to stat WAL for poison recovery: {e}"))
         })?;
         let file_len = metadata.len();
@@ -653,7 +654,7 @@ impl Wal {
             poison_state: Arc::new(std::sync::atomic::AtomicU8::new(0)),
         };
         if let Err(e) = wal.enable_flusher_with_config(
-            self::fs::LoomFile::new(),
+            fs::LoomFile::new(),
             WalFlusherConfig {
                 batch_window_micros: 0,
                 queue_capacity: DEFAULT_WAL_QUEUE_CAPACITY,

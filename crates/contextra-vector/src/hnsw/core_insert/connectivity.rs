@@ -26,7 +26,7 @@ impl HnswIndexCore {
         if total == 0 {
             return 1.0;
         }
-        (1.0 - deleted as f64 / total as f64).max(0.0)
+        (1.0_f64 - deleted as f64 / total as f64).max(0.0_f64)
     }
 
     /// Prüft die Graph-Konnektivität (`INV-VEC-CONNECTIVITY-1`):
