@@ -116,6 +116,7 @@ impl TenantKeyCodec {
 pub use crate::compat::engine::tenant_storage::*;
 
 pub struct TenantScopedStorage<S> {
+    #[allow(dead_code)]
     pub(crate) inner: S,
     pub(crate) codec: TenantKeyCodec,
 }
@@ -134,6 +135,7 @@ impl<S> TenantScopedStorage<S> {
         self.codec.tenant_id
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn make_key(&self, key: &[u8]) -> Vec<u8> {
         let prefix = self.codec.scan_prefix();
@@ -143,6 +145,7 @@ impl<S> TenantScopedStorage<S> {
         physical
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub(crate) fn strip_key(&self, key: Vec<u8>) -> Option<Vec<u8>> {
         let prefix = self.codec.scan_prefix();
@@ -153,6 +156,7 @@ impl<S> TenantScopedStorage<S> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn filter_strip_batch(&self, batch: Vec<(Vec<u8>, Vec<u8>)>) -> Vec<(Vec<u8>, Vec<u8>)> {
         let prefix = self.codec.scan_prefix();
         batch
@@ -168,6 +172,7 @@ impl<S> TenantScopedStorage<S> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
     let mut ub = prefix.to_vec();
     while let Some(last) = ub.pop() {
@@ -179,6 +184,7 @@ pub(crate) fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
     None
 }
 
+#[allow(dead_code)]
 pub(crate) fn bound_as_ref(bound: &Bound<Vec<u8>>) -> Bound<&[u8]> {
     match bound {
         Bound::Included(v) => Bound::Included(v.as_slice()),

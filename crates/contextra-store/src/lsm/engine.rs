@@ -338,10 +338,12 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn sstables_arc(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn block_cache(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
@@ -380,6 +382,7 @@ impl LsmStorage {
 
 
     /// Returns a snapshot of the active memtable and immutable memtables for scanner/purger introspection.
+    #[allow(dead_code)]
     pub(crate) async fn memtables_for_scanner(
         &self,
     ) -> (
@@ -394,6 +397,7 @@ impl LsmStorage {
     }
 
     /// Returns a snapshot of currently open SSTable readers.
+    #[allow(dead_code)]
     pub(crate) async fn sstables_for_scanner(&self) -> Vec<Arc<crate::sstable::SstableReader>> {
         self.sstables.read().await.clone()
     }

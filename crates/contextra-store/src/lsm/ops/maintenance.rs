@@ -19,6 +19,7 @@ pub(crate) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 }
 
 /// Fuehrt ein Rollback bis zu einer Ziel-Transaktions-ID durch.
+#[allow(dead_code)]
 pub(crate) async fn rollback_to_tx(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
     LsmStorage::rollback_to_tx(storage, tx_id).await
 }
