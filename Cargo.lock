@@ -1132,7 +1132,6 @@ dependencies = [
  "contextra-crypto",
  "contextra-env",
  "contextra-ports",
- "contextra-testkit",
  "contextra-types",
  "criterion",
  "lru",

@@ -58,13 +58,13 @@ pub trait OrphanCleanupIndex: Send + Sync {
 
 impl OrphanCleanupIndex for contextra_vector::hnsw::HnswIndex {
     fn check_connectivity(&self) -> contextra_types::Result<()> {
-        self.check_connectivity()
+        self.check_connectivity().map_err(Into::into)
     }
 
     fn rebuild(
         &self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = contextra_types::Result<()>> + Send + '_>>
     {
-        Box::pin(async move { self.rebuild() })
+        Box::pin(async move { self.rebuild().map_err(Into::into) })
     }
 }

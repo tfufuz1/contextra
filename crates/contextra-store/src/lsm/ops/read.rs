@@ -1,6 +1,11 @@
 //! # Lesepfad-Implementierung (Ring 1)
 //!
-//! Sucht Schluessel hierarchisch: Aktive MemTable -> Immutable MemTables -> L0..LN SSTables.
+//! ZWECK: Hierarchische Schluesselsuche: Aktive MemTable -> Immutable MemTables -> L0..LN SSTables (newest first).
+//! INVARIANTEN:
+//! - INV-STORE-4: Bit-63-Maskierung vor max_seq-Vergleichen (Tombstone-Bit `TOMBSTONE_BIT = 1 << 63`).
+//! - INV-STORE-5: Single-Load-Regel fuer konsistente Snapshot-Sequenznummern.
+//! - INV-MVCC-SSI-1: Clamping bei `snapshot_seq = u64::MAX` auf `storage.last_applied_seq`.
+//! LOCK-HIERARCHIE: Keine `parking_lot`-Locks ueber `.await`; state-ReadLock vor SSTable-Iteration.
 
 use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};

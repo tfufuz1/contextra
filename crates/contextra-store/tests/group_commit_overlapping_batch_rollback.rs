@@ -64,6 +64,7 @@ async fn test_overlapping_batch_rollback_does_not_truncate_durable_batch() {
     assert_eq!(storage.get(b"key3").await.unwrap(), None);
 
     // Drop and reopen storage to verify WAL durability and replay integrity
+    let _ = storage.close().await;
     drop(storage);
 
     let config_reopen = LsmConfig {

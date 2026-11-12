@@ -91,6 +91,8 @@ async fn test_commit_paths_equivalence_single_vs_group() {
     );
 
     // Verify persistence across restart
+    storage1.close().await.expect("close 1");
+    storage2.close().await.expect("close 2");
     drop(storage1);
     drop(storage2);
 

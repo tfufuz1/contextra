@@ -184,11 +184,7 @@ impl StorageEngine for LsmStorage {
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
         Box::pin(async move {
             let s = self.stats().await.map_err(|e| contextra_types::ContextraError::from(e))?;
-            Ok(StorageStats {
-                num_segments: s.num_segments,
-                total_size_bytes: s.total_size_bytes,
-                memtable_size_bytes: s.memtable_size_bytes,
-            })
+            Ok(s.into())
         })
     }
 
@@ -202,5 +198,25 @@ impl StorageEngine for LsmStorage {
         Box::pin(async move {
             self.last_tx_id().await.map_err(Into::into)
         })
+    }
+}
+
+impl From<crate::stats::StorageStats> for StorageStats {
+    fn from(s: crate::stats::StorageStats) -> Self {
+        Self {
+            num_segments: s.num_segments,
+            total_size_bytes: s.total_size_bytes,
+            memtable_size_bytes: s.memtable_size_bytes,
+        }
+    }
+}
+
+impl From<StorageStats> for crate::stats::StorageStats {
+    fn from(s: StorageStats) -> Self {
+        Self {
+            num_segments: s.num_segments,
+            total_size_bytes: s.total_size_bytes,
+            memtable_size_bytes: s.memtable_size_bytes,
+        }
     }
 }

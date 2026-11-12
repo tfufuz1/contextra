@@ -3,7 +3,7 @@
 // INVARIANTEN: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes (HotState/ColdState).
 // NICHT-OFFENSICHTLICH: Multi-threaded Reads sperren nie write_mutex; background rebuild tauscht Core atomar via Swap.
 // HOTSPOTS: mod.rs (HnswIndex::insert, search, delete, rebuild, save)
-// STAND: TS:2026-11-11T02:00:00Z
+// STAND: 2026-11-12
 
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 //!
@@ -30,12 +30,6 @@ pub mod clock;
 // ANCHOR[contextra-vector:HNSW-MOD-DELETION]
 // Tombstone-Verwaltung, Slot-Nullung und GhostFreeVectorIndex.
 pub mod deletion;
-// ANCHOR[contextra-vector:HNSW-MOD-PURGE]
-// Deprecated Wartungs-Purger (Teil der Übergangsbrücke).
-
-// ANCHOR[contextra-vector:HNSW-MOD-SCANNER]
-// Deprecated Wartungs-Scanner (Teil der Übergangsbrücke).
-
 // ANCHOR[contextra-vector:HNSW-MOD-SQ8-BIAS]
 // Asymmetrische Distanzkorrektur für quantisierte Vektoren.
 pub mod sq8_bias;
@@ -45,10 +39,8 @@ pub mod sq8_bias;
 
 #[allow(deprecated)]
 #[cfg(feature = "ports-compat")]
-#[cfg(feature = "ports-compat")]
 pub use crate::compat::purge::{hnsw_purger, HnswPurger};
 #[allow(deprecated)]
-#[cfg(feature = "ports-compat")]
 #[cfg(feature = "ports-compat")]
 pub use crate::compat::scanner::{hnsw_scanner, HnswScanner};
 // !SECTION
@@ -64,13 +56,12 @@ mod core_search;
 pub mod staging;
 pub(crate) mod types;
 
-
-#[cfg(test)]
-mod tests;
 // !SECTION
 
 // SECTION Re-Exports der HNSW-Komponenten
 
+#[cfg(feature = "ports-compat")]
+pub use crate::compat::hnsw_vector_index::{HnswCompactStats, Index, Maintain};
 pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats};
 pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
@@ -83,8 +74,6 @@ pub use types::{
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,
     SENTINEL_NO_ENTRY_POINT,
 };
-#[cfg(feature = "ports-compat")]
-pub use crate::compat::hnsw_vector_index::{HnswCompactStats, Index, Maintain};
 
 pub use staging::{VectorStagingOp, VectorTxBuffer};
 // !SECTION

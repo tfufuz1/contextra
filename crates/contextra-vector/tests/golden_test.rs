@@ -1,10 +1,11 @@
-use std::fs;
-use std::path::PathBuf;
 use contextra_ports::{Rng as PortsRng, VectorIndex};
-use contextra_types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_vector::distance::{compute_distance, validate_vector};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
+use contextra_vector::types::DistanceMetric;
+use std::fs;
+use std::path::PathBuf;
 
 #[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
@@ -18,7 +19,8 @@ fn golden_dir() -> PathBuf {
 fn deterministic_vector(doc_id: u64, dim: usize) -> Vec<f32> {
     let mut vec = Vec::with_capacity(dim);
     for i in 0..dim {
-        let angle = ((doc_id.wrapping_mul(31) + i as u64) % 1000) as f32 / 1000.0 * std::f32::consts::TAU;
+        let angle =
+            ((doc_id.wrapping_mul(31) + i as u64) % 1000) as f32 / 1000.0 * std::f32::consts::TAU;
         vec.push(angle.sin());
     }
     vec
@@ -89,12 +91,21 @@ async fn generate_golden_files() {
     let index_tombstones = HnswIndex::try_new(config_tombstones).unwrap();
     for id in 1..=20u64 {
         let v = deterministic_vector(id, dim);
-        index_tombstones.insert(tx, DocId::new(id), &v).await.unwrap();
+        index_tombstones
+            .insert(tx, DocId::new(id), &v)
+            .await
+            .unwrap();
     }
     index_tombstones.commit(tx).await.unwrap();
     let tx_del = TxId::new(2);
-    index_tombstones.delete(tx_del, DocId::new(5)).await.unwrap();
-    index_tombstones.delete(tx_del, DocId::new(15)).await.unwrap();
+    index_tombstones
+        .delete(tx_del, DocId::new(5))
+        .await
+        .unwrap();
+    index_tombstones
+        .delete(tx_del, DocId::new(15))
+        .await
+        .unwrap();
     index_tombstones.commit(tx_del).await.unwrap();
     let tombstones_file = dir.join("hnsw_tombstones.bin");
     index_tombstones.save(&tombstones_file).unwrap();
@@ -124,12 +135,19 @@ async fn generate_golden_files() {
 
     let query = deterministic_vector(999, dim);
     let results = index_raw.search(&query, 5).await.unwrap();
-    let ranking_data: Vec<(u64, f32)> = results.into_iter().map(|s| (s.doc_id.inner() as u64, s.score)).collect();
+    let ranking_data: Vec<(u64, f32)> = results
+        .into_iter()
+        .map(|s| (s.doc_id.inner() as u64, s.score))
+        .collect();
     let ranking_json = serde_json::to_string_pretty(&ranking_data).unwrap();
     fs::write(dir.join("ranking_golden.json"), ranking_json).unwrap();
 
     let dims = [4, 17, 128, 768];
-    let metrics = [DistanceMetric::Cosine, DistanceMetric::Euclidean, DistanceMetric::DotProduct];
+    let metrics = [
+        DistanceMetric::Cosine,
+        DistanceMetric::Euclidean,
+        DistanceMetric::DotProduct,
+    ];
     let mut oracle_entries = Vec::new();
 
     for &d in &dims {
@@ -200,7 +218,10 @@ async fn generate_golden_files() {
         diskann.build(&vecs, &ids).await.unwrap();
 
         let p_vec = deterministic_vector(21, dim);
-        diskann.insert(TxId::new(10), DocId::new(21), &p_vec).await.unwrap();
+        diskann
+            .insert(TxId::new(10), DocId::new(21), &p_vec)
+            .await
+            .unwrap();
         diskann.delete(TxId::new(10), DocId::new(5)).await.unwrap();
     }
 }
@@ -211,8 +232,16 @@ async fn test_golden_hnsw_persistence() {
     let raw_file = dir.join("hnsw_raw.bin");
     let sq8_file = dir.join("hnsw_sq8.bin");
 
-    assert!(raw_file.exists(), "Raw golden file must exist: {:?}", raw_file);
-    assert!(sq8_file.exists(), "SQ8 golden file must exist: {:?}", sq8_file);
+    assert!(
+        raw_file.exists(),
+        "Raw golden file must exist: {:?}",
+        raw_file
+    );
+    assert!(
+        sq8_file.exists(),
+        "SQ8 golden file must exist: {:?}",
+        sq8_file
+    );
 
     let mmap_raw = MmapIndex::open(&raw_file).expect("open raw golden");
     assert_eq!(mmap_raw.header.node_count(), 20);
@@ -242,7 +271,8 @@ async fn test_golden_level_rng_determinism() {
     let level_path = dir.join("level_rng_golden.json");
     if level_path.exists() {
         let content = fs::read_to_string(level_path).expect("read level golden");
-        let entries: Vec<serde_json::Value> = serde_json::from_str(&content).expect("parse level golden");
+        let entries: Vec<serde_json::Value> =
+            serde_json::from_str(&content).expect("parse level golden");
         for entry in entries {
             let seed = entry["seed"].as_u64().unwrap();
             let expected_layers: Vec<usize> = entry["layers"]
@@ -272,9 +302,16 @@ async fn test_golden_diskann_persistence() {
     let diskann_file = dir.join("diskann.dann");
     if diskann_file.exists() {
         let bytes = fs::read(&diskann_file).expect("read diskann golden");
-        assert!(bytes.len() >= 40 + 36, "DiskANN file must have at least header + footer");
+        assert!(
+            bytes.len() >= 40 + 36,
+            "DiskANN file must have at least header + footer"
+        );
         assert_eq!(&bytes[0..4], b"DANN", "Invalid DISKANN magic");
-        assert_eq!(&bytes[bytes.len() - 36..bytes.len() - 32], b"DANF", "Invalid DISKANN footer magic");
+        assert_eq!(
+            &bytes[bytes.len() - 36..bytes.len() - 32],
+            b"DANF",
+            "Invalid DISKANN footer magic"
+        );
     }
 }
 
@@ -288,7 +325,8 @@ async fn test_golden_ranking_and_oracle() {
     assert!(oracle_path.exists());
 
     let ranking_str = fs::read_to_string(ranking_path).expect("read ranking");
-    let expected_ranking: Vec<(u64, f32)> = serde_json::from_str(&ranking_str).expect("parse ranking");
+    let expected_ranking: Vec<(u64, f32)> =
+        serde_json::from_str(&ranking_str).expect("parse ranking");
 
     let dim = 16;
     let config_raw = HnswConfig {
@@ -311,17 +349,29 @@ async fn test_golden_ranking_and_oracle() {
     index_raw.commit(tx).await.unwrap();
 
     let query = deterministic_vector(999, dim);
-    let results = index_raw.search(&query, expected_ranking.len()).await.unwrap();
-    let actual_ranking: Vec<(u64, f32)> = results.into_iter().map(|s| (s.doc_id.inner() as u64, s.score)).collect();
+    let results = index_raw
+        .search(&query, expected_ranking.len())
+        .await
+        .unwrap();
+    let actual_ranking: Vec<(u64, f32)> = results
+        .into_iter()
+        .map(|s| (s.doc_id.inner() as u64, s.score))
+        .collect();
 
     assert_eq!(actual_ranking.len(), expected_ranking.len());
     for (act, exp) in actual_ranking.iter().zip(expected_ranking.iter()) {
         assert_eq!(act.0, exp.0, "DocId mismatch in ranking");
-        assert!((act.1 - exp.1).abs() < 1e-6, "Score mismatch: {} vs {}", act.1, exp.1);
+        assert!(
+            (act.1 - exp.1).abs() < 1e-6,
+            "Score mismatch: {} vs {}",
+            act.1,
+            exp.1
+        );
     }
 
     let oracle_str = fs::read_to_string(oracle_path).expect("read oracle");
-    let oracle_entries: Vec<serde_json::Value> = serde_json::from_str(&oracle_str).expect("parse oracle");
+    let oracle_entries: Vec<serde_json::Value> =
+        serde_json::from_str(&oracle_str).expect("parse oracle");
     for entry in oracle_entries {
         let d = entry["dim"].as_u64().unwrap() as usize;
         let metric_str = entry["metric"].as_str().unwrap();

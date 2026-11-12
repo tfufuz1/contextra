@@ -3,8 +3,8 @@
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
-use crate::ComputePool;
 use crate::types::{DistanceMetric, DocId};
+use crate::ComputePool;
 use std::path::PathBuf;
 
 /// Fallback behavior policy when DiskANN loading, integrity checks, or reads fail.

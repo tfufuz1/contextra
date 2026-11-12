@@ -1,7 +1,7 @@
 //! Konfiguration des Write-Ahead-Logs.
 
 use super::flusher::WalFlusherConfig;
-use super::replay::WalVersion;
+use super::encode::WalVersion;
 use contextra_crypto::crypto::KeyManager;
 use std::sync::Arc;
 

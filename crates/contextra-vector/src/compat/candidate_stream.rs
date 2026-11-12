@@ -5,9 +5,9 @@
 
 use crate::types::{DocId, ScoredDocument, MAX_SEARCH_K};
 use crate::error::Result;
-#[cfg(feature = "ports-compat")]
+#[cfg(any(feature = "ports-compat", feature = "workspace"))]
 use contextra_ports::VectorIndex;
-#[cfg(not(feature = "ports-compat"))]
+#[cfg(not(any(feature = "ports-compat", feature = "workspace")))]
 pub trait VectorIndex: Send + Sync {}
 use std::collections::{BTreeSet, VecDeque};
 

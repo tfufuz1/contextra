@@ -2,6 +2,9 @@
 //!
 //! Implementiert [`LsmStorage`] als zentrale Fassade fuer alle Speicheroperationen.
 
+
+pub mod facade;
+pub mod migration;
 use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
@@ -335,10 +338,12 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn sstables_arc(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn block_cache(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
@@ -375,143 +380,9 @@ impl LsmStorage {
             .await
     }
 
-    /// Checks if a database directory contains any legacy WAL files requiring explicit migration.
-    ///
-    /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
-    /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
-    /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
-    pub async fn has_pending_legacy_wal_migration_path(path: &std::path::Path) -> Result<bool> {
-        let mut entries = match tokio::fs::read_dir(path).await {
-            Ok(entries) => entries,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(e) => {
-                return Err(crate::error::StoreError::Storage(format!(
-                    "Failed to read directory for legacy WAL check: {e}"
-                )).into())
-            }
-        };
-
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            crate::error::StoreError::Storage(format!(
-                "Failed to read directory entry for legacy WAL check: {e}"
-            ))
-        })? {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            let is_wal_file = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
-                || name_str == "wal.log"
-                || name_str.ends_with(".wal");
-
-            if is_wal_file {
-                let file_path = entry.path();
-                if !Wal::has_migration_marker(&file_path).await {
-                    let test_wal = Wal::open_read_only_with_config(
-                        &file_path,
-                        crate::wal::WalConfig {
-                            allow_legacy_integrity_key_fallback: true,
-                            min_wal_version: crate::wal::WalVersion::V1,
-                            ..Default::default()
-                        },
-                    )
-                    .await?;
-
-                    let _ = test_wal.replay().await?;
-                    if test_wal.legacy_key_used_for_test() {
-                        return Ok(true);
-                    }
-                }
-            }
-        }
-
-        Ok(false)
-    }
-
-    /// Checks if the current storage instance's data directory contains any pending legacy WAL files.
-    ///
-    /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
-    /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
-    /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
-    pub async fn has_pending_legacy_wal_migration(&self) -> Result<bool> {
-        Self::has_pending_legacy_wal_migration_path(&self.config.path).await
-    }
-
-    /// Explicitly migrates all legacy WAL files in the specified directory using the provided clock port.
-    ///
-    /// Returns the number of migrated WAL files.
-    ///
-    /// Dies ist der Migrationsmechanismus vor der endgültigen Entfernung des Legacy-Fallbacks
-    /// (v17 Teil 4.1, Ziel P1). Die Entfernung selbst erfolgt in einem separaten PR, erst
-    /// nachdem bestätigt ist, dass keine produktiven Alt-WAL-Dateien mehr existieren.
-    pub async fn migrate_legacy_wal_keys(
-        config: &LsmConfig,
-        clock: Arc<dyn contextra_env::Clock>,
-    ) -> Result<usize> {
-        let mut entries = match tokio::fs::read_dir(&config.path).await {
-            Ok(entries) => entries,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
-            Err(e) => {
-                return Err(crate::error::StoreError::Storage(format!(
-                    "Failed to read directory for legacy WAL migration: {e}"
-                )).into())
-            }
-        };
-
-        let salt_path = config.path.join("SALT");
-        if !salt_path.exists() {
-            let buf = crate::lsm::recovery::generate_crypto_salt()?;
-            crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;
-        }
-
-        let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
-            crate::error::StoreError::Storage(format!(
-                "SALT file read failed during migration: {e}"
-            ))
-        })?;
-
-        let key_manager = if let Some(passphrase) = &config.encryption_passphrase {
-            Some(Arc::new(crate::wal::KeyManager::try_new(
-                passphrase, &salt,
-            )?))
-        } else {
-            None
-        };
-
-        let mut migrated_count = 0usize;
-
-        while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            crate::error::StoreError::Storage(format!(
-                "Failed to read directory entry for legacy WAL migration: {e}"
-            ))
-        })? {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            let is_wal_file = (name_str.starts_with("wal-") && name_str.ends_with(".log"))
-                || name_str == "wal.log"
-                || name_str.ends_with(".wal");
-
-            if is_wal_file {
-                let file_path = entry.path();
-                if !Wal::has_migration_marker(&file_path).await {
-                    let wal =
-                        Wal::open_for_legacy_migration(&file_path, key_manager.clone()).await?;
-
-                    if wal.was_legacy_rekeyed() {
-                        let timestamp_nanos = clock.now_unix_nanos();
-                        tracing::info!(
-                            wal_path = %file_path.display(),
-                            timestamp_nanos = timestamp_nanos,
-                            "Legacy WAL key migration executed for segment"
-                        );
-                        migrated_count += 1;
-                    }
-                }
-            }
-        }
-
-        Ok(migrated_count)
-    }
 
     /// Returns a snapshot of the active memtable and immutable memtables for scanner/purger introspection.
+    #[allow(dead_code)]
     pub(crate) async fn memtables_for_scanner(
         &self,
     ) -> (
@@ -526,6 +397,7 @@ impl LsmStorage {
     }
 
     /// Returns a snapshot of currently open SSTable readers.
+    #[allow(dead_code)]
     pub(crate) async fn sstables_for_scanner(&self) -> Vec<Arc<crate::sstable::SstableReader>> {
         self.sstables.read().await.clone()
     }
@@ -560,86 +432,3 @@ impl LsmStorage {
 }
 
 
-impl LsmStorage {
-    /// Inherent read operations for standalone usage.
-    pub async fn get<'a>(&'a self, key: &'a [u8]) -> Result<Option<bytes::Bytes>> {
-        crate::lsm::ops::read::get(self, key).await
-    }
-
-    pub async fn get_at_seq<'a>(&'a self, key: &'a [u8], seq_no: u64) -> Result<Option<bytes::Bytes>> {
-        crate::lsm::ops::read::get_at_seq(self, key, seq_no).await
-    }
-
-    pub async fn scan_prefix<'a>(&'a self, prefix: &'a [u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        crate::lsm::ops::read::scan_prefix(self, prefix).await
-    }
-
-    pub async fn scan_prefix_bounded<'a>(&'a self, prefix: &'a [u8], limit: usize, cursor: Option<&'a [u8]>) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
-        crate::lsm::ops::read::scan_prefix_bounded(self, prefix, limit, cursor).await
-    }
-
-    pub async fn scan_prefix_at<'a>(&'a self, prefix: &'a [u8], seq_no: u64) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        crate::lsm::ops::read::scan_prefix_at(self, prefix, seq_no).await
-    }
-
-    pub async fn scan_bounded<'a>(&'a self, start: std::ops::Bound<&'a [u8]>, end: std::ops::Bound<&'a [u8]>, limit: usize, cursor: Option<&'a [u8]>) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
-        crate::lsm::ops::read::scan_bounded(self, start, end, limit, cursor).await
-    }
-
-    pub async fn scan<'a>(&'a self, start: std::ops::Bound<&'a [u8]>, end: std::ops::Bound<&'a [u8]>, limit: Option<usize>) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        crate::lsm::ops::read::scan(self, start, end, limit).await
-    }
-
-    /// Inherent write and maintenance operations.
-    pub async fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> Result<()> {
-        crate::lsm::ops::write::put(self, tx_id, key, value).await
-    }
-
-    pub async fn put_if_absent<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> Result<bool> {
-        crate::lsm::ops::write::put_if_absent(self, tx_id, key, value).await
-    }
-
-    pub async fn delete_many<'a>(&'a self, tx_id: TxId, keys: Vec<Vec<u8>>) -> Result<u64> {
-        crate::lsm::ops::write::delete_many(self, tx_id, keys).await
-    }
-
-    pub async fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> Result<u64> {
-        crate::lsm::ops::write::delete_prefix(self, tx_id, prefix).await
-    }
-
-    pub async fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> Result<()> {
-        crate::lsm::ops::write::delete(self, tx_id, key).await
-    }
-
-    pub async fn commit<'a>(&'a self, tx_id: TxId) -> Result<()> {
-        crate::lsm::ops::write::commit(self, tx_id).await
-    }
-
-    pub async fn rollback<'a>(&'a self, tx_id: TxId) -> Result<()> {
-        crate::lsm::ops::maintenance::rollback(self, tx_id).await
-    }
-
-    pub async fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> Result<()> {
-        crate::lsm::ops::maintenance::pin_checkpoint(self, seq_no).await
-    }
-
-    pub async fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> Result<()> {
-        crate::lsm::ops::maintenance::unpin_checkpoint(self, seq_no).await
-    }
-
-    pub async fn flush<'a>(&'a self) -> Result<()> {
-        crate::lsm::ops::compaction::flush(self).await
-    }
-
-    pub async fn stats<'a>(&'a self) -> Result<crate::stats::StorageStats> {
-        crate::lsm::ops::maintenance::stats(self).await
-    }
-
-    pub async fn last_seq_no<'a>(&'a self) -> Result<u64> {
-        crate::lsm::ops::maintenance::last_seq_no(self).await
-    }
-
-    pub async fn last_tx_id<'a>(&'a self) -> Result<TxId> {
-        crate::lsm::ops::maintenance::last_tx_id(self).await
-    }
-}

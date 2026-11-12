@@ -1,8 +1,9 @@
 // FILE-CONTEXT
 // ZWECK: mmap-basiertes Lesen für HNSW Vektor-Indizes.
-// INVARIANTEN: Zero-Panic bei Deserialisierung; mmap-Reads überleben POSIX file replace.
+// INVARIANTEN: Zero-Panic bei Deserialisierung; checked Arithmetik gegen Overflow und OOB; fail-closed.
 // NICHT-OFFENSICHTLICH: MmapIndex hält read-only FD; Schreibvorgänge laufen atomar über .tmp und Rename.
-// HOTSPOTS: persistence/mmap.rs (MmapIndex::open)
+// HOTSPOTS: persistence/mmap.rs (MmapIndex::open, get_node_record, get_vector, get_connections)
+// STAND: TS:2026-11-12T00:00:00Z
 
 use super::{HnswHeader, NodeRecord};
 use crate::error::{Result, VectorError};
@@ -16,9 +17,10 @@ pub struct MmapIndex {
 }
 
 impl MmapIndex {
+    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
-        let file = std::fs::File::open(&path_buf)
+        let file = crate::persistence::io::open_readonly(&path_buf)
             .map_err(|e| VectorError::Storage(format!("Failed to open HNSW file: {}", e)))?;
 
         let mmap = contextra_sys::mmap_readonly(&file)
@@ -37,19 +39,37 @@ impl MmapIndex {
             path: Some(path_buf),
         };
 
+        let file_len = index_obj.mmap.len();
+
         if index_obj.header.node_count() > 0 {
-            let expected_nodes_bytes = (index_obj.header.node_count() as usize)
+            let node_count = usize::try_from(index_obj.header.node_count())
+                .map_err(|_| VectorError::Storage("Node count exceeds address space".into()))?;
+            let nodes_offset = usize::try_from(index_obj.header.nodes_offset())
+                .map_err(|_| VectorError::Storage("nodes_offset exceeds address space".into()))?;
+            let connections_offset = usize::try_from(index_obj.header.connections_offset())
+                .map_err(|_| {
+                    VectorError::Storage("connections_offset exceeds address space".into())
+                })?;
+
+            // File darf nicht kuerzer sein als die Verbindungsdaten
+            if file_len < connections_offset {
+                return Err(VectorError::Storage(format!(
+                    "HNSW file truncated: file len is {}, but connections start at {}",
+                    file_len, connections_offset
+                )));
+            }
+
+            let expected_nodes_bytes = node_count
                 .checked_mul(NodeRecord::SIZE)
-                .ok_or_else(|| {
-                    VectorError::Storage("Node records total size overflow".into())
-                })?;
-            let actual_nodes_bytes = (index_obj.header.connections_offset() as usize)
-                .checked_sub(index_obj.header.nodes_offset() as usize)
-                .ok_or_else(|| {
-                    VectorError::Storage(
-                        "Invalid nodes_offset / connections_offset relative position".into(),
-                    )
-                })?;
+                .ok_or_else(|| VectorError::Storage("Node records total size overflow".into()))?;
+            let actual_nodes_bytes =
+                connections_offset
+                    .checked_sub(nodes_offset)
+                    .ok_or_else(|| {
+                        VectorError::Storage(
+                            "Invalid nodes_offset / connections_offset relative position".into(),
+                        )
+                    })?;
             if actual_nodes_bytes < expected_nodes_bytes {
                 return Err(VectorError::Storage(format!(
                     "NodeRecord size mismatch / DocId bit-width mismatch: expected at least {} bytes for {} nodes ({} bytes per record), found {} bytes between nodes_offset and connections_offset",
@@ -62,9 +82,7 @@ impl MmapIndex {
 
             if index_obj.header.version() == 2 {
                 let rec0 = index_obj.get_node_record(0)?;
-                let expected_vector_offset = index_obj
-                    .header
-                    .nodes_offset()
+                let expected_vector_offset = (index_obj.header.nodes_offset())
                     .checked_add(
                         index_obj
                             .header
@@ -81,6 +99,30 @@ impl MmapIndex {
                         rec0.vector_offset, expected_vector_offset
                     )));
                 }
+
+                if index_obj.header.quant_calibration_offset() > 0 {
+                    let cal_off = usize::try_from(index_obj.header.quant_calibration_offset())
+                        .map_err(|_| {
+                            VectorError::Storage(
+                                "quant_calibration_offset exceeds address space".into(),
+                            )
+                        })?;
+                    let cal_len = usize::try_from(index_obj.header.quant_calibration_len())
+                        .map_err(|_| {
+                            VectorError::Storage(
+                                "quant_calibration_len exceeds address space".into(),
+                            )
+                        })?;
+                    let cal_end = cal_off.checked_add(cal_len).ok_or_else(|| {
+                        VectorError::Storage("Calibration segment overflow".into())
+                    })?;
+                    if file_len < cal_end {
+                        return Err(VectorError::Storage(format!(
+                            "HNSW file truncated: file len is {}, but calibration ends at {}",
+                            file_len, cal_end
+                        )));
+                    }
+                }
             }
         }
 
@@ -88,6 +130,7 @@ impl MmapIndex {
     }
 
     /// Opens an HNSW file without requiring external runtime blocking task spawns.
+    #[cfg(any(feature = "mmap", feature = "workspace"))]
     pub async fn open_async(path: impl AsRef<std::path::Path> + Send) -> Result<Self> {
         Self::open(path)
     }
@@ -96,7 +139,8 @@ impl MmapIndex {
         let byte_offset = index
             .checked_mul(NodeRecord::SIZE)
             .ok_or_else(|| VectorError::Storage("Node index overflow in mmap".into()))?;
-        let nodes_offset = self.header.nodes_offset() as usize;
+        let nodes_offset = usize::try_from(self.header.nodes_offset())
+            .map_err(|_| VectorError::Storage("nodes_offset exceeds address space".into()))?;
         let offset = nodes_offset
             .checked_add(byte_offset)
             .ok_or_else(|| VectorError::Storage("Node record offset overflow in mmap".into()))?;
@@ -111,14 +155,16 @@ impl MmapIndex {
     }
 
     pub fn get_vector(&self, record: &NodeRecord) -> Result<&[u8]> {
-        let dim = self.header.dimension() as usize;
+        let dim = usize::try_from(self.header.dimension())
+            .map_err(|_| VectorError::Storage("dimension exceeds address space".into()))?;
         let size = if self.header.is_quantized() {
             dim
         } else {
             dim.checked_mul(4)
                 .ok_or_else(|| VectorError::Storage("Vector size overflow in mmap".into()))?
         };
-        let offset = record.vector_offset as usize;
+        let offset = usize::try_from(record.vector_offset())
+            .map_err(|_| VectorError::Storage("vector_offset exceeds address space".into()))?;
         let vector_end = offset
             .checked_add(size)
             .ok_or_else(|| VectorError::Storage("Vector offset overflow in mmap".into()))?;
@@ -130,7 +176,8 @@ impl MmapIndex {
     }
 
     pub fn get_connections(&self, record: &NodeRecord, layer: usize) -> Result<Vec<u32>> {
-        let offset = record.connections_offset as usize;
+        let offset = usize::try_from(record.connections_offset())
+            .map_err(|_| VectorError::Storage("connections_offset exceeds address space".into()))?;
         let num_layers_byte = *self
             .mmap
             .get(offset)
@@ -152,11 +199,14 @@ impl MmapIndex {
                 .mmap
                 .get(current_pos..check_pos)
                 .ok_or_else(|| VectorError::Storage("Connection length out of bounds".into()))?;
-            let len = u32::from_le_bytes(
+            let len_u32 = u32::from_le_bytes(
                 len_bytes
                     .try_into()
                     .map_err(|_| VectorError::Storage("Corrupt connection length".into()))?,
-            ) as usize;
+            );
+            let len = usize::try_from(len_u32).map_err(|_| {
+                VectorError::Storage("Connection length exceeds address space".into())
+            })?;
 
             let connections_byte_size = len.checked_mul(4).ok_or_else(|| {
                 VectorError::Storage("Connection count overflow in node record".into())
@@ -178,11 +228,13 @@ impl MmapIndex {
             .get(current_pos..check_pos)
             .ok_or_else(|| VectorError::Storage("Connection length out of bounds".into()))?;
 
-        let len = u32::from_le_bytes(
+        let len_u32 = u32::from_le_bytes(
             len_bytes
                 .try_into()
                 .map_err(|_| VectorError::Storage("Corrupt connection length".into()))?,
-        ) as usize;
+        );
+        let len = usize::try_from(len_u32)
+            .map_err(|_| VectorError::Storage("Connection length exceeds address space".into()))?;
 
         let connections_byte_size = len.checked_mul(4).ok_or_else(|| {
             VectorError::Storage("Connection count overflow in node record".into())

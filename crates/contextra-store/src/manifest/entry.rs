@@ -10,8 +10,8 @@
 // FORMATABKÜNDIGUNG (S-01 / T-04): Der Schreibpfad schreibt kein rank mehr in Replace-Einträge (schreibt stets 0u64 für binäre Nutzlastkompatibilität).
 // Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.
 
-use crate::error::{StoreError, StoreResult};
 use crate::error::StoreResult as Result;
+use crate::error::{StoreError, StoreResult};
 use std::path::PathBuf;
 
 use super::MAX_MANIFEST_ENTRY_SIZE;
@@ -117,14 +117,12 @@ impl ManifestEntry {
     #[deny(clippy::indexing_slicing)]
     pub fn from_bytes(data: &[u8]) -> StoreResult<Self> {
         if data.len() < 5 {
-            return Err(StoreError::Serialization(
-                "Manifest entry too short".into(),
-            ));
+            return Err(StoreError::Serialization("Manifest entry too short".into()));
         }
 
-        let stored_crc_bytes = data.get(0..4).ok_or_else(|| {
-            StoreError::Serialization("Failed to read stored CRC bytes".into())
-        })?;
+        let stored_crc_bytes = data
+            .get(0..4)
+            .ok_or_else(|| StoreError::Serialization("Failed to read stored CRC bytes".into()))?;
         let stored_crc = u32::from_le_bytes(
             stored_crc_bytes
                 .try_into()
@@ -145,32 +143,32 @@ impl ManifestEntry {
         let op_tag = *payload
             .first()
             .ok_or_else(|| StoreError::Serialization("Failed to read op_tag".into()))?;
-        let remaining = payload.get(1..).ok_or_else(|| {
-            StoreError::Serialization("Failed to read remaining payload".into())
-        })?;
+        let remaining = payload
+            .get(1..)
+            .ok_or_else(|| StoreError::Serialization("Failed to read remaining payload".into()))?;
 
         match op_tag {
             0 => {
                 // Add
                 if remaining.len() < 12 {
-                    return Err(StoreError::Serialization(
-                        "Add payload too short".into(),
-                    ));
+                    return Err(StoreError::Serialization("Add payload too short".into()));
                 }
-                let max_tx_bytes = remaining.get(0..8).ok_or_else(|| {
-                    StoreError::Serialization("Add max_tx bytes missing".into())
-                })?;
-                let max_tx =
-                    u64::from_le_bytes(max_tx_bytes.try_into().map_err(|_| {
-                        StoreError::Serialization("Invalid max_tx format".into())
-                    })?);
+                let max_tx_bytes = remaining
+                    .get(0..8)
+                    .ok_or_else(|| StoreError::Serialization("Add max_tx bytes missing".into()))?;
+                let max_tx = u64::from_le_bytes(
+                    max_tx_bytes
+                        .try_into()
+                        .map_err(|_| StoreError::Serialization("Invalid max_tx format".into()))?,
+                );
                 let path_len_bytes = remaining.get(8..12).ok_or_else(|| {
                     StoreError::Serialization("Add path_len bytes missing".into())
                 })?;
-                let path_len =
-                    u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
-                        StoreError::Serialization("Invalid path_len format".into())
-                    })?) as usize;
+                let path_len = u32::from_le_bytes(
+                    path_len_bytes
+                        .try_into()
+                        .map_err(|_| StoreError::Serialization("Invalid path_len format".into()))?,
+                ) as usize;
                 let expected_len = 12 + path_len;
                 if remaining.len() != expected_len {
                     return Err(StoreError::Serialization(format!(
@@ -179,12 +177,11 @@ impl ManifestEntry {
                         remaining.len()
                     )));
                 }
-                let path_bytes = remaining.get(12..12 + path_len).ok_or_else(|| {
-                    StoreError::Serialization("Add path bytes missing".into())
-                })?;
-                let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
-                    StoreError::Serialization(format!("Invalid path UTF-8: {}", e))
-                })?;
+                let path_bytes = remaining
+                    .get(12..12 + path_len)
+                    .ok_or_else(|| StoreError::Serialization("Add path bytes missing".into()))?;
+                let path_str = std::str::from_utf8(path_bytes)
+                    .map_err(|e| StoreError::Serialization(format!("Invalid path UTF-8: {}", e)))?;
                 Ok(ManifestEntry::Add {
                     path: PathBuf::from(path_str),
                     max_tx,
@@ -193,17 +190,16 @@ impl ManifestEntry {
             1 => {
                 // Remove
                 if remaining.len() < 4 {
-                    return Err(StoreError::Serialization(
-                        "Remove payload too short".into(),
-                    ));
+                    return Err(StoreError::Serialization("Remove payload too short".into()));
                 }
                 let path_len_bytes = remaining.get(0..4).ok_or_else(|| {
                     StoreError::Serialization("Remove path_len bytes missing".into())
                 })?;
-                let path_len =
-                    u32::from_le_bytes(path_len_bytes.try_into().map_err(|_| {
-                        StoreError::Serialization("Invalid path_len format".into())
-                    })?) as usize;
+                let path_len = u32::from_le_bytes(
+                    path_len_bytes
+                        .try_into()
+                        .map_err(|_| StoreError::Serialization("Invalid path_len format".into()))?,
+                ) as usize;
                 let expected_len = 4 + path_len;
                 if remaining.len() != expected_len {
                     return Err(StoreError::Serialization(format!(
@@ -212,12 +208,11 @@ impl ManifestEntry {
                         remaining.len()
                     )));
                 }
-                let path_bytes = remaining.get(4..4 + path_len).ok_or_else(|| {
-                    StoreError::Serialization("Remove path bytes missing".into())
-                })?;
-                let path_str = std::str::from_utf8(path_bytes).map_err(|e| {
-                    StoreError::Serialization(format!("Invalid path UTF-8: {}", e))
-                })?;
+                let path_bytes = remaining
+                    .get(4..4 + path_len)
+                    .ok_or_else(|| StoreError::Serialization("Remove path bytes missing".into()))?;
+                let path_str = std::str::from_utf8(path_bytes)
+                    .map_err(|e| StoreError::Serialization(format!("Invalid path UTF-8: {}", e)))?;
                 Ok(ManifestEntry::Remove {
                     path: PathBuf::from(path_str),
                 })
@@ -230,12 +225,13 @@ impl ManifestEntry {
                         remaining.len()
                     )));
                 }
-                let target_tx_bytes = remaining.get(0..8).ok_or_else(|| {
-                    StoreError::Serialization("target_tx bytes missing".into())
-                })?;
-                let target_tx = u64::from_le_bytes(target_tx_bytes.try_into().map_err(|_| {
-                    StoreError::Serialization("Invalid target_tx format".into())
-                })?);
+                let target_tx_bytes = remaining
+                    .get(0..8)
+                    .ok_or_else(|| StoreError::Serialization("target_tx bytes missing".into()))?;
+                let target_tx =
+                    u64::from_le_bytes(target_tx_bytes.try_into().map_err(|_| {
+                        StoreError::Serialization("Invalid target_tx format".into())
+                    })?);
                 Ok(ManifestEntry::RollbackComplete { target_tx })
             }
             3 => {
@@ -255,10 +251,11 @@ impl ManifestEntry {
                 let rank_bytes = remaining
                     .get(8..16)
                     .ok_or_else(|| StoreError::Serialization("rank bytes missing".into()))?;
-                let rank =
-                    u64::from_le_bytes(rank_bytes.try_into().map_err(|_| {
-                        StoreError::Serialization("Invalid rank format".into())
-                    })?);
+                let rank = u64::from_le_bytes(
+                    rank_bytes
+                        .try_into()
+                        .map_err(|_| StoreError::Serialization("Invalid rank format".into()))?,
+                );
                 let added_path_len_bytes = remaining.get(16..20).ok_or_else(|| {
                     StoreError::Serialization("added_path_len bytes missing".into())
                 })?;
@@ -272,12 +269,9 @@ impl ManifestEntry {
                         "Replace added path data truncated".into(),
                     ));
                 }
-                let added_path_bytes =
-                    remaining
-                        .get(offset..offset + added_path_len)
-                        .ok_or_else(|| {
-                            StoreError::Serialization("added_path bytes missing".into())
-                        })?;
+                let added_path_bytes = remaining
+                    .get(offset..offset + added_path_len)
+                    .ok_or_else(|| StoreError::Serialization("added_path bytes missing".into()))?;
                 let added_str = std::str::from_utf8(added_path_bytes).map_err(|e| {
                     StoreError::Serialization(format!("Invalid added path UTF-8: {}", e))
                 })?;
@@ -313,21 +307,22 @@ impl ManifestEntry {
                             "Replace removed path length truncated".into(),
                         ));
                     }
-                    let r_len_bytes = remaining.get(offset..offset + 4).ok_or_else(|| {
-                        StoreError::Serialization("r_len bytes missing".into())
-                    })?;
-                    let r_len = u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
-                        StoreError::Serialization("Invalid r_len format".into())
-                    })?) as usize;
+                    let r_len_bytes = remaining
+                        .get(offset..offset + 4)
+                        .ok_or_else(|| StoreError::Serialization("r_len bytes missing".into()))?;
+                    let r_len =
+                        u32::from_le_bytes(r_len_bytes.try_into().map_err(|_| {
+                            StoreError::Serialization("Invalid r_len format".into())
+                        })?) as usize;
                     offset += 4;
                     if remaining.len() < offset + r_len {
                         return Err(StoreError::Serialization(
                             "Replace removed path data truncated".into(),
                         ));
                     }
-                    let r_bytes = remaining.get(offset..offset + r_len).ok_or_else(|| {
-                        StoreError::Serialization("r_path bytes missing".into())
-                    })?;
+                    let r_bytes = remaining
+                        .get(offset..offset + r_len)
+                        .ok_or_else(|| StoreError::Serialization("r_path bytes missing".into()))?;
                     let r_str = std::str::from_utf8(r_bytes).map_err(|e| {
                         StoreError::Serialization(format!("Invalid removed path UTF-8: {}", e))
                     })?;

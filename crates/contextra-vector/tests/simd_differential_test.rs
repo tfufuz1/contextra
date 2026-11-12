@@ -1,3 +1,8 @@
+// FILE-CONTEXT
+// ZWECK: Differenzieller Test zwischen SIMD- und Skalar-Kernen für AVX2/NEON/Fallback.
+// INVARIANTEN: Bit-Identität bzw. Differenz <= 1e-5 für alle Metriken.
+// HOTSPOTS: 15-55
+// STAND: 2026-11-12
 use contextra_vector::distance::{compute_distance, ScalarKernel, DistanceKernel};
 use contextra_types::DistanceMetric;
 

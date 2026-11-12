@@ -1,5 +1,11 @@
 //! # Sperrenregister & Rangbasierte Lock-Hierarchie (Ring 1)
 //!
+//! // FILE-CONTEXT
+//! // STAND: 2026-11-11
+//! // ZWECK: Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher
+//! // INVARIANTEN: INV-LOCK-ORDER-1, SPEC §3.5, SPEC §5.4, MV-08
+//! // HOTSPOTS: commit_mutex, wal.truncate_lock, state, memtable.shards
+//!
 //! Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher gemäß
 //! SPEC §3.5, SPEC §5.4, MV-08 und Invariante `INV-LOCK-ORDER-1`:
 //!
@@ -17,6 +23,12 @@
 //! Speicherebene (sstables-RwLock)
 //!       ↓
 //! MemTable-Shards (parking_lot::RwLock)
+//!       ↓
+//! Manifest-Mutex (Manifest::file)
+//!       ↓
+//! Observer-Registry (ObserverRegistry::observers)
+//!       ↓
+//! Block-Cache (SieveCacheBackend::state)
 //! ```
 //!
 //! Jede Verletzung dieser Reihenfolge führt zu deterministischen Verklemmungen (Deadlocks).
@@ -42,6 +54,9 @@
 //! 2. **Tokio-Guards mit Zeitschranke:**
 //!    Asynchrone `tokio::sync`-Guards dürfen nur gehalten werden, solange strikte Deadlock-Freiheit
 //!    durch Einhaltung obiger Rangordnung sichergestellt ist.
+//! 3. **Lock-Handoff-Invariante (ADR-0XX-P0A):**
+//!    Beim Group-Commit wird `wal.truncate_lock` akquiriert, BEVOR `commit_mutex` freigegeben wird.
+//!    Dadurch wird verhindert, dass parallele Commits oder Truncates interleaven.
 
 /// Rang 100: Transaktionale Absichtssperren auf Dokument-/Schlüsselebene (`intent_locks`).
 pub const RANK_DOCUMENT_INTENT: u32 = 100;
@@ -72,3 +87,21 @@ pub const RANK_OBSERVER_REGISTRY: u32 = 900;
 
 /// Rang 950: SSTable-Block-Cache-Sperre (`SieveCacheBackend::state`).
 pub const RANK_BLOCK_CACHE: u32 = 950;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lock_hierarchy_monotonicity() {
+        assert!(RANK_DOCUMENT_INTENT < RANK_COMMIT_MUTEX);
+        assert!(RANK_COMMIT_MUTEX < RANK_FLUSH_MUTEX);
+        assert!(RANK_FLUSH_MUTEX < RANK_STATE_RWLOCK);
+        assert!(RANK_STATE_RWLOCK < RANK_WAL_TRUNCATE);
+        assert!(RANK_WAL_TRUNCATE < RANK_SSTABLES_RWLOCK);
+        assert!(RANK_SSTABLES_RWLOCK < RANK_MEMTABLE_SHARDS);
+        assert!(RANK_MEMTABLE_SHARDS < RANK_MANIFEST_MUTEX);
+        assert!(RANK_MANIFEST_MUTEX < RANK_OBSERVER_REGISTRY);
+        assert!(RANK_OBSERVER_REGISTRY < RANK_BLOCK_CACHE);
+    }
+}

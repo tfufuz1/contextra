@@ -1,6 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - NodeRecord-Format.
-// INVARIANTEN: Zero-Panic bei Deserialisierung.
+// INVARIANTEN: Zero-Panic bei Deserialisierung; checked Slicing und Getter für sichere Zugriffe.
+// HOTSPOTS: NodeRecord::from_bytes, NodeRecord::to_bytes
+// STAND: TS:2026-11-12T00:00:00Z
 
 use crate::error::{Result, VectorError};
 
@@ -21,6 +23,16 @@ impl NodeRecord {
     pub const SIZE: usize = 8 + 1 + 8 + 8; // 25 bytes
     #[cfg(feature = "docid-128")]
     pub const SIZE: usize = 16 + 1 + 8 + 8; // 33 bytes
+
+    #[inline]
+    pub fn vector_offset(&self) -> u64 {
+        self.vector_offset
+    }
+
+    #[inline]
+    pub fn connections_offset(&self) -> u64 {
+        self.connections_offset
+    }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < Self::SIZE {

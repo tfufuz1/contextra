@@ -119,7 +119,10 @@ impl HnswArena {
         m: usize,
         final_connections: &[Vec<u32>],
     ) -> Result<usize> {
-        let raw_capacity = (m * 2) + max_layer * m;
+        let raw_capacity = m
+            .checked_mul(2)
+            .and_then(|m2| max_layer.checked_mul(m).and_then(|mlm| m2.checked_add(mlm)))
+            .ok_or_else(|| VectorError::Index("Capacity overflow in allocate_node".into()))?;
         if raw_capacity == 0 {
             return Err(VectorError::invalid_input(
                 "Node connection capacity cannot be 0",
@@ -418,7 +421,7 @@ mod tests {
 
         let retrieved = backlinks.get(5, 0);
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap(), &vec![10, 20, 30]);
+        assert_eq!(retrieved.unwrap().as_slice(), &[10, 20, 30]);
 
         assert!(backlinks.get(5, 1).is_none());
         assert!(backlinks.get(99, 0).is_none());

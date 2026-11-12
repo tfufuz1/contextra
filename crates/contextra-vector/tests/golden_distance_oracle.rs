@@ -1,7 +1,7 @@
+use contextra_vector::types::DistanceMetric;
 // FILE-CONTEXT
 // ZWECK: Golden Values Testtabelle und Differentialtests für DistanceKernel / ScalarKernel (WP-VEC-3, INV-SIMD-DETERMINISM-1).
 
-use contextra_types::DistanceMetric;
 use contextra_vector::distance::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted,
     validate_vector, DistanceKernel, ScalarKernel,

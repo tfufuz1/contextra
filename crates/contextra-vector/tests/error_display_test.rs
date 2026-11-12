@@ -5,24 +5,24 @@ fn test_vector_error_display() {
     let cases = vec![
         (
             VectorError::InvalidInput("bad value".to_string()),
-            "invalid input: bad value",
+            "Invalid input: bad value",
         ),
         (
             VectorError::Index("corrupted node".to_string()),
-            "index error: corrupted node",
+            "Index error: corrupted node",
         ),
         (
             VectorError::DimensionMismatch {
                 expected: 128,
                 actual: 64,
             },
-            "dimension mismatch: expected 128, got 64",
+            "Embedding dimension mismatch: expected 128, got 64",
         ),
         (
             VectorError::ConnectivityDegraded {
                 deleted_ratio: 0.854321,
             },
-            "HNSW connectivity degraded: deleted ratio 0.8543",
+            "HNSW graph connectivity degraded: 0.9% deleted nodes",
         ),
         (
             VectorError::GraphRepairFailed("unreachable island".to_string()),
@@ -30,15 +30,15 @@ fn test_vector_error_display() {
         ),
         (
             VectorError::Concurrency("lock acquisition timed out".to_string()),
-            "concurrency error: lock acquisition timed out",
+            "Concurrency error: lock acquisition timed out",
         ),
         (
             VectorError::Io("file not found".to_string()),
-            "io error: file not found",
+            "I/O error: file not found",
         ),
         (
             VectorError::Unsupported("feature X not available".to_string()),
-            "unsupported capability: feature X not available",
+            "Capability unsupported: vector - feature X not available",
         ),
     ];
 
@@ -63,12 +63,12 @@ fn test_vector_error_conversion_roundtrip() {
         actual: 64,
     };
     let c_dim: ContextraError = v_dim.clone().into();
-    assert!(matches!(c_dim, ContextraError::InvalidInput(_)));
+    assert!(matches!(
+        c_dim,
+        ContextraError::EmbeddingDimensionMismatch { .. }
+    ));
     let back_dim: VectorError = c_dim.into();
-    assert_eq!(
-        back_dim,
-        VectorError::InvalidInput("dimension mismatch: expected 128, got 64".into())
-    );
+    assert_eq!(back_dim, v_dim);
 
     let v_conn = VectorError::ConnectivityDegraded { deleted_ratio: 0.5 };
     let c_conn: ContextraError = v_conn.clone().into();

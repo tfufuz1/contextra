@@ -2,9 +2,10 @@
 //! Tests cover HNSW, DiskANN, ACORN, Adaptive ef, Rebuild/Swap, Arena Node Reuse, Partial Rebuild, Recall Suite, Limits & MVCC.
 
 use contextra_ports::VectorIndex;
-use contextra_types::{DistanceMetric, DocId, Result, ScoredDocument, TxId};
+use contextra_types::{DocId, Result, ScoredDocument, TxId};
 use contextra_vector::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};
 use contextra_vector::hnsw::{AdaptiveEfPolicy, AdaptiveEfStateMachine, HnswConfig, HnswIndex};
+use contextra_vector::types::DistanceMetric;
 use std::collections::HashSet;
 
 // --- ORACLE / ANTI-MIRRORING (R4) ---

@@ -6,6 +6,7 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
 
 use crate::*;
+use contextra_ports::StorageEngine;
 use contextra_store::LsmStorage;
 use contextra_types::{DocId, FilterExpr, Result};
 use serde_json::Value;
@@ -101,14 +102,14 @@ impl Contextra {
     /// Dokumentation für `last_committed_seq` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn last_committed_seq(&self) -> Result<u64> {
-        self.storage.last_seq_no().await
+        StorageEngine::last_seq_no(&*self.storage).await
     }
 
     // ANCHOR[contextra-engine:CRE-086]
     /// Dokumentation für `create_snapshot` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn create_snapshot(&self) -> Result<u64> {
-        self.storage.last_seq_no().await
+        StorageEngine::last_seq_no(&*self.storage).await
     }
 
     // ANCHOR[contextra-engine:UPD-091]

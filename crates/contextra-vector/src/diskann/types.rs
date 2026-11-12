@@ -2,14 +2,14 @@
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
-// STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
+// STAND: 2026-11-11
 use super::build::TombstoneSet;
 use super::config::{CachedNode, DiskAnnConfig};
 use super::format::DiskAnnHeader;
-use crate::ComputePool;
-use ahash::AHashMap;
 use crate::error::{Result, VectorError};
 use crate::types::DocId;
+use crate::ComputePool;
+use std::collections::BTreeMap;
 use memmap2::Mmap;
 use parking_lot::RwLock;
 use std::io::Read;
@@ -32,7 +32,7 @@ pub(crate) struct DiskAnnIndexInner {
     pub(crate) header: RwLock<Option<DiskAnnHeader>>,
     pub(crate) mmap: RwLock<Option<Mmap>>,
     pub(crate) node_size_bytes: AtomicU64,
-    pub(crate) cache: RwLock<AHashMap<u32, CachedNode>>,
+    pub(crate) cache: RwLock<BTreeMap<u32, CachedNode>>,
     pub(crate) doc_ids: RwLock<Vec<DocId>>,
     pub(crate) quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub(crate) drift_warn_count: AtomicU64,
@@ -43,7 +43,7 @@ pub(crate) struct DiskAnnIndexInner {
     pub(crate) pending_count: AtomicU64,
     /// Flag um überlappende persist_delta-Hintergrundläufe zu verhindern.
     pub(crate) flushing_in_progress: AtomicBool,
-    pub(crate) hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
+    pub(crate) hnsw_fallback: RwLock<Option<crate::diskann::hnsw_bridge::HnswFallbackBridge>>,
     pub(crate) tombstones: RwLock<TombstoneSet>,
     pub(crate) compute_pool: ComputePool,
 }
@@ -81,7 +81,8 @@ mod tests {
     fn test_try_new_corrupt_magic_fails_immediately() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("corrupt_magic.dann");
-        std::fs::write(
+        crate::diskann::io::write_bytes(
+            &path,
             &path,
             b"BADM_corrupt_header_data_bytes_1234567890_padding_bytes",
         )
@@ -112,7 +113,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("truncated.dann");
         // Only write 10 bytes (smaller than DiskAnnHeader::SIZE = 40)
-        std::fs::write(&path, b"DANN_small").unwrap();
+        crate::diskann::io::write_bytes(&path, &path, b"DANN_small").unwrap();
 
         let config = DiskAnnConfig {
             index_path: path,
@@ -204,8 +205,8 @@ impl DiskAnnIndex {
         let node_size_bytes = raw_node_size.div_ceil(config.sector_size) * config.sector_size;
 
         if config.index_path.exists() {
-            let mut file = std::fs::File::open(&config.index_path).map_err(VectorError::Io)?;
-            let metadata = file.metadata().map_err(VectorError::Io)?;
+            let mut file = crate::diskann::io::open_read(&config.index_path)?;
+            let metadata = file.metadata().map_err(VectorError::from)?;
             let file_len = metadata.len() as usize;
 
             if file_len < DiskAnnHeader::SIZE {
@@ -216,7 +217,7 @@ impl DiskAnnIndex {
 
             let mut header_buf = [0u8; DiskAnnHeader::SIZE];
             file.read_exact(&mut header_buf)
-                .map_err(VectorError::Io)?;
+                .map_err(VectorError::from)?;
 
             let header = DiskAnnHeader::try_from_bytes(&header_buf)?;
 
@@ -263,7 +264,7 @@ impl DiskAnnIndex {
                 header: RwLock::new(None),
                 mmap: RwLock::new(None),
                 node_size_bytes: AtomicU64::new(node_size_bytes as u64),
-                cache: RwLock::new(AHashMap::new()),
+                cache: RwLock::new(BTreeMap::new()),
                 doc_ids: RwLock::new(Vec::new()),
                 quantizer: RwLock::new(None),
                 drift_warn_count: AtomicU64::new(0),

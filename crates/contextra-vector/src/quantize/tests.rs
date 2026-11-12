@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use super::*;
+use crate::types::DistanceMetric;
 
 #[test]
 fn test_percentile_clipping_in_try_train() {

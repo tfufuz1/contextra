@@ -2,7 +2,7 @@
 // ZWECK: Prädikatsagnostischer Suchpfad (ACORN-Muster, Patel et al. 2024).
 // INVARIANTEN: FilteredIndex Trait; Zero Panic; Ring-0 Algorithmen.
 // HOTSPOTS: FilteredIndex::search_knn_acorn, AcornError
-// STAND: TS:2026-11-11T02:00:00Z
+// STAND: 2026-11-12
 
 // SECTION Submodule & Re-Exports
 
@@ -15,6 +15,7 @@ pub use gamma_augmentation::compute_gamma_edge_budget;
 pub use naive_reference::NaiveReferenceIndex;
 
 use crate::types::DocId;
+use thiserror::Error;
 // !SECTION
 
 // SECTION Trait & Fehler-Definitionen
@@ -37,9 +38,10 @@ pub trait FilteredIndex {
 
 // ANCHOR[contextra-vector:ACORN-ERROR]
 /// Errors occurring during ACORN search or graph traversal operations.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AcornError {
     /// Dimension mismatch between query and vector database points.
+    #[error("Invalid query dimension: expected {expected}, got {got}")]
     DimensionMismatch {
         /// Expected dimension.
         expected: usize,
@@ -48,36 +50,18 @@ pub enum AcornError {
     },
 
     /// Invalid search parameter k (e.g. k = 0).
+    #[error("Requested k ({k}) is invalid or zero")]
     InvalidK {
         /// Requested k value.
         k: usize,
     },
 
     /// Invalid gamma augmentation factor.
+    #[error("Invalid gamma factor: {0}")]
     InvalidGamma(u32),
 
     /// Internal calculation or traversal error.
+    #[error("Internal ACORN error: {0}")]
     Internal(String),
 }
-
-impl std::fmt::Display for AcornError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AcornError::DimensionMismatch { expected, got } => {
-                write!(f, "Invalid query dimension: expected {expected}, got {got}")
-            }
-            AcornError::InvalidK { k } => {
-                write!(f, "Requested k ({k}) is invalid or zero")
-            }
-            AcornError::InvalidGamma(gamma) => {
-                write!(f, "Invalid gamma factor: {gamma}")
-            }
-            AcornError::Internal(msg) => {
-                write!(f, "Internal ACORN error: {msg}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for AcornError {}
 // !SECTION

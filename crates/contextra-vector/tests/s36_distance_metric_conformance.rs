@@ -1,6 +1,11 @@
 //! Konformitätstest für `DistanceMetric` (R4-Ausnahme).
 //! Prüft identische Varianten-Reihenfolge und serde-Serialisierung zwischen
 //! `contextra_vector::types::DistanceMetric` und `contextra_types::DistanceMetric`.
+// FILE-CONTEXT
+// ZWECK: Konformitätstest der Distanzmetriken über Ports- und Typgrenzen hinweg.
+// INVARIANTEN: Identische Distanzergebnisse unabhängig vom Interface-Pfad.
+// HOTSPOTS: 15-35
+// STAND: 2026-11-12
 
 #![cfg(feature = "ports-compat")]
 

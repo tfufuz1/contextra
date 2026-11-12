@@ -44,6 +44,7 @@ async fn test_cancel_after_prepare_batch_maintains_hmac_chain_consistency() {
     assert!(res3.is_ok(), "tx3 commit must succeed: {:?}", res3);
 
     // Reopen DB to ensure WAL HMAC verification succeeds during recovery
+    storage.close().await.unwrap();
     drop(storage);
 
     let storage_reopen = LsmStorage::new(config)

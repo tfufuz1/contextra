@@ -2,7 +2,7 @@
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
-// STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
+// STAND: 2026-11-11
 
 use super::config::{DiskAnnFallbackPolicy, VectorData};
 use super::format::DiskAnnHeader;
@@ -11,21 +11,21 @@ use crate::distance::compute_distance_trusted;
 use crate::error::{Result, VectorError};
 use crate::types::{DistanceMetric, DocId, ScoredDocument};
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, BTreeSet};
+use std::collections::{BTreeSet, BinaryHeap};
 
 impl DiskAnnIndex {
     pub(crate) fn get_dist_to_query(&self, query: &[f32], node_idx: u32) -> Result<f32> {
         let node = self.load_node(node_idx)?;
         match &node.vector {
             VectorData::F32(v) => {
-                compute_distance_trusted(query, v, self.inner.config.distance_metric)
+                compute_distance_trusted(query, v.as_slice(), self.inner.config.distance_metric)
             }
             VectorData::U8(v) => {
                 let q_guard = self.inner.quantizer.read();
                 let q = q_guard
                     .as_ref()
                     .ok_or_else(|| VectorError::Index("Quantizer missing".into()))?;
-                q.asymmetric_dist(query, v, self.inner.config.distance_metric)
+                q.asymmetric_dist(query, v.as_slice(), self.inner.config.distance_metric)
             }
         }
     }
@@ -390,7 +390,7 @@ impl DiskAnnIndex {
                 DistanceMetric::DotProduct => -c.distance,
                 _ => 1.0 / (1.0 + c.distance),
             };
-            final_results.push(ScoredDocument::new(node.doc_id, score));
+            final_results.push(ScoredDocument::new(node.doc_id, score, c.distance));
         }
 
         Ok(final_results)

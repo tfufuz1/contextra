@@ -2,6 +2,7 @@
 
 #[cfg(any(feature = "ports-compat", feature = "workspace"))]
 pub mod candidate_stream;
+#[cfg(any(feature = "ports-compat", feature = "workspace"))]
 pub mod error;
 #[cfg(any(feature = "ports-compat", feature = "workspace"))]
 pub mod types;

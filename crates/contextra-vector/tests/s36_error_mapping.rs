@@ -28,7 +28,9 @@ fn test_s36_error_mapping_bidirectional() {
             "Embedding dimension mismatch: expected 128, got 64".into(),
         ),
         (
-            VectorError::ConnectivityDegraded { deleted_ratio: 0.25 },
+            VectorError::ConnectivityDegraded {
+                deleted_ratio: 0.25,
+            },
             "HNSW graph connectivity degraded: 0.2% deleted nodes".into(),
         ),
         (

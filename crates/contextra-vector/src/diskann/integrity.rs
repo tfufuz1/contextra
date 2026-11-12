@@ -11,9 +11,7 @@ impl DiskAnnHmac {
     /// Creates a new `DiskAnnHmac` using the provided integrity key.
     pub fn new(integrity_key: &[u8]) -> Result<Self> {
         if integrity_key.is_empty() {
-            return Err(VectorError::InvalidInput(
-                "Key cannot be empty".to_string(),
-            ));
+            return Err(VectorError::InvalidInput("Key cannot be empty".to_string()));
         }
         if integrity_key.len() > 10_000 {
             return Err(VectorError::InvalidInput(format!(
