@@ -464,7 +464,7 @@ def write_agents(crates: Dict[str, Crate], root: Path, hubs: Iterable[str],
         if target.is_file():
             old = target.read_text(encoding="utf-8")
             b = old.find(GEN_BEGIN)
-            e = old.find(GEN_END, b + 1) if b != -1 else -1
+            e = old.rfind(GEN_END) if b != -1 else -1  # letzter Marker: entfernt auch Altreste
             if b != -1 and e != -1:
                 new = old[:b] + block + old[e + len(GEN_END):]
             else:

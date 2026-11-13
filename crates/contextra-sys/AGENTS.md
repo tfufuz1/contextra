@@ -26,6 +26,4 @@
 
 Regeneriert mit `python3 tools/crate_inventory.py agents`. Manuelle Notizen stehen außerhalb dieses Blocks.
 
-<!-- END GENERATED: crate_inventory.py -->`.
-
 <!-- END GENERATED: crate_inventory.py -->
