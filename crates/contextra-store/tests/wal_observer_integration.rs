@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 #![allow(unexpected_cfgs)]
 #![cfg(not(loom))]
 

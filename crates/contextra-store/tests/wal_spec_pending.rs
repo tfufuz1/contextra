@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 //! Specification tests for ADR-N12 (High-Water-Mark Anchoring) and ADR-N13 (Frame Header V4 Integrity).

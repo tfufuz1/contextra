@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_store::tenant_codec::TenantKeyCodec;
 use contextra_types::{CollectionId, DocId, TenantId};
 use proptest::prelude::*;

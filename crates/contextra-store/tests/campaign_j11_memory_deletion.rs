@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // Campaign test for J-11-F03: memory-only-storage behavior under store engine creation.
 // Oracle: StorageEngine transaction lifecycle (put + commit) vs uncommitted isolation.
 

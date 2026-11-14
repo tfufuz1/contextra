@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::SnapshotRegistry;

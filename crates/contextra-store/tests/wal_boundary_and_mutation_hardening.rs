@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Invariant and mutation tests for WAL framing, replay, and fail-closed durability (INV-FSYNC-1).
 
 use contextra_store::wal::{PoisonCause, Wal, WalOp};

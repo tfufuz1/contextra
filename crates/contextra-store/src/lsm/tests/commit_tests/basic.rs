@@ -10,9 +10,10 @@ use contextra_env::ManualClock;
 use std::sync::atomic::Ordering;
 use tempfile::TempDir;
 
+#[tokio::test]
 async fn test_clock_port_integration_with_manual_clock() {
     let tmp = TempDir::new().expect("temp dir");
-    let clock = Arc::new(ManualClock::new(100_000));
+    let clock = Arc::new(ManualClock::new(100_000, 0));
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
         ..Default::default()
@@ -24,7 +25,7 @@ async fn test_clock_port_integration_with_manual_clock() {
 
     assert_eq!(storage.clock().now_unix_nanos(), 100_000);
 
-    clock.advance(Duration::from_nanos(50_000));
+    clock.advance_nanos(50_000);
     assert_eq!(storage.clock().now_unix_nanos(), 150_000);
 
     let tx = TxId::new(1);

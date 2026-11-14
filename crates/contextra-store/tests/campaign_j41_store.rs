@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Campaign J-41 hypothesis test suite for contextra-store.
 //! Tests static scan findings: integer truncation, P28 determinism invariants, dropped errors.
 

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration tests for SSI tracked reads via trait objects and TenantScopedStorage.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

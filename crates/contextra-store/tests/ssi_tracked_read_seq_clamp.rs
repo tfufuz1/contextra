@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration test for SSI tracked read sequence clamping in LsmStorage.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

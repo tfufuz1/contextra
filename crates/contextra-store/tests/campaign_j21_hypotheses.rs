@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Campaign J-21 Integration Test Suite verifying hypotheses H1 through H8
 //! for Intent-Locks, Tenant Isolation, Deletion Proof Binding, DirLock,
 //! Observer Fail-Open, Differential BTreeMap Model, and System Pressure.

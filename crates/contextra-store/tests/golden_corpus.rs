@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Golden Corpus Generator & Regression Tests (ST6.1)
 //!
 //! Generates and verifies byte-for-byte deterministic reference files for:

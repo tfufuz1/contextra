@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Fehlertoleranz und Korruptionsprüfung (PROOF-3, G-F1)
 //!
 //! Prüft, dass das Laden beschädigter Dateien (Manifest, SSTable-Footer, WAL-Mitte, WAL-Tail)

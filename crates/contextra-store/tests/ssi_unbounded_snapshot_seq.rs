@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration test verifying SSI tracked reads when specifying `u64::MAX` as `snapshot_seq` (B-16).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

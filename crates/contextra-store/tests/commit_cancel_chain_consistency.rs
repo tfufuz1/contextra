@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // ZWECK: Testet die HMAC-Kettenkonsistenz und Recovery, wenn ein Commit-Future nach prepare_batch abgebrochen (gedroppt) wird.
 

@@ -54,6 +54,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 [dev-dependencies]
 contextra-testkit = { workspace = true }
+contextra-env = { workspace = true, features = ["test-utils"] }
 libc = "0.2"
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
@@ -184,10 +185,12 @@ harness = false
 [[bench]]
 name = "wal_bench"
 harness = false
+required-features = ["workspace"]
 
 [[bench]]
 name = "lsm_concurrency_bench"
 harness = false
+required-features = ["workspace"]
 
 [[bench]]
 name = "block_cache_bench"
@@ -196,3 +199,14 @@ harness = false
 [[bench]]
 name = "redb_comparative_bench"
 harness = false
+required-features = ["workspace"]
+
+[[example]]
+name = "store_standalone"
+path = "examples/store_standalone.rs"
+required-features = ["workspace"]
+
+[[example]]
+name = "chaos_writer"
+path = "examples/chaos_writer.rs"
+required-features = ["workspace"]

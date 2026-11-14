@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_ports::license::FeatureRing;
 use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
 

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use contextra_types::Result;
 use std::path::PathBuf;

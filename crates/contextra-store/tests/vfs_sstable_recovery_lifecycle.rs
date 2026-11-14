@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration tests for SSTable lifecycle and recovery on VFS / in-memory Vfs.
 
 use contextra_ports::{ContextraError, Result, Vfs, VfsFile, VfsOpenOptions};

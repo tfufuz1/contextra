@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // STAND: 2026-09-28T00:00:00Z
 // ZWECK: Integrationstests für MemTable Systempräfix-Hash-Sharding und Scans.

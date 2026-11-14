@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Black-box prefix crash harness enumerating WAL byte truncations and verifying reference model invariants.
 // STAND: 2026-09-28
 // INVARIANTEN: No unsafe code, no modification of production store code, std + tokio test harness.

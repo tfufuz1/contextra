@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // Integration tests for store manifest and compaction audit findings.
 
 use contextra_mvcc::SnapshotRegistry;

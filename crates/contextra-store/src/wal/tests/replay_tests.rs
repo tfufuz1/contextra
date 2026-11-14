@@ -4,6 +4,7 @@
 
 use super::*;
 use contextra_ids::TxId;
+use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

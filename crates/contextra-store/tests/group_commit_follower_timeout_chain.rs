@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // ZWECK: Testet, dass ein Follower, der per Timeout aus der Group-Commit-Queue ausscheidet, keine HMAC-Kette korrumpiert.
 

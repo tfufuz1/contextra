@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_ports::StorageEngine;
 use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin};
 use contextra_types::TxId;

@@ -9,6 +9,7 @@ use crate::error::StoreError as ContextraError;
 use std::sync::atomic::Ordering;
 use tempfile::TempDir;
 
+#[tokio::test]
 async fn test_system_pressure_monitor_integration() {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {

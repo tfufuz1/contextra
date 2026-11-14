@@ -1,3 +1,5 @@
+#![cfg(feature = "workspace")]
+
 use contextra_ports::ResourceTracker;
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};

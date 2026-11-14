@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! SD-02-STORE-001 — Flush Crash Simulation Tests.
 //!
 //! Verifies WAL-Atomicity invariant: the WAL must NEVER be deleted before

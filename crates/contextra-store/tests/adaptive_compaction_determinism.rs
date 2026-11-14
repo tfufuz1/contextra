@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_ports::StorageStats;
 use contextra_store::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 

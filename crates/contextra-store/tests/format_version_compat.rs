@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! WP-31: Format-Versionen und Fixtures
 //!
 //! Verifiziert die Versionierungsfelder von:

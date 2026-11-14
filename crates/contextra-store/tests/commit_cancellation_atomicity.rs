@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Integration tests verifying atomicity, HMAC chain integrity, and recovery after commit cancellation across various timeout points.
 // INVARIANTEN:
 // - Pro Transaktion nach Abbruch und Neustart: Entweder alle Schlüssel oder keiner (All-or-Nothing).

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration / unit tests for LSM scan limits, source distribution, and range bounds safety.
 
 use bytes::Bytes;

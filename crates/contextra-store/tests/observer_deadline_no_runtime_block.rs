@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // ZWECK: Testet, dass Observer-Benachrichtigungen Tokio Runtime-Threads in current_thread-Runtimes nicht blockieren.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

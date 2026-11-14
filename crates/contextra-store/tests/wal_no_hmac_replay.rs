@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_store::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
 use contextra_types::TxId;
 use tempfile::tempdir;

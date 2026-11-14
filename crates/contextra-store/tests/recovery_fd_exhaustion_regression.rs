@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 #![allow(unsafe_code)]
 
 use contextra_ports::StorageEngine;

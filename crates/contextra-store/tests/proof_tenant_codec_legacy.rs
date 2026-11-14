@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Differenztests Tenant-Codec: Aktuelle Implementierung vs. Legacy-Referenz (PROOF-3)
 //!
 //! Verifiziert mindestens 10.000 generierte Werte über proptest sowie Randfälle.

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // STAND: 2026-10-29
 // ZWECK: Deterministic regression test for fuzz_memtable_concurrent crash artifact (Bug J-15-F02).
 // ORAKEL: Invariant Zero-Panic — MemTable::put must not panic even on out-of-order sequence numbers.

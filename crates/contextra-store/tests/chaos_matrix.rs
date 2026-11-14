@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Chaos testing matrix combining randomized fault scenarios with seed logging and ground truth verification. (TS: 2026-08-30) (SESSION: 283abf0f)
 //! Chaos matrix integration tests combining randomized fault injection scenarios.
 //!

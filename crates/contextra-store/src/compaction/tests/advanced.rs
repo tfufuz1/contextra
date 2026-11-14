@@ -574,7 +574,6 @@ async fn test_compaction_cancellation() {
 #[tokio::test]
 async fn test_concurrent_flush_and_compact_is_safe() {
     use crate::lsm::{LsmConfig, LsmStorage};
-    use crate::StorageEngine;
 
     for _iteration in 0..10 {
         let tmp = tempfile::TempDir::new().unwrap(); // unwrap

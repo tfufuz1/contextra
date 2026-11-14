@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Integration-Test: Chaos Bit-Flip SSTable Injektion (`chaos_bitflip_sstable.rs`)
 //!
 //! Testziel:

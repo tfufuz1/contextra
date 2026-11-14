@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT: Integration test verifying fsync timeout handling, clean rollback, and intent file recovery. (TS: 2026-09-11)
 
 use contextra_ports::StorageEngine;

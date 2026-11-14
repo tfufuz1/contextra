@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // ZWECK: Integrationstests für WalObserver Fail-Open Deadline, Circuit Breaker, Drop Counter und Non-blocking Shutdown.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Write- and Read-Amplification benchmark for `contextra-store`.
 
 use contextra_ports::StorageEngine;

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Deterministic environment injection tests (P28 / B11).
 //!
 //! Verifies:

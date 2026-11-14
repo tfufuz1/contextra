@@ -5,6 +5,7 @@
 use super::*;
 use crate::wal::{PreparedBatch, WalConfig, WalEntry, WalOp};
 use contextra_ids::TxId;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]

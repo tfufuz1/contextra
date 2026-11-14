@@ -4,6 +4,8 @@
 
 use super::*;
 use contextra_ids::TxId;
+use crate::error::StoreResult as Result;
+use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

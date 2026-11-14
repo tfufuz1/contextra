@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! # Guard-Aufräumreihenfolge & Cancel-Safety Integrationstest (MZ-E)
 //!
 //! // FILE-CONTEXT

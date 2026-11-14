@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::config::DurabilityMode;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
