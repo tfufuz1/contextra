@@ -3,288 +3,241 @@
 <p align="center"><b>CONTEXTRA</b></p>
 <p align="center"><i>Das lokale Wissens- und Gedächtnissystem für KI-Assistenten und Agenten</i></p>
 
-<p align="center">
-  <a href="#überblick">Überblick</a> ·
-  <a href="#welche-herausforderungen-contextra-löst">Herausforderungen</a> ·
-  <a href="#so-funktioniert-contextra">Funktionsweise</a> ·
-  <a href="#funktionen">Funktionen</a> ·
-  <a href="#ein-beispiel-aus-der-praxis">Beispiel</a> ·
-  <a href="#einsatzbereiche">Einsatzbereiche</a>
-</p>
-
 ---
 
-## Überblick
+## Was ist CONTEXTRA?
 
-KI-Assistenten sind nur so hilfreich wie das Wissen, auf das sie zugreifen können. Contextra stellt dieses Wissen bereit, ohne dass Daten das Unternehmen verlassen.
+KI-Assistenten sind nur so gut wie das Wissen, auf das sie zugreifen können. In der Praxis scheitern Projekte selten am Sprachmodell, sondern an fünf Fragen:
 
-Contextra ist eine Softwarebibliothek, die direkt in eine bestehende Anwendung eingebunden wird. Es gibt keinen externen Dienst, keinen zusätzlichen Server-Prozess und keine Cloud-Verbindung. Dokumente, Erinnerungen und Zusammenhänge zwischen Begriffen werden auf dem eigenen Rechner, im eigenen Netzwerk oder auf einem Gerät ohne Internetzugang gespeichert und durchsucht.
+* Findet die KI **zuverlässig** die richtige Information in großen, gewachsenen Wissensbeständen?
+* Kann sie sich **über Wochen und Monate erinnern**, ohne mit veraltetem oder widersprüchlichem Wissen zu arbeiten?
+* Lässt sich ihr Verhalten **steuern, begrenzen und nachvollziehen**?
+* Bleiben **vertrauliche Daten** unter Ihrer Kontrolle, auch wenn externe Modelle im Spiel sind?
+* Läuft das Ganze **stabil, nachweisbar korrekt und wirtschaftlich** im Dauerbetrieb?
 
-Dabei vereint Contextra Fähigkeiten, die sonst auf mehrere Werkzeuge verteilt sind:
+CONTEXTRA beantwortet diese Fragen in einem einzigen, lokal betriebenen System. Es gibt Ihren KI-Anwendungen ein präzises Wissensfundament, ein belastbares Langzeitgedächtnis, intelligente Steuerung, eingebauten Datenschutz und ein Speicherfundament, das auch bei Störungen konsistent bleibt.
 
-- **Suche** nach Bedeutung, nach exakten Begriffen und nach Zusammenhängen
-- **Bewertung der Ergebnisqualität**, damit erkennbar ist, wie verlässlich ein Treffer ist
-- **Gedächtnis für KI-Agenten**, das gepflegt, verdichtet und wieder abgerufen wird
-- **Datenschutz und Verschlüsselung**, einschließlich nachweisbarer Löschung
-- **Zuverlässige Speicherung** mit gesicherten Arbeitsschritten und Rückkehr zu früheren Zuständen
+### Auf einen Blick
 
-Das Ziel: Ein KI-System soll nicht nur Treffer finden, sondern auch einschätzen können, wie belastbar sie sind.
-
----
-
-## Welche Herausforderungen Contextra löst
-
-| Herausforderung | Lösung in Contextra |
+| Baustein | Das leistet er für Sie |
 |---|---|
-| **Sensible Daten dürfen das Unternehmen nicht verlassen** | Speicherung, Suche und Auswertung erfolgen vollständig lokal. Ausgehende Anfragen werden auf personenbezogene Daten geprüft, sensible Werte durch Platzhalter ersetzt. |
-| **Löschungen müssen nachweisbar sein** | Jede Löschung wird in einem digital signierten Nachweis dokumentiert. Verschlüsselte Daten werden durch Vernichtung ihres Schlüssels dauerhaft unlesbar. |
-| **Exakte Begriffe gehen bei reiner Bedeutungssuche verloren** | Drei Suchverfahren laufen parallel und werden zu einer gemeinsamen Ergebnisliste zusammengeführt. |
-| **Ähnlich klingende Treffer sind nicht automatisch verlässlich** | Jedes Ergebnis erhält einen statistisch geprüften Vertrauenswert, sodass Schwellenwerte eine klare Bedeutung haben. |
-| **Lange Arbeitsabläufe scheitern an einem einzelnen Fehler** | Jeder Arbeitsschritt wird gesichert. Nach einem Fehler wird der letzte gültige Zustand wiederhergestellt. |
-| **Kosten und Textmengen wachsen unkontrolliert** | Verläufe werden verdichtet, und ein Budget begrenzt Arbeitsschritte und Verbrauch. |
-| **Nicht jede Anfrage braucht das leistungsstärkste Modell** | Das System wählt je Anfrage das Modell mit dem besten Verhältnis aus Qualität, Geschwindigkeit und Kosten. |
+| **1. Retrieval & Suche** | Die KI findet die richtige Information, auch bei Fachbegriffen, deutschen Wortzusammensetzungen und verknüpftem Wissen. |
+| **2. Agenten & Gedächtnis** | Mehrstufige Aufgaben laufen kontrolliert und nachvollziehbar; Wissen bleibt über lange Zeit aktuell und verlässlich. |
+| **3. Adaptives Routing** | Jede Anfrage geht an das passende Modell, mit Qualität, Geschwindigkeit und Kosten im Gleichgewicht. |
+| **4. Sicherheit & Compliance** | Sensible Daten verlassen Ihr Haus nicht ungeschützt; Löschungen sind belegbar; Nachweise entstehen automatisch. |
+| **5. Speicher & Durability** | Keine verlorenen Daten, keine inkonsistenten Zustände, Rückkehr zu jedem früheren Stand möglich. |
+| **6. Ingest, Anbindung & Qualitätssicherung** | Ihre Dokumente kommen sauber ins System, Modelle und Tools lassen sich einfach anbinden, Qualität wird laufend gemessen. |
 
 ---
 
-## So funktioniert Contextra
-
-Contextra arbeitet in fünf Stufen, vom Dokument bis zur Antwort.
-
-**1. Aufnehmen.** Dokumente wie PDF, Word (DOCX), Markdown oder E-Mails werden eingelesen und entlang ihrer Struktur in Abschnitte gegliedert. Überschriften, Listen und Absätze bleiben erhalten. Dieselbe Eingabe ergibt immer dieselbe Gliederung.
-
-**2. Speichern.** Die Abschnitte werden verschlüsselt abgelegt. Jeder Schreibvorgang wird vollständig übernommen oder vollständig verworfen und zusätzlich in einem Protokoll gesichert. Ein Absturz hinterlässt daher keine beschädigten Daten.
-
-**3. Auf mehreren Wegen suchen.** Eine Anfrage wird gleichzeitig über drei Wege beantwortet: nach inhaltlicher Bedeutung, nach exakten Begriffen und Zahlen sowie nach Beziehungen zwischen Personen, Begriffen und Ereignissen.
-
-**4. Zusammenführen und prüfen.** Die Ergebnisse der drei Wege werden gewichtet zu einer Liste verschmolzen. Treffer, die über mehrere Wege bestätigt werden, rücken nach oben. Anschließend wird für jedes Ergebnis ein Vertrauenswert berechnet und die Verteilung dieser Werte laufend überwacht.
-
-**5. Liefern.** Der Anwender oder das angebundene KI-System erhält wenige, begründete Treffer. Ist die Beleglage dünn, wird das ausdrücklich ausgewiesen, statt eine scheinbar sichere Antwort vorzutäuschen.
-
-```
-   Dokument oder Erinnerung
-            │
-            ▼
-   ┌───────────────────────┐     ┌──────────────────────────────┐
-   │ Aufnehmen             │ ──▶ │ Speichern                    │
-   │ PDF · Word · Mail     │     │ verschlüsselt · abgesichert  │
-   └───────────────────────┘     └──────────────┬───────────────┘
-                                                │
-        ┌──────────────────┬────────────────────┼─────────────────┐
-        ▼                  ▼                    ▼                 ▼
-   Bedeutungssuche   Begriffssuche        Beziehungssuche    Zeitbezug
-   (Inhalt)          (exakte Wörter)      (Zusammenhänge)    (wann gültig)
-        └──────────────────┴─────────┬──────────┴─────────────────┘
-                                     ▼
-                  Zusammenführen · Vertrauenswerte · Überwachung
-                                     │
-                                     ▼
-                     Wenige, begründete Treffer
-```
-
----
-
-## Funktionen
-
-### 1. Intelligente Suche
+## 1. Finden statt Suchen: Retrieval & Wissenszugriff
 
 <img width="2752" height="1536" alt="hybrid-retrieval" src="https://github.com/user-attachments/assets/0c24b7b2-7037-42f2-98a0-b439c33c83c7" />
 
-Contextra kombiniert drei Suchverfahren. Jedes deckt Fälle ab, die die anderen übersehen würden.
+**Das Ziel:** Ihre KI soll auf Anhieb die Informationen finden, die für eine Antwort wirklich zählen, auch wenn Ihr Wissensbestand groß ist, aus vielen Quellen stammt und sich ständig ändert.
 
-**Bedeutungssuche.** Findet Passagen mit gleichem Inhalt, auch wenn andere Wörter verwendet werden. Wer nach „Kündigungsfrist“ sucht, findet auch Abschnitte zur „Beendigung des Vertrags“. Die Suche bleibt auch in sehr großen Beständen schnell. Platzsparende Speicherverfahren reduzieren den Speicherbedarf deutlich, und für extrem große Bestände steht eine Variante bereit, die nicht vollständig im Arbeitsspeicher liegen muss.
+CONTEXTRA kombiniert dafür mehrere Suchverfahren, die sich gegenseitig ergänzen: Bedeutungssuche, exakte Stichwortsuche und die Suche entlang von Zusammenhängen im Wissensgraphen. Ein Dokument, das in mehreren dieser Perspektiven gleichzeitig überzeugt, wird bevorzugt.
 
-**Begriffssuche.** Findet exakte Begriffe, Namen, Produktnummern und Zahlen und bewertet sie nach Häufigkeit und Seltenheit. Die deutsche Sprache wird berücksichtigt: Zusammengesetzte Wörter wie „Datenschutzfolgenabschätzung“ werden zerlegt, Umlaute vereinheitlicht und Füllwörter ignoriert. Lesende Zugriffe müssen nicht auf laufende Schreibvorgänge warten.
+### Bedeutung verstehen: Semantische Suche
 
-**Beziehungssuche.** Personen, Begriffe und Ereignisse bilden ein Netz aus Verbindungen. Contextra erkennt, welche Elemente rund um eine Frage relevant sind, und belegt Zusammenhänge mit nachvollziehbaren Pfaden. Auch Beziehungen, an denen mehr als zwei Parteien beteiligt sind, werden berücksichtigt.
+* **Treffer nach Sinn, nicht nach Wortlaut.** Eine Frage wie „Kündigungsfrist bei Lieferverzug“ findet auch Passagen, die andere Formulierungen verwenden.
+* **Skaliert mit Ihrem Bestand.** Der Zugriff bleibt auch bei sehr großen Datenmengen schnell. Neue und gelöschte Inhalte werden laufend im Index nachgeführt, ohne dass dieser neu aufgebaut werden muss.
+* **Deutlich geringerer Hardwarebedarf.** Platzsparende Speicherverfahren reduzieren den Arbeitsspeicherbedarf auf ein Viertel, in der kompaktesten Variante auf ein Zweiunddreißigstel, bei nur minimalem Qualitätsverlust.
+* **Auch jenseits des Arbeitsspeichers.** Bestände, die nicht mehr in den RAM passen, werden direkt von der SSD bedient. Kleinere Bestände nutzen automatisch den schnelleren In-Memory-Weg.
+* **Filter, die die Trefferqualität nicht kosten.** Einschränkungen wie Mandant, Dokumenttyp oder Zeitraum werden schon während der Suche angewandt und nicht erst danach. So bleiben auch bei sehr engen Filtern passende Treffer erhalten.
+* **Hardware optimal ausgenutzt.** Das System erkennt automatisch, welche Prozessorfunktionen verfügbar sind (Intel/AMD und ARM), und nutzt die schnellste Variante. Durch automatische Gegenprüfung liefern alle Pfade identische Ergebnisse.
 
-**Themengruppen.** Zusammengehörige Begriffe werden automatisch zu Wissensbereichen gruppiert. Häufig gemeinsam genutzte Verbindungen werden gestärkt, und das System erkennt, wenn ein Themenbereich zerfällt.
+### Exakt treffen: Volltextsuche mit deutscher Sprachkompetenz
 
-**Zusammenführung der Ergebnisse.** Die Trefferlisten der drei Verfahren werden gewichtet zu einer gemeinsamen Rangliste verschmolzen. Passagen, die über mehrere Wege gleichzeitig auftauchen, erhalten einen Bonus. Die Länge der Ergebnisliste wird als echtes Budget behandelt und nicht nur als feste Grenze.
+* **Bewährte Relevanzbewertung.** Titel, Überschriften, Fließtext und Schlagworte lassen sich unterschiedlich gewichten.
+* **Schnell bei großen Korpora.** Intelligentes Überspringen irrelevanter Bereiche beschleunigt die Suche, ohne Treffer zu verlieren.
+* **Für deutsche Sprache gebaut.** „Straße“ und „Strasse“, „Müller“ und „Mueller“ führen zum selben Ergebnis. Zusammengesetzte Wörter wie „Haftpflichtversicherungsvertrag“ werden zerlegt und gefunden, ob Sie nach dem ganzen Wort oder nach einem Teil suchen. Stoppwörter und Wortendungen werden berücksichtigt.
+* **Suchen ohne Wartezeit bei Updates.** Leser arbeiten stets auf einem konsistenten Stand, während im Hintergrund neue Daten eingepflegt werden.
 
-**Verlässliche Vertrauenswerte.** Rohwerte der Suche werden in belastbare Wahrscheinlichkeiten umgerechnet. Statistische Verfahren liefern zudem Vertrauensbereiche mit mathematisch abgesicherter Garantie. Ein Überwachungsmodul meldet, wenn sich die Qualität der Ergebnisse im laufenden Betrieb verschiebt.
+### Zusammenhänge nutzen: Wissensgraph und GraphRAG
+
+* **Verknüpftes Wissen wird auffindbar.** Wenn die Antwort auf mehrere Dokumente verteilt ist, folgt CONTEXTRA den Beziehungen zwischen Personen, Organisationen, Verträgen oder Sachverhalten und holt das relevante Umfeld hinzu.
+* **Mehrstellige Beziehungen.** Nicht nur „A hängt mit B zusammen“, sondern auch Sachverhalte mit mehreren Beteiligten und Rollen, inklusive zeitlicher Gültigkeit.
+* **Wissen mit Beziehungstypen.** Aussagen können sich stützen, widersprechen, ergänzen, voneinander abstammen oder einander ablösen. Wird ein Dokument durch eine neuere Fassung ersetzt, gelten davon abhängige Aussagen automatisch als überholt, die Historie bleibt nachvollziehbar.
+* **Themenlandkarte statt Dokumenthaufen.** Der Wissensbestand wird automatisch in Themengruppen auf mehreren Ebenen gegliedert. Das System erkennt, wenn das Netz unübersichtlich wird, und stärkt häufig genutzte, bestätigte Pfade, während Ungenutztes allmählich zurücktritt.
+
+### Wissen automatisch strukturieren: Informationsextraktion
+
+* **Aus Fließtext wird strukturiertes Wissen.** Beim Einlesen werden Aussagen der Form „wer – tut was – mit wem/was“ erkannt, ebenso Organisationen, Personen, Normen, Zeitangaben und Kennungen.
+* **Jede Aussage ist belegt.** Zu jedem extrahierten Fakt ist Quelldokument, Textstelle und Verlässlichkeit gespeichert.
+* **Sie steuern den Aufwand.** Die Extraktion lässt sich abschalten, auf Regeln beschränken oder voll nutzen.
+
+### Komplexe Fragen beantworten: Mehrstufige Suche und Steuerung
+
+* **Fragen, die mehr als einen Schritt brauchen.** CONTEXTRA verfeinert die Anfrage selbstständig anhand der bisherigen Funde und erschließt Folgeinformationen.
+* **Stoppt, wenn genug gefunden ist.** Ein Regelmechanismus misst den Informationsgewinn pro Schritt und beendet die Suche, sobald nichts Neues mehr hinzukommt. So werden Zeit und Kosten gespart.
+* **Eine Abfrage, voll steuerbar.** Sie legen fest: in welchem Bereich gesucht wird (Mandant, Sammlung, Dokumentgruppe), nach welcher Strategie, wie stark die einzelnen Suchverfahren zählen und ob nur der Stand zu einem bestimmten Zeitpunkt maßgeblich ist.
+* **Schlanke Antworten.** Schwere Inhalte werden erst für die endgültigen Treffer geladen. Kontexte werden auf das Token-Budget gekürzt, ohne die entscheidenden Textstellen zu verlieren.
+* **Planbares Verhalten bei Störungen.** Fällt ein Suchkanal aus, bestimmen Sie vorab, ob abgebrochen, mit den übrigen Kanälen weitergearbeitet oder ein Pflichtkanal verlangt wird.
+* **Zeitlich korrekt.** Wissen hat ein Gültigkeitsdatum. Gefragt werden kann nach dem, was heute gilt, aber auch nach dem, was zu einem früheren Zeitpunkt galt oder bekannt war.
+
+### Ein Ergebnis, dem man vertrauen kann: Fusion und Kalibrierung
+
+* **Fairer Zusammenschluss der Suchverfahren.** Die Ergebnisse unterschiedlicher Verfahren werden zu einer gemeinsamen Rangliste zusammengeführt. Auffällig klare Spitzentreffer heben sich von diffusen Feldern ab, Mehrfachbestätigungen erhalten einen Bonus.
+* **Aussagekräftige Wahrscheinlichkeiten.** Rohwerte werden in kalibrierte Konfidenzen umgerechnet, sodass „80 % relevant“ auch tatsächlich ungefähr 80 % bedeutet, mit statistisch abgesicherten Unsicherheitsbereichen.
+* **Frühwarnsystem gegen schleichende Qualitätsverluste.** Das System erkennt automatisch, wenn sich das Verhalten der Suche gegenüber der Referenz verschiebt, etwa durch geänderte Daten oder Nutzungsmuster.
 
 ---
 
-### 2. Gedächtnis für KI-Agenten
+## 2. Aufgaben selbstständig erledigen: Agenten und Langzeitgedächtnis
 
 <img width="2752" height="1536" alt="agentic" src="https://github.com/user-attachments/assets/87780e2a-54bb-492f-817b-df9f0d67c1c3" />
 
-Ein KI-Agent braucht ein Gedächtnis, das er pflegt, verdichtet und gezielt abruft. Contextra bietet dafür eine einfache Oberfläche und im Hintergrund die Technik, die lange Arbeitsläufe zuverlässig macht.
+**Das Ziel:** KI-Agenten sollen mehrstufige Aufgaben zuverlässig abarbeiten, im Rahmen klarer Regeln und Budgets, mit lückenloser Dokumentation, und über die Zeit dazulernen, ohne zu „zumüllen“ oder zu halluzinieren.
 
-**Vier einfache Operationen.**
+### Kontrollierte Agenten-Ausführung
 
-| Operation | Wirkung |
-|---|---|
-| `remember` | Speichert eine Erinnerung, optional mit Zusatzinformationen |
-| `recall` | Ruft relevante Erinnerungen zu einer Frage ab |
-| `relate` | Verknüpft zwei Erinnerungen miteinander |
-| `forget` | Entfernt Erinnerungen kontrolliert |
+* **Jeder Schritt ist abgesichert.** Agenten arbeiten Prozesse als Folge klar definierter Schritte ab: Zustand sichern, ausführen, bestätigen, protokollieren. Misslingt etwas, ist der letzte gute Stand wiederherstellbar.
+* **Reproduzierbar und testbar.** Abläufe lassen sich exakt nachspielen, Fehler gezielt nachstellen und Tests verlässlich automatisieren.
+* **Wege und Ziele sind definiert.** Verzweigungen, Fallbacks und parallele Pfade folgen festen Bedingungen. Ein Workflow endet erst, wenn sein Ziel nachweislich erreicht ist.
+* **Kein Endlosdrehen.** Schrittgrenzen und die Erkennung wiederkehrender Zustände stoppen Agenten, die sich im Kreis bewegen oder keinen Fortschritt mehr machen.
+* **Fehler gehen nicht verloren.** Fehlgeschlagene Schritte landen in einer Warteschlange mit Fehlerklassifizierung und automatischen Wiederholversuchen. Sie lassen sich später gezielt erneut anstoßen.
+* **Reagiert auf Ereignisse.** Agenten können auf eingehende Ereignisse reagieren, ohne vom Ansturm überrollt zu werden.
+* **Ein aufgeräumter Arbeitsbereich.** Zwischenergebnisse und Hypothesen liegen getrennt von den eigentlichen Anweisungen. Grundregeln und Rollenprofile bleiben geschützt im Kontext und werden bei Verdichtung nicht verdrängt.
+* **Kosten und Ressourcen im Griff.** Token, Schritte, Werkzeugaufrufe und Kosten werden pro Aufgabe und über parallele Teilagenten hinweg exakt begrenzt.
+* **Werkzeuge mit klaren Spielregeln.** Jedes Tool hat eine Beschreibung mit erlaubten Eingaben, Berechtigungen, Zeitlimit und Auswirkungen. Aufrufe werden vorab geprüft, die Wissenssuche ist direkt eingebaut.
+* **Vollständige Nachvollziehbarkeit.** Zustandswechsel, Entscheidungen, Werkzeugaufrufe, Verbräuche und Fehler werden manipulationssicher protokolliert.
 
-Suche, Zusammenführung und Vertrauensbewertung laufen dabei automatisch im Hintergrund.
+### Ein Gedächtnis, das mitwächst und aufräumt
 
-**Ausführung in gesicherten Schritten.** Ein Agentenlauf folgt dem Zyklus Sicherungspunkt, Ausführung, Übernahme und Protokollierung. Vor jedem Schritt entsteht automatisch ein Abbild des Zustands. Scheitert ein Schritt, kehrt der Agent zuverlässig zum letzten gültigen Zustand zurück.
-
-**Begrenzung von Kosten und Endlosschleifen.** Ein Budget begrenzt Verbrauch und Anzahl der Schritte. Ein Agent endet dadurch auch dann, wenn er sich verrennt.
-
-**Verdichtung statt Überlauf.** Lange Dialoge werden gekürzt, zusammengefasst oder selektiv behalten. Ein Notizbereich erlaubt dem Agenten, Zwischenstände zu bearbeiten und bei Teilzielen zu leeren. Jede Änderung wird protokolliert.
-
-**Aufräumen und Zusammenführen.** Doppelte oder nahezu gleiche Erinnerungen werden erkannt und zusammengeführt. Eine Schutzregel verhindert, dass unterschiedliche Inhalte allein wegen einer Kette ähnlicher Einträge verschmolzen werden. Übergeordnete Wissensknoten halten auch große Wissensbestände überschaubar.
-
-**Nachvollziehbarkeit.** Jeder Agentenschritt und jede Änderung am Gedächtnis hinterlässt eine Spur, die sich später prüfen lässt.
+* **Doppeltes wird zusammengeführt.** Im Hintergrund erkennt das System Duplikate und Beinahe-Duplikate und bündelt sie, effizient auch bei großen Beständen. Sperren und Schutzmechanismen verhindern, dass parallele Läufe sich in die Quere kommen.
+* **Lange Gespräche bleiben handhabbar.** Wächst ein Verlauf an die Kontextgrenze, wird er automatisch verdichtet. Sie wählen die Strategie: Ältestes entfernen, zusammenfassen oder nur das Wesentliche (Fakten, Entscheidungen, Randbedingungen) behalten. Gepinnte Vorgaben bleiben stets erhalten, die Rohdaten archiviert.
+* **Aus Einzelheiten werden Konzepte.** Zusammengehörige Erinnerungen werden zu übergeordneten Wissensknoten verdichtet, die mit den Details verknüpft bleiben, so dass Antworten auch über mehrere Stationen hinweg gelingen.
+* **Schutz vor Fehlschlüssen.** Das System verhindert, dass Dinge fälschlich verschmelzen, nur weil sie über Umwege ähnlich wirken.
+* **Keine erfundenen Erinnerungen.** Jede verdichtete Zusammenfassung wird gegen die Originalquellen geprüft. Unbelegte Aussagen werden gar nicht erst gespeichert.
+* **Vergessen, wie ein gutes Gedächtnis.** Ungenutztes tritt mit der Zeit zurück, häufig Abgerufenes wird gestärkt. Ein Hintergrunddienst übernimmt Konsolidierung, Auffrischung, Archivierung und Ablauf nach Ihrer Konfiguration.
 
 ---
 
-### 3. Adaptive Modellauswahl
+## 3. Das richtige Modell zur richtigen Zeit: Adaptives Routing und Regelung
 
 <img width="2752" height="1536" alt="routing" src="https://github.com/user-attachments/assets/d792ecc5-2744-4010-b258-f9011030ad81" />
 
-Nicht jede Anfrage verdient dasselbe KI-Modell. Einfache Fragen brauchen kein teures Spitzenmodell, anspruchsvolle schon. Contextra lernt aus den Ergebnissen, welches Modell für welche Art von Anfrage am besten passt.
+**Das Ziel:** Nicht jede Frage braucht das größte und teuerste Modell. CONTEXTRA wählt pro Anfrage automatisch das Modell aus, das Qualität, Antwortzeit und Kosten am besten ausbalanciert, und lernt dabei aus der eigenen Praxis.
 
-**Lernende Auswahl.** Das System wählt je Anfrage das Modell mit dem besten erwarteten Ergebnis. Der Rechenaufwand bleibt auch bei vielen unterschiedlichen Anfragearten gering.
+### Lernende Modellauswahl
 
-**Umgang mit Veränderung.** Verändert sich die Leistung eines Modells, passt sich die Auswahl an. Neue oder selten genutzte Modelle erhalten bewusst eine faire Chance, sich zu bewähren.
+* **Entscheidung nach Kontext.** Art und Anforderungen einer Anfrage bestimmen, ob ein lokales Kleinmodell, ein leistungsstarkes Remote-Modell oder ein anderer Kandidat zum Zug kommt.
+* **Probieren und Bewähren.** Das System testet gezielt Alternativen, um bessere Optionen zu entdecken, und nutzt Bewährtes, wo es sich lohnt. Die Mechanik ist kontrollierbar und nachvollziehbar.
+* **Robust gegen Schwankungen.** Tageszeitabhängige Latenzen oder Modell-Updates verfälschen die Auswahl nicht. Veraltete Beobachtungen werden schrittweise aus dem Lernen verdrängt, einzelne Ausreißer (etwa ein Netzwerk-Timeout) dämpfen die Bewertung nicht.
+* **Neue Strategien gefahrlos prüfen.** Mit historischen Daten lässt sich vorab abschätzen, wie eine neue Routing-Strategie abgeschnitten hätte. Im Schattenbetrieb läuft sie parallel mit und protokolliert, was sie getan hätte, ohne dass Nutzer davon etwas merken.
 
-**Steuerung der Antwortzeit.** Die Kapazität der Modelle wird so geregelt, dass eine vorgegebene Antwortzeit eingehalten wird. Bei Lastspitzen reagiert die Regelung besonnen und schwingt nicht über.
+### Stabiler Betrieb durch Regelung
 
-**Gleichgewicht und Vergessen.** Die Auslastung der Modelle wird in einem stabilen Bereich gehalten. Erinnerungen verblassen über die Zeit, und das Tempo orientiert sich an der Auslastung des Systems. Die Stabilität der gesamten Regelung wird mathematisch überwacht.
+* **Konstante Antwortzeiten.** Ein Regler passt Suchtiefe, Kandidatenzahl und Zeitbudgets laufend an das Latenzziel an und bleibt auch bei Lastspitzen stabil.
+* **Keine Modell-Monokultur.** Ein Ausgleichsmechanismus hält Auslastung, Warteschlangen und Modellvielfalt in einem gesunden Korridor, damit nicht dauerhaft alles auf ein einziges Modell läuft.
+* **Aktuelle Zahlen zählen mehr.** Ältere Leistungsdaten verlieren nach einer einstellbaren Halbwertszeit an Gewicht.
+* **Mathematisch überwachte Stabilität.** Zur Laufzeit wird geprüft, ob sich das Zusammenspiel der Regelkreise beruhigt oder aufschaukelt. Droht Instabilität, schaltet das System selbstständig auf vorsichtige Sicherheitswerte um.
 
 ---
 
-### 4. Datenschutz, Sicherheit und Compliance
+## 4. Vertraulichkeit und Nachweisbarkeit: Sicherheit, Datenschutz und Compliance
 
 <img width="2752" height="1536" alt="security" src="https://github.com/user-attachments/assets/2c02271c-171c-4256-92fc-d43a4b98623d" />
 
-Wissen ist wertvoll, und sein Abfluss hat Folgen. Contextra schützt an den Stellen, an denen Daten das System verlassen könnten, und dokumentiert, was dabei geschieht.
+**Das Ziel:** Sie können KI intensiv nutzen, auch mit externen Modellen, ohne die Kontrolle über sensible Daten zu verlieren, und können Ihre Schutzmaßnahmen gegenüber Dritten belegen.
 
-**Erkennung personenbezogener Daten.** Kennungen wie IBAN und E-Mail-Adressen werden in Texten automatisch erkannt.
+### Schutz vor Datenabfluss und Manipulation
 
-**Platzhalter statt Originalwerte.** Vor einer Modellanfrage werden sensible Werte durch Platzhalter ersetzt. Nach der Antwort werden die Originalwerte wieder eingesetzt. Der Anwender erhält das vollständige Ergebnis, das Modell sieht die Originalwerte nie.
+* **Sensible Daten werden erkannt, bevor sie das Haus verlassen.** Personenbezogene und vertrauliche Angaben wie IBAN, Kreditkartennummern, Steuer- und Ausweisnummern, E-Mail-Adressen und Telefonnummern werden mit gezielten Regeln und rechnerischen Prüfungen erkannt, nicht nur geraten.
+* **Pseudonymisierung mit Rückweg.** Vor dem Versand an ein externes Modell werden sensible Angaben durch neutrale Platzhalter ersetzt (z. B. `[IBAN_01]`). In der Antwort werden sie verlustfrei wieder eingesetzt. Das externe Modell sieht die echten Werte nie.
+* **Schutz auch vor Umschreibungen.** Ein semantischer Abgleich blockiert Übertragungen, die vertrauliche Inhalte nur in anderen Worten wiedergeben würden.
+* **Erkennt unnormale Datenabflüsse.** Sowohl plötzliche Massenabflüsse als auch langsames, unauffälliges Abgreifen werden pro Mandant und Ziel überwacht und gestoppt.
+* **Abwehr von Prompt-Injection.** Manipulationsversuche, sei es direkt oder versteckt in abgerufenen Dokumenten oder Werkzeugantworten, werden erkannt. Anweisungen und Nutzdaten bleiben strikt getrennt.
+* **Lückenloses Eingriffsprotokoll.** Jede Maskierung, Ersetzung und Blockade wird in einer verketteten, nachträglich nicht veränderbaren Protokollfolge festgehalten.
 
-**Ausgangskontrolle.** Ausgehende Inhalte werden gegen geschützte Referenzen geprüft. Ein Frühwarnsystem erkennt ungewöhnlich große Datenmengen in kurzer Zeit, auch wenn jede einzelne Anfrage unauffällig wirkt.
+### Verschlüsselung und Löschung, die man beweisen kann
 
-**Schutz vor manipulierten Dokumenten.** Versteckte Anweisungen in Dokumenten, die einen Agenten fehlleiten sollen (sogenannte Prompt-Injection), werden erkannt und isoliert, bevor sie wirken.
+* **Moderne Verschlüsselung mit doppeltem Boden.** Daten sind auch bei Fehlern in der Anwendung robust geschützt. Mandanten und Dokumente haben getrennte Schlüssel in einer klaren Schlüsselhierarchie, Passwörter werden mit speicherintensiven Verfahren abgesichert.
+* **Löschen heißt wirklich löschen.** Wird der Schlüssel eines Dokuments oder Mandanten vernichtet, sind alle zugehörigen Daten sofort unwiederbringlich unlesbar, in Datenbank, Indizes und Backups, ohne langwieriges Neuindizieren.
+* **Löschnachweise mit digitaler Signatur.** Jede Löschung kann extern überprüfbar belegt werden, mit unveränderlichem Widerrufsprotokoll.
+* **Manipulationssichere Protokolle.** Jeder Eintrag im Transaktionslog ist kryptografisch an den vorherigen gebunden. Auch gelöschte oder eingeschleuste Einträge werden bei Wiederherstellung und im Betrieb entdeckt.
+* **Echte Modelle, nachweislich.** Vor jeder Nutzung wird per Fingerabdruck geprüft, dass Modellgewichte und Konfiguration unverändert sind.
+* **Geheimnisse bleiben im Speicher.** Schlüssel und Passwörter werden vor dem Auslagern auf die Festplatte geschützt und nach Gebrauch zuverlässig überschrieben.
 
-**Lückenloses Protokoll.** Jede Änderung am Wissensbestand wird festgehalten. Die Einträge sind kryptografisch verkettet, sodass nachträgliche Manipulationen auffallen.
+### Compliance auf Knopfdruck
 
-**Verschlüsselung.** Alle gespeicherten Daten sind mit AES-256 verschlüsselt, einem anerkannten Industriestandard. Die Schlüssel werden über ein mehrstufiges Verfahren abgeleitet und nach Gebrauch aus dem Arbeitsspeicher gelöscht.
-
-**Speicherschutz.** Sensible Daten im Arbeitsspeicher werden vor dem Auslagern auf die Festplatte geschützt und beim Verlassen ihres Gültigkeitsbereichs sicher überschrieben.
-
-**Löschen durch Schlüsselvernichtung.** Wird der Schlüssel eines Dokuments vernichtet, sind dessen Daten dauerhaft unlesbar. Der Bestand muss dafür nicht neu aufgebaut werden. Die Löschung läuft als nachvollziehbarer, mehrstufiger Vorgang mit Journal, und während der Löschung ist der Lesezugriff gesperrt.
-
-**Löschnachweis.** Über jede Löschung entsteht ein digital signierter Bericht, der sich unabhängig prüfen lässt. Beim Einspielen eines Backups bleiben bereits gelöschte Daten gelöscht. Die rechtliche Bewertung eines Löschvorgangs obliegt dem Betreiber.
-
-**Unterstützung bei der DSGVO-Dokumentation.** Contextra kann ein Verzeichnis der Verarbeitungstätigkeiten nach Art. 30 DSGVO exportieren und liefert Vorlagen für Auftragsverarbeitungsverträge, die auf die technischen Schutzmaßnahmen verweisen. Ein Lizenzmodul steuert, welche Funktionsbereiche freigeschaltet sind.
+* **Nachweise für Audits.** Verarbeitungsverzeichnisse und Audit-Exporte (JSON, CSV, Markdown) werden automatisch erzeugt, vertrauliche Nutzdaten dabei bereinigt, und lassen sich den Bausteinen des BSI IT-Grundschutz-Kompendiums zuordnen.
+* **Auftragsverarbeitungsvertrag (Art. 28 DSGVO) aus der tatsächlichen Konfiguration.** Der Vertrag entsteht aus den Funktionen Ihres Systems, mit Klauseln zu Weisungsbindung, Vertraulichkeit, Betroffenenrechten, Unterstützungspflichten, Kontroll- und Auditrechten sowie Beendigung und Löschung. Vertrag und Realität stimmen so überein. Eine rechtliche Prüfung im Einzelfall ersetzt dies nicht.
 
 ---
 
-### 5. Zuverlässige Speicherung
+## 5. Verlässlich im Dauerbetrieb: Speicher, Transaktionen und Wiederherstellung
 
 <img width="2752" height="1536" alt="storage" src="https://github.com/user-attachments/assets/4ac5cdb6-b731-4653-af1c-4435c670a7fc" />
 
-Ein Gedächtnis ist nur so verlässlich wie sein Speicher. Contextra setzt auf eine bewährte Speicherarchitektur mit Transaktionen, Zeitbezug und sauberer Trennung gleichzeitiger Zugriffe.
+**Das Ziel:** Ihre Daten bleiben vollständig und konsistent, auch bei Stromausfall, Absturz oder gleichzeitigen Zugriffen, und Sie können jederzeit zu einem früheren Stand zurückkehren.
 
-**Schneller und abgesicherter Speicherkern.** Schreibvorgänge werden zunächst im Arbeitsspeicher gesammelt und später dauerhaft abgelegt. Im Hintergrund wird der Bestand laufend aufgeräumt, damit Lesezugriffe schnell bleiben. Vorgeschaltete Filter klären meist ohne Festplattenzugriff, ob ein Eintrag existiert.
+### Absturzsichere Datenhaltung
 
-**Absturzsicheres Protokoll.** Jeder Schreibvorgang wird zuerst in ein Protokoll geschrieben, das gegen Beschädigung gesichert ist. Fehler werden dadurch erkannt.
+* **Nach einem Absturz sofort wieder konsistent.** Jede Änderung wird vorab geprüft protokolliert. Beim Neustart stellt das System den korrekten Zustand automatisch und gefahrlos wieder her.
+* **Schutz vor schleichender Datenkorruption.** Im Hintergrund werden gespeicherte Daten gegen Prüfsummen abgeglichen, damit auch stille Fehler auf dem Datenträger auffallen. Verwaiste Dateien werden aufgeräumt, der Gesundheitszustand ist jederzeit einsehbar.
+* **Gründlich getestet.** Gezielte Fehlersimulation prüft systematisch, was bei Abstürzen an jeder denkbaren Stelle passiert.
+* **Schnelle Schreibleistung ohne Kompromiss.** Der Speicherkern ist auf hohen Schreibdurchsatz ausgelegt. Mehrstufige Filter vermeiden unnötige Lesezugriffe, ein geschütztes Protokoll sichert jede Änderung und eine Hintergrundpflege hält den Bestand kompakt.
 
-**Alles oder nichts.** Beliebig viele Einträge werden in einer gemeinsamen Transaktion übernommen. Wie streng die Dauerhaftigkeit gesichert wird, lässt sich je Vorgang einstellen.
+### Gleichzeitiger Zugriff ohne Überraschungen
 
-**Konsistenz bei gleichzeitigem Zugriff.** Jede Transaktion arbeitet auf einer konsistenten Momentaufnahme. Das System erkennt und verhindert Konflikte, bei denen sich zwei gleichzeitige Änderungen widersprechen würden.
+* **Vollständige Konsistenz bei parallelen Zugriffen.** Mehrere Nutzer und Agenten arbeiten gleichzeitig, ohne sich zu blockieren. Typische Konflikte wie Lost Updates oder widersprüchliche Lesestände werden zuverlässig verhindert.
+* **Alles oder nichts, auch über mehrere Indizes.** Eine Änderung wird in Vektor-, Volltext-, Graph- und Schlüsselspeicher entweder vollständig übernommen oder vollständig zurückgenommen. Mandanten bleiben strikt getrennt, bei Überlast schützt das System sich selbst.
 
-**Zeitreisen.** Contextra unterscheidet, wann etwas erfasst wurde und wann es fachlich galt. So lässt sich abfragen, welcher Wissensstand an einem bestimmten Datum vorlag oder was in einem bestimmten Zeitraum gültig war.
+### Zeitreise und Rückkehr zu guten Zuständen
 
-**Sicherung und Wiederherstellung.** Sicherungspunkte und Snapshots sichern den Bestand. Daten werden crash-sicher auf den Datenträger geschrieben.
+* **Automatischer Rücksetzpunkt.** Vor kritischen Operationen wird ein Zustand gesichert und bei Fehlern selbsttätig wiederhergestellt.
+* **Sofortige Sicherungen ohne Kopieraufwand.** Zustandskopien entstehen in kürzester Zeit und fast ohne zusätzlichen Speicherbedarf.
+* **Zurück zu jedem früheren Stand.** Die gesamte Datenbank lässt sich auf einen belegten, früheren Zeitpunkt zurücksetzen. Die Prüfung der Sicherungen verhindert, dass beschädigte oder unpassende Stände eingespielt werden.
 
-**Abgeschottete Werkzeuge.** Zusätzliche Werkzeuge laufen in einer isolierten Umgebung mit festen Grenzen für Rechenaufwand und Laufzeit. Freigaben erfolgen über Anfragen mit Risikobewertung.
+### Gefahrlose Erweiterbarkeit
+
+* **Fremder Code in der Sandbox.** Externe Tools und Erweiterungen laufen in einer abgeschotteten Umgebung ohne Zugriff auf das Hostsystem. Rechenzeit und Arbeitsspeicher sind exakt begrenzt, so dass kein Zusatzbaustein das System lahmlegen kann.
 
 ---
 
-### 6. Aufnahme, Modelle und Schnittstellen
+## 6. Vom Dokument zur Qualitätskontrolle: Ingest, Anbindung und Evaluation
 
 <img width="2752" height="1536" alt="ingest" src="https://github.com/user-attachments/assets/18e529ac-5458-4d62-8dcb-48c962df873c" />
 
-Wissen kommt aus Dokumenten, und Antworten entstehen mit KI-Modellen. Contextra verbindet beides und lässt sich in bestehende Werkzeuge einfügen.
+**Das Ziel:** Ihr vorhandenes Wissen wird ohne Aufwand erschlossen, passende KI-Modelle lassen sich einfach anbinden, und die Qualität des Gesamtsystems wird fortlaufend belegt statt behauptet.
 
-**Dokumentaufnahme.** PDF, Word, Markdown, E-Mails und weitere Formate werden formatbewusst gelesen. Die Gliederung folgt der Struktur des Dokuments und ist reproduzierbar.
+### Dokumente sauber einlesen
 
-**Lokale KI-Modelle.** Modelle laufen direkt im eigenen Programm. Alternativ kann ein eigener Modellserver (z. B. Ollama) angebunden werden. Fällt dieser aus, fängt eine Schutzschaltung den Fehler ab.
+* **Viele Formate, erhaltene Struktur.** PDF, Word, Markdown und Klartext werden gelesen. Überschriften, Absätze, Tabellen und Codeblöcke bleiben als Struktur erkennbar.
+* **Sinnvoll zerteilt.** Texte werden an natürlichen Satz- und Abschnittsgrenzen in passend große, leicht überlappende Abschnitte geteilt, damit nichts an Schnittstellen verloren geht und das Token-Budget eingehalten wird.
+* **Vollständig portabel.** Komplette Bestände mit Vektoren, Volltext, Beziehungen und Metadaten lassen sich verlustfrei exportieren und wieder importieren, inklusive Integritätsprüfung.
 
-**Effiziente Wiederverwendung.** Wiederkehrende Textanfänge werden nur einmal berechnet und von mehreren Anfragen gemeinsam genutzt. Mandanten bleiben dabei strikt getrennt. Ein Kompressionsverfahren reduziert den Speicherbedarf zusätzlich.
+### Modelle nach Wahl anbinden
 
-**Verständnis komplexer Fragen.** Ein KI-gestützter Umformulierer zerlegt komplexe Fragen in Teilfragen, die schrittweise beantwortet werden.
+* **Direkt im Prozess.** Lokale Sprach- und Embedding-Modelle laufen ressourcenschonend ohne zusätzlichen Server. Modellinformationen werden automatisch ausgelesen.
+* **Industrieller Standard.** ONNX-Modelle für Embeddings, Nachsortierung der Treffer (Reranking) und Klassifikation werden mit Pooling und Bündelung effizient betrieben.
+* **Ollama-Anbindung mit Selbstschutz.** Lokale und entfernte Ollama-Server werden stabil angebunden. Bei Ausfall werden sie automatisch umgangen und nach Erholung wieder zugeschaltet.
 
-**Anbindung an KI-Werkzeuge.** Über das Model Context Protocol (MCP) ist Contextra mit Anwendungen wie Claude Desktop, Cursor oder VS Code nutzbar.
+### Einfach integrierbar
 
-**Python-Schnittstelle.** Bestehende Python-Anwendungen können Contextra direkt verwenden.
+* **Für Entwicklungsumgebungen und Agenten-Hosts.** Der MCP-Server stellt Suche, Wissensgraph, Gedächtnis und Agentenfunktionen als eigenständiges Programm ohne Abhängigkeiten bereit.
+* **Für Python-Teams.** Als Python-Paket installierbar und ohne Leistungseinbußen nutzbar, auch bei parallelen Aufgaben und großen Vektordaten.
+* **Ein zentraler Einstiegspunkt.** Die Integrations-Engine verwaltet Start und Betrieb, liefert Messwerte und Gesundheitsdiagnosen und stellt sicher, dass die übergreifenden Qualitätsregeln des Systems eingehalten werden.
 
-**Keine verlorenen Ereignisse.** Ereignisse, die nicht verarbeitet werden konnten, werden gesondert festgehalten und können später nachbearbeitet werden.
+### Qualität messbar und abgesichert
 
----
-
-## Ein Beispiel aus der Praxis
-
-Eine Anwaltskanzlei möchte, dass ein KI-Assistent Fragen zu internen Akten beantwortet, ohne dass Mandantendaten die Kanzlei verlassen.
-
-1. Akten (PDF, Word, E-Mails) werden in Contextra eingelesen und verschlüsselt gespeichert.
-2. Ein Mitarbeiter fragt: „Welche Fristen gelten im Fall Müller?“
-3. Contextra sucht gleichzeitig nach Inhalt, exakten Begriffen („Müller“, Aktenzeichen) und Zusammenhängen zwischen Personen und Ereignissen.
-4. Der Assistent erhält wenige, begründete Treffer samt Vertrauenswert. Personenbezogene Daten werden bei Bedarf durch Platzhalter ersetzt.
-5. Ist die Beleglage dünn, weist das System darauf hin.
-6. Wird ein Mandat beendet, löscht Contextra die zugehörigen Daten durch Schlüsselvernichtung und stellt einen signierten Löschnachweis aus.
-
-Für Entwickler genügen wenige Zeilen, um das Gedächtnis einzubinden:
-
-```rust
-use contextra::{AgentMemory, ContextraBuilder};
-use contextra_types::DistanceMetric;
-
-let db = ContextraBuilder::new(4)
-    .with_storage_path("./wissen")
-    .with_distance_metric(DistanceMetric::Cosine)
-    .build()
-    .await?;
-
-let memory = AgentMemory::new(db);
-
-memory.remember("Rust ist eine typsichere Systemprogrammiersprache.", None).await?;
-
-let treffer = memory.recall("Systemprogrammiersprache", 5).await?;
-```
+* **Suchqualität in Zahlen.** Standardisierte Benchmarks (NDCG, MRR, Recall) auf bekannten Datensätzen sowie auf einem eigenen deutschen Kompositakorpus.
+* **Geschwindigkeit und Trefferquote im Zusammenspiel.** Durchsatz und Antwortzeiten (Median bis p99) werden für jede Suchvariante vermessen.
+* **Gedächtnisqualität.** Benchmarks für langfristiges, sitzungsübergreifendes Erinnern, zeitliche Konsistenz und die Güte der Verdichtung.
+* **Keine unbemerkten Rückschritte.** Automatisierte Tests, auch bei Mehrschritt-Wissenssuche und mit 100.000-Dokument-Skalierung, blockieren Änderungen, die Qualität oder Geschwindigkeit verschlechtern würden, bevor sie ausgeliefert werden.
 
 ---
 
-## Einsatzbereiche
+## Zusammenfassung
 
-**Wissensassistent für Kanzleien, Verwaltungen und Beratungen.** Akten werden lokal durchsucht, Fristen und Zusammenhänge erkannt, und kein Dokument verlässt das Haus.
+CONTEXTRA ist kein einzelnes Werkzeug, sondern ein zusammenhängendes Fundament für produktive KI-Anwendungen:
 
-**Entwicklungsassistenten mit Projektgedächtnis.** Architekturentscheidungen und frühere Fehler bleiben erhalten, und die Arbeit wird nach einem Abbruch an der richtigen Stelle fortgesetzt.
-
-**Industrie, Robotik und Geräte ohne Netzverbindung.** Wissen über Orte, Abläufe und Ereignisse bleibt lokal verfügbar, Entscheidungen fallen direkt auf dem Gerät.
-
-**Gesundheitswesen und industrielle Systeme.** Datenschutz, Nachvollziehbarkeit und nachweisbares Löschen sind Teil der Architektur.
-
-**Kundenservice auf Basis geprüfter Quellen.** Antworten stützen sich auf belegte Treffer. Ist die Beleglage dünn, erkennt das System dies und gibt es zurück.
-
-**Forschung zur Suche.** Bedeutungs-, Begriffs- und Beziehungssuche lassen sich einzeln und kombiniert vergleichen, mit denselben Daten und denselben Messwerten.
-
----
-
-## Technische Eckdaten
-
-| Bereich | Merkmale |
-|---|---|
-| Betrieb | Vollständig lokal, ohne Cloud und ohne externen Dienst |
-| Entwicklung | Programmiersprache Rust, nutzbar aus Rust und Python |
-| Suche | Bedeutungs-, Begriffs- und Beziehungssuche mit gewichteter Zusammenführung und statistisch geprüften Vertrauenswerten |
-| Sprache | Deutsche Sprachverarbeitung inklusive Zerlegung zusammengesetzter Wörter |
-| Sicherheit | AES-256-Verschlüsselung, Erkennung personenbezogener Daten, manipulationssicheres Protokoll |
-| Löschung | Schlüsselvernichtung mit digital signiertem Nachweis |
-| Speicher | Transaktional, absturzsicher, mit Zeitreisen und Wiederherstellung |
-| Hardware | Beschleunigung auf x86 (AVX2, AVX-512) und ARM (NEON), Standardbetrieb auf allen anderen Systemen |
-| Integration | MCP-Server, Python-Schnittstelle, lokale Modelle, Ollama-Anbindung |
-| Compliance | Export des Verarbeitungsverzeichnisses (Art. 30 DSGVO), Vorlagen für Auftragsverarbeitungsverträge |
-
----
-
-<p align="center"><i>Lizenz: MIT oder Apache-2.0</i></p>
+* **Treffsicher:** die richtige Information zur richtigen Frage, auch bei deutschem Fachvokabular und verteiltem Wissen.
+* **Verlässlich:** ein Gedächtnis, das mitwächst, Widersprüche auflöst und nichts erfindet.
+* **Wirtschaftlich:** das passende Modell pro Anfrage, mit planbaren Kosten und Antwortzeiten.
+* **Vertrauenswürdig:** Datenschutz, Löschbeweise und Audit-Unterlagen als fester Bestandteil.
+* **Robust:** konsistente Daten bei jedem Ausfall, Rückkehr zu jedem früheren Stand.
+* **Offen:** einfache Anbindung von Dokumenten, Modellen, Entwicklungsumgebungen und Python.
+* **Belegt:** Qualität, die laufend gemessen und abgesichert wird.
