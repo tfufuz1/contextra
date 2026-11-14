@@ -23,7 +23,9 @@
 // ANCHOR[contextra-agent:clm-scratchpad]
 
 
-use contextra_db::volatile_vault::{SignalModality, VaultChunk, VaultConfig, VolatileContextVault};
+use contextra_db::volatile_vault::{
+    SignalModality, VaultChunk, VaultConfig, VaultDocId, VaultTxId, VolatileContextVault,
+};
 use contextra_ports::{Clock, SystemClock};
 use contextra_types::{ContextraError, DocId, Result, TenantId, TxId};
 use serde::{Deserialize, Serialize};
