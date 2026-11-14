@@ -20,7 +20,7 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "workspace", "exp-dibud", "exp-resonance", "experimental-rank"]
+default = ["std", "exp-dibud", "exp-resonance", "experimental-rank"]
 std = []
 workspace = ["dep:contextra-types", "dep:contextra-ports"]
 types-compat = ["workspace"]

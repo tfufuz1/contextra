@@ -20,7 +20,7 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "workspace"]
+default = ["std"]
 std = []
 serde = []
 tracing = []

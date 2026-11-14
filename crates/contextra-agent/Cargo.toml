@@ -21,7 +21,7 @@ contextra-types      = { workspace = true }
 contextra-ports      = { workspace = true }
 bytes = { workspace = true }
 contextra-db         = { workspace = true, features = ["volatile-vault"] }
-contextra-checkpoint = { workspace = true }
+contextra-checkpoint = { workspace = true, features = ["workspace"] }
 contextra-router     = { workspace = true }
 serde              = { workspace = true, features = ["derive"] }
 serde_json         = { workspace = true }
