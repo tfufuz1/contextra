@@ -13,7 +13,8 @@
 use super::super::types::EdgePayload;
 use super::CsrGraph;
 use crate::consistency_enforcement::EdgeAssertion;
-use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
+use crate::error::{GraphError, Result};
+use crate::types::{DocId, EntityId, TxId};
 use std::sync::Arc;
 
 
@@ -39,7 +40,7 @@ impl CsrGraph {
                             suppression_count = pattern.contradiction_count,
                             "ConsistencyEnforcer: edge insertion suppressed by conflict pattern"
                         );
-                        return Err(ContextraError::PolicyViolation(
+                        return Err(GraphError::PolicyViolation(
                             "Contradictory edge suppressed by consistency enforcer".to_string(),
                         ));
                     }
@@ -67,7 +68,7 @@ impl CsrGraph {
         object_repr: Option<Vec<u8>>,
     ) -> Result<()> {
         if !weight.is_finite() || weight < 0.0 {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(GraphError::InvalidInput(format!(
                 "Invalid edge weight {weight}: weight must be finite and non-negative"
             )));
         }
@@ -189,7 +190,7 @@ impl CsrGraph {
         source_doc_id: Option<DocId>,
     ) -> Result<()> {
         if !weight.is_finite() || weight < 0.0 {
-            return Err(ContextraError::InvalidInput(format!(
+            return Err(GraphError::InvalidInput(format!(
                 "Invalid edge weight {weight}: weight must be finite and non-negative"
             )));
         }

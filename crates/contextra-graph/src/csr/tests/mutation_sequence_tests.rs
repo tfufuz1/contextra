@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Sequenzielle Mutationstests für komplexe Einfüge- und Löschfolgen.
 //!
 //! # Zweck

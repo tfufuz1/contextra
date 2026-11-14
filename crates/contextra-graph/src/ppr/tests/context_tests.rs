@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Tests für `PprContext` und Speicherpuffer-Wiederverwendung.
 //!
 //! # Zweck

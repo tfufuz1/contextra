@@ -120,7 +120,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
                         "Consolidation pass: cascade edge invalidation failed"
                     );
                     errors.push(format!("DocId {:?}: {}", doc_id, e));
-                    reports.push((doc_id, Err(e)));
+                    reports.push((doc_id, Err(contextra_types::ContextraError::Internal(e.to_string()))));
                 }
             }
         }

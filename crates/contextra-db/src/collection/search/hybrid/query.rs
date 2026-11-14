@@ -454,7 +454,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .await
                 }
                 contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
-                    self.graph_index.path_rag_at(anchors, max_hops, seq).await
+                    GraphIndex::path_rag_at(&*self.graph_index, anchors, max_hops, seq).await
                 }
             };
 

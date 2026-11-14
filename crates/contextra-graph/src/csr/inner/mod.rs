@@ -20,7 +20,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use contextra_types::{DocId, Entity, EntityId, TxId};
+use crate::types::{DocId, Entity, EntityId, TxId};
 
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::types::CsrEdge;

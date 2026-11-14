@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Golden-Master-Tests mit deterministischen Referenzergebnissen für PPR.
 //!
 //! # Zweck

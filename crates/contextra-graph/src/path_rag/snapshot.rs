@@ -9,7 +9,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use contextra_types::{EntityId, TxId};
+use crate::types::{EntityId, TxId};
 
 use crate::csr::visibility::is_edge_visible_bitemporal;
 use crate::csr::GraphInner;

@@ -13,7 +13,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use contextra_types::{DocId, Entity, EntityId, TxId};
+use crate::types::{DocId, Entity, EntityId, TxId};
 
 use super::super::types::EdgePayload;
 use super::GraphInner;

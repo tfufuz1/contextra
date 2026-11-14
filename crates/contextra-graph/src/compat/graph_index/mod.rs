@@ -173,7 +173,11 @@ impl GraphIndex for CsrGraph {
         max_hops: usize,
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
-        self.path_rag_at(start_nodes, max_hops, seq_no)
+        Box::pin(async move {
+            self.path_rag_at(start_nodes, max_hops, seq_no)
+                .await
+                .map_err(Into::into)
+        })
     }
 
     fn traverse_at<'a>(
@@ -248,7 +252,7 @@ impl GraphIndex for CsrGraph {
     }
 
     fn neighbors<'a>(&'a self, start: EntityId) -> BoxFuture<'a, Result<Vec<EntityId>>> {
-        Box::pin(async move { self.neighbors(start).await })
+        Box::pin(async move { self.neighbors(start).await.map_err(Into::into) })
     }
 
     fn rollback<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>> {

@@ -7,7 +7,7 @@
 // HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-use contextra_types::{PprAlgorithm, PprConfig};
+use crate::types::{PprAlgorithm, PprConfig};
 use parking_lot::Mutex;
 use std::sync::Arc;
 

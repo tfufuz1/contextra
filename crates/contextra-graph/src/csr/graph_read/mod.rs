@@ -18,9 +18,8 @@ pub mod path_rag;
 
 #[cfg(feature = "ports-compat")]
 use crate::GraphIndexExt;
-#[cfg(feature = "ports-compat")]
-use contextra_types::TxId;
-use contextra_types::{EntityId, Result};
+use crate::error::Result;
+use crate::types::{EntityId, TxId};
 
 use super::graph_write::CsrGraph;
 
@@ -157,6 +156,7 @@ impl CsrGraph {
     }
 
     pub async fn is_entity_deleted(&self, entity: EntityId) -> bool {
+        #[cfg(feature = "ports-compat")]
         if let Some(storage) = &self.storage {
             let key = format!("graph:entity:deleted:{}", entity.0);
             return storage.get(key.as_bytes()).await.ok().flatten().is_some();
@@ -174,7 +174,9 @@ impl CsrGraph {
 
     #[cfg(feature = "ports-compat")]
     pub async fn remove_entity(&self, tx: TxId, entity: EntityId) -> Result<()> {
-        GraphIndexExt::remove_entity(self, tx, entity).await
+        GraphIndexExt::remove_entity(self, tx, entity)
+            .await
+            .map_err(|e| crate::error::GraphError::Internal(e.to_string()))
     }
 }
 

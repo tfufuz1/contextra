@@ -13,12 +13,13 @@
 
 use std::sync::Arc;
 
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 use super::graph_write::CsrGraph;
 
 
 // SECTION Path Graph Core Implementation
+#[cfg(any(feature = "types-compat", feature = "ports-compat"))]
 impl crate::provider::GraphProvider for CsrGraph {
     fn node_ids(&self) -> Vec<EntityId> {
         let inner = self.inner_read();

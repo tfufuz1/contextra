@@ -7,7 +7,7 @@
 // HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-use contextra_types::EntityId;
+use crate::types::EntityId;
 use std::cmp::Ordering;
 
 /// Truncates hyperedge participants to at most `max_sort_size` top x-value participants plus the min x-value participant.

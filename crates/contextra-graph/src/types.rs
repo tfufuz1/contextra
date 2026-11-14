@@ -59,6 +59,8 @@ pub mod local {
         pub const fn new(id: u64) -> Self { Self(id) }
         #[inline]
         pub const fn inner(self) -> u64 { self.0 }
+        #[inline]
+        pub const fn as_u64(&self) -> u64 { self.0 }
         pub fn from_key(key: &str) -> Result<Self, std::num::ParseIntError> {
             if key.is_empty() { "".parse::<u64>().map(Self) } else { Ok(Self(hash_key_u64(key))) }
         }
@@ -89,10 +91,14 @@ pub mod local {
     pub struct TxId(pub u64);
 
     impl TxId {
+        pub const INVALID: Self = Self(0);
+        pub const INTERNAL_BASE: u64 = u64::MAX - 1_000_000;
         #[inline]
         pub const fn new(id: u64) -> Self { Self(id) }
         #[inline]
         pub const fn inner(self) -> u64 { self.0 }
+        #[inline]
+        pub const fn as_u64(self) -> u64 { self.0 }
     }
 
     impl fmt::Display for TxId {

@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Grundlegende Funktionsprüfungen für `CsrGraph`.
 //!
 //! # Zweck

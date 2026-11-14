@@ -39,7 +39,7 @@ impl Default for EdgeReinforcementConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::EntityId;
+    use crate::types::EntityId;
 
     // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-002]
     #[test]

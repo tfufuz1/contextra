@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Test-Modul fuer Community-Detection
 
 // FILE-CONTEXT
@@ -10,7 +11,7 @@
 use super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
-use contextra_types::{Edge, Entity, EntityId, TxId};
+use crate::types::{Edge, Entity, EntityId, TxId};
 
 // ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-001]
 #[tokio::test]

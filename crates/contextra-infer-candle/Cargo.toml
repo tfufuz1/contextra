@@ -53,6 +53,13 @@ required-features = ["kv-bridge"]
 
 [features]
 default = ["candle"]
+workspace = [
+    "dep:contextra-types",
+    "dep:contextra-ports",
+    "dep:contextra-rank",
+]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
 candle = [
     "dep:candle-core",
     "dep:candle-nn",
@@ -60,7 +67,7 @@ candle = [
     "dep:tokenizers",
     "dep:half"
 ]
-kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
+kv-bridge = ["workspace", "dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
 kv-stage-b = ["dep:bincode"]
 exp-kv-stage-b = ["kv-stage-b"]
 exp-gasp = []

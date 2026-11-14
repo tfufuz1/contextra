@@ -11,6 +11,7 @@
 
 // SECTION Csr Core Implementation
 pub(crate) mod graph_index;
+#[cfg(feature = "workspace")]
 pub(crate) mod graph_persist;
 pub(crate) mod graph_read;
 pub(crate) mod graph_write;

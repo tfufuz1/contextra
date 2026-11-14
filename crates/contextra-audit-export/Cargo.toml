@@ -14,7 +14,7 @@ ring = "0"
 klasse = "A"
 
 [features]
-default = ["std", "workspace", "test-utils"]
+default = ["std", "test-utils"]
 std = ["serde/std"]
 workspace = ["dep:contextra-types"]
 types-compat = ["workspace"]

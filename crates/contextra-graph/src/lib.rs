@@ -60,12 +60,14 @@ pub mod path_rag;
 #[cfg(feature = "graph-connectivity-health")]
 pub mod percolation;
 pub mod ppr;
+#[cfg(feature = "workspace")]
 pub mod ppr_stream;
 pub mod provenance;
 pub mod provider;
 pub mod purger;
 #[cfg(feature = "experimental-graph")]
 pub mod session_dag;
+#[cfg(any(test, feature = "test-support"))]
 pub mod test_doubles;
 pub mod types;
 pub mod tl_hfd;
@@ -111,9 +113,11 @@ pub use hyperedge::{
     HyperEdgeView, RoleBinding, RoleId, RoleInterner, HYPEREDGE_BY_ENTITY_PREFIX, HYPEREDGE_PREFIX,
 };
 pub use hyperedge_suggest::{
-    compute_co_occurrence_candidates, validate_candidates_with_llm, HyperEdgeCandidate,
+    compute_co_occurrence_candidates, HyperEdgeCandidate,
     HyperedgeSuggestError, ValidatedHyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
 };
+#[cfg(feature = "workspace")]
+pub use hyperedge_suggest::validate_candidates_with_llm;
 pub use path_rag::{GraphPath, PathGraph, PathRAGConfig, PathRAGEngine};
 #[cfg(feature = "k-path-diffusion")]
 pub use path_rag::{KPathConfig, KPathDiffusion, KPathResult};
@@ -125,6 +129,7 @@ pub use percolation::{
 #[cfg(feature = "apprh-diffusion")]
 pub use ppr::compute_ppr_with_apprh_selector;
 pub use ppr::{compute_ppr, compute_ppr_at, DeletedView, PprContext};
+#[cfg(feature = "workspace")]
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
 #[cfg(any(feature = "types-compat", feature = "ports-compat"))]
@@ -143,17 +148,8 @@ pub use tl_hfd::{
     MIN_SHADOW_SAMPLES,
 };
 
-/// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
-// ANCHOR[contextra-graph:SRC-LIB-001]
-#[cfg(feature = "ports-compat")]
-pub trait GraphIndexExt: contextra_ports::GraphIndex {
-    /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
-    fn remove_entity<'a>(
-        &'a self,
-        tx: contextra_types::TxId,
-        entity: EntityId,
-    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>>;
-}
+#[cfg(feature = "workspace")]
+pub use compat::graph_index_ext::GraphIndexExt;
 
 // !SECTION Lib Core Implementation
 

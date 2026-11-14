@@ -11,8 +11,9 @@
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use crate::error::GraphMutationError;
+#[cfg(feature = "workspace")]
 use contextra_ports::LlmTextGenerator;
-use contextra_types::{DocId, EntityId};
+use crate::types::{DocId, EntityId};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
@@ -124,6 +125,7 @@ pub fn compute_co_occurrence_candidates(
 /// # Budget Guard
 /// If `candidates.len() > max_llm_calls_per_cycle`, returns `Err(GraphMutationError)`
 /// wrapping `HyperedgeSuggestError::LlmValidationBudgetExceeded`.
+#[cfg(feature = "workspace")]
 pub async fn validate_candidates_with_llm(
     candidates: &[HyperEdgeCandidate],
     entity_labels: &dyn Fn(EntityId) -> Option<String>,

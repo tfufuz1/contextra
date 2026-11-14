@@ -12,7 +12,9 @@
 
 use super::super::graph_write::CsrGraph;
 use ahash::AHashMap;
-use contextra_types::{EntityId, Result, TxId};
+use crate::error::Result;
+use crate::storage::GraphFuture;
+use crate::types::{EntityId, TxId};
 
 
 // SECTION Path Rag Core Implementation
@@ -23,7 +25,7 @@ impl CsrGraph {
         start_nodes: &'a [EntityId],
         max_hops: usize,
         seq_no: u64,
-    ) -> contextra_ports::BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
+    ) -> GraphFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
             let as_of_tx = TxId::new(seq_no);
             if super::super::visibility::is_suspicious_tx_id(as_of_tx) {

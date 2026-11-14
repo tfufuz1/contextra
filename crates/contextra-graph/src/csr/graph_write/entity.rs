@@ -12,7 +12,8 @@
 
 use super::super::inner::sentinel_entity;
 use super::CsrGraph;
-use contextra_types::{Entity, Result};
+use crate::error::Result;
+use crate::types::Entity;
 
 
 // SECTION Entity Core Implementation

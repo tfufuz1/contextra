@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Persistenz- und Wiederherstellungstests für den Graphen.
 //!
 //! # Zweck

@@ -12,7 +12,7 @@ use super::error::TlHfdError;
 use super::params::TlHfdParams;
 use crate::path_rag::{forward_push_ppr, PathGraph, PprParams};
 use ahash::AHashSet;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 use std::cmp::Ordering;
 
 /// Minimum required sample count for shadow mode default flip evaluation.

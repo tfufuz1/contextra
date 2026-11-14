@@ -53,6 +53,18 @@ pub enum GraphError {
     Internal(String),
 }
 
+impl From<std::num::ParseIntError> for GraphError {
+    fn from(err: std::num::ParseIntError) -> Self {
+        GraphError::InvalidInput(err.to_string())
+    }
+}
+
+impl From<contextra_ids::IdError> for GraphError {
+    fn from(err: contextra_ids::IdError) -> Self {
+        GraphError::InvalidInput(err.to_string())
+    }
+}
+
 /// Detailed errors occurring during graph mutations.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

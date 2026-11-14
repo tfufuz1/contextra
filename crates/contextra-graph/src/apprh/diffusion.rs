@@ -11,7 +11,7 @@ use super::error::ApprhError;
 use super::params::ApprhParams;
 use crate::path_rag::PathGraph;
 use ahash::{AHashMap, AHashSet};
-use contextra_types::EntityId;
+use crate::types::EntityId;
 use std::collections::VecDeque;
 
 /// Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH).

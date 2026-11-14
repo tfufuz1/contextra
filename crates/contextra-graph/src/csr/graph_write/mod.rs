@@ -26,7 +26,7 @@ use std::sync::Arc;
 use crate::consistency_enforcement::ConsistencyEnforcer;
 #[cfg(feature = "ports-compat")]
 use contextra_ports::StorageEngine;
-use contextra_types::{DocId, EntityId};
+use crate::types::{DocId, EntityId};
 
 use super::inner::{GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::CsrGraphConfig;
@@ -109,29 +109,6 @@ impl CsrGraph {
         }
     }
 
-    // ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-MOD-007]
-    /// Delegiert an [`GraphIndex::personalized_page_rank_at`].
-    #[cfg(feature = "ports-compat")]
-    pub fn personalized_page_rank_at<'a>(
-        &'a self,
-        seed_nodes: &'a [contextra_types::EntityId],
-        config: &'a contextra_types::PprConfig,
-        seq_no: u64,
-    ) -> contextra_ports::BoxFuture<
-        'a,
-        contextra_types::Result<Vec<(contextra_types::EntityId, f32)>>,
-    > {
-        contextra_ports::GraphIndex::personalized_page_rank_at(self, seed_nodes, config, seq_no)
-    }
-
-    /// Delegiert an [`GraphIndex::rollback_to_tx`].
-    #[cfg(feature = "ports-compat")]
-    pub fn rollback_to_tx<'a>(
-        &'a self,
-        tx_id: contextra_types::TxId,
-    ) -> contextra_ports::BoxFuture<'a, contextra_types::Result<()>> {
-        contextra_ports::GraphIndex::rollback_to_tx(self, tx_id)
-    }
 
     pub fn inner_read(&self) -> arc_swap::Guard<Arc<GraphInner>> {
         self.inner.load()

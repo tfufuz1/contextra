@@ -28,10 +28,4 @@ pub enum ApprhError {
     NonFinite,
 }
 
-impl From<ApprhError> for contextra_types::ContextraError {
-    fn from(err: ApprhError) -> Self {
-        contextra_types::ContextraError::InvalidInput(err.to_string())
-    }
-}
-
 // !SECTION Error Core Implementation

@@ -30,8 +30,8 @@ pub use snapshot::SnapshotPathGraph;
 
 pub use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use ahash::AHashMap;
-use contextra_types::DocId;
-pub use contextra_types::EntityId;
+use crate::types::DocId;
+pub use crate::types::EntityId;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;

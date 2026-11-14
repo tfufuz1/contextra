@@ -10,8 +10,8 @@
 // SIEHE AUCH: crates/contextra-graph/src/cascade.rs
 
 use crate::consistency_enforcement::EdgeId;
+use crate::types::{DocId, TxId};
 use ahash::{AHashMap, AHashSet};
-use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
@@ -95,7 +95,7 @@ impl DocEdgeIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::EntityId;
+    use crate::types::EntityId;
 
     // ANCHOR[contextra-graph:SRC-PROVENANCE-009]
     #[test]

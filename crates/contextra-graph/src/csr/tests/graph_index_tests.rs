@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Tests für die `GraphIndex`-Port-Schnittstelle auf `CsrGraph`.
 //!
 //! # Zweck

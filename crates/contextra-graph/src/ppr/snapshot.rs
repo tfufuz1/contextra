@@ -15,7 +15,7 @@ use crate::csr::types::{EdgePayload, InternalIndex};
 use crate::csr::visibility::is_edge_visible_bitemporal;
 use crate::csr::GraphInner;
 use crate::ppr::{compute_ppr_with_context, DeletedView, PprContext};
-use contextra_types::{EntityId, PprConfig, TxId};
+use crate::types::{EntityId, PprConfig, TxId};
 use std::collections::HashMap;
 
 

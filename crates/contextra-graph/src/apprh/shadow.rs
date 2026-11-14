@@ -12,7 +12,7 @@ use super::error::ApprhError;
 use super::params::ApprhParams;
 use crate::path_rag::{forward_push_ppr, PathGraph, PprParams};
 use ahash::AHashSet;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 use std::cmp::Ordering;
 
 /// Formal default-flip gate trait evaluating whether APPRH can replace ForwardPush as default.

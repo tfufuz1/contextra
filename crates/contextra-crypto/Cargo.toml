@@ -64,7 +64,7 @@ lru = "0.16.4"
 regex = { workspace = true }
 
 [features]
-default = ["kv-encryption", "workspace"]
+default = ["kv-encryption"]
 workspace = ["dep:contextra-types", "dep:contextra-ports"]
 types-compat = ["workspace"]
 ports-compat = ["workspace"]

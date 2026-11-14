@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 // FILE-CONTEXT
 // STAND: 2026-11-15T12:00:00Z
 // ZWECK: Compressed Sparse Row (CSR) Graph-Engine Kern.
@@ -18,7 +19,8 @@ use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, Entity, EntityId, Result, TxId};
+use contextra_types::{ContextraError, Result};
+use crate::types::{Entity, EntityId, TxId};
 
 use super::graph_write::CsrGraph;
 use super::types::{

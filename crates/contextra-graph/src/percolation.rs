@@ -11,7 +11,7 @@
 // HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-use contextra_types::EntityId;
+use crate::types::EntityId;
 use std::collections::HashMap;
 
 /// Konfiguration für den Perkolations-Gesundheitsmonitor.
@@ -85,6 +85,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 
 /// Findet Kandidaten-Paare für Re-Bonding.
 /// Gibt `(EntityId, EntityId, similarity)`-Tupel zurück, sortiert absteigend nach Similarity.
+#[cfg(feature = "workspace")]
 pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
     graph: &G,
     embeddings: &HashMap<EntityId, Vec<f32>>,
@@ -157,8 +158,9 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
 mod tests {
     use super::*;
     use crate::CsrGraph;
+    #[cfg(feature = "workspace")]
     use contextra_ports::GraphIndex;
-    use contextra_types::{Entity, TxId};
+    use crate::types::{Entity, TxId};
     use std::sync::Arc;
 
     // ANCHOR[contextra-graph:SRC-PERCOLATION-004]

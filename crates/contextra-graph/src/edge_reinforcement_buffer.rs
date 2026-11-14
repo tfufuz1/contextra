@@ -18,7 +18,7 @@ use crate::csr::CsrGraph;
 #[cfg(feature = "edge-reinforcement-learning")]
 use crate::edge_reinforcement::EdgeReinforcementConfig;
 #[cfg(feature = "edge-reinforcement-learning")]
-use contextra_types::EntityId;
+use crate::types::EntityId;
 #[cfg(feature = "edge-reinforcement-learning")]
 use parking_lot::Mutex;
 
@@ -151,7 +151,7 @@ impl EdgeReinforcementBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::EntityId;
+    use crate::types::EntityId;
 
     // ANCHOR[contextra-graph:SRC-EDGE-REINFORCEMENT-BUFFER-010]
     #[test]
@@ -182,8 +182,9 @@ mod tests {
     async fn test_flush_with_populated_graph_edges() {
         use crate::csr::CsrGraph;
         use crate::edge_reinforcement::EdgeReinforcementConfig;
+        #[cfg(feature = "workspace")]
         use contextra_ports::GraphIndex;
-        use contextra_types::{Edge, Entity, TxId};
+        use crate::types::{Edge, Entity, TxId};
 
         let graph = CsrGraph::new();
         let tx = TxId::new(1);

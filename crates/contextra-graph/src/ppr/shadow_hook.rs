@@ -8,7 +8,7 @@
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use ahash::AHashMap;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 /// Diskrepanz-Eintrag: Baseline-Ergebnis vs. Kandidaten-Ergebnis (§12).
 #[derive(Debug, Clone, PartialEq)]

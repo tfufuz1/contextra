@@ -13,7 +13,8 @@
 use super::CsrGraph;
 #[cfg(feature = "ports-compat")]
 use contextra_ports::GraphIndex;
-use contextra_types::{EntityId, Result, TxId};
+use crate::error::Result;
+use crate::types::{EntityId, TxId};
 use std::collections::HashSet;
 
 

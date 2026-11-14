@@ -27,7 +27,7 @@ pub use shadow::{
 use crate::csr::CsrGraph;
 use crate::path_rag::PathGraph;
 use ahash::AHashMap;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 /// Computes Thresholded Local Hyper-Flow Diffusion (TL-HFD) over a generic [`PathGraph`].
 ///
@@ -67,7 +67,7 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use contextra_types::Entity;
+    use crate::types::Entity;
 
     // ANCHOR[contextra-graph:SRC-TL-HFD-MOD-003]
     #[tokio::test]

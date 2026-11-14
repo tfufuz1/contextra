@@ -29,9 +29,10 @@ pub use shadow::{
 };
 
 use crate::csr::CsrGraph;
+use crate::error::{GraphError, Result as GraphResult};
 use crate::path_rag::{PathGraph, PprParams};
 use ahash::AHashMap;
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 /// Computes Averaging-based Personalized PageRank for Hypergraphs (APPRH) over a generic [`PathGraph`].
 ///
@@ -62,12 +63,12 @@ pub fn forward_push_apprh<G: PathGraph>(
     seeds: &[EntityId],
     params: &PprParams,
     hyperedge_decay_factor: f32,
-) -> Result<AHashMap<EntityId, f32>, contextra_types::ContextraError> {
+) -> GraphResult<AHashMap<EntityId, f32>> {
     if !hyperedge_decay_factor.is_finite() // NAN-CHECK-OK
         || hyperedge_decay_factor <= 0.0
         || hyperedge_decay_factor > 1.0
     {
-        return Err(contextra_types::ContextraError::InvalidInput(format!(
+        return Err(GraphError::InvalidInput(format!(
             "hyperedge_decay_factor must be in (0.0, 1.0] and finite, got {}",
             hyperedge_decay_factor
         )));
@@ -113,7 +114,7 @@ impl CsrGraph {
 mod tests {
     use super::*;
     use crate::csr::CsrGraph;
-    use contextra_types::Entity;
+    use crate::types::Entity;
 
     // ANCHOR[contextra-graph:SRC-APPRH-MOD-005]
     #[tokio::test]

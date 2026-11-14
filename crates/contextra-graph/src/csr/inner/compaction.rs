@@ -10,7 +10,7 @@
 // HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-use contextra_types::{DocId, EntityId, TxId};
+use crate::types::{DocId, EntityId, TxId};
 
 use super::super::types::{EdgePayload, InternalIndex};
 use super::GraphInner;

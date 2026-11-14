@@ -15,7 +15,6 @@ klasse = "A"
 
 [features]
 default = [
-    "workspace",
     "session-dag",
     "entity-extraction",
     "hyperedge-suggest",

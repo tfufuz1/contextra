@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Algorithmische Vergleichstests zwischen Dense- und Forward-Push-PPR.
 //!
 //! # Zweck

@@ -10,10 +10,10 @@
 // HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
+use crate::error::Result;
 use crate::path_rag::{PathGraph, PathRAGEngine};
 use ahash::AHashSet;
-// TODO(baukasten): K-Path Algorithmus für Path-RAG entkoppeln (AD-2/AD-4). Reiner Graph-Pfadsuch-Algorithmus auf contextra-ids::EntityId und lokalem GraphError.
-use contextra_types::EntityId;
+use crate::types::EntityId;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 
@@ -62,7 +62,7 @@ pub trait KPathDiffusion: Send + Sync {
         source: EntityId,
         target: EntityId,
         config: &KPathConfig,
-    ) -> contextra_types::Result<KPathResult>;
+    ) -> Result<KPathResult>;
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +105,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
         source: EntityId,
         target: EntityId,
         config: &KPathConfig,
-    ) -> contextra_types::Result<KPathResult> {
+    ) -> Result<KPathResult> {
         if config.k == 0 {
             return Ok(KPathResult {
                 paths: vec![],

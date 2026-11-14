@@ -20,8 +20,9 @@
 #![forbid(unsafe_code)]
 
 use crate::csr::{CsrGraph, EdgeType};
+use crate::error::{GraphError, Result};
 use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
-use contextra_types::{DocId, Entity, EntityId, Result};
+use crate::types::{DocId, Entity, EntityId};
 
 /// Repräsentiert eine aus Freitext extrahierte Binärbeziehung zwischen zwei Entitäten.
 #[derive(Debug, Clone, PartialEq)]
@@ -308,7 +309,7 @@ pub fn ingest_extracted_relations(
                 ) {
                     created_edges.push(he);
                 } else {
-                    return Err(contextra_types::ContextraError::Internal(format!(
+                    return Err(GraphError::Internal(format!(
                         "Failed to convert ExtractedRelation to hyperedge: {e}"
                     )));
                 }

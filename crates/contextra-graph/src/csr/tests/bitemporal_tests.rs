@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Bitemporale Transaktionstests für den CSR-Graphen.
 //!
 //! # Zweck

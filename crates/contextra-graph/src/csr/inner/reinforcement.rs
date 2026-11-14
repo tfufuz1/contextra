@@ -12,7 +12,7 @@
 //! Passt Kantengewichte dynamisch an, wenn Pfade erfolgreich traversiert werden.
 
 #[cfg(feature = "edge-reinforcement-learning")]
-use contextra_types::EntityId;
+use crate::types::EntityId;
 
 #[cfg(feature = "edge-reinforcement-learning")]
 use super::super::types::CsrEdge;

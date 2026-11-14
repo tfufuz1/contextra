@@ -10,7 +10,7 @@
 // HOTSPOTS: Keine kritischen Bottlenecks identifiziert
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
-use contextra_types::TxId;
+use crate::types::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
 ///

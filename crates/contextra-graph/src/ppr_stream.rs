@@ -1,3 +1,4 @@
+#![cfg(feature = "workspace")]
 //! Candidate stream for Personalized PageRank (PPR) graph retrieval (DiBud / Spec §21.2 / AK-17).
 //!
 //! # Candidate Ordering & Determinism
@@ -18,7 +19,8 @@
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use contextra_ports::GraphIndex;
-use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
+use crate::error::{GraphError, Result};
+use crate::types::{DocId, EntityId, PprConfig, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).
@@ -160,7 +162,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
         match self.ranked.as_mut() {
             Some(ranked) => Ok(ranked),
-            None => Err(contextra_types::ContextraError::Internal(
+            None => Err(GraphError::Internal(
                 "Failed to initialize PPR stream ranking buffer".to_string(),
             )),
         }

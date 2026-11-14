@@ -28,7 +28,7 @@
 // SECTION Consistency Enforcement Core Implementation
 pub type NodeIdx = u64;
 
-use contextra_types::{EntityId, TxId};
+use crate::types::{EntityId, TxId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

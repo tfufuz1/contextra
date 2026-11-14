@@ -11,8 +11,8 @@
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use super::CsrGraph;
-use crate::error::GraphMutationError;
-use contextra_types::{DocId, EntityId, Result, TxId};
+use crate::error::{GraphMutationError, Result};
+use crate::types::{DocId, EntityId, TxId};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -97,7 +97,9 @@ impl CsrGraph {
                 }
             }
 
-            if let Some(storage) = self.storage() {
+            #[cfg(feature = "ports-compat")]
+            #[cfg(feature = "ports-compat")]
+        if let Some(storage) = self.storage() {
                 let key = format!(
                     "{}{:016x}:{:016x}",
                     crate::cascade::CASCADE_QUEUE_PREFIX,
@@ -139,6 +141,7 @@ impl CsrGraph {
         tx: TxId,
         hyperedge: &crate::hyperedge::HyperEdge,
     ) -> Result<()> {
+        #[cfg(feature = "ports-compat")]
         if let Some(storage) = self.storage() {
             let key = format!(
                 "{}{:016x}",
