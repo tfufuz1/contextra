@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 use super::*;
+use std::sync::Arc;
 use crate::lsm::{LsmConfig, LsmStorage};
 use crate::tenant_codec::TenantKeyCodec;
 use contextra_ports::clock::SystemClock;

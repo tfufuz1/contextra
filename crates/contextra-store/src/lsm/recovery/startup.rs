@@ -76,7 +76,7 @@ impl LsmStorage {
                 }
                 buf
             }
-            Err(crate::error::StoreError::NotFound(_)) => {
+            Err(contextra_types::ContextraError::NotFound(_)) => {
                 if !directory_is_pristine(&config.path).await? {
                     return Err(ContextraError::Storage(
                         "SALT file missing in non-pristine database directory".into(),
@@ -272,7 +272,7 @@ impl LsmStorage {
         let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;
 
         let budget_config = crate::budget::ResourceBudget {
-            memory_limit: (config.max_ram_mb * 1024 * 1024) as usize,
+            memory_limit: config.max_ram_mb * 1024 * 1024,
         };
         let resource_tracker = Arc::new(crate::budget::ResourceTracker::new(budget_config));
         if replayed_size > 0 {

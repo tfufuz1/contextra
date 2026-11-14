@@ -526,7 +526,7 @@ impl CompactionEngine {
 
         if merge_res.is_err() {
             if let Err(e) = self.vfs.remove_file(output_path) {
-                if !matches!(e, crate::error::StoreError::NotFound(_)) {
+                if !matches!(e, contextra_types::ContextraError::NotFound(_)) {
                     tracing::warn!(
                         "Failed to clean up partial compaction output file {:?}: {}",
                         output_path,

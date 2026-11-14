@@ -201,22 +201,3 @@ impl StorageEngine for LsmStorage {
     }
 }
 
-impl From<crate::stats::StorageStats> for StorageStats {
-    fn from(s: crate::stats::StorageStats) -> Self {
-        Self {
-            num_segments: s.num_segments,
-            total_size_bytes: s.total_size_bytes,
-            memtable_size_bytes: s.memtable_size_bytes,
-        }
-    }
-}
-
-impl From<StorageStats> for crate::stats::StorageStats {
-    fn from(s: StorageStats) -> Self {
-        Self {
-            num_segments: s.num_segments,
-            total_size_bytes: s.total_size_bytes,
-            memtable_size_bytes: s.memtable_size_bytes,
-        }
-    }
-}

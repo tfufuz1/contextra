@@ -3,70 +3,17 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use crate::error::{StoreError, StoreResult as Result};
+use contextra_types::ContextraError;
 
-/// Method via which medium verification was performed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum VerifiedVia {
-    Direct,
-    CacheDropped,
-    Cached,
-}
-
-/// Options configuring how a file is opened via [].
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct VfsOpenOptions {
-    pub read: bool,
-    pub write: bool,
-    pub create: bool,
-    pub create_new: bool,
-    pub truncate: bool,
-}
-
-impl VfsOpenOptions {
-    pub fn read_only() -> Self {
-        Self { read: true, ..Default::default() }
-    }
-}
-
-/// Abstract positional file handle.
-pub trait VfsFile: Send + Sync + 'static {
-    fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize>;
-    fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
-    fn set_len(&self, len: u64) -> std::io::Result<()>;
-    fn len(&self) -> std::io::Result<u64>;
-    fn sync_data(&self) -> std::io::Result<()>;
-    fn sync_all(&self) -> std::io::Result<()>;
-}
-
-/// Abstract virtual file system for contextra-store.
-pub trait Vfs: Send + Sync + 'static {
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>>;
-    fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()>;
-    fn create_dir_all(&self, path: &Path) -> Result<()>;
-    fn remove_file(&self, path: &Path) -> Result<()>;
-    fn rename(&self, from: &Path, to: &Path) -> Result<()>;
-    fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>>;
-    fn exists(&self, path: &Path) -> Result<bool>;
-    fn len(&self, path: &Path) -> Result<u64>;
-    fn list_dir(&self, path: &Path) -> Result<Vec<String>>;
-    fn sync_dir(&self, path: &Path) -> Result<()>;
-    fn read(&self, path: &Path) -> Result<Vec<u8>> {
-        std::fs::read(path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                StoreError::NotFound(path.display().to_string())
-            } else {
-                StoreError::from(e)
-            }
-        })
-    }
-}
+// A3: canonical Vfs/VfsFile/VfsOpenOptions/VerifiedVia live in contextra-ports.
+pub use contextra_ports::vfs::{VerifiedVia, VfsFile, VfsOpenOptions, Vfs};
 
 /// Default POSIX/OS filesystem implementation of [] for contextra-store.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RealFs;
 
 impl Vfs for RealFs {
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
+    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> contextra_types::Result<Box<dyn VfsFile>> {
         let mut std_opts = std::fs::OpenOptions::new();
         std_opts.read(opts.read);
         std_opts.write(opts.write);
@@ -74,13 +21,13 @@ impl Vfs for RealFs {
         std_opts.create_new(opts.create_new);
         std_opts.truncate(opts.truncate);
 
-        let file = std_opts.open(path).map_err(StoreError::Io)?;
+        let file = std_opts.open(path).map_err(ContextraError::Io)?;
         Ok(Box::new(RealFsFile::new(file)))
     }
 
-    fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
+    fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_types::Result<()> {
         let parent = path.parent().ok_or_else(|| {
-            StoreError::InvalidInput("Path has no parent directory".into())
+            ContextraError::InvalidInput("Path has no parent directory".into())
         })?;
 
         let tmp_path = path.with_extension(format!("tmp.{}", std::process::id()));
@@ -90,17 +37,17 @@ impl Vfs for RealFs {
             .write(true)
             .create_new(true)
             .open(&tmp_path)
-            .map_err(StoreError::Io)?;
+            .map_err(ContextraError::Io)?;
         use std::io::Write;
-        f.write_all(data).map_err(StoreError::Io)?;
+        f.write_all(data).map_err(ContextraError::Io)?;
         // 2. fsync file
-        f.sync_all().map_err(StoreError::Io)?;
+        f.sync_all().map_err(ContextraError::Io)?;
         drop(f);
 
         // 3. atomic rename
         if let Err(e) = std::fs::rename(&tmp_path, path) {
             let _ = std::fs::remove_file(&tmp_path);
-            return Err(StoreError::Io(e));
+            return Err(ContextraError::Io(e));
         }
 
         // 4. fsync parent dir
@@ -108,52 +55,62 @@ impl Vfs for RealFs {
         Ok(())
     }
 
-    fn create_dir_all(&self, path: &Path) -> Result<()> {
-        std::fs::create_dir_all(path).map_err(StoreError::Io)
-    }
-
-    fn remove_file(&self, path: &Path) -> Result<()> {
-        std::fs::remove_file(path).map_err(|e| {
+    fn read(&self, path: &Path) -> contextra_types::Result<Vec<u8>> {
+        std::fs::read(path).map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                StoreError::NotFound(path.display().to_string())
+                ContextraError::NotFound(path.display().to_string())
             } else {
-                StoreError::Io(e)
+                ContextraError::Io(e)
             }
         })
     }
 
-    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
-        std::fs::rename(from, to).map_err(StoreError::Io)
+    fn create_dir_all(&self, path: &Path) -> contextra_types::Result<()> {
+        std::fs::create_dir_all(path).map_err(ContextraError::Io)
     }
 
-    fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
-        let entries = std::fs::read_dir(path).map_err(StoreError::Io)?;
+    fn remove_file(&self, path: &Path) -> contextra_types::Result<()> {
+        std::fs::remove_file(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> contextra_types::Result<()> {
+        std::fs::rename(from, to).map_err(ContextraError::Io)
+    }
+
+    fn read_dir(&self, path: &Path) -> contextra_types::Result<Vec<PathBuf>> {
+        let entries = std::fs::read_dir(path).map_err(ContextraError::Io)?;
         let mut res = Vec::new();
         for entry in entries {
-            res.push(entry.map_err(StoreError::Io)?.path());
+            res.push(entry.map_err(ContextraError::Io)?.path());
         }
         Ok(res)
     }
 
-    fn exists(&self, path: &Path) -> Result<bool> {
+    fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
         Ok(path.exists())
     }
 
-    fn len(&self, path: &Path) -> Result<u64> {
+    fn len(&self, path: &Path) -> contextra_types::Result<u64> {
         std::fs::metadata(path).map(|m| m.len()).map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                StoreError::NotFound(path.display().to_string())
+                ContextraError::NotFound(path.display().to_string())
             } else {
-                StoreError::Io(e)
+                ContextraError::Io(e)
             }
         })
     }
 
-    fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
-        let entries = std::fs::read_dir(path).map_err(StoreError::Io)?;
+    fn list_dir(&self, path: &Path) -> contextra_types::Result<Vec<String>> {
+        let entries = std::fs::read_dir(path).map_err(ContextraError::Io)?;
         let mut res = Vec::new();
         for entry in entries {
-            let entry = entry.map_err(StoreError::Io)?;
+            let entry = entry.map_err(ContextraError::Io)?;
             if let Some(name) = entry.file_name().to_str() {
                 res.push(name.to_string());
             }
@@ -162,15 +119,15 @@ impl Vfs for RealFs {
         Ok(res)
     }
 
-    fn sync_dir(&self, path: &Path) -> Result<()> {
+    fn sync_dir(&self, path: &Path) -> contextra_types::Result<()> {
         let f = std::fs::File::open(path).map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                StoreError::NotFound(path.display().to_string())
+                ContextraError::NotFound(path.display().to_string())
             } else {
-                StoreError::Io(e)
+                ContextraError::Io(e)
             }
         })?;
-        f.sync_all().map_err(StoreError::Io)
+        f.sync_all().map_err(ContextraError::Io)
     }
 }
 
@@ -277,14 +234,14 @@ impl StoreIo {
 
     /// Opens a file using positional VfsFile options.
     pub fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
-        self.vfs.open(path, opts)
+        self.vfs.open(path, opts).map_err(StoreError::from)
     }
 
     /// Reads an entire file to a vector of bytes.
     pub async fn read(&self, path: &Path) -> Result<Vec<u8>> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.read(&p))
+        tokio::task::spawn_blocking(move || vfs.read(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -326,7 +283,7 @@ impl StoreIo {
     pub async fn write_atomic(&self, path: &Path, data: Vec<u8>) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.write_atomic(&p, &data))
+        tokio::task::spawn_blocking(move || vfs.write_atomic(&p, &data).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -335,7 +292,7 @@ impl StoreIo {
     pub async fn create_dir_all(&self, path: &Path) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.create_dir_all(&p))
+        tokio::task::spawn_blocking(move || vfs.create_dir_all(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -344,7 +301,7 @@ impl StoreIo {
     pub async fn remove_file(&self, path: &Path) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.remove_file(&p))
+        tokio::task::spawn_blocking(move || vfs.remove_file(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -354,7 +311,7 @@ impl StoreIo {
         let vfs = Arc::clone(&self.vfs);
         let f = from.to_path_buf();
         let t = to.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.rename(&f, &t))
+        tokio::task::spawn_blocking(move || vfs.rename(&f, &t).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -363,7 +320,7 @@ impl StoreIo {
     pub async fn exists(&self, path: &Path) -> Result<bool> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.exists(&p))
+        tokio::task::spawn_blocking(move || vfs.exists(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -372,7 +329,7 @@ impl StoreIo {
     pub async fn len(&self, path: &Path) -> Result<u64> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.len(&p))
+        tokio::task::spawn_blocking(move || vfs.len(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -381,7 +338,7 @@ impl StoreIo {
     pub async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.read_dir(&p))
+        tokio::task::spawn_blocking(move || vfs.read_dir(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
@@ -390,7 +347,7 @@ impl StoreIo {
     pub async fn sync_dir(&self, path: &Path) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
-        tokio::task::spawn_blocking(move || vfs.sync_dir(&p))
+        tokio::task::spawn_blocking(move || vfs.sync_dir(&p).map_err(StoreError::from))
             .await
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }

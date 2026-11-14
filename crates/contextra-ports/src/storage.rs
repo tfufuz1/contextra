@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 // ANCHOR[contextra-ports:STORAGE-STATS-001]
 /// Statistics for the storage engine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StorageStats {
     /// Number of SSTable segments.
     pub num_segments: usize,

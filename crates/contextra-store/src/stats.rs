@@ -1,12 +1,5 @@
-//! Storage statistics definitions for contextra-store.
+//! Storage statistics for contextra-store.
+//!
+//! Canonical definition lives in `contextra-ports` (A1 of the decoupling plan).
 
-/// Detailed operational and storage statistics.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct StorageStats {
-    /// Number of SSTable segments.
-    pub num_segments: usize,
-    /// Total size of all SSTables in bytes.
-    pub total_size_bytes: u64,
-    /// Total size of memtables in bytes.
-    pub memtable_size_bytes: u64,
-}
+pub use contextra_ports::StorageStats;

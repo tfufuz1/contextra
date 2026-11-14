@@ -223,7 +223,7 @@ pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {
                         let uuid_sidecar =
                             std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
                         if let Err(e) = storage.compaction_engine.vfs.remove_file(&uuid_sidecar) {
-                            if !matches!(e, crate::error::StoreError::NotFound(_)) {
+                            if !matches!(e, contextra_types::ContextraError::NotFound(_)) {
                                 tracing::debug!(
                                     "Could not delete sidecar {:?}: {}",
                                     uuid_sidecar,
