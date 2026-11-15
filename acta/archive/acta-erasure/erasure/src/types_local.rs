@@ -664,7 +664,7 @@ impl fmt::Debug for LedgerEntry {
 pub trait LedgerSink: Send + Sync {
     /// Hängt einen Eintrag an das Ledger an.
     fn append(&self, e: &LedgerEntry) -> Result<(), String>;
-    /// Liest alle Einträge aus.
+    /// Liest alle Einträge.
     fn read_all(&self) -> Result<Vec<LedgerEntry>, String>;
     /// Bereinigt alte Einträge nach Aufbewahrungsfrist.
     fn prune(&self, older_than: Timestamp) -> Result<usize, String>;
@@ -734,7 +734,7 @@ pub struct Unarmed;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Armed(pub ());
 
-/// Beleg für eine beobachtete Positivkontrolle (D-72).
+/// Beleg für eine beobachtete Positivkontrolle.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct ControlEvidence(pub ());
 
@@ -1862,7 +1862,7 @@ pub enum KeyScope {
 
 /// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
 pub trait Purger: Send + Sync {
-    /// Führt die physische Bereinigung für das gegebene Ziel aus.
+    /// Führt die physische Bereinigung für das gegebene Ziel.
     fn purge(
         &self,
         ctx: &RequestContext,
@@ -2045,7 +2045,7 @@ pub trait LayerScanner: Send + Sync {
     /// Gibt die von diesem Scanner bediente Schicht zurück.
     fn layer(&self) -> WitnessLayer;
 
-    /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
+    /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession`.
     fn scan_units(
         &self,
         session: &mut ScanSession,
@@ -2302,10 +2302,10 @@ impl<T: Vfs + ?Sized> Vfs for Arc<T> {
 }
 
 // =========================================================================
-// Erweiterte Ports der Löschkette (Spezifikation §3.2, INV-ERA-5 / 6 / 7)
+// Erweiterte Ports der Löschkette
 // =========================================================================
 
-/// RAII-Token für einen aktiven Lese-/Schreib-Fence (INV-ERA-5).
+/// RAII-Token für einen aktiven Lese-/Schreib-Fence.
 pub struct FencePermit {
     _token: Option<Arc<()>>,
 }
@@ -2323,7 +2323,7 @@ impl fmt::Debug for FencePermit {
     }
 }
 
-/// Port-Vertrag für FenceGate (INV-ERA-5).
+/// Port-Vertrag für FenceGate.
 /// Blockiert konkurrierende Schreiber und Lesezugriffe während eines physischen Purge.
 pub trait FenceGate: Send + Sync {
     /// Aktiviert den Fence für einen bestimmten KeyScope und gibt ein RAII-Token zurück.
@@ -2349,7 +2349,7 @@ impl<T: FenceGate + ?Sized> FenceGate for Arc<T> {
     }
 }
 
-/// Port-Vertrag für WalSink (INV-ERA-6).
+/// Port-Vertrag für WalSink.
 /// Verwaltet WAL-Entsorgung, Verankerung und Unlesbarmachung von WAL-Einträgen eines gelöschten Scopes.
 pub trait WalSink: Send + Sync {
     /// Entsorgt oder überschreibt alle WAL-Segmente/Einträge, die zum Scope gehören.
@@ -2387,7 +2387,7 @@ impl<T: WalSink + ?Sized> WalSink for Arc<T> {
     }
 }
 
-/// Port-Vertrag für KeyStore (WP-K).
+/// Port-Vertrag für KeyStore.
 /// Verwaltet Schlüsselhierarchien (KEK/DEK), Wrapping und unwiderrufliche Schlüsselvernichtung.
 pub trait KeyStore: Send + Sync {
     /// Vernichtet alle Schlüssel (DEKs / SubKeys) eines Scopes unwiderruflich.
@@ -2415,7 +2415,7 @@ impl<T: KeyStore + ?Sized> KeyStore for Arc<T> {
     }
 }
 
-/// Port-Vertrag für ResidueScanner (WP-12 / INV-CLASS-MEASURED-1).
+/// Port-Vertrag für ResidueScanner.
 /// Untersucht Index-Artefakte (z.B. Vektorindex / Graph) auf unzulässige Restspuren.
 pub trait ResidueScanner: Send + Sync {
     /// Führt den Restspuren-Scan für einen Scope auf einem Ziel-Artefakt durch.

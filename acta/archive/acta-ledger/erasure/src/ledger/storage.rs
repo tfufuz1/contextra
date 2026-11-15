@@ -1,4 +1,4 @@
-//! Lokaler Storage-Port für persistente Ledger-Backends (WP-8,).
+//! Lokaler Storage-Port für persistente Ledger-Backends.
 
 use super::error::LedgerError;
 use parking_lot::RwLock;

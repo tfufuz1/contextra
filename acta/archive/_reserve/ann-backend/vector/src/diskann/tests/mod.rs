@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Moduldeklaration der DiskANN-Testsuiten (WP-VEC-07).
+// ZWECK: Moduldeklaration der DiskANN-Testsuiten.
 // STAND: 2026-11-11
 
 mod build_search_tests;

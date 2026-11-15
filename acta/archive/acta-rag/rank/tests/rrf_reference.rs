@@ -110,7 +110,7 @@ fn rrf_with_three_lists() {
     }
 }
 
-/// Differentialtest WP-60:
+/// Differentialtest
 /// `rrf_fuse` (Referenz-Orakel auf `ScoredItem`) und `weighted_reciprocal_rank_fusion`
 /// (Produktiver Pfad auf `SearchResult`) liefern bei Einheitsgewichten ($w=1.0$) und
 /// $k=60$ dieselbe relative Rangfolge (Ordering) und numerisch identische Scores.

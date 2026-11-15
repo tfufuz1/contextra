@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: Satzsegmentierung für übergroße Absätze mit Abkürzungsbehandlung (de/en) (WP M3 / SPEC C-11.7).
+// ZWECK: Satzsegmentierung für übergroße Absätze mit Abkürzungsbehandlung (de/en).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, keine Satzteilung bei bekannten Abkürzungen.
 // STAND: TS:2026-10-31T00:00:00Z
 

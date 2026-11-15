@@ -70,8 +70,8 @@ impl ScoredDocument {
 pub const MAX_SEARCH_K: usize = 10_000;
 
 /// Bitmaske für Tombstone-Markierung in Sequenznummern.
-/// Moved to acta_base::TOMBSTONE_BIT per ADR-0120.
-/// This re-export remains until S-70 (INV-2).
+/// Moved to acta_base::TOMBSTONE_BIT per.
+/// This re-export remains until S-70.
 pub use acta_base::TOMBSTONE_BIT;
 // !SECTION
 

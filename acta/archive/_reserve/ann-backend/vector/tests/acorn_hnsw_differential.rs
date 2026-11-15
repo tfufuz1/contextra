@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Differential-Testing & Recall-Regressionstests für HnswIndex::search_knn_acorn (Spec §8.5, §22.4).
+// ZWECK: Differential-Testing & Recall-Regressionstests für HnswIndex::search_knn_acorn.
 // INVARIANTEN: Zero Panic; Zero Cross-Contamination; Differential vs. NaiveReferenceIndex >= 95% Recall@k.
 
 use acta_base::VectorIndex; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

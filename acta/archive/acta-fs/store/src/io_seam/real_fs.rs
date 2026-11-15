@@ -1,7 +1,7 @@
 //! Standard-POSIX-Implementierung des VFS für `acta-seg`.
 //!
 //! Nutzt atomares Schreiben (tmp -> fsync -> rename -> parent sync)
-//! gemäß Invariante INV-FSYNC-1.
+//! gemäß Invariante.
 
 use std::fs::{File, OpenOptions};
 use std::os::unix::fs::FileExt;

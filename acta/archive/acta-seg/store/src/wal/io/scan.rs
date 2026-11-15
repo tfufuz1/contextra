@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! WAL Scanning und Iteration über persistierte Frames.
 //! Low-level WAL IO Submodule.
 use acta_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};

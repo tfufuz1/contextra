@@ -2,7 +2,7 @@
 //!
 //! # Zweck
 //! Berechnet kryptografisch verifizierbare Audit-Traces (Prüfspuren) für Egress-Klassifikationsentscheidungen
-//! gemäß INV-EGRESS-AUDIT-1 und Richtlinie P28. Ein Audit-Trace verknüpft die Payload-Daten, die getroffene
+//! gemäß und Richtlinie P28. Ein Audit-Trace verknüpft die Payload-Daten, die getroffene
 //! Entscheidung bzw. Regel-ID und den Zeitstempel deterministisch miteinander.
 //!
 //! # Ring-Zugehörigkeit
@@ -55,7 +55,7 @@ pub fn extract_rule_id(classification: &EgressClassification) -> String {
 /// 3. Zeitstempel-Länge (8 Bytes, u64 LE) + Zeitstempel (Nanosekunden seit Unix-Epoche, u64 LE).
 ///
 /// # Vorbedingungen
-/// `nanos` muss aus einem standardkonformen Clock-Port stammen (Regel 3 aus CLAUDE.md).
+/// `nanos` muss aus einem standardkonformen Clock-Port stammen.
 ///
 /// # Nachbedingungen
 /// Liefert reproduzierbar denselben 32-Byte BLAKE3-Hashwert für identische Eingaben.
@@ -90,7 +90,7 @@ pub trait EgressClassifierTrace: EgressClassifier {
     ///
     /// # Ablauf
     /// 1. Liest den aktuellen Zeitstempel in Nanosekunden aus `clock.now_unix_nanos()`.
-    /// 2. Führt die asynchrone Klassifikation über `self.classify(payload)` aus.
+    /// 2. Führt die asynchrone Klassifikation über `self.classify(payload)`.
     /// 3. Extrahiert die Regel-Kennung via [`extract_rule_id`].
     /// 4. Berechnet den Audit-Trace via [`compute_audit_trace`].
     /// 5. Gibt das Tupel `(Klassifikation, Trace)` zurück.

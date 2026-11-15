@@ -10,7 +10,7 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: Parsing von Fußnoten, Endnoten, Kommentaren, Kopf- & Fußzeilen (WP-ING-04).
+// ZWECK: Parsing von Fußnoten, Endnoten, Kommentaren, Kopf- & Fußzeilen.
 // INVARIANTEN: Zero-Panic, Policy-Prüfung vor Extraktion von Kommentaren/Kopfzeilen, kein unsafe.
 // STAND: TS:2026-10-31T00:00:00Z
 

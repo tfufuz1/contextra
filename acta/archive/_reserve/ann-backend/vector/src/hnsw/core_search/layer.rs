@@ -32,7 +32,7 @@ impl HnswIndexCore {
     }
 
     // ANCHOR[acta-vec:HNSW-SEARCH-LAYER-CTX]
-    /// Führt die Schichtsuche mit Berücksichtigung vorheriger vorbereiteter Einfügungen aus.
+    /// Führt die Schichtsuche mit Berücksichtigung vorheriger vorbereiteter Einfügungen.
     pub(crate) fn search_layer_with_context(
         &self,
         query: &[f32],

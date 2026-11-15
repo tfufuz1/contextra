@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Hilfsfunktionen zum Erzeugen von DOCX-ZIP-Dateien im Speicher für Integrationstests (WP-ING-04).
+// ZWECK: Hilfsfunktionen zum Erzeugen von DOCX-ZIP-Dateien im Speicher für Integrationstests.
 // INVARIANTEN: Zero-Panic in Testhelfern.
 // STAND: TS:2026-10-31T00:00:00Z
 

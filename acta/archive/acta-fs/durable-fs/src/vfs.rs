@@ -13,7 +13,7 @@ pub trait Vfs: Send + Sync {
     /// Liest den gesamten Inhalt einer Datei.
     fn read(&self, path: &Path) -> Result<Vec<u8>>;
 
-    /// Schreibt Daten atomar und crash-sicher in eine Datei (`INV-VFS-ATOMIC-1`).
+    /// Schreibt Daten atomar und crash-sicher in eine Datei.
     fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()>;
 
     /// Hängt Daten an eine Datei an und flusht synchron.

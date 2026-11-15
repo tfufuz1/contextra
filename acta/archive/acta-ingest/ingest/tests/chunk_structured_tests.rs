@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Akzeptanz- und Proptests für StructuredChunker (WP-ING-15).
+// ZWECK: Akzeptanz- und Proptests für StructuredChunker.
 // INVARIANTEN: Zero-Panic in Produktion, Test-First, Lints eingehalten.
 // STAND: TS:2026-10-31T00:00:00Z
 

@@ -1,4 +1,4 @@
-//! # SingleFlightCoordinator: Scope-Concurrency-Schutz (INV-ERA-3 / WP-3).
+//! # SingleFlightCoordinator: Scope-Concurrency-Schutz.
 //!
 //! Stellt sicher, dass pro Scope (`KeyScope`) zu jedem Zeitpunkt höchstens ein
 //! physischer Purge-Vorgang aktiv ausgeführt wird. Konkurrierende Anfragen werden
@@ -38,7 +38,7 @@ impl SingleFlightCoordinatorInner {
     }
 }
 
-/// Koordinator zur Durchsetzung von INV-ERA-3 (Single-Flight je Scope).
+/// Koordinator zur Durchsetzung von (Single-Flight je Scope).
 #[derive(Clone)]
 pub struct SingleFlightCoordinator {
     inner: Arc<SingleFlightCoordinatorInner>,

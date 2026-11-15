@@ -19,7 +19,7 @@ use super::rerank::{compute_distance_score, sort_and_truncate_results};
 use super::validate::validate_search_params;
 
 impl HnswIndex {
-    /// Führt eine adaptive Suche (Ada-ef) auf dem HNSW-Index aus.
+    /// Führt eine adaptive Suche (Ada-ef) auf dem HNSW-Index.
     pub async fn search_adaptive(
         &self,
         query: &[f32],
@@ -29,7 +29,7 @@ impl HnswIndex {
         self.search_adaptive_filtered(query, k, policy, None).await
     }
 
-    /// Führt eine adaptive Suche mit Prädikatsfilter aus.
+    /// Führt eine adaptive Suche mit Prädikatsfilter.
     pub async fn search_adaptive_filtered(
         &self,
         query: &[f32],

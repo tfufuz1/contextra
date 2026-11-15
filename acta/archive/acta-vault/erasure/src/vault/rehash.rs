@@ -6,7 +6,7 @@
 //!   live / capacity < 0,30: Kapazität beibehalten (nur Grabsteine abräumen).
 //!   sonst: Kapazität verdoppeln.
 //! Protokoll: Neue Datei schreiben, alle aktiven Slots kopieren (Grabsteine nicht),
-//! sync_data, rename, Verzeichnis-fsync, alte Datei vollständig mit Nullen überschreiben (D-111 Abs. 5).
+//! sync_data, rename, Verzeichnis-fsync, alte Datei vollständig mit Nullen überschreiben.
 
 use super::durable::DurableVaultShard;
 use super::table::VaultTable;
@@ -15,14 +15,14 @@ use crate::types_local::Vfs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-/// Ergebnis einer Rehash-Operation (D-111).
+/// Ergebnis einer Rehash-Operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RehashOutcome {
     /// Neue Shard-Kapazität.
     pub new_capacity: usize,
     /// Anzahl kopierter aktiver Slots.
     pub slots_copied: usize,
-    /// Ob die Altdatei vollständig mit Nullen überschrieben wurde (D-111 Abs. 5, D-111 Abs. 11).
+    /// Ob die Altdatei vollständig mit Nullen überschrieben wurde.
     pub old_overwritten: bool,
 }
 
@@ -64,7 +64,7 @@ pub fn rehash_shard(
     ))
 }
 
-/// Führt Rehash für einen dauerhaften Shard über VFS durch nach SPEC D-111 Abs. 4 bis 6:
+/// Führt Rehash für einen dauerhaften Shard über VFS durch nach SPEC Abs. 4 bis 6
 /// - Prüft ob Abbruch durch wartendes erase angefordert wurde (`erase_pending`), falls λ <= 0.80.
 /// - Schreibt temporäre Datei `<nn>.vlt.new` mit F.1-Kopf und Metablock, kopiert alle aktiven Slots, sync_data.
 /// - Rename `<nn>.vlt.new` -> `<nn>.vlt`, sync_dir.

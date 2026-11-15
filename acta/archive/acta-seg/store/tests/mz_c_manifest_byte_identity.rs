@@ -1,4 +1,4 @@
-//! Differenz- und Byte-Identitätstest für das MFMN-Manifestformat (ST6 / MZ_C)
+//! Differenz- und Byte-Identitätstest für das AMNF-Manifestformat (ST6 / MZ_C)
 //!
 //! Validiert, dass die Kodierung aller Varianten von ManifestEntry unverändert
 //! byte-identisch bleibt und die Manifest-Header-Magic sowie Version stimmen.

@@ -6,6 +6,13 @@
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Fx(pub i64);
 
+// Die Methoden sind bewusst keine `std::ops`-Implementierungen: Addition und Subtraktion
+// saettigen, `div` liefert `None` bei Division durch null. Eine Operator-Implementierung
+// wuerde diese Semantik verdecken.
+#[allow(
+    clippy::should_implement_trait,
+    reason = "saturierende Festkomma-Semantik, bewusst kein std::ops"
+)]
 impl Fx {
     /// Anzahl Nachkommabits.
     pub const FRAC: u32 = 32;

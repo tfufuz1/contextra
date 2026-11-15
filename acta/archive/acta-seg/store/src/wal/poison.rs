@@ -1,7 +1,7 @@
 //! Typisierte Ursache für das Vergiften eines WAL-Handles.
 //!
 //! Invarianten:
-//! - INV-FSYNC-1: Nach fsync-, Schreib-, Truncate- oder HMAC-Kettendivergenz-Fehlern wird das Handle
+//! -: Nach fsync-, Schreib-, Truncate- oder HMAC-Kettendivergenz-Fehlern wird das Handle
 //!   irreversibel vergiftet. Einzig bei partiellem Abbruch (`TornWrite`) ist Recovery erlaubt.
 //! - Discriminant-Stabilität: Numerische Werte 1 bis 5 bleiben strikt unverändert.
 

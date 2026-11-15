@@ -3,7 +3,7 @@
 **Aufgabe:** Segmentierter Volltextindex (BM25 Festkomma), DE/EN-Normalisierung  
 **Level:** L3 · **Budget:** 5000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.2  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-gate, acta-vault, acta-seg  
-**Umfang des Archivs:** 47 Dateien, 10850 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 60 Dateien, 14272 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -33,50 +33,63 @@
 
 | Datei (relativ zu `archive/acta-text/`) | LOC | Befunde |
 |---|---:|---|
-| `text/src/bm25.rs` | 687 | float=49, panic=5 |
-| `text/src/compat/purge.rs` | 508 | float=3, serde=4, hr6=3, hub=3, liste_a=1 |
-| `text/src/compat/scanner.rs` | 310 | hr6=3, hub=3 |
-| `text/src/domain/legal_de.rs` | 61 |  |
-| `text/src/domain/medical_de.rs` | 61 |  |
-| `text/src/domain/mod.rs` | 141 |  |
-| `text/src/error.rs` | 45 |  |
-| `text/src/inverted.rs` | 33 |  |
-| `text/src/inverted/index_struct.rs` | 671 | float=6, serde=10, async=15 |
-| `text/src/inverted/types.rs` | 55 | serde=1 |
-| `text/src/lib.rs` | 91 | serde=2 |
-| `text/src/memory_index.rs` | 508 | float=8, panic=7 |
-| `text/src/morphology.rs` | 34 |  |
-| `text/src/morphology/compound_splitter.rs` | 316 |  |
-| `text/src/morphology/metrics.rs` | 33 | float=3 |
-| `text/src/morphology/passthrough.rs` | 34 |  |
-| `text/src/morphology/stopwords.rs` | 64 |  |
-| `text/src/morphology/tests.rs` | 765 | float=2, unsafe=6, zeit_zufall=1, panic=2 |
-| `text/src/morphology/trie.rs` | 65 |  |
-| `text/src/posting_list.rs` | 585 | serde=6, panic=15 |
-| `text/src/storage.rs` | 65 |  |
-| `text/src/stream.rs` | 157 | float=2, async=3 |
-| `text/src/tokenizer.rs` | 1025 | serde=8, zeit_zufall=1, panic=12, hr6=2 |
-| `text/src/traits.rs` | 33 |  |
-| `text/src/types.rs` | 81 | float=1, serde=1 |
-| `text/src/wand.rs` | 818 | float=12, async=3 |
-| `text/tests/bm25_candidate_stream.rs` | 388 | async=15, hub=4 |
-| `text/tests/bm25_edge_cases.rs` | 171 | float=3 |
-| `text/tests/bm25_reference_values.rs` | 253 | float=33 |
-| `text/tests/domain_compound_integration.rs` | 143 |  |
-| `text/tests/domain_vocab_quality.rs` | 458 | zeit_zufall=1 |
-| `text/tests/golden/bm25_ranking.json` | 18 |  |
-| `text/tests/golden/clock_reference.json` | 1 |  |
-| `text/tests/golden/doc_id.bin` | 1 |  |
-| `text/tests/golden/doc_id.json` | 1 |  |
-| `text/tests/golden/doc_key.bin` | 1 |  |
-| `text/tests/golden/posting_list_v2.bin` | 0 |  |
-| `text/tests/golden/tokenizer_default.json` | 10 |  |
-| `text/tests/golden/tokenizer_german.json` | 11 |  |
-| `text/tests/golden_oracle_tests.rs` | 293 | float=2, serde=4, panic=38, std_fs=1 |
-| `text/tests/pipeline_analyzer_tests.rs` | 160 | panic=4 |
-| `text/tests/pipeline_identity_regression.rs` | 313 | async=6, panic=1, hub=10 |
-| `text/tests/posting_roundtrip_tests.rs` | 146 | panic=6, hub=1 |
-| `text/tests/proptest_bm25_invariants.rs` | 369 | async=1, panic=9, hub=10 |
-| `text/tests/snapshot_oracle_proptest.rs` | 107 | panic=4, alt_spec=1 |
-| `text/tests/wand_differential.rs` | 488 | float=7, async=2, panic=3, hub=9 |
-| `text/tests/wand_tie_break_threshold.rs` | 272 | async=4, hub=4 |
+| `ports/src/text_index.rs` | 276 | panic=3, async=26, serde=1 |
+| `text/fuzz/fuzz_targets/fuzz_bm25_tokenize.rs` | 21 |  |
+| `text/fuzz/fuzz_targets/fuzz_tokenizer_smoke.rs` | 36 |  |
+| `text/src/bm25.rs` | 686 | panic=5, float=49 |
+| `text/src/compat/purge.rs` | 507 | async=15, float=3, serde=4, alt_spec=3 |
+| `text/src/compat/scanner.rs` | 309 | async=6, alt_spec=3 |
+| `text/src/domain/legal_de.rs` | 60 |  |
+| `text/src/domain/medical_de.rs` | 60 |  |
+| `text/src/domain/mod.rs` | 140 |  |
+| `text/src/error.rs` | 44 |  |
+| `text/src/inverted.rs` | 32 |  |
+| `text/src/inverted/index_struct.rs` | 670 | async=15, float=6, serde=10 |
+| `text/src/inverted/types.rs` | 54 | serde=1 |
+| `text/src/lib.rs` | 90 | async=1, serde=2 |
+| `text/src/memory_index.rs` | 507 | panic=7, float=8 |
+| `text/src/morphology.rs` | 33 |  |
+| `text/src/morphology/compound_splitter.rs` | 315 |  |
+| `text/src/morphology/metrics.rs` | 32 | float=3 |
+| `text/src/morphology/passthrough.rs` | 33 |  |
+| `text/src/morphology/stopwords.rs` | 63 |  |
+| `text/src/morphology/tests.rs` | 764 | panic=2, float=2, unsafe=6 |
+| `text/src/morphology/trie.rs` | 64 |  |
+| `text/src/posting_list.rs` | 584 | panic=15, serde=6 |
+| `text/src/storage.rs` | 64 |  |
+| `text/src/stream.rs` | 156 | async=3, float=2 |
+| `text/src/tokenizer.rs` | 1024 | panic=12, serde=8 |
+| `text/src/traits.rs` | 32 |  |
+| `text/src/types.rs` | 80 | float=1, serde=1 |
+| `text/src/wand.rs` | 817 | async=14, float=12 |
+| `text/tests/bm25_candidate_stream.rs` | 387 | async=31 |
+| `text/tests/bm25_edge_cases.rs` | 170 | float=3 |
+| `text/tests/bm25_reference_values.rs` | 252 | float=33 |
+| `text/tests/bm25f_field_weighting.rs` | 167 | panic=3, float=1 |
+| `text/tests/concurrent_metadata.rs` | 215 | panic=2, async=24 |
+| `text/tests/core_smoke.rs` | 180 | async=13 |
+| `text/tests/docid_128_tombstone_resolution.rs` | 263 | async=18 |
+| `text/tests/domain_compound_integration.rs` | 142 |  |
+| `text/tests/domain_vocab_quality.rs` | 457 |  |
+| `text/tests/fault_injection_limits_test.rs` | 82 | panic=3 |
+| `text/tests/golden/bm25_ranking.json` | 0 |  |
+| `text/tests/golden/clock_reference.json` | 0 |  |
+| `text/tests/golden/doc_id.json` | 0 |  |
+| `text/tests/golden/tokenizer_default.json` | 0 |  |
+| `text/tests/golden/tokenizer_german.json` | 0 |  |
+| `text/tests/golden_oracle_tests.rs` | 292 | panic=38, float=2, serde=4, std_fs=1 |
+| `text/tests/index_purge_proptests.rs` | 424 | panic=3, async=22 |
+| `text/tests/lib_scorer_lifecycle_test.rs` | 171 | panic=4, async=18 |
+| `text/tests/pipeline_analyzer_tests.rs` | 159 | panic=4 |
+| `text/tests/pipeline_identity_regression.rs` | 312 | panic=1, async=22 |
+| `text/tests/posting_roundtrip_tests.rs` | 145 | panic=7 |
+| `text/tests/proptest_bm25_invariants.rs` | 368 | panic=9, async=18 |
+| `text/tests/purge_error_injection_tests.rs` | 257 | panic=1, async=22 |
+| `text/tests/snapshot_concurrency_test.rs` | 102 | panic=6 |
+| `text/tests/snapshot_oracle_proptest.rs` | 106 | panic=4 |
+| `text/tests/text_scanner_purger_tests.rs` | 372 | async=33 |
+| `text/tests/text_search_at_wrappers.rs` | 383 | async=24 |
+| `text/tests/tombstone_read_your_writes.rs` | 305 | async=20 |
+| `text/tests/tombstone_update.rs` | 250 | async=22 |
+| `text/tests/wand_differential.rs` | 487 | panic=3, async=18, float=7 |
+| `text/tests/wand_tie_break_threshold.rs` | 271 | async=20 |

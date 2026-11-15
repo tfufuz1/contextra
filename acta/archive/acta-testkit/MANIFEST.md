@@ -1,7 +1,7 @@
 # Extraktion fuer `acta-testkit`
 
 **Aufgabe:** Entwicklungs-Crate: ManualClock, SeededRng, Fehlerinjektion, Konformitaetstests.  
-**Umfang des Archivs:** 13 Dateien, 2415 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 15 Dateien, 3312 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -27,16 +27,18 @@
 
 | Datei (relativ zu `archive/acta-testkit/`) | LOC | Befunde |
 |---|---:|---|
-| `env/src/manual_clock.rs` | 71 |  |
-| `env/src/rng.rs` | 283 | float=8 |
-| `testkit/src/conformance/clock.rs` | 48 | hub=1 |
-| `testkit/src/conformance/failure.rs` | 62 |  |
-| `testkit/src/conformance/macros.rs` | 48 |  |
-| `testkit/src/conformance/mod.rs` | 104 | async=2 |
-| `testkit/src/conformance/rng.rs` | 66 | hub=1 |
-| `testkit/src/in_memory_text.rs` | 207 | float=2, async=9, hub=2 |
-| `testkit/src/in_memory_vector.rs` | 232 | float=6, async=10, hub=2 |
-| `testkit/src/lib.rs` | 146 | unsafe=1, hub=4, alt_spec=1 |
-| `testkit/src/manual_clock.rs` | 173 | float=2, zeit_zufall=2, hub=1 |
-| `testkit/src/mocks.rs` | 691 | float=13, async=4, unsafe=2, hub=10, alt_spec=1 |
-| `testkit/src/reference_model.rs` | 284 |  |
+| `env/src/manual_clock.rs` | 70 |  |
+| `env/src/rng.rs` | 282 | float=8 |
+| `ports/src/conformance.rs` | 278 | async=2, serde=4 |
+| `ports/src/contract_tests.rs` | 632 | panic=40, async=3 |
+| `testkit/src/conformance/clock.rs` | 47 |  |
+| `testkit/src/conformance/failure.rs` | 61 |  |
+| `testkit/src/conformance/macros.rs` | 47 |  |
+| `testkit/src/conformance/mod.rs` | 103 | async=3 |
+| `testkit/src/conformance/rng.rs` | 65 |  |
+| `testkit/src/in_memory_text.rs` | 206 | async=9, float=2 |
+| `testkit/src/in_memory_vector.rs` | 231 | async=10, float=6 |
+| `testkit/src/lib.rs` | 145 | unsafe=1 |
+| `testkit/src/manual_clock.rs` | 172 | float=2 |
+| `testkit/src/mocks.rs` | 690 | async=10, float=13, unsafe=2 |
+| `testkit/src/reference_model.rs` | 283 |  |

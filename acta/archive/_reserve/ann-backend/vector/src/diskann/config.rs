@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
+// ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (.3).
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an acta-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
@@ -39,7 +39,7 @@ pub struct DiskAnnConfig {
     /// Fallback policy when index file loading or integrity validation fails.
     pub fallback_policy: DiskAnnFallbackPolicy,
     /// Optionaler Override für den Pending-Flush-Threshold (für Benchmarks/Tests).
-    /// None: adaptiver Threshold gemäß ADR-068 (max(50, min(1000, floor(N × 0.05)))).
+    /// None: adaptiver Threshold gemäß (max(50, min(1000, floor(N × 0.05)))).
     pub pending_flush_threshold: Option<u64>,
     /// Optional compute pool for background operations.
     pub compute_pool: Option<ComputePool>,

@@ -1,7 +1,7 @@
 //! Orchestrierung des Löschkerns via `ErasureCore`.
 //!
-//! Exakte Schritte 1–6 aus:
-//! 1. Validierung & RetentionAttestation (Matrix D-124 Abs. 6), resolve je Schicht, Journal Requested+Intent (fsync #1).
+//! Exakte Schritte 1–6:
+//! 1. Validierung & RetentionAttestation, resolve je Schicht, Journal Requested+Intent (fsync #1).
 //! 2. Gate setzen unter CommitBarrier::exclusive -> add_gate mit gated_seq (fsync #2).
 //! 3. on_gate je Schicht, Schlüsselvernichtung höchster Ebene via SagaVault (fsync #3), Fehlen prüfen.
 //! 4. Journal KeyDestroyed (fsync #4) -> Observer-Benachrichtigung Gated -> Rückgabe Gated.
@@ -17,7 +17,7 @@
 //! 6. Messung via SagaMeasure (matches != 0 oder Zeuge fehlt -> Pending(WitnessMissing)),
 //!    signierter Bericht, Ledger, Journal Completed, Gate-Kompaktion -> Observer Completed.
 //!
-//! Cancel-Safety (ER-24): Jede mutierende Operation läuft in einer vom Aufrufer unabhängigen
+//! Cancel-Safety: Jede mutierende Operation läuft in einer vom Aufrufer unabhängigen
 //! Task (`tokio::spawn` + `oneshot`). Drop blockiert nie. Keine Locks über .await fremder Tasks.
 
 use crate::error::ErasureError;
@@ -58,7 +58,7 @@ pub struct ErasureConfig {
     pub batch_window: Duration,
     /// Mindestanzahl freier Bytes auf dem Speichermedium vor dem Purge.
     pub min_free_bytes: u64,
-    /// Index-Schlüssel für Open-Key Ableitung nach D-119.
+    /// Index-Schlüssel für Open-Key Ableitung.
     pub k_idx: [u8; 32],
 }
 
@@ -102,7 +102,7 @@ pub struct ErasureDeps {
     pub clock: Arc<dyn Clock>,
     /// ID-Generator.
     pub ids: Arc<dyn IdGen>,
-    /// Optionaler Beobachter für Phase-Übergänge (D-118).
+    /// Optionaler Beobachter für Phase-Übergänge.
     pub observer: Option<Arc<dyn ErasureObserver>>,
 }
 
@@ -128,7 +128,7 @@ pub struct ErasureCoreStatus {
     pub id: ErasureId,
     /// Der aktuelle Zustand.
     pub state: SagaState,
-    /// Detaillierter Status gemäß
+    /// Detaillierter Status
     pub status: ErasureStatus,
     /// Gated-Sequenz (falls erreicht).
     pub gated_seq: Option<u64>,
@@ -170,7 +170,7 @@ impl ErasureCore {
         clock.now_unix_nanos() / 1_000_000
     }
 
-    /// Kanonische Bytes für ein Ziel zwecks Open-Key-Ableitung (D-119).
+    /// Kanonische Bytes für ein Ziel zwecks Open-Key-Ableitung.
     fn canonical_target_bytes(target: &EraseTarget) -> Vec<u8> {
         match target {
             EraseTarget::ExactKeys(keys) => {
@@ -219,7 +219,7 @@ impl ErasureCore {
         &self.deps
     }
 
-    /// Benachrichtigt den Beobachter at-least-once ohne PII (D-118).
+    /// Benachrichtigt den Beobachter at-least-once ohne PII.
     /// Fehler des Observers stoppen die Saga nicht.
     async fn notify_observer(
         deps: &ErasureDeps,
@@ -251,7 +251,7 @@ impl ErasureCore {
         }
     }
 
-    /// Führt die Validierung der Retention-Attestierung gemäß Matrix D-124 Abs. 6 durch.
+    /// Führt die Validierung der Retention-Attestierung gemäß Matrix Abs. 6 durch.
     pub fn evaluate_retention(
         mode: EraseMode,
         attestation: &RetentionAttestation,
@@ -276,12 +276,12 @@ impl ErasureCore {
         }
     }
 
-    /// Nimmt eine Löschung an und führt sie bis mindestens `Gated` aus.
+    /// Nimmt eine Löschung an und führt sie bis mindestens `Gated`.
     ///
-    /// Cancel-Safety (ER-24): Die Ausführung läuft in einer unabhängigen Tokio-Task.
+    /// Cancel-Safety: Die Ausführung läuft in einer unabhängigen Tokio-Task.
     /// Bricht das Aufrufer-Future ab, läuft die Löschung unbeeinflusst weiter.
     pub async fn erase(&self, req: EraseExecutionRequest) -> Result<EraseReceipt, ErasureError> {
-        // Idempotenz offener Anträge nach D-119
+        // Idempotenz offener Anträge
         let mode_byte = match req.mode {
             EraseMode::Erase => 0x01,
             EraseMode::Restrict => 0x02,
@@ -328,7 +328,7 @@ impl ErasureCore {
         let active_sagas = Arc::clone(&self.active_sagas);
         let open_keys = Arc::clone(&self.open_keys);
 
-        // Spawn einer entkoppelten Task für Cancel-Safety (ER-24)
+        // Spawn einer entkoppelten Task für Cancel-Safety
         tokio::spawn(async move {
             let res =
                 Self::execute_erase_flow(req, deps, cfg, active_sagas, open_keys, open_key).await;
@@ -356,7 +356,7 @@ impl ErasureCore {
     ) -> Result<EraseReceipt, ErasureError> {
         let erasure_id = req.erasure_id;
 
-        // Retention-Matrix prüfen (D-124 Abs. 6)
+        // Retention-Matrix prüfen
         let decision = Self::evaluate_retention(req.mode, &req.attestation)?;
         match decision {
             RetentionDecision::Refuse(reason) => {
@@ -380,7 +380,7 @@ impl ErasureCore {
                 });
             }
             RetentionDecision::ProceedRestrict => {
-                // Modus Restrict: Gate setzen als Restricted, keine Vernichtung (D-15, D-116)
+                // Modus Restrict: Gate setzen als Restricted, keine Vernichtung
                 let mut saga = EraseSaga::with_id(erasure_id);
                 saga.transition_to(SagaState::Restricted)?;
                 deps.journal
@@ -590,7 +590,7 @@ impl ErasureCore {
             }
         }
 
-        // Bis hierher sind 4 fsyncs vollbracht (D-58), O(1) bis Gated
+        // Bis hierher sind 4 fsyncs vollbracht, O(1) bis Gated
         Ok(EraseReceipt {
             id: erasure_id,
             status: ErasureStatus::Gated,
@@ -625,10 +625,10 @@ impl ErasureCore {
         };
 
         // --- SCHRITT 5: Purge-Fenster (Reihenfolge a–g) ---
-        // PurgeBarrier exklusiv nehmen gegen Kompaktion (ER-21)
+        // PurgeBarrier exklusiv nehmen gegen Kompaktion
         let _purge_permit = deps.purge_barrier.purge().await;
 
-        // Plattenreserve vorab prüfen (ER-22)
+        // Plattenreserve vorab prüfen
         let reserve = check_disk_reserve(cfg.min_free_bytes, 0)?;
         if let ReserveCheck::Insufficient { .. } = reserve {
             let reason = PendingReason::DiskReserve;
@@ -658,7 +658,7 @@ impl ErasureCore {
             .append_state(erasure_id, SagaState::Purging, None)
             .await?;
 
-        // 5a. Snapshots des Mandanten widerrufen (D-61, L-21)
+        // 5a. Snapshots des Mandanten widerrufen
         deps.snapshots.revoke_covering(target, gated_seq).await?;
 
         // 5b - 5f: Sortierung der Schichten nach Priorität a–g (PurgePriority)
@@ -782,7 +782,7 @@ impl ErasureCore {
         Ok(ErasureStatus::Completed)
     }
 
-    /// Führt ein Purge-Fenster über alle offenen Sagas im Zustand `KeyDestroyed` oder `Purging` aus.
+    /// Führt ein Purge-Fenster über alle offenen Sagas im Zustand `KeyDestroyed` oder `Purging`.
     pub async fn run_purge_window(
         &self,
     ) -> Result<crate::purge::window::WindowOutcome, ErasureError> {

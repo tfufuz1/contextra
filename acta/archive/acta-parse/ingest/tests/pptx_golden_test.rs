@@ -6,7 +6,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Golden-Tests für PPTX-Extraktion (PresentationML, Folienreihenfolge, Formen, Notizen, Limits) (WP-ING-05).
+// ZWECK: Golden-Tests für PPTX-Extraktion (PresentationML, Folienreihenfolge, Formen, Notizen, Limits).
 // INVARIANTEN: Zero-Panic, Test-First, dynamische Zip-Generierung im Code.
 // STAND: TS:2026-10-31T00:00:00Z
 

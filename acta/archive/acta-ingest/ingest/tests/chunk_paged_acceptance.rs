@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Akzeptanztests und Zitierbarkeitstests für PagedChunker (WP-ING-14).
+// ZWECK: Akzeptanztests und Zitierbarkeitstests für PagedChunker.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

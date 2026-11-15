@@ -1,7 +1,7 @@
 //! I/O-Primitive und Vfs-Interaktion für den Löschkern.
 //!
 //! Alle I/O-Operationen des Löschkerns laufen ausschließlich über dieses Modul
-//! und den Port `Vfs` (D-04). Kein `std::fs`, kein `tokio::fs`.
+//! und den Port `Vfs`. Kein `std::fs`, kein `tokio::fs`.
 
 use crate::error::ErasureError;
 use crate::types_local::VfsFile;

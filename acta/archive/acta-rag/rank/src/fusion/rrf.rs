@@ -1,6 +1,6 @@
 //! # Reziproke Rangfusion (RRF) & mRRF (`rrf`)
 //!
-//! ## Rollen und Fusionspfade (Architektur-Entscheidung WP-60)
+//! ## Rollen und Fusionspfade (Architektur-Entscheidung )
 //! In diesem Modul existieren drei distinkte Fusionsfunktionen in zwei Typdomänen,
 //! die bewusst nicht zusammengelegt werden:
 //! - **`weighted_reciprocal_rank_fusion` (Produktivpfad):**

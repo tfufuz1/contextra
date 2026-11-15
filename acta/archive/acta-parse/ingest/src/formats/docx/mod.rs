@@ -10,7 +10,7 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: Word DOCX Extractor (Docx) (WP-ING-04).
+// ZWECK: Word DOCX Extractor (Docx).
 // INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl, Zero-Panic, Fail-Closed bei Beschädigungen.
 // STAND: TS:2026-10-31T00:00:00Z
 

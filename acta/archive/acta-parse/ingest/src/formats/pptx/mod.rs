@@ -10,7 +10,7 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: PowerPoint PresentationML Extractor (PPTX, PPSX, POTX, PPTM) (WP-ING-05).
+// ZWECK: PowerPoint PresentationML Extractor (PPTX, PPSX, POTX, PPTM).
 // INVARIANTEN: FILE-CONTEXT Kopf, Zero-Panic, ResourceBudget-Absicherung, BTreeMap.
 // STAND: TS:2026-10-31T00:00:00Z
 

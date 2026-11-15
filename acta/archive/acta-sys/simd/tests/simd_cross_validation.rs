@@ -1,10 +1,10 @@
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::indexing_slicing)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_sign_loss)]
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 
 //! # Quervalidierungs- und Property-Test-Suite: `simd_cross_validation`
 //!

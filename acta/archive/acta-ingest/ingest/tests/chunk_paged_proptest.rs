@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Property-basierte Tests für PagedChunker (WP-ING-14).
+// ZWECK: Property-basierte Tests für PagedChunker.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

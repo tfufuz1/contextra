@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen (F-02).
-// INVARIANTEN: INV-NUC-1: Partial-Rebuild darf globalen HNSW-Graph nicht inkonsistent hinterlassen.
+// INVARIANTEN:: Partial-Rebuild darf globalen HNSW-Graph nicht inkonsistent hinterlassen.
 // NICHT-OFFENSICHTLICH: Ergänzt den globalen HNSW_REBUILD_DELETION_RATIO-Trigger hinter Feature-Flag partial-index-rebuild.
 // STAND: TS:2026-11-11T02:00:00Z
 
@@ -11,7 +11,7 @@
 //!              Kein Ersatz — der globale Trigger bleibt aktiv.
 //!              Nur der Partial-Rebuild-Pfad wird ergänzt.
 //!
-//! INVARIANTE INV-NUC-1: Ein Partial-Rebuild darf den globalen HNSW-Graph nicht inkonsistent
+//! INVARIANTE: Ein Partial-Rebuild darf den globalen HNSW-Graph nicht inkonsistent
 //!   hinterlassen. Nachbarschaftsbeziehungen über die Regionsgrenze hinaus bleiben erhalten.
 //!
 //! ### Algorithmic Recall Preservation Guarantee (Requirement 5.5.7)
@@ -20,7 +20,7 @@
 //! local partial rebuild where tombstones $T \subset R$ are removed.
 //! For any query $q$ and top-$k$ ground truth $K \subset V \setminus T$:
 //!
-//! 1. **Boundary Preservation Invariant (INV-NUC-1):**
+//! 1. **Boundary Preservation Invariant:**
 //!    For every boundary edge $(u, v) \in E$ where $u \in R$ and $v \in V \setminus R$,
 //!    the connection is preserved unless $u \in T$.
 //! 2. **Triangular Inequality Connectivity Bound:**
@@ -30,7 +30,7 @@
 //!    small-world navigability.
 //! 3. **Recall Preservation Guarantee:**
 //!    $Recall_{partial}(q, k) \ge Recall_{global}(q, k) - \epsilon$.
-//!    *Hinweis (INV-CLAIMS-1):* Der Wert $\epsilon \le 0.02$ ist ein vorläufiger Ziel-/Startwert und nicht mathematisch belegt.
+//!    *Hinweis:* Der Wert $\epsilon \le 0.02$ ist ein vorläufiger Ziel-/Startwert und nicht mathematisch belegt.
 //!    Die empirische Validierung in `tests/partial_rebuild_recall_regression.rs` belegt ein Toleranzband von
 //!    bis zu $\pm 0.05$ (5 Prozentpunkte) bei 20 % Tombstones ohne Re-Wiring.
 

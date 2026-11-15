@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::path::Path;
 
-/// Signierter Löschbericht mit Base64url-Signatur und Prüffingerabdruck (ER-27,).
+/// Signierter Löschbericht mit Base64url-Signatur und Prüffingerabdruck.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SignedReport {
     /// Kanonischer JSON-Inhalt ohne Signaturfelder bzw. vollständiger Berichtskörper.
@@ -30,7 +30,7 @@ pub struct SignedReport {
     pub signature_base64: String,
     /// SHA-256 Fingerprint des öffentlichen Schlüssels (erste 16 Bytes / 32 Hex-Zeichen).
     pub pub_fingerprint: String,
-    /// Signer-ID nach SPEC F.10 / D-130 (0 = K_sign, 1 = Operator).
+    /// Signer-ID nach SPEC F.10 / (0 = K_sign, 1 = Operator).
     pub signer_id: u8,
 }
 
@@ -75,12 +75,12 @@ impl SignedReport {
         Ok(())
     }
 
-    /// Verifiziert sowohl die Ed25519-Signatur als auch die kryptografische Zeugenkette (INV-ERA-7, INV-CLASS-MEASURED-1).
+    /// Verifiziert sowohl die Ed25519-Signatur als auch die kryptografische Zeugenkette.
     ///
     /// Validiert:
     /// 1. Ed25519 verify_strict über Signatur und kanonischen Body.
     /// 2. Kanonisches JSON und Deserialisierung des `ErasureReport`.
-    /// 3. Vorhandensein von Zeugen (INV-CLASS-MEASURED-1: leere Zeugenliste wird abgelehnt).
+    /// 3. Vorhandensein von Zeugen.
     /// 4. Für jeden Zeugen: Positivkontrolle `control_ok == true`, `matches == 0`.
     /// 5. Jeden Zeugen-Digest gegen die im `witness_chain.witness_digests` deklarierten Digests.
     /// 6. Den kaskadierten Kettenwurzel-Hash gegen `witness_chain.chain_root`.
@@ -264,7 +264,7 @@ pub fn base64url_encode(data: &[u8]) -> String {
     out
 }
 
-/// Implementierung des `ReportSigner`-Ports für intern abgeleitete Schlüssel (signer_id = 0, D-130).
+/// Implementierung des `ReportSigner`-Ports für intern abgeleitete Schlüssel.
 pub struct DerivedReportSigner {
     key: SigningKey,
     signer_id: SignerId,

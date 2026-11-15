@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Crate-lokale Distanz-Kernel-Schnittstelle und u8-Komponenten (WP-VEC-06).
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); INV-SIMD-FINITE-1.
+// ZWECK: Crate-lokale Distanz-Kernel-Schnittstelle und u8-Komponenten.
+// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]);.
 // HOTSPOTS: DistanceKernel, CosineSimilarityPartsU8
 // STAND: 2026-11-12
 

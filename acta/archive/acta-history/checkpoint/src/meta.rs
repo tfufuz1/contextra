@@ -112,7 +112,7 @@ impl CheckpointMeta {
     /// Konvertiert die Metadaten in einen [`WorkflowState`].
     ///
     /// # Kompatibilität
-    /// Behält `&self` für Rückwärtskompatibilität mit externen Aufrufern bei (ADR-011).
+    /// Behält `&self` für Rückwärtskompatibilität mit externen Aufrufern bei.
     #[allow(clippy::wrong_self_convention)]
     pub fn into_workflow_state(&self) -> WorkflowState {
         self.to_workflow_state()

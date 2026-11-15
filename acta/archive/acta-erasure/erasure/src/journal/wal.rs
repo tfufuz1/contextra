@@ -1,4 +1,4 @@
-//! # WAL-Entsorgung und Verankerung (INV-ERA-6 / WP-7).
+//! # WAL-Entsorgung und Verankerung.
 //!
 //! Koordiniert die Entsorgung oder Unlesbarmachung von WAL-Einträgen zu gelöschten Scopes
 //! sowie deren dauerhafte Verankerung via Marker.

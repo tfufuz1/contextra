@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-mmap-main,epic=sys-mmap,seq=0] Read-Only Memory Mapping Fassade
 // =========================================================================
-// NOTE: Read-only memory mapping facade over memmap2 (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-IO-1 / INV-ENCRYPT-REST-2).
+// NOTE: Read-only memory mapping facade over memmap2.
 // Invariante: Zero panic; typed error propagation; read-only mapping; bounds checks.
 // Keine unzulässigen Garantieversprechen.
 
@@ -49,7 +49,7 @@ pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
 // ANCHOR[id=sys-mmap-sealed,epic=sys-mmap,seq=2] Typisierte Versiegelung (Typestate)
 
 /// Typzustands-Marker: Zeigt an, dass eine Datei vollständig versiegelt, unveränderlich
-/// und prüfsummenverifiziert ist (gemäß INV-IO-1 und INV-ENCRYPT-REST-2).
+/// und prüfsummenverifiziert ist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SealedReadOnly;
 
@@ -110,7 +110,7 @@ impl SealedFile<SealedReadOnly> {
 // SECTION Sealed Map Abstraction
 // ANCHOR[id=sys-mmap-sealed-map,epic=sys-mmap,seq=3] SealedMap
 
-/// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien (INV-IO-1).
+/// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien.
 #[derive(Debug)]
 pub struct SealedMap {
     inner: memmap2::Mmap,

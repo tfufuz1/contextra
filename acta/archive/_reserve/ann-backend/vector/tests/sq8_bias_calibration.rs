@@ -3,7 +3,7 @@
 // INVARIANTEN: Erwartungswert des Schätzfehlers konvergiert gegen 0.
 // HOTSPOTS: 15-25
 // STAND: 2026-11-12
-// Testpflicht AK-12 (docs/specs/ACTA_SPEC_v2.md / Spec §15.2)
+// Testpflicht AK-12
 
 use acta_base::DistanceMetric; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_vec::hnsw::Sq8Bias;

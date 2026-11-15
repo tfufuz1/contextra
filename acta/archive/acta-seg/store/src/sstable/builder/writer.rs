@@ -1,6 +1,6 @@
 //! # SSTable-Writer & Dateifinalisierung (Ring 1)
 //!
-//! Zweck: Sequentieller Aufbau vollständiger SSTables (V4 MFSX / Legacy V3 MFST)
+//! Zweck: Sequentieller Aufbau vollständiger SSTables (V4 ASGX / Legacy V3 ASGT)
 //! inklusive Index-Block, Bloom-Filter, Trailer und atomarem Schreiben (tmp -> rename -> fsync).
 // ANCHOR[acta-seg:SST-BLD-102]
 
@@ -140,7 +140,7 @@ impl SstableBuilder {
     fn write_to_file(&mut self, buf: &[u8], offset: u64) -> Result<()> {
         if self.poisoned {
             return Err(ActaError::Storage(
-                "SstableBuilder handle is poisoned after IO failure (INV-FSYNC-1)".into(),
+                "SstableBuilder handle is poisoned after IO failure".into(),
             ));
         }
         let file = self
@@ -177,7 +177,7 @@ impl SstableBuilder {
     pub async fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> Result<()> {
         if self.poisoned {
             return Err(ActaError::Storage(
-                "SstableBuilder handle is poisoned after IO failure (INV-FSYNC-1)".into(),
+                "SstableBuilder handle is poisoned after IO failure".into(),
             ));
         }
         if key.is_empty() {
@@ -289,7 +289,7 @@ impl SstableBuilder {
         if self.poisoned {
             let _ = self.vfs.remove_file(&self.tmp_path);
             return Err(ActaError::Storage(
-                "Cannot finish poisoned SstableBuilder (INV-FSYNC-1)".into(),
+                "Cannot finish poisoned SstableBuilder".into(),
             ));
         }
 
@@ -402,7 +402,7 @@ impl SstableBuilder {
         let parent = self.path.parent().unwrap_or_else(|| Path::new("."));
         if let Err(e) = self.vfs.sync_dir(parent) {
             self.poisoned = true;
-            // Failure on sync_dir after rename: fail-closed (INV-FSYNC-1)
+            // Failure on sync_dir after rename: fail-closed
             return Err(e.into());
         }
 

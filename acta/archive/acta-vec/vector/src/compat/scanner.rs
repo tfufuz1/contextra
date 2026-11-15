@@ -15,9 +15,9 @@ use crate::hnsw::types::{HnswIndex, VectorData};
 
 /// Neutrale Scan- und Validierungsroutine für Vektorknoten.
 ///
-/// Gemäß D-E1 als Prüfprimitiv isoliert.
+/// Gemäß als Prüfprimitiv isoliert.
 #[deprecated(
-    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
+    note = "Als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
 )]
 pub struct HnswScanner {
     index: Arc<HnswIndex>,
@@ -30,7 +30,7 @@ impl HnswScanner {
         Self { index }
     }
 
-    /// Führt die Positivkontrolle durch Ausführung von `scan_index_content` auf einem Scratch-Canary-Index aus.
+    /// Führt die Positivkontrolle durch Ausführung von `scan_index_content` auf einem Scratch-Canary-Index.
     fn run_positive_control(&self, session: &mut ScanSession) -> Result<()> {
         let config = HnswConfigBuilder::new(4)
             .m(8)
@@ -55,7 +55,7 @@ impl HnswScanner {
             map.insert(canary_doc_id.inner(), idx);
         }
 
-        // Führe scan_index_content auf dem Canary-Index aus.
+        // Führe scan_index_content auf dem Canary-Index.
         // session.record_control_match() wird aufgerufen, wenn der Inhalts-Scan Einheiten verarbeitet hat.
         let mut canary_scanned = false;
 
@@ -202,7 +202,7 @@ impl HnswScanner {
 /// Erzeugt einen `Arc<dyn LayerScanner>` für einen HNSW Index.
 #[allow(deprecated)]
 #[deprecated(
-    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
+    note = "Als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
 )]
 pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner> {
     Arc::new(HnswScanner::new(index))
@@ -210,7 +210,7 @@ pub fn hnsw_scanner(index: Arc<HnswIndex>) -> Arc<dyn LayerScanner> {
 
 #[allow(deprecated)]
 impl HnswScanner {
-    /// Führt den Schicht-Scan für den HNSW-Index aus.
+    /// Führt den Schicht-Scan für den HNSW-Index.
     pub fn scan_units(&self, session: &mut ScanSession, _ctx: &RequestContext) -> Result<()> {
         // 1. Positivkontrolle (Control Match)
         self.run_positive_control(session)?;

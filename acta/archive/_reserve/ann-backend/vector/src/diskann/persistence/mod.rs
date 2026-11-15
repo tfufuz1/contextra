@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Persistenz-Subsystem für DiskANN (WP-VEC-07).
+// ZWECK: Persistenz-Subsystem für DiskANN.
 // INVARIANTEN: Modulare Aufteilung in Teildomänen; re-exportiert alle bisherigen Pfade.
 // STAND: 2026-11-11
 

@@ -1,4 +1,4 @@
-//! Invarianten-Test: `INV-INGEST-NO-ARCHIVE-BOMB-1`
+//! Invarianten-Test
 //!
 //! Stellt sicher, dass ZIP-, XML- und Archiv-Dekomprimierung strikt geschützt ist gegen:
 //! - Zip-Bomben (Kompressionsrate, unkomprimierte Gesamtgröße)

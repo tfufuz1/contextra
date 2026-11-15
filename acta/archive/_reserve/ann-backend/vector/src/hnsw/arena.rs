@@ -314,7 +314,7 @@ impl HnswArena {
     }
 
     /// Zeroizes connection memory for a node slot across all layers and clears counts,
-    /// without releasing to `free_list` (`INV-VEC-ZEROIZE-1`, `INV-HNSW-SLOT-1`).
+    /// without releasing to `free_list`.
     // ANCHOR[acta-vec:ARENA-ZEROIZE-CONNECTIONS]
     pub fn zeroize_node_connections(&self, ram_idx: usize, max_layer: usize, m: usize) {
         let offsets = self.offsets.read();

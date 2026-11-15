@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Gebündelte Dateizugriffe und Durability-Primitive für DiskANN (WP-VEC-07 / S-80).
+// ZWECK: Gebündelte Dateizugriffe und Durability-Primitive für DiskANN ( / S-80).
 // INVARIANTEN: Strengste Durability-Reihenfolge: tmp sync_all -> rename -> parent dir sync_all; Zero-Panic.
 // HOTSPOTS: atomic_replace, append_wal, read_all, remove_if_exists, open_mmap_readonly
 // STAND: 2026-11-11
@@ -16,7 +16,7 @@ use std::path::Path;
 use crate::error::{Result, VectorError};
 
 // ANCHOR[acta-vec:W07-IO-001]
-/// Führt ein atomares Ersetzen von `dest` durch `tmp` durch (INV-DISKANN-1).
+/// Führt ein atomares Ersetzen von `dest` durch `tmp` durch.
 ///
 /// Reihenfolge (strengste vorhandene Variante):
 /// 1. `tmp_file.sync_all()` zur Garantie vollständiger Dateiinhalte auf Platte

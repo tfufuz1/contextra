@@ -2,8 +2,8 @@
 //! Golden Corpus Generator & Regression Tests (ST6.1)
 //!
 //! Generates and verifies byte-for-byte deterministic reference files for:
-//! 1. Manifest (`MFMN` v1)
-//! 2. SSTable (`MFSX` v4 default, `MFST` legacy v3, multiblock with Bloom)
+//! 1. Manifest (`AMNF` v1)
+//! 2. SSTable (`ASGX` v4 default, `ASGT` legacy v3, multiblock with Bloom)
 //! 3. WAL including HMAC hash chain, WAL without HMAC, WAL with corrupt tail
 //! 4. Rollback Intent (`MFRLBK\0\0`)
 //! 5. Tenant Codec Test Vectors
@@ -74,11 +74,11 @@ async fn test_golden_backward_compatibility_read() {
     // If CURRENT_MANIFEST_VERSION > 1: reader must still read v1 manifest seamlessly (as verified above).
     if CURRENT_MANIFEST_VERSION == 1 {
         let manifest_bytes = fs::read(&manifest_path).expect("read manifest bytes");
-        assert_eq!(&manifest_bytes[0..4], b"MFMN");
+        assert_eq!(&manifest_bytes[0..4], b"AMNF");
         assert_eq!(manifest_bytes[4], 1);
     }
 
-    // 3. Read SSTable MFSX (single block)
+    // 3. Read SSTable ASGX (single block)
     let sst_path = dir.join("sstable_v4.sst");
     let cache = Arc::new(acta_seg::sstable::BlockCache::new(1024 * 1024));
     let reader = SstableReader::open(&sst_path, cache.clone())
@@ -108,7 +108,7 @@ async fn test_golden_backward_compatibility_read() {
         assert!(val_none.is_none());
     }
 
-    // 5. Read SSTable Legacy MFST (v3)
+    // 5. Read SSTable Legacy ASGT (v3)
     let legacy_sst_path = dir.join("sstable_legacy.sst");
     let legacy_reader = SstableReader::open(&legacy_sst_path, cache)
         .await
@@ -200,7 +200,7 @@ async fn generate_golden_corpus() {
         .expect("append add 2");
     drop(manifest);
 
-    // 3. SSTable MFSX (v4)
+    // 3. SSTable ASGX (v4)
     let sst_path = dir.join("sstable_v4.sst");
     let _ = fs::remove_file(&sst_path);
     let mut b = SstableBuilder::create(&sst_path).await.expect("create sst");
@@ -222,7 +222,7 @@ async fn generate_golden_corpus() {
     }
     b_mb.finish().await.expect("finish mb sst");
 
-    // 5. SSTable Legacy MFST (v3)
+    // 5. SSTable Legacy ASGT (v3)
     let legacy_sst_path = dir.join("sstable_legacy.sst");
     let _ = fs::remove_file(&legacy_sst_path);
     let mut b_leg = SstableBuilder::create(&legacy_sst_path).await.expect("create legacy sst");

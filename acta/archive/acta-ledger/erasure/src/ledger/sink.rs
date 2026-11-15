@@ -1,6 +1,6 @@
 //! Dateibasierte LedgerSink-Implementierung außerhalb des Datenverzeichnisses.
 //!
-//! Das Ledger liegt außerhalb des Datenverzeichnisses (D-74).
+//! Das Ledger liegt außerhalb des Datenverzeichnisses.
 //! Lebensdauer = `backup_retention`. Einträge jenseits davon werden entfernt.
 
 use super::durable::{BatchRecordItem, ErasureLedger, LedgerAnchorProof};
@@ -11,7 +11,7 @@ use super::storage::LedgerStorage;
 use crate::error::ErasureError;
 use std::fmt;
 
-/// In-Memory-Ledger-Implementierung (für Tests und WP-4.3 als Basis).
+/// In-Memory-Ledger-Implementierung (für Tests und.3 als Basis).
 ///
 /// Ausgebaut um optionales persistentes Backend (`ErasureLedger`),
 /// behält aber alle bestehenden öffentlichen Signaturen exakt bei (Entscheidung E3).
@@ -48,7 +48,7 @@ impl InMemoryLedger {
         }
     }
 
-    /// Erstellt ein Ledger mit persistentem `LedgerStorage`-Backend (WP-8).
+    /// Erstellt ein Ledger mit persistentem `LedgerStorage`-Backend.
     pub fn with_storage(
         storage: Box<dyn LedgerStorage>,
         ledger_key: [u8; 32],
@@ -78,7 +78,7 @@ impl InMemoryLedger {
         })
     }
 
-    /// Fügt einen Eintrag hinzu (ER-30).
+    /// Fügt einen Eintrag hinzu.
     pub fn append(
         &mut self,
         commitment: [u8; 32],
@@ -114,7 +114,7 @@ impl InMemoryLedger {
         Ok(())
     }
 
-    /// Führt einen atomaren Batch-Append mit Verankerungsnachweis durch (WP-8, INV-ERA-4).
+    /// Führt einen atomaren Batch-Append mit Verankerungsnachweis durch.
     pub fn append_batch(
         &mut self,
         items: &[BatchRecordItem],
@@ -193,12 +193,12 @@ impl InMemoryLedger {
         true
     }
 
-    /// Prüft auf Zeitregression: `store_seq < max(gated_seq)` (ER-30).
+    /// Prüft auf Zeitregression: `store_seq < max(gated_seq)`.
     pub fn detect_time_regression(&self, store_current_seq: u64) -> bool {
         store_current_seq < self.max_gated_seq
     }
 
-    /// Gibt den ledger_floor zurück: `max(gated_seq)` (ER-30).
+    /// Gibt den ledger_floor zurück: `max(gated_seq)`.
     pub fn ledger_floor(&self) -> u64 {
         self.max_gated_seq
     }
@@ -208,7 +208,7 @@ impl InMemoryLedger {
         &self.entries
     }
 
-    /// Entfernt Einträge jenseits von `backup_retention` (ER-30).
+    /// Entfernt Einträge jenseits von `backup_retention`.
     ///
     /// `cutoff_us`: Mikrosekunden UTC, Einträge mit `completed_at < cutoff_us` werden entfernt.
     pub fn prune(&mut self, cutoff_us: u64) {

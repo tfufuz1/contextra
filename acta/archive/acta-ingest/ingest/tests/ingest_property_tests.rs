@@ -1,10 +1,10 @@
-//! Property-Tests für Ingestion, Kanonisierung und Chunking (WP-5).
+//! Property-Tests für Ingestion, Kanonisierung und Chunking.
 //!
 //! # Zweck & Invarianten
-//! - Idempotenz der Text-Sanitisierung & Kanonisierung (INV-1).
+//! - Idempotenz der Text-Sanitisierung & Kanonisierung.
 //! - Vollständige Textabdeckung der Chunks (kein Datenverlust).
 //! - Monotone und syntaktisch valide Breadcrumb-Hierarchien.
-//! - Strenger Determinismus bei Wiederholung identischer Eingaben (INV-5).
+//! - Strenger Determinismus bei Wiederholung identischer Eingaben.
 
 #![allow(
     clippy::unwrap_used,

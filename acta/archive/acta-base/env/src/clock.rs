@@ -20,7 +20,7 @@ pub trait Clock: Send + Sync + 'static {
     /// Returns `0` if system time is before the epoch instead of panicking.
     ///
     /// # Invarianten
-    /// - `INV-ENV-TIME-1`: Garantiert panikfrei; liefert bei Zeiten vor Unix-Epoche `0`.
+    /// -: Garantiert panikfrei; liefert bei Zeiten vor Unix-Epoche `0`.
     ///
     /// # Fehler
     /// Keine; garantiert panikfrei, liefert bei Zeit vor Unix-Epoche `0`.
@@ -31,7 +31,7 @@ pub trait Clock: Send + Sync + 'static {
     /// Returns nanoseconds elapsed since a monotonic baseline reference point.
     ///
     /// # Invarianten
-    /// - `INV-ENV-TIME-2`: Garantiert panikfrei und monoton nicht fallend innerhalb des Prozesses.
+    /// -: Garantiert panikfrei und monoton nicht fallend innerhalb des Prozesses.
     ///
     /// # Fehler
     /// Keine; garantiert panikfrei und monoton nicht fallend.
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_system_clock_monotonic_non_decreasing() {
-        // NOTE: Verifiziert INV-ENV-TIME-2 (Monotonie über Zeitintervall)
+        // NOTE: Verifiziert (Monotonie über Zeitintervall)
         let clock = SystemClock::new();
         let t1 = clock.monotonic_nanos();
         std::thread::sleep(std::time::Duration::from_millis(1));
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_system_clock_now_unix_nanos() {
-        // NOTE: Verifiziert INV-ENV-TIME-1 (Gültige Epochenzeit > 0)
+        // NOTE: Verifiziert (Gültige Epochenzeit > 0)
         let clock = SystemClock::default();
         let nanos = clock.now_unix_nanos();
         assert!(nanos > 0, "Unix nanos must be > 0 in modern systems");

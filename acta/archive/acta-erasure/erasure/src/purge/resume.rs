@@ -1,4 +1,4 @@
-//! Wiederanlauf- und Fortschritts-API für den Purge-Lebenszyklus (P9, WP-2, WP-3,, §11.4).
+//! Wiederanlauf- und Fortschritts-API für den Purge-Lebenszyklus (P9, §11.4).
 //!
 //! Stellt getypte Methoden zur Verfügung, um den Fortschritt eines Purge-Laufes
 //! nach einem Crash wiederherzustellen, zu validieren und schrittweise voranzutreiben.

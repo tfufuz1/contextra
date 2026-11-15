@@ -8,7 +8,7 @@ use crate::types_local::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, Re
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-/// Thread-sichere Implementierung des `ReadGate`-Ports (ER-11, D-120).
+/// Thread-sichere Implementierung des `ReadGate`-Ports.
 pub struct GateGuard {
     inner: Arc<RwLock<ErasedSet>>,
 }
@@ -19,7 +19,7 @@ impl GateGuard {
         Self { inner: set }
     }
 
-    /// Führt einen linearisierten Lesevorgang aus.
+    /// Führt einen linearisierten Lesevorgang.
     ///
     /// Prüft das Gate vor und nach der übergebenen Lese-/Entschlüsselungs-Operation `f`.
     /// Hat sich `gate_epoch` während der Ausführung verändert, wird die Operation
@@ -53,7 +53,7 @@ impl GateGuard {
         }
     }
 
-    /// Führt einen linearisierten Lesevorgang auf einem 78-Byte-Schlüssel aus.
+    /// Führt einen linearisierten Lesevorgang auf einem 78-Byte-Schlüssel.
     pub fn linearized_read_raw<T, F>(&self, raw: &[u8; 78], mut f: F) -> Result<T, GateDecision>
     where
         F: FnMut() -> Result<T, GateDecision>,

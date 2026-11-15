@@ -56,12 +56,12 @@ impl Default for ManualClock {
 }
 
 impl Clock for ManualClock {
-    /// Liest den atomaren Unix-Zeitstempel sequentiell konsistent aus.
+    /// Liest den atomaren Unix-Zeitstempel sequentiell konsistent.
     fn now_unix_nanos(&self) -> u64 {
         self.unix_nanos.load(Ordering::SeqCst)
     }
 
-    /// Liest den atomaren monotonen Zeitstempel sequentiell konsistent aus.
+    /// Liest den atomaren monotonen Zeitstempel sequentiell konsistent.
     fn monotonic_nanos(&self) -> u64 {
         self.mono_nanos.load(Ordering::SeqCst)
     }

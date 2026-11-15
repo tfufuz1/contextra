@@ -165,7 +165,7 @@ fn test_expired_license() {
 }
 
 // ANCHOR[acta-node:TEST-GATE-FAST-RING-ALWAYS-OK]
-// Prüft Invariante INV-LICENSE-2: Fast-Ring ist selbst bei abgelaufener Lizenz immer erlaubt.
+// Prüft Invariante: Fast-Ring ist selbst bei abgelaufener Lizenz immer erlaubt.
 #[test]
 fn test_inv_license_2_fast_ring_always_allowed() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -194,7 +194,7 @@ fn test_inv_license_2_fast_ring_always_allowed() {
     )
     .expect("gate creation succeeds");
 
-    // Fast ring MUST pass unconditionally under INV-LICENSE-2 despite expiration & missing allowed_rings
+    // Fast ring MUST pass unconditionally under despite expiration & missing allowed_rings
     assert_eq!(gate.check_ring(FeatureRing::Fast), Ok(()));
 }
 
@@ -230,7 +230,7 @@ fn test_invariant_non_destructive_degradation() {
     // 2. Sovereign-Ring scheitert (Fail-Closed)
     assert!(gate.check_ring(FeatureRing::Sovereign).is_err());
 
-    // 3. Fast-Ring bleibt vollkommen funktionsfähig (INV-LICENSE-2 / Non-Destructive Degradation)
+    // 3. Fast-Ring bleibt vollkommen funktionsfähig
     assert!(gate.check_ring(FeatureRing::Fast).is_ok());
     assert!(gate.authorize(FeatureRing::Fast).is_ok());
 }

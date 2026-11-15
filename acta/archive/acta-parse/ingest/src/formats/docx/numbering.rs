@@ -10,7 +10,7 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: Parsing von word/numbering.xml zur Listenauflösung (aufzählend vs. nummeriert) (WP-ING-04).
+// ZWECK: Parsing von word/numbering.xml zur Listenauflösung (aufzählend vs. nummeriert).
 // INVARIANTEN: Zero-Panic, deterministische Zuordnung, kein unsafe.
 // STAND: TS:2026-10-31T00:00:00Z
 

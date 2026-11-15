@@ -1,14 +1,14 @@
 // FILE-CONTEXT
 // ZWECK: 8-Bit Skalare Quantisierung (SQ8) mit pro-Dimension Min/Max Skalierung.
-// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben; INV-SQ8-ERROR-BOUND-1.
+// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); Keine Panics bei unpassenden Eingaben;.
 // NICHT-OFFENSICHTLICH: try_train prüft Vektor-Dimensionen vor Rekalibrierung der Min/Max-Grenzen.
 // HOTSPOTS: ScalarQuantizer
 // STAND: 2026-11-12
 
 //! Scalar Quantization (SQ8) for HNSW Index.
 //!
-//! # Error Bounds Guarantee (INV-SQ8-ERROR-BOUND-1)
-//! For each dimension $i \in [0, D-1]$, given quantization interval $[\text{min}_i, \text{max}_i]$ with
+//! # Error Bounds Guarantee
+//! For each dimension $i \in [0, ]$, given quantization interval $[\text{min}_i, \text{max}_i]$ with
 //! range $\Delta_i = \text{max}_i - \text{min}_i$:
 //! Rounding into 256 discrete levels ($u8 \in [0, 255]$) guarantees that for any in-distribution value $v_i \in [\text{min}_i, \text{max}_i]$,
 //! the reconstruction error $e_i = |v_i - \hat{v}_i|$ satisfies:

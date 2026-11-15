@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Phase-1 Rebuild: Snapshot des Index nehmen, Quantisierer re-kalibrieren und neuen Kern aufbauen.
-// INVARIANTEN: Deterministische Nachbarschaftsauswahl und Distanzberechnung; INV-INDEX-APPLY-1.
+// INVARIANTEN: Deterministische Nachbarschaftsauswahl und Distanzberechnung;.
 // HOTSPOTS: rebuild_phase1_snapshot_and_build, select_neighbors_heuristic_with_batch
 // STAND: TS:2026-11-11T02:00:00Z
 

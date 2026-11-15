@@ -1,4 +1,4 @@
-//! WP-30 (c): Fault-Injection an den 5 definierten Punkten:
+//! (c): Fault-Injection an den 5 definierten Punkten
 //! 1. WAL-Append
 //! 2. fsync
 //! 3. Memtable-Flush

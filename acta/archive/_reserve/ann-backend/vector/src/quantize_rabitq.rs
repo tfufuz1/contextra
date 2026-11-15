@@ -14,10 +14,10 @@
 //! Given an input vector $x \in \mathbb{R}^D$ and a random orthogonal rotation matrix $R \in \mathbb{R}^{D \times D}$ ($R R^T = I$):
 //! 1. Rotated vector: $x' = R x$, with norm $\|x'\| = \|x\|$.
 //! 2. Sign binarization: $b_i = \mathbb{I}(x'_i \ge 0) \in \{0, 1\}$.
-//! 3. Reconstructed rotated vector estimate: $\hat{x}'_i = c_s \cdot \bar{s} \cdot (2 b_i - 1)$, where $\bar{s} = \frac{1}{D} \sum_{i=0}^{D-1} |x'_i|$ and $c_s = \frac{\pi}{2} \approx 1.5707963$.
+//! 3. Reconstructed rotated vector estimate: $\hat{x}'_i = c_s \cdot \bar{s} \cdot (2 b_i - 1)$, where $\bar{s} = \frac{1}{D} \sum_{i=0}^{} |x'_i|$ and $c_s = \frac{\pi}{2} \approx 1.5707963$.
 //!    The factor $c_s = \frac{\pi}{2}$ compensates for sign binarization attenuation under random orthogonal rotation (Gao & Long, 2024), where $\mathbb{E}\left[\bar{s} \sum q'_i \text{sgn}(x'_i)\right] = \frac{2}{\pi} \langle q, x \rangle$, ensuring $\mathbb{E}[\langle q', \hat{x}' \rangle] = \langle q, x \rangle$.
 //! 4. Asymmetric inner product estimation for query $q$ (rotated $q' = R q$):
-//!    $$\langle q, x \rangle = \langle q', x' \rangle \approx c_s \bar{s} \sum_{i=0}^{D-1} q'_i (2 b_i - 1)$$
+//! $$\langle q, x \rangle = \langle q', x' \rangle \approx c_s \bar{s} \sum_{i=0}^{} q'_i (2 b_i - 1)$$
 //! 5. Asymmetric Euclidean distance estimation:
 //!    $$d(q, x) = \sqrt{\max\left(0, \|q\|^2 + \|x\|^2 - 2 \langle q', \hat{x}' \rangle\right)}$$
 
@@ -154,7 +154,7 @@ impl RaBitQQuantizer {
     /// Under random orthogonal rotation, rotated vector components follow joint Gaussian distributions.
     /// By Bussgang's theorem / price's theorem, $\mathbb{E}[q'_i \text{sgn}(x'_i)] = \sqrt{\frac{2}{\pi}} \frac{\langle q, x \rangle}{D \sigma_x}$,
     /// and $\mathbb{E}[\bar{s}] = \sqrt{\frac{2}{\pi}} \sigma_x$, yielding:
-    /// $$\mathbb{E}\left[\bar{s} \sum_{i=0}^{D-1} q'_i \text{sgn}(x'_i)\right] = \frac{2}{\pi} \langle q, x \rangle$$
+    /// $$\mathbb{E}\left[\bar{s} \sum_{i=0}^{} q'_i \text{sgn}(x'_i)\right] = \frac{2}{\pi} \langle q, x \rangle$$
     /// To ensure unbiased inner product estimation $\mathbb{E}[\hat{\langle q, x \rangle}] = \langle q, x \rangle$,
     /// the raw sign dot product estimate $\bar{s} \sum q'_i \text{sgn}(x'_i)$ must be scaled by the expectation correction factor:
     /// $$c_s = \frac{\pi}{2} \approx 1.5707963268$$

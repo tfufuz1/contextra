@@ -73,7 +73,7 @@ fn compute_v3_checksum(
 
 /// Dokumentiert und beweist die bekannte HMAC-Kollisionslücke im Legacy-V2-Pfad.
 ///
-/// DOKUMENTATION DER LÜCKE (Architektur-Audit Befund F2 / Spec §22.2b):
+/// DOKUMENTATION DER LÜCKE:
 /// Im `verify_and_update_v2`-Pfad werden für `op_type == 0` (Put) der Schlüssel (`key`)
 /// und der Wert (`value`) ohne Längenpräfix direkt hintereinander in den HMAC eingespeist.
 /// Dadurch führen zwei unterschiedliche (Key, Value)-Paare mit identischer Byte-Konkatenation

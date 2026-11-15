@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! # Asynchroner WAL-Flusher (Ring 1)
 //!
 //! Koordiniert Flush- und fsync-Aufrufe mit Timeout und Batching-Strategien.

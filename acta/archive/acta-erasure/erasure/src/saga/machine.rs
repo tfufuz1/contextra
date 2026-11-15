@@ -37,9 +37,9 @@ pub enum SagaState {
     Verifying,
     /// Löschung vollständig abgeschlossen.
     Completed,
-    /// Zugriffsbeschränkung aktiv (Art. 18 DSGVO, D-116).
+    /// Zugriffsbeschränkung aktiv.
     Restricted,
-    /// Zugriffsbeschränkung aufgehoben (D-116).
+    /// Zugriffsbeschränkung aufgehoben.
     Lifted,
     /// Temporär verzögert (mit Grund).
     Pending,
@@ -63,7 +63,7 @@ impl SagaState {
             (Requested, Refused) => true,
             (Requested, Pending) => true,
             (Gated, KeyDestroyed) => true,
-            (Gated, Purging) => true, // D-117: Superseded Version ohne KeyDestroy direkt zu Purging
+            (Gated, Purging) => true, //: Superseded Version ohne KeyDestroy direkt zu Purging
             (Gated, Pending) => true,
             (KeyDestroyed, Purging) => true,
             (KeyDestroyed, Pending) => true,
@@ -71,9 +71,9 @@ impl SagaState {
             (Purging, Pending) => true,
             (Verifying, Completed) => true,
             (Verifying, Pending) => true,
-            // Restriktion (D-116)
+            // Restriktion
             (Restricted, Lifted) => true,
-            (Restricted, Gated) => true, // Erase hebt Restriktion durch Löschung auf (D-15, D-119)
+            (Restricted, Gated) => true, // Erase hebt Restriktion durch Löschung auf
             (Restricted, Pending) => true,
             // Pending kann nur zu den aktiven Schritten fortsetzen, NIE direkt zu Completed (FW-9, I-4)
             (Pending, Gated) => true,
@@ -165,7 +165,7 @@ impl EraseSaga {
         self.transition_with_reason(next, None)
     }
 
-    /// Führt einen Zustandsübergang mit Begründung durch (ER-18: idempotent).
+    /// Führt einen Zustandsübergang mit Begründung durch.
     ///
     /// Gibt `Err` zurück wenn der Übergang nicht erlaubt ist.
     pub fn transition_with_reason(

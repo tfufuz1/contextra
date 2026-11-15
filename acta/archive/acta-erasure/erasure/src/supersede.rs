@@ -1,6 +1,6 @@
 //! Domänenlogik für Sonderziel Berichtigung mit Purge alter Versionen (`update_with(..., Purge)`,, Zieltyp 5).
 //!
-//! # Normative Referenzen (D-117, F.9)
+//! # Normative Referenzen
 //! - **Matcher `PrefixSeq { prefix[65], seq_lt }`:** Trifft jeden Schlüssel mit Präfix
 //!   `DATA || tenant || coll || cluster || doc_tag` und commit_seq < seq_lt.
 //! - **Protokoll (Zieltyp 5, Superseded):**
@@ -136,7 +136,7 @@ impl SupersedePlan {
         self.mode
     }
 
-    /// Validiert, dass eine neue Version mit `seq > intent_seq` committet wurde (D-117).
+    /// Validiert, dass eine neue Version mit `seq > intent_seq` committet wurde.
     ///
     /// Liefert `ErasureError::UpdateMissing`, wenn die neue Version fehlt oder `seq <= intent_seq` ist.
     pub fn verify_updated_seq(&self, latest_committed_seq: u64) -> Result<(), ErasureError> {
@@ -148,7 +148,7 @@ impl SupersedePlan {
 
     /// Zeigt an, ob auf Schlüsselebene etwas vernichtet wurde.
     ///
-    /// SPEC D-117: Bei Supersede bleibt der DEK gleich, kein Schlüssel wird vernichtet.
+    /// SPEC: Bei Supersede bleibt der DEK gleich, kein Schlüssel wird vernichtet.
     #[inline]
     pub const fn is_key_destroyed(&self) -> bool {
         false

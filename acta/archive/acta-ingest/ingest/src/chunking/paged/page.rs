@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: Seiten- und Folien-Verarbeitung für PagedChunker (WP-ING-14).
+// ZWECK: Seiten- und Folien-Verarbeitung für PagedChunker.
 // INVARIANTEN: Zero-Panic, Zitierbarkeit über page/slide locators, monotone Spans.
 // STAND: TS:2026-10-31T00:00:00Z
 

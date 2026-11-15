@@ -1,6 +1,6 @@
-//! Single-Flight-Koordination und Scope-Sperren (INV-ERA-3, WP-3,).
+//! Single-Flight-Koordination und Scope-Sperren.
 //!
-//! Invariante INV-ERA-3: Pro Scope läuft höchstens ein Purge (Single-Flight).
+//! Invariante: Pro Scope läuft höchstens ein Purge (Single-Flight).
 //! Ein Scope-Lock überlebt Prozessabstürze.
 //!
 //! Stale-Lock-Erkennung:
@@ -172,7 +172,7 @@ pub fn scope_lock_path(scope_id: &[u8; 16]) -> PathBuf {
     PathBuf::from(format!("scope/{}.lock", hex_id))
 }
 
-/// Single-Flight Guard für einen Scope (INV-ERA-3).
+/// Single-Flight Guard für einen Scope.
 ///
 /// Hält das Lock auf einen Scope solange aktiv, bis der Guard gedroppt oder
 /// explizit via [`ScopeLockGuard::release`] freigegeben wird.
@@ -234,7 +234,7 @@ impl<'a> ScopeLockGuard<'a> {
     }
 }
 
-/// Verwaltet Single-Flight Scope-Locks (INV-ERA-3).
+/// Verwaltet Single-Flight Scope-Locks.
 pub struct ScopeLockManager<'a> {
     vfs: &'a dyn Vfs,
     clock: &'a dyn Clock,
@@ -296,7 +296,7 @@ impl<'a> ScopeLockManager<'a> {
             let existing = ScopeLockRecord::from_bytes(&data)?;
 
             if !existing.is_stale(now) {
-                // Lock ist noch aktiv -> Fail-Closed Single Flight (INV-ERA-3)
+                // Lock ist noch aktiv -> Fail-Closed Single Flight
                 return Err(ScopeLockError::ScopeLocked {
                     scope_id,
                     owner_id: existing.owner_id,

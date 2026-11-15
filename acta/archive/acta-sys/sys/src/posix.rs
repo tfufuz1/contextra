@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-posix-main,epic=sys-posix,seq=0] POSIX Systemaufrufe & Limits
 // =========================================================================
-// NOTE: Low-level POSIX syscall wrappers (Ring 0 / E0 / docs/SPEC.md §10.1).
+// NOTE: Low-level POSIX syscall wrappers.
 // Invariante: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls.
 // Keine unzulässigen Garantieversprechen.
 

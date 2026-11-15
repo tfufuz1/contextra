@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Zero-Panic geprüfte numerische Typkonvertierungen für acta-vec (WP-VEC-7).
+// ZWECK: Zero-Panic geprüfte numerische Typkonvertierungen für acta-vec.
 // INVARIANTEN: Zero-Panic, kein ungeprüftes Truncation-Casting (`as`), strikte Fehlerbehandlung.
 // HOTSPOTS: casting.rs:18-24 (to_u32), casting.rs:32-38 (u64_to_usize), casting.rs:60-78 (float casts)
 // STAND: 2026-11-11

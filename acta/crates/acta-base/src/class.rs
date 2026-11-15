@@ -22,6 +22,9 @@ impl DataClass {
     /// `true`, wenn die Klasse zur Ebene P gehoert (verschluesselt, loeschbar).
     #[must_use]
     pub fn is_personal_layer(self) -> bool {
-        matches!(self, Self::Personal | Self::Besonders | Self::Unklassifiziert)
+        matches!(
+            self,
+            Self::Personal | Self::Besonders | Self::Unklassifiziert
+        )
     }
 }

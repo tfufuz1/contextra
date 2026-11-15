@@ -100,7 +100,7 @@ pub fn hkdf_expand(prk: &[u8], info: &[u8], out: &mut [u8]) -> Result<(), HkdfEr
     Ok(())
 }
 
-/// Leitet den DEK nach SPEC D-79 / §9.4 / §10.1 ab:
+/// Leitet den DEK nach SPEC / §9.4 / §10.1 ab
 /// `DEK = HKDF-SHA256(ikm = K_unit, salt = SHA-256("acta/dek-salt/v2" || salt_T || salt_C || salt_S || salt_D), info = "acta/dek/v2" || doc_tag)`
 pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: [u8; 16]) -> Dek {
     let mut hasher = Sha256::new();

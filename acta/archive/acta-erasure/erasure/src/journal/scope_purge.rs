@@ -16,8 +16,8 @@ use acta_erasure::types_local::Clock;
 
 /// Führt die WAL-Entsorgung für den angegebenen Scope synchron durch.
 ///
-/// Gemäß INV-ERA-6 werden WAL-Einträge eines gelöschten Scopes entsorgt oder unlesbar gemacht.
-/// - **Wiederaufnehmbarkeit & Idempotenz (INV-ERA-2):** Wurde der Scope bereits entsorgt, wird
+/// Gemäß werden WAL-Einträge eines gelöschten Scopes entsorgt oder unlesbar gemacht.
+/// - **Wiederaufnehmbarkeit & Idempotenz:** Wurde der Scope bereits entsorgt, wird
 ///   dies sofort erkannt und quittiert (`WalDisposalMethod::AlreadyDisposed`).
 /// - **Priorität:** Zuerst werden alle auffindbaren Einträge physisch getilgt (`dispose_entries`).
 /// - **Sicherheitsfall:** Anschließend bzw. zur vollständigen Entwertung wird der scope-spezifische

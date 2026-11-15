@@ -18,3 +18,26 @@ Python-Werkzeuge der Altquelle als **Vorlage fuer die noch fehlenden Gates** aus
 | `doc_lint.py` | G-WORD (Vertiefung) |
 
 Die Skripte sind bereinigt, aber nicht angepasst; Pfade und Crate-Namen vor Gebrauch auf `crates/acta-*` abgleichen.
+## Dateien
+
+| Datei (relativ zu `archive/xtask/`) | LOC | Befunde |
+|---|---:|---|
+| `tools/abhaengigkeits_budget.py` | 142 |  |
+| `tools/async_boundary_scanner.py` | 181 |  |
+| `tools/concurrency_lock_auditor.py` | 226 |  |
+| `tools/crate_inventory.py` | 603 |  |
+| `tools/determinism_guard.py` | 190 |  |
+| `tools/doc_lint.py` | 134 |  |
+| `tools/erasure_leak_prober.py` | 141 |  |
+| `tools/error_topology_mapper.py` | 134 |  |
+| `tools/fsync_durability_tracer.py` | 173 |  |
+| `tools/gate_dependencies.py` | 167 |  |
+| `tools/gate_g1_layering.py` | 14 |  |
+| `tools/gate_layering.py` | 197 |  |
+| `tools/layering.rs` | 60 | panic=2 |
+| `tools/loc.py` | 159 |  |
+| `tools/modularity_score.py` | 216 |  |
+| `tools/port_contract_auditor.py` | 186 |  |
+| `tools/unsafe_boundary_auditor.py` | 188 |  |
+| `tools/unsafe_islands.rs` | 127 | std_fs=1, unsafe=6 |
+| `tools/zero_panic_analyzer.py` | 223 |  |

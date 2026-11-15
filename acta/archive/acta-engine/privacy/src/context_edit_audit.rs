@@ -10,7 +10,7 @@
 //!
 //! # Invarianten
 //! - Deterministische Erzeugung von [`ContextEditAuditRecord`]-Strukturen mit kryptografischer Hash-Verkettung (BLAKE3).
-//! - Zeitstempel stammen ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
+//! - Zeitstempel stammen ausschließlich über den `Clock`-Port ([`crate::Clock`]).
 //! - Zero-Panic: Kein `unwrap`, `expect` im Produktionspfad.
 //! - Kein Klartext-Inhalt im Record (Privacy-by-Design: nur Längen, Hashes, Typen und Labels).
 

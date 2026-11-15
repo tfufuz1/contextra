@@ -2,150 +2,17 @@
 //!
 //! Bietet kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
 
-// ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
+// ZWECK: HMAC-Kette der Journal-Rahmen.
+// TODO(acta-altlast): `load_or_create_integrity_key*` legt eine Schluesseldatei im Datenverzeichnis an und widerspricht Z10/5.1; Schluessel nur als Parameter (HKDF `acta/wal/v1`).
 
 use crate::error::{StoreError, StoreResult as Result};
 use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
 
-#[cfg(feature = "legacy-wal-key")]
-const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
-
-/// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback
-/// during WAL replay of legacy databases (INV-WAL-LEGACY-KEY-1).
-///
-/// # PREREQUISITES FOR FUTURE PERMANENT REMOVAL OF `LEGACY_INTEGRITY_KEY_OBFUSCATED`:
-/// To safely remove this constant, the static key fallback, and `deobfuscate_legacy_integrity_key()`
-/// in a future separate step without breaking existing operational databases, the following
-/// conditions MUST be verified and fulfilled:
-///
-/// 1. **Complete Operator Migration**: All legacy WAL files (V1/V2) across all active deployments
-///    must have been explicitly migrated using `Wal::migrate_legacy_wal` or `open_for_legacy_migration`.
-/// 2. **Retirement Marker Verification**: Every stored WAL segment in active deployment data
-///    directories must possess a corresponding `.rekeyed` retirement marker file containing a valid
-///    BLAKE3 key binding and be rewritten in V3 format.
-/// 3. **Zero Pending Migrations**: Audit checks via `LsmStorage::has_pending_legacy_wal_migration_path`
-///    return `false` across all operational environments, proven by an operator migration report audit artifact.
-/// 4. **Feature Gate Deprecation**: Cargo feature `legacy-wal-key` is formally deprecated and removed
-///    from crate feature definitions, enforcing fail-closed compilation errors on legacy key usage.
-#[cfg(feature = "legacy-wal-key")]
-const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
-
-#[cfg(feature = "legacy-wal-key")]
-static LEGACY_KEY_WARN_ONCE: std::sync::Once = std::sync::Once::new();
-
-/// Emits a process-wide one-time warning log when the legacy HMAC integrity key path is used.
-///
-/// **SECURITY**: This message intentionally contains NO key material or secret data.
-#[cfg(feature = "legacy-wal-key")]
-pub(crate) fn warn_legacy_key_use_once(context_msg: &str) {
-    LEGACY_KEY_WARN_ONCE.call_once(|| {
-        tracing::warn!(
-            target: "acta_seg::wal::legacy_key",
-            event = "legacy_integrity_key_accessed",
-            context = %context_msg,
-            "Legacy-WAL-Integritätsschlüssel im Einsatz ({context_msg}) — dieses Format bietet keine echte Manipulationssicherheit, da der Schlüssel öffentlich ist. Bitte migriere die WAL-Datei auf ein neues Schlüsselformat."
-        );
-    });
-}
-
-/// Status indicating whether a WAL segment or key configuration uses the obfuscated legacy key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LegacyKeyStatus {
-    /// A standard, secure integrity key (e.g. from `.wal_integrity_key` or `KeyManager`) is in use.
-    Standard,
-    /// The legacy obfuscated key is active and requires migration.
-    LegacyActive,
-}
-
-impl LegacyKeyStatus {
-    /// Returns `true` if the status is [`LegacyKeyStatus::LegacyActive`].
-    pub const fn is_legacy(self) -> bool {
-        matches!(self, Self::LegacyActive)
-    }
-
-    /// Returns `true` if the status is [`LegacyKeyStatus::Standard`].
-    pub const fn is_standard(self) -> bool {
-        matches!(self, Self::Standard)
-    }
-}
-
-/// Internal const helper for deobfuscating the legacy static integrity key bytes.
-#[cfg(feature = "legacy-wal-key")]
-pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
-    let mut out = [0u8; 32];
-    let mut i = 0;
-    while i < 32 {
-        out[i] = LEGACY_INTEGRITY_KEY_OBFUSCATED[i] ^ LEGACY_KEY_OBFUSCATION_MASK;
-        i += 1;
-    }
-    out
-}
-
-/// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
-#[cfg(feature = "legacy-wal-key")]
-pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
-    warn_legacy_key_use_once("legacy_integrity_key");
-    Ok(deobfuscate_legacy_integrity_key())
-}
-
-#[cfg(not(feature = "legacy-wal-key"))]
-pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
-    Err(StoreError::Storage(
-        "Legacy WAL key support is disabled at compile time. Enable Cargo feature 'legacy-wal-key' to allow legacy key fallback.".into()
-    ))
-}
-
-/// Migrates a legacy integrity key to a new 32-byte key material state.
-///
-/// # Chain Compatibility
-/// When migrating a legacy WAL segment to a new integrity key format, HMAC chain validation
-/// during replay must verify historical entries using the legacy key before signing new entries
-/// or rewriting segments using `new_key_material`.
-///
-/// # Security & Zeroize Note
-/// `acta-seg` does not use a `zeroize` dependency. To avoid non-volatile manual memory
-/// wipes, key material in memory is handled via standard Rust slice operations without manual zeroing.
-///
-/// # Errors
-/// Returns [`StoreError::Storage`] if `legacy` does not match the expected legacy integrity key,
-/// if `new_key_material` is not 32 bytes long, or if `new_key_material` is identical to `legacy`.
-#[cfg(feature = "legacy-wal-key")]
-pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8; 32]> {
-    warn_legacy_key_use_once("migrate_legacy_key");
-
-    let expected_legacy = deobfuscate_legacy_integrity_key();
-    if legacy != expected_legacy {
-        return Err(StoreError::Storage(
-            "Provided legacy key material does not match expected legacy integrity key".into(),
-        ));
-    }
-
-    if new_key_material.len() != 32 {
-        return Err(StoreError::Storage(format!(
-            "New key material must be exactly 32 bytes, got {}",
-            new_key_material.len()
-        )));
-    }
-
-    if new_key_material == expected_legacy {
-        return Err(StoreError::Storage(
-            "New key material cannot be identical to the legacy integrity key".into(),
-        ));
-    }
-
-    let mut derived = [0u8; 32];
-    derived.copy_from_slice(new_key_material);
-    Ok(derived)
-}
-
-#[cfg(not(feature = "legacy-wal-key"))]
-pub fn migrate_legacy_key(_legacy: &[u8], _new_key_material: &[u8]) -> Result<[u8; 32]> {
-    Err(StoreError::Storage(
-        "Legacy WAL key support is disabled at compile time. Recompile with Cargo feature 'legacy-wal-key' to perform legacy key migration.".into()
-    ))
-}
+// Altlast entfernt: statischer Legacy-Integritaetsschluessel, Legacy-Migration und
+// `LegacyKeyStatus`. Es gibt keine Standard- oder Ersatzschluessel (Z10); das Journal
+// erhaelt seinen Schluessel nur als Parameter (5.1).
 
 impl Wal {
     /// Prepares a batch of WAL operations with sequential sequence numbers and HMAC hash-chaining.
@@ -214,11 +81,6 @@ impl Wal {
     
     pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {
         std::sync::Arc::clone(&self.last_hmac)
-    }
-
-    
-    pub fn legacy_integrity_key_for_test() -> Result<[u8; 32]> {
-        legacy_integrity_key()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).

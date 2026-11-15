@@ -4,8 +4,8 @@
 //! Schlüsselmaterial vor Kaltstart-Angriffen, Speicher-Dumps und Timing-Orakeln schützen.
 //!
 //! ## Invarianten
-//! - **INV-CRYPTO-ZEROIZE-1**: Automatisches Zeroizing beim Verlassen des Gültigkeitsbereichs (`Drop`).
-//! - **INV-CRYPTO-CONSTANT-TIME-1**: Alle Schlüssel-, Tag- und Prüfsummenvergleiche in konstanter Zeit
+//! - ****: Automatisches Zeroizing beim Verlassen des Gültigkeitsbereichs (`Drop`).
+//! - ****: Alle Schlüssel-, Tag- und Prüfsummenvergleiche in konstanter Zeit
 //!   mittels `subtle::ConstantTimeEq`. Verbot von `==`-Vergleichen auf Byte-Geheimnissen.
 //! - Manuelle Notfallbereinigung (`emergency_wipe`) überschreibt Speicher deterministisch mit Nullen.
 //! - Debug- und Display-Ausgaben maskieren sensible Schlüssel (`[REDACTED]`).
@@ -80,7 +80,7 @@ impl Eq for VolatileEncryptionKey {}
 
 // SECTION [epic=crypto-tamper,seq=3] Konstantzeit-Operationen
 // ANCHOR[acta-crypto:TAMPER-002] Konstantzeit-Vergleich zweier Slices
-/// Konstantzeit-Verifikation zweier Byte-Slices (`INV-CRYPTO-CONSTANT-TIME-1`).
+/// Konstantzeit-Verifikation zweier Byte-Slices.
 ///
 /// Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen.
 #[inline]

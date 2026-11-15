@@ -1,6 +1,6 @@
-//! Data Encryption Key (DEK) derivation per D-79 and L-3.
+//! Data Encryption Key (DEK) derivation per and L-3.
 //!
-//! Enforces strict zeroization on drop for all key structures (`INV-CRYPTO-ZEROIZE-1`).
+//! Enforces strict zeroization on drop for all key structures.
 
 // SECTION [epic=crypto-dek,seq=1] Imports
 use crate::error::{CryptoError, Result};
@@ -62,7 +62,7 @@ pub const WRAP_AAD: &[u8] = b"acta/dek-wrap/v1";
 // !SECTION
 
 // SECTION [epic=crypto-dek,seq=3] Hierarchische Schlüsselableitung
-// ANCHOR[acta-crypto:DEK-003] Deterministische DEK-Ableitung nach D-79
+// ANCHOR[acta-crypto:DEK-003] Deterministische DEK-Ableitung
 // NOTE: Hash der Vorfahren-Salts garantiert Mandanten- und Dokumentenisolierung (TS:2026-11-11)
 /// Derives a DEK using AncestorSalts and DocTag.
 pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {

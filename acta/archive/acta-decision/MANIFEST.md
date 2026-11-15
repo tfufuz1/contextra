@@ -3,7 +3,7 @@
 **Aufgabe:** Entscheidungsprotokoll, Szenarien, Vergleich, Akteure  
 **Level:** L4 · **Budget:** 4500 LOC · **Spezifikation:** docs/SPEC.md Kap. 7  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-ledger, acta-vault, acta-seg, acta-history, acta-pstore, acta-gate, acta-access, acta-infer  
-**Umfang des Archivs:** 1 Dateien, 466 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 1 Dateien, 465 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -24,4 +24,4 @@
 
 | Datei (relativ zu `archive/acta-decision/`) | LOC | Befunde |
 |---|---:|---|
-| `rank/src/explain.rs` | 466 | float=13, serde=1 |
+| `rank/src/explain.rs` | 465 | float=13, serde=1 |

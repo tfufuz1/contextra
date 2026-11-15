@@ -1,5 +1,5 @@
 #![cfg(feature = "workspace")]
-//! Invariant and mutation tests for WAL framing, replay, and fail-closed durability (INV-FSYNC-1).
+//! Invariant and mutation tests for WAL framing, replay, and fail-closed durability.
 
 use acta_seg::wal::{PoisonCause, Wal, WalOp};
 use acta_base::TxId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

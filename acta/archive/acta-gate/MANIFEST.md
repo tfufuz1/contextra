@@ -3,7 +3,7 @@
 **Aufgabe:** ErasedView, GateWriter, Roaring-Mengen, ErasureLayer, LayerAck  
 **Level:** L1 · **Budget:** 1200 LOC · **Spezifikation:** docs/SPEC.md Kap. 3.7, 5.3  
 **Interne Abhaengigkeiten (Soll):** acta-base  
-**Umfang des Archivs:** 8 Dateien, 1884 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 12 Dateien, 2497 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -26,11 +26,15 @@
 
 | Datei (relativ zu `archive/acta-gate/`) | LOC | Befunde |
 |---|---:|---|
-| `erasure/src/gate.rs` | 15 |  |
-| `erasure/src/gate/batch.rs` | 263 | async=1, alt_spec=9 |
-| `erasure/src/gate/erased_set.rs` | 342 | alt_spec=7 |
-| `erasure/src/gate/fence.rs` | 442 | alt_spec=3 |
-| `erasure/src/gate/log.rs` | 203 | serde=1 |
-| `erasure/src/gate/read_gate.rs` | 121 | alt_spec=2 |
-| `ports/src/erasure.rs` | 273 | serde=1 |
-| `ports/src/gate.rs` | 225 | serde=1 |
+| `erasure/src/gate.rs` | 14 |  |
+| `erasure/src/gate/batch.rs` | 262 | async=1 |
+| `erasure/src/gate/erased_set.rs` | 341 |  |
+| `erasure/src/gate/fence.rs` | 441 | async=1 |
+| `erasure/src/gate/log.rs` | 202 | serde=1 |
+| `erasure/src/gate/read_gate.rs` | 120 |  |
+| `erasure/tests/gate_linearization_test.rs` | 230 | panic=2, async=9 |
+| `erasure/tests/loom_gate.rs` | 157 | panic=6 |
+| `erasure/tests/t_gate.rs` | 75 |  |
+| `ports/src/erasure.rs` | 272 | serde=1 |
+| `ports/src/gate.rs` | 224 | serde=1 |
+| `types/src/tombstone.rs` | 159 | panic=1 |

@@ -1,0 +1,398 @@
+//! Konsolidierte Suite für Verarbeitungsverzeichnis, Audit-Ketten und Egress-Schutz.
+//! Consolidated tests for `acta-privacy` resolving TenantId duplicates,
+//! verifying processing registry serialization, tenant separation, data subject searches,
+//! and audit-chain manipulation detection with `ManualClock`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+
+use acta_privacy::context_edit_audit::{
+    build_context_edit_audit_record, render_audit_line, verify_audit_chain, ContextEditAuditError,
+    ContextEditInput, ContextEditKind,
+};
+use acta_privacy::egress_guard::TextSearchEngine;
+use acta_privacy::processing_registry::{
+    generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistryExport,
+    ProcessorRole,
+};
+use acta_privacy::TenantId;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
+
+pub struct ManualClock {
+    nanos: AtomicU64,
+}
+
+impl ManualClock {
+    pub fn new(initial_nanos: u64) -> Self {
+        Self {
+            nanos: AtomicU64::new(initial_nanos),
+        }
+    }
+
+    pub fn advance(&self, duration: Duration) {
+        self.nanos.fetch_add(
+            u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX),
+            Ordering::SeqCst,
+        );
+    }
+}
+
+impl acta_privacy::Clock for ManualClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::SeqCst)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::SeqCst)
+    }
+}
+
+fn make_sample_record(tenant_u64: u64, name: &str, purpose: &str) -> ProcessingActivityRecord {
+    ProcessingActivityRecord {
+        activity_name: name.to_string(),
+        controller_or_processor_role: ProcessorRole::Controller,
+        purpose: purpose.to_string(),
+        legal_basis: "Art. 6 Abs. 1 lit. f DSGVO".to_string(),
+        data_categories: vec!["E-Mail".to_string(), "Kundennummer".to_string()],
+        data_subject_categories: vec!["Bestandskunden".to_string()],
+        recipients: vec!["Rechenzentrum GmbH".to_string()],
+        third_country_transfers: vec![],
+        retention_period: "10 Jahre nach Vertragsende".to_string(),
+        technical_and_organizational_measures: vec![
+            "Kryptografische Mandantentrennung".to_string(),
+            "TLS 1.3".to_string(),
+        ],
+        tenant_id: TenantId::try_new(tenant_u64).unwrap_or(TenantId::SYSTEM),
+        version: 1,
+        created_at_unix_secs: 1_700_000_000,
+    }
+}
+
+// 1. Serde JSON Roundtrip
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-001]
+// Prüft: Prüft JSON-Serialisierung und Deserialisierung des Verarbeitungsverzeichnisses.
+fn test_01_registry_json_serde_roundtrip() {
+    let rec = make_sample_record(101, "Kundendatenbank", "Vertragsabwicklung");
+    let export = generate_registry(std::slice::from_ref(&rec));
+
+    let json_str = serde_json::to_string(&export).expect("serialization to json");
+    let deser: ProcessingRegistryExport =
+        serde_json::from_str(&json_str).expect("deserialization from json");
+
+    assert_eq!(export, deser);
+    assert_eq!(deser.records[0].tenant_id, TenantId::try_new(101).unwrap());
+}
+
+// 2. Bincode Roundtrip
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-002]
+// Prüft: Prüft Bincode-Binär-Serialisierung des Verarbeitungsverzeichnisses.
+fn test_02_registry_bincode_serde_roundtrip() {
+    let rec = make_sample_record(202, "Personalverwaltung", "Lohnabrechnung");
+    let export = generate_registry(&[rec]);
+
+    let encoded = bincode::serialize(&export).expect("bincode serialize");
+    let decoded: ProcessingRegistryExport =
+        bincode::deserialize(&encoded).expect("bincode deserialize");
+
+    assert_eq!(export, decoded);
+    assert_eq!(
+        decoded.records[0].tenant_id,
+        TenantId::try_new(202).unwrap()
+    );
+}
+
+// 3. Golden Test (Deterministic JSON String Output)
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-003]
+// Prüft: Prüft das Schema-Format des Verzeichnisses gegen die Golden-Definition.
+fn test_03_registry_golden_json_format() {
+    let rec = ProcessingActivityRecord {
+        activity_name: "Auskunfts-Dienst".to_string(),
+        controller_or_processor_role: ProcessorRole::Processor,
+        purpose: "Art. 15 DSGVO Bearbeitung".to_string(),
+        legal_basis: "Art. 6 Abs. 1 lit. c DSGVO".to_string(),
+        data_categories: vec!["Stammdaten".to_string()],
+        data_subject_categories: vec!["Betroffene".to_string()],
+        recipients: vec!["Datenschutzbeauftragter".to_string()],
+        third_country_transfers: vec![],
+        retention_period: "3 Jahre".to_string(),
+        technical_and_organizational_measures: vec!["AES-256".to_string()],
+        tenant_id: TenantId::try_new(42).unwrap(),
+        version: 1,
+        created_at_unix_secs: 1_700_000_000,
+    };
+    let export = generate_registry(&[rec]);
+
+    let json = serde_json::to_string_pretty(&export).expect("pretty json");
+    assert!(json.contains(r#""tenant_id": 42"#));
+    assert!(json.contains(r#""activity_name": "Auskunfts-Dienst""#));
+    assert!(json.contains(r#""controller_or_processor_role": "Processor""#));
+}
+
+// 4. Tenant Isolation & Filtering
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-004]
+// Prüft: Prüft die Filterung von Verarbeitungsdatensätzen nach Mandanten-ID.
+fn test_04_tenant_filtering_isolation() {
+    let rec_t1 = make_sample_record(1, "Vertrieb", "Kundenakquise");
+    let rec_t2 = make_sample_record(2, "Buchhaltung", "Rechnungsstellung");
+    let export = generate_registry(&[rec_t1, rec_t2]);
+
+    let filtered_t1 = export.filter_by_tenant(TenantId::try_new(1).unwrap());
+    assert_eq!(filtered_t1.records.len(), 1);
+    assert_eq!(filtered_t1.records[0].activity_name, "Vertrieb");
+
+    let filtered_t2 = export.filter_by_tenant(TenantId::try_new(2).unwrap());
+    assert_eq!(filtered_t2.records.len(), 1);
+    assert_eq!(filtered_t2.records[0].activity_name, "Buchhaltung");
+
+    let filtered_t3 = export.filter_by_tenant(TenantId::try_new(999).unwrap());
+    assert!(filtered_t3.records.is_empty());
+}
+
+// 5. Art. 15 Data Subject Access Search (Exact Match)
+#[tokio::test]
+// ANCHOR[acta-privacy:TEST-CONS-005]
+// Prüft: Prüft die exakte Volltextsuche für Auskunftsersuchen nach Art. 15 DSGVO.
+async fn test_05_art15_search_exact_matches() {
+    let rec1 = make_sample_record(10, "Bewerbermanagement", "Recruiting");
+    let rec2 = make_sample_record(10, "Zeiterfassung", "Arbeitszeit-Nachweis");
+
+    let export = generate_registry(&[rec1, rec2]);
+
+    let results = export.search_text("Recruiting", 5).await.unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].id, "record-0");
+    assert!(results[0].score > 0.0);
+}
+
+// 6. Art. 15 Search (Empty Query / No Match)
+#[tokio::test]
+// ANCHOR[acta-privacy:TEST-CONS-006]
+// Prüft: Prüft die Textsuche bei leeren Abfragen oder fehlenden Treffern.
+async fn test_06_art15_search_empty_or_no_match() {
+    let rec = make_sample_record(10, "Support-Tickets", "Kunden-Helpline");
+    let export = generate_registry(&[rec]);
+
+    let empty_res = export.search_text("   ", 5).await.unwrap();
+    assert!(empty_res.is_empty());
+
+    let nomatch_res = export.search_text("NonExistentTermXYZ", 5).await.unwrap();
+    assert!(nomatch_res.is_empty());
+}
+
+// 7. Art. 15 Search Limit & Score Ordering
+#[tokio::test]
+// ANCHOR[acta-privacy:TEST-CONS-007]
+// Prüft: Prüft die Relevanzsortierung und Trefferbegrenzung der Textsuche.
+async fn test_07_art15_search_limit_and_score_ordering() {
+    let mut rec1 = make_sample_record(5, "E-Mail Marketing", "Newsletter");
+    rec1.data_categories = vec!["E-Mail".to_string(), "Name".to_string()];
+
+    let mut rec2 = make_sample_record(5, "E-Mail Support", "Kundenservice");
+    rec2.data_categories = vec!["E-Mail".to_string()];
+
+    let export = generate_registry(&[rec1, rec2]);
+
+    let results = export.search_text("E-Mail", 1).await.unwrap();
+    assert_eq!(results.len(), 1);
+}
+
+// 8. Markdown Rendering Multi-Tenant
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-008]
+// Prüft: Prüft das Rendern einer tabellarischen Markdown-Übersicht für mehrere Mandanten.
+fn test_08_markdown_rendering_multi_tenant() {
+    let r1 = make_sample_record(100, "Aktion A", "Zweck A");
+    let r2 = make_sample_record(200, "Aktion B", "Zweck B");
+
+    let export = generate_registry(&[r1, r2]);
+    let md = render_markdown(&export);
+
+    assert!(md.contains("| TenantId(100) | Aktion A |"));
+    assert!(md.contains("| TenantId(200) | Aktion B |"));
+}
+
+// 9. Audit Chain Construction with ManualClock
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-009]
+// Prüft: Prüft den Aufbau einer verketteten Audit-Spur mit deterministischer manueller Uhr.
+fn test_09_audit_chain_construction_manual_clock() {
+    let clock = ManualClock::new(100_000_000);
+    let tenant = TenantId::try_new(7).unwrap();
+
+    let input0 = ContextEditInput {
+        task_id: "task-99".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Append,
+        chunk_label: Some("chunk-head".to_string()),
+        bytes_affected: 512,
+        subgoal_index: 0,
+    };
+
+    let r0 = build_context_edit_audit_record([0u8; 32], input0, &clock);
+    clock.advance(std::time::Duration::from_nanos(5000));
+
+    let input1 = ContextEditInput {
+        task_id: "task-99".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Replace,
+        chunk_label: Some("chunk-body".to_string()),
+        bytes_affected: 128,
+        subgoal_index: 1,
+    };
+
+    let r1 = build_context_edit_audit_record(r0.record_hash, input1, &clock);
+
+    let chain = vec![r0, r1];
+    assert!(verify_audit_chain(&chain).is_ok());
+}
+
+// 10. Audit Chain Tampering Detection at Index 0
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-010]
+// Prüft: Prüft die Manipulationserkennung beim ersten Glied der Audit-Kette.
+fn test_10_audit_chain_tamper_detection_index_0() {
+    let clock = ManualClock::new(50_000);
+    let tenant = TenantId::try_new(12).unwrap();
+
+    let input0 = ContextEditInput {
+        task_id: "t1".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Append,
+        chunk_label: None,
+        bytes_affected: 64,
+        subgoal_index: 0,
+    };
+
+    let mut r0 = build_context_edit_audit_record([0u8; 32], input0, &clock);
+    // Tamper with previous hash of root record
+    r0.previous_hash = [1u8; 32];
+
+    assert_eq!(
+        verify_audit_chain(&[r0]),
+        Err(ContextEditAuditError::ChainTampered { index: 0 })
+    );
+}
+
+// 11. Audit Chain Tampering Detection at Index 1 (Bytes Affected)
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-011]
+// Prüft: Prüft die Manipulationserkennung bei veränderter Byte-Anzahl.
+fn test_11_audit_chain_tamper_bytes_affected() {
+    let clock = ManualClock::new(10_000);
+    let tenant = TenantId::try_new(15).unwrap();
+
+    let input0 = ContextEditInput {
+        task_id: "t2".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Append,
+        chunk_label: None,
+        bytes_affected: 100,
+        subgoal_index: 0,
+    };
+    let r0 = build_context_edit_audit_record([0u8; 32], input0, &clock);
+
+    let input1 = ContextEditInput {
+        task_id: "t2".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Remove,
+        chunk_label: None,
+        bytes_affected: 50,
+        subgoal_index: 1,
+    };
+    let mut r1 = build_context_edit_audit_record(r0.record_hash, input1, &clock);
+
+    // Tamper with bytes_affected
+    r1.bytes_affected = 51;
+
+    let chain = vec![r0, r1];
+    assert_eq!(
+        verify_audit_chain(&chain),
+        Err(ContextEditAuditError::ChainTampered { index: 1 })
+    );
+}
+
+// 12. Audit Chain Tampering Detection at Index 1 (Subgoal Index)
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-012]
+// Prüft: Prüft die Manipulationserkennung bei geändertem Subgoal-Index.
+fn test_12_audit_chain_tamper_subgoal_index() {
+    let clock = ManualClock::new(20_000);
+    let tenant = TenantId::try_new(20).unwrap();
+
+    let input0 = ContextEditInput {
+        task_id: "t3".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::CheckpointReset,
+        chunk_label: Some("cp1".to_string()),
+        bytes_affected: 0,
+        subgoal_index: 0,
+    };
+    let r0 = build_context_edit_audit_record([0u8; 32], input0, &clock);
+
+    let input1 = ContextEditInput {
+        task_id: "t3".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Append,
+        chunk_label: Some("cp2".to_string()),
+        bytes_affected: 10,
+        subgoal_index: 1,
+    };
+    let mut r1 = build_context_edit_audit_record(r0.record_hash, input1, &clock);
+
+    r1.subgoal_index = 99;
+
+    assert_eq!(
+        verify_audit_chain(&[r0, r1]),
+        Err(ContextEditAuditError::ChainTampered { index: 1 })
+    );
+}
+
+// 13. Audit Line Formatter Test
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-013]
+// Prüft: Prüft die Formatierung der Audit-Protokollzeile.
+fn test_13_render_audit_line_format() {
+    let clock = ManualClock::new(123_456_789);
+    let tenant = TenantId::try_new(88).unwrap();
+
+    let input = ContextEditInput {
+        task_id: "task-fmt".to_string(),
+        tenant_id: tenant,
+        kind: ContextEditKind::Append,
+        chunk_label: Some("lbl-1".to_string()),
+        bytes_affected: 1024,
+        subgoal_index: 3,
+    };
+
+    let record = build_context_edit_audit_record([0u8; 32], input, &clock);
+    let line = render_audit_line(&record);
+
+    assert!(line.contains("task=task-fmt"));
+    assert!(line.contains("tenant=TenantId(88)"));
+    assert!(line.contains("kind=Append"));
+    assert!(line.contains("chunk_label=lbl-1"));
+    assert!(line.contains("bytes=1024"));
+    assert!(line.contains("recorded_at_tx=123456789"));
+    assert!(line.contains("subgoal=3"));
+}
+
+// 14. ProcessorRole as_str
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-016]
+// Prüft: Prüft die String-Repräsentationen von ProcessorRole.
+fn test_14_processor_role_as_str() {
+    assert_eq!(ProcessorRole::Controller.as_str(), "Verantwortlicher");
+    assert_eq!(ProcessorRole::Processor.as_str(), "Auftragsverarbeiter");
+}
+
+// 15. ProcessingRegistryExport Constructor
+#[test]
+// ANCHOR[acta-privacy:TEST-CONS-017]
+// Prüft: Prüft die Konstruktion eines ProcessingRegistryExport-Objekts.
+fn test_15_processing_registry_export_new() {
+    let export = ProcessingRegistryExport::new(vec![]);
+    assert!(export.records.is_empty());
+}

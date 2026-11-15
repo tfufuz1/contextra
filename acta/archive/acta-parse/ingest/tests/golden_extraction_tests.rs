@@ -1,8 +1,8 @@
-//! Golden-Extraktionstests (WP-2).
+//! Golden-Extraktionstests.
 //!
 //! # Zweck & Invarianten
 //! Verifiziert, dass die Ingest-Pipeline für den Eingabe-Korpus deterministische,
-//! bitidentische IR- und Chunk-Ergebnisse liefert (INV-1).
+//! bitidentische IR- und Chunk-Ergebnisse liefert.
 //! Ein Generator `generate_golden_outputs` (mit `#[ignore]` markiert) erzeugt
 //! die Golden-Dateien und `MANIFEST.sha256`.
 

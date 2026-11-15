@@ -1,7 +1,7 @@
 //! Manifest-Handle, Öffnen, Vergiftungsschutz und Lifecycle (Ring 1)
 //!
 //! Verwaltet die geöffnete Manifest-Datei mit atomarem Schreibpuffer, fsync-Semantik
-//! und Vergiftungszustand bei fsync-Fehlern (INV-FSYNC-1).
+//! und Vergiftungszustand bei fsync-Fehlern.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -92,13 +92,13 @@ impl Manifest {
         })
     }
 
-    /// Checks if the manifest handle has been poisoned by a preceding fsync failure (INV-FSYNC-1).
+    /// Checks if the manifest handle has been poisoned by a preceding fsync failure.
     #[inline]
     pub fn is_poisoned(&self) -> bool {
         self.is_poisoned.load(Ordering::SeqCst)
     }
 
-    /// Explicitly poisons the manifest handle (INV-FSYNC-1).
+    /// Explicitly poisons the manifest handle.
     #[inline]
     pub fn poison(&self) {
         self.is_poisoned.store(true, Ordering::SeqCst);

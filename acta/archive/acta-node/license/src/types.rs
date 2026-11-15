@@ -1,4 +1,4 @@
-//! # Crate-lokale Kern-Typen und Traits für die Lizenzprüfung (§14.6, §15, SPEC v4.0).
+//! # Crate-lokale Kern-Typen und Traits für die Lizenzprüfung.
 //!
 //! Stellt fundamentale Schnittstellen und Datenstrukturen zur Verfügung, die für eine
 //! autarke Funktionsweise (Klasse A, B1–B12) ohne Abhängigkeit von `acta-base`
@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// Einteilung der Acta-Funktionsringe (§14.6).
 ///
 /// Definiert die Sicherheits- und Isolationsstufen von Acta-Instanzen.
-/// Der freie `Fast`-Ring steht ohne Lizenz zur Verfügung (INV-LICENSE-2).
+/// Der freie `Fast`-Ring steht ohne Lizenz zur Verfügung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum FeatureRing {
     /// Fast-Ring: Freie Open-Source-Kernfunktionen ohne Lizenzprüfung.
@@ -188,7 +188,7 @@ pub trait LicenseGate: Send + Sync {
 }
 
 // ANCHOR[acta-node:STRUCT-OPEN-FAST-GATE]
-/// Standard-Gate ohne Lizenzbeschränkung für den freien `Fast`-Ring (INV-LICENSE-2).
+/// Standard-Gate ohne Lizenzbeschränkung für den freien `Fast`-Ring.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct OpenFastGate;
 

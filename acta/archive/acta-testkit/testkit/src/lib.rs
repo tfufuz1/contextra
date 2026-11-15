@@ -6,7 +6,7 @@
 //! ## Ring & Architektur-Einordnung
 //! - **Ring:** Werkzeug / Tooling (außerhalb der numerischen Ringe 0 bis 4).
 //! - **Klasse:** Werkzeug (`—`).
-//! - **Sicherheits-Invariante (INV-EMBED-1):** `acta-testkit` darf ausschließlich
+//! - **Sicherheits-Invariante:** `acta-testkit` darf ausschließlich
 //!   als `[dev-dependencies]` in Produktions-Crates eingebunden werden und niemals
 //!   in Release-Binaries oder produktiven Abhängigkeiten landen.
 //! - **Unsafe-Code:** Ausdrücklich verboten über `#![forbid(unsafe_code)]`.
@@ -47,7 +47,7 @@ pub mod fault_vfs;
 /// Deterministische In-Memory-Referenzimplementierung des `GraphIndex`-Ports.
 pub mod in_memory_graph;
 
-// ANCHOR[acta-testkit:MOD-IN-MEM-STORE-001]
+// ANCHOR[acta-testkit:MOD-IN-MEM-]
 /// Transaktionale In-Memory-Referenzimplementierung des `StorageEngine`-Ports.
 pub mod in_memory_store;
 

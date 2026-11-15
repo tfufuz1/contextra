@@ -10,7 +10,7 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: Parsing von word/styles.xml zur Erkennung von Überschriftenhierarchien (WP-ING-04).
+// ZWECK: Parsing von word/styles.xml zur Erkennung von Überschriftenhierarchien.
 // INVARIANTEN: Zero-Panic, deterministische Style-Vererbung (max. 16 Ebenen), kein unsafe.
 // STAND: TS:2026-10-31T00:00:00Z
 

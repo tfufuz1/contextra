@@ -3,7 +3,7 @@
 //! **Zweck:** Autarker Fail-Closed ErasureOrchestrator für gemessene Bereinigungen.
 //!
 //! Eingehaltene Invarianten:
-//! - DeletionProof entsteht ausschließlich nach unabhängiger Messung aller Schichten (INV-DELETION-1).
+//! - DeletionProof entsteht ausschließlich nach unabhängiger Messung aller Schichten.
 //! - Physische Bereinigung und Schlüsselvernichtung wirken gemeinsam (E-04).
 
 #![forbid(unsafe_code)]
@@ -117,7 +117,7 @@ pub fn compute_collection_id(name: &str) -> CollectionId {
     CollectionId::new(id_u64)
 }
 
-/// Kanonischer einheitlicher Koordinator der Löschkette (INV-ERA-1 / WP-10).
+/// Kanonischer einheitlicher Koordinator der Löschkette.
 /// Stellt sicher, dass es genau einen koordinierten Löschpfad im Crate gibt.
 pub struct ErasureCoordinator {
     single_flight: crate::scope::SingleFlightCoordinator,
@@ -137,7 +137,7 @@ impl ErasureCoordinator {
         }
     }
 
-    /// Einheitlicher Einstiegspunkt für die Ausführung einer Lösch-Pipeline (INV-ERA-1).
+    /// Einheitlicher Einstiegspunkt für die Ausführung einer Lösch-Pipeline.
     pub fn coordinate_erasure(
         &self,
         scope: crate::types_local::KeyScope,

@@ -3,7 +3,7 @@
 **Aufgabe:** Chunking, Normalisierung, Ressourcenlimits, Worker-Protokoll (ohne Parser-Abhaengigkeiten)  
 **Level:** L1 · **Budget:** 3000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.1  
 **Interne Abhaengigkeiten (Soll):** acta-base  
-**Umfang des Archivs:** 44 Dateien, 11235 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 44 Dateien, 11191 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -27,47 +27,47 @@
 
 | Datei (relativ zu `archive/acta-ingest/`) | LOC | Befunde |
 |---|---:|---|
-| `db/src/chunker/blocks.rs` | 230 |  |
-| `db/src/chunker/config.rs` | 38 |  |
-| `db/src/chunker/estimate.rs` | 93 | float=3 |
-| `db/src/chunker/mod.rs` | 400 | hub=1 |
-| `db/src/chunker/sections.rs` | 27 |  |
-| `db/src/chunker/split.rs` | 250 |  |
-| `db/src/chunker/unit_tests.rs` | 412 | float=2, panic=9 |
-| `db/src/chunker/windows.rs` | 91 |  |
-| `ingest/src/canonical.rs` | 324 | serde=1 |
-| `ingest/src/chunking/common.rs` | 241 | float=3 |
-| `ingest/src/chunking/config.rs` | 192 | serde=1 |
-| `ingest/src/chunking/email/mod.rs` | 474 |  |
-| `ingest/src/chunking/fallback.rs` | 79 | panic=1 |
-| `ingest/src/chunking/meta.rs` | 167 | panic=1 |
-| `ingest/src/chunking/mod.rs` | 129 |  |
-| `ingest/src/chunking/paged/mod.rs` | 53 |  |
-| `ingest/src/chunking/paged/page.rs` | 811 |  |
-| `ingest/src/chunking/prose/markdown_parse.rs` | 857 | panic=3 |
-| `ingest/src/chunking/prose/merge.rs` | 164 |  |
-| `ingest/src/chunking/prose/mod.rs` | 517 |  |
-| `ingest/src/chunking/prose/sentence.rs` | 156 | panic=9 |
-| `ingest/src/chunking/prose/split.rs` | 420 |  |
-| `ingest/src/chunking/structured/mod.rs` | 541 |  |
-| `ingest/src/chunking/stubs.rs` | 81 |  |
-| `ingest/src/chunking/tabular/helpers.rs` | 122 |  |
-| `ingest/src/chunking/tabular/mod.rs` | 781 |  |
-| `ingest/src/chunking/types.rs` | 72 | float=1, serde=1 |
-| `ingest/src/error.rs` | 107 | serde=1 |
-| `ingest/src/fuzz_support.rs` | 38 |  |
-| `ingest/src/ir.rs` | 254 | serde=1 |
-| `ingest/src/lib.rs` | 40 |  |
-| `ingest/src/limits.rs` | 95 | serde=1 |
-| `ingest/src/pipeline.rs` | 178 | panic=1 |
-| `ingest/tests/chunk_email_tests.rs` | 292 | panic=11 |
-| `ingest/tests/chunk_paged_acceptance.rs` | 519 | panic=13 |
-| `ingest/tests/chunk_paged_proptest.rs` | 174 | panic=7 |
-| `ingest/tests/chunk_prose_edge_cases.rs` | 201 | panic=8 |
-| `ingest/tests/chunk_prose_parity.rs` | 101 | panic=1 |
-| `ingest/tests/chunk_prose_proptest.rs` | 126 | panic=2 |
-| `ingest/tests/chunk_structured_tests.rs` | 226 | panic=6 |
-| `ingest/tests/chunk_tabular_tests.rs` | 583 | panic=38 |
-| `ingest/tests/contract_tests.rs` | 370 | panic=7 |
-| `ingest/tests/ingest_property_tests.rs` | 132 | panic=4 |
-| `ingest/tests/inv_ingest_bounded_tests.rs` | 77 |  |
+| `db/src/chunker/blocks.rs` | 229 |  |
+| `db/src/chunker/config.rs` | 37 |  |
+| `db/src/chunker/estimate.rs` | 92 | float=3 |
+| `db/src/chunker/mod.rs` | 399 |  |
+| `db/src/chunker/sections.rs` | 26 |  |
+| `db/src/chunker/split.rs` | 249 |  |
+| `db/src/chunker/unit_tests.rs` | 411 | panic=9, float=2 |
+| `db/src/chunker/windows.rs` | 90 |  |
+| `ingest/src/canonical.rs` | 323 | serde=1 |
+| `ingest/src/chunking/common.rs` | 240 | float=3 |
+| `ingest/src/chunking/config.rs` | 191 | serde=1 |
+| `ingest/src/chunking/email/mod.rs` | 473 |  |
+| `ingest/src/chunking/fallback.rs` | 78 | panic=1 |
+| `ingest/src/chunking/meta.rs` | 166 | panic=1 |
+| `ingest/src/chunking/mod.rs` | 128 |  |
+| `ingest/src/chunking/paged/mod.rs` | 52 |  |
+| `ingest/src/chunking/paged/page.rs` | 810 |  |
+| `ingest/src/chunking/prose/markdown_parse.rs` | 856 | panic=3 |
+| `ingest/src/chunking/prose/merge.rs` | 163 |  |
+| `ingest/src/chunking/prose/mod.rs` | 516 |  |
+| `ingest/src/chunking/prose/sentence.rs` | 155 | panic=9 |
+| `ingest/src/chunking/prose/split.rs` | 419 |  |
+| `ingest/src/chunking/structured/mod.rs` | 540 |  |
+| `ingest/src/chunking/stubs.rs` | 80 |  |
+| `ingest/src/chunking/tabular/helpers.rs` | 121 |  |
+| `ingest/src/chunking/tabular/mod.rs` | 780 |  |
+| `ingest/src/chunking/types.rs` | 71 | float=1, serde=1 |
+| `ingest/src/error.rs` | 106 | serde=1 |
+| `ingest/src/fuzz_support.rs` | 37 |  |
+| `ingest/src/ir.rs` | 253 | serde=1 |
+| `ingest/src/lib.rs` | 39 |  |
+| `ingest/src/limits.rs` | 94 | serde=1 |
+| `ingest/src/pipeline.rs` | 177 | panic=1 |
+| `ingest/tests/chunk_email_tests.rs` | 291 | panic=11 |
+| `ingest/tests/chunk_paged_acceptance.rs` | 518 | panic=13 |
+| `ingest/tests/chunk_paged_proptest.rs` | 173 | panic=7 |
+| `ingest/tests/chunk_prose_edge_cases.rs` | 200 | panic=8 |
+| `ingest/tests/chunk_prose_parity.rs` | 100 | panic=1 |
+| `ingest/tests/chunk_prose_proptest.rs` | 125 | panic=2 |
+| `ingest/tests/chunk_structured_tests.rs` | 225 | panic=6 |
+| `ingest/tests/chunk_tabular_tests.rs` | 582 | panic=38 |
+| `ingest/tests/contract_tests.rs` | 369 | panic=7 |
+| `ingest/tests/ingest_property_tests.rs` | 131 | panic=4 |
+| `ingest/tests/inv_ingest_bounded_tests.rs` | 76 |  |

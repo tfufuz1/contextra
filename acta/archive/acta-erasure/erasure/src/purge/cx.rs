@@ -5,12 +5,12 @@
 use crate::types_local::{Clock, SystemClock};
 use std::time::Duration;
 
-/// Ausführungskontext eines Purge-Fensters (ER-20, ER-22).
+/// Ausführungskontext eines Purge-Fensters.
 #[derive(Debug, Clone)]
 pub struct PurgeCx {
     /// Deadline für das Purge-Fenster in Monotonic Nanos.
     pub deadline_nanos: Option<u64>,
-    /// Mindest-freier Speicherplatz (Bytes) vor dem Rewrite (ER-22).
+    /// Mindest-freier Speicherplatz (Bytes) vor dem Rewrite.
     pub min_free_bytes: u64,
     /// Batch-Fensterbreite.
     pub batch_window: Duration,

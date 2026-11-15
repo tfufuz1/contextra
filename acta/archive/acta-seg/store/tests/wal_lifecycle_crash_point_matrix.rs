@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 // ANCHOR[TEST:STO-WAL-LIFECYCLE-MATRIX] STATUS:DONE (TS:2026-09-26T02:30:00Z) (SESSION: chaos-matrix)
 //! Lifecycle crash point matrix test suite for WAL operations (`Append`, `Truncate`, `Seal`, `Rewrite`, `Scan`).
 //! Feature `fault-injection` is required.

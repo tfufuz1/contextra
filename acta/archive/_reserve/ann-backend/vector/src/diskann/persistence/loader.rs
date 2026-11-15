@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Laden des DiskANN-Indexes aus Speicherabbildung (WP-VEC-07).
+// ZWECK: Laden des DiskANN-Indexes aus Speicherabbildung.
 // INVARIANTEN: Zero-Panic bei korruptem Header/Footer; Bounds-Prüfungen vor Slice-Zugriff.
 // STAND: 2026-11-11
 

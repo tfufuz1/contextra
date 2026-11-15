@@ -62,7 +62,7 @@ pub trait CheckpointRegistry: Send + Sync {
         Box::pin(async move { Ok(Vec::new()) })
     }
 
-    /// Führt für alle verwaisten Checkpoints ein kontrolliertes Rollback aus.
+    /// Führt für alle verwaisten Checkpoints ein kontrolliertes Rollback.
     fn recover_orphaned_checkpoints<'a>(&'a self) -> BoxFuture<'a, Result<Vec<TxId>>> {
         Box::pin(async move { Ok(Vec::new()) })
     }
@@ -809,7 +809,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         self.flush_orphan_registry().await
     }
 
-    /// Alias für `shutdown()`. Führt einen kontrollierten Flush beim Schließen aus.
+    /// Alias für `shutdown()`. Führt einen kontrollierten Flush beim Schließen.
     pub async fn close(&self) -> Result<()> {
         self.shutdown().await
     }
@@ -840,7 +840,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
     }
 
     // ANCHOR[acta-history:STO-010]
-    /// Recovers all registered/persisted orphaned sequence pins (ADR-052).
+    /// Recovers all registered/persisted orphaned sequence pins.
     ///
     /// # Ablauf von `recover_orphaned_pins`:
     /// 1. Liste verwaister Pins aus der Orphan-Registry abrufen.

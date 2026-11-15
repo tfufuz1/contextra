@@ -178,7 +178,7 @@ impl<V: Vfs> Vfs for FaultInjectingVfs<V> {
 
         if self.fail_next_fsync.swap(false, Ordering::AcqRel) {
             return Err(DurableFsError::Io(io::Error::other(
-                "injected fsync failure (INV-FSYNC-1)",
+                "injected fsync failure",
             )));
         }
 

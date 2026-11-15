@@ -1,6 +1,6 @@
 //! Schichtreihenfolge und Priorisierung beim physischen Purge.
 //!
-//! Feste Tabelle `LayerId → Priorität` gemäß ER-20:
+//! Feste Tabelle `LayerId → Priorität`
 //!   a) Snapshots widerrufen
 //!   b) Textsegment-Rewrite
 //!   c) Memtable-Drain, Flush, WAL-Segmente entfernen

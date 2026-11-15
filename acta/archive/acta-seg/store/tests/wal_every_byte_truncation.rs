@@ -1,5 +1,5 @@
 #![cfg(feature = "workspace")]
-//! WP-30 (a): Schneidet ein WAL an JEDER einzelnen Byte-Grenze ab.
+//! (a): Schneidet ein WAL an JEDER einzelnen Byte-Grenze ab.
 //! Verifiziert: Wiederöffnen lädt konsistent bis zum letzten vollständigen Eintrag
 //! ODER endet mit einem sauberen Fehler, niemals mit einer Panic.
 

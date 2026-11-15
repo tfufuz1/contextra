@@ -1,4 +1,4 @@
-//! Tests für die deterministische Audit-Trace-Generierung nach INV-EGRESS-AUDIT-1.
+//! Tests für die deterministische Audit-Trace-Generierung.
 use acta_pii::Clock;
 use acta_pii::{
     compute_audit_trace, extract_rule_id, BlockReason, EgressClassification, EgressClassifier,

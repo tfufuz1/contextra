@@ -1,4 +1,4 @@
-//! Port `KeyStore` für die Schlüsselhierarchie und Schlüsselvernichtung (WP-K).
+//! Port `KeyStore` für die Schlüsselhierarchie und Schlüsselvernichtung.
 //!
 //! Entkoppelte Schnittstelle zum Erzeugen, Wrappen, Entschlüsseln und physischen
 //! Vernichten von Schlüsseln (KEK/DEK) mit Zeroize und Fail-Closed-Semantik.
@@ -98,7 +98,7 @@ pub enum KeyStoreError {
     InvalidInput(String),
 }
 
-/// Synchroner Port-Trait für Schlüsselverwaltung und Vernichtung (WP-K).
+/// Synchroner Port-Trait für Schlüsselverwaltung und Vernichtung.
 ///
 /// Folgt der synchronen Kernregel: Keine Async-Runtime im Löschpfad.
 /// Zeit und Zufall werden ausschließlich über Ports (`Clock`) injiziert.
@@ -129,7 +129,7 @@ pub trait KeyStore: Send + Sync {
     ///
     /// Nullt das Schlüsselmaterial im RAM mit Zeroize, markiert die Epoche
     /// als vernichtet und liefert ein Quittungsobjekt zur Ledger-Verankerung.
-    /// Idempotent: Mehrfachaufrufe führen nicht zu Fehlern oder Reaktivierung (INV-NO-RESURRECTION-1).
+    /// Idempotent: Mehrfachaufrufe führen nicht zu Fehlern oder Reaktivierung.
     fn purge_keys(
         &self,
         scope: GroupEpochKey,

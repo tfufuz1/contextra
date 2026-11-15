@@ -1,5 +1,5 @@
 #![allow(deprecated)]
-// FILE-CONTEXT: TextIndex Storage & Memory Layer Scanner (§12.7.4, INV-WITNESS-MINT-1).
+// FILE-CONTEXT: TextIndex Storage & Memory Layer Scanner.
 // ZWECK: Stellt den LayerScanner für WitnessLayer::TextIndex bereit.
 // INVARIANTEN: Scan-Messungen laufen unabhängig vom Löschcode; Positivkontrolle vorab zwingend.
 // NICHT-OFFENSICHTLICH: Scans read both LSM storage keys and in-memory ResidentPostingIndex entries directly.

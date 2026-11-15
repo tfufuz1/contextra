@@ -18,8 +18,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 
-/// Magic bytes for SSTable file trailer ("MFSX")
-const SSTABLE_MAGIC_MFSX: u32 = 0x5853_464D;
+/// Magic bytes for SSTable file trailer ("ASGX")
+const SSTABLE_MAGIC_MFSX: u32 = 0x5847_5341;
 
 /// SSTable Layout Metadata with block boundaries
 #[derive(Debug, Clone)]

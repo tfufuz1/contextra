@@ -25,11 +25,11 @@ pub enum GuardOutcome {
         /// Gate-Seq der betroffenen Löschung.
         gated_seq: u64,
     },
-    /// Ledger fehlt – degradierter Betrieb, Bestätigung erforderlich (ER-30).
+    /// Ledger fehlt – degradierter Betrieb, Bestätigung erforderlich.
     LedgerMissing,
 }
 
-/// Dateibasierter Restore-Checker: prüft auf Zeitregression und Wiederauftauchen (ER-30).
+/// Dateibasierter Restore-Checker: prüft auf Zeitregression und Wiederauftauchen.
 pub struct FileRestoreChecker<'a> {
     ledger: &'a InMemoryLedger,
 }
@@ -40,11 +40,11 @@ impl<'a> FileRestoreChecker<'a> {
         Self { ledger }
     }
 
-    /// Führt die Integritätsprüfung durch (ER-30).
+    /// Führt die Integritätsprüfung durch.
     ///
     /// `store_current_seq`: aktuelle Sequenznummer des Stores.
     pub fn check(&self, store_current_seq: u64) -> GuardOutcome {
-        // Zeitregression prüfen (ER-30 Nr. 1)
+        // Zeitregression prüfen
         if self.ledger.detect_time_regression(store_current_seq) {
             return GuardOutcome::TimeRegression {
                 store_seq: store_current_seq,
@@ -53,12 +53,12 @@ impl<'a> FileRestoreChecker<'a> {
         }
 
         // Wiederauftauchen: produktiv über RangeProbe-Port (L-22)
-        // Stub: kein Wiederauftauchen erkannt ohne Store-Zugang (WP-4.3)
+        // Stub: kein Wiederauftauchen erkannt ohne Store-Zugang (.3)
 
         GuardOutcome::Clean
     }
 
-    /// Berechnet die nächste sichere Sequenznummer: `max(current_seq, ledger_floor) + 1` (ER-30).
+    /// Berechnet die nächste sichere Sequenznummer: `max(current_seq, ledger_floor) + 1`.
     pub fn next_safe_seq(&self, store_current_seq: u64) -> u64 {
         store_current_seq
             .max(self.ledger.ledger_floor())

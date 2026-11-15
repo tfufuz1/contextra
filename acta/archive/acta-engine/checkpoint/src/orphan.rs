@@ -7,7 +7,7 @@
 //! Snapshots) und räumt Transaktionen auf, deren `CheckpointGuard` gedroppt wurde, ohne dass ein
 //! explizites `commit()` oder `rollback()` stattfand.
 //!
-//! ## Funktionsweise: Synchroner Drop & Asynchrones Reaping (ADR-011, ADR-053)
+//! ## Funktionsweise: Synchroner Drop & Asynchrones Reaping
 //! In Rust kann der `Drop`-Trait nicht asynchron sein (`async drop`). Wenn ein Guard bei einem Panic
 //! oder vorzeitigen Funktionsabbruch zerstört wird:
 //! 1. Der synchrone `drop()`-Handler registriert den Eintrag im Speicher in [`InstanceOrphanRegistry`].
@@ -67,7 +67,7 @@ fn warn_deprecated_global_orphan_path() {
 // ANCHOR[acta-history:ORP-003]
 /// Veralteter globaler Zugriff auf die Orphan-Registry.
 ///
-/// # Historie & ADR-053
+/// # Historie &
 /// Statischer globaler Zustand verstößt gegen P29 (Mandanten-/Instanz-Isolation).
 /// Bitte stattdessen instanzgebundene [`InstanceOrphanRegistry`] verwenden.
 #[deprecated(
@@ -97,7 +97,7 @@ fn default_data_dir() -> std::path::PathBuf {
 /// # Parameter
 /// - `clock`: Referenz auf eine Implementierung des [`Clock`]-Traits.
 pub fn monotonic_timestamp_ms_with(clock: &dyn Clock) -> u64 {
-    // NOTE: Zeit und Zufall dürfen gemäß Regel 3 / INV-CHECKPOINT-DETERMINISM-1 nur über Ports fließen
+    // NOTE: Zeit und Zufall dürfen gemäß Regel 3 / nur über Ports fließen
     clock.now_unix_nanos() / 1_000_000
 }
 
@@ -119,7 +119,7 @@ fn orphan_pin_file_path() -> std::path::PathBuf {
 }
 
 // ANCHOR[acta-history:ORP-006]
-/// Persistente Append-Only-Registry für verwaiste Sequenz-Pins (ADR-052).
+/// Persistente Append-Only-Registry für verwaiste Sequenz-Pins.
 ///
 /// Veraltet zugunsten von [`InstanceOrphanRegistry`].
 #[deprecated(
@@ -298,7 +298,7 @@ impl OrphanState {
 }
 
 // ANCHOR[acta-history:ORP-009]
-/// Instanz-gebundene Orphan-Registry für Checkpoints und gepinnte Sequenznummern (ADR-053).
+/// Instanz-gebundene Orphan-Registry für Checkpoints und gepinnte Sequenznummern.
 ///
 /// # Thread-Sicherheit & Nebenläufigkeit
 /// Verwendet [`parking_lot::Mutex`] für minimale Latenz beim Guard-Drop ohne OS-Thread-Blockaden.

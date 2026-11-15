@@ -6,12 +6,12 @@
 //! # Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`acta-fs`)
 //!
 //! Autarker Baustein der Klasse A (B1–B12) für crash-sichere Dateioperationen,
-//! synchrones fsync-Poisoning (`INV-FSYNC-1`) und atomare Dateieretzungen (`INV-VFS-ATOMIC-1`).
+//! synchrones fsync-Poisoning und atomare Dateieretzungen.
 //!
 //! ## Invarianten
-//! - `INV-FSYNC-1`: Schlägt ein Flush/fsync fehl, wird das Handle unwiderruflich vergiftet.
+//! -: Schlägt ein Flush/fsync fehl, wird das Handle unwiderruflich vergiftet.
 //!   Keine nachfolgende Schreiboperation wird auf demselben Deskriptor ausgeführt.
-//! - `INV-VFS-ATOMIC-1`: Atomares Schreiben (`write_atomic`) erfolgt strikt über temporäre Dateien
+//! -: Atomares Schreiben (`write_atomic`) erfolgt strikt über temporäre Dateien
 //!   im selben Zielverzeichnis, gefolgt von `sync_file`, atomarem Rename und Verzeichnis-Sync.
 
 /// Fehlertypen und Result-Definitionen für Dateisystemoperationen.
@@ -124,7 +124,7 @@ pub fn rename_durable(from: &Path, to: &Path) -> Result<()> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoisonedHandle;
 
-/// Ein Wrapper um [`File`], der das Handle bei einem `fsync`- oder Schreibfehler dauerhaft vergiftet (`INV-FSYNC-1`).
+/// Ein Wrapper um [`File`], der das Handle bei einem `fsync`- oder Schreibfehler dauerhaft vergiftet.
 #[derive(Debug)]
 pub struct DurableHandle<F: FaultInjector = NoFault> {
     file: Option<File>,
@@ -161,13 +161,13 @@ impl<F: FaultInjector> DurableHandle<F> {
         }
     }
 
-    /// Prüft, ob dieses Handle aufgrund eines vorangegangenen Flush-Fehlers vergiftet ist (`INV-FSYNC-1`).
+    /// Prüft, ob dieses Handle aufgrund eines vorangegangenen Flush-Fehlers vergiftet ist.
     #[must_use]
     pub fn is_poisoned(&self) -> bool {
         self.is_poisoned
     }
 
-    /// Flusht Dateiinhalte synchron auf die Festplatte und führt Fehlerinjektions-Hooks aus.
+    /// Flusht Dateiinhalte synchron auf die Festplatte und führt Fehlerinjektions-Hooks.
     pub fn flush(&mut self, kind: FlushKind) -> Result<()> {
         if self.is_poisoned {
             return Err(DurableFsError::PoisonedHandle);
@@ -221,7 +221,7 @@ impl<F: FaultInjector> Write for DurableHandle<F> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if self.is_poisoned {
             return Err(std::io::Error::other(
-                "handle is poisoned due to previous fsync failure (INV-FSYNC-1)",
+                "handle is poisoned due to previous fsync failure",
             ));
         }
 
@@ -331,7 +331,7 @@ pub fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<()> {
     atomic_replace_with_injector(path, bytes, &NoFault)
 }
 
-/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung eines [`FaultInjector`] (`INV-VFS-ATOMIC-1`).
+/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung eines [`FaultInjector`].
 pub fn atomic_replace_with_injector<F: FaultInjector>(
     path: &Path,
     bytes: &[u8],

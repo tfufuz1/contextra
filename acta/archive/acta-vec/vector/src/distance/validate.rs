@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Validierungsfunktionen für Vektoren und Bytes (INV-SIMD-FINITE-1, INV-SIMD-ALIGN-1).
+// ZWECK: Validierungsfunktionen für Vektoren und Bytes.
 // INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); NaN und Inf werden zuverlässig abgewiesen.
 // HOTSPOTS: validate_vector, validate_slices, validate_bytes
 // STAND: 2026-11-12
@@ -11,7 +11,7 @@
 use crate::error::{Result, VectorError};
 
 // ANCHOR[acta-vec:DIST-VALIDATE-VECTOR]
-/// Prüft, ob ein Vektor frei von NaN oder Unendlichkeitswerten ist (INV-SIMD-FINITE-1).
+/// Prüft, ob ein Vektor frei von NaN oder Unendlichkeitswerten ist.
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {

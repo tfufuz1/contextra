@@ -16,7 +16,7 @@
 // HOTSPOTS: [35-180]
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
-//! Encryption at Rest layer for LSM/WAL components (WP-3.2)
+//! Encryption at Rest layer for LSM/WAL components (.2)
 //!
 //! Secures blocks of data transparently via ChaCha20Poly1305 / AES-GCM-SIV.
 
@@ -477,7 +477,7 @@ impl IntegrityVerifier {
 
     /// Verifies a V2 entry (legacy without tx_id and without length prefixes) and updates the chain state.
     ///
-    /// # Sicherheitshinweis & Kollisionslücke (Architektur-Audit F2 / Spec §22.2b)
+    /// # Sicherheitshinweis & Kollisionslücke
     /// - Dieser Pfad verwendet KEINE längenpräfixierte Feldkodierung. Für `op_type == 0` (Put) werden `entry.key` und
     ///   `entry.value` ohne Längenpräfix direkt hintereinander in den HMAC eingespeist. Bei variabler Key/Value-Aufteilung
     ///   (z. B. `key = b"ab"`, `value = b"c"` vs. `key = b"a"`, `value = b"bc"`) ist dieser Pfad kollisionsanfällig.

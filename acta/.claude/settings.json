@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CARGO_TERM_COLOR": "never",
+    "CARGO_INCREMENTAL": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cargo check:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo xtask:*)",
+      "Bash(cargo fetch:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(cargo tree:*)",
+      "Bash(rustc --version)",
+      "Bash(rustup toolchain list)",
+      "Bash(bash scripts/bootstrap-toolchain.sh)",
+      "Bash(just:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(cargo deny:*)",
+      "Bash(cargo audit:*)",
+      "Bash(cargo nextest:*)",
+      "Bash(cargo mutants:*)",
+      "Bash(cargo llvm-cov:*)",
+      "Bash(cargo cyclonedx:*)",
+      "Bash(cargo geiger:*)",
+      "Bash(bash scripts/bootstrap-tools.sh)",
+      "Bash(bash scripts/session-start.sh)",
+      "Bash(bash scripts/make-delivery.sh:*)",
+      "Bash(unzip -l:*)"
+    ],
+    "deny": [
+      "Read(./target/**)",
+      "Bash(rustup toolchain install:*)",
+      "Bash(rustup update:*)",
+      "Bash(cargo update:*)",
+      "Bash(git push:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/session-start.sh\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

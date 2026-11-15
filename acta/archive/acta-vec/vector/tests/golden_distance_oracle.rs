@@ -1,6 +1,6 @@
 use acta_vec::types::DistanceMetric;
 // FILE-CONTEXT
-// ZWECK: Golden Values Testtabelle und Differentialtests für DistanceKernel / ScalarKernel (WP-VEC-3, INV-SIMD-DETERMINISM-1).
+// ZWECK: Golden Values Testtabelle und Differentialtests für DistanceKernel / ScalarKernel.
 
 use acta_vec::distance::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted,
@@ -151,7 +151,7 @@ fn test_fault_and_edge_cases() {
     assert!(compute_distance(&v2, &v3, DistanceMetric::Euclidean).is_err());
     assert!(compute_distance_trusted(&v2, &v3, DistanceMetric::Cosine).is_err());
 
-    // 2. Unaligned bytes (INV-SIMD-ALIGN-1)
+    // 2. Unaligned bytes
     let bad_bytes = [1u8, 2, 3];
     assert!(
         compute_distance_f32_bytes_trusted(&v2, &bad_bytes, DistanceMetric::Euclidean).is_err()
@@ -161,7 +161,7 @@ fn test_fault_and_edge_cases() {
     let v2_bytes = [0u8; 8];
     assert!(compute_distance_f32_bytes_trusted(&v3, &v2_bytes, DistanceMetric::Euclidean).is_err());
 
-    // 4. Non-finite values (INV-SIMD-FINITE-1)
+    // 4. Non-finite values
     let nan_vec = [1.0, f32::NAN];
     let inf_vec = [1.0, f32::INFINITY];
     let neg_inf_vec = [1.0, f32::NEG_INFINITY];

@@ -8,7 +8,7 @@
 // HOTSPOTS: Bm25Scorer::search, Bm25Scorer::insert
 // STAND: TS:2026-09-09T13:22:45Z (SESSION: dc71d70)
 
-//! Hybrid Search Engine & BM25 Scoring (WP-2.1)
+//! Hybrid Search Engine & BM25 Scoring (.1)
 //!
 //! Evaluates Inverse Document Frequencies integrating natively into the
 //! `fusion.rs` layer in `acta-engine`.

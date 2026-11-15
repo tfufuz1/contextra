@@ -1,7 +1,7 @@
 //! Prüfung und Reservierung von Speicherplatz vor dem Purge-Rewrite.
 //!
 //! Fehlt Platz → `Pending(DiskReserve)`, Gate bleibt aktiv.
-//! `erase` bis `Gated` braucht keinen nennenswerten Platz (ER-06).
+//! `erase` bis `Gated` braucht keinen nennenswerten Platz.
 
 use crate::error::ErasureError;
 

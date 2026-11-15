@@ -11,7 +11,7 @@ use serde::Serialize;
 
 /// Verifiziertes Messergebnis eines Storage-Scanners.
 ///
-/// Unter INV-WITNESS-MINT-1 kann ein `LayerWitness` ausschließlich in `ScanSession::finish`
+/// Unter kann ein `LayerWitness` ausschließlich in `ScanSession::finish`
 /// entstehen. Ein direkter Konstruktor oder `Default` ist nicht vorhanden.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LayerWitness {

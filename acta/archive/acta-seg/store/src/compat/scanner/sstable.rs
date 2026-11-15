@@ -3,7 +3,7 @@
 //! Ermoeglicht geordnete Bereichsscans ueber eine oder mehrere SSTables.
 
 // FILE-CONTEXT
-// ZWECK: SSTable-Scanner für SsTableAllLevels-Schicht (§12.7.4, INV-WITNESS-MINT-1).
+// ZWECK: SSTable-Scanner für SsTableAllLevels-Schicht.
 // INVARIANTEN: liest Roh-SSTables und Waisen-Dateien (Altdateien) via Block-Reader statt Merge-Iterator.
 // HOTSPOTS: [1-100]
 

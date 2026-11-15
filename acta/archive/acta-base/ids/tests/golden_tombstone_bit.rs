@@ -1,14 +1,14 @@
-//! Golden test for TOMBSTONE_BIT — Format invariant guard per ADR-0120.
+//! Golden test for TOMBSTONE_BIT — Format invariant guard per.
 //!
 //! Diese Datei muss grün sein, BEVOR jede Änderung an TOMBSTONE_BIT oder den
-//! importierenden Crates gemergt wird. Sie sichert INV-1 (Formatgleichheit).
+//! importierenden Crates gemergt wird. Sie sichert (Formatgleichheit).
 //!
 //! G-F1: Format-Invariante. Bit 63 einer u64-Sequenznummer kennzeichnet Tombstones.
 //! Jede Änderung am Bitmuster bricht die SSTable-, WAL- und MVCC-Persistenz.
 
 use acta_base::TOMBSTONE_BIT;
 
-/// INV-1: Der Bitwert muss exakt 2^63 sein — keine andere Konstante ist korrekt.
+///: Der Bitwert muss exakt 2^63 sein — keine andere Konstante ist korrekt.
 #[test]
 fn test_tombstone_bit_exact_value() {
     assert_eq!(TOMBSTONE_BIT, 0x8000_0000_0000_0000u64);
@@ -19,7 +19,7 @@ fn test_tombstone_bit_exact_value() {
     assert_eq!(TOMBSTONE_BIT.trailing_zeros(), 63);
 }
 
-/// INV-1: Little-Endian-Serialisierung des Tombstone-Bit in gespeicherten Sequenznummern.
+///: Little-Endian-Serialisierung des Tombstone-Bit in gespeicherten Sequenznummern.
 /// SSTable- und WAL-Einträge serialisieren u64-Werte als 8 Little-Endian-Bytes.
 /// Bit 63 landet im 8. Byte (Index 7), Bit 7 dieses Bytes.
 #[test]

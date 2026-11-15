@@ -1,4 +1,4 @@
-//! Lokale Fehlertaxonomie für das Ledger-Subsystem (WP-8,).
+//! Lokale Fehlertaxonomie für das Ledger-Subsystem.
 
 use thiserror::Error;
 

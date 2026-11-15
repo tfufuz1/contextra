@@ -10,7 +10,7 @@
 //!   sind außerhalb des kryptographischen Einflussbereichs dieses Bausteins.
 
 // FILE-CONTEXT
-// ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding (AP-P0-06, Spec v17 §16.1).
+// ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding.
 // INVARIANTEN: CryptoShred vernichtet KEK (Gruppenbereinigung) oder DEK-Wrap (Einzelbereinigung) in O(1).
 // Zero-Panic, deterministische Fehlerpfade, ZeroizeOnDrop für alle Schlüsseltypen.
 
@@ -910,7 +910,7 @@ impl KeyRegistry {
     ///
     ///
     /// Vernichtet den KEK, nullt alle Rohschlüssel und gewrappten DEKs via Zeroize,
-    /// markiert die Epoche unwiderruflich als widerrufen (INV-NO-RESURRECTION-1)
+    /// markiert die Epoche unwiderruflich als widerrufen
     /// und liefert ein `KeyPurgeReceipt` zur späteren Ledger-Verankerung zurück.
     /// Bei wiederholtem Aufruf verhält sich die Funktion idempotent und liefert ein Quittungsobjekt
     /// mit 0 betroffenen DEKs.
@@ -924,7 +924,7 @@ impl KeyRegistry {
 
         let key = (group_id, epoch);
 
-        // Idempotenz-Prüfung nach INV-NO-RESURRECTION-1: Bereits widerrufen?
+        // Idempotenz-Prüfung nach: Bereits widerrufen?
         let is_already_revoked = {
             let lock = match self.revoked_epoch_groups.read() {
                 Ok(guard) => guard,

@@ -16,7 +16,7 @@
 //! über das Laufzeit-Dispatching in `dispatch.rs` nach Prüfung der CPU-Features aufgerufen.
 //! Das Modul `scalar` ist öffentlich zugänglich und dient als Fallback und Referenz.
 //!
-//! **Determinismus & Reduktionsordnung (INV-RING0-DETERMINISM-1):**
+//! **Determinismus & Reduktionsordnung:**
 //! Alle SIMD-Kernel und die Skalar-Referenz garantieren eine deterministische Summations- und
 //! Reduktionsreihenfolge. Vektorstreifen (Lanes: 4 bei NEON, 8 bei AVX2, 16 bei AVX-512) akkumulieren
 //! in Lane-Registern und werden am Blockende über eine feste Baum-Reduktion (`hsum`) zusammengeführt.

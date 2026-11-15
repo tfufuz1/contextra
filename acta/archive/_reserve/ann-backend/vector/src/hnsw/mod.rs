@@ -7,7 +7,7 @@
 
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 //!
-//! ### Lock-Hierarchie (§3.5, INV-LOCK-ORDER-1)
+//! ### Lock-Hierarchie
 //! Um Deadlocks mathematisch auszuschließen, gilt eine strikte, globale Akquisitionsreihenfolge:
 //! 1. `write_mutex`: Exklusiver Schreib- & Rebuild-Mutex (HotState). Schützt koordinierte Graph-Mutationen.
 //! 2. `entry_point` / `ram_entry_point`: Atomare Entry-Point Pointer (`AtomicU32` mit Acquire/Release Ordering).

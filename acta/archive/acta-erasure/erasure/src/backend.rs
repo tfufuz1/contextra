@@ -15,7 +15,7 @@ use std::fmt::Debug;
 
 /// Generisches Storage-Backend für modulare Datenzugriffe im Löschkern.
 pub trait StorageBackend: Send + Sync + 'static {
-    /// Führt physische Bereinigung auf dem Backend aus.
+    /// Führt physische Bereinigung auf dem Backend.
     fn purge<'a>(&'a self, cx: &'a PurgeCx) -> BoxFuture<'a, Result<PurgeOutcome, ErasureError>>;
 
     /// Liefert den Schicht-Identifikator des Backends.

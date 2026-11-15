@@ -31,7 +31,7 @@ async fn test_corrupted_golden_files_fail_closed_without_panic() {
     }
 
     let mf_path = dir.path().join("test.manifest");
-    tokio::fs::write(&mf_path, b"MFMN\x01\x00bad_crc_or_short").await.expect("write bad mf");
+    tokio::fs::write(&mf_path, b"AMNF\x01\x00bad_crc_or_short").await.expect("write bad mf");
     let mf_res = Manifest::load(&mf_path).await;
     let _ = mf_res;
 }

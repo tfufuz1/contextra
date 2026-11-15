@@ -15,7 +15,7 @@ pub enum ErasureError {
     #[error("key revoked: {0}")]
     KeyRevoked(String),
 
-    /// I/O-Fehler (D-55): nach diesem Fehler darf derselbe Handle nie wieder verwendet werden.
+    /// I/O-Fehler: nach diesem Fehler darf derselbe Handle nie wieder verwendet werden.
     #[error("erasure-io: {0}")]
     Io(#[from] std::io::Error),
     /// Speicherfehler.
@@ -105,7 +105,7 @@ pub enum ErasureError {
     #[error("erasure-restricted: audit entry required before read")]
     RestrictedReadAuditRequired,
 
-    /// Unzulässiger Übergang in der Purge-Zustandsmaschine (WP-1 / WP-2).
+    /// Unzulässiger Übergang in der Purge-Zustandsmaschine.
     #[error("purge-phase: illegal transition from {from:?} to {to:?}")]
     PurgePhaseTransition {
         /// Ausgangsphase.
@@ -114,7 +114,7 @@ pub enum ErasureError {
         to: crate::purge::PurgePhase,
     },
 
-    /// Fehler während einer spezifischen Purge-Phase (WP-1).
+    /// Fehler während einer spezifischen Purge-Phase.
     #[error("purge-phase-error during {phase:?}: {reason}")]
     PurgePhaseError {
         /// Betroffene Purge-Phase.

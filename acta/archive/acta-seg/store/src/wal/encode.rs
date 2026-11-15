@@ -4,9 +4,9 @@
 //! und kryptografischer HMAC-Verkettung.
 //!
 //! ## Invarianten
-//! - **INV-WAL-FRAME-1:** Bounded entry length: Jeder Record validiert key_len und val_len strikt gegen Maximallimits.
-//! - **INV-WAL-CRC-1:** Jedes Frame trägt eine CRC32C-Prüfsumme über den Nutzdaten-Payload.
-//! - **INV-WAL-HMAC-1:** Sequenzielle Hash-Kette bindet vorherigen HMAC (`prev_hmac`), Sequenznummer und Operation.
+//! - **:** Bounded entry length: Jeder Record validiert key_len und val_len strikt gegen Maximallimits.
+//! - **:** Jedes Frame trägt eine CRC32C-Prüfsumme über den Nutzdaten-Payload.
+//! - **:** Sequenzielle Hash-Kette bindet vorherigen HMAC (`prev_hmac`), Sequenznummer und Operation.
 
 use acta_crypto::wal_crypto::WalHmac;
 use crate::error::{StoreError, StoreResult};
@@ -62,11 +62,11 @@ impl WalOp {
     }
 }
 
-/// Magic header for V2 batch-encrypted WAL files (`b"MFW2"`).
-pub const WAL_V2_HEADER: [u8; 4] = *b"MFW2";
+/// Magic header for V2 batch-encrypted WAL files (`b"AWL2"`).
+pub const WAL_V2_HEADER: [u8; 4] = *b"AWL2";
 
-/// Magic header for V3 WAL files (`b"MFW3"`).
-pub const WAL_V3_HEADER: [u8; 4] = *b"MFW3";
+/// Magic header for V3 WAL files (`b"AWL3"`).
+pub const WAL_V3_HEADER: [u8; 4] = *b"AWL3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WalVersion {

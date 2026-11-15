@@ -1,7 +1,7 @@
-//! # Witness Binding & Hash-Chaining (INV-ERA-7 / WP-9).
+//! # Witness Binding & Hash-Chaining.
 //!
 //! Ein Löschbericht bindet kryptografisch deterministisch die Zeugen, auf die er sich
-//! stützt, über eine BLAKE3-Hash-Kette (INV-ERA-7).
+//! stützt, über eine BLAKE3-Hash-Kette.
 
 use crate::types_local::LayerWitness;
 
@@ -36,7 +36,7 @@ mod tests {
         let chain = compute_witnesses_chain_hash(&[w1.clone(), w2.clone()]);
         assert!(verify_witnesses_binding(&[w1.clone(), w2.clone()], &chain));
 
-        // Vertauschte Reihenfolge bricht die Bindung (INV-ERA-7)
+        // Vertauschte Reihenfolge bricht die Bindung
         assert!(!verify_witnesses_binding(&[w2.clone(), w1.clone()], &chain));
 
         // Manipulierter Zeuge bricht die Bindung

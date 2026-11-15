@@ -10,7 +10,7 @@ fn make_chunk(id: u64, content: &[u8]) -> VaultChunk {
     )
 }
 
-/// INV-VAULT-2: ingest() darf kein I/O auslösen — nur RAM-Zustand ändern.
+///: ingest darf kein I/O auslösen — nur RAM-Zustand ändern.
 #[test]
 fn test_ingest_is_memory_only() {
     let mut vault = VolatileContextVault::open(VaultConfig::default());
@@ -19,7 +19,7 @@ fn test_ingest_is_memory_only() {
     assert_eq!(vault.current_size_bytes(), b"sensitive data".len());
 }
 
-/// INV-VAULT-3: Kapazitätsüberschreitung → Err, kein Disk-Fallback.
+///: Kapazitätsüberschreitung → Err, kein Disk-Fallback.
 #[test]
 fn test_capacity_exceeded_returns_error() {
     let config = VaultConfig {
@@ -32,7 +32,7 @@ fn test_capacity_exceeded_returns_error() {
     assert!(matches!(err, VaultError::CapacityExceeded { .. }));
 }
 
-/// INV-VAULT-1: purge() konsumiert den Vault und zeroized Inhalte.
+///: purge konsumiert den Vault und zeroized Inhalte.
 #[test]
 fn test_purge_consumes_vault() {
     let mut vault = VolatileContextVault::open(VaultConfig {

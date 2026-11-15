@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Hintergrund- und Delta-Persistenz für DiskANN (WP-VEC-07).
+// ZWECK: Hintergrund- und Delta-Persistenz für DiskANN.
 // INVARIANTEN: Lock-Hierarchie; atomares Ersetzen von Delta-Dateien; fsync auf Verzeichnisebene.
 // STAND: 2026-11-11
 
@@ -62,7 +62,7 @@ impl DiskAnnIndex {
         let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
         self.write_incremental_to_file_sync(&tmp_path, &pending)?;
 
-        // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
+        // Atomares Rename + Parent-fsync
         let index_path = self.inner.config.index_path.clone();
         crate::diskann::io::atomic_replace(&tmp_path, &index_path)?;
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");

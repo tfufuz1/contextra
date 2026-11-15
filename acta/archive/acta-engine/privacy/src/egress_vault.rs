@@ -291,7 +291,7 @@ pub enum EgressVaultError {
 /// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation (64 KiB = 65.536 Bytes).
 pub const MAX_CLASSIFY_PAYLOAD_BYTES: usize = 65_536;
 
-/// Führt eine Layer-1-Regex-Klassifikation auf dem Payload mit neuem Task und hartem Timeout aus.
+/// Führt eine Layer-1-Regex-Klassifikation auf dem Payload mit neuem Task und hartem Timeout.
 ///
 /// Invariante: **Fail-Closed**. Bei Timeout, Panic oder Fehler wird stets `Block(...)` zurückgegeben.
 pub async fn classify_layer1(

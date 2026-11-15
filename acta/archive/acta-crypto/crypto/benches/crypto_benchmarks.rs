@@ -62,7 +62,7 @@ fn bench_hmac_integrity(c: &mut Criterion) {
     });
 }
 
-// ADR-082 Performance-Nachweis Benchmarks
+// Performance-Nachweis Benchmarks
 
 use acta_crypto::kv_segment::{KvSegment, TenantIsolatedKvStore};
 use acta_base::TenantId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

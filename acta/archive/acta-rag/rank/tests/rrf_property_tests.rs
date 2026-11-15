@@ -138,7 +138,7 @@ proptest! {
         prop_assert_eq!(fused.first().map(|f| f.id.as_str()), Some("dup_doc"));
     }
 
-    /// WP-63: Proptest Permutation der Eingabelisten bei gleichen Gewichten ändert die Ausgabe nicht
+    ///: Proptest Permutation der Eingabelisten bei gleichen Gewichten ändert die Ausgabe nicht
     /// im PRODUKTIVEN Pfad (`weighted_reciprocal_rank_fusion`).
     #[test]
     fn prop_weighted_rrf_permutation_invariance_arbitrary_docs(
@@ -190,7 +190,7 @@ proptest! {
         }
     }
 
-    /// WP-63: Proptest Tie-Break nach ID aufsteigend im PRODUKTIVEN Pfad (`weighted_reciprocal_rank_fusion`).
+    ///: Proptest Tie-Break nach ID aufsteigend im PRODUKTIVEN Pfad (`weighted_reciprocal_rank_fusion`).
     #[test]
     fn prop_weighted_rrf_tie_break_ascending_id(
         suffix in "[a-z]{3,6}",

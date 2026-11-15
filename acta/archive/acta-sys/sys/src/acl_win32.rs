@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-acl-main,epic=sys-acl,seq=0] Zugriffskontrolle und Besitzverifikation
 // =========================================================================
-// NOTE: Win32 & POSIX ACL restriction and file ownership verification wrappers (Ring 0 / E0 / docs/SPEC.md §7.7 / §10.1).
+// NOTE: Win32 & POSIX ACL restriction and file ownership verification wrappers.
 // Invariante: Safe Rust facade; zero panic; cross-platform file permissions enforcement.
 // Keine unzulässigen Garantieversprechen.
 
@@ -81,7 +81,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 /// - die Datei einem anderen Benutzer gehört.
 ///
 /// # Nebenwirkungen
-/// Führt Dateisystem-Metadaten-I/O und den POSIX-Systemaufruf `geteuid` aus.
+/// Führt Dateisystem-Metadaten-I/O und den POSIX-Systemaufruf `geteuid`.
 pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(path)?;

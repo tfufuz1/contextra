@@ -2,7 +2,7 @@
 
 use blake3::Hasher;
 
-/// Berechnet den Open-Lookup-Key nach D-119:
+/// Berechnet den Open-Lookup-Key
 /// `open_key = BLAKE3-keyed(K_idx, "acta/erasure-open/v1" || kanonisches_Ziel || mode)`
 pub fn derive_open_key(k_idx: &[u8; 32], canonical_target: &[u8], mode_byte: u8) -> [u8; 32] {
     let mut hasher = Hasher::new_keyed(k_idx);

@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Isolierte Brücke für HNSW-Fallback und Konfigurationsableitung (WP-VEC-07 / S-80).
+// ZWECK: Isolierte Brücke für HNSW-Fallback und Konfigurationsableitung ( / S-80).
 // INVARIANTEN: Kapselt alle Zugriffe auf crate::hnsw::*; keine direkten HNSW-Imports im DiskANN-Kern.
 // HOTSPOTS: HnswFallbackBridge, create_hnsw_fallback, search_hnsw
 // STAND: 2026-11-11

@@ -16,9 +16,9 @@ use crate::hnsw::types::{HnswIndex, VectorData};
 
 /// Neutrale Bereinigungs- und Wartungsroutine für Vektorknoten.
 ///
-/// Gemäß D-E1 als Wartungsprimitiv isoliert.
+/// Gemäß als Wartungsprimitiv isoliert.
 #[deprecated(
-    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
+    note = "Als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
 )]
 pub struct HnswPurger {
     index: Arc<HnswIndex>,
@@ -35,7 +35,7 @@ impl HnswPurger {
 /// Erzeugt einen `Arc<dyn Purger>` für einen HNSW Index.
 #[allow(deprecated)]
 #[deprecated(
-    note = "Gemäß D-E1 als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
+    note = "Als Wartungsprimitiv isoliert; Löschschnittstellen wandern nach acta-erasure"
 )]
 pub fn hnsw_purger(index: Arc<HnswIndex>) -> Arc<dyn Purger> {
     Arc::new(HnswPurger::new(index))

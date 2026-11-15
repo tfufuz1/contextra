@@ -26,7 +26,7 @@ use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-/// Führt einen asynchronen Block synchron blockierend aus.
+/// Führt einen asynchronen Block synchron blockierend.
 fn block_on_async<F: std::future::Future + Send + 'static>(f: F) -> F::Output
 where
     F::Output: Send + 'static,

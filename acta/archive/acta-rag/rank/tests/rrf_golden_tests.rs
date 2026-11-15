@@ -5,7 +5,7 @@
 //! Alle Erwartungswerte in dieser Testsuite sind per Hand gemäß der RRF-Formel
 //! $\text{score}(d) = \sum_{l} \frac{w_l}{k + \text{rank}_l(d)}$
 //! exakt vorgerechnet und als Kommentar dokumentiert. Keiner der Erwartungswerte
-//! wird durch Aufruf einer Fusionsfunktion erzeugt (Anforderung WP-61).
+//! wird durch Aufruf einer Fusionsfunktion erzeugt (Anforderung ).
 //!
 //! Standard-Parameter:
 //! In `weighted_reciprocal_rank_fusion` ist $k = 60$ fest verankert.

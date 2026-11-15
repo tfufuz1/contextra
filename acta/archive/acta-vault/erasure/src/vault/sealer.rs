@@ -1,12 +1,12 @@
 //! RecordSealer-Implementierung.
 //!
-//! DEK-Ableitung nach SPEC D-79 / §9.4 / §10.1:
+//! DEK-Ableitung nach SPEC / §9.4 / §10.1
 //! `DEK = HKDF-SHA256(ikm = K_unit, salt = SHA-256("acta/dek-salt/v2" ‖ salt_T ‖ salt_C ‖ salt_S ‖ salt_D), info = "acta/dek/v2" ‖ doc_tag)`
 //! Bei Dokumenten ohne Betroffenen: `salt_S = 0³²`.
 //! Fehlt einer der Ahnen-Slots T/C/S/D im Tresor, ist der DEK nicht ableitbar (`Erased`).
 //! `make_slots_durable`: synchronisiert alle berührten Shards über VFS vor WAL-Schreibvorgängen (I-9).
-//! WP-5a: Sicherer Speicher-Swap, Fail-Closed Handle-Vergiftung (INV-VAULT-FAILCLOSED-1) und Zeroize-Garantie.
-//! WP-5: Blob-Rewrite mit Journal, Manifest und RAM-Swap.
+//! WP-5a: Sicherer Speicher-Swap, Fail-Closed Handle-Vergiftung und Zeroize-Garantie.
+//!: Blob-Rewrite mit Journal, Manifest und RAM-Swap.
 
 use crate::crypto_local::{derive_dek, AncestorSalts, UnitKey};
 use crate::types_local::{Envelope, RecordSealer, SealCtx};
@@ -28,7 +28,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 /// Fehlerarten für Sealer- und Swap-Operationen mit Phasenbezug (WP-5a).
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum SealerError {
-    /// Handle ist vergiftet (D-55, INV-VAULT-FAILCLOSED-1).
+    /// Handle ist vergiftet.
     #[error("sealer handle is permanently poisoned")]
     Poisoned,
     /// Puffer-Längen stimmen beim Speicher-Swap nicht überein.
@@ -119,7 +119,7 @@ impl VaultSealer {
         }
     }
 
-    /// Prüft ob das Sealer-Handle vergiftet ist (INV-VAULT-FAILCLOSED-1).
+    /// Prüft ob das Sealer-Handle vergiftet ist.
     pub fn is_poisoned(&self) -> bool {
         self.poisoned.load(Ordering::Acquire)
     }
@@ -129,9 +129,9 @@ impl VaultSealer {
         self.poisoned.store(true, Ordering::Release);
     }
 
-    /// Sicherer Speicher-Swap mit Fail-Closed Garantie (WP-5a, INV-VAULT-FAILCLOSED-1).
+    /// Sicherer Speicher-Swap mit Fail-Closed Garantie.
     ///
-    /// Tauscht die Inhalte von `dest` und `src` byteweise aus.
+    /// Tauscht die Inhalte von `dest` und `src` byteweise.
     /// Falls `fail_at_step` aktiv ist oder ein Fehler auftritt, werden BEIDE Puffer
     /// sofort vollständig mit Nullen überschrieben (`zeroize`), das Sealer-Handle
     /// wird dauerhaft vergiftet und ein entsprechender Fehler zurückgegeben.
@@ -189,7 +189,7 @@ impl VaultSealer {
         Ok(())
     }
 
-    /// Leitet den DEK aus den Ahnen-Salts im Tresor ab (D-79).
+    /// Leitet den DEK aus den Ahnen-Salts im Tresor ab.
     pub fn derive_dek_from_vault(
         &self,
         hierarchy: &DocumentHierarchyTags,
@@ -374,7 +374,7 @@ impl RecordSealer for VaultSealer {
     }
 }
 
-/// Modul für Tresor-Blob-Rewrite mit Journal und Manifest (WP-5, INV-VAULT-FAILCLOSED-1).
+/// Modul für Tresor-Blob-Rewrite mit Journal und Manifest.
 pub mod rewrite {
     use crate::backend::StorageBackend;
     use crate::types_local::{Clock, PurgeCx, Vfs};
@@ -384,10 +384,10 @@ pub mod rewrite {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
-    /// Fehlerarten für Rewrite-Operationen mit Phasenbezug (WP-5).
+    /// Fehlerarten für Rewrite-Operationen mit Phasenbezug.
     #[derive(Debug, thiserror::Error, PartialEq, Eq)]
     pub enum RewriteError {
-        /// Handle ist dauerhaft vergiftet (INV-VAULT-FAILCLOSED-1).
+        /// Handle ist dauerhaft vergiftet.
         #[error("rewriter handle is permanently poisoned")]
         Poisoned,
         /// Phase 1: Fehler beim Schreiben des Intent ins Journal.
@@ -674,7 +674,7 @@ pub mod rewrite {
             }
         }
 
-        /// Prüft ob der Rewriter dauerhaft vergiftet ist (INV-VAULT-FAILCLOSED-1).
+        /// Prüft ob der Rewriter dauerhaft vergiftet ist.
         pub fn is_poisoned(&self) -> bool {
             self.poisoned.load(Ordering::Acquire)
         }
@@ -694,7 +694,7 @@ pub mod rewrite {
             &self.manifest
         }
 
-        /// Führt die 5-Phasen-Rewrite-Pipeline absturzsicher und fail-closed aus.
+        /// Führt die 5-Phasen-Rewrite-Pipeline absturzsicher und fail-closed.
         ///
         /// 1. Phase 1: Intent ins Journal schreiben (`Planned`).
         /// 2. Phase 2: Überschreiben der Ziel-Blobs im Speicher (`Overwritten`).
@@ -748,7 +748,7 @@ pub mod rewrite {
             if let Some(3) = crash_after_step {
                 self.poison();
                 return Err(RewriteError::SyncFailure(
-                    "injected sync failure (INV-VAULT-FAILCLOSED-1)".to_string(),
+                    "injected sync failure".to_string(),
                 ));
             }
 

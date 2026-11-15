@@ -11,7 +11,7 @@ use super::entry::ManifestEntry;
 use super::recovery::is_valid_tail_truncation_candidate;
 use super::MAX_MANIFEST_ENTRY_SIZE;
 
-pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
+pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"AMNF";
 pub const CURRENT_MANIFEST_VERSION: u8 = 2;
 #[allow(dead_code)]
 pub const MANIFEST_VERSION_V1: u8 = 1;

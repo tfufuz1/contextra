@@ -20,8 +20,8 @@ pub enum DurableFsError {
         path: PathBuf,
     },
 
-    /// Das Dateihandle wurde aufgrund eines vorangegangenen fsync-Fehlers dauerhaft vergiftet (`INV-FSYNC-1`).
-    #[error("handle is poisoned due to previous fsync failure (INV-FSYNC-1)")]
+    /// Das Dateihandle wurde aufgrund eines vorangegangenen fsync-Fehlers dauerhaft vergiftet.
+    #[error("handle is poisoned due to previous fsync failure")]
     PoisonedHandle,
 
     /// Ungültige Eingabe oder Parameterverletzung.

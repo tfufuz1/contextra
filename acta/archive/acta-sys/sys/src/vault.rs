@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-vault-main,epic=sys-vault,seq=0] Tresor-Speicherverwaltung
 // =========================================================================
-// NOTE: RAII manager for RAM memory-locked sensitive buffer regions, protected page allocations, and zeroization (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-SYS-MEMLOCK-1).
+// NOTE: RAII manager for RAM memory-locked sensitive buffer regions, protected page allocations, and zeroization.
 // Invariante: Zero panic; VaultBuffer protected allocation; non-optimizable volatile zeroize + compiler fence; mlock + MADV_DONTDUMP; munlock after zeroize.
 // Keine unzulässigen Garantieversprechen.
 
@@ -16,7 +16,7 @@
 //!   einer sequenziellen Compiler-Fence (`std::sync::atomic::compiler_fence(Ordering::SeqCst)`).
 //! - **Verwendung im System:** Wird von Kryptografie- und Schlüsselverwaltungsmodulen
 //!   (z. B. `acta-sys`, `acta-crypto` oder Schlüsselladern in `acta-seg`) eingesetzt.
-//! - **Sicherheitsanforderung (INV-SYS-MEMLOCK-1):**
+//! - **Sicherheitsanforderung:**
 //!   Über [`VaultBuffer`] allozierte Puffer werden mit `mlock` im physischen RAM verankert,
 //!   per `madvise(MADV_DONTDUMP)` vom Core-Dump ausgenommen und beim Drop vor der Speicherfreigabe
 //!   vollständig genullt. Erst nach dem Nullsetzen wird der Speicher entsperrt (`munlock`).
@@ -118,7 +118,7 @@ impl Drop for LockedRegions {
 // SECTION Protected Vault Buffer
 // ANCHOR[id=sys-vault-buffer,epic=sys-vault,seq=2] VaultBuffer
 
-/// Ein im RAM verankerter, geschützter Speicherpuffer für hochsensible kryptografische Schlüsseldaten (INV-SYS-MEMLOCK-1).
+/// Ein im RAM verankerter, geschützter Speicherpuffer für hochsensible kryptografische Schlüsseldaten.
 #[derive(Debug)]
 pub struct VaultBuffer {
     data: Vec<u8>,
@@ -127,7 +127,7 @@ pub struct VaultBuffer {
 
 impl VaultBuffer {
     /// Allokiert einen neuen Puffer der Größe `size` mit Nullen, verankert ihn im RAM (`MemLockPolicy::FailClosed`)
-    /// und schließt ihn von Core-Dumps aus.
+    /// und schließt ihn von Core-Dumps.
     ///
     /// # Fehler
     /// Liefert [`crate::Error::MemoryLockFailed`], wenn das Festpinnen im RAM scheitert (Fail-Closed).
@@ -202,7 +202,7 @@ impl std::ops::DerefMut for VaultBuffer {
 }
 
 // ANCHOR[id=sys-vault-drop,epic=sys-vault,seq=3] RAII Drop-Säuberung
-// NOTE: Führt volatile zeroize vor munlock aus (INV-SYS-MEMLOCK-1).
+// NOTE: Führt volatile zeroize vor munlock.
 impl Drop for VaultBuffer {
     fn drop(&mut self) {
         if !self.data.is_empty() {
@@ -270,7 +270,7 @@ mod tests {
         assert_eq!(secret, vec![0u8; 16]);
     }
 
-    /// Prüft INV-SYS-MEMLOCK-1: VaultBuffer wird gesperrt, mit Nullen überschrieben und schlägt fail-closed fehl, wenn mlock scheitert.
+    /// Prüft: VaultBuffer wird gesperrt, mit Nullen überschrieben und schlägt fail-closed fehl, wenn mlock scheitert.
     #[test]
     fn test_inv_sys_memlock_1_vault_protection() -> Result<()> {
         let mut buf = VaultBuffer::allocate(64)?;

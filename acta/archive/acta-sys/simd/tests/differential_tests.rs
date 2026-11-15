@@ -1,4 +1,4 @@
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::indexing_slicing)]
@@ -16,7 +16,7 @@
 //! Dadurch wird nachgewiesen, dass SIMD-Loop-Unrolling, Restschleifen (Tail-Loops) und
 //! nicht 32-Byte-ausgerichtete Slice-Fenster identische Resultate liefern.
 
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 
 use acta_sys::dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,

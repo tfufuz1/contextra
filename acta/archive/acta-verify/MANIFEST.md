@@ -3,7 +3,7 @@
 **Aufgabe:** Unabhaengige Pruefung von Berichten und Ledgern; keine interne Abhaengigkeit  
 **Level:** L9 · **Budget:** 1200 LOC · **Spezifikation:** docs/SPEC.md Kap. 17  
 **Interne Abhaengigkeiten (Soll):** keine  
-**Umfang des Archivs:** 6 Dateien, 3538 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 7 Dateien, 3637 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -27,9 +27,10 @@
 
 | Datei (relativ zu `archive/acta-verify/`) | LOC | Befunde |
 |---|---:|---|
-| `erasure/src/deletion_proof.rs` | 2744 | serde=33, zeit_zufall=1, panic=117, hr6=2, alt_spec=12 |
-| `erasure/tests/deletion_proof_external_verify_rejects_tamper.rs` | 172 | panic=8 |
-| `erasure/tests/deletion_proof_hash_collision.rs` | 113 | panic=7 |
-| `erasure/tests/deletion_proof_prefix_collision_proptest.rs` | 76 |  |
-| `erasure/tests/deletion_proof_signature_version_serde.rs` | 245 | serde=1, zeit_zufall=1, panic=16 |
-| `erasure/tests/deletion_proof_v3_validation.rs` | 188 | panic=11 |
+| `erasure/src/deletion_proof.rs` | 2743 | panic=117, serde=33, alt_spec=12 |
+| `erasure/tests/deletion_proof_external_verify_rejects_tamper.rs` | 171 | panic=8 |
+| `erasure/tests/deletion_proof_hash_collision.rs` | 112 | panic=7 |
+| `erasure/tests/deletion_proof_prefix_collision_proptest.rs` | 75 |  |
+| `erasure/tests/deletion_proof_signature_version_serde.rs` | 244 | panic=16, serde=1 |
+| `erasure/tests/deletion_proof_v3_validation.rs` | 187 | panic=11 |
+| `erasure/tests/proof_ed25519_external_verify.rs` | 105 |  |

@@ -1,6 +1,6 @@
 //! Domänenlogik für eingeschränkte Verarbeitung (Art. 18 DSGVO,).
 //!
-//! # Normative Referenzen (D-116, Art. 18 Abs. 2)
+//! # Normative Referenzen
 //! - `Restricted` sperrt reguläres Lesen, Suchen und Schreiben.
 //! - Expliziter, auditierter Lesepfad nach Art. 18 Abs. 2:
 //!   - `RestrictedPurpose`: `LegalClaims` oder `DataSubjectConsent`.
@@ -39,7 +39,7 @@ impl OperatorAttestation {
     /// Erstellt eine neue Betreiber-Attestierung mit gehashtem Fallbezug.
     ///
     /// `case_ref` wird kryptografisch mit dem Epochenschlüssel gehasht (`case_commitment`),
-    /// sodass kein Personenbezug im Klartext persistiert wird (P13, D-116).
+    /// sodass kein Personenbezug im Klartext persistiert wird.
     pub fn new(operator: &str, case_ref: &[u8], attested_at: u64, epoch_key: &[u8; 32]) -> Self {
         let commitment = blake3::keyed_hash(epoch_key, case_ref);
         Self {
@@ -166,7 +166,7 @@ pub enum RestrictedState {
     Restricted,
     /// Einschränkung durch formalen Journal-Eintrag aufgehoben.
     Lifted,
-    /// Restriktion durch nachfolgenden Löschauftrag abgelöst (D-119).
+    /// Restriktion durch nachfolgenden Löschauftrag abgelöst.
     SupersededByErasure,
 }
 
@@ -195,7 +195,7 @@ impl RestrictedState {
         }
     }
 
-    /// Ersetzt die Restriktion durch einen nachfolgenden regulären Erase-Vorgang (D-119).
+    /// Ersetzt die Restriktion durch einen nachfolgenden regulären Erase-Vorgang.
     pub fn supersede_by_erasure(&mut self) -> Result<(), ErasureError> {
         match self {
             Self::Restricted => {

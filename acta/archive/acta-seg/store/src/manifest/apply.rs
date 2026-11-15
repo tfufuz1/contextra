@@ -1,7 +1,7 @@
 //! Manifest Edit-Anwendung, atomares Anhängen und Snapshot-Umschaltung (Ring 1)
 //!
 //! Stellt atomare Append-Batch-Operationen mit Flush-before-Visible- und fsync-Garantien
-//! bereit. Vergiftet das Handle bei fsync-Fehlern sofort fail-closed (INV-FSYNC-1).
+//! bereit. Vergiftet das Handle bei fsync-Fehlern sofort fail-closed.
 
 use std::sync::atomic::Ordering;
 use tokio::io::AsyncWriteExt;
@@ -20,7 +20,7 @@ impl Manifest {
     pub async fn append_batch(&self, entries: &[ManifestEntry]) -> StoreResult<()> {
         if self.is_poisoned() {
             return Err(StoreError::Storage(format!(
-                "Manifest handle for {} is poisoned due to a previous fsync failure (INV-FSYNC-1)",
+                "Manifest handle for {} is poisoned due to a previous fsync failure",
                 self.path.display()
             )));
         }

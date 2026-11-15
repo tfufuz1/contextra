@@ -3,7 +3,7 @@
 **Aufgabe:** Sandbox-Prozess fuer Parser; keine Schluessel, kein Netz  
 **Level:** L9 · **Budget:** 600 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.1, 13.2  
 **Interne Abhaengigkeiten (Soll):** acta-ingest, acta-parse, acta-sys  
-**Umfang des Archivs:** 11 Dateien, 2252 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 11 Dateien, 2241 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -27,14 +27,14 @@
 
 | Datei (relativ zu `archive/acta-parse-worker/`) | LOC | Befunde |
 |---|---:|---|
-| `sandbox/src/capabilities.rs` | 184 | alt_spec=3 |
-| `sandbox/src/error.rs` | 39 |  |
-| `sandbox/src/executor/mod.rs` | 161 | async=4, zeit_zufall=2 |
-| `sandbox/src/executor/runner.rs` | 152 | async=6 |
-| `sandbox/src/executor/state.rs` | 93 | async=1, alt_spec=3 |
-| `sandbox/src/lib.rs` | 34 |  |
-| `sandbox/src/output.rs` | 30 |  |
-| `sandbox/tests/abuse_test_matrix.rs` | 916 | async=60 |
-| `wire/src/adapter.rs` | 223 |  |
-| `wire/src/lib.rs` | 77 | serde=1 |
-| `wire/src/verification.rs` | 343 | alt_spec=12 |
+| `sandbox/src/capabilities.rs` | 183 |  |
+| `sandbox/src/error.rs` | 38 |  |
+| `sandbox/src/executor/mod.rs` | 160 | async=4 |
+| `sandbox/src/executor/runner.rs` | 151 | async=7 |
+| `sandbox/src/executor/state.rs` | 92 | async=1 |
+| `sandbox/src/lib.rs` | 33 |  |
+| `sandbox/src/output.rs` | 29 |  |
+| `sandbox/tests/abuse_test_matrix.rs` | 915 | async=60 |
+| `wire/src/adapter.rs` | 222 |  |
+| `wire/src/lib.rs` | 76 | serde=1 |
+| `wire/src/verification.rs` | 342 |  |

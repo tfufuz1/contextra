@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Dekodieren und Laden einzelner Graphknoten aus dem Mmap (WP-VEC-07).
+// ZWECK: Dekodieren und Laden einzelner Graphknoten aus dem Mmap.
 // INVARIANTEN: Zero-Panic bei unvollständigen Knoten oder korrupten Nachbarlisten.
 // STAND: 2026-11-11
 

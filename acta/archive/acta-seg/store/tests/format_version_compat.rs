@@ -1,10 +1,10 @@
 #![cfg(feature = "workspace")]
-//! WP-31: Format-Versionen und Fixtures
+//!: Format-Versionen und Fixtures
 //!
 //! Verifiziert die Versionierungsfelder von:
 //! 1. WAL: `WalVersion` (V1, V2, V3) mit Downgrade- / Rejection-Prüfung
 //! 2. SSTable: `SSTABLE_MAGIC_MFSX` mit Versionsfeld v0..v4, saubere Ablehnung bei v5+
-//! 3. Manifest: `MANIFEST_HEADER_MAGIC` (MFMN) mit Versionsfeld, saubere Ablehnung bei v2+
+//! 3. Manifest: `MANIFEST_HEADER_MAGIC` (AMNF) mit Versionsfeld, saubere Ablehnung bei v2+
 //!
 //! Erzeugt programmatisch Fixtures unter `tests/fixtures/` und prüft:
 //! - Liest Version n-1 oder lehnt sauber ab.

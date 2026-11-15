@@ -1,4 +1,4 @@
-//! Numerik-Orakel und Golden-Tests für `acta-sys` (WP-M1).
+//! Numerik-Orakel und Golden-Tests für `acta-sys`.
 //!
 //! Friert das numerische Verhalten der Distanzkerne ein:
 //! - Dimensionen: 4, 17, 128, 768

@@ -270,11 +270,11 @@ fn test_property_recognizer_never_panics_on_arbitrary_inputs() {
 }
 
 // ============================================================================
-// 9. ReDoS Resilience & INV-PRIVACY-FAILCLOSED-1 Tests
+// 9. ReDoS Resilience & Tests
 // ============================================================================
 
 #[test]
-/// SPEC: INV-PRIVACY-FAILCLOSED-1
+/// SPEC
 fn test_inv_privacy_failclosed_1_limit_and_error_handling() {
     let recognizer = PatternRecognizer::new().with_max_input_length(256);
 

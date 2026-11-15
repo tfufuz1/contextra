@@ -1,5 +1,5 @@
 #![cfg(feature = "workspace")]
-//! Fehlertoleranz und Korruptionsprüfung (PROOF-3, G-F1)
+//! Fehlertoleranz und Korruptionsprüfung (G-F1)
 //!
 //! Prüft, dass das Laden beschädigter Dateien (Manifest, SSTable-Footer, WAL-Mitte, WAL-Tail)
 //! einen sauberen typisierten Fehler bzw. Open-Heal Recovery liefert, niemals in Panics abgleitet
@@ -18,7 +18,7 @@ async fn test_manifest_corrupted_header_rejects_cleanly() {
     let tmp = TempDir::new().expect("tempdir");
     let corrupt_manifest_path = tmp.path().join("corrupt.manifest");
 
-    fs::write(&corrupt_manifest_path, b"MFMN\x63").expect("write corrupt");
+    fs::write(&corrupt_manifest_path, b"AMNF\x63").expect("write corrupt");
     let initial_hash = blake3::hash(&fs::read(&corrupt_manifest_path).unwrap());
 
     let res = Manifest::load(&corrupt_manifest_path).await;
@@ -27,7 +27,7 @@ async fn test_manifest_corrupted_header_rejects_cleanly() {
     let post_hash = blake3::hash(&fs::read(&corrupt_manifest_path).unwrap());
     assert_eq!(initial_hash, post_hash, "File must remain byte-identical after rejected load");
 
-    fs::write(&corrupt_manifest_path, b"MFMN\x01\xFF\xFF\xFF\xFF").expect("write garbage payload");
+    fs::write(&corrupt_manifest_path, b"AMNF\x01\xFF\xFF\xFF\xFF").expect("write garbage payload");
     let initial_hash = blake3::hash(&fs::read(&corrupt_manifest_path).unwrap());
 
     let res = Manifest::load(&corrupt_manifest_path).await;

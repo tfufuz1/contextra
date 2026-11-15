@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Property-Tests (proptest) für den ProseChunker (WP M3 / SPEC C-11.7).
+// ZWECK: Property-Tests (proptest) für den ProseChunker.
 // INVARIANTEN: kein Inhaltsverlust, UTF-8-Grenzen, token_count <= hard_limit, exakter Span oder Synthese, Monotonie, Determinismus.
 // STAND: TS:2026-10-31T00:00:00Z
 

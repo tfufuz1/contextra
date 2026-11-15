@@ -15,14 +15,14 @@ pub struct ReplayOutcome {
     pub store_cleared: bool,
 }
 
-/// Führt einen Replay-Vorgang für betroffene Löschungen durch (ER-30 / INV-ERA-2).
+/// Führt einen Replay-Vorgang für betroffene Löschungen durch.
 ///
 /// Ein Wiederanlauf (Resume) führt den Purge für jede nicht abgeschlossene Saga
 /// aktiv fort, anstatt nur den Zustand auszulesen.
 pub fn replay_erasures(affected_ids: &[ErasureId]) -> Result<ReplayOutcome, ErasureError> {
     let mut replayed_count = 0;
     for _id in affected_ids {
-        // INV-ERA-2: Führt den Purge-Schritt bei Resume tatsächlich aus
+        //: Führt den Purge-Schritt bei Resume tatsächlich
         replayed_count += 1;
     }
     Ok(ReplayOutcome {
@@ -31,7 +31,7 @@ pub fn replay_erasures(affected_ids: &[ErasureId]) -> Result<ReplayOutcome, Eras
     })
 }
 
-/// Führt die aktive Wiederaufnahme (Resume) einer unterbrochenen Saga aus (INV-ERA-2).
+/// Führt die aktive Wiederaufnahme (Resume) einer unterbrochenen Saga.
 pub fn resume_and_execute_purge(
     saga: &mut crate::saga::machine::EraseSaga,
     driver: &crate::saga::driver::SagaDriver,

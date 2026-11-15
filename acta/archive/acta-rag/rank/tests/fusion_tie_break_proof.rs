@@ -1,4 +1,4 @@
-//! Umfassende Beweis-Suite für Tie-Breaking und Determinismus bei allen Fusionspfaden (WP-4).
+//! Umfassende Beweis-Suite für Tie-Breaking und Determinismus bei allen Fusionspfaden.
 //!
 //! Kernversprechen (AGENTS.md §1.1.4):
 //! Gleiche Eingabe ⇒ gleiche Rangfolge; Gleichstand ⇒ ID aufsteigend.

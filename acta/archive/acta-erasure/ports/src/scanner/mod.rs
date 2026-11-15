@@ -62,7 +62,7 @@ pub trait LayerScanner: Send + Sync {
     /// Reiner Statusabruf ohne Mutation.
     fn layer(&self) -> WitnessLayer;
 
-    /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession` aus.
+    /// Führt das Scannen von Einheiten auf der übergebenen `ScanSession`.
     ///
     /// # Fehler
     /// Liefert `ActaError` bei I/O- oder Verifizierungsfehlern.

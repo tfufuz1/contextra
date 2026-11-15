@@ -36,10 +36,10 @@ async fn test_inv_vec_connectivity_1_reachable_after_compact() {
         index.remove(doc_id).expect("remove succeeds");
     }
 
-    // 3. Führe kontrollierten Rebuild via Maintain::compact aus
+    // 3. Führe kontrollierten Rebuild via Maintain::compact
     index.compact().expect("compact must succeed");
 
-    // 4. INV-VEC-CONNECTIVITY-1: Nach compact ist jeder lebende Knoten vom Einstiegspunkt erreichbar!
+    // 4.: Nach compact ist jeder lebende Knoten vom Einstiegspunkt erreichbar!
     let connected = index.verify_full_connectivity();
     assert!(
         connected,

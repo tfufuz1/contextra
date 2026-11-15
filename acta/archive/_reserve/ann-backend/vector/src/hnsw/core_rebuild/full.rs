@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Öffentliche Einstiegspunkte für HNSW-Rebuild, Status, Wartefunktionen und Konnektivitätsprüfung.
-// INVARIANTEN: Rebuild atomar per Swap; Maintain-Trait Implementierung; INV-VEC-CONNECTIVITY-1.
+// INVARIANTEN: Rebuild atomar per Swap; Maintain-Trait Implementierung;.
 // HOTSPOTS: rebuild_sync_with_clock, verify_full_connectivity, do_delete
 // STAND: TS:2026-11-11T02:00:00Z
 
@@ -300,7 +300,7 @@ impl HnswIndexCore {
 }
 
 impl HnswIndex {
-    /// Führt Graphtraversierung durch zur Überprüfung von `INV-VEC-CONNECTIVITY-1`.
+    /// Führt Graphtraversierung durch zur Überprüfung von.
     pub fn verify_full_connectivity(&self) -> bool {
         let mmap_guard = self.inner.cold.mmap_index.read();
         let mmap_node_count = mmap_guard
@@ -403,12 +403,12 @@ impl crate::types::Maintain for HnswIndex {
 }
 
 impl HnswIndex {
-    /// Führt den synchronen Rebuild mit der übergebenen Uhr-Instanz aus.
+    /// Führt den synchronen Rebuild mit der übergebenen Uhr-Instanz.
     pub fn rebuild_sync_with_clock(&self, clock: &dyn crate::types::Clock) -> Result<()> {
         self.inner.rebuild_sync_with_clock(clock)
     }
 
-    /// Führt den Rebuild mit der übergebenen Uhr-Instanz aus.
+    /// Führt den Rebuild mit der übergebenen Uhr-Instanz.
     pub fn rebuild_with_clock(&self, clock: &dyn crate::types::Clock) -> Result<()> {
         self.inner.rebuild_with_clock(clock)
     }

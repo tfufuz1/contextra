@@ -1,11 +1,12 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! # WAL Replay & Wiederherstellung (Ring 1)
 //!
 //! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
 //!
 //! ## Invarianten
-//! - **INV-WAL-REPLAY-1:** Idempotentes Streaming-Replay: Zweimaliges Abspielen erzeugt identischen Zustand.
-//! - **INV-WAL-REPLAY-2:** Fail-Closed bei Mittel-Beschädigung: Beschädigungen in der Mitte des WAL lösen hard `StoreError::Corrupt` aus.
-//! - **INV-WAL-REPLAY-3:** Clean Torn Write Tail Cutoff: Unvollständige Schreibabbrüche am Dateiende werden deterministisch abgeschnitten.
+//! - **:** Idempotentes Streaming-Replay: Zweimaliges Abspielen erzeugt identischen Zustand.
+//! - **:** Fail-Closed bei Mittel-Beschädigung: Beschädigungen in der Mitte des WAL lösen hard `StoreError::Corrupt`.
+//! - **:** Clean Torn Write Tail Cutoff: Unvollständige Schreibabbrüche am Dateiende werden deterministisch abgeschnitten.
 
 use acta_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use crate::error::{StoreError, StoreResult as Result};

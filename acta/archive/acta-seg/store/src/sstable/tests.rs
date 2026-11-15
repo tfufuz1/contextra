@@ -346,7 +346,7 @@ async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
         .map(|i| format!("key_recovery_{:04}_{}", i, rand::random::<u32>()).into_bytes())
         .collect();
 
-    // 1. Build MFSX SSTable with CRC
+    // 1. Build ASGX SSTable with CRC
     {
         let mut builder = SstableBuilder::create(&sst_path)
             .await
@@ -368,9 +368,9 @@ async fn test_mfsx_bloom_filter_crc_recovery_no_false_rejections() {
 
     assert!(
         reader.bloom_filter.is_some(),
-        "MFSX SSTable must have bloom filter"
+        "ASGX SSTable must have bloom filter"
     );
-    assert!(reader.has_crc, "MFSX SSTable must have CRC enabled");
+    assert!(reader.has_crc, "ASGX SSTable must have CRC enabled");
 
     // 3. Verify for ALL 120 keys that Bloom filter does not falsely reject any key
     for (seq, key) in keys.iter().enumerate() {
@@ -435,7 +435,7 @@ async fn test_bloom_filter_integration() {
 
         let data = tokio::fs::read(&old_sst_path).await.expect("read"); // #[cfg(test)]
         let file_size = data.len();
-        // MFSX 54-byte trailer layout: bloom_offset at file_size - 22..file_size - 14, index_offset at file_size - 14..file_size - 6
+        // ASGX 54-byte trailer layout: bloom_offset at file_size - 22..file_size - 14, index_offset at file_size - 14..file_size - 6
         let bloom_off = usize::try_from(u64::from_le_bytes(
             data[file_size - 22..file_size - 14].try_into().unwrap(),
         ))
@@ -451,10 +451,10 @@ async fn test_bloom_filter_integration() {
                                  // Write data blocks without block CRC (data[4..index_off])
         f.write_all(&data[4..index_off]).await.unwrap(); // #[cfg(test)]
         let legacy_index_off = (index_off - 4) as u64;
-        // Write index entries (strip MFSX 4-byte index CRC at index_off..index_off+4)
+        // Write index entries (strip ASGX 4-byte index CRC at index_off..index_off+4)
         f.write_all(&data[index_off + 4..bloom_off]).await.unwrap(); // #[cfg(test)]
         f.write_u64_le(legacy_index_off).await.expect("write ioff"); // #[cfg(test)]
-        f.write_u32_le(0x4D465354).await.expect("write magic"); // #[cfg(test)]
+        f.write_u32_le(0x41534754).await.expect("write magic"); // #[cfg(test)]
         f.sync_all().await.expect("sync"); // #[cfg(test)]
     }
 

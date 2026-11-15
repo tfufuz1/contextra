@@ -3,7 +3,7 @@
 //! Ablauf: `Scanner<Unarmed>` → Positivkontrolle → `ControlEvidence::observed()` →
 //! `arm` → `Scanner<Armed>` → `record(files, bytes)` → `finish(matches, duration, hash)` → `LayerWitness`.
 //!
-//! `arm` und `ControlEvidence::observed` dürfen nur hier aufgerufen werden (L-5, ER-25).
+//! `arm` und `ControlEvidence::observed` dürfen nur hier aufgerufen werden.
 
 pub mod field;
 pub mod positive_control;
@@ -32,7 +32,7 @@ pub use crate::types_local::{
 
 use crate::error::ErasureError;
 
-/// Art des Positivkontroll-Nachweises (ER-25).
+/// Art des Positivkontroll-Nachweises.
 #[deprecated(note = "Verwende crate::types_local::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(deprecated)]
@@ -70,7 +70,7 @@ impl UnarmedScanner {
         Self
     }
 
-    /// Führt die Positivkontrolle auf einem bekannten Muster aus (ER-25).
+    /// Führt die Positivkontrolle auf einem bekannten Muster.
     pub fn run_positive_control(
         &self,
         pattern: &[u8],
@@ -86,7 +86,7 @@ impl UnarmedScanner {
         }
     }
 
-    /// Schaltet den Scanner mit dem Positivkontrollnachweis scharf (`arm`, L-5, ER-25).
+    /// Schaltet den Scanner mit dem Positivkontrollnachweis scharf.
     pub fn arm(self, _evidence: LocalControlEvidence) -> ArmedScanner {
         ArmedScanner
     }
@@ -99,7 +99,7 @@ pub struct ArmedScanner;
 
 #[allow(deprecated)]
 impl ArmedScanner {
-    /// Schließt den Scan ab. Gibt `TestWitness` NUR zurück, wenn `matches == 0` (ER-25).
+    /// Schließt den Scan ab. Gibt `TestWitness` NUR zurück, wenn `matches == 0`.
     pub fn finish(&self, matches: u64) -> Result<TestWitness, ErasureError> {
         if matches == 0 {
             let hash = blake3::hash(b"acta/witness/verified-zero-matches");
@@ -127,7 +127,7 @@ impl TestWitness {
     }
 }
 
-/// Koordinator für Feldmessungen (MK1, MK2, MK3, ER-26).
+/// Koordinator für Feldmessungen.
 #[derive(Debug, Default)]
 pub struct MeasurementCoordinator {
     _private: (),

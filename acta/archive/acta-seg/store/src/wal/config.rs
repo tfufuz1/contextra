@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! Konfiguration des Write-Ahead-Logs.
 
 use super::flusher::WalFlusherConfig;

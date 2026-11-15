@@ -6,7 +6,7 @@
 //! - `prefix_seq`: Matcher `PrefixSeq { prefix[65], seq_lt }`
 //!
 //! `check` ist O(log n); kein I/O.
-//! Hält atomare `gate_epoch` für Lese-Linearisierung (D-120, I-21).
+//! Hält atomare `gate_epoch` für Lese-Linearisierung.
 
 use crate::types_local::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -60,7 +60,7 @@ impl PrefixSeqEntry {
         if raw[0..65] != self.prefix {
             return false;
         }
-        // commit_seq aus Bytes 70..78 extrahieren (!commit_seq komplementiert im Suffix, D-74, D-123)
+        // commit_seq aus Bytes 70..78 extrahieren
         let mut raw_seq = [0u8; 8];
         raw_seq.copy_from_slice(&raw[70..78]);
         let commit_seq = !u64::from_be_bytes(raw_seq);
@@ -68,7 +68,7 @@ impl PrefixSeqEntry {
     }
 }
 
-/// Sortierte Bereichsmenge aktiver Gates (ER-11, D-120).
+/// Sortierte Bereichsmenge aktiver Gates.
 pub struct ErasedSet {
     gate_epoch: AtomicU64,
     erased: Vec<GateEntry>,
@@ -190,13 +190,13 @@ impl ErasedSet {
         self.restricted.retain(|e| &e.gate_id != gate_id);
     }
 
-    /// Hebt eine Restriktion auf (ER-15).
+    /// Hebt eine Restriktion auf.
     pub fn lift_restriction(&mut self, lo: &KeyBuf, hi: &KeyBuf) {
         self.increment_epoch();
         self.restricted.retain(|e| &e.lo != lo || &e.hi != hi);
     }
 
-    /// Entfernt ein Erased-Gate (bei Completed, ER-12 / L-24).
+    /// Entfernt ein Erased-Gate.
     pub fn remove_erased(&mut self, lo: &KeyBuf, hi: &KeyBuf) {
         self.increment_epoch();
         self.erased.retain(|e| &e.lo != lo || &e.hi != hi);

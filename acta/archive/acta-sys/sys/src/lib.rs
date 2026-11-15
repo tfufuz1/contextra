@@ -67,7 +67,7 @@ pub mod fsmeta {
     pub use crate::acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 }
 
-/// Baukasten-Zielmodul `map`: Sichere Speicherabbildung (INV-IO-1 / INV-ENCRYPT-REST-2).
+/// Baukasten-Zielmodul `map`: Sichere Speicherabbildung.
 pub mod map {
     pub use crate::mmap::{mmap_readonly, SealedFile, SealedMap, SealedReadOnly, Unsealed};
 }

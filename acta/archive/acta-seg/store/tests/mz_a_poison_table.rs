@@ -1,6 +1,6 @@
-//! Additive Integrationstests für die PoisonCause-Wertetabelle (Auftrag STORE-MOD-A).
+//! Additive Integrationstests für die PoisonCause-Wertetabelle (Auftrag ).
 //!
-//! Validiert numerische Stabilität (Discriminant mapping) gemäß INV-FSYNC-1.
+//! Validiert numerische Stabilität (Discriminant mapping).
 
 use acta_seg::wal::PoisonCause;
 

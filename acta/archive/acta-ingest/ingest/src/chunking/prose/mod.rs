@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: ProseChunker Hauptmodul für IR-basiertes span-genaues Chunking (WP M3 / SPEC C-11.7).
+// ZWECK: ProseChunker Hauptmodul für IR-basiertes span-genaues Chunking.
 // INVARIANTEN: Zero-Panic, deterministisch, span-genau im kanonischen Text, Parität zu Engine-Chunker.
 // STAND: TS:2026-10-31T00:00:00Z
 

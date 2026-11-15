@@ -3,7 +3,7 @@
 **Aufgabe:** Vertraege Embedder, Reranker, Generator, Verifier, ModelFingerprint, ContextPurge  
 **Level:** L1 · **Budget:** 700 LOC · **Spezifikation:** docs/SPEC.md Kap. 11.1  
 **Interne Abhaengigkeiten (Soll):** acta-base  
-**Umfang des Archivs:** 5 Dateien, 448 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 6 Dateien, 1152 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -29,8 +29,9 @@
 
 | Datei (relativ zu `archive/acta-infer/`) | LOC | Befunde |
 |---|---:|---|
-| `ports/src/embedding.rs` | 270 | float=6, async=8, panic=2, hr6=1, alt_spec=1 |
-| `ports/src/inference.rs` | 18 |  |
-| `ports/src/query_rewriter.rs` | 47 |  |
-| `ports/src/reranker.rs` | 33 |  |
-| `types/src/model_fingerprint.rs` | 80 | serde=1, panic=2 |
+| `ports/src/embedding.rs` | 269 | panic=2, async=14, float=6 |
+| `ports/src/inference.rs` | 17 |  |
+| `ports/src/query_rewriter.rs` | 46 | async=2 |
+| `ports/src/reranker.rs` | 32 |  |
+| `types/src/model_fingerprint.rs` | 79 | panic=2, serde=1 |
+| `types/src/types/budget.rs` | 709 | panic=14, serde=3 |

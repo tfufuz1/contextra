@@ -1,10 +1,10 @@
-//! FileKeyring für Dateischlüssel nach, §8.2, D-85, D-113 und PO-06.
+//! FileKeyring für Dateischlüssel nach, §8.2, und PO-06.
 //!
 //! Dateischlüssel liegen als Tresor-Slot Typ `F` (0x05) mit `tag = file_id_16`:
 //! `tag = file_id.as_u64().to_be_bytes() ‖ 0^8`
 //! `payload = Dateischlüssel ⊕ HKDF-Expand(K_enc, "acta/fkmask/v1" ‖ file_id_16, 32)`
 //! Bei `destroy` wird der `F`-Slot über `destroy_slot` genullt (`status = 0x02`),
-//! dauerhaft synchronisiert und verifiziert (D-85, D-113).
+//! dauerhaft synchronisiert und verifiziert.
 
 use crate::error::ErasureError;
 use crate::types_local::{FileId, FileKey, FileKeyring, FileKind};
@@ -29,7 +29,7 @@ pub fn file_id_to_tag(id: FileId) -> [u8; 16] {
     tag
 }
 
-/// Maskiert oder demaskiert den Dateischlüssel mit HKDF-Expand nach SPEC F.3 / D-85.
+/// Maskiert oder demaskiert den Dateischlüssel mit HKDF-Expand nach SPEC F.3 /.
 pub fn mask_file_key(raw_key: &[u8; 32], tag: &[u8; 16], k_enc: &[u8; 32]) -> [u8; 32] {
     // HKDF-Expand(K_enc, "acta/fkmask/v1" || file_id, 32)
     let mut info = Vec::with_capacity(30);
@@ -54,7 +54,7 @@ pub fn mask_file_key(raw_key: &[u8; 32], tag: &[u8; 16], k_enc: &[u8; 32]) -> [u
     masked
 }
 
-/// Tresor-gestützte `FileKeyring`-Implementierung nach SPEC D-85 / PO-06.
+/// Tresor-gestützte `FileKeyring`-Implementierung nach SPEC / PO-06.
 #[derive(Clone)]
 pub struct VaultKeyring {
     vault: Arc<RwLock<FileVault>>,
@@ -134,7 +134,7 @@ impl FileKeyring for VaultKeyring {
             let mut v = self.vault.write();
 
             // destroy_slot nullt den Slot mit Grabstein-Abbild, sync_data,
-            // und verifiziert Nullen und Grabstein-MAC (D-111, D-113, PO-06)
+            // und verifiziert Nullen und Grabstein-MAC
             match v.destroy_slot(SlotType::File, tag) {
                 Ok(_destroyed) => Ok(()),
                 Err(ErasureError::SlotMissing) => {
@@ -150,7 +150,7 @@ impl FileKeyring for VaultKeyring {
 /// In-Memory-Keyring für Tests und abwärtskompatible Validierung.
 pub type InMemoryKeyring = VaultKeyring;
 
-// --- Port-Definitionen für WP-K (KeyStore, KeyStoreError, KeyPurgeReceipt) ---
+// --- Port-Definitionen für (KeyStore, KeyStoreError, KeyPurgeReceipt) --
 
 #[path = "key_store.rs"]
 pub mod key_store;

@@ -11,7 +11,7 @@
 //! - [`PinGuard`]: Schützt gepinnte MVCC-Sequenznummern vor versehentlichem Löschen durch den LSM-Compactor.
 //! - [`CheckpointGuard`]: Kapselt Transaktionen eines Agenten-Schritts. Erzwingt explizites `commit()` oder `rollback()`.
 //!
-//! ## Invariante: Fail-Closed und Non-Blocking Drop (ADR-011, ADR-053)
+//! ## Invariante: Fail-Closed und Non-Blocking Drop
 //! Wenn ein Guard panickt oder vorzeitig fallen gelassen (`drop`) wird, darf der synchrone Drop-Handler
 //! keine blockierenden Disk-I/O- oder Netzwerk-Operationen im Tokio-Worker-Thread ausführen.
 //! Stattdessen wird der betroffene Zustand synchron in der [`InstanceOrphanRegistry`] vorgemerkt,
@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 // ANCHOR[acta-history:GRD-001]
-/// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ADR-015).
+/// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ).
 ///
 /// # Zweck
 /// Stellt sicher, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
@@ -357,7 +357,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     }
 
     // ANCHOR[acta-history:GRD-009]
-    /// Führt ein manuelles, asynchrones Rollback des Checkpoints aus.
+    /// Führt ein manuelles, asynchrones Rollback des Checkpoints.
     /// Nach Aufruf von `rollback()` ist der Guard konsumiert, sodass beim Drop kein erneutes Rollback ausgelöst wird.
     ///
     /// # Serialisierungsbarriere
@@ -406,7 +406,7 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
     }
 
     // ANCHOR[acta-history:GRD-010]
-    /// Führt ein synchrones, blockierendes Rollback des Checkpoints aus.
+    /// Führt ein synchrones, blockierendes Rollback des Checkpoints.
     ///
     /// # Einschränkung
     /// Diese Methode darf **nicht** aus einem laufenden asynchronen Tokio-Kontext heraus aufgerufen werden.
@@ -491,7 +491,7 @@ impl<S: SnapshotSource> Drop for CheckpointGuard<S> {
             tracing::error!(
                 tx_id = ?cp.tx_id,
                 "CheckpointGuard dropped without explicit commit or rollback — \
-                 checkpoint registered in instance-scoped orphan registry for controlled recovery (ADR-053)."
+                 checkpoint registered in instance-scoped orphan registry for controlled recovery."
             );
             // NOTE: Reines In-Memory-Vormerken; der eigentliche Rollback erfolgt kontrolliert beim Recovery
             self.orphan_registry.register_checkpoint_sync(cp);

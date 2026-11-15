@@ -244,7 +244,7 @@ impl VfsFile for RealFsFile {
     }
 }
 
-/// Central Store I/O abstraction () wrapping .
+/// Central Store I/O abstraction () wrapping.
 #[derive(Clone)]
 pub struct StoreIo {
     vfs: Arc<dyn Vfs>,
@@ -265,12 +265,12 @@ impl Default for StoreIo {
 }
 
 impl StoreIo {
-    /// Creates a new  with the specified .
+    /// Creates a new  with the specified.
     pub fn new(vfs: Arc<dyn Vfs>) -> Self {
         Self { vfs }
     }
 
-    /// Returns a reference to the inner .
+    /// Returns a reference to the inner.
     pub fn vfs(&self) -> &Arc<dyn Vfs> {
         &self.vfs
     }
@@ -289,7 +289,7 @@ impl StoreIo {
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
 
-    /// Reads data positionally from  into .
+    /// Reads data positionally from  into.
     pub async fn read_at(&self, path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
@@ -331,7 +331,7 @@ impl StoreIo {
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
 
-    /// Creates directories along .
+    /// Creates directories along.
     pub async fn create_dir_all(&self, path: &Path) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
@@ -340,7 +340,7 @@ impl StoreIo {
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
 
-    /// Removes a file at .
+    /// Removes a file at.
     pub async fn remove_file(&self, path: &Path) -> Result<()> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();
@@ -368,7 +368,7 @@ impl StoreIo {
             .map_err(|e| StoreError::Storage(format!("Join error: {}", e)))?
     }
 
-    /// Returns the length in bytes of the file at .
+    /// Returns the length in bytes of the file at.
     pub async fn len(&self, path: &Path) -> Result<u64> {
         let vfs = Arc::clone(&self.vfs);
         let p = path.to_path_buf();

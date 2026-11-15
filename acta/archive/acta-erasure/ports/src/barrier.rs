@@ -1,6 +1,6 @@
 //! Synchronization barrier ports for concurrency control between writes, compactions, and purges.
 //!
-//! # SPEC-REF (L-7,, §11.4, D-57, D-78)
+//! # SPEC-REF
 //! - [`CommitBarrier`]: Controls synchronization between concurrent group commits (shared)
 //!   and erasure gate transitions (exclusive).
 //! - [`PurgeBarrier`]: Controls mutual exclusion between background LSM compactions (shared)

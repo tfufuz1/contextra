@@ -1,6 +1,6 @@
 //! Treiber und Ablaufkoordination der Lösch-Saga.
 //!
-//! Cancel-Safety (ER-24): Jede mutierende Operation läuft in einer vom Aufrufer
+//! Cancel-Safety: Jede mutierende Operation läuft in einer vom Aufrufer
 //! unabhängigen Task (`spawn`, Ergebnis über `oneshot`). `Drop` blockiert nie.
 
 use crate::error::ErasureError;
@@ -64,7 +64,7 @@ impl SagaDriver {
         self.core.as_ref()
     }
 
-    /// Führt den nächsten Schritt der Saga durch (idempotent, ER-18).
+    /// Führt den nächsten Schritt der Saga durch.
     ///
     /// Validiert den Übergang und vollzieht den Schritt in der Zustandsmaschine.
     pub fn step(&self, saga: &mut EraseSaga) -> Result<StepOutcome, ErasureError> {
@@ -88,7 +88,7 @@ impl SagaDriver {
                 return Ok(StepOutcome::Terminal(saga.state()))
             }
             SagaState::Restricted => {
-                // Restricted wartet auf Lifted oder Erase (D-116, D-119).
+                // Restricted wartet auf Lifted oder Erase.
                 return Ok(StepOutcome::Terminal(SagaState::Restricted));
             }
         };

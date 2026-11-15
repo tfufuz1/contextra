@@ -1,8 +1,8 @@
 //! Comprehensive Property and Invariant Tests for acta-crypto (Class A, Ring 0).
 //!
 //! Validates:
-//! - INV-CRYPTO-ZEROIZE-1
-//! - INV-CRYPTO-CONSTANT-TIME-1
+//!
+//!
 //! - open(seal(x)) == x roundtrip
 //! - Bit-mutation rejection across ciphertext, tag, AAD, and nonce.
 

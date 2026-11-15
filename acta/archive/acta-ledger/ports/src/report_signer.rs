@@ -1,7 +1,7 @@
 //! Report signing port trait and types.
 //!
 //! # Normative Referenz
-//! - **D-130:** Kryptografie-Abnahme und Berichtssignatur.
+//! - **:** Kryptografie-Abnahme und Berichtssignatur.
 //! - **F.10:** Berichtsformat (kanonisches JSON), Signatur über `"acta/report/v1" ‖ kanonische_Bytes`.
 //!   `signer_id` (0 = K_sign abgeleitet, 1 = betreibereigener Signierer).
 //! - Ports beschreiben nur Verhalten, nicht Implementierung. Standardimplementierung
@@ -19,7 +19,7 @@ pub type SignerId = u8;
 pub struct ReportSignature {
     /// Signer identifier (u8: 0 = internal, 1 = operator / HSM).
     pub signer_id: SignerId,
-    /// Base64url-encoded signature string without padding (RFC 4648 §5, SPEC F.10).
+    /// Base64url-encoded signature string without padding.
     pub signature_base64: String,
     /// Hex-encoded SHA-256 fingerprint (first 16 bytes / 32 hex chars) of verifying public key.
     pub pub_fingerprint: String,

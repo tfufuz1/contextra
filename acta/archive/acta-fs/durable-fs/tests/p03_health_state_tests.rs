@@ -1,6 +1,6 @@
 //! # Testsuite: p03_health_state_tests.rs
 //!
-//! Zweck: Zustandsautomaten-Tests für `HealthState` und `AtomicHealthState` (§18.4, `INV-POISON-1`).
+//! Zweck: Zustandsautomaten-Tests für `HealthState` und `AtomicHealthState`.
 
 use acta_fs::{AtomicHealthState, HealthEvent, HealthState};
 
@@ -51,7 +51,7 @@ fn test_p03_health_state_read_checksum_warning_transitions_to_degraded() {
 }
 
 // ANCHOR[acta-fs:TEST-HEALTH-POISONED-TERMINAL]
-/// Prüft die Invariante INV-POISON-1: Poisoned ist ein Endzustand.
+/// Prüft die Invariante: Poisoned ist ein Endzustand.
 #[test]
 fn test_p03_health_state_poisoned_never_returns_automatically() {
     let state = HealthState::Poisoned;

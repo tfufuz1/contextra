@@ -340,7 +340,7 @@ impl<'a> ResidueMeasurementCoordinator<'a> {
         Self { scanner, clock }
     }
 
-    /// Führt die Positivkontrolle auf dem Scanner aus.
+    /// Führt die Positivkontrolle auf dem Scanner.
     pub fn verify_positive_control(&self, canary: &[u8]) -> Result<(), ResidueMeasurementError> {
         if canary.is_empty() {
             return Err(ResidueMeasurementError::InvalidCanary {

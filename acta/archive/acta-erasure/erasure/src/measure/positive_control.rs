@@ -9,7 +9,7 @@ use std::path::Path;
 
 /// Führt eine echte Positivkontrolle im Speicher durch:
 /// 1. Schreibt ein Kontrollmuster eingebettet in einen Scratch-Puffer mit Zufalls-/Paddingdaten.
-/// 2. Führt einen echten Scan-Durchlauf über den Puffer aus.
+/// 2. Führt einen echten Scan-Durchlauf über den Puffer.
 /// 3. Erzwingt und prüft die exakte Übereinstimmung des Musters und dessen Position/Trefferanzahl.
 /// 4. Verifiziert, dass ein mutiertes oder fehlendes Muster fehlschlägt.
 ///
@@ -32,7 +32,7 @@ pub fn run_positive_control(pattern: &[u8]) -> Option<ControlEvidence> {
     scratch.extend_from_slice(pattern);
     scratch.extend_from_slice(suffix_noise.as_bytes());
 
-    // Führe echten Scan-Durchlauf über den Scratch-Puffer aus
+    // Führe echten Scan-Durchlauf über den Scratch-Puffer
     let mut matches = 0usize;
     let mut detected_offset = None;
 

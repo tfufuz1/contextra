@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Cryptographic deletion proof for GDPR Article 17 compliance verification across storage layers.
-// INVARIANTEN: INV-DELETION-1: DeletionProof::create() MUST only be invoked AFTER physical layer sanitization.
+// INVARIANTEN:: DeletionProof::create MUST only be invoked AFTER physical layer sanitization.
 // NICHT-OFFENSICHTLICH: V1 signiert nur scope, key-hash und tx_id via HMAC-SHA256; V2 signiert scope, key-hash, tx_id, covered_layers, excluded_scopes und wal_receipt via HMAC-SHA256; V3 signiert mit Ed25519 und nutzt längenpräfixierte Key-Hashes. verify() nutzt bei HMAC-Versionen Constant-Time-Vergleiche.
 // HOTSPOTS: [40-130]
 // STAND: TS:2026-09-07T00:00:00Z
@@ -20,7 +20,7 @@
 //! Er KANN NICHT garantieren, dass Wissen aus Fine-Tuning-Zusammenfassungen
 //! aus LLM-Parametern entfernbar ist. Referenz: arXiv:2505.16831.
 //!
-//! INVARIANTE INV-DELETION-1: DeletionProof::create() wird NUR nach
+//! INVARIANTE: DeletionProof::create wird NUR
 //! physischer Layer-Bereinigung aufgerufen. Proof vor Bereinigung = falsch.
 
 use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
@@ -239,7 +239,7 @@ impl LayerCleanupProof {
     /// wenn der Aufrufer nachweislich (durch einen Re-Scan des betroffenen
     /// Storage-Bereichs NACH der physischen Bereinigung) verifiziert hat, dass für
     /// diesen Layer keine lebenden Einträge mehr existieren. Ein Proof für einen
-    /// Layer mit `remaining_live_entries > 0` ist ein Widerspruch zu INV-DELETION-1
+    /// Layer mit `remaining_live_entries > 0` ist ein Widerspruch zu
     /// und wird abgelehnt statt stillschweigend akzeptiert.
     ///
     /// # Errors
@@ -271,7 +271,7 @@ impl LayerCleanupProof {
     /// belegt, dass keine der zu löschenden Daten mehr vorhanden sind),
     /// KEINE bloße Behauptung. Ein `Ok(false)`-Rückgabewert oder ein
     /// `Err` aus `verification` führt zu einem `Err` hier — es wird in
-    /// diesem Fall NIEMALS ein Proof erzeugt (INV-DELETION-1).
+    /// diesem Fall NIEMALS ein Proof erzeugt.
     #[deprecated(note = "Umstellung auf DeletionProof::issue, siehe P-19")]
     pub fn verify_and_create<F>(layer: DeletionLayer, verification: F) -> Result<Self>
     where
@@ -453,7 +453,7 @@ pub struct DeletionProof {
     /// Blake3-Hash aller gelöschten Dokumentschlüssel (sortiert → deterministisch).
     pub deleted_keys_hash: [u8; 32],
     /// TxId nach der kein gelöschtes Datum mehr im System vorhanden ist.
-    /// ADR-016: TxId statt SystemTime für Determinismus.
+    ///: TxId statt SystemTime für Determinismus.
     pub deleted_after_tx: TxId,
     /// Zeitstempel der Erstellung (Unix Timestamp in Sekunden).
     #[serde(default)]
@@ -498,7 +498,7 @@ const fn default_signature_version() -> u8 {
 impl DeletionProof {
     /// Issues a new `DeletionProof` based on verified `LayerWitness` measurements.
     ///
-    /// # Fail-Closed Validation (INV-WITNESS-MINT-1 & REQ-PRF-2)
+    /// # Fail-Closed Validation
     /// Returns an error if any provided witness has `remaining > 0` or if its scan method
     /// is neither `ScanMethod::Structural` nor `ScanMethod::FeatureDisabled` (e.g. `ScanMethod::NotMeasured`).
     #[allow(clippy::too_many_arguments)]
@@ -706,7 +706,7 @@ impl DeletionProof {
 
     /// Erstellt und signiert einen DeletionProof nach Layer-Bereinigung.
     ///
-    /// AUFRUFREIHENFOLGE (INV-DELETION-1):
+    /// AUFRUFREIHENFOLGE:
     /// 1. Alle covered_layers physisch bereinigen
     /// 2. WAL-Commit mit Lösch-Intent (P3)
     /// 3. DeletionProof::create() aufrufen
@@ -943,7 +943,7 @@ impl DeletionProof {
     }
 
     /// Verifiziert Signatur.
-    /// Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1.
+    /// Referenz: Befund v17 Teil 10.1 & INVARIANTE.
     /// NICHT-GARANTIE: Prüft nur Signatur, nicht ob Storage tatsächlich bereinigt ist.
     pub fn verify<'a>(&self, key: impl Into<VerificationKey<'a>>) -> Result<bool> {
         let version = self
@@ -1179,7 +1179,7 @@ impl DeletionProof {
         &self,
         public_key: &ed25519_dalek::VerifyingKey,
     ) -> std::result::Result<(), CryptoError> {
-        // Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1
+        // Referenz: Befund v17 Teil 10.1 & INVARIANTE
         // Verzweigung ausschließlich über den typisierten SignatureVersion-Wert.
         let version = self
             .signature_version_typed()
@@ -1203,7 +1203,7 @@ impl DeletionProof {
     /// Exportiert Proof als JSON für Compliance-Dokumentation.
     /// ExcludedScope-Liste ist maschinenlesbar enthalten.
     pub fn export_for_audit(&self) -> Result<String> {
-        // Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1
+        // Referenz: Befund v17 Teil 10.1 & INVARIANTE
         // Typisierte Versionsprüfung über SignatureVersion.
         let version = self
             .signature_version_typed()
@@ -2351,7 +2351,7 @@ mod tests {
 
     #[test]
     fn test_bit_flipped_signature_rejected_for_all_valid_versions() {
-        // Befund v17 Teil 10.1 & INV-DELETION-1 Regressionstest:
+        // Befund v17 Teil 10.1 & Regressionstest
         // Ein um ein Bit manipulierter Signaturwert schlägt bei allen gültigen Versionen (v1, v2, v3) fehl.
         let scope = DeletionScope::Document {
             doc_id: DocId(42),

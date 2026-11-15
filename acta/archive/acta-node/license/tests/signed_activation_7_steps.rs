@@ -34,7 +34,7 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
-/// Prüfstufe 1: Fast-Ring ohne jede Aktivierung ist Ok (INV-LICENSE-2)
+/// Prüfstufe 1: Fast-Ring ohne jede Aktivierung ist Ok
 // ANCHOR[acta-node:TEST-STEPS-STEP-1-OK]
 // Prüft, dass verify_step_1_fast_ring für Fast true und sonst false liefert.
 #[test]

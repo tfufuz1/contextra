@@ -1,4 +1,4 @@
-//! # Vollständige Crash-Matrix für atomare Schreiboperationen (`INV-VFS-ATOMIC-1`)
+//! # Vollständige Crash-Matrix für atomare Schreiboperationen
 
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::io_other_error)]
 

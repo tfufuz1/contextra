@@ -36,7 +36,7 @@ pub use slot::{
 };
 pub use table::{Destroyed, VaultTable as VaultShard, VerifiedVia};
 
-/// Anzahl Shards im Tresor nach SPEC D-111 Abs. 1.
+/// Anzahl Shards im Tresor nach SPEC Abs. 1.
 pub const VAULT_NUM_SHARDS: usize = 16;
 
 /// Backend-Speicher eines Shards (entweder persistent über VFS oder im Arbeitsspeicher).
@@ -47,7 +47,7 @@ pub enum ShardBackend {
     Durable(DurableVaultShard),
 }
 
-/// 16-Shard Tresor nach SPEC D-111.
+/// 16-Shard Tresor nach SPEC.
 pub struct FileVault {
     shards: Vec<ShardBackend>,
     vault_id: [u8; 16],
@@ -102,7 +102,7 @@ impl FileVault {
         format!("{shard_no:02x}.vlt")
     }
 
-    /// Berechnet die Anfangskapazität je Shard nach SPEC D-111 Abs. 7:
+    /// Berechnet die Anfangskapazität je Shard nach SPEC Abs. 7
     /// `nextpow2(planned_docs * 1.3 / 16 / 0.5).max(1024)`
     pub fn initial_shard_capacity(planned_docs: usize) -> usize {
         #[allow(
@@ -164,7 +164,7 @@ impl FileVault {
         })
     }
 
-    /// Öffnet einen bestehenden dauerhaften Tresor über VFS nach SPEC D-111 Abs. 8 / D-112:
+    /// Öffnet einen bestehenden dauerhaften Tresor über VFS nach SPEC Abs. 8 /
     pub fn open_dir(
         vfs: &Arc<dyn crate::types_local::Vfs>,
         vault_dir: &Path,
@@ -197,13 +197,13 @@ impl FileVault {
         })
     }
 
-    /// Ermittelt den zuständigen Shard nach SPEC D-111 Abs. 1.
+    /// Ermittelt den zuständigen Shard nach SPEC Abs. 1.
     pub fn shard_index(&self, slot_type: SlotType, tag: &[u8; 16]) -> usize {
         let (shard, _idx) = slot_probe_start(slot_type, tag, 1);
         (shard as usize) % VAULT_NUM_SHARDS
     }
 
-    /// Speichert einen Slot (ER-04, D-111, I-9).
+    /// Speichert einen Slot.
     pub fn put_slot(
         &mut self,
         slot_type: SlotType,
@@ -235,7 +235,7 @@ impl FileVault {
         }
     }
 
-    /// Liest einen Slot (ER-02, D-111).
+    /// Liest einen Slot.
     pub fn get_slot(
         &self,
         slot_type: SlotType,
@@ -249,7 +249,7 @@ impl FileVault {
         }
     }
 
-    /// Vernichtet einen Slot (D-111 Abs. 3, D-113, I-23):
+    /// Vernichtet einen Slot:
     pub fn destroy_slot(
         &mut self,
         slot_type: SlotType,
@@ -263,7 +263,7 @@ impl FileVault {
         }
     }
 
-    /// Führt Gruppen-Sync für alle Shards aus (D-111 Abs. 9, I-9).
+    /// Führt Gruppen-Sync für alle Shards.
     pub fn sync_all_shards(&self) -> Result<(), ErasureError> {
         for shard in &self.shards {
             if let ShardBackend::Durable(d) = shard {
@@ -314,7 +314,7 @@ impl FileVault {
             .sum()
     }
 
-    /// Prüft ob mindestens ein Shard vergiftet ist (D-55, I-10).
+    /// Prüft ob mindestens ein Shard vergiftet ist.
     pub fn is_poisoned(&self) -> bool {
         self.shards.iter().any(|s| match s {
             ShardBackend::InMemory(t) => t.is_poisoned(),

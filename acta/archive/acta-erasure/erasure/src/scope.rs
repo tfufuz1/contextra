@@ -1,6 +1,6 @@
 //! Scope-Modul.
 //!
-//! Scope-Auflösung, -Persistenz und Single-Flight-Koordination (INV-ERA-3) für Löschvorgänge.
+//! Scope-Auflösung, -Persistenz und Single-Flight-Koordination für Löschvorgänge.
 
 pub mod codec;
 pub mod file;

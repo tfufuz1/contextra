@@ -4,7 +4,7 @@
 //! im betroffenen Schlüsselbereich.
 //!
 //! # Architektur & Invarianten
-//! - **INV-ERA-5:** Ein Fence blockiert konkurrierende Schreiber während eines physischen Purge.
+//! - **:** Ein Fence blockiert konkurrierende Schreiber während eines physischen Purge.
 //! - **Owner-Token-Prinzip:** Ein Fence kann ausschließlich mit dem Token freigegeben werden, der bei der Erstellung erzeugt wurde.
 //! - **Keine Überlappung:** Doppel-Fences auf identischen oder überlappenden Bereichen werden abgewiesen.
 //! - **Fail-Closed:** Unbekannte oder korrumpierte Fence-Zustände blockieren jeden Schreiber.
@@ -159,7 +159,7 @@ impl Drop for WriterGuard {
     }
 }
 
-/// Port-Trait für das Fencing von Schlüsselbereichen während des physischen Purge (INV-ERA-5).
+/// Port-Trait für das Fencing von Schlüsselbereichen während des physischen Purge.
 pub trait FenceGate: Send + Sync {
     /// Blockiert einen Schlüsselbereich für Schreibzugriffe und liefert einen Autorisierungs-Token.
     ///
@@ -330,7 +330,7 @@ impl FenceGate for InMemoryFenceGate {
         // Lock freigeben vor eventuellem Warten
         drop(entries);
 
-        // 6. Synchrones, beschränktes Drainen von bestehenden Schreibern (INV-ERA-5).
+        // 6. Synchrones, beschränktes Drainen von bestehenden Schreibern.
         let _ = self.drain_inflight_bounded(100_000);
 
         Ok(token)

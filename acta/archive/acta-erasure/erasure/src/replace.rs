@@ -1,6 +1,6 @@
 //! Domänenlogik für Sonderziel Ersetzung (`replace_erasing`,, Zieltyp 6).
 //!
-//! # Normative Referenzen (D-115, I-25)
+//! # Normative Referenzen
 //! - **Vorbedingungen:** `doc_tag(new_ref) != doc_tag(old)`, sonst `SameIdentity`.
 //! - **Protokoll (Zieltyp 6, DocumentReplace):**
 //!   - R1: Journal `Requested+Intent` mit Umfang des alten Dokuments und `new_doc_tag`.
@@ -72,7 +72,7 @@ impl ReplacePlan {
         &self.old_doc_tag
     }
 
-    /// Liefert den Ersatz-Tag (`replacement_tag`, SPEC D-115) für den Löschbericht.
+    /// Liefert den Ersatz-Tag für den Löschbericht.
     #[inline]
     pub fn replacement_tag(&self) -> &[u8; 16] {
         &self.new_doc_tag
@@ -84,7 +84,7 @@ impl ReplacePlan {
         self.step
     }
 
-    /// Schaltet idempotent auf R2 (PreGate Intent) vor (D-115 R2).
+    /// Schaltet idempotent auf R2 (PreGate Intent) vor.
     pub fn advance_to_r2_intent(&mut self) -> Result<(), ErasureError> {
         match self.step {
             ReplaceStep::R1Requested | ReplaceStep::R2PreGate => {
@@ -108,7 +108,7 @@ impl ReplacePlan {
         Ok(())
     }
 
-    /// Schaltet nach Bestätigung des Neudokuments auf R3 (Gate altes Dokument) vor (D-115 R3).
+    /// Schaltet nach Bestätigung des Neudokuments auf R3 (Gate altes Dokument) vor.
     pub fn advance_to_r3_gate_old(&mut self) -> Result<(), ErasureError> {
         match self.step {
             ReplaceStep::R2PreGate | ReplaceStep::R3GatedOld => {
@@ -122,7 +122,7 @@ impl ReplacePlan {
         }
     }
 
-    /// Schaltet auf R4 (D-Slot des Altdokuments vernichtet) vor (D-115 R4).
+    /// Schaltet auf R4 (D-Slot des Altdokuments vernichtet) vor.
     pub fn advance_to_r4_key_destroyed(&mut self) -> Result<(), ErasureError> {
         match self.step {
             ReplaceStep::R3GatedOld | ReplaceStep::R4KeyDestroyed => {

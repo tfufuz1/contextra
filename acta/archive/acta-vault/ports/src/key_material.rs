@@ -7,7 +7,7 @@
 //!
 //! // ANCHOR[acta-base:KEY-MAT-001]
 //! // SECTION key-material-contracts
-//! // NOTE: Fail-Closed: Keine unsicheren Fallbacks bei Entropiemangel (ADR-098).
+//! // NOTE: Fail-Closed: Keine unsicheren Fallbacks bei Entropiemangel.
 
 use acta_base::Result; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use std::fmt::Debug;
@@ -20,7 +20,7 @@ use std::fmt::Debug;
 ///
 /// # Trennung von `Rng`
 /// Dieser Trait ist bewusst von `RngPort` getrennt, da kryptografische Schlüsselgenerierung
-/// stärkere Sicherheitsanforderungen hat als allgemeiner Pseudo-Zufall (P28, ADR-098).
+/// stärkere Sicherheitsanforderungen hat als allgemeiner Pseudo-Zufall (P28).
 ///
 /// # Verwendung
 /// - WAL-HMAC-Schlüsselerzeugung (`wal/hmac.rs`)

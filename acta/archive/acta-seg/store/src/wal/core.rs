@@ -1,8 +1,9 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! Kern-Struktur und Basismethoden für das Write-Ahead-Log.
 //!
 //! Invarianten:
-//! - INV-STORE-1: Durabilität durch Vorwegschreiben ins Log.
-//! - INV-FSYNC-1: Fail-closed Verhalten bei Fehlern.
+//! -: Durabilität durch Vorwegschreiben ins Log.
+//! -: Fail-closed Verhalten bei Fehlern.
 
 use super::config::WalConfig;
 use super::flusher::{WalCommand, WalFlusherConfig};
@@ -81,7 +82,7 @@ impl Wal {
 
     /// Explicitly migrates a legacy WAL segment to the V3 format signed with a secure integrity key.
     ///
-    /// **INV-WAL-LEGACY-KEY-1**: Legacy migration requires explicit operator invocation.
+    /// ****: Legacy migration requires explicit operator invocation.
     /// Fallback to the legacy static integrity key is NEVER enabled implicitly during standard database open.
     ///
     /// # Prerequisites for Future Permanent Removal of `LEGACY_INTEGRITY_KEY_OBFUSCATED`:
@@ -120,7 +121,7 @@ impl Wal {
 
     /// Explicitly opens a legacy WAL file requiring migration using the legacy integrity key fallback.
     ///
-    /// **INV-WAL-LEGACY-KEY-1**: This is the ONLY entry point permitted to enable
+    /// ****: This is the ONLY entry point permitted to enable
     /// `allow_legacy_integrity_key_fallback = true` for legacy WAL migration.
     ///
     /// # Forced Migration Workflow
@@ -291,7 +292,7 @@ impl Wal {
     pub async fn open_with_config(path: impl AsRef<Path>, config: WalConfig) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
 
-        // Vor dem eigentlichen Öffnen der WAL-Datei: prüfen, ob ein Crash-Recovery aus
+        // Vor dem eigentlichen Öffnen der WAL-Datei: prüfen, ob ein Crash-Recovery
         // einem .bak-Backup nötig ist (z. B. Crash zwischen set_len(0) und V3-Rewrite).
         let _ = recover_from_bak_if_present(&path).await?;
 
@@ -558,7 +559,7 @@ impl Wal {
     /// Bytes am Dateiende physisch ab und setzt den Poison-Zustand auf `0` (nicht vergiftet) zurück.
     ///
     /// **Dies ist der einzige erlaubte Mechanismus, um ein vergiftetes `Wal`-Handle wieder in Betrieb zu nehmen.**
-    /// Gemäß und ADR-002 sind alle anderen Ursachen (`FsyncFailed`, `WriteFailed`, `TruncateFailed`,
+    /// Gemäß und sind alle anderen Ursachen (`FsyncFailed`, `WriteFailed`, `TruncateFailed`,
     /// `HmacChainDiverged`) pro Handle-Instanz **irreversibel**. Ein Wiederherstellungsversuch für diese Ursachen
     /// wird deterministisch mit einem Fehler abgewiesen.
     ///

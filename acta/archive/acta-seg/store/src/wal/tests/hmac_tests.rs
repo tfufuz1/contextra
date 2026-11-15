@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! # Tests fuer WAL HMAC-Verkettung (Ring 1)
 //!
 //! Testet Schutz gegen Vertauschung und Modifikation von Frame-Hashes.

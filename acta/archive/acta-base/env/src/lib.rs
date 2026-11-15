@@ -67,7 +67,7 @@ pub use manual_clock::ManualClock;
 /// Keine; garantiert panikfrei, da [`Clock::now_unix_nanos`] stets einen `u64` liefert.
 ///
 /// # Invarianten
-/// - `INV-ENV-TIME-1`: Bei Zeiten vor der Epoche liefert `now_unix_nanos()` 0, somit auch `unix_ms()` 0.
+/// -: Bei Zeiten vor der Epoche liefert `now_unix_nanos` 0, somit auch `unix_ms` 0.
 #[inline]
 pub fn unix_ms(c: &dyn Clock) -> u64 {
     // NOTE: Abrundende Ganzzahldivision von Nanosekunden zu Millisekunden (/ 1_000_000).

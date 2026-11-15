@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Fehlerzustände während der einzelnen Purge-Phasen (WP-1, WP-2).
+/// Fehlerzustände während der einzelnen Purge-Phasen.
 ///
 /// Jeder Fehler besitzt einen klaren Phasenbezug; Freitext-Stringfehler sind verboten.
 #[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -165,7 +165,7 @@ pub enum ReleaseFailure {
     IntentCleanupFailed,
 }
 
-/// Einheitliche Enum für den gesamten Lebenszyklus des physischen Purge (WP-2).
+/// Einheitliche Enum für den gesamten Lebenszyklus des physischen Purge.
 ///
 /// Repräsentiert als `u8`-Codes (1..=9) zur sicheren Persistenz und Wiederherstellung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

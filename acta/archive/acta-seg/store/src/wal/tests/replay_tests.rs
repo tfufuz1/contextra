@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
 //! # Tests fuer WAL Replay (Ring 1)
 //!
 //! Prueft deterministisches Replay ueber Sequenzgrenzen hinweg.
@@ -450,7 +451,7 @@ async fn test_old_v1_format_backward_compatibility() {
     let uuid_bytes = Wal::load_or_create_wal_uuid(&wal_path).await.expect("uuid"); // expect
     let sub_km = km.derive_file_key(&uuid_bytes).expect("derive file key"); // expect
 
-    // Manually construct an old V1 encrypted WAL file (no MFW2 header, each entry encrypted separately)
+    // Manually construct an old V1 encrypted WAL file (no AWL2 header, each entry encrypted separately)
     let integrity_key = sub_km
         .integrity_key()
         .map_err(StoreError::from)
@@ -619,7 +620,7 @@ async fn test_wal_v1_auto_migration_on_min_version_v3() {
         .expect("v1 entry"); // expect
 
         let mut v1_bytes = Vec::new();
-        // V1 WAL file has no MFW3 or MFW2 header prefix
+        // V1 WAL file has no AWL3 or AWL2 header prefix
         v1_bytes.extend_from_slice(&entry.to_bytes().expect("to_bytes")); // expect
         fs::write(&wal_path, v1_bytes).await.expect("write v1 wal"); // expect
     }

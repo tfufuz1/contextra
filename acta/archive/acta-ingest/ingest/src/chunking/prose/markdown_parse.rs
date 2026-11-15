@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: Eigenständiger Markdown-Blockparser mit exakten Byte-Offsets ohne Fremdabhängigkeiten (WP M3 / SPEC C-11.7).
+// ZWECK: Eigenständiger Markdown-Blockparser mit exakten Byte-Offsets ohne Fremdabhängigkeiten.
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, exakte Byte-Spans relativ zur Eingabe, Deterministisch.
 // STAND: TS:2026-10-31T00:00:00Z
 

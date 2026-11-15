@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: StructuredChunker für flache Record-Blöcke (JSON, JSONL, XML, YAML, TOML) (WP M4 / WP-ING-15).
+// ZWECK: StructuredChunker für flache Record-Blöcke (JSON, JSONL, XML, YAML, TOML) (WP M4 / ).
 // INVARIANTEN: Zero-Panic, deterministisch, Monotone Spans im kanonischen Text.
 // STAND: TS:2026-10-31T00:00:00Z
 

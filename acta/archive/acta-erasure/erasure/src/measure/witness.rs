@@ -5,14 +5,14 @@
 use crate::types_local::{Armed, ControlEvidence, LayerWitness, Scanner, Unarmed};
 use std::time::Duration;
 
-/// Erstellt einen bewaffneten Scanner nach Positivkontrolle (ER-25).
+/// Erstellt einen bewaffneten Scanner nach Positivkontrolle.
 ///
 /// Nur aus `src/measure` aufzurufen (L-5).
 pub fn arm_scanner(scanner: Scanner<Unarmed>, evidence: ControlEvidence) -> Scanner<Armed> {
     scanner.arm(evidence)
 }
 
-/// Erstellt einen Zeugen nach erfolgreichem Scan (ER-25).
+/// Erstellt einen Zeugen nach erfolgreichem Scan.
 ///
 /// `matches == 0` → Ok(LayerWitness)
 /// `matches != 0` → Err(Residue)
@@ -25,7 +25,7 @@ pub fn finish_scan(
     scanner.finish(matches, duration, scan_hash)
 }
 
-/// Prüft, ob ein `LayerWitness` die strengen Invarianten für die Berichterstellung erfüllt (INV-CLASS-MEASURED-1).
+/// Prüft, ob ein `LayerWitness` die strengen Invarianten für die Berichterstellung erfüllt.
 ///
 /// Ein Zeuge ist nur dann gültig, wenn:
 /// 1. `matches == 0` (keine Restspuren)

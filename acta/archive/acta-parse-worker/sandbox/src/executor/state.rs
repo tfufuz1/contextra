@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use tokio::time::Instant;
 
-/// Custom error type returned by host functions on capability violation (INV-SBX-3).
+/// Custom error type returned by host functions on capability violation.
 #[derive(Debug, Clone)]
 pub struct CapabilityViolationError {
     pub capability: &'static str,
@@ -67,7 +67,7 @@ impl wasmtime::ResourceLimiter for SandboxState {
         desired: usize,
         _max: Option<usize>,
     ) -> anyhow::Result<bool> {
-        // INV-SBX-2: Rounding up with div_ceil ensures exact page limits without page under-counting
+        //: Rounding up with div_ceil ensures exact page limits without page under-counting
         let pages = desired.div_ceil(65536);
         let desired_pages = match u32::try_from(pages) {
             Ok(p) => p,
@@ -82,7 +82,7 @@ impl wasmtime::ResourceLimiter for SandboxState {
         desired: usize,
         _max: Option<usize>,
     ) -> anyhow::Result<bool> {
-        // INV-SBX-2: Enforce strict ceiling on table elements
+        //: Enforce strict ceiling on table elements
         let desired_entries = match u32::try_from(desired) {
             Ok(d) => d,
             Err(_) => return Ok(false),

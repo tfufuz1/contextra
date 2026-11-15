@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: PagedChunker für seitenbasierte Dokumente (PDF, PPTX, ODP, PPT) (WP-ING-14).
+// ZWECK: PagedChunker für seitenbasierte Dokumente (PDF, PPTX, ODP, PPT).
 // INVARIANTEN: Zero-Panic, deterministisch, präzise Zitierbarkeit (page/slide locators), Spans monoton.
 // STAND: TS:2026-10-31T00:00:00Z
 

@@ -1,5 +1,5 @@
 // ANCHOR[TEST:WAL-POISON-CAUSES] STATUS:DONE (TS:2026-11-08)
-//! Test suite verifying fail-closed WAL durability and PoisonCause discipline (WP-STO-3 / INV-FSYNC-1).
+//! Test suite verifying fail-closed WAL durability and PoisonCause discipline.
 
 #![cfg(feature = "fault-injection")]
 

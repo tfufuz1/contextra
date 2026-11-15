@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Schreiben des DiskANN-Index-Dateiformats DANN v1 (WP-VEC-07).
+// ZWECK: Schreiben des DiskANN-Index-Dateiformats DANN v1.
 // INVARIANTEN: Deterministische Header- & Knoten-Serialisierung; Footer-HMAC-Abschluss.
 // STAND: 2026-11-11
 

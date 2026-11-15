@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Tombstone-Set und WAL-Verwaltung für gelöschte Dokumente (WP-VEC-07).
+// ZWECK: Tombstone-Set und WAL-Verwaltung für gelöschte Dokumente.
 // INVARIANTEN: Zero-Panic bei WAL-Lesezugriff; HMAC-Integritätsprüfung.
 // STAND: 2026-11-11
 

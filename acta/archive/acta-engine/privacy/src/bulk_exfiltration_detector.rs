@@ -12,7 +12,7 @@
 //! - **Zero-Panic-Doctrine**: Kein `unwrap` oder `expect` im Produktionscode.
 //! - **Fail-Closed**: Bei Zeitanomalien (z. B. nicht-monotonen Zeitsprüngen in die Vergangenheit) wird sofort blockiert.
 //! - **Thread-Sicherheit**: Nebenläufiger, lock-armer Zugriff über `scc::HashMap` mit feingranularen Mutexen pro Sitzung.
-//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port ([`crate::Clock`]) (INV-EGRESS-AUDIT-1).
+//! - **Port-Entkopplung**: Zeitstempel ausschließlich über den `Clock`-Port ([`crate::Clock`]).
 
 use crate::types::{Clock, SystemClock};
 use parking_lot::Mutex;
@@ -212,7 +212,7 @@ impl BulkExfiltrationDetector {
     ///
     /// # Nebenwirkungen
     /// Liest monotone Zeit über den internen `Clock`-Port.
-    #[allow(clippy::disallowed_methods)] // ADR-098: Monotonic sliding window timestamp in BulkExfiltrationDetector
+    #[allow(clippy::disallowed_methods)] //: Monotonic sliding window timestamp in BulkExfiltrationDetector
     pub fn record_and_check(
         &self,
         session: SessionId,
@@ -239,7 +239,7 @@ impl BulkExfiltrationDetector {
     /// 1. Sucht den Sitzungs-Eintrag in der `scc::HashMap` oder erzeugt ihn atomar.
     /// 2. Konvertiert die Fensterdauer in Nanosekunden.
     /// 3. Sperrt den Sitzungs-Mutex kurzzeitig.
-    /// 4. Führt `record_and_check` auf dem `SlidingWindowCounter` aus.
+    /// 4. Führt `record_and_check` auf dem `SlidingWindowCounter`.
     pub fn record_and_check_at_nanos(
         &self,
         session: SessionId,

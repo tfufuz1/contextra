@@ -1,4 +1,4 @@
-//! Fehlerpfad- und Lebenszyklus-Tests für `acta-sys` (WP-3).
+//! Fehlerpfad- und Lebenszyklus-Tests für `acta-sys`.
 //!
 //! Validiert das deterministische Fehlermodell bei Systemgrenzen und ungültigen Inputs:
 //! - `mmap` bei ungültigem / nur zum Schreiben geöffnetem Handle

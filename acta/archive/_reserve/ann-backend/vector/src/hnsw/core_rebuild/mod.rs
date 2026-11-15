@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Index-Reorganisation (Rebuild Phase 1 & 2), Backoff-Cooldown und globale Konnektivitäts-Verifikation.
-// INVARIANTEN: Zero-Panic; deterministische Rekonstruktion (INV-INDEX-APPLY-1); Swap unter write_mutex (SSI-Determinismus).
+// INVARIANTEN: Zero-Panic; deterministische Rekonstruktion; Swap unter write_mutex (SSI-Determinismus).
 // HOTSPOTS: full.rs, snapshot.rs, seq_replay.rs, backoff.rs, region.rs
 // STAND: TS:2026-11-11T02:00:00Z
 

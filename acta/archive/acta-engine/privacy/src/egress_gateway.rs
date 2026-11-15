@@ -389,7 +389,7 @@ pub fn pii_vault_requires_isolated_retention(is_pii_match: bool, is_memory_only:
     is_pii_match && !is_memory_only
 }
 
-/// Evaluates whether PII vault data forces CryptoShred mode for an affected document (INV-COLLECTION-PROFILE-3).
+/// Evaluates whether PII vault data forces CryptoShred mode for an affected document.
 // ANCHOR[acta-pii:EGW-009]
 /// Entscheidet anhand von PII-Match und Speichermodus, ob kryptografisches Schreddern erzwungen wird.
 ///
@@ -419,7 +419,7 @@ where
     }
 }
 
-/// Read-only check for PII Vault coupling (Spec B.1.8 / INV-COLLECTION-PROFILE-3):
+/// Read-only check for PII Vault coupling:
 /// If a document contains a PII match AND `durability_mode` is not `MemoryOnly`,
 /// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
 // ANCHOR[acta-pii:EGW-010]

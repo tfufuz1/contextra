@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Kennung einer Schicht (für Scope-Zuordnung).
 pub type ScopeLayerId = [u8; 16];
 
-/// Auflösung einer einzelnen Schicht für eine Löschung (ER-17).
+/// Auflösung einer einzelnen Schicht für eine Löschung.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResolvedLayerScope {
     /// Schicht-ID.
@@ -39,7 +39,7 @@ impl ResolvedLayerScope {
         }
     }
 
-    /// Prüft ob der Scope klein genug ist um eingebettet zu werden (ER-17).
+    /// Prüft ob der Scope klein genug ist um eingebettet zu werden.
     ///
     /// Schwellwert: ≤ 16 Einheiten → Einbettung in Journal-Eintrag.
     pub fn is_embeddable(&self) -> bool {
@@ -70,7 +70,7 @@ impl LayerScopeSet {
         self.scopes.iter().map(|s| s.unit_count).sum()
     }
 
-    /// Prüft ob der gesamte Scope einbettbar ist (ER-17).
+    /// Prüft ob der gesamte Scope einbettbar ist.
     pub fn is_embeddable(&self) -> bool {
         self.scopes.iter().all(|s| s.is_embeddable())
     }

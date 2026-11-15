@@ -1,7 +1,7 @@
 //! Persistenz von Scope-Dateien scope/<erasure_id>.scp.
 //!
 //! Scope-Dateien verwenden Dateityp kind=9, zufälligen Dateischlüssel (key_mode=0 via FileKeyring).
-//! Der Dateiname enthält nur Tags bzw. die ErasureId in Hex (D-75).
+//! Der Dateiname enthält nur Tags bzw. die ErasureId in Hex.
 //!
 //! Crash-Konsistenz: Schreiben erfolgt atomar (temp + rename + fsync des Elternverzeichnisses über Vfs).
 
@@ -19,7 +19,7 @@ use std::path::PathBuf;
 const FILE_HEADER_MAGIC: &[u8; 8] = b"CTXFILE\0";
 const FILE_KIND_SCOPE: u8 = 9;
 
-/// Ermittelt den relativen Pfad der Scope-Datei nach SPEC D-75:
+/// Ermittelt den relativen Pfad der Scope-Datei nach SPEC
 /// `scope/<erasure_id_hex>.scp`
 pub fn scope_file_path(erasure_id: &[u8; 16]) -> PathBuf {
     let hex_id = erasure_id
@@ -41,7 +41,7 @@ pub async fn store_scope_file(
 ) -> Result<(), ErasureError> {
     let plain_bytes = encode_scope(scope)?;
 
-    // Dateischlüssel über FileKeyring anfordern (key_mode = 0, F-Slot im Tresor, D-85)
+    // Dateischlüssel über FileKeyring anfordern
     let port_key = keyring
         .create(PortFileKind::Auxiliary, file_id)
         .await

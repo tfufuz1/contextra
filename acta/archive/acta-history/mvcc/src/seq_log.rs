@@ -65,7 +65,7 @@ impl SeqLogEntry {
     // ANCHOR[id=seq-log-entry-is-visible]
     /// Prüft in O(1), ob dieser Protokolleintrag zu einem bestimmten Snapshot-Stand `as_of` sichtbar ist.
     ///
-    /// ### Formale Sichtbarkeitsinvariante (INV-INDEX-SNAPSHOT-1):
+    /// ### Formale Sichtbarkeitsinvariante:
     /// Eine Version `(key, seq)` ist für Snapshot `s` mit Lese-Sequenz `as_of` genau dann sichtbar, wenn:
     /// `seq <= as_of && (delete_seq.is_none() || delete_seq > as_of)`.
     ///
@@ -73,7 +73,7 @@ impl SeqLogEntry {
     /// sowie Tombstones (Tombstone markiert `delete_seq` und maskiert ältere Versionen aus).
     ///
     /// ### Ablauf der Sichtbarkeitsprüfung:
-    /// 1. Maskiere eventuell gesetzte Tombstone-Bits (höchstwertiges Bit) auf allen Sequenznummern aus.
+    /// 1. Maskiere eventuell gesetzte Tombstone-Bits (höchstwertiges Bit) auf allen Sequenznummern.
     /// 2. Prüfe, ob der Eintrag vor oder genau zum Snapshot-Zeitpunkt eingefügt wurde (`insert_seq <= as_of`).
     /// 3. Prüfe, ob das Dokument ungelöscht ist (`delete_seq == None`) oder erst nach dem Snapshot
     ///    gelöscht wurde (`delete_seq > as_of`).
@@ -827,7 +827,7 @@ mod tests {
         assert_eq!(log.min_retention_seq(), Some(50));
     }
 
-    // Prüft, dass Updates und Tombstones demselben formalen Sichtbarkeitsgesetz (INV-INDEX-SNAPSHOT-1) folgen.
+    // Prüft, dass Updates und Tombstones demselben formalen Sichtbarkeitsgesetz folgen.
     #[test]
     fn test_sequence_log_tombstones_and_updates_follow_same_law() {
         let mut log = SequenceLog::new();

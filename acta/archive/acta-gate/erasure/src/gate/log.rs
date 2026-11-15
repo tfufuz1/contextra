@@ -45,7 +45,7 @@ pub enum GateLogEntry {
         /// Zugehörige Lösch-ID.
         erasure_id: [u8; 16],
     },
-    /// Ein Gate entfernen (bei Completed nach Ledger-Eintrag, SPEC 11.8).
+    /// Ein Gate entfernen.
     Remove {
         /// Gate-Kennung.
         gate_id: [u8; 16],

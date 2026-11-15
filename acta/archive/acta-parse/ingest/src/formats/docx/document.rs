@@ -10,7 +10,7 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 // FILE-CONTEXT
-// ZWECK: Parsing von word/document.xml für Absätze, Überschriften, Listen, Tabellen & Textboxen (WP-ING-04).
+// ZWECK: Parsing von word/document.xml für Absätze, Überschriften, Listen, Tabellen & Textboxen.
 // INVARIANTEN: Zero-Panic, LimitExceeded bei Budget-Überschreitung, AlternateContent ohne Dopplung.
 // STAND: TS:2026-10-31T00:00:00Z
 

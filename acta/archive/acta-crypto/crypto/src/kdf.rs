@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: Versionierter Key Derivation Function (KDF) Header und Argon2id Schlüsselableitung für Passphrasen.
 // INVARIANTEN: OWASP Argon2id Parameter-Standards (m_cost >= 19456, t_cost >= 2, p_cost >= 1). Binär-Format KdfHeader total geparst (keine Panics).
-// NICHT-OFFENSICHTLICH: Zeroizing für abgeleitete Schlüssel. KdfHeader binary layout: magic (4B "MFKD") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (>=16B).
+// NICHT-OFFENSICHTLICH: Zeroizing für abgeleitete Schlüssel. KdfHeader binary layout: magic (4B "AKDF") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (>=16B).
 // HOTSPOTS: [KdfHeader::from_bytes, derive_key_argon2id]
 
 //! Versionierter KDF-Header und Argon2id-Schlüsselableitung für `acta-crypto`.
@@ -20,8 +20,8 @@ use crate::error::{CryptoError, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
 use zeroize::ZeroizeOnDrop;
 
-/// Magischer Header-Marker "MFKD" (Acta Key Derivation)
-pub const KDF_HEADER_MAGIC: &[u8; 4] = b"MFKD";
+/// Magischer Header-Marker "AKDF" (Acta Key Derivation)
+pub const KDF_HEADER_MAGIC: &[u8; 4] = b"AKDF";
 
 /// Aktuelle KDF Header Version
 pub const KDF_HEADER_VERSION_1: u8 = 1;
@@ -112,7 +112,7 @@ impl KdfParams {
 /// ### Binär-Layout (Big-Endian):
 /// | Offset | Länge | Feld | Beschreibung |
 /// |---|---|---|---|
-/// | 0..4 | 4B | Magic | "MFKD" (Acta Key Derivation) |
+/// | 0..4 | 4B | Magic | "AKDF" (Acta Key Derivation) |
 /// | 4 | 1B | Version | Versionsnummer (aktuell 1) |
 /// | 5 | 1B | KDF-ID | 1 = Argon2id |
 /// | 6..10 | 4B | m_cost_kib | Speicherkosten in KiB (>= 19456) |
@@ -166,7 +166,7 @@ impl KdfHeader {
     /// Serialisiert den `KdfHeader` in Binärform.
     ///
     /// Layout:
-    /// `magic (4B "MFKD") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (salt_len B)`
+    /// `magic (4B "AKDF") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (salt_len B)`
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(4 + 1 + 1 + 4 + 4 + 4 + 4 + self.salt.len());
         buf.extend_from_slice(KDF_HEADER_MAGIC);

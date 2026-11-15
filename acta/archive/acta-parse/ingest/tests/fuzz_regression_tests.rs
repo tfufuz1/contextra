@@ -1,9 +1,9 @@
-//! Fuzzing-Regressionstest-Suite (WP-4).
+//! Fuzzing-Regressionstest-Suite.
 //!
 //! # Zweck & Invarianten
-//! Führt alle 14 Fuzzing-Ziele mit ihren jeweiligen Seed-Korpora aus,
+//! Führt alle 14 Fuzzing-Ziele mit ihren jeweiligen Seed-Korpora,
 //! um sicherzustellen, dass kein Seed zu einem Panic, Crash oder unzulässigen
-//! Fehlerzustand führt (Zero-Panic Invariante INV-5).
+//! Fehlerzustand führt.
 
 #![allow(
     clippy::unwrap_used,

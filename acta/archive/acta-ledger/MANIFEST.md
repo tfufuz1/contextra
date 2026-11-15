@@ -3,7 +3,7 @@
 **Aufgabe:** Append-only-Ledger K/E/A, Checkpoints, Commitments, RegistrySink, DirSink  
 **Level:** L2 · **Budget:** 2800 LOC · **Spezifikation:** docs/SPEC.md Kap. 6.2  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-fs  
-**Umfang des Archivs:** 10 Dateien, 1855 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 16 Dateien, 3268 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -27,13 +27,19 @@
 
 | Datei (relativ zu `archive/acta-ledger/`) | LOC | Befunde |
 |---|---:|---|
-| `erasure/src/ledger.rs` | 210 |  |
-| `erasure/src/ledger/durable.rs` | 291 | alt_spec=4 |
-| `erasure/src/ledger/entry.rs` | 77 | serde=1 |
-| `erasure/src/ledger/error.rs` | 49 |  |
-| `erasure/src/ledger/persistent.rs` | 185 | serde=2, panic=4, alt_spec=3 |
-| `erasure/src/ledger/record.rs` | 318 |  |
-| `erasure/src/ledger/sink.rs` | 229 | alt_spec=6 |
-| `erasure/src/ledger/storage.rs` | 185 | std_fs=9 |
-| `ports/src/ledger.rs` | 180 | serde=1 |
-| `ports/src/report_signer.rs` | 131 | panic=1, alt_spec=1 |
+| `erasure/src/ledger.rs` | 209 |  |
+| `erasure/src/ledger/durable.rs` | 290 |  |
+| `erasure/src/ledger/entry.rs` | 76 | serde=1 |
+| `erasure/src/ledger/error.rs` | 48 |  |
+| `erasure/src/ledger/persistent.rs` | 184 | panic=4, serde=2 |
+| `erasure/src/ledger/record.rs` | 317 |  |
+| `erasure/src/ledger/sink.rs` | 228 |  |
+| `erasure/src/ledger/storage.rs` | 184 | std_fs=3 |
+| `erasure/tests/ledger_spec_tests.rs` | 167 | panic=10, async=1 |
+| `erasure/tests/p5_wal_sink_tests.rs` | 233 | panic=10, alt_spec=1 |
+| `erasure/tests/p6_ledger_durability.rs` | 406 | panic=24, alt_spec=3 |
+| `erasure/tests/p7_report_chain_tests.rs` | 279 | panic=15, std_fs=2 |
+| `erasure/tests/revocation_log_vfs.rs` | 262 | panic=17 |
+| `erasure/tests/t_report_ledger.rs` | 76 | panic=4 |
+| `ports/src/ledger.rs` | 179 | serde=1 |
+| `ports/src/report_signer.rs` | 130 | panic=1, async=1 |

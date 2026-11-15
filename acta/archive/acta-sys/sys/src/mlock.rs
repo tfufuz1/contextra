@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-mlock-main,epic=sys-mlock,seq=0] RAM Memory Locking & Schutz
 // =========================================================================
-// NOTE: Platform-aware RAM memory locking abstractions with policy enforcement (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-SYS-MEMLOCK-1).
+// NOTE: Platform-aware RAM memory locking abstractions with policy enforcement.
 // Invariante: Zero panic; configurable mlock policy; madvise(MADV_DONTDUMP) integration; structured error propagation.
 // Keine unzulässigen Garantieversprechen.
 
@@ -10,8 +10,8 @@
 //! Dieses Modul kapselt das Festpinnen (Locking) von virtuellem Speicher im physischen RAM
 //! (Random Access Memory). Dadurch wird das Betriebssystem angewiesen, die betroffenen Speicherseiten
 //! nicht in die Auslagerungsdatei (Swap / Pagefile) auf den persistenten Datenträger auszulagern.
-//! Zusätzlich wird unter Unix `madvise(..., MADV_DONTDUMP)` angewandt, um sensible Daten aus
-//! Core-Dumps auszuschließen (INV-SYS-MEMLOCK-1).
+//! Zusätzlich wird unter Unix `madvise(..., MADV_DONTDUMP)` angewandt, um sensible Daten
+//! Core-Dumps auszuschließen.
 //!
 //! ## Ring-Zugehörigkeit und Sicherheitsrelevanz
 //! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Direkte Aufrufe von POSIX `libc::mlock` / `libc::munlock`

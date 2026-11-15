@@ -195,12 +195,12 @@ pub struct CommitReceipt {
 /// Ephemerer RAM-Puffer für sensitive Kontexte im Safe-Modus.
 ///
 /// # INVARIANTEN
-/// - **INV-VAULT-1:** `purge()` zeroized alle Chunk-Inhalte via `ZeroizeOnDrop` vor
-///   der Deallokation. `std::mem::forget` auf den Vault hebelt diese Invariante aus.
-/// - **INV-VAULT-2:** `ingest()` schreibt NIE in Storage, Log-Writer oder
+/// - **:** `purge` zeroized alle Chunk-Inhalte via `ZeroizeOnDrop` vor
+///   der Deallokation. `std::mem::forget` auf den Vault hebelt diese Invariante.
+/// - **:** `ingest` schreibt NIE in Storage, Log-Writer oder
 ///   irgendeinen Vektorindex. Einziger Schreibpfad auf dauerhafte Ablage:
 ///   expliziter Aufruf von `commit()`.
-/// - **INV-VAULT-3:** Kapazitätsüberschreitung führt zu `VaultError::CapacityExceeded`.
+/// - **:** Kapazitätsüberschreitung führt zu `VaultError::CapacityExceeded`.
 ///   Kein stiller Fallback auf Disk-Speicher.
 pub struct VolatileContextVault {
     chunks: Vec<VaultChunk>,
@@ -217,7 +217,7 @@ pub struct VolatileContextVault {
 impl VolatileContextVault {
     /// Öffnet einen neuen leeren Vault im RAM.
     ///
-    /// Führt keinerlei Datei-I/O oder Festplattenzugriffe aus.
+    /// Führt keinerlei Datei-I/O oder Festplattenzugriffe.
     pub fn open(config: VaultConfig) -> Self {
         let initial_locked = config.attempt_mlock;
         if !config.attempt_mlock {
@@ -243,7 +243,7 @@ impl VolatileContextVault {
     /// 3. Memory-Locking: `mlock`-Aufruf versuchen, um Swap-Auslagerung auf SSD zu verhindern.
     /// 4. Chunk im flüchtigen RAM-Vektor speichern und Byte-Zähler inkrementieren.
     ///
-    /// # Invariante INV-VAULT-2:
+    /// # Invariante
     /// Schreibt niemals auf Festplatte oder in ein persistentes Log.
     pub fn ingest(&mut self, chunk: VaultChunk) -> Result<(), VaultError> {
         if self.consumed {
@@ -340,7 +340,7 @@ impl VolatileContextVault {
         self.is_memory_locked
     }
 
-    /// Transferiert alle Chunks zur dauerhaften Speicherung und stellt ein [`CommitReceipt`] aus.
+    /// Transferiert alle Chunks zur dauerhaften Speicherung und stellt ein [`CommitReceipt`].
     ///
     /// # Ablauf von `commit`:
     /// 1. Status prüfen: Falls bereits konsumiert, `Err(AlreadyConsumed)`.

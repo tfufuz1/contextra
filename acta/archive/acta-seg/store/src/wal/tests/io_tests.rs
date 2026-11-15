@@ -407,7 +407,7 @@ async fn test_append_batch_concurrent_double_header_write_race() -> Result<()> {
 
     assert_eq!(
         header_magic_count, 1,
-        "Header magic 'MFW3' must appear EXACTLY ONCE in physical WAL file, found {}",
+        "Header magic 'AWL3' must appear EXACTLY ONCE in physical WAL file, found {}",
         header_magic_count
     );
 

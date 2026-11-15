@@ -11,8 +11,10 @@ use std::process::{Command, ExitCode};
 
 type Res = Result<Vec<String>, String>;
 
-/// Gate-Name und Funktion.
-const GATES: &[(&str, fn(&Ctx) -> Res)] = &[
+/// Gate-Name und Pruefungsfunktion.
+type Gate = (&'static str, fn(&Ctx) -> Res);
+
+const GATES: &[Gate] = &[
     ("g1", g1),
     ("g-def", g_def),
     ("g-hub", g_hub),
@@ -94,7 +96,9 @@ fn g1(c: &Ctx) -> Res {
     let mut bad = Vec::new();
     for pkg in md["packages"].as_array().ok_or("no packages")? {
         let name = pkg["name"].as_str().unwrap_or_default();
-        let Some(&la) = c.levels.get(name) else { continue };
+        let Some(&la) = c.levels.get(name) else {
+            continue;
+        };
         for d in pkg["dependencies"].as_array().into_iter().flatten() {
             if d["kind"].as_str() == Some("dev") {
                 continue;
@@ -105,7 +109,9 @@ fn g1(c: &Ctx) -> Res {
             }
             if let Some(&lb) = c.levels.get(dn) {
                 if la <= lb {
-                    bad.push(format!("{name} (L{la}) -> {dn} (L{lb}) verletzt level(A) > level(B)"));
+                    bad.push(format!(
+                        "{name} (L{la}) -> {dn} (L{lb}) verletzt level(A) > level(B)"
+                    ));
                 }
             }
         }
@@ -114,8 +120,13 @@ fn g1(c: &Ctx) -> Res {
     for pkg in md["packages"].as_array().into_iter().flatten() {
         let name = pkg["name"].as_str().unwrap_or_default();
         for d in pkg["dependencies"].as_array().into_iter().flatten() {
-            if d["name"].as_str() == Some("acta-engine") && d["kind"].as_str() != Some("dev") && name != "acta-node" {
-                bad.push(format!("{name}: HR-8 verletzt (nur acta-node darf acta-engine nutzen)"));
+            if d["name"].as_str() == Some("acta-engine")
+                && d["kind"].as_str() != Some("dev")
+                && name != "acta-node"
+            {
+                bad.push(format!(
+                    "{name}: HR-8 verletzt (nur acta-node darf acta-engine nutzen)"
+                ));
             }
         }
     }
@@ -126,12 +137,19 @@ fn g1(c: &Ctx) -> Res {
 fn g_def(c: &Ctx) -> Res {
     let md = metadata(&c.root)?;
     let all = md["workspace_members"].as_array().map_or(0, Vec::len);
-    let def = md["workspace_default_members"].as_array().map_or(0, Vec::len);
-    Ok(if all == def { vec![] } else { vec![format!("{def} von {all} Crates in default-members")] })
+    let def = md["workspace_default_members"]
+        .as_array()
+        .map_or(0, Vec::len);
+    Ok(if all == def {
+        vec![]
+    } else {
+        vec![format!("{def} von {all} Crates in default-members")]
+    })
 }
 
 fn is_test_path(p: &Path) -> bool {
-    p.components().any(|c| c.as_os_str() == "tests" || c.as_os_str() == "benches")
+    p.components()
+        .any(|c| c.as_os_str() == "tests" || c.as_os_str() == "benches")
         || p.file_name().is_some_and(|n| n == "tests.rs")
 }
 
@@ -158,7 +176,9 @@ fn g_hub(c: &Ctx) -> Res {
             }
         }
         if loc > budget {
-            bad.push(format!("{name}: {loc} LOC > Budget {budget} (ADR erforderlich)"));
+            bad.push(format!(
+                "{name}: {loc} LOC > Budget {budget} (ADR erforderlich)"
+            ));
         }
     }
     Ok(bad)
@@ -175,15 +195,24 @@ fn g_unsafe(c: &Ctx) -> Res {
         let lines: Vec<&str> = text.lines().collect();
         for (i, l) in lines.iter().enumerate() {
             let t = l.trim();
-            if t.starts_with("//") || !has_word(t, "unsafe") || t.contains("forbid(unsafe_code)") || t.contains("unsafe_code")
+            if t.starts_with("//")
+                || !has_word(t, "unsafe")
+                || t.contains("forbid(unsafe_code)")
+                || t.contains("unsafe_code")
                 || t.contains("unsafe_op_in_unsafe_fn")
             {
                 continue;
             }
             if !in_sys {
-                bad.push(format!("{}:{}: unsafe ausserhalb acta-sys", f.display(), i + 1));
+                bad.push(format!(
+                    "{}:{}: unsafe ausserhalb acta-sys",
+                    f.display(),
+                    i + 1
+                ));
             } else if t.contains("unsafe {") || t.contains("unsafe impl") {
-                let ok = (i.saturating_sub(3)..i).filter_map(|k| lines.get(k)).any(|p| p.contains("SAFETY:"));
+                let ok = (i.saturating_sub(3)..i)
+                    .filter_map(|k| lines.get(k))
+                    .any(|p| p.contains("SAFETY:"));
                 if !ok {
                     bad.push(format!("{}:{}: unsafe ohne // SAFETY:", f.display(), i + 1));
                 }
@@ -195,8 +224,14 @@ fn g_unsafe(c: &Ctx) -> Res {
 
 fn has_word(hay: &str, w: &str) -> bool {
     hay.match_indices(w).any(|(i, _)| {
-        let before = hay[..i].chars().next_back().is_none_or(|c| !(c.is_alphanumeric() || c == '_'));
-        let after = hay[i + w.len()..].chars().next().is_none_or(|c| !(c.is_alphanumeric() || c == '_'));
+        let before = hay[..i]
+            .chars()
+            .next_back()
+            .is_none_or(|c| !(c.is_alphanumeric() || c == '_'));
+        let after = hay[i + w.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !(c.is_alphanumeric() || c == '_'));
         before && after
     })
 }
@@ -224,7 +259,8 @@ fn g_lint(c: &Ctx) -> Res {
     for name in c.levels.keys() {
         let p = c.root.join("crates").join(name).join("Cargo.toml");
         let t = fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?;
-        let ok = t.contains("[lints]\nworkspace = true") || (name == "acta-sys" && t.contains("unwrap_used = \"deny\""));
+        let ok = t.contains("[lints]\nworkspace = true")
+            || (name == "acta-sys" && t.contains("unwrap_used = \"deny\""));
         if !ok {
             bad.push(format!("{name}: Workspace-Lints fehlen"));
         }
@@ -235,15 +271,26 @@ fn g_lint(c: &Ctx) -> Res {
 /// G-WORD: verbotene Formulierungen (Spec 1.6, Liste A) in Quelltext des Workspace.
 fn g_word(c: &Ctx) -> Res {
     const LISTE_A: &[&str] = &[
-        "dsgvo-konform", "dsgvo-zertifiziert", "erfüllt art. 17 automatisch", "100 % gelöscht", "garantiert gelöscht",
-        "garantiert vernichtet", "unwiederbringlich", "vergisst daten", "revisionssicher", "fehlerfrei",
-        "löscht aus allen backups", "perfekte antworten",
+        "dsgvo-konform",
+        "dsgvo-zertifiziert",
+        "erfüllt art. 17 automatisch",
+        "100 % gelöscht",
+        "garantiert gelöscht",
+        "garantiert vernichtet",
+        "unwiederbringlich",
+        "vergisst daten",
+        "revisionssicher",
+        "fehlerfrei",
+        "löscht aus allen backups",
+        "perfekte antworten",
     ];
     let mut bad = Vec::new();
     let mut files = Vec::new();
     rs_files(&c.root.join("crates"), &mut files);
     for f in files {
-        let text = fs::read_to_string(&f).map_err(|e| e.to_string())?.to_lowercase();
+        let text = fs::read_to_string(&f)
+            .map_err(|e| e.to_string())?
+            .to_lowercase();
         for w in LISTE_A {
             if text.contains(w) {
                 bad.push(format!("{}: verbotene Formulierung \"{w}\"", f.display()));
@@ -255,7 +302,9 @@ fn g_word(c: &Ctx) -> Res {
 
 fn main() -> ExitCode {
     let arg = std::env::args().nth(1).unwrap_or_else(|| "gates".into());
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
     let text = match fs::read_to_string(root.join("rings.toml")) {
         Ok(t) => t,
         Err(e) => {
@@ -264,7 +313,12 @@ fn main() -> ExitCode {
         }
     };
     let (levels, budgets, isolated) = parse_rings(&text);
-    let ctx = Ctx { root, levels, budgets, isolated };
+    let ctx = Ctx {
+        root,
+        levels,
+        budgets,
+        isolated,
+    };
     let mut failed = false;
     for (name, f) in GATES {
         if arg != "gates" && arg != *name {
@@ -285,5 +339,9 @@ fn main() -> ExitCode {
             }
         }
     }
-    if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS }
+    if failed {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }

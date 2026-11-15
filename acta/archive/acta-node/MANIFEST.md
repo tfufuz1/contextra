@@ -3,7 +3,7 @@
 **Aufgabe:** Composition Root der Kernports: Konfiguration, Verdrahtung, Selbsttest, Hintergrundaufgaben  
 **Level:** L7 · **Budget:** 3000 LOC · **Spezifikation:** docs/SPEC.md Kap. 3.4 HR-7, 14.1  
 **Interne Abhaengigkeiten (Soll):** acta-engine, acta-base, acta-crypto, acta-fs, acta-sys, acta-gate, acta-access, acta-infer, acta-ingest, acta-ledger, acta-vault, acta-seg, acta-pstore, acta-history, acta-text, acta-vec, acta-erasure, acta-decision, acta-rag, acta-reports  
-**Umfang des Archivs:** 10 Dateien, 2358 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 16 Dateien, 3425 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -30,13 +30,19 @@
 
 | Datei (relativ zu `archive/acta-node/`) | LOC | Befunde |
 |---|---:|---|
-| `env/src/metrics.rs` | 408 | float=18, panic=1 |
-| `license/src/lib.rs` | 45 | serde=2, unsafe=1 |
-| `license/src/signed_gate.rs` | 800 | serde=8, std_fs=3, alt_spec=4 |
-| `license/src/types.rs` | 206 | serde=1, zeit_zufall=1, alt_spec=2 |
-| `license/tests/clock_expiration_boundary.rs` | 151 |  |
-| `license/tests/error_no_information_leak.rs` | 35 |  |
-| `license/tests/key_rotation.rs` | 221 | serde=2, panic=2 |
-| `license/tests/signature_covers_all_fields.rs` | 66 |  |
-| `license/tests/signed_activation_7_steps.rs` | 189 | zeit_zufall=1, alt_spec=1 |
-| `license/tests/signed_gate.rs` | 237 | serde=5, zeit_zufall=1, panic=10, alt_spec=3 |
+| `env/src/metrics.rs` | 407 | panic=1, float=18 |
+| `license/src/lib.rs` | 44 | serde=2, unsafe=1 |
+| `license/src/signed_gate.rs` | 799 | serde=8, std_fs=3 |
+| `license/src/types.rs` | 205 | serde=1 |
+| `license/tests/clock_expiration_boundary.rs` | 150 |  |
+| `license/tests/crypto_hygiene_payload.rs` | 160 | panic=2, serde=3 |
+| `license/tests/error_no_information_leak.rs` | 34 |  |
+| `license/tests/installation_binding.rs` | 296 | panic=14, serde=7 |
+| `license/tests/installation_binding_isolation.rs` | 110 | std_fs=1 |
+| `license/tests/key_rotation.rs` | 220 | panic=2, serde=2 |
+| `license/tests/license_gate_default.rs` | 34 |  |
+| `license/tests/negative_matrix_and_from_activation.rs` | 318 | panic=4, serde=3 |
+| `license/tests/signature_covers_all_fields.rs` | 65 |  |
+| `license/tests/signed_activation_7_steps.rs` | 188 |  |
+| `license/tests/signed_gate.rs` | 236 | panic=10, serde=5 |
+| `ports/src/license.rs` | 159 | serde=4 |

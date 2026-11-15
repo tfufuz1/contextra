@@ -7,7 +7,7 @@
 )]
 
 // FILE-CONTEXT
-// ZWECK: Golden- & Akzeptanz-Tests für den DocxExtractor (WP-ING-04).
+// ZWECK: Golden- & Akzeptanz-Tests für den DocxExtractor.
 // INVARIANTEN: Zero-Panic, Erfüllung aller Akzeptanzkriterien gem. AUFTRAG.
 // STAND: TS:2026-10-31T00:00:00Z
 

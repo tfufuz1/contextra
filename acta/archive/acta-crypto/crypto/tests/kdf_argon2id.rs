@@ -116,7 +116,7 @@ fn test_kdf_header_exact_22_bytes_boundary_with_zero_salt_len() {
     // a 22-byte slice returns "KdfHeader-Bytes zu kurz" instead of reaching the
     // salt_len < MIN_SALT_LEN check which returns "unter Minimum".
     let mut header_22 = Vec::new();
-    header_22.extend_from_slice(b"MFKD");
+    header_22.extend_from_slice(b"AKDF");
     header_22.push(1); // version
     header_22.push(1); // kdf_id
     header_22.extend_from_slice(&65536u32.to_be_bytes());
@@ -185,7 +185,7 @@ fn test_kdf_header_salt_len_boundaries() {
 
     // Above max salt_len (10,001 bytes)
     let mut bytes_10k1 = Vec::new();
-    bytes_10k1.extend_from_slice(b"MFKD");
+    bytes_10k1.extend_from_slice(b"AKDF");
     bytes_10k1.push(1);
     bytes_10k1.push(1);
     bytes_10k1.extend_from_slice(&65536u32.to_be_bytes());
@@ -209,7 +209,7 @@ fn test_kdf_header_salt_len_boundaries() {
 
     // Above max salt_len (10,002 bytes) - Kills > with == mutant
     let mut bytes_10k2 = Vec::new();
-    bytes_10k2.extend_from_slice(b"MFKD");
+    bytes_10k2.extend_from_slice(b"AKDF");
     bytes_10k2.push(1);
     bytes_10k2.push(1);
     bytes_10k2.extend_from_slice(&65536u32.to_be_bytes());

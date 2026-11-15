@@ -32,7 +32,7 @@ pub trait Rng: Send + Sync + 'static {
     /// Generates the next pseudorandom 64-bit unsigned integer.
     ///
     /// # Invarianten
-    /// - `INV-ENV-RNG-1`: Deterministische Reproduzierbarkeit bei gleichem Seed.
+    /// -: Deterministische Reproduzierbarkeit bei gleichem Seed.
     ///
     /// # Fehler
     /// Keine; garantiert panikfrei und nicht-blockierend.
@@ -52,7 +52,7 @@ pub trait Rng: Send + Sync + 'static {
     /// with 53 bits of precision.
     ///
     /// # Invarianten
-    /// - `INV-ENV-RNG-2`: Ergebnis liegt strikt im Bereich `[0.0, 1.0)`.
+    /// -: Ergebnis liegt strikt im Bereich `[0.0, 1.0)`.
     ///
     /// # Fehler
     /// Keine; garantiert panikfrei.
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_seeded_rng_reproducibility() {
-        // NOTE: Verifiziert INV-ENV-RNG-1 (Gleicher Seed liefert identische Zahlenfolge)
+        // NOTE: Verifiziert (Gleicher Seed liefert identische Zahlenfolge)
         let rng1 = SeededRng::new(12345);
         let rng2 = SeededRng::new(12345);
 
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_next_unit_f64_in_bounds() {
-        // NOTE: Verifiziert INV-ENV-RNG-2 (Intervall-Grenzen 0.0 <= val < 1.0)
+        // NOTE: Verifiziert (Intervall-Grenzen 0.0 <= val < 1.0)
         let rng = SeededRng::new(42);
         for _ in 0..1000 {
             let val = rng.next_unit_f64();

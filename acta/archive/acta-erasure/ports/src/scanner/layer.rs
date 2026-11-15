@@ -113,7 +113,7 @@ pub struct PurgeStats {
 
 /// Trait für physische Bereinigungsaktionen (Purger) einer Schicht.
 pub trait Purger: Send + Sync {
-    /// Führt die physische Bereinigung für das gegebene Ziel aus.
+    /// Führt die physische Bereinigung für das gegebene Ziel.
     ///
     /// # Fehler
     /// Liefert `ActaError` bei I/O- oder Freigabefehlern während der physischen Bereinigung.

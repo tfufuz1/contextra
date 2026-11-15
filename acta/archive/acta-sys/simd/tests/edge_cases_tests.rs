@@ -10,7 +10,7 @@
 //! - Mathematische Extrema (Nullvektoren, identische Vektoren, orthogonale Vektoren, antipodische Vektoren).
 //! - Numerische Stabilität (sehr große Werte bis 1e18, maximale u8-Akkumulation ohne 32-Bit Überlauf).
 
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::indexing_slicing)]
@@ -431,8 +431,8 @@ fn test_scalar_functions_zero_length_and_single_element_slices() {
     );
 }
 
-/// SPEC: INV-SIMD-FINITE-1
-// Invariante INV-SIMD-FINITE-1: Nie mit NaN/Inf rechnen, fail-closed Abweisung.
+/// SPEC
+// Invariante: Nie mit NaN/Inf rechnen, fail-closed Abweisung.
 #[test]
 fn test_inv_simd_finite_1() {
     let valid = [1.0f32, 2.0, 3.0, 4.0];
@@ -465,8 +465,8 @@ fn test_inv_simd_finite_1() {
     assert!(!res.unwrap().is_nan());
 }
 
-/// SPEC: INV-SIMD-ALIGN-1
-// Invariante INV-SIMD-ALIGN-1: Byte-Puffer ganzzahlig durch 4, keine Annahme über Ausrichtung.
+/// SPEC
+// Invariante: Byte-Puffer ganzzahlig durch 4, keine Annahme über Ausrichtung.
 #[test]
 fn test_inv_simd_align_1() {
     let a = [1.0f32, 2.0, 3.0, 4.0];
@@ -506,8 +506,8 @@ fn test_inv_simd_align_1() {
     .is_err());
 }
 
-/// SPEC: INV-SIMD-DETERMINISM-1
-// Invariante INV-SIMD-DETERMINISM-1: Jeder Kernel weicht höchstens um dokumentierte Toleranz (1e-5 relativ) von der Skalar-Referenz ab.
+/// SPEC
+// Invariante: Jeder Kernel weicht höchstens um dokumentierte Toleranz (1e-5 relativ) von der Skalar-Referenz ab.
 #[test]
 fn test_inv_simd_determinism_1() {
     // Teste über verschiedene Dimensionen inklusive SIMD-Grenzbreiten

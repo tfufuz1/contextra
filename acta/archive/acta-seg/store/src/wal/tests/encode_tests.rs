@@ -164,7 +164,7 @@ async fn test_batch_encryption_single_nonce_layout() {
     let file_bytes = fs::read(&wal_path).await.expect("read wal file"); // expect
 
     // Layout:
-    // Offset 0..4: WAL_V3_HEADER (b"MFW3")
+    // Offset 0..4: WAL_V3_HEADER (b"AWL3")
     // Offset 4..8: batch chunk_len (u32 LE)
     // Offset 8..20: single 12-byte nonce
     // Offset 20..: AES-GCM-SIV ciphertext

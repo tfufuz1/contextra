@@ -42,7 +42,7 @@ pub enum FlatBufferError {
     /// Die interne Verifikation der FlatBuffers-Tabellenstruktur schlug fehl.
     VerificationFailed(String),
     /// Expected file identifier was missing or mismatched.
-    /// Die erwartete Dateikennung (`file_identifier "CTRA"`) fehlt oder weicht ab.
+    /// Die erwartete Dateikennung (`file_identifier "ACTA"`) fehlt oder weicht ab.
     IdentifierMismatch,
 }
 

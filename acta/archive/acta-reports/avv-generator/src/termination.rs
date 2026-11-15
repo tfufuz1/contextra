@@ -1,7 +1,7 @@
 //! Löschung und Rückgabe nach Beendigung gemäß Art. 28 Abs. 3 lit. g DSGVO.
 //!
 //! # Zweck & Hintergrund
-//! Regelt das Schicksal der Mandantendaten nach Beendigung des Hauptvertrages oder nach
+//! Regelt das Schicksal der Mandantendaten nach Beendigung des Hauptvertrages oder
 //! gesonderter Löschanforderung.
 //!
 //! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. g DSGVO:

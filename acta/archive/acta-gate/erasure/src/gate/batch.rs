@@ -5,10 +5,10 @@
 //!
 //! Ablauf unter CommitBarrier::exclusive:
 //! 1. `gate_epoch += 1` (VOR der Schlüsselvernichtung, I-21)
-//! 2. Gate-Log-Append mit `gated_seq` (D-58)
+//! 2. Gate-Log-Append mit `gated_seq`
 //! 3. Gates in `ErasedSet` einfügen
 //! 4. Barriere frei
-//! 5. EIN fsync je Gruppe (Gate-Gruppen-Commit, D-78, T-GATEGROUP-1) auf Critical-Spur (D-128).
+//! 5. EIN fsync je Gruppe auf Critical-Spur.
 //!
 //! Zeit bis Gated ist O(1) in der Zielgröße (P16).
 
@@ -112,13 +112,13 @@ impl GateBatchCoordinator {
         }
     }
 
-    /// Führt den Gruppen-Commit für die übergebenen Anfragen unter `CommitBarrier::exclusive` aus.
+    /// Führt den Gruppen-Commit für die übergebenen Anfragen unter `CommitBarrier::exclusive`.
     ///
     /// Invarianten und Zusicherungen:
     /// - `gate_epoch += 1` vor Schlüsselvernichtung (I-21)
-    /// - Gate-Log-Append mit `gated_seq` (D-58)
-    /// - Genau EIN fsync / Persistierungsschritt je Gruppe (D-78, T-GATEGROUP-1)
-    /// - Freigabe der Barriere unmittelbar nach In-Memory/Log-Update (D-57)
+    /// - Gate-Log-Append mit `gated_seq`
+    /// - Genau EIN fsync / Persistierungsschritt je Gruppe
+    /// - Freigabe der Barriere unmittelbar nach In-Memory/Log-Update
     /// - O(1) Zeit bezüglich Zielgröße (P16)
     pub async fn execute_batch(
         &self,
@@ -133,7 +133,7 @@ impl GateBatchCoordinator {
             });
         }
 
-        // 1. Exklusive Commit-Barriere anfordern (D-57)
+        // 1. Exklusive Commit-Barriere anfordern
         let _exclusive_permit = self.barrier.exclusive().await;
 
         // 2. Unter exklusiver Barriere: Epoche erhöhen (I-21) und Einträge vorbereiten
@@ -176,13 +176,13 @@ impl GateBatchCoordinator {
             }
         }
 
-        // 3. Gate-Log persistent anhängen (D-58, ein fsync je Gruppe auf Critical-Spur)
+        // 3. Gate-Log persistent anhängen
         {
             let mut log_guard = self.gate_log.write();
             log_guard.append_batch(log_entries);
         }
 
-        // 4. Barriere wird beim Drop von `_exclusive_permit` freigegeben (D-57)
+        // 4. Barriere wird beim Drop von `_exclusive_permit` freigegeben
         drop(_exclusive_permit);
 
         Ok(BatchGateOutcome {

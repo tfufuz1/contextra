@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Randfall- und Performance-Smoke-Tests für ProseChunker (WP M3 / SPEC C-11.7).
+// ZWECK: Randfall- und Performance-Smoke-Tests für ProseChunker.
 // STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(

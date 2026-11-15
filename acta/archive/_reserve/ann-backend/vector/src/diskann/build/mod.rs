@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Graphaufbau (Vamana-Algorithmus) und Re-Exports für DiskANN (WP-VEC-07).
+// ZWECK: Graphaufbau (Vamana-Algorithmus) und Re-Exports für DiskANN.
 // INVARIANTEN: Lock-Hierarchie; atomares Ersetzen temporärer Dateien.
 // STAND: 2026-11-11
 

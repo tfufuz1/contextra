@@ -1,10 +1,10 @@
 //! Tresor-Scrubbing und Waisen-Prüfung.
 //!
 //! Waisenbereinigung:
-//! - Nicht beim Open (kein Vollscan, D-111 Abs. 8).
+//! - Nicht beim Open.
 //! - Hintergrundaufgabe `vault_scrub` wandert schrittweise über Slots mit persistiertem Cursor `rsv`.
 //! - D-Slot ohne Manifest-Record mit `gen < next_seq - 2^20` wird genullt.
-//! - F-Slot ohne Datendatei wird genullt (D-85).
+//! - F-Slot ohne Datendatei wird genullt.
 
 use crate::error::ErasureError;
 use crate::vault::slot::SlotType;

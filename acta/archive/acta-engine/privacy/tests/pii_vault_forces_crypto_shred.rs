@@ -1,6 +1,6 @@
 //! Tests für die kryptografische Löschung von PII-Daten im Egress-Vault.
 // FILE-CONTEXT
-// ZWECK: Test PII vault forces CryptoShred under DeploymentTier::EdgeMinimal (INV-COLLECTION-PROFILE-3)
+// ZWECK: Test PII vault forces CryptoShred under DeploymentTier::EdgeMinimal
 #![allow(deprecated)]
 
 use acta_pii::egress_gateway::pii_vault_forces_crypto_shred;

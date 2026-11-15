@@ -30,7 +30,7 @@
 //! - [`ReadSet`] / [`SsiValidator`] / [`SequenceLogSsiValidator`]: Serializable Snapshot Isolation (SSI)
 //!   zur Erkennung von Write-Skew-Anomalien und Phantom-Reads bei Transaktionen.
 //!
-//! ## Sperrenordnung & Invarianten (INV-LOCK-ORDER-1)
+//! ## Sperrenordnung & Invarianten
 //!
 //! Um Verklemmungen (Deadlocks) bei nebenläufigem Zugriff deterministisch auszuschließen,
 //! gilt für `acta-history` und die darüberliegende Engine eine strikte, totale Sperrenhierarchie:
@@ -46,7 +46,7 @@
 //! 4. **SequenceLog / SSI (CommittedWrites)**: Feingranularer `parking_lot::RwLock` zur Verfolgung
 //!    bestätigter Schreibvorgänge und Phantom-Präfixe.
 //!
-//! **Regel (INV-LOCK-ORDER-1):** Kein Sperr-Guard wird über `.await`-Punkte hinweg gehalten
+//! **Regel:** Kein Sperr-Guard wird über `.await`-Punkte hinweg gehalten
 //! (`acta-history` ist vollkommen synchron und frei von Async-Runtimes wie Tokio).
 //!
 //! ## Anwendungsbeispiel (Doctest)

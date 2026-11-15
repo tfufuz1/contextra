@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Initialisierung des HNSW-Fallbacks für DiskANN (WP-VEC-07).
+// ZWECK: Initialisierung des HNSW-Fallbacks für DiskANN.
 // INVARIANTEN: Gekapselte Erstellung über hnsw_bridge; saubere Fehlerweiterleitung.
 // STAND: 2026-11-11
 

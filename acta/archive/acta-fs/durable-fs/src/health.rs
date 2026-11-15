@@ -5,7 +5,7 @@
 //! der Integrität des Speichersubstrats gemäß Spezifikation §18.4.
 //!
 //! Invarianten:
-//! - `INV-FSYNC-1` / `INV-POISON-1`: Schlägt ein Flush/fsync fehl, wechselt das System
+//! - /: Schlägt ein Flush/fsync fehl, wechselt das System
 //!   unwiderruflich in den Zustand `Poisoned`. Ein Verlassen des Zustands ohne Neustart
 //!   ist strikt verboten (Fail-Closed).
 //! - Nebenläufigkeit: Lock-freier CAS-Loop (`compare_exchange_weak`) mit `AcqRel`/`Acquire`-Ordnung.
@@ -23,7 +23,7 @@ pub enum HealthState {
     Degraded = 1,
     /// Speichermedium voll (`ENOSPC`); Schreib- und Commit-Operationen abgewiesen, Lesen weiterhin gestattet.
     ReadOnly = 2,
-    /// Fataler Flush- oder `fsync`-Fehler; alle Schreibzugriffe dauerhaft abgewiesen (`INV-FSYNC-1`).
+    /// Fataler Flush- oder `fsync`-Fehler; alle Schreibzugriffe dauerhaft abgewiesen.
     Poisoned = 3,
 }
 
@@ -102,7 +102,7 @@ impl AtomicHealthState {
         }
     }
 
-    /// Liest den aktuellen [`HealthState`] mit `Acquire`-Speicherordnung aus.
+    /// Liest den aktuellen [`HealthState`] mit `Acquire`-Speicherordnung.
     #[must_use]
     pub fn load(&self) -> HealthState {
         match self.state.load(Ordering::Acquire) {
@@ -113,7 +113,7 @@ impl AtomicHealthState {
         }
     }
 
-    /// Führt einen atomaren Zustandsübergang anhand eines [`HealthEvent`] aus.
+    /// Führt einen atomaren Zustandsübergang anhand eines [`HealthEvent`].
     pub fn record_event(&self, event: HealthEvent) -> HealthState {
         let mut current = self.load();
         loop {

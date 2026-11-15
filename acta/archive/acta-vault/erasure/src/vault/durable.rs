@@ -89,7 +89,7 @@ impl DurableVaultShard {
 
         file.set_len(total_bytes).map_err(ErasureError::Io)?;
 
-        // 4. Dauerhaft festschreiben via sync_data (D-111, D-55)
+        // 4. Dauerhaft festschreiben via sync_data
         file.sync_data().map_err(ErasureError::Io)?;
 
         Ok(Self {
@@ -199,7 +199,7 @@ impl DurableVaultShard {
         }
         let rsv_cursor = u64::from_be_bytes(rsv_bytes);
 
-        // 3. Stichprobe von Slots prüfen (D-111 Abs. 8: bis zu 256 Slots prüfen)
+        // 3. Stichprobe von Slots prüfen
         let samples = capacity.min(256);
         let step = (capacity / samples).max(1);
         let mut slot_buf = [0u8; VAULT_SLOT_SIZE];
@@ -235,12 +235,12 @@ impl DurableVaultShard {
         })
     }
 
-    /// Prüft ob der Shard vergiftet ist (D-55, I-10).
+    /// Prüft ob der Shard vergiftet ist.
     pub fn is_poisoned(&self) -> bool {
         self.poisoned.load(Ordering::Acquire)
     }
 
-    /// Vergiftet den Shard irreversibel (D-55, I-10).
+    /// Vergiftet den Shard irreversibel.
     pub fn poison(&self) {
         self.poisoned.store(true, Ordering::Release);
     }
@@ -249,7 +249,7 @@ impl DurableVaultShard {
     fn check_poison(&self) -> Result<(), ErasureError> {
         if self.is_poisoned() {
             Err(ErasureError::Io(std::io::Error::other(
-                "vault shard is poisoned due to previous sync or I/O failure (D-55)",
+                "vault shard is poisoned due to previous sync or I/O failure",
             )))
         } else {
             Ok(())
@@ -334,7 +334,7 @@ impl DurableVaultShard {
         self.load_factor() > 0.80
     }
 
-    /// Prüft ob Lastfaktor mit nächstem Insert > 0,90 wäre (D-111 Abs. 4).
+    /// Prüft ob Lastfaktor mit nächstem Insert > 0,90 wäre.
     pub fn load_exceeded(&self) -> bool {
         if self.capacity == 0 {
             return true;
@@ -471,12 +471,12 @@ impl DurableVaultShard {
         Err(ErasureError::Capacity)
     }
 
-    /// Vernichtet einen Slot nach SPEC D-111 Abs. 3, D-113 und I-23:
+    /// Vernichtet einen Slot nach SPEC Abs. 3, und I-23
     /// 1. Schreibt in EINEM 64-Byte-Schreibvorgang das Grabstein-Abbild (tombstone_image)
     /// 2. sync_data
     /// 3. read_verified Verifikation: Bytes 0 und 2..56 sind 0, Byte 1 ist 0x02, MAC ist gültig.
     ///
-    /// Bei Fehler: Shard irreversibel poisoned (D-55, I-10).
+    /// Bei Fehler: Shard irreversibel poisoned.
     pub fn destroy(
         &mut self,
         slot_type: SlotType,
@@ -519,7 +519,7 @@ impl DurableVaultShard {
             return Err(ErasureError::Io(e));
         }
 
-        // 2. Verifikation über read_verified (D-111 Abs. 3, D-113)
+        // 2. Verifikation über read_verified
         let (verified_bytes, verified_via) = match self.file.read_verified(off, VAULT_SLOT_SIZE) {
             Ok(res) => res,
             Err(e) => {
@@ -599,7 +599,7 @@ impl DurableVaultShard {
     }
 
     /// Synchronisiert die Datenblöcke der Datei (`sync_data`).
-    /// Bei Fehler: Shard wird vergiftet (D-55, I-10).
+    /// Bei Fehler: Shard wird vergiftet.
     pub fn sync_data(&self) -> Result<(), ErasureError> {
         self.check_poison()?;
         if let Err(e) = self.file.sync_data() {
@@ -609,7 +609,7 @@ impl DurableVaultShard {
         Ok(())
     }
 
-    /// Sammelt alle aktiven Slots für den Rehash (Grabsteine werden nicht übernommen, D-111 Abs. 5).
+    /// Sammelt alle aktiven Slots für den Rehash.
     pub fn collect_active_slots(&self) -> Result<Vec<SlotData>, ErasureError> {
         self.check_poison()?;
         let mut list = Vec::with_capacity(usize::try_from(self.live).unwrap_or(0));
@@ -624,7 +624,7 @@ impl DurableVaultShard {
         Ok(list)
     }
 
-    /// Überschreibt die Shard-Datei über das gehaltene Handle vollständig mit Nullen (D-111 Abs. 5).
+    /// Überschreibt die Shard-Datei über das gehaltene Handle vollständig mit Nullen.
     pub fn overwrite_with_zeros(&mut self) -> Result<(), ErasureError> {
         self.check_poison()?;
         let len = self.file.len().map_err(|e| {

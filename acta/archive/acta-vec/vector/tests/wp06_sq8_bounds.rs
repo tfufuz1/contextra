@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Fehlerschranken-, Serialisierungs- und Stabilitätstests für SQ8 (WP-VEC-06).
+// ZWECK: Fehlerschranken-, Serialisierungs- und Stabilitätstests für SQ8.
 // INVARIANTEN: Rekonstruktionsfehler <= Delta / 510 je Dimension; Bincode/Serde Roundtrip.
 // STAND: 2026-11-12
 

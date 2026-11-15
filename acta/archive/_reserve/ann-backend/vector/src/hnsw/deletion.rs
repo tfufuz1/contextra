@@ -1,8 +1,8 @@
 // FILE-CONTEXT
 // ZWECK: Synchronous ghost-free node deletion with budgeted neighborhood repair and zeroization for HNSW graph.
-// INVARIANTEN: INV-VEC-CONNECTIVITY-1: Graph connectivity is preserved post deletion via neighborhood repair.
-//              INV-VEC-ZEROIZE-1: Deleted vector slots and arena connections are zeroized in memory.
-//              INV-HNSW-SLOT-1: Deleted slots are NOT reused before full index rebuild (rebuild_sync).
+// INVARIANTEN:: Graph connectivity is preserved post deletion via neighborhood repair.
+//: Deleted vector slots and arena connections are zeroized in memory.
+//: Deleted slots are NOT reused before full index rebuild (rebuild_sync).
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 // STAND: TS:2026-11-11T02:00:00Z
 
@@ -65,7 +65,7 @@ pub trait GhostFreeVectorIndex {
     /// before returning.
     ///
     /// # Invariant
-    /// `INV-DELETION-2`: After `Ok(stats)` returns, no neighborhood pointer in the entire index
+    ///: After `Ok(stats)` returns, no neighborhood pointer in the entire index
     /// references `doc_id`.
     fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats>;
 }
@@ -292,7 +292,7 @@ impl GhostFreeVectorIndex for HnswIndex {
             ));
         }
 
-        // Immediate Slot-Nullung (INV-VEC-ZEROIZE-1)
+        // Immediate Slot-Nullung
         if target_idx >= mmap_node_count {
             let ram_idx = target_idx - mmap_node_count;
             let mut nodes_write = self.inner.hot.nodes.write();
@@ -311,7 +311,7 @@ impl GhostFreeVectorIndex for HnswIndex {
             }
             drop(nodes_write);
 
-            // Zeroize arena connection slots without releasing to free_list (INV-HNSW-SLOT-1)
+            // Zeroize arena connection slots without releasing to free_list
             self.inner
                 .hot
                 .arena
@@ -336,8 +336,8 @@ impl GhostFreeVectorIndex for HnswIndex {
 impl HnswIndex {
     /// Removes a document from the vector index by its 64-bit ID.
     ///
-    /// Executes tombstone insertion, immediate slot zeroization (`INV-VEC-ZEROIZE-1`),
-    /// and budgeted neighborhood graph repair (`INV-VEC-CONNECTIVITY-1`).
+    /// Executes tombstone insertion, immediate slot zeroization,
+    /// and budgeted neighborhood graph repair.
     ///
     /// Returns `Ok(true)` if the document was found and removed, or `Ok(false)` if
     /// it was not found or already deleted.
@@ -430,7 +430,7 @@ impl HnswIndex {
         ghost_pointers
     }
 
-    /// O(1) Tombstone-Markierung gemäß VETO-F02 und INV-VEC-ZEROIZE-1.
+    /// O(1) Tombstone-Markierung gemäß VETO-F02 und.
     ///
     /// Markiert den Knoten deterministisch als inaktiv, nullt den Vektorspeicher im Slot
     /// und entfernt die ID aus der Dokumentenzuordnung.
@@ -447,7 +447,7 @@ impl HnswIndex {
             return Ok(false);
         };
 
-        // INV-VEC-ZEROIZE-1: Vektorslot im Speicher mit Nullen überschreiben
+        //: Vektorslot im Speicher mit Nullen überschreiben
         let mmap_guard = self.inner.cold.mmap_index.read();
         let mmap_count = mmap_guard
             .as_ref()

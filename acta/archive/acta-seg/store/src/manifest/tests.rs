@@ -421,7 +421,7 @@ async fn test_manifest_poisoning_on_fsync_failure() {
     let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
     assert!(!manifest.is_poisoned());
 
-    // Manually trigger poison state to simulate fsync failure (INV-FSYNC-1)
+    // Manually trigger poison state to simulate fsync failure
     manifest
         .is_poisoned
         .store(true, std::sync::atomic::Ordering::SeqCst);

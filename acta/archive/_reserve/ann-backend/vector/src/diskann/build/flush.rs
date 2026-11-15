@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Inkrementelles Pruning und Index-Erweiterung (WP-VEC-07).
+// ZWECK: Inkrementelles Pruning und Index-Erweiterung.
 // INVARIANTEN: RobustPrune mit Alpha-Kriterium; NAN/INF-Filterung.
 // STAND: 2026-11-11
 

@@ -1,5 +1,5 @@
 //! Lokales Trait `PostingStore` für Speicherung und Abruf von Posting-Listen und Metadaten.
-// ANCHOR[acta-text:STORE-001]
+// ANCHOR[acta-text:]
 
 use bytes::Bytes;
 use acta_base::TxId;

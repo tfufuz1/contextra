@@ -12,7 +12,7 @@ use super::failure::{ConformanceFailure, ConformanceResult};
 use acta_base::Vfs; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use std::path::Path;
 
-/// Führt die umfassende Konformitätsprüfsuite gegen eine gegebene [`Vfs`]-Instanz aus.
+/// Führt die umfassende Konformitätsprüfsuite gegen eine gegebene [`Vfs`]-Instanz.
 ///
 /// **Geprüfte Verträge:**
 /// 1. `non_existent_read_fails`: Nicht vorhandene Dateien erzeugen einen Fehler.

@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Crate-lokale Distanz-Abstraktion und skalare Referenzimplementierung ohne acta-sys (WP-VEC-06).
-// INVARIANTEN: Zero unsafe code in distance (#![forbid(unsafe_code)]); INV-SIMD-FINITE-1; INV-SIMD-ALIGN-1.
+// ZWECK: Crate-lokale Distanz-Abstraktion und skalare Referenzimplementierung ohne acta-sys.
+// INVARIANTEN: Zero unsafe code in distance (#![forbid(unsafe_code)]);.
 // HOTSPOTS: compute_distance, compute_distance_trusted, compute_distance_f32_bytes_trusted, ScalarKernel, ScalarDistance
 // STAND: 2026-11-12
 

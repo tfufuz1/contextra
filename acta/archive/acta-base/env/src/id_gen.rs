@@ -14,7 +14,7 @@ pub trait IdGen: Send + Sync + 'static {
     /// Generates and returns the next unique 64-bit unsigned identifier.
     ///
     /// # Invarianten
-    /// - `INV-ENV-ID-1`: Keine Duplikate bei aufeinanderfolgenden Aufrufen; threadsichere Monotonie.
+    /// -: Keine Duplikate bei aufeinanderfolgenden Aufrufen; threadsichere Monotonie.
     ///
     /// # Fehler
     /// Keine; garantiert panikfrei durch atomare Operationen.
@@ -108,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_sequential_id_gen_concurrent_no_duplicates() {
-        // NOTE: Verifiziert INV-ENV-ID-1 (Nebenläufige Eindeutigkeit über 8 Threads à 1000 IDs = 8000 eindeutige IDs)
+        // NOTE: Verifiziert (Nebenläufige Eindeutigkeit über 8 Threads à 1000 IDs = 8000 eindeutige IDs)
         let gen = Arc::new(SequentialIdGen::new(1));
         let handles: Vec<_> = (0..8)
             .map(|_| {

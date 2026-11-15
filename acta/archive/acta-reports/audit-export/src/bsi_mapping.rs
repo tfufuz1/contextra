@@ -1,4 +1,4 @@
-//! BSI Grundschutz / TR-02102 Cryptographic Mapping (Spec §2.4 Punkt 2, §16.3).
+//! BSI Grundschutz / TR-02102 Cryptographic Mapping.
 //!
 //! # Maintenance Notice / Single Source of Truth
 //! This module serves as the Single Source of Truth (SSOT) for the BSI Grundschutz / TR-02102

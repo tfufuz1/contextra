@@ -1,4 +1,4 @@
-//! Persistente, hash-verkettete ErasureLedger-Implementierung (WP-8,).
+//! Persistente, hash-verkettete ErasureLedger-Implementierung.
 
 use super::entry::GENESIS_HASH;
 use super::error::LedgerError;
@@ -6,7 +6,7 @@ use super::record::{FramedRecord, LedgerFileHeader, RecordType};
 use super::storage::LedgerStorage;
 use std::fmt;
 
-/// Bestätigung für einen atomaren Batch-Append als Verankerungsnachweis (WP-8, INV-ERA-4).
+/// Bestätigung für einen atomaren Batch-Append als Verankerungsnachweis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LedgerAnchorProof {
     /// Höchste Sequenznummer nach diesem Batch.
@@ -32,7 +32,7 @@ pub struct BatchRecordItem {
     pub completed_at: u64,
 }
 
-/// Persistentes, hash-verkettetes Ledger (WP-8, ACTALEDG v1).
+/// Persistentes, hash-verkettetes Ledger (ACTALEDG v1).
 pub struct ErasureLedger {
     storage: Box<dyn LedgerStorage>,
     ledger_key: [u8; 32],
@@ -161,7 +161,7 @@ impl ErasureLedger {
         })
     }
 
-    /// Führt einen atomaren Batch-Append von Einträgen durch (INV-ERA-4).
+    /// Führt einen atomaren Batch-Append von Einträgen durch.
     ///
     /// Synchronisiert vor Rückgabe (`sync`) und liefert einen `LedgerAnchorProof`.
     /// Bei Fehlern vor dem Abschluss wird kein Zustand verändert (Fail-Closed & Crash-Safety).
@@ -256,12 +256,12 @@ impl ErasureLedger {
         &self.last_hash
     }
 
-    /// Liefert den ledger_floor: `max(gated_seq)` (ER-30).
+    /// Liefert den ledger_floor: `max(gated_seq)`.
     pub fn ledger_floor(&self) -> u64 {
         self.max_gated_seq
     }
 
-    /// Prüft auf Zeitregression: `store_current_seq < max(gated_seq)` (ER-30).
+    /// Prüft auf Zeitregression: `store_current_seq < max(gated_seq)`.
     pub fn detect_time_regression(&self, store_current_seq: u64) -> bool {
         store_current_seq < self.max_gated_seq
     }

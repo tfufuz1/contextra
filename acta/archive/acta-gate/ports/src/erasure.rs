@@ -181,7 +181,7 @@ impl<State> fmt::Debug for Scanner<State> {
 // NOTE: Normative Konsolidierung nach Soll §3 / Prinzip 8:
 // Für das Konzept `LayerWitness` gibt es genau eine Wahrheit im Crate:
 // `crate::scanner::LayerWitness`.
-// Historische Definition wurde nach docs/handoff/PORTS-1/erasure_ports_legacy.rs archiviert.
+// Historische Definition wurde nach docs/handoff//erasure_ports_legacy.rs archiviert.
 pub use crate::scanner::LayerWitness;
 
 /// Key coverage capability of a layer.

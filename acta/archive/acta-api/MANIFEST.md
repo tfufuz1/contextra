@@ -3,7 +3,7 @@
 **Aufgabe:** HTTP/JSON-Schnittstelle, OIDC, mTLS, Streaming  
 **Level:** L8 · **Budget:** 6000 LOC · **Spezifikation:** docs/SPEC.md Kap. 13.4, 18.5  
 **Interne Abhaengigkeiten (Soll):** acta-node, acta-base  
-**Umfang des Archivs:** 1 Dateien, 739 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 2 Dateien, 1337 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -25,4 +25,5 @@
 
 | Datei (relativ zu `archive/acta-api/`) | LOC | Befunde |
 |---|---:|---|
-| `wire/src/jsonrpc.rs` | 739 | serde=6, unsafe=2, panic=12 |
+| `types/src/error_dto.rs` | 599 | panic=3, serde=4 |
+| `wire/src/jsonrpc.rs` | 738 | panic=13, serde=6, unsafe=2 |

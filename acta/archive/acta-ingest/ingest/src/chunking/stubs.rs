@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: Stubs und Anbindung spezifischer Chunking-Strategien (WP M3/M4 / WP-ING-15).
+// ZWECK: Stubs und Anbindung spezifischer Chunking-Strategien (WP M3/M4 / ).
 // INVARIANTEN: Zero-Panic, Delegierung an Strategie-Modul oder FallbackChunker.
 // STAND: TS:2026-10-31T00:00:00Z
 

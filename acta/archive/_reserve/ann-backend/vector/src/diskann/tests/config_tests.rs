@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Modularisierte Testsuiten für DiskANN (WP-VEC-07).
+// ZWECK: Modularisierte Testsuiten für DiskANN.
 // STAND: 2026-11-11
 
 use super::super::config::{DiskAnnConfig, DiskAnnFallbackPolicy};
@@ -157,7 +157,7 @@ async fn test_diskann_persist_delta_empty_noop() {
 
 #[tokio::test]
 async fn test_diskann_persist_delta_atomic_rename() {
-    // INV-DISKANN-1: Nach persist_delta() existiert kein .delta.tmp
+    //: Nach persist_delta existiert kein.delta.tmp
     let dir = tempfile::tempdir().unwrap();
     let index_path = dir.path().join("atomic_test.idx");
     let config = DiskAnnConfig {

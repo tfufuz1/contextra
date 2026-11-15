@@ -1,4 +1,4 @@
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::indexing_slicing)]
@@ -17,7 +17,7 @@
 //!   Datenbank-Vektoren (`u8`).
 //! - Grenzwerte wie All-Zeros, All-Ones und Wertebereiche von 0 bis 255.
 
-// ADR-002 /: Test assertions and test dataset casts
+// /: Test assertions and test dataset casts
 
 use acta_sys::dispatch::{
     cosine_similarity_parts_u8, dot_product_u8, euclidean_distance_sq_u8,

@@ -44,7 +44,7 @@ pub struct RetrievalExplanation {
     pub source_collection: Option<String>,
 }
 
-// ADR-098 (Prozentwert-Anzeige: f32 -> u32 Konvertierung)
+// (Prozentwert-Anzeige: f32 -> u32 Konvertierung)
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn round_share_to_pct(share: f32) -> u32 {
     let scaled = (share * 100.0).round();

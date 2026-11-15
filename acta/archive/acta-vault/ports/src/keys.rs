@@ -150,7 +150,7 @@ pub trait RecordSealer: Send + Sync {
     fn open<'a>(&'a self, key: &'a KeyBuf, env: &'a [u8])
         -> BoxFuture<'a, Result<Vec<u8>, String>>;
 
-    /// Evicts key range from DEK cache, zeroizing RAM keys (D-79).
+    /// Evicts key range from DEK cache, zeroizing RAM keys.
     ///
     /// # Fehler
     /// Synchrone Operation ohne Fehlerzustände.
@@ -173,7 +173,7 @@ pub trait RecordSealer: Send + Sync {
 ///
 /// # Contract (PO-06)
 /// `destroy` zeroes the key slot, executes `sync_data`, and verifies the key's non-presence
-/// via a read-check; failure leaves the slot in `Pending` requiring a retry upon reopen (D-55).
+/// via a read-check; failure leaves the slot in `Pending` requiring a retry upon reopen.
 pub trait FileKeyring: Send + Sync {
     /// Allocates and records a new file key for the given kind and ID.
     ///
@@ -199,6 +199,6 @@ pub trait FileKeyring: Send + Sync {
     /// Liefert Fehler falls Slot-Nullung oder Sync fehlschlägt.
     ///
     /// # Crash
-    /// Nullt Slot, führt sync_data aus und prüft Fehlen; bei fsync-Fehler verbleibt Slot in Pending (PO-06, D-55).
+    /// Nullt Slot, führt sync_data aus und prüft Fehlen; bei fsync-Fehler verbleibt Slot in Pending.
     fn destroy(&self, id: FileId) -> BoxFuture<'_, Result<(), String>>;
 }

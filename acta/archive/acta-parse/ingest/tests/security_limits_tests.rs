@@ -1,10 +1,10 @@
-//! Sicherheits-, Limits- und Robustheits-Beweise (WP-3).
+//! Sicherheits-, Limits- und Robustheits-Beweise.
 //!
 //! # Zweck & Invarianten
 //! Verifiziert, dass alle fehlerhaften, manipulierten oder bösartigen Eingaben
 //! (Zip-Bomben, XXE, Rekursionsbomben, Directory Traversal, übergroße Dokumente,
 //! defekte oder abgeschnittene Datei-Header) deterministisch zu typisierten `IngestError`
-//! führen und NIEMALS zu Panic, OOM oder Deadlock/Hängern (INV-1, INV-5).
+//! führen und NIEMALS zu Panic, OOM oder Deadlock/Hängern.
 
 #![allow(
     clippy::unwrap_used,

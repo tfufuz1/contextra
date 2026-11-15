@@ -3,11 +3,11 @@
 //! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher
-//! // INVARIANTEN: INV-LOCK-ORDER-1,,, MV-08
+//! // INVARIANTEN:, MV-08
 //! // HOTSPOTS: commit_mutex, wal.truncate_lock, state, memtable.shards
 //!
-//! Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher gemäß
-//!,, MV-08 und Invariante `INV-LOCK-ORDER-1`:
+//! Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher
+//!, MV-08 und Invariante
 //!
 //! ```text
 //! Dokument-Lock (Intent)
@@ -54,7 +54,7 @@
 //! 2. **Tokio-Guards mit Zeitschranke:**
 //!    Asynchrone `tokio::sync`-Guards dürfen nur gehalten werden, solange strikte Deadlock-Freiheit
 //!    durch Einhaltung obiger Rangordnung sichergestellt ist.
-//! 3. **Lock-Handoff-Invariante (ADR-0XX-P0A):**
+//! 3. **Lock-Handoff-Invariante:**
 //!    Beim Group-Commit wird `wal.truncate_lock` akquiriert, BEVOR `commit_mutex` freigegeben wird.
 //!    Dadurch wird verhindert, dass parallele Commits oder Truncates interleaven.
 

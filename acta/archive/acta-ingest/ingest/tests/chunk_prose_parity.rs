@@ -5,7 +5,7 @@
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
 // FILE-CONTEXT
-// ZWECK: Paritätstests zwischen ProseChunker und MarkdownChunker (Engine) (WP M3 / SPEC C-11.7).
+// ZWECK: Paritätstests zwischen ProseChunker und MarkdownChunker (Engine).
 // INVARIANTEN: Dieselbe Wortfolge (split_whitespace), passende Breadcrumbs/Heading-Levels.
 // STAND: TS:2026-10-31T00:00:00Z
 

@@ -12,7 +12,7 @@
 //! - **Deterministische Zeitprüfung:** Zeitabfragen erfolgen strikt über den [`Clock`]-Trait
 //!   (B11: Crate-lokaler Trait für Zeit). Dies erlaubt deterministische Tests sowie Schutz vor Replay.
 //! - **Fail-Closed Prinzip:** Tritt ein Fehler, eine fehlende Aktivierung oder ein ungültiger Hash auf,
-//!   wird der Zugriff verweigert (`Err(LicenseError::...)`). Nur der freie `Fast`-Ring ist immer freigeschaltet (INV-LICENSE-2).
+//!   wird der Zugriff verweigert (`Err(LicenseError::...)`). Nur der freie `Fast`-Ring ist immer freigeschaltet.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -219,7 +219,7 @@ impl SignedActivation {
 /// Ermittelt oder erzeugt deterministisch den 32-Byte-BLAKE3-Hash der lokalen Installation.
 ///
 /// # Status
-/// **VORLÄUFIG, BIS ZUR SCHRIFTLICHEN ENTSCHEIDUNG** (Spec Teil 15, „Offene Entscheidungen“).
+/// **VORLÄUFIG, BIS ZUR SCHRIFTLICHEN ENTSCHEIDUNG**.
 ///
 /// **Ablauf:**
 /// 1. Falls ein Speicherpfad (`storage_path`) übergeben wird:
@@ -302,7 +302,7 @@ impl From<LegacyLicensePayload> for LicensePayload {
 // ============================================================================
 
 // ANCHOR[acta-node:STEP-1-FAST-RING]
-/// Schritt 1: Prüfung auf Fast-Ring-Bypass (Invariante INV-LICENSE-2).
+/// Schritt 1: Prüfung auf Fast-Ring-Bypass.
 ///
 /// **Garantie:** Der freie Standard-Ring `FeatureRing::Fast` benötigt niemals eine Lizenz
 /// und darf nicht blockiert werden. Gibt `true` zurück, wenn alle weiteren Prüfungen übersprungen werden können.
@@ -639,12 +639,12 @@ impl SignedLicenseGate {
     }
 
     // ANCHOR[acta-node:GATE-STEP-CHECKS]
-    /// Führt Schritt 1 (Fast Ring Bypass) auf dieser Instanz aus.
+    /// Führt Schritt 1 (Fast Ring Bypass) auf dieser Instanz.
     pub fn check_step_1_fast_ring(&self, ring: FeatureRing) -> bool {
         verify_step_1_fast_ring(ring)
     }
 
-    /// Führt Schritt 2 (Vorhandenseinsprüfung) auf dieser Instanz aus.
+    /// Führt Schritt 2 (Vorhandenseinsprüfung) auf dieser Instanz.
     pub fn check_step_2_presence(&self, ring: FeatureRing) -> Result<(), StepVerificationError> {
         verify_step_2_presence(
             self.activation.as_ref(),
@@ -653,7 +653,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Führt Schritt 3 (Installationsbindung) auf dieser Instanz aus.
+    /// Führt Schritt 3 (Installationsbindung) auf dieser Instanz.
     pub fn check_step_3_installation(
         &self,
         ring: FeatureRing,
@@ -666,7 +666,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Führt Schritt 4 (Signaturprüfung) auf dieser Instanz aus.
+    /// Führt Schritt 4 (Signaturprüfung) auf dieser Instanz.
     pub fn check_step_4_signature(&self) -> Result<(), StepVerificationError> {
         verify_step_4_signature(
             self.activation.as_ref(),
@@ -675,7 +675,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Führt Schritt 5 (Ablaufprüfung via Zeit-Port) auf dieser Instanz aus.
+    /// Führt Schritt 5 (Ablaufprüfung via Zeit-Port) auf dieser Instanz.
     pub fn check_step_5_expiration(&self) -> Result<(), StepVerificationError> {
         verify_step_5_expiration(
             self.activation.as_ref(),
@@ -684,7 +684,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Führt Schritt 6 (Ring-Berechtigung) auf dieser Instanz aus.
+    /// Führt Schritt 6 (Ring-Berechtigung) auf dieser Instanz.
     pub fn check_step_6_ring_permission(
         &self,
         ring: FeatureRing,
@@ -696,7 +696,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Führt Schritt 7 (Erfolgsbestätigung) auf dieser Instanz aus.
+    /// Führt Schritt 7 (Erfolgsbestätigung) auf dieser Instanz.
     pub fn check_step_7_success(&self) -> Result<(), StepVerificationError> {
         verify_step_7_success()
     }
@@ -737,7 +737,7 @@ impl LicenseGate for SignedLicenseGate {
     /// Überprüft, ob der angeforderte Feature-Ring nach dem 7-stufigen Fail-Closed-Verfahren freigeschaltet ist.
     ///
     /// **Ablauf:**
-    /// 1. **Schritt 1:** Fast Ring Bypass (INV-LICENSE-2). Ist `ring == FeatureRing::Fast`, sofort `Ok(())`.
+    /// 1. **Schritt 1:** Fast Ring Bypass. Ist `ring == FeatureRing::Fast`, sofort `Ok(())`.
     /// 2. **Schritt 2:** Prüfen, ob Aktivierung oder Payload vorhanden ist.
     /// 3. **Schritt 3:** Prüfen der lokalen Installations-ID in konstanter Zeit ([`constant_time_eq_32`]).
     /// 4. **Schritt 4:** Kryptografische Prüfung der Ed25519-Signatur.
@@ -747,7 +747,7 @@ impl LicenseGate for SignedLicenseGate {
     ///
     /// Scheitert irgendein Schritt ab Schritt 2, bricht die Prüfung sofort fail-closed ab.
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
-        // (1) Step 1: Fast Ring Bypass - INVARIANTE INV-LICENSE-2
+        // (1) Step 1: Fast Ring Bypass - INVARIANTE
         if verify_step_1_fast_ring(ring) {
             return Ok(());
         }

@@ -63,7 +63,7 @@ impl WasmExecutor {
             .map_err(|e| SandboxError::InvalidModule(e.to_string()))
     }
 
-    /// Führt ein WASM-Binary mit Capability-Einschränkungen aus.
+    /// Führt ein WASM-Binary mit Capability-Einschränkungen.
     ///
     /// # Garantien
     /// - Fuel-Budget: CPU-Limit (deterministisch), verhindert Endlosschleifen

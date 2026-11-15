@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-error-main,epic=sys-error,seq=0] Crate-level structured error types
 // =========================================================================
-// NOTE: Crate-level structured error types for acta-sys (Ring 0 / E0 / docs/SPEC.md v3 §3.1 / R3).
+// NOTE: Crate-level structured error types for acta-sys.
 // Invariante: Zero panic; structured error propagation; no string-parsed errnos; thiserror integration.
 // Keine unzulässigen Garantieversprechen.
 
@@ -31,7 +31,7 @@ pub enum Error {
     },
 
     /// Eine physische Synchronisation (`fsync`/`fdatasync`/`FlushFileBuffers`) ist fehlgeschlagen.
-    /// Nach diesem Fehler ist das betroffene Handle dauerhaft vergiftet (INV-SYS-FSYNC-1).
+    /// Nach diesem Fehler ist das betroffene Handle dauerhaft vergiftet.
     #[error("durability sync failed (errno {0})")]
     SyncFailed(i32),
 
@@ -51,7 +51,7 @@ pub enum Error {
     #[error("operation unsupported on this platform: {0}")]
     Unsupported(&'static str),
 
-    /// Ein Datei-Handle befindet sich in einem dauerhaft vergifteten Zustand nach vorherigem Flush-Fehler (INV-SYS-FSYNC-1).
+    /// Ein Datei-Handle befindet sich in einem dauerhaft vergifteten Zustand nach vorherigem Flush-Fehler.
     #[error("file handle is permanently poisoned due to previous sync failure")]
     HandlePoisoned,
 }
@@ -60,7 +60,7 @@ pub enum Error {
 // SECTION Type Aliases & Standard Conversions
 // ANCHOR[id=sys-error-aliases,epic=sys-error,seq=2] Typ-Aliase und Konvertierungen
 
-/// Typ-Alias für das Crate-Fehlermodell gemäß Baukasten-Spezifikation (docs/SPEC.md §3.1 / R3).
+/// Typ-Alias für das Crate-Fehlermodell gemäß Baukasten-Spezifikation.
 pub type SysError = Error;
 
 /// Spezifischer Result-Typ für `acta-sys`.

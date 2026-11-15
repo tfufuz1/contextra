@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Konnektivitäts-Prüfung und Score-Berechnung (INV-VEC-CONNECTIVITY-1).
+// ZWECK: Konnektivitäts-Prüfung und Score-Berechnung.
 // INVARIANTEN: Zero-Panic; BFS auf Layer 0; Fail-Closed bei isolierten Knoten.
 // HOTSPOTS: connectivity_score, check_connectivity
 // STAND: 2026-11-12
@@ -29,7 +29,7 @@ impl HnswIndexCore {
         (1.0_f64 - deleted as f64 / total as f64).max(0.0_f64)
     }
 
-    /// Prüft die Graph-Konnektivität (`INV-VEC-CONNECTIVITY-1`):
+    /// Prüft die Graph-Konnektivität:
     /// Verifiziert mittels BFS auf Layer 0, dass alle aktiven (nicht gelöschten) Knoten
     /// vom aktuellen Entry-Point aus erreichbar sind.
     ///

@@ -336,7 +336,7 @@ impl SnapshotRegistry {
     }
 
     // ANCHOR[id=snapshot-registry-pinning]
-    /// Dauerhaftes Pinnen einer Sequenznummer (z. B. für SAOS Checkpoints oder Backups),
+    /// Dauerhaftes Pinnen einer Sequenznummer (z. B. für Checkpoints oder Backups),
     /// ohne einen RAII-Guard zu halten.
     ///
     /// Muss manuell über [`SnapshotRegistry::unpin`] wieder freigegeben werden.

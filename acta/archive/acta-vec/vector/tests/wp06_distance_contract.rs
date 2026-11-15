@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Integrations- und Vertragstests für Distanzfunktionen (WP-VEC-06).
+// ZWECK: Integrations- und Vertragstests für Distanzfunktionen.
 // INVARIANTEN: Längenprüfung, NaN/Inf-Abweisung, Dreiecksungleichung, Symmetrie, SIMD vs Skalar.
 // STAND: 2026-11-12
 

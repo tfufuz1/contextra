@@ -4,7 +4,7 @@
 //!   `Scanner<Unarmed>` → Positivkontrolle → `ControlEvidence` → `arm` → `Scanner<Armed>`
 //!   → `record(files, bytes)` → `finish(matches, duration, hash)` → `LayerWitness`
 //!
-//! Nur `measure`-intern erlaubt (L-5, ER-25).
+//! Nur `measure`-intern erlaubt.
 
 use super::field::{collect_all_files, read_file_verified, ScanPlan, VerifiedVia};
 use super::positive_control::run_positive_control_vfs;
@@ -179,7 +179,7 @@ pub fn scan_with_control(vfs: &dyn Vfs, plan: &ScanPlan) -> Result<LayerWitness,
         .map_err(|r| ErasureError::Residue(r.matches))
 }
 
-/// Führt einen delegierenden Scan-Fluss für Schichten aus.
+/// Führt einen delegierenden Scan-Fluss für Schichten.
 ///
 /// Veraltet: Für echte Messungen muss `scan_with_control(vfs, plan)` verwendet werden.
 /// Gibt `ErasureError::NotImplemented` zurück, um Scheinerfolge zu verhindern (P1, HR-10).

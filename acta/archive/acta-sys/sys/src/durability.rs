@@ -1,7 +1,7 @@
 // =========================================================================
 // ANCHOR[id=sys-durability-main,epic=sys-durability,seq=0] Haltbare Dateisystem-Synchronisation
 // =========================================================================
-// NOTE: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / E0 / docs/SPEC.md §10.1 / INV-SYS-FSYNC-1).
+// NOTE: Platform-aware low-level durability primitives for file and directory flushes.
 // Invariante: Zero panic; typed error propagation; fail-closed on unsupported targets; EINTR retry only; Handle-Poisoning on sync failure.
 // Keine unzulässigen Garantieversprechen.
 
@@ -16,7 +16,7 @@
 //!   `libc::fcntl(F_FULLFSYNC)`, `FlushFileBuffers`).
 //! - **Verwendung im System:** Wird von `acta-seg` (Write-Ahead-Log WAL und LSM-SSTables)
 //!   sowie `acta-fs` genutzt.
-//! - **Persistenz & Fehlerrichtlinie (INV-SYS-FSYNC-1):**
+//! - **Persistenz & Fehlerrichtlinie:**
 //!   Schlägt ein `fsync`/`fdatasync` fehl, wird sofort ein [`crate::Error::SyncFailed`] bzw.
 //!   [`std::io::Error`] an den Aufrufer propagiert. Es gibt keinen stillen Retry auf demselben
 //!   Handle: Ein fehlerhaftes Handle wird permanent vergiftet ([`DurableFile`]) und alle
@@ -63,9 +63,9 @@ pub(crate) mod fault_injection {
 // SECTION OS Sync Primitives
 // ANCHOR[id=sys-durability-os-sync,epic=sys-durability,seq=2] raw_os_sync_file
 
-/// Führt den rohen Betriebssystem-Sync-Syscall auf einem Dateideskriptor aus.
+/// Führt den rohen Betriebssystem-Sync-Syscall auf einem Dateideskriptor.
 ///
-/// # Invariante (INV-SYS-FSYNC-1)
+/// # Invariante
 /// Nur `EINTR` führt zu einer Wiederholung. Jeder andere Fehlercode führt sofort
 /// zum Abbruch und Rückgabe von `Error::SyncFailed(errno)`.
 #[cfg(unix)]
@@ -226,7 +226,7 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
 // SECTION Durable File Wrapper
 // ANCHOR[id=sys-durability-durable-file,epic=sys-durability,seq=5] DurableFile (Handle-Poisoning)
 
-/// Ein sicherer RAII-Wrapper um [`std::fs::File`], der die Invariante **INV-SYS-FSYNC-1** erzwingt:
+/// Ein sicherer RAII-Wrapper um [`std::fs::File`], der die Invariante **** erzwingt
 /// Sobald ein `fsync`/`fdatasync` oder Flush-Aufruf fehlschlägt, wird das Handle dauerhaft vergiftet (`is_poisoned() == true`).
 /// Alle nachfolgenden Schreib- und Synchronisationsaufrufe auf dieser Instanz schlagen sofort mit [`Error::HandlePoisoned`] fehl.
 #[derive(Debug)]
@@ -430,7 +430,7 @@ mod tests {
         }
     }
 
-    /// Prüft INV-SYS-FSYNC-1: Ein fehlgeschlagener Flush vergiftet das Handle dauerhaft.
+    /// Prüft: Ein fehlgeschlagener Flush vergiftet das Handle dauerhaft.
     #[test]
     fn test_inv_sys_fsync_1_poisoning() -> Result<()> {
         let temp_dir = std::env::temp_dir();

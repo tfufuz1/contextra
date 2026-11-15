@@ -387,7 +387,7 @@ pub enum NormalizationPolicy {
 }
 
 impl NormalizationPolicy {
-    /// Führt die Normalisierung deterministisch und idempotent auf dem String aus.
+    /// Führt die Normalisierung deterministisch und idempotent auf dem String.
     pub fn normalize(&self, text: &str) -> String {
         match self {
             Self::Lowercase => text.to_lowercase(),

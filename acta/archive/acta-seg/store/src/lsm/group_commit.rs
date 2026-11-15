@@ -3,7 +3,7 @@
 //! // FILE-CONTEXT
 //! // STAND: 2026-11-11
 //! // ZWECK: Buendelt parallele Schreibanfragen deterministisch zur Reduktion von fsync-Aufrufen
-//! // INVARIANTEN: ADR-0XX-P0A (Lock-Handoff), INV-FSYNC-1, fail-closed
+//! // INVARIANTEN: (Lock-Handoff), fail-closed
 
 use crate::error::StoreResult as Result;
 use crate::lsm::config::DurabilityMode;

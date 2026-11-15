@@ -1,12 +1,12 @@
 // FILE-CONTEXT
 // ZWECK: Phase-2 Delta-Replay via MVCC-Sequenzlog und atomarer Swap unter write_mutex.
-// INVARIANTEN: INV-INDEX-SNAPSHOT-1 (born_seq/died_seq Filterung); SSI-Determinismus; Swap unter write_mutex.
+// INVARIANTEN: (born_seq/died_seq Filterung); SSI-Determinismus; Swap unter write_mutex.
 // HOTSPOTS: replay_delta_and_swap, ReplayDecision, compute_replay_decisions
 // STAND: TS:2026-11-11T02:00:00Z
 
 //! Sequenzlog-Wiedergabe für den HNSW-Rebuild (Phase 2).
 //!
-//! #[derive(Debug, Clone)]Invariante INV-INDEX-SNAPSHOT-1:
+//! #[derive(Debug, Clone)]Invariante
 //! Für jedes Dokument im Index gilt ein wohldefinierter Transaktions-Sichtbarkeitsbereich:
 //! - `born_seq`: Transaktionssequenznummer der Einfügung.
 //! - `died_seq`: Transaktionssequenznummer der Löschung (Tombstone).
@@ -85,9 +85,9 @@ pub(super) fn compute_replay_decisions(
     Ok(decisions)
 }
 
-/// Führt Phase 2 des Rebuilds aus: Wendet Änderungen nach dem Snapshot-Tx an und tauscht Kern-Puffer aus.
+/// Führt Phase 2 des Rebuilds aus: Wendet Änderungen nach dem Snapshot-Tx an und tauscht Kern-Puffer.
 ///
-/// Invariante (INV-INDEX-SNAPSHOT-1 & SSI-Determinismus):
+/// Invariante:
 /// Der Puffer-Swap erfolgt atomar unter gehaltener `write_mutex`. Leser behalten deterministische Sicht.
 pub(super) fn replay_delta_and_swap(
     core: &HnswIndexCore,

@@ -175,7 +175,7 @@ impl AppendOnlyJournal {
         Ok(seq)
     }
 
-    /// Flusht ausstehende Journal-Schreibvorgänge synchron auf stabilen Speicher (`INV-FSYNC-1`).
+    /// Flusht ausstehende Journal-Schreibvorgänge synchron auf stabilen Speicher.
     pub fn flush(&mut self) -> Result<()> {
         if self.health.load().is_poisoned() {
             return Err(DurableFsError::PoisonedHandle);

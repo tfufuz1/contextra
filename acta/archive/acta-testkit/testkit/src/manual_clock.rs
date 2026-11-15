@@ -91,7 +91,7 @@ impl ManualClock {
     }
 
     // ANCHOR[acta-testkit:MANUAL-CLOCK-NOW-001]
-    /// Liest den aktuellen Zeitstempel in Nanosekunden seit UNIX_EPOCH aus.
+    /// Liest den aktuellen Zeitstempel in Nanosekunden seit UNIX_EPOCH.
     pub fn now_nanos(&self) -> u64 {
         self.nanos.load(Ordering::SeqCst)
     }

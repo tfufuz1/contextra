@@ -3,7 +3,7 @@
 //! Scannt sequentiell durch das WAL zur Integritaetspruefung oder gezielten Datenextraktion.
 
 // FILE-CONTEXT
-// ZWECK: WAL-Scanner für WalAllSegments-Schicht (§12.7.4, INV-WITNESS-MINT-1).
+// ZWECK: WAL-Scanner für WalAllSegments-Schicht.
 // INVARIANTEN: dekodiert alle WAL-Segmente inklusive HMAC-Prüfung und misst Rohdaten.
 // HOTSPOTS: [1-90]
 

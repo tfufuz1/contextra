@@ -190,7 +190,7 @@ async fn test_authenticated_data_parse_error_is_corruption_not_tail() {
         .expect("encrypt");
 
     let mut file_bytes = Vec::new();
-    file_bytes.extend_from_slice(b"MFW3");
+    file_bytes.extend_from_slice(b"AWL3");
     let chunk_len = (12 + encrypted.len()) as u32;
     file_bytes.extend_from_slice(&chunk_len.to_le_bytes());
     file_bytes.extend_from_slice(&nonce);

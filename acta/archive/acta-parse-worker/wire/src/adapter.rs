@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // STAND: 2026-11-08T12:00:00Z
 // ZWECK: Zero-copy byte buffer slice wrapper (WireBuffer) with typestate verification for FlatBuffers IPC messages.
-// INVARIANTEN: No pointer transmutes or lifetime transmutations; reference counting via Bytes; INV-WIRE-BOUNDS-1 (Unverified -> Verified).
+// INVARIANTEN: No pointer transmutes or lifetime transmutations; reference counting via Bytes; (Unverified -> Verified).
 
 //! # Zero-Copy-Adapter-Abstraktionen für IPC-Drahtnachrichten
 //!
@@ -12,8 +12,8 @@
 //! ohne dass Speicher kopiert werden muss (Zero-Copy). Durch die atomare Referenzzählung in `Bytes`
 //! bleibt der Speicherzugriff threadsicher und allokationsarm.
 //!
-//! ## Typzustand-Garantie (`INV-WIRE-BOUNDS-1`)
-//! Gemäß `INV-WIRE-BOUNDS-1` gibt der Adapter keinen typisierten Zugriff auf unverifizierte Puffer heraus.
+//! ## Typzustand-Garantie
+//! Gemäß gibt der Adapter keinen typisierten Zugriff auf unverifizierte Puffer heraus.
 //! Ein neu erzeugter Puffer startet im Zustand `Unverified`. Erst durch explizite Verifikation
 //! via `.verify::<T>(&config)` wird ein typisierter Puffer im Zustand `Verified<T>` erzeugt, der
 //! sicheren Zugriff auf die geparste Wurzelstruktur gewährt.
@@ -32,7 +32,7 @@ pub struct Unverified;
 /// Typzustands-Marker: Verifizierter Puffer für FlatBuffers-Wurzeltabelle `T`.
 ///
 /// Garantiert durch vorangegangene Verifikation gegen `FlatBufferConfig`, dass alle Offsets,
-/// VTables, Vektoren und Bounds des Typs `T` innerhalb des Puffers liegen (`INV-WIRE-BOUNDS-1`).
+/// VTables, Vektoren und Bounds des Typs `T` innerhalb des Puffers liegen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Verified<T> {
     _phantom: PhantomData<fn() -> T>,
@@ -86,7 +86,7 @@ impl VerifiableRoot for crate::generated::acta_generated::acta::ipc::HyperEdge<'
 /// von Binärdaten ohne Speicherallokation oder Kopiervorgänge zu ermöglichen.
 ///
 /// # Invarianten
-/// - `INV-WIRE-BOUNDS-1`: Typzustand `Unverified` -> `Verified<T>`. Wurzelzugriff existiert nur auf `Verified<T>`.
+/// -: Typzustand `Unverified` -> `Verified<T>`. Wurzelzugriff existiert nur auf `Verified<T>`.
 /// - Keine Zeiger-Transmutes (`transmute`) oder Lebenszeit-Manipulationen (`lifetime transmutations`).
 /// - Threadsicher durch interne atomare Referenzzählung (`Arc`-äquivalent in `Bytes`).
 #[derive(Debug, Clone)]
@@ -120,7 +120,7 @@ impl WireBuffer<Unverified> {
 
     /// Verifiziert den Puffer gegen das angegebene FlatBuffers-Root-Schema `T` und die Schutzgrenzen `config`.
     ///
-    /// # Ablauf (`INV-WIRE-BOUNDS-1`)
+    /// # Ablauf
     /// 1. Übergabe des Rohdaten-Slices an `verification::verify_flatbuffer::<T::Table>`.
     /// 2. Bei Erfolg: Rückgabe eines typisierten `WireBuffer<Verified<T>>` mit gespeicherter Verifikationskonfiguration.
     /// 3. Bei Fehlschlag: Rückgabe von `FlatBufferError`.
@@ -147,7 +147,7 @@ impl WireBuffer<Unverified> {
 impl<T: VerifiableRoot> WireBuffer<Verified<T>> {
     /// Liefert die verifizierte FlatBuffers-Wurzel für diesen Puffer unter Verwendung der bei der Verifikation geprüften Grenzwerte.
     ///
-    /// # Garantien (`INV-WIRE-BOUNDS-1`)
+    /// # Garantien
     /// Durch den Typzustand `Verified<T>` ist sichergestellt, dass die Pufferstruktur,
     /// Offsets und Tabellengrenzen vorab vollständig geprüft wurden.
     ///
@@ -162,7 +162,7 @@ impl<T: VerifiableRoot> WireBuffer<Verified<T>> {
 
     /// Liefert die verifizierte FlatBuffers-Wurzel für diesen Puffer unter Verwendung der angegebenen Schutzgrenzen.
     ///
-    /// # Garantien (`INV-WIRE-BOUNDS-1`)
+    /// # Garantien
     /// Sicherer, geprüfter Zugriff ohne ungeschützte Zeigerarithmetik.
     #[inline]
     pub fn root_with_config<'a>(

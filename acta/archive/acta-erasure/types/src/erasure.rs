@@ -16,7 +16,7 @@ use crate::refs::{CollectionRef, DocRef, OperatorRef, SubjectRef, TenantRef};
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum EraseTarget {
     /// Einzelnes Dokument.
@@ -28,7 +28,7 @@ pub enum EraseTarget {
         /// Dokument-Referenz (inklusive Subject).
         doc: DocRef,
     },
-    /// Betroffener über alle Dokumente einer oder mehrerer Collections (D-14).
+    /// Betroffener über alle Dokumente einer oder mehrerer Collections.
     Subject {
         /// Mandanten-Referenz.
         tenant: TenantRef,
@@ -42,7 +42,7 @@ pub enum EraseTarget {
         /// Collection-Referenz.
         collection: CollectionRef,
     },
-    /// Mandanten-Offboarding (D-38).
+    /// Mandanten-Offboarding.
     Tenant {
         /// Mandanten-Referenz.
         tenant: TenantRef,
@@ -53,7 +53,7 @@ pub enum EraseTarget {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum Timing {
     /// Sofortige Ausführung im Vordergrund.
@@ -66,7 +66,7 @@ pub enum Timing {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum EraseMode {
     /// Vollständige physische Bereinigung und Schlüsselvernichtung.
@@ -79,7 +79,7 @@ pub enum EraseMode {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum RetentionCode {
     /// Es besteht keine Aufbewahrungspflicht.
@@ -100,7 +100,7 @@ pub enum RetentionCode {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct RetentionAttestation {
     /// Aufbewahrungscode.
@@ -115,7 +115,7 @@ pub struct RetentionAttestation {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct EraseRequest {
     /// Löschziel.
@@ -132,7 +132,7 @@ pub struct EraseRequest {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct EraseReceipt {
     /// Eindeutige Kennung des Löschvorgangs.
@@ -147,7 +147,7 @@ pub struct EraseReceipt {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct LayerId(pub [u8; 16]);
 
@@ -177,7 +177,7 @@ impl fmt::Debug for LayerId {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum PendingReason {
     /// I/O-Fehler bei der Schichtbearbeitung.
@@ -196,7 +196,7 @@ pub enum PendingReason {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum RefusalReason {
     /// Gesetzliche Aufbewahrungspflicht steht der Bereinigung entgegen.
@@ -209,7 +209,7 @@ pub enum RefusalReason {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum Phase {
     /// Intent-Registrierung.
@@ -222,11 +222,11 @@ pub enum Phase {
     Purge,
     /// Unabhängige Nachweismessung.
     Verify,
-    /// Dokument-Ersetzung (D-115).
+    /// Dokument-Ersetzung.
     Replace,
-    /// Version-Supersede (D-117).
+    /// Version-Supersede.
     Supersede,
-    /// Zugriffseinschränkung (D-116).
+    /// Zugriffseinschränkung.
     Restrict,
 }
 
@@ -234,7 +234,7 @@ pub enum Phase {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum ErasureStatus {
     /// Auftrag empfangen und validiert.
@@ -249,9 +249,9 @@ pub enum ErasureStatus {
     Verifying,
     /// Bereinigung vollständig nachgewiesen und abgeschlossen.
     Completed,
-    /// Einschränkung der Verarbeitung aktiv (D-116, D-124).
+    /// Einschränkung der Verarbeitung aktiv.
     Restricted,
-    /// Einschränkung aufgehoben (D-116, D-124).
+    /// Einschränkung aufgehoben.
     Lifted,
     /// Verzögert mit sichtbarem Grund (nie still).
     Pending {
@@ -268,7 +268,7 @@ pub enum ErasureStatus {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum KeyCoverage {
     /// Vollständige kryptografische Unlesbarkeit aller Records/Payloads.
@@ -283,7 +283,7 @@ pub enum KeyCoverage {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum GateVariant {
     /// Klasse P: Physisch gelöscht und gesperrt.
@@ -296,7 +296,7 @@ pub enum GateVariant {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum MeasureClass {
     /// MK1: Logische/funktionale Prüfung.
@@ -311,7 +311,7 @@ pub enum MeasureClass {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum ScanMethod {
     /// MK1: Logische Scanmethode (z. B. Iteration über Indexeinträge).
@@ -337,7 +337,7 @@ impl ScanMethod {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum RiskCondition {
     /// Bedingung trifft immer zu.
@@ -352,7 +352,7 @@ pub enum RiskCondition {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub enum ResidualRisk {
     /// Flash-Remanenz auf FTL-Ebene.
@@ -420,28 +420,28 @@ impl ResidualRisk {
 }
 
 // =========================================================================
-// Typisierter Zeuge (Typzustandsmuster, SPEC 8.1, 12.2, D-72, I-19, L-5, TY-10)
+// Typisierter Zeuge
 // =========================================================================
 
 /// Typzustand: Scanner ist noch nicht scharfgeschaltet.
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct Unarmed;
 
 /// Typzustand: Scanner ist scharfgeschaltet nach erfolgreicher Positivkontrolle.
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct Armed(());
 
-/// Beleg für eine beobachtete Positivkontrolle (D-72).
+/// Beleg für eine beobachtete Positivkontrolle.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct ControlEvidence(());
 
@@ -457,7 +457,7 @@ impl ControlEvidence {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct Residue {
     /// Anzahl gefundener Treffer / Rückstände.
@@ -480,7 +480,7 @@ impl std::error::Error for Residue {}
 #[must_use = "Scanner muss mit finish() abgeschlossen werden"]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct Scanner<S> {
     layer: LayerId,
@@ -526,7 +526,7 @@ impl Scanner<Armed> {
 
     /// Schließt die Messung ab.
     /// matches != 0 => Err(Residue).
-    /// LayerWitness wird ausschließlich bei matches == 0 ausgegeben (TY-10, I-19, D-72).
+    /// LayerWitness wird ausschließlich bei matches == 0 ausgegeben.
     pub fn finish(
         self,
         matches: u64,
@@ -549,12 +549,12 @@ impl Scanner<Armed> {
     }
 }
 
-/// Unveränderlicher Zeuge einer Schichtmessung (D-72, I-19).
+/// Unveränderlicher Zeuge einer Schichtmessung.
 /// Felder sind privat; matches() ist per Konstruktion immer 0.
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[deprecated(
     since = "0.1.0",
-    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure-spi per D-E1)"
+    note = "Löschtypen gehören in die Erasure-Familie (acta-erasure)"
 )]
 pub struct LayerWitness {
     layer: LayerId,

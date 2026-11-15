@@ -3,7 +3,7 @@
 **Aufgabe:** Loeschkern: Saga, Gate-Journal, Messung, Restore-Schutz, Mehrbetroffenen-Plan  
 **Level:** L4 · **Budget:** 9000 LOC · **Spezifikation:** docs/SPEC.md Kap. 8  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-fs, acta-gate, acta-ledger, acta-vault, acta-seg, acta-pstore  
-**Umfang des Archivs:** 58 Dateien, 12015 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 76 Dateien, 16365 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -34,61 +34,79 @@
 
 | Datei (relativ zu `archive/acta-erasure/`) | LOC | Befunde |
 |---|---:|---|
-| `erasure/benches/bm_erase.rs` | 47 | zeit_zufall=3, panic=1 |
-| `erasure/fuzz/fuzz_targets/fuzz_ledger_record.rs` | 12 |  |
-| `erasure/src/backend.rs` | 33 |  |
-| `erasure/src/erasure_domain.rs` | 634 | serde=1, hr6=23, alt_spec=13 |
-| `erasure/src/error.rs` | 126 | alt_spec=1 |
-| `erasure/src/io.rs` | 65 | async=1, std_fs=1, alt_spec=1 |
-| `erasure/src/journal.rs` | 76 |  |
-| `erasure/src/journal/appendlog.rs` | 386 |  |
-| `erasure/src/journal/epoch.rs` | 54 | alt_spec=1 |
-| `erasure/src/journal/record.rs` | 406 | serde=1 |
-| `erasure/src/journal/reduce.rs` | 24 |  |
-| `erasure/src/journal/scope_purge.rs` | 79 | alt_spec=2, liste_a=1 |
-| `erasure/src/journal/wal.rs` | 86 | serde=3, panic=2, alt_spec=1 |
-| `erasure/src/journal/wal_sink.rs` | 407 |  |
-| `erasure/src/lib.rs` | 45 |  |
-| `erasure/src/measure.rs` | 142 | hr6=5, alt_spec=6 |
-| `erasure/src/measure/field.rs` | 327 | alt_spec=5, liste_a=1 |
-| `erasure/src/measure/positive_control.rs` | 177 |  |
-| `erasure/src/measure/residue.rs` | 567 | serde=1 |
-| `erasure/src/measure/scanner_flow.rs` | 197 | hr6=1, alt_spec=1 |
-| `erasure/src/measure/witness.rs` | 62 | alt_spec=2 |
-| `erasure/src/orchestrator.rs` | 148 | serde=1, alt_spec=3 |
-| `erasure/src/purge.rs` | 27 |  |
-| `erasure/src/purge/cx.rs` | 48 | alt_spec=3 |
-| `erasure/src/purge/order.rs` | 54 | alt_spec=1 |
-| `erasure/src/purge/phase.rs` | 309 | serde=1 |
-| `erasure/src/purge/reserve.rs` | 41 | alt_spec=1 |
-| `erasure/src/purge/resume.rs` | 87 | serde=1 |
-| `erasure/src/purge/window.rs` | 76 | async=1, alt_spec=2 |
-| `erasure/src/replace.rs` | 139 | serde=1, alt_spec=5 |
-| `erasure/src/restore.rs` | 30 |  |
-| `erasure/src/restore/guard.rs` | 68 | alt_spec=5 |
-| `erasure/src/restore/replay.rs` | 49 | alt_spec=4 |
-| `erasure/src/restricted.rs` | 212 | serde=1, alt_spec=4 |
-| `erasure/src/saga.rs` | 26 |  |
-| `erasure/src/saga/core.rs` | 933 | async=11, alt_spec=17 |
-| `erasure/src/saga/driver.rs` | 146 | async=1, alt_spec=4 |
-| `erasure/src/saga/idempotency.rs` | 20 | alt_spec=1 |
-| `erasure/src/saga/machine.rs` | 192 | serde=1, alt_spec=7 |
-| `erasure/src/saga/retention.rs` | 23 |  |
-| `erasure/src/saga/seams.rs` | 129 | async=1 |
-| `erasure/src/scope.rs` | 18 | alt_spec=1 |
-| `erasure/src/scope/codec.rs` | 163 |  |
-| `erasure/src/scope/file.rs` | 186 | async=2, alt_spec=3 |
-| `erasure/src/scope/flight.rs` | 119 | serde=1, panic=1, alt_spec=3 |
-| `erasure/src/scope/set.rs` | 78 | serde=1, alt_spec=3 |
-| `erasure/src/scope/single_flight.rs` | 362 | serde=1, alt_spec=5 |
-| `erasure/src/supersede.rs` | 175 | serde=3, alt_spec=3 |
-| `erasure/src/test_mocks.rs` | 81 | async=1 |
-| `erasure/src/types_local.rs` | 2440 | serde=1, zeit_zufall=3, std_fs=7, alt_spec=5, liste_a=1 |
-| `erasure/tests/crash_matrix_recovery.rs` | 276 | async=2, panic=8 |
-| `ports/src/barrier.rs` | 166 | alt_spec=2 |
-| `ports/src/lifecycle.rs` | 68 | float=3, serde=1, alt_spec=1 |
-| `ports/src/scanner/layer.rs` | 124 | serde=1 |
-| `ports/src/scanner/mod.rs` | 216 | panic=5, hub=1, alt_spec=2 |
-| `ports/src/scanner/session.rs` | 107 |  |
-| `ports/src/scanner/witness.rs` | 109 | serde=1 |
-| `types/src/erasure.rs` | 618 | serde=1, hr6=24, alt_spec=13 |
+| `erasure/benches/bm_erase.rs` | 46 | panic=1 |
+| `erasure/fuzz/fuzz_targets/fuzz_ledger_record.rs` | 11 |  |
+| `erasure/src/backend.rs` | 32 | async=2 |
+| `erasure/src/erasure_domain.rs` | 633 | serde=1 |
+| `erasure/src/error.rs` | 125 |  |
+| `erasure/src/io.rs` | 64 | async=1, std_fs=2 |
+| `erasure/src/journal.rs` | 75 |  |
+| `erasure/src/journal/appendlog.rs` | 385 |  |
+| `erasure/src/journal/epoch.rs` | 53 |  |
+| `erasure/src/journal/record.rs` | 405 | serde=1 |
+| `erasure/src/journal/reduce.rs` | 23 |  |
+| `erasure/src/journal/scope_purge.rs` | 78 |  |
+| `erasure/src/journal/wal.rs` | 85 | panic=2, serde=3 |
+| `erasure/src/journal/wal_sink.rs` | 406 |  |
+| `erasure/src/lib.rs` | 44 |  |
+| `erasure/src/measure.rs` | 141 |  |
+| `erasure/src/measure/field.rs` | 326 |  |
+| `erasure/src/measure/positive_control.rs` | 176 |  |
+| `erasure/src/measure/residue.rs` | 566 | serde=1 |
+| `erasure/src/measure/scanner_flow.rs` | 196 |  |
+| `erasure/src/measure/witness.rs` | 61 | alt_spec=1 |
+| `erasure/src/orchestrator.rs` | 147 | serde=1 |
+| `erasure/src/purge.rs` | 26 | async=1 |
+| `erasure/src/purge/cx.rs` | 47 |  |
+| `erasure/src/purge/order.rs` | 53 |  |
+| `erasure/src/purge/phase.rs` | 308 | serde=1 |
+| `erasure/src/purge/reserve.rs` | 40 |  |
+| `erasure/src/purge/resume.rs` | 86 | serde=1 |
+| `erasure/src/purge/window.rs` | 75 | async=3 |
+| `erasure/src/replace.rs` | 138 | serde=1 |
+| `erasure/src/restore.rs` | 29 |  |
+| `erasure/src/restore/guard.rs` | 67 |  |
+| `erasure/src/restore/replay.rs` | 48 |  |
+| `erasure/src/restricted.rs` | 211 | serde=1 |
+| `erasure/src/saga.rs` | 25 | async=2 |
+| `erasure/src/saga/core.rs` | 932 | async=13 |
+| `erasure/src/saga/driver.rs` | 145 | async=8 |
+| `erasure/src/saga/idempotency.rs` | 19 |  |
+| `erasure/src/saga/machine.rs` | 191 | serde=1 |
+| `erasure/src/saga/retention.rs` | 22 |  |
+| `erasure/src/saga/seams.rs` | 128 | async=3 |
+| `erasure/src/scope.rs` | 17 |  |
+| `erasure/src/scope/codec.rs` | 162 |  |
+| `erasure/src/scope/file.rs` | 185 | async=2 |
+| `erasure/src/scope/flight.rs` | 118 | panic=1, serde=1, alt_spec=1 |
+| `erasure/src/scope/set.rs` | 77 | serde=1 |
+| `erasure/src/scope/single_flight.rs` | 361 | serde=1 |
+| `erasure/src/supersede.rs` | 174 | serde=3 |
+| `erasure/src/test_mocks.rs` | 80 | async=4 |
+| `erasure/src/types_local.rs` | 2439 | async=2, serde=1, alt_spec=3 |
+| `erasure/tests/crash_matrix_recovery.rs` | 275 | panic=8, async=19 |
+| `erasure/tests/journal_durable_spec_tests.rs` | 397 | panic=17 |
+| `erasure/tests/loom_erasure_models.rs` | 76 | panic=2 |
+| `erasure/tests/measure_real_scan_tests.rs` | 368 | panic=27 |
+| `erasure/tests/measure_spec_tests.rs` | 280 | panic=20 |
+| `erasure/tests/p3_purge_and_scope_tests.rs` | 460 | panic=27, async=14 |
+| `erasure/tests/p4_fence_tests.rs` | 325 | panic=18, alt_spec=1 |
+| `erasure/tests/p8_residue_scan_tests.rs` | 247 | panic=7, alt_spec=2 |
+| `erasure/tests/proof_crash_resume_matrix.rs` | 207 | panic=13 |
+| `erasure/tests/proof_fail_closed_and_consistency.rs` | 149 | panic=12, std_fs=1 |
+| `erasure/tests/saga_core_orchestration.rs` | 547 | panic=12, async=36 |
+| `erasure/tests/scope_codec_spec_tests.rs` | 209 | panic=5, async=6 |
+| `erasure/tests/special_targets_test.rs` | 289 | panic=22 |
+| `erasure/tests/t_inv_era.rs` | 169 | panic=8, async=2, alt_spec=1 |
+| `erasure/tests/t_measure.rs` | 84 | panic=4 |
+| `erasure/tests/t_observer.rs` | 69 | async=4 |
+| `erasure/tests/t_saga_journal.rs` | 186 | panic=17, async=9 |
+| `erasure/tests/t_saga_spec_extensions.rs` | 189 | panic=4 |
+| `ports/src/barrier.rs` | 165 |  |
+| `ports/src/lifecycle.rs` | 67 | float=3, serde=1 |
+| `ports/src/observer.rs` | 157 | panic=1, async=1 |
+| `ports/src/scanner/layer.rs` | 123 | serde=1 |
+| `ports/src/scanner/mod.rs` | 215 | panic=5 |
+| `ports/src/scanner/session.rs` | 106 | alt_spec=3 |
+| `ports/src/scanner/witness.rs` | 108 | serde=1 |
+| `types/src/erasure.rs` | 617 | serde=1 |

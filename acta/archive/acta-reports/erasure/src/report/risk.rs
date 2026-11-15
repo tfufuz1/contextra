@@ -38,13 +38,13 @@ pub enum ResidualRiskId {
     PurgeDeferred,
     /// Schlüsselkompromittierung vor Löschung.
     KeyCompromise,
-    /// Verifikation stützt sich auf Cache statt Medium (D-113).
+    /// Verifikation stützt sich auf Cache statt Medium.
     VerifiedViaCache,
-    /// Backup enthält Schlüsselmaterial (D-112).
+    /// Backup enthält Schlüsselmaterial.
     BackupKeyMaterial,
-    /// R2/R3-Überlappung bei Dokument-Ersetzung (D-115).
+    /// R2/R3-Überlappung bei Dokument-Ersetzung.
     ReplacementOverlap,
-    /// Berichtigung mit Purge belässt Schlüssel (D-117).
+    /// Berichtigung mit Purge belässt Schlüssel.
     SupersededWithSameKey,
 }
 
@@ -129,9 +129,9 @@ impl ResidualRiskId {
         match self {
             Self::FlashRemanence => "Volume-Verschluesselung, Medienaussonderung",
             Self::FsJournalOrCow => {
-                "Dateischluessel-Vernichtung mindert (D-85); Volume-Verschluesselung"
+                "Dateischluessel-Vernichtung mindert; Volume-Verschluesselung"
             }
-            Self::WrappedKeyRemanence => "Hardware-Anker (D-53) oder Volume-Verschluesselung",
+            Self::WrappedKeyRemanence => "Hardware-Anker oder Volume-Verschluesselung",
             Self::FreedBlockRemanence => {
                 "keine weitere Massnahme erforderlich, ausser hohem Schutzbedarf"
             }
@@ -148,11 +148,11 @@ impl ResidualRiskId {
             Self::PurgeScalesWithDb => "-",
             Self::PurgeDeferred => "Abschluss abwarten",
             Self::KeyCompromise => "Schluesselverwaltung des Betreibers",
-            Self::VerifiedViaCache => "Betrieb mit O_DIRECT-faehigem Dateisystem (D-113)",
-            Self::BackupKeyMaterial => "Tresor getrennt sichern, RB-9 (D-112)",
-            Self::ReplacementOverlap => "Abschluss abwarten (D-115)",
+            Self::VerifiedViaCache => "Betrieb mit O_DIRECT-faehigem Dateisystem",
+            Self::BackupKeyMaterial => "Tresor getrennt sichern, RB-9",
+            Self::ReplacementOverlap => "Abschluss abwarten",
             Self::SupersededWithSameKey => {
-                "Mehr-Personen-Dokument: Entscheidungsregel D-115 (D-117)"
+                "Mehr-Personen-Dokument: Entscheidungsregel D-115"
             }
         }
     }
@@ -299,7 +299,7 @@ pub fn evaluate_residual_risks_with_context(ctx: &ResidualRiskContext) -> Vec<Re
     risks
 }
 
-/// Abwärtskompatible Auswertung aller Restrisiken (ER-28).
+/// Abwärtskompatible Auswertung aller Restrisiken.
 ///
 /// Beinhaltet standardmäßig alle bedingungslosen und die Purge-abhängigen Risiken.
 pub fn evaluate_residual_risks(purge_complete: bool) -> Vec<ResidualRiskId> {

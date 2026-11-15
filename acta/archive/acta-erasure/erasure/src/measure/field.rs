@@ -9,14 +9,14 @@ use crate::types_local::Vfs;
 use crate::types_local::{LayerId, MeasureClass};
 use std::path::{Path, PathBuf};
 
-/// Art der Leseverifikation gemäß SPEC D-113.
+/// Art der Leseverifikation gemäß SPEC.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerifiedVia {
     /// Direktes Lesen am Medium (O_DIRECT / F_NOCACHE).
     Direct,
     /// Cache vor dem Lesen verworfen (posix_fadvise DONTNEED).
     CacheDropped,
-    /// Regulärer Cache-Lesepfad (Fallback bis D-113 voll in Ports gemergt ist).
+    /// Regulärer Cache-Lesepfad.
     Cached,
 }
 
@@ -147,7 +147,7 @@ pub struct Mk1Result {
     pub checked_structures: u64,
     /// Treffer (sollte 0 sein).
     pub matches: u64,
-    /// Verifikationsmethode (D-113).
+    /// Verifikationsmethode.
     pub verified_via: VerifiedVia,
 }
 
@@ -160,7 +160,7 @@ pub struct Mk2Result {
     pub checked_bytes: u64,
     /// Treffer (sollte 0 sein).
     pub matches: u64,
-    /// Verifikationsmethode (D-113).
+    /// Verifikationsmethode.
     pub verified_via: VerifiedVia,
 }
 
@@ -173,7 +173,7 @@ pub struct Mk3Result {
     pub dek_derivation_fails: bool,
     /// F-Slots der Zieldateien nicht mehr vorhanden.
     pub file_slots_absent: bool,
-    /// Art der Verifikation (D-113).
+    /// Art der Verifikation.
     pub verified_via: VerifiedVia,
 }
 

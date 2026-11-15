@@ -1,4 +1,4 @@
-//! Traits für Index-Oberfläche und Wartung gemäß
+//! Traits für Index-Oberfläche und Wartung
 
 use crate::error::Result;
 

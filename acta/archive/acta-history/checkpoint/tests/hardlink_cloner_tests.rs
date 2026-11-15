@@ -1,0 +1,180 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::indexing_slicing,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::await_holding_lock
+)]
+//! # Integrationstest: SSTable Hardlink-Cloner
+//!
+//! Überprüft die Erstellung von Hardlink-Klonen, Dateisystem-Fallbacks und Cross-Device-Verhalten.
+
+use acta_checkpoint::{CheckpointHardlinkCloner, DefaultHardlinkCloner, SnapshotPinner};
+use acta_types::ActaError;
+use std::fs;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use tempfile::TempDir;
+
+/// Test-Double für SnapshotPinner, das aktive Pins zählt.
+#[derive(Default)]
+struct CountingPinner {
+    active_pins: Arc<AtomicU64>,
+}
+
+struct PinGuardDouble {
+    counter: Arc<AtomicU64>,
+}
+
+impl Drop for PinGuardDouble {
+    fn drop(&mut self) {
+        self.counter.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl SnapshotPinner for CountingPinner {
+    fn pin_seq_no(&self, _seq_no: u64) -> Box<dyn std::any::Any + Send + Sync> {
+        self.active_pins.fetch_add(1, Ordering::SeqCst);
+        Box::new(PinGuardDouble {
+            counter: Arc::clone(&self.active_pins),
+        })
+    }
+}
+
+// Testet: test successful hardlink clone and inode identity.
+#[tokio::test]
+async fn test_successful_hardlink_clone_and_inode_identity() -> acta_types::Result<()> {
+    let source_dir = TempDir::new().map_err(ActaError::Io)?;
+    let target_dir = TempDir::new().map_err(ActaError::Io)?;
+
+    let file1 = source_dir.path().join("000001.sst");
+    let file2 = source_dir.path().join("000002.sst");
+    let other_file = source_dir.path().join("ignore.txt");
+
+    fs::write(&file1, b"sstable_data_1").map_err(ActaError::Io)?;
+    fs::write(&file2, b"sstable_data_2").map_err(ActaError::Io)?;
+    fs::write(&other_file, b"not_an_sstable").map_err(ActaError::Io)?;
+
+    let pinner = CountingPinner::default();
+    let cloner = DefaultHardlinkCloner::new();
+
+    let res = cloner
+        .clone_sstable_hardlinks(100, source_dir.path(), target_dir.path(), &pinner)
+        .await?;
+
+    assert_eq!(res.source_seq_no, 100);
+    assert_eq!(res.linked_files.len(), 2);
+    assert_eq!(res.wal_tail_offset, None);
+
+    let target1 = target_dir.path().join("000001.sst");
+    let target2 = target_dir.path().join("000002.sst");
+
+    assert!(target1.exists());
+    assert!(target2.exists());
+    assert!(!target_dir.path().join("ignore.txt").exists());
+
+    assert_eq!(
+        fs::read(&target1).map_err(ActaError::Io)?,
+        b"sstable_data_1"
+    );
+    assert_eq!(
+        fs::read(&target2).map_err(ActaError::Io)?,
+        b"sstable_data_2"
+    );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let meta_src1 = fs::metadata(&file1).map_err(ActaError::Io)?;
+        let meta_tgt1 = fs::metadata(&target1).map_err(ActaError::Io)?;
+        assert_eq!(
+            meta_src1.ino(),
+            meta_tgt1.ino(),
+            "Hardlinked SSTables must share identical inode numbers on Unix"
+        );
+    }
+
+    Ok(())
+}
+
+// Testet: test cross device link error handling.
+#[tokio::test]
+async fn test_cross_device_link_error_handling() -> acta_types::Result<()> {
+    let source_dir = TempDir::new().map_err(ActaError::Io)?;
+    // Mount point /dev/shm is a tmpfs mount on Linux (distinct filesystem from /rom/overlay)
+    let shm_base = std::path::Path::new("/dev/shm");
+    if !shm_base.exists() {
+        return Ok(()); // Skip if /dev/shm is not available
+    }
+
+    let target_dir_path = shm_base.join(format!("acta_test_{}", std::process::id()));
+    let file1 = source_dir.path().join("000001.sst");
+    fs::write(&file1, b"sst_data").map_err(ActaError::Io)?;
+
+    let pinner = CountingPinner::default();
+    let cloner = DefaultHardlinkCloner::new();
+
+    let result = cloner
+        .clone_sstable_hardlinks(200, source_dir.path(), &target_dir_path, &pinner)
+        .await;
+
+    let _ = fs::remove_dir_all(&target_dir_path);
+
+    match result {
+        Err(acta_checkpoint::CheckpointError::CrossDeviceLink {
+            source_path,
+            target_path,
+            ..
+        }) => {
+            assert!(source_path.contains("000001.sst"));
+            assert!(target_path.contains("000001.sst"));
+            Ok(())
+        }
+        Err(other) => Err(ActaError::Internal(format!(
+            "Expected CrossDeviceLink error, got: {other:?}"
+        ))),
+        Ok(_) => {
+            // In case /dev/shm happens to be on the same filesystem in some container environments,
+            // verify hardlink created successfully
+            Ok(())
+        }
+    }
+}
+
+// Testet: test snapshot registry compaction gc exclusion during cloning.
+#[tokio::test]
+async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning(
+) -> acta_types::Result<()> {
+    let source_dir = TempDir::new().map_err(ActaError::Io)?;
+    let target_dir = TempDir::new().map_err(ActaError::Io)?;
+
+    let file1 = source_dir.path().join("000001.sst");
+    fs::write(&file1, b"sstable_content").map_err(ActaError::Io)?;
+
+    let pinner = CountingPinner::default();
+    assert_eq!(
+        pinner.active_pins.load(Ordering::SeqCst),
+        0,
+        "Initially no active pins"
+    );
+
+    let cloner = DefaultHardlinkCloner::new();
+
+    let seq_no = 42;
+    let res = cloner
+        .clone_sstable_hardlinks(seq_no, source_dir.path(), target_dir.path(), &pinner)
+        .await?;
+
+    assert_eq!(res.source_seq_no, 42);
+    assert_eq!(
+        pinner.active_pins.load(Ordering::SeqCst),
+        0,
+        "Snapshot pin released after clone finishes"
+    );
+
+    Ok(())
+}

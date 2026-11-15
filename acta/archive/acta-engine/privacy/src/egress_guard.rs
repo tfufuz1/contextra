@@ -122,17 +122,17 @@ impl EgressGuard {
     // ANCHOR[acta-pii:EG-013]
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
-    /// Gemäß **v17 Teil 10.3** (Priorität P1, "Fail-Closed-Randfall"), Invariante **INV-EGRESS-AUDIT-1**
+    /// Gemäß **v17 Teil 10.3** (Priorität P1, "Fail-Closed-Randfall"), Invariante ****
     /// und dem generellen **Fail-Closed-Prinzip** (Teil 12, "Fail-closed als Default"):
     /// - Liefert `Allow`, wenn `payload.len() < min_bytes`.
-    /// - Führt k-NN Suche ($k=1$) via `search_text` aus.
+    /// - Führt k-NN Suche ($k=1$) via `search_text`.
     /// - Bei Score $\ge$ `threshold` (0.85): `Block(BlockReason::SensitivePattern("bulk-exfiltration-hnsw-match"))`.
     /// - Bei Score < `threshold`: `Allow`.
     /// - Bei Index-Fehler, uninitialisiertem Index oder leeren Ergebnissen: strikt **Fail-Closed** mit
     ///   `Block(BlockReason::InternalError("egress guard index unavailable — fail-closed"))`.
     /// - Bei Timeout (200 ms): strikt **Fail-Closed** mit `Block(BlockReason::ClassificationTimeout)`.
     /// - Jede Egress-Entscheidung (inkl. aller Fail-Closed-Entscheidungen) wird über `EgressClassifierTrace`
-    ///   vollständig auditiert (**INV-EGRESS-AUDIT-1**).
+    ///   vollständig auditiert.
     pub async fn check(&self, payload: &str) -> EgressClassification {
         if payload.len() < self.min_bytes {
             return EgressClassification::Allow;
@@ -448,7 +448,7 @@ mod tests {
             ))
         );
 
-        // (b) Audit trace entry is generated correctly (INV-EGRESS-AUDIT-1)
+        // (b) Audit trace entry is generated correctly
         let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;
         assert_eq!(traced_class, classification);
         let rule_id = extract_rule_id(&traced_class);
@@ -487,7 +487,7 @@ mod tests {
             EgressClassification::Block(BlockReason::ClassificationTimeout)
         );
 
-        // (b) Audit trace entry is generated correctly (INV-EGRESS-AUDIT-1)
+        // (b) Audit trace entry is generated correctly
         let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;
         assert_eq!(traced_class, classification);
         let rule_id = extract_rule_id(&traced_class);

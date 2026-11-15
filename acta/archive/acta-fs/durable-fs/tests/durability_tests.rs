@@ -1,6 +1,6 @@
 //! # Testsuite: durability_tests.rs
 //!
-//! Zweck: Durability-Tests für Handle-Poisoning (`INV-FSYNC-1`), `DirLock`-Dateisystemprüfungen und `atomic_replace`.
+//! Zweck: Durability-Tests für Handle-Poisoning, `DirLock`-Dateisystemprüfungen und `atomic_replace`.
 
 use acta_fs::{
     atomic_replace, fs_class, DirLock, DurableHandle, FlushKind, FsClass, LockMode,

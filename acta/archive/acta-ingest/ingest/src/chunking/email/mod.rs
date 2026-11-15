@@ -6,7 +6,7 @@
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
 // FILE-CONTEXT
-// ZWECK: EmailChunker für E-Mail-Nachrichten und Anhänge (EML, MBOX, MSG) (WP M4 / WP-ING-15).
+// ZWECK: EmailChunker für E-Mail-Nachrichten und Anhänge (EML, MBOX, MSG) (WP M4 / ).
 // INVARIANTEN: Zero-Panic, deterministisch, keine nachrichtenübergreifende Bündelung.
 // STAND: TS:2026-10-31T00:00:00Z
 

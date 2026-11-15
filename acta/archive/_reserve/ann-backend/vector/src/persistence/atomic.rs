@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: Atomares Schreiben von Persistenz-Dateien (temp -> sync_all -> rename -> dir sync).
-// INVARIANTEN: INV-FSYNC-1 (Fail-closed durability ohne ungesicherte Fehler, Cleanup bei Abbruch).
+// INVARIANTEN: (Fail-closed durability ohne ungesicherte Fehler, Cleanup bei Abbruch).
 // HOTSPOTS: write_atomic, write_atomic_with
 // STAND: TS:2026-11-12T00:00:00Z
 
@@ -10,13 +10,13 @@ use std::path::Path;
 
 use super::io as persistence_io;
 
-/// Fuehrt einen Schreibvorgang atomar ueber eine temporaere Datei aus.
+/// Fuehrt einen Schreibvorgang atomar ueber eine temporaere Datei.
 ///
 /// 1. Erstellt temporaere Datei im selben Verzeichnis (PID-basiert).
 /// 2. Uebergibt das geoeffnete `File`-Handle an die Callback-Funktion `write_fn`.
 /// 3. Synchronisiert Datei-Inhalt und Metadaten (`sync_all`).
 /// 4. Benennt temporaere Datei atomar auf `destination` um.
-/// 5. Synchronisiert das Elternverzeichnis via `sync_dir` (INV-FSYNC-1).
+/// 5. Synchronisiert das Elternverzeichnis via `sync_dir`.
 /// 6. Raeumt bei jedem Fehler die temporaere Datei auf.
 pub(crate) fn write_atomic_with<F>(destination: &Path, write_fn: F) -> Result<()>
 where

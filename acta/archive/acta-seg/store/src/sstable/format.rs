@@ -1,21 +1,21 @@
 //! # SSTable-Format: Konstanten, Header & Trailer
 //!
 //! Zweck: Zentralisiert die Format-Konstanten, Magic-Bytes, Trailer-Größen
-//! und Versionsprüfung für SSTables (Format V4 MFSX und Legacy V3 MFST).
+//! und Versionsprüfung für SSTables (Format V4 ASGX und Legacy V3 ASGT).
 //!
 //! Invarianten:
-//! - Magic `SSTABLE_MAGIC_MFSX` = `0x5853_464D` (b"MFSX" little-endian)
-//! - Magic `SSTABLE_MAGIC_LEGACY` = `0x4D46_5354` (b"MFST" little-endian)
-//! - Bit 63 (`TOMBSTONE_BIT`) wird vor `max_seq`-Vergleichen maskiert (INV-STORE-4).
+//! - Magic `SSTABLE_MAGIC_MFSX` = `0x5847_5341` (b"ASGX" little-endian)
+//! - Magic `SSTABLE_MAGIC_LEGACY` = `0x4153_4754` (b"ASGT" little-endian)
+//! - Bit 63 (`TOMBSTONE_BIT`) wird vor `max_seq`-Vergleichen maskiert.
 //! - Byte-Identität persistierter Formate bleibt strikt gewahrt.
 
 use crate::error::{StoreError, StoreResult};
 
-/// Magic-Bytes für V4 SSTable: `MFSX` in Hex (0x5853_464D).
-pub const SSTABLE_MAGIC_MFSX: u32 = 0x5853_464D;
+/// Magic-Bytes für V4 SSTable: `ASGX` in Hex (0x5847_5341).
+pub const SSTABLE_MAGIC_MFSX: u32 = 0x5847_5341;
 
-/// Magic-Bytes für Legacy SSTable: `MFST` in Hex (0x4D46_5354).
-pub const SSTABLE_MAGIC_LEGACY: u32 = 0x4D46_5354;
+/// Magic-Bytes für Legacy SSTable: `ASGT` in Hex (0x4153_4754).
+pub const SSTABLE_MAGIC_LEGACY: u32 = 0x4153_4754;
 
 /// Standard-Blockgröße für SSTable Data Blocks (4 KiB).
 pub const BLOCK_SIZE: usize = 4096;
@@ -23,21 +23,21 @@ pub const BLOCK_SIZE: usize = 4096;
 /// Aktuelle unterstützte SSTable-Formatversion (V4).
 pub const CURRENT_SSTABLE_FORMAT_VERSION: u16 = 4;
 
-/// Trailer-Länge für MFSX Format Version >= 1 (54 Bytes).
+/// Trailer-Länge für ASGX Format Version >= 1 (54 Bytes).
 pub const MFSX_TRAILER_LEN_V1: usize = 54;
 
-/// Trailer-Länge für MFSX Format Version 0 (52 Bytes).
+/// Trailer-Länge für ASGX Format Version 0 (52 Bytes).
 pub const MFSX_TRAILER_LEN_V0: usize = 52;
 
-/// Trailer-Länge für Legacy MFST (54 Bytes).
+/// Trailer-Länge für Legacy ASGT (54 Bytes).
 pub const LEGACY_TRAILER_LEN: usize = 54;
 
 /// Strukturierte Repräsentation des SSTable-Footers / Trailers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SstableFooter {
-    /// Format-Version (z. B. 4 für MFSX v4, 0/1 für frühere MFSX, 3 für Legacy).
+    /// Format-Version (z. B. 4 für ASGX v4, 0/1 für frühere ASGX, 3 für Legacy).
     pub format_version: u16,
-    /// Gibt an, ob es sich um das moderne MFSX-Format handelt (sonst Legacy MFST).
+    /// Gibt an, ob es sich um das moderne ASGX-Format handelt (sonst Legacy ASGT).
     pub is_mfsx: bool,
     /// Byte-Offset des Bloom-Filters in der SSTable (0 falls kein Bloom-Filter vorhanden).
     pub bloom_offset: u64,

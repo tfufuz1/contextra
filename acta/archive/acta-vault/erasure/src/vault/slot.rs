@@ -38,7 +38,7 @@ pub const VAULT_FILE_KIND: u8 = 10;
 /// Standard-Algorithmen-Satz v1: [aead=1, kdf=0, mac=1, hash=1].
 pub const VAULT_ALG_IDS: [u8; 4] = [1, 0, 1, 1];
 
-/// Größe eines Tresor-Slots in Bytes (F.3, D-111, I-23).
+/// Größe eines Tresor-Slots in Bytes.
 pub const VAULT_SLOT_SIZE: usize = 64;
 
 /// Slot-Status-Werte (F.3).
@@ -64,7 +64,7 @@ pub mod off {
     pub const MAC: usize = 56;
 }
 
-/// Typen von Tresor-Slots (F.3, D-33, D-79, D-85, D-111, D-125).
+/// Typen von Tresor-Slots.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum SlotType {
@@ -203,7 +203,7 @@ pub fn verify_vault_header(
     Ok((file_id, created_seq))
 }
 
-/// Maskiert oder demaskiert einen Epochenschlüssel (Slot-Typ E) nach SPEC D-125 / F.3:
+/// Maskiert oder demaskiert einen Epochenschlüssel (Slot-Typ E) nach SPEC / F.3
 /// `payload = K_epoch ⊕ HKDF-Expand(K_enc, "acta/emask/v1" ‖ epoch_id, 32)`
 pub fn mask_epoch_key(raw_key: &[u8; 32], epoch_id: &[u8; 16], k_enc: &[u8; 32]) -> [u8; 32] {
     let mut info = Vec::with_capacity(29);
@@ -227,7 +227,7 @@ pub fn mask_epoch_key(raw_key: &[u8; 32], epoch_id: &[u8; 16], k_enc: &[u8; 32])
     masked
 }
 
-/// Serialisiert einen aktiven Slot in 64 Bytes inkl. MAC (F.3, D-111).
+/// Serialisiert einen aktiven Slot in 64 Bytes inkl. MAC.
 pub fn encode_slot(
     vault_id: &[u8; 16],
     slot_type: SlotType,
@@ -291,7 +291,7 @@ pub fn compute_slot_mac(mac_key: &[u8; 32], vault_id: &[u8; 16], slot_pre_mac: &
     out
 }
 
-/// Erstellt das kanonische Grabstein-Abbild (tombstone_image) nach SPEC D-111 Abs. 3 / F.3:
+/// Erstellt das kanonische Grabstein-Abbild (tombstone_image) nach SPEC Abs. 3 / F.3
 /// Alle Bytes 0 außer `status = 0x02`, MAC über das Abbild mit `vault_id`.
 pub fn tombstone_image(vault_id: &[u8; 16], mac_key: &[u8; 32]) -> [u8; VAULT_SLOT_SIZE] {
     let mut buf = [0u8; VAULT_SLOT_SIZE];
@@ -327,7 +327,7 @@ pub fn decode_slot(
             return Err(ErasureError::Corrupt);
         }
         STATUS_TOMBSTONE => {
-            // Grabstein-Prüfung nach D-111 Abs. 3:
+            // Grabstein-Prüfung nach Abs. 3
             // Bytes 0 und 2..56 müssen 0 sein, Byte 1 ist 0x02, MAC muss gültig sein
             let pre = match raw.get(..off::MAC) {
                 Some(p) => p,
@@ -401,7 +401,7 @@ pub fn decode_slot(
     }))
 }
 
-/// Bestimmt Shard und Startindex für lineare Sondierung nach SPEC D-111 Abs. 1:
+/// Bestimmt Shard und Startindex für lineare Sondierung nach SPEC Abs. 1
 /// `h = BLAKE3(slot_type ‖ tag)`
 /// `shard = h[0] >> 4` (0..15)
 /// `i = u64_be(h[1..9]) mod 2^cap_log2`

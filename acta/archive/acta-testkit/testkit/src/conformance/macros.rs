@@ -8,7 +8,7 @@
 ///
 /// **Verhalten:**
 /// Falls `res` ein `Err(ConformanceFailure)` ist, löst das Makro im Testläufer
-/// eine Panic mit dem formatierten Fehlerbericht aus.
+/// eine Panic mit dem formatierten Fehlerbericht.
 ///
 /// **Hinweis zu Regel 2 (Kein Panic in Produktion):**
 /// Dieses Makro ist ausschließlich für Testcode bestimmt.

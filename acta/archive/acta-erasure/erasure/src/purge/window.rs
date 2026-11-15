@@ -1,6 +1,6 @@
 //! Steuerung und Bündelung des Purge-Fensters.
 //!
-//! Reihenfolge gemäß ER-20 (fest):
+//! Reihenfolge gemäß (fest)
 //!   a) Snapshots widerrufen (SnapshotRevoker)
 //!   b) Textsegment-Rewrite
 //!   c) Memtable-Drain, Flush, WAL-Segmente
@@ -51,7 +51,7 @@ impl WindowOutcome {
     }
 }
 
-/// Führt ein Purge-Fenster durch (ER-20).
+/// Führt ein Purge-Fenster durch.
 ///
 /// Quellkompatible Signatur für bestehende Aufrufer: prüft Plattenreserve.
 /// Schlägt fehl mit `DiskReserve`, falls kein ausreichender Platz vorhanden ist,
@@ -68,7 +68,7 @@ pub fn run_window(cx: &PurgeCx) -> Result<WindowOutcome, ErasureError> {
     ))
 }
 
-/// Führt ein vollständiges Purge-Fenster über den `ErasureCore` aus.
+/// Führt ein vollständiges Purge-Fenster über den `ErasureCore`.
 #[cfg(feature = "async")]
 pub async fn run_core_window(core: &ErasureCore) -> Result<WindowOutcome, ErasureError> {
     core.run_purge_window().await

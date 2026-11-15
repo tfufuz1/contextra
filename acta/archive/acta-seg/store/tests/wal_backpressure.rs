@@ -1,5 +1,5 @@
 #![cfg(feature = "workspace")]
-// Testpflicht AK-13 (docs/specs/ACTA_SPEC_v2.md)
+// Testpflicht AK-13
 
 use acta_seg::wal::{Wal, WalConfig, WalFlusherConfig, WalOp};
 use acta_base::TxId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

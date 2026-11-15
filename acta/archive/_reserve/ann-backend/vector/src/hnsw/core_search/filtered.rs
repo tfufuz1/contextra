@@ -18,7 +18,7 @@ use super::rerank::{compute_distance_score, sort_and_truncate_results};
 use super::validate::validate_search_params;
 
 impl HnswIndex {
-    /// Führt die interne gefilterte k-NN Suche aus.
+    /// Führt die interne gefilterte k-NN Suche.
     pub(crate) async fn search_filtered_internal(
         &self,
         query: &[f32],

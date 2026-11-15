@@ -1,4 +1,4 @@
-//! Property-Based Model Equivalence Test (Reference Oracle) for `MemoryTextIndex` (INV-TEXT-1).
+//! Property-Based Model Equivalence Test (Reference Oracle) for `MemoryTextIndex`.
 //!
 //! Verifies that `MemoryTextIndex` operations (insert, remove, compact) yield
 //! identical search results and active document tracking compared to a trivial reference model.

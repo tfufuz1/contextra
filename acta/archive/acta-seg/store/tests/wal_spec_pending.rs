@@ -1,9 +1,9 @@
 #![cfg(feature = "workspace")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! Specification tests for ADR-N12 (High-Water-Mark Anchoring) and ADR-N13 (Frame Header V4 Integrity).
+//! Specification tests for (High-Water-Mark Anchoring) and (Frame Header V4 Integrity).
 //!
-//! These pending tests specify the target behavior defined in ADR-N12 and ADR-N13.
+//! These pending tests specify the target behavior defined in and.
 //! They are ignored until the corresponding production implementations (H1, H2) are integrated.
 
 use acta_seg::lsm::{LsmConfig, LsmStorage};
@@ -14,13 +14,13 @@ use tempfile::tempdir;
 use tokio::fs;
 
 // ============================================================================
-// ADR-N12 Specification Tests (High-Water-Mark-Verankerung - H2)
+// Specification Tests (High-Water-Mark-Verankerung - H2)
 // ============================================================================
 
-/// ADR-N12 Spec Test 1: Verifies that WAL tail truncation is reliably detected
+/// Spec Test 1: Verifies that WAL tail truncation is reliably detected
 /// after SSTable flush and startup when Manifest High-Water-Mark anchoring is active.
 ///
-/// Target Behavior (ADR-N12 / INV-WAL-TRUNCATION-1):
+/// Target Behavior:
 /// After a MemTable flush creates an SSTable and writes a `WalCheckpoint` to Manifest,
 /// any uncommitted or committed truncation of the active WAL tail before the HWM
 /// MUST fail LsmStorage startup with `ActaError::WalTruncationDetected`.
@@ -102,9 +102,9 @@ async fn spec_n12_wal_tail_truncation_detection_after_sstable_flush() {
     }
 }
 
-/// ADR-N12 Spec Test 2: Verifies cross-segment HMAC chain continuity.
+/// Spec Test 2: Verifies cross-segment HMAC chain continuity.
 ///
-/// Target Behavior (ADR-N12 / Option B):
+/// Target Behavior ( / Option B)
 /// Segment N+1 embeds `prev_segment_last_hmac` from Segment N in its header.
 /// Deleting or swapping intermediate segment N MUST cause replay of Segment N+1 to fail
 /// with `ActaError::WalTruncationDetected` or `ActaError::WalCorruption`.
@@ -151,9 +151,9 @@ async fn spec_n12_cross_segment_hmac_chain_continuity() {
     );
 }
 
-/// ADR-N12 Spec Test 3: Verifies periodic Manifest HWM checkpointing.
+/// Spec Test 3: Verifies periodic Manifest HWM checkpointing.
 ///
-/// Target Behavior (ADR-N12 / Option B):
+/// Target Behavior ( / Option B)
 /// Periodically written `WalCheckpoint` entries in MANIFEST provide a monotonically
 /// advancing high-water-mark anchor that is verified upon startup.
 #[tokio::test]
@@ -182,13 +182,13 @@ async fn spec_n12_manifest_periodic_hwm_checkpoint_verification() {
 }
 
 // ============================================================================
-// ADR-N13 Specification Tests (WAL-Frame-V4 Header-Integrität - H1)
+// Specification Tests (WAL-Frame-V4 Header-Integrität - H1)
 // ============================================================================
 
-/// ADR-N13 Spec Test 1: Bitflip in 4-byte length header of a middle entry fails hard.
+/// Spec Test 1: Bitflip in 4-byte length header of a middle entry fails hard.
 ///
-/// Target Behavior (ADR-N13 / H1):
-/// In WAL V4 (`MFW4`), each frame has a protected header `[len: u32][header_crc: u32]`.
+/// Target Behavior ( / H1)
+/// In WAL V4 (`AWL4`), each frame has a protected header `[len: u32][header_crc: u32]`.
 /// A bitflip in `len` causes `header_crc` validation to fail. When this occurs for a middle entry,
 /// the reader MUST return `ActaError::WalCorruption` rather than silently breaking
 /// and losing subsequent valid commits.
@@ -237,9 +237,9 @@ async fn spec_n13_v4_frame_header_crc_bitflip_fails_hard_middle_entry() {
     }
 }
 
-/// ADR-N13 Spec Test 2: Clean torn tail distinguished from middle header corruption.
+/// Spec Test 2: Clean torn tail distinguished from middle header corruption.
 ///
-/// Target Behavior (ADR-N13 / H1 Policy Matrix):
+/// Target Behavior ( / H1 Policy Matrix)
 /// An incomplete write or zero-fill padding at the exact EOF (file tail) is accepted as a
 /// clean torn write during crash recovery. A corrupted header before EOF MUST trigger `WalCorruption`.
 #[tokio::test]
@@ -284,11 +284,11 @@ async fn spec_n13_v4_clean_torn_tail_distinguished_from_middle_corrupted_header(
     );
 }
 
-/// ADR-N13 Spec Test 3: Backward compatibility with V2/V3 and transparent V4 rewrite.
+/// Spec Test 3: Backward compatibility with V2/V3 and transparent V4 rewrite.
 ///
-/// Target Behavior (ADR-N13 / Migration Path):
+/// Target Behavior ( / Migration Path)
 /// V2 and V3 format WALs remain readable by the WAL parser. When rewritten or consolidated
-/// via `.bak` / `recover_from_bak_if_present`, old formats are transparently converted to V4 (`MFW4`).
+/// via `.bak` / `recover_from_bak_if_present`, old formats are transparently converted to V4 (`AWL4`).
 #[tokio::test]
 #[ignore = "Pending production implementation of ADR-N13 (Frame V4 backward compat rewrite). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n13_v2_v3_to_v4_transparent_migration_and_compatibility() {

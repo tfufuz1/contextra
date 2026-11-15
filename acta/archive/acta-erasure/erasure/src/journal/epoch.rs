@@ -11,7 +11,7 @@ pub trait EpochKeys: Send + Sync {
     fn commit_key(&self, epoch_id: u32) -> [u8; 32];
 }
 
-/// Berechnet das kryptografische Commitment für Journal und Bericht nach und D-125:
+/// Berechnet das kryptografische Commitment für Journal und Bericht nach und
 /// `BLAKE3-keyed(K_commit(epoch), "acta/commit/v1" ‖ subject ‖ tenant)`
 pub fn compute_commitment(commit_key: &[u8; 32], subject: &[u8], tenant: &[u8]) -> [u8; 16] {
     let mut hasher = blake3::Hasher::new_keyed(commit_key);

@@ -13,7 +13,7 @@ use thiserror::Error;
 #[derive(Debug, Error, PartialEq, Clone)]
 #[non_exhaustive]
 pub enum SimdError {
-    /// Ungültige Vektoreingaben, beispielsweise `NaN` oder `±Inf` (INV-SIMD-FINITE-1).
+    /// Ungültige Vektoreingaben, beispielsweise `NaN` oder `±Inf`.
     #[error("invalid input: {0}")]
     InvalidInput(&'static str),
 

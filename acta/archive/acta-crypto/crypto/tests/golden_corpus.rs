@@ -2,7 +2,7 @@
 //!
 //! Inhalt des Golden-Korpus:
 //! 1. WAL-HMAC-Kette (`wal_hmac_chain.bin`)
-//! 2. MFKD-Schlüsselableitung (`mfkd_keys.bin`)
+//! 2. AKDF-Schlüsselableitung (`mfkd_keys.bin`)
 //! 3. AEAD-Vektoren mit festem Schlüssel und fester Nonce (`aead_vectors.bin`)
 //! 4. KV-Segment v2 Format (`kv_segment_v2.bin`)
 //! 5. WAL-Completeness Prüfungsausgaben (`wal_completeness.bin`)
@@ -158,7 +158,7 @@ fn test_golden_corpus_backward_reading_without_panics() {
         fs::read(format!("{GOLDEN_DIR}/wal_hmac_chain.bin")).expect("read wal hmac");
     assert_eq!(wal_hmac_bytes.len(), 32 * 10);
 
-    // 2. Read MFKD keys
+    // 2. Read AKDF keys
     let mfkd_bytes = fs::read(format!("{GOLDEN_DIR}/mfkd_keys.bin")).expect("read mfkd");
     assert_eq!(mfkd_bytes.len(), 32 * 4);
 

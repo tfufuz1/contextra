@@ -1,7 +1,7 @@
-//! # ErasureLedger: Persistentes Fail-Closed Ledger (INV-ERA-4 / WP-8).
+//! # ErasureLedger: Persistentes Fail-Closed Ledger.
 //!
 //! Stellt sicher, dass jede Schlüsselvernichtung vor dem Ende der Lösch-Saga
-//! dauerhaft und unveränderlich im Ledger verankert ist (INV-ERA-4).
+//! dauerhaft und unveränderlich im Ledger verankert ist.
 //! Bei beschädigter oder nicht lesbarer Ledger-Datei verhält sich das System fail-closed.
 
 use crate::error::ErasureError;
@@ -69,7 +69,7 @@ impl ErasureLedger {
         })
     }
 
-    /// Verankert eine Schlüsselvernichtung dauerhaft vor dem Abschluss der Saga (INV-ERA-4).
+    /// Verankert eine Schlüsselvernichtung dauerhaft vor dem Abschluss der Saga.
     pub fn record_key_destruction(
         &self,
         commitment: [u8; 32],

@@ -8,13 +8,13 @@
 //!   - Klassen G/K/P je `reached/not_reached` ohne Gesamtnote (12.5)
 //!   - `key_coverage` je Schicht (full, unlinked, none, nicht erfasst)
 //!   - `segments_rewritten`, `bytes_rewritten`
-//!   - `vault_medium`, `vault_rehash_count`, `vault_old_overwritten` (D-111)
-//!   - `vault_backup_scope` (D-112)
-//!   - `verified_via` (D-113)
-//!   - `epoch_id` (D-125)
-//!   - `replaced`, `replacement_tag` (D-115)
-//!   - `target = Superseded` mit `key_coverage` (D-117)
-//!   - `signer_id` (D-130)
+//!   - `vault_medium`, `vault_rehash_count`, `vault_old_overwritten`
+//!   - `vault_backup_scope`
+//!   - `verified_via`
+//!   - `epoch_id`
+//!   - `replaced`, `replacement_tag`
+//!   - `target = Superseded` mit `key_coverage`
+//!   - `signer_id`
 //!   - `process_hardening`
 //!   - `residual_risks` (vollständiger Katalog Anhang D)
 //!   - Pflichttexte: Signaturumfang (E-L11), keine Rechtsberatung, Außenaussage (6.4)
@@ -27,7 +27,7 @@ use crate::types_local::LayerWitness;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Pflichtstatus einer Nachweisklasse (G, K, P laut SPEC D-36, §12.5).
+/// Pflichtstatus einer Nachweisklasse.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReachStatus {
@@ -131,7 +131,7 @@ pub struct WitnessChainReport {
 }
 
 impl WitnessChainReport {
-    /// Berechnet die Zeugenkette aus einer geordneten Liste von Zeugendigests (INV-ERA-7).
+    /// Berechnet die Zeugenkette aus einer geordneten Liste von Zeugendigests.
     ///
     /// Bei leerer Liste ist der Wurzel-Digest 32 Nullbytes.
     /// Bei n Zeugen wird die Kette deterministisch kaskadiert:
@@ -224,7 +224,7 @@ impl Default for ProcessHardeningStatus {
     }
 }
 
-/// Kanonischer Löschbericht (ER-27,, Anhang D).
+/// Kanonischer Löschbericht.
 ///
 /// Keine Inhalte, Schlüssel oder Klartext-Kennungen (P13).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -255,7 +255,7 @@ pub struct ErasureReport {
     pub retention_code: String,
     /// Feldmessungs-Status der Schichtprüfungen (MK1, MK2, MK3).
     pub field_measurement: FieldMeasurementSection,
-    /// Release-Evidenzbündel-Hash (Lab-Nachweis), strikt getrennt von field_measurement (D-72).
+    /// Release-Evidenzbündel-Hash (Lab-Nachweis), strikt getrennt von field_measurement.
     pub lab_evidence: String,
     /// Klassenverband G, K, P je einzeln als reached/not_reached.
     pub classes: BTreeMap<String, String>,
@@ -265,24 +265,24 @@ pub struct ErasureReport {
     pub segments_rewritten: u64,
     /// Anzahl neugeschriebener Bytes.
     pub bytes_rewritten: u64,
-    /// Speichermedium des Tresors ("rotational", "flash", "cow", "unknown", D-111).
+    /// Speichermedium des Tresors.
     pub vault_medium: String,
-    /// Anzahl Rehash-Vorgänge des Tresors (D-111).
+    /// Anzahl Rehash-Vorgänge des Tresors.
     pub vault_rehash_count: u64,
-    /// Ob alte Slots beim letzten Rehash überschrieben wurden (D-111).
+    /// Ob alte Slots beim letzten Rehash überschrieben wurden.
     pub vault_old_overwritten: bool,
-    /// Sicherungsbereich des Tresors ("SeparateShortRetention", "None", "SameAsData", "Unknown", D-112).
+    /// Sicherungsbereich des Tresors.
     pub vault_backup_scope: String,
-    /// Art der Verifikation ("Direct", "CacheDropped", "Cached", D-113).
+    /// Art der Verifikation.
     pub verified_via: String,
-    /// Commitment-Epoche (D-125).
+    /// Commitment-Epoche.
     pub epoch_id: String,
-    /// Ob es sich um eine Dokumentersetzung handelte (D-115).
+    /// Ob es sich um eine Dokumentersetzung handelte.
     pub replaced: bool,
-    /// Replacement-Tag bei Ersetzung (Tag, nie Klartextinhalt, D-115).
+    /// Replacement-Tag bei Ersetzung.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub replacement_tag: Option<String>,
-    /// Signer-Identifikator (0 = K_sign abgeleitet, 1 = Betreiber, D-130).
+    /// Signer-Identifikator.
     pub signer_id: u8,
     /// Status der Prozesshärtung.
     pub process_hardening: String,
@@ -300,7 +300,7 @@ pub struct ErasureReport {
     pub signature_scope_notice: String,
     /// Pflichttext „keine Rechtsberatung“.
     pub legal_notice: String,
-    /// Zulässige Außenaussage nach
+    /// Zulässige Außenaussage
     pub scope_notice: String,
     /// Optionaler Pflichttext bei Berichtigung mit Purge.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -417,7 +417,7 @@ impl Default for ReportBuildOptions {
     }
 }
 
-/// Erstellt einen vollständigen, normativen Löschbericht nach
+/// Erstellt einen vollständigen, normativen Löschbericht
 pub fn build_report_with_options(
     erasure_id: ErasureId,
     witnesses: Vec<LayerWitness>,
@@ -503,7 +503,7 @@ pub fn build_report_with_options(
         mk3: mk3_status,
     };
 
-    // Zeugenkette berechnen (INV-ERA-7)
+    // Zeugenkette berechnen
     let witness_digests: Vec<[u8; 32]> = witnesses
         .iter()
         .map(crate::measure::witness::compute_witness_digest)
@@ -577,7 +577,7 @@ pub fn build_report_with_options(
     }
 }
 
-/// Erstellt einen normativen Löschbericht mit strenger Validierung (fail-closed, INV-CLASS-MEASURED-1).
+/// Erstellt einen normativen Löschbericht mit strenger Validierung.
 ///
 /// Schlägt fehl (`Err`), wenn:
 /// - keine Zeugen übergeben wurden (`witnesses.is_empty()`)
@@ -610,7 +610,7 @@ pub fn try_build_report_with_options(
     ))
 }
 
-/// Erstellt einen Löschbericht mit Standardoptionen (ER-27).
+/// Erstellt einen Löschbericht mit Standardoptionen.
 pub fn build_report(
     erasure_id: ErasureId,
     gated_at: u64,

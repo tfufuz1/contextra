@@ -1,6 +1,6 @@
 //! Tresor-Open: Kopf-, Metablock- und Stichprobenprüfung.
 //!
-//! Ablauf Open nach D-111 Abs. 8:
+//! Ablauf Open nach Abs. 8
 //! 16 Köpfe und Metablöcke lesen und prüfen (`vault_id`, MAC);
 //! je Shard 256 zufällige Slots auf MAC prüfen.
 //! **Kein Vollscan.**
@@ -24,7 +24,7 @@ use sha2::Sha256;
 /// Größe des Metablocks nach SPEC F.3.
 pub const VAULT_METABLOCK_SIZE: usize = 64;
 
-/// Ergebnis der Open-Prüfung für einen Tresor-Shard (D-111 Abs. 8).
+/// Ergebnis der Open-Prüfung für einen Tresor-Shard.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VaultOpenOutcome {
     /// Vault-ID laut Metablock.
@@ -115,7 +115,7 @@ pub fn encode_metablock(params: MetablockParams<'_>) -> [u8; VAULT_METABLOCK_SIZ
     buf
 }
 
-/// Öffnet und prüft einen Tresor-Shard (Kopf + Metablock + Stichprobe, kein Vollscan, D-111 Abs. 8).
+/// Öffnet und prüft einen Tresor-Shard.
 pub fn open_vault_shard(
     raw_shard: &[u8],
     expected_vault_id: &[u8; 16],
@@ -147,7 +147,7 @@ pub fn open_vault_shard(
         return Err(ErasureError::Corrupt);
     }
 
-    // vault_id binden (D-112 Abs. 2)
+    // vault_id binden
     let mut vault_id = [0u8; 16];
     if let (Some(dest), Some(src)) = (vault_id.get_mut(..), meta.get(0..16)) {
         dest.copy_from_slice(src);
@@ -189,7 +189,7 @@ pub fn open_vault_shard(
     }
     let scrub_cursor = u64::from_be_bytes(rsv_bytes);
 
-    // 3. Stichprobe von Slots prüfen (D-111 Abs. 8: bis zu 256 Slots prüfen)
+    // 3. Stichprobe von Slots prüfen
     let samples = capacity.min(256);
     let step = (capacity / samples).max(1);
     for s in 0..samples {

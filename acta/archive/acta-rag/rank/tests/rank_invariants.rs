@@ -1,8 +1,8 @@
 //! Invarianz- und mathematische Vertragstests für `acta-rag`.
 //!
 //! Prüft die zentralen Verträge:
-//! - `INV-RANK-DETERMINISM-1`: Bitgenaue Reproduzierbarkeit bei identischen Eingabelisten.
-//! - `INV-RANK-MONOTONIC-1`: Isotonische Kalibrierung invertiert nie die relative Rangfolge.
+//! -: Bitgenaue Reproduzierbarkeit bei identischen Eingabelisten.
+//! -: Isotonische Kalibrierung invertiert nie die relative Rangfolge.
 //! - RRF-Kommutativität / Unabhängigkeit von der Listenreihenfolge bei ungewichteter RRF.
 //! - Conformal Coverage: Empirische Überdeckung >= 1 - alpha.
 //! - DiBud Streaming- vs Batch-Äquivalenz.
@@ -23,7 +23,7 @@ use acta_rag::fusion::{rrf_fuse, ScoredItem};
 use proptest::prelude::*;
 
 /// SPEC: T-RANK-DET-1
-/// INV-RANK-DETERMINISM-1: Bei identischen Eingabelisten ist das Ergebnis bitgenau reproduzierbar,
+///: Bei identischen Eingabelisten ist das Ergebnis bitgenau reproduzierbar,
 /// unabhängig von Hash-Reihenfolge und Thread-Zahl.
 #[test]
 fn test_inv_rank_determinism_1() {
@@ -96,7 +96,7 @@ fn reference_pava(mut points: Vec<(f32, f32)>) -> Vec<(f32, f32)> {
 }
 
 /// SPEC: T-RANK-MONO-1
-/// INV-RANK-MONOTONIC-1: Isotonische Kalibrierung invertiert nie die relative Rangfolge
+///: Isotonische Kalibrierung invertiert nie die relative Rangfolge
 /// (monoton nicht fallend) und stimmt mit dem Orakel-PAVA überein.
 #[test]
 fn test_inv_rank_monotonic_1() {
@@ -327,7 +327,7 @@ fn test_dibud_streaming_vs_batch_equivalence() {
 }
 
 proptest! {
-    /// Property: `INV-RANK-MONOTONIC-1` holds for arbitrary generated sequences.
+    /// Property: holds for arbitrary generated sequences.
     #[test]
     fn prop_inv_rank_monotonic_1(
         scores in proptest::collection::vec(0.01f32..10.0f32, 10..50),

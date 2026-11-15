@@ -3,7 +3,7 @@
 
 //! # Benchmark-Suite: `simd_bench`
 //!
-//! **Zweck (WP-91):**
+//! **Zweck:**
 //! Misst und vergleicht Durchsatz und Latenz der SIMD-Distanzberechnungen:
 //! (a) Eigener Kernel (Laufzeit-Dispatch: AVX2 / AVX-512 / NEON)
 //! (b) `simsimd` (SpatialSimilarity: cos, l2sq, dot)
