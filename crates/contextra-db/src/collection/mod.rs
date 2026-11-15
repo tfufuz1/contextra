@@ -561,6 +561,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.namespaced_key(b"", 0)
     }
 
+    /// Returns the namespaced prefix for internal doc_id keys in this collection.
+    pub fn doc_key_prefix(&self) -> Vec<u8> {
+        self.namespaced_key(b"", 1)
+    }
+
     /// Returns the name of the collection.
     #[tracing::instrument(level = "trace", skip(self))]
     pub fn name(&self) -> &str {

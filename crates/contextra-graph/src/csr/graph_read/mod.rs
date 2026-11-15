@@ -151,7 +151,7 @@ impl CsrGraph {
         if let Some(&idx) = inner.id_map.get(&id) {
             inner.entity_at(idx).is_some()
         } else {
-            false
+            inner.hyperedge_index.contains_key(&id)
         }
     }
 

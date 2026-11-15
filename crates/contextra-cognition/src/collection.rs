@@ -199,11 +199,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     ) -> Result<()> {
         let doc_id = DocId::from_key(id).unwrap_or_else(|_| DocId::new(0));
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-        let meta = StoredDocumentMeta {
+        let stored = StoredDocument {
             id: id.to_string(),
+            embedding: embedding.to_vec(),
             metadata,
         };
-        let serialized = serde_json::to_vec(&meta)
+        let serialized = serde_json::to_vec(&stored)
             .map_err(|e| contextra_types::ContextraError::Serialization(e.to_string()))?;
         self.storage.put(db_tx.tx_id, &doc_key, &serialized).await?;
         let _ = self.index.insert(db_tx.tx_id, doc_id, embedding).await;
