@@ -1,0 +1,43 @@
+{
+  "disclaimer": "Hinweis: Diese Zahlen messen nur Speicher- und Indexlatenz bzw. Retrieval-Genauigkeit auf dem genannten Testkorpus. Embedding-Inferenz addiert 10 bis 500 ms. Der Testkorpus umfasst 2000 Chunks; die Zahlen sind nicht auf größere Bestände extrapolierbar.",
+  "total_docs_requested": 2000,
+  "step_size": 500,
+  "dimension": 128,
+  "seed": 42,
+  "aborted_at_docs": null,
+  "error": null,
+  "intervals": [
+    {
+      "docs_inserted": 500,
+      "insert_rate_docs_per_sec": 54.37948170136623,
+      "search_p50_ns": 417160,
+      "search_p95_ns": 4471969,
+      "search_p99_ns": 5134468,
+      "rss_bytes": 22781952
+    },
+    {
+      "docs_inserted": 1000,
+      "insert_rate_docs_per_sec": 35.93812258608343,
+      "search_p50_ns": 345320,
+      "search_p95_ns": 4410463,
+      "search_p99_ns": 4568954,
+      "rss_bytes": 50409472
+    },
+    {
+      "docs_inserted": 1500,
+      "insert_rate_docs_per_sec": 19.77963015518312,
+      "search_p50_ns": 729876,
+      "search_p95_ns": 4795040,
+      "search_p99_ns": 5103943,
+      "rss_bytes": 91512832
+    },
+    {
+      "docs_inserted": 2000,
+      "insert_rate_docs_per_sec": 12.82769241746499,
+      "search_p50_ns": 547526,
+      "search_p95_ns": 4672195,
+      "search_p99_ns": 5063608,
+      "rss_bytes": 150777856
+    }
+  ]
+}
