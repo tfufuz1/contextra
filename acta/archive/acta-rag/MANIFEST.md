@@ -3,7 +3,7 @@
 **Aufgabe:** Abrufpipeline: Hybridsuche, RRF, Reranking, Kontextaufbau, Belegpruefung, Eval  
 **Level:** L4 · **Budget:** 7000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.4-9.7  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-ledger, acta-text, acta-vec, acta-history, acta-pstore, acta-gate, acta-access, acta-infer  
-**Umfang des Archivs:** 54 Dateien, 9604 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 54 Dateien, 9797 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -68,10 +68,10 @@
 | `rank/tests/fusion_deep_property_tests.rs` | 273 | float=1 |
 | `rank/tests/fusion_tie_break_proof.rs` | 144 | panic=2, float=1 |
 | `rank/tests/global_fusion_community_aware.rs` | 136 | panic=4, float=1 |
-| `rank/tests/golden/drift_status.json` | 0 |  |
-| `rank/tests/golden/id_serde.json` | 0 |  |
-| `rank/tests/golden/isotonic_calibration.json` | 0 |  |
-| `rank/tests/golden/rrf_fusion.json` | 0 |  |
+| `rank/tests/golden/drift_status.json` | 1 |  |
+| `rank/tests/golden/id_serde.json` | 52 |  |
+| `rank/tests/golden/isotonic_calibration.json` | 30 |  |
+| `rank/tests/golden/rrf_fusion.json` | 110 |  |
 | `rank/tests/golden_tests.rs` | 191 | panic=15, float=3, serde=1, std_fs=1 |
 | `rank/tests/hardening_tests.rs` | 76 | panic=4, std_fs=1 |
 | `rank/tests/isotonic_mutation_hardening_test.rs` | 190 | panic=9, float=1 |

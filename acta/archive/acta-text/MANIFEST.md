@@ -3,7 +3,7 @@
 **Aufgabe:** Segmentierter Volltextindex (BM25 Festkomma), DE/EN-Normalisierung  
 **Level:** L3 · **Budget:** 5000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.2  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-gate, acta-vault, acta-seg  
-**Umfang des Archivs:** 60 Dateien, 14272 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 60 Dateien, 14313 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -72,11 +72,11 @@
 | `text/tests/domain_compound_integration.rs` | 142 |  |
 | `text/tests/domain_vocab_quality.rs` | 457 |  |
 | `text/tests/fault_injection_limits_test.rs` | 82 | panic=3 |
-| `text/tests/golden/bm25_ranking.json` | 0 |  |
-| `text/tests/golden/clock_reference.json` | 0 |  |
-| `text/tests/golden/doc_id.json` | 0 |  |
-| `text/tests/golden/tokenizer_default.json` | 0 |  |
-| `text/tests/golden/tokenizer_german.json` | 0 |  |
+| `text/tests/golden/bm25_ranking.json` | 18 |  |
+| `text/tests/golden/clock_reference.json` | 1 |  |
+| `text/tests/golden/doc_id.json` | 1 |  |
+| `text/tests/golden/tokenizer_default.json` | 10 |  |
+| `text/tests/golden/tokenizer_german.json` | 11 |  |
 | `text/tests/golden_oracle_tests.rs` | 292 | panic=38, float=2, serde=4, std_fs=1 |
 | `text/tests/index_purge_proptests.rs` | 424 | panic=3, async=22 |
 | `text/tests/lib_scorer_lifecycle_test.rs` | 171 | panic=4, async=18 |

@@ -3,7 +3,7 @@
 **Aufgabe:** Versiegelter schluesselfreier Segmentspeicher: Journal, Segmente, Manifest  
 **Level:** L2 · **Budget:** 6500 LOC · **Spezifikation:** docs/SPEC.md Kap. 5.1  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-fs, acta-gate  
-**Umfang des Archivs:** 143 Dateien, 28922 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 144 Dateien, 29896 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -122,8 +122,8 @@
 | `store/tests/fault_injection_durability_points.rs` | 169 | panic=35, async=13, std_fs=2 |
 | `store/tests/fault_injection_recovery.rs` | 138 | panic=23, async=7, std_fs=1 |
 | `store/tests/format_version_compat.rs` | 145 | panic=29, async=14, std_fs=6 |
-| `store/tests/golden/tenant_codec_vectors.json` | 0 |  |
-| `store/tests/golden_corpus.rs` | 320 | panic=57, async=6, std_fs=1 |
+| `store/tests/golden/tenant_codec_vectors.json` | 971 |  |
+| `store/tests/golden_corpus.rs` | 321 | panic=57, async=6, std_fs=1 |
 | `store/tests/group_commit_fault_injection.rs` | 111 | panic=14, async=4 |
 | `store/tests/group_commit_flush_race.rs` | 216 | panic=29, async=25, std_fs=3 |
 | `store/tests/group_commit_follower_timeout_chain.rs` | 87 | panic=11, async=7 |
@@ -144,6 +144,7 @@
 | `store/tests/mz_b_support/mod.rs` | 1 |  |
 | `store/tests/mz_c_manifest_byte_identity.rs` | 64 | panic=6, async=6, std_fs=1 |
 | `store/tests/mz_c_support/mod.rs` | 31 |  |
+| `store/tests/proof_format_constants.rs` | 0 |  |
 | `store/tests/proof_open_rejects_corrupt.rs` | 104 | panic=20, async=6, std_fs=1 |
 | `store/tests/sstable_audit.rs` | 321 | panic=40, async=10, std_fs=4 |
 | `store/tests/sstable_block_bloom_fpr.rs` | 82 | panic=5, async=2, float=2 |
@@ -159,9 +160,9 @@
 | `store/tests/wal_hmac_binding_attack_tests.rs` | 1 |  |
 | `store/tests/wal_hmac_chain_ordering.rs` | 210 | panic=13, async=13 |
 | `store/tests/wal_hmac_rollback_race.rs` | 142 | panic=14, async=7 |
-| `store/tests/wal_key_lifecycle.rs` | 76 | panic=15, async=12, std_fs=2 |
+| `store/tests/wal_key_lifecycle.rs` | 77 | panic=15, async=12, std_fs=2 |
 | `store/tests/wal_lifecycle_crash_point_matrix.rs` | 259 | panic=1, async=3, float=2 |
-| `store/tests/wal_no_hmac_replay.rs` | 64 | panic=10, async=3, std_fs=1 |
+| `store/tests/wal_no_hmac_replay.rs` | 65 | panic=10, async=3, std_fs=1 |
 | `store/tests/wal_observer.rs` | 212 | panic=27, async=15 |
 | `store/tests/wal_observer_contract.rs` | 182 | panic=17, async=11 |
 | `store/tests/wal_observer_integration.rs` | 322 | panic=32, async=14 |

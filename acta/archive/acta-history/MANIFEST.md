@@ -3,7 +3,7 @@
 **Aufgabe:** Versionskontrolle K: Objekte, Refs, Sichtbarkeitsmengen, Diff, Merge, Takedown  
 **Level:** L3 · **Budget:** 6500 LOC · **Spezifikation:** docs/SPEC.md Kap. 6  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-pii, acta-ledger, acta-vault, acta-seg, acta-gate  
-**Umfang des Archivs:** 37 Dateien, 11401 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 39 Dateien, 12629 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -63,6 +63,8 @@
 | `mvcc/src/seq_log.rs` | 855 | panic=11 |
 | `mvcc/src/snapshot.rs` | 962 | panic=4 |
 | `mvcc/src/tombstone.rs` | 52 |  |
+| `mvcc/tests/history_anomaly_checker.rs` | 305 |  |
+| `mvcc/tests/isolation_tests.rs` | 923 |  |
 | `mvcc/tests/loom_sequence_log.rs` | 160 | panic=10 |
 | `mvcc/tests/loom_snapshot_registry.rs` | 166 | panic=8 |
 | `mvcc/tests/tombstone_diff.rs` | 40 |  |

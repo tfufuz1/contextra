@@ -3,7 +3,7 @@
 **Aufgabe:** Segmentierter exakter i8-Vektorindex mit Lineage  
 **Level:** L3 · **Budget:** 4000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.3  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-gate, acta-vault, acta-seg  
-**Umfang des Archivs:** 36 Dateien, 5399 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 39 Dateien, 6413 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -55,14 +55,17 @@
 | `vector/src/types.rs` | 92 | float=5, serde=4 |
 | `vector/tests/distance_determinism.rs` | 81 | panic=3, float=2 |
 | `vector/tests/distance_determinism_test.rs` | 32 | float=4 |
-| `vector/tests/golden/distance_oracle.json` | 0 |  |
+| `vector/tests/golden/distance_oracle.json` | 254 |  |
 | `vector/tests/golden_distance_oracle.rs` | 180 | panic=10, float=14 |
 | `vector/tests/golden_test.rs` | 419 | panic=54, async=12, float=15, std_fs=1 |
 | `vector/tests/nan_validation_policy.rs` | 198 | panic=10, async=6, float=12 |
 | `vector/tests/nan_validation_test.rs` | 30 | float=3 |
+| `vector/tests/partial_rebuild_recall_regression.rs` | 374 |  |
 | `vector/tests/proptest_distance_quantize.rs` | 105 | panic=5, float=6 |
 | `vector/tests/s36_distance_metric_conformance.rs` | 40 | panic=2, serde=2 |
 | `vector/tests/simd_differential_test.rs` | 66 | panic=5, float=3 |
 | `vector/tests/sq8_error_bound_proptest.rs` | 38 | panic=4 |
+| `vector/tests/wp02_contract_object_safety.rs` | 114 |  |
+| `vector/tests/wp04_rebuild_invariants.rs` | 272 |  |
 | `vector/tests/wp06_distance_contract.rs` | 122 | panic=17, float=5 |
 | `vector/tests/wp06_sq8_bounds.rs` | 116 | panic=13, float=13, serde=2 |

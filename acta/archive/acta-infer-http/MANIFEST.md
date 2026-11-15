@@ -3,7 +3,7 @@
 **Aufgabe:** Client fuer Inferenzdienste (OpenAI-kompatibel); tokio erlaubt  
 **Level:** L8 · **Budget:** 3000 LOC · **Spezifikation:** docs/SPEC.md Kap. 11.1  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-infer  
-**Umfang des Archivs:** 16 Dateien, 3339 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 17 Dateien, 5078 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -35,6 +35,7 @@
 | `infer-ollama/src/client/policy.rs` | 409 | serde=1 |
 | `infer-ollama/src/client/validation.rs` | 62 |  |
 | `infer-ollama/src/client/wire.rs` | 62 | float=2, serde=2 |
+| `infer-ollama/src/compat/client_tests.rs` | 1739 |  |
 | `infer-ollama/src/embedding.rs` | 155 | async=2, float=2 |
 | `infer-ollama/src/error.rs` | 189 | float=6, serde=4 |
 | `infer-ollama/src/lib.rs` | 43 |  |

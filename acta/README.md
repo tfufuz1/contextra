@@ -27,6 +27,7 @@ Siehe [`archive/INDEX.md`](archive/INDEX.md). Empfohlene Reihenfolge (jede Zeile
 | 2 | `acta-gate`, `acta-ledger`, `acta-vault` | Roaring-Gate + HMAC-Log, K/E/A-Ledger, Tresor 92 B mit Slot-AAD, Wurzelrotation, KeyAnchor |
 | 3 | `acta-seg` | Journal-Rahmen und Segmentformat nach 5.1, Manifest, kein LSM |
 | 4 | `acta-text`, `acta-vec` | Festkomma-BM25 (Z7), i8-Flat-Suche, Lineage `Derived<T>` |
+| 4b | `acta-graph` (nur nach ADR, siehe `docs/ADR-VORSCHLAG-graph.md`) | CSR/PPR/Pfad-RAG aus `archive/acta-graph/`; Erweiterungen in `archive/_reserve/graph-ext/`; Festkomma, Zugriffsfilter, `ErasureLayer` |
 | 5 | `acta-ingest`, `acta-parse`, `acta-parse-worker`, `acta-pii` | Chunking `chunk_cfg` v1, Worker-Sandbox (Landlock/seccomp), `Validated<T>` |
 | 6 | `acta-erasure`, `acta-reports`, `acta-verify` | Saga S0–S9 synchron, Messung mit Positivkontrolle, JCS-Bericht, unabhaengiger Pruefer |
 | 7 | `acta-pstore`, `acta-history`, `acta-access`, `acta-decision`, `acta-rag` | Neubauanteile mit Referenzcode aus dem Archiv |

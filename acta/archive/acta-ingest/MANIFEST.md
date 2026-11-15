@@ -3,7 +3,7 @@
 **Aufgabe:** Chunking, Normalisierung, Ressourcenlimits, Worker-Protokoll (ohne Parser-Abhaengigkeiten)  
 **Level:** L1 · **Budget:** 3000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.1  
 **Interne Abhaengigkeiten (Soll):** acta-base  
-**Umfang des Archivs:** 44 Dateien, 11191 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 45 Dateien, 11353 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -35,6 +35,7 @@
 | `db/src/chunker/split.rs` | 249 |  |
 | `db/src/chunker/unit_tests.rs` | 411 | panic=9, float=2 |
 | `db/src/chunker/windows.rs` | 90 |  |
+| `engine/tests/chunker_hardening_tests.rs` | 162 |  |
 | `ingest/src/canonical.rs` | 323 | serde=1 |
 | `ingest/src/chunking/common.rs` | 240 | float=3 |
 | `ingest/src/chunking/config.rs` | 191 | serde=1 |

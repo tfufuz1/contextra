@@ -1,0 +1,1177 @@
+#![allow(deprecated)]
+//! Fehlertypen für `acta`.
+//!
+//! # Architektur-Rolle: Typen-Fundament (Kanonische Fehlerdefinition)
+//!
+//! Dieses Modul stellt das zentrale `ActaError`-Enum bereit.
+//! In Übereinstimmung mit dem Zero-Panic-Prinzip werden Fehler strukturiert modelliert
+//! und über den `?`-Operator im System propagiert.
+//!
+//! # Invarianten
+//! - Einzige Fehler-Enum: Im gesamten Workspace dient `ActaError` als systemweiter Fehlertyp.
+//! - Abwärtskompatibilität: Durch `#[non_exhaustive]` können neue Varianten ergänzt werden,
+//!   ohne Downstream-Gleichheitsprüfungen (`match`) zu brechen.
+//! - Keine Panics: Alle Hilfs- und Konvertierungsmethoden sind panic-frei.
+
+// FILE-CONTEXT
+// STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
+// ZWECK: Kanonische unified ActaError Enum für den gesamten Workspace.
+// INVARIANTEN: Zero-Panic via ? propagation; #[non_exhaustive] für binäre Abwärtskompatibilität. KEINE neue Error-Enum in anderen Crates anlegen.
+// HOTSPOTS: 20-180
+// NICHT-OFFENSICHTLICH: Neue Fehler-Varianten NUR unten anhängen; Downstream-Crates brauchen Wildcard-Match arm.
+// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
+
+// INVARIANT: Einzige Error-Enum für den gesamten Workspace.
+// Neue Varianten nur ANHÄNGEN (niemals umsortieren) → binäre Kompatibilität.
+// DOWNSTREAM: acta_seg, acta_base, acta_base konvertieren via `?` und `From`.
+
+use crate::DocId;
+use thiserror::Error;
+
+/// Errors that can occur during HNSW graph deletion and repair operations.
+#[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[acta_base:ERR-001]
+#[deprecated(
+    since = "0.1.0",
+    note = "Löschfehler gehören in die Erasure-Familie (acta_base per D-E1)"
+)]
+pub enum HnswDeletionError {
+    /// Target node with doc_id not found in graph.
+    #[error("Node for doc_id {0:?} not found in HNSW index")]
+    NodeNotFound(DocId),
+
+    /// Graph repair resulted in a disconnected graph component.
+    #[error("Graph repair resulted in disconnected component for node {0:?}")]
+    DisconnectedComponent(DocId),
+
+    /// Verification failed with remaining ghost pointers.
+    #[error("Verification failed: {remaining_pointers} remaining ghost pointers found")]
+    VerificationFailed {
+        /// Number of ghost pointers remaining in the graph.
+        remaining_pointers: usize,
+    },
+}
+
+/// Step identifier in an agent workflow execution.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[repr(transparent)]
+// ANCHOR[acta_base:ERR-002]
+pub struct StepId(pub u64);
+
+impl StepId {
+    /// Creates a new `StepId` wrapping a `u64`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Returns the inner raw `u64` value.
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for StepId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StepId({})", self.0)
+    }
+}
+
+impl From<u64> for StepId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+/// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[acta_base:ERR-003]
+pub enum CacheDirective {
+    /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
+    Pin {
+        /// Optional maximum duration for which the segment remains pinned. `None` indicates indefinite pinning.
+        ttl: Option<std::time::Duration>,
+    },
+    /// Segment must never be inserted into the cache.
+    NeverCache,
+    /// Standard automatic cache insertion and eviction management.
+    Auto,
+    /// Transient step segment automatically released after completion of the specified step.
+    ReleaseAfterStep {
+        /// Step ID after whose completion this segment should be released.
+        step_id: StepId,
+    },
+}
+
+impl Default for CacheDirective {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+/// Convenience alias for `Result<T, ActaError>`.
+// ANCHOR[acta_base:ERR-004]
+pub type Result<T> = std::result::Result<T, ActaError>;
+
+/// Unified error type for all `acta` operations across the entire workspace.
+///
+/// # Non-Exhaustive Variant Guarantee
+/// This enum is marked `#[non_exhaustive]` to allow appending new error variants
+/// in future minor releases without breaking downstream `match` statements across crate boundaries
+/// (such as `acta_base` and `acta_base`).
+///
+/// Downstream callers matching on `ActaError` must include a wildcard arm (`_ => ...`).
+/// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
+#[derive(Error, Debug)]
+#[non_exhaustive]
+// ANCHOR[acta_base:ERR-005]
+pub enum ActaError {
+    // ═══ Core & Logic ═══
+    /// Internal engine logic error.
+    #[error("Internal error: {0}")]
+    Internal(String),
+
+    /// Invalid user or API argument input.
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
+    /// Resource, key, or document not found.
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    /// Security or execution policy violation.
+    #[error("Policy violation: {0}")]
+    PolicyViolation(String),
+
+    // ═══ Storage Engine ═══
+    /// Storage layer failure.
+    #[error("Storage error: {0}")]
+    Storage(String),
+
+    /// Standard I/O error wrapper.
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// Data integrity corruption detected in Write-Ahead Log.
+    #[error("WAL corruption detected at offset {offset}: {reason}")]
+    #[non_exhaustive]
+    WalCorruption {
+        /// Byte offset in WAL file where corruption occurred.
+        offset: u64,
+        /// Detail text describing corruption cause.
+        reason: String,
+    },
+
+    /// Block checksum validation failure.
+    #[error("Checksum mismatch: file={path}, block={block_id}")]
+    #[non_exhaustive]
+    ChecksumMismatch {
+        /// File path of corrupted storage block.
+        path: String,
+        /// Block identifier.
+        block_id: u64,
+    },
+
+    // ═══ Transactions & Consistency ═══
+    /// Transaction lifecycle or execution failure.
+    #[error("Transaction error: {0}")]
+    Transaction(String),
+
+    /// Transaction execution timeout exceeded.
+    #[error("Transaction {tx_id} timed out after {elapsed_ms}ms")]
+    TransactionTimeout {
+        /// Identifier of timed out transaction.
+        tx_id: u64,
+        /// Elapsed time in milliseconds before timeout.
+        elapsed_ms: u64,
+    },
+
+    /// Data conflict during commit or mutation.
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
+    /// Out-of-order or invalid sequence number.
+    #[error("Invalid sequence number: {0}")]
+    InvalidSequenceNumber(u64),
+
+    // ═══ Index & Search ═══
+    /// General index operation failure.
+    #[error("Index error: {0}")]
+    Index(String),
+
+    /// Vector or embedding dimension mismatch.
+    #[error("Embedding dimension mismatch: expected {expected}, got {got}")]
+    EmbeddingDimensionMismatch {
+        /// Expected vector dimension.
+        expected: usize,
+        /// Actual vector dimension.
+        got: usize,
+    },
+
+    /// HNSW graph degradation warning threshold reached.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Indexspezifische Fehler gehören in das Crate acta_vec"
+    )]
+    #[error("HNSW graph connectivity degraded: {deleted_ratio:.1}% deleted nodes")]
+    HnswConnectivityDegraded {
+        /// Ratio of deleted tombstone nodes in graph.
+        deleted_ratio: f64,
+    },
+
+    /// Text search engine operation failure.
+    #[error("Text engine error: {0}")]
+    Text(String),
+
+    // ═══ Resources & Sandbox ═══
+    /// Configured memory allocation budget exceeded.
+    #[error("Memory budget exceeded: {used_mb}MB / {limit_mb}MB")]
+    MemoryBudgetExceeded {
+        /// Currently used memory in MB.
+        used_mb: u64,
+        /// Configured memory limit in MB.
+        limit_mb: u64,
+    },
+
+    /// Code or query sandbox execution error.
+    #[error("Sandbox error: {0}")]
+    Sandbox(String),
+
+    /// Sandbox memory limit breach.
+    #[error("Memory limit exceeded in sandbox: {0}")]
+    MemoryLimitExceeded(String),
+
+    /// Sandbox execution timeout breach.
+    #[error("Timeout exceeded in sandbox: {0}")]
+    SandboxTimeout(String),
+
+    /// General operation execution timeout breach.
+    #[error("Operation timed out: {operation} (limit: {timeout_ms}ms)")]
+    Timeout {
+        /// Identifier of the timed out operation.
+        operation: String,
+        /// Configured timeout limit in milliseconds.
+        timeout_ms: u64,
+    },
+
+    // ═══ Infrastructure ═══
+    /// Data serialization or deserialization error.
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    /// JSON processing error wrapper.
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
+    /// Cryptographic operation error.
+    #[error("Crypto error: {0}")]
+    Crypto(String),
+
+    /// Requested checkpoint missing or deleted.
+    #[error("Checkpoint not found")]
+    CheckpointNotFound,
+
+    /// Distributed cluster operation error.
+    #[error("Cluster error: {0}")]
+    Cluster(String),
+
+    /// Data parsing error.
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    /// Bincode serialization or deserialization error wrapper.
+    #[error("Bincode error: {0}")]
+    Bincode(#[from] bincode::Error),
+
+    /// Capability requested is not supported by this engine or implementation.
+    #[error("Capability unsupported: {capability} - {reason}")]
+    CapabilityUnsupported {
+        /// Unique capability identifier.
+        capability: String,
+        /// Detail text describing why capability is unsupported.
+        reason: String,
+    },
+
+    /// Snapshot isolation is unsupported for the requested search signal or graph strategy.
+    #[error("Snapshot unsupported for signal/strategy: {0}")]
+    SnapshotUnsupportedForSignal(String),
+
+    /// Optimistic concurrency control stale read or version conflict.
+    #[error("Stale read / OCC conflict: {0}")]
+    StaleRead(String),
+
+    /// Scan or query result limit exceeded.
+    #[error("Limit exceeded: {context} (limit: {limit})")]
+    LimitExceeded {
+        /// Configured or default result limit.
+        limit: usize,
+        /// Context description of the scan or operation.
+        context: String,
+    },
+
+    /// GGUF-/Modell-Ladefehler (Candle-Backend). Nutzung: korrupte, unvollständige
+    /// oder dimensions-inkompatible Modell-Dateien beim Laden über acta_base.
+    #[error("Model load error for {path}: {reason}")]
+    ModelLoad {
+        /// Path to model file.
+        path: String,
+        /// Detailed reason for failure.
+        reason: String,
+    },
+
+    /// Strukturelle Inkonsistenz zwischen Vektor-Index und Dokumentenspeicher:
+    /// eine Vektor-ID im Index verweist auf ein DocId, das im Store nicht (mehr)
+    /// existiert (Split-Brain-Zustand). Unterscheidet sich bewusst von `NotFound`,
+    /// das für normale, erwartbare Lookup-Misses (z.B. TTL-Expiry) reserviert bleibt.
+    #[error("Orphaned vector reference: index_id={index_id} -> doc_id={doc_id}")]
+    OrphanedVectorReference {
+        /// Identifier of document referenced by index.
+        doc_id: String,
+        /// Identifier of vector in index.
+        index_id: String,
+    },
+
+    /// Group commit execution timeout exceeded for a follower transaction.
+    #[error("Group commit timed out for transaction {tx_id}")]
+    CommitTimeout {
+        /// Identifier of timed out transaction.
+        tx_id: u64,
+    },
+
+    /// KV-seitige `KvDeleteMode`-Konfiguration inkonsistent mit aktiven Invarianten.
+    #[error("KV delete mode configuration error: {0}")]
+    KvDeleteModeConfig(&'static str),
+
+    /// KV-Quantisierungsfehler.
+    #[error("KV quantization error: {0}")]
+    KvQuantization(String),
+
+    /// Durability mode configuration error.
+    #[error("Durability configuration error: {0}")]
+    DurabilityConfig(String),
+
+    /// Plugin lifecycle or execution error.
+    #[error("Plugin error: {0}")]
+    Plugin(String),
+
+    /// KV Cache segment pin memory budget exceeded for a tenant.
+    #[error("Pin budget exceeded: {0}")]
+    PinBudgetExceeded(String),
+
+    /// HNSW graph repair failure.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Indexspezifische Fehler gehören in das Crate acta_vec"
+    )]
+    #[error("graph repair failed: {0}")]
+    GraphRepairFailed(#[from] HnswDeletionError),
+
+    /// Subsequent external or malicious truncation of an otherwise consistent WAL chain detected.
+    #[error("WAL truncation attack detected: expected tail HMAC {expected_hmac:?}, actual tail HMAC {actual_hmac:?}")]
+    WalTruncationDetected {
+        /// Expected WAL tail HMAC from manifest high water mark.
+        expected_hmac: [u8; 32],
+        /// Actual computed WAL tail HMAC after replay.
+        actual_hmac: [u8; 32],
+    },
+
+    /// Hardlink across distinct filesystems or volumes.
+    #[error("Cross-device link failed: cannot hard link '{source_path}' to '{target_path}' across distinct filesystems/mounts")]
+    CrossDeviceLink {
+        /// Path of source file.
+        source_path: String,
+        /// Path of target file.
+        target_path: String,
+    },
+}
+
+impl ActaError {
+    /// Creates a `LimitExceeded` error.
+    // ANCHOR[acta_base:ERR-FN-LIMIT_EXCEEDED]
+    pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self {
+        Self::LimitExceeded {
+            limit,
+            context: context.into(),
+        }
+    }
+
+    /// Creates a `ModelLoad` error.
+    // ANCHOR[acta_base:ERR-FN-MODEL_LOAD]
+    pub fn model_load(path: impl Into<String>, reason: impl Into<String>) -> Self {
+        Self::ModelLoad {
+            path: path.into(),
+            reason: reason.into(),
+        }
+    }
+
+    /// Creates a `SnapshotUnsupportedForSignal` error.
+    // ANCHOR[acta_base:ERR-FN-SNAPSHOT_UNSUPPORTED_FOR_SIGNAL]
+    pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self {
+        Self::SnapshotUnsupportedForSignal(strategy.into())
+    }
+
+    /// Creates an `OrphanedVectorReference` error.
+    // ANCHOR[acta_base:ERR-FN-ORPHANED_VECTOR_REFERENCE]
+    pub fn orphaned_vector_reference(
+        doc_id: impl Into<String>,
+        index_id: impl Into<String>,
+    ) -> Self {
+        Self::OrphanedVectorReference {
+            doc_id: doc_id.into(),
+            index_id: index_id.into(),
+        }
+    }
+
+    /// Creates a `CapabilityUnsupported` error.
+    // ANCHOR[acta_base:ERR-FN-CAPABILITY_UNSUPPORTED]
+    pub fn capability_unsupported(
+        capability: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self::CapabilityUnsupported {
+            capability: capability.into(),
+            reason: reason.into(),
+        }
+    }
+    /// Creates an `InvalidInput` error from any displayable value.
+    // ANCHOR[acta_base:ERR-FN-INVALID_INPUT]
+    pub fn invalid_input(msg: impl Into<String>) -> Self {
+        Self::InvalidInput(msg.into())
+    }
+
+    /// Creates a `WalCorruption` error.
+    // ANCHOR[acta_base:ERR-FN-WAL_CORRUPTION]
+    pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self {
+        Self::WalCorruption {
+            offset,
+            reason: reason.into(),
+        }
+    }
+
+    /// Creates a `ChecksumMismatch` error.
+    // ANCHOR[acta_base:ERR-FN-CHECKSUM_MISMATCH]
+    pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self {
+        Self::ChecksumMismatch {
+            path: path.into(),
+            block_id,
+        }
+    }
+
+    /// Creates a `KvQuantization` error.
+    // ANCHOR[acta_base:ERR-FN-KV_QUANTIZATION]
+    pub fn kv_quantization(msg: impl Into<String>) -> Self {
+        Self::KvQuantization(msg.into())
+    }
+
+    /// Creates a `DurabilityConfig` error.
+    // ANCHOR[acta_base:ERR-FN-DURABILITY_CONFIG]
+    pub fn durability_config(msg: impl Into<String>) -> Self {
+        Self::DurabilityConfig(msg.into())
+    }
+
+    /// Creates a `PinBudgetExceeded` error.
+    // ANCHOR[acta_base:ERR-FN-PIN_BUDGET_EXCEEDED]
+    pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
+        Self::PinBudgetExceeded(msg.into())
+    }
+
+    /// Creates a `CrossDeviceLink` error.
+    // ANCHOR[acta_base:ERR-FN-CROSS_DEVICE_LINK]
+    pub fn cross_device_link(
+        source_path: impl Into<String>,
+        target_path: impl Into<String>,
+    ) -> Self {
+        Self::CrossDeviceLink {
+            source_path: source_path.into(),
+            target_path: target_path.into(),
+        }
+    }
+
+    /// Creates a `WalTruncationDetected` error.
+    // ANCHOR[acta_base:ERR-FN-WAL_TRUNCATION_DETECTED]
+    pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
+        Self::WalTruncationDetected {
+            expected_hmac,
+            actual_hmac,
+        }
+    }
+
+    /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
+    // ANCHOR[acta_base:ERR-FN-IS_OCC_CONFLICT]
+    pub fn is_occ_conflict(&self) -> bool {
+        matches!(self, Self::StaleRead(_) | Self::Conflict(_))
+    }
+}
+
+impl From<std::array::TryFromSliceError> for ActaError {
+    fn from(e: std::array::TryFromSliceError) -> Self {
+        Self::ParseError(e.to_string())
+    }
+}
+
+
+impl From<acta_base::IdError> for ActaError {
+    fn from(err: acta_base::IdError) -> Self {
+        match err {
+            acta_base::IdError::TxIdAllocationOverflow(offset) => {
+                ActaError::Transaction(format!(
+                    "Internal TxId allocation offset {offset} overflows u64::MAX (INTERNAL_BASE={})",
+                    acta_base::TxId::INTERNAL_BASE
+                ))
+            }
+            other => ActaError::InvalidInput(other.to_string()),
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn acta_base() {
+        let variants = [
+            ActaError::Internal("test".into()),
+            ActaError::InvalidInput("test".into()),
+            ActaError::NotFound("test".into()),
+            ActaError::Storage("test".into()),
+            ActaError::PolicyViolation("test".into()),
+            ActaError::WalCorruption {
+                offset: 10,
+                reason: "test".into(),
+            },
+            ActaError::ChecksumMismatch {
+                path: "file".into(),
+                block_id: 1,
+            },
+            ActaError::Transaction("test".into()),
+            ActaError::TransactionTimeout {
+                tx_id: 1,
+                elapsed_ms: 100,
+            },
+            ActaError::Conflict("test".into()),
+            ActaError::InvalidSequenceNumber(1),
+            ActaError::Index("test".into()),
+            ActaError::EmbeddingDimensionMismatch {
+                expected: 1536,
+                got: 768,
+            },
+            ActaError::HnswConnectivityDegraded { deleted_ratio: 0.1 },
+            ActaError::Text("test".into()),
+            ActaError::MemoryBudgetExceeded {
+                used_mb: 10,
+                limit_mb: 5,
+            },
+            ActaError::Sandbox("test".into()),
+            ActaError::MemoryLimitExceeded("test".into()),
+            ActaError::SandboxTimeout("test".into()),
+            ActaError::Serialization("test".into()),
+            ActaError::Crypto("test".into()),
+            ActaError::CheckpointNotFound,
+            ActaError::Cluster("test".into()),
+            ActaError::ParseError("test".into()),
+            ActaError::ModelLoad {
+                path: "model.gguf".into(),
+                reason: "corrupt header".into(),
+            },
+            ActaError::OrphanedVectorReference {
+                doc_id: "doc_123".into(),
+                index_id: "idx_456".into(),
+            },
+            ActaError::KvQuantization("test".into()),
+            ActaError::DurabilityConfig("test".into()),
+            ActaError::PinBudgetExceeded("test".into()),
+            ActaError::CrossDeviceLink {
+                source_path: "/a/file.sst".into(),
+                target_path: "/b/file.sst".into(),
+            },
+        ];
+        for v in &variants {
+            let _ = format!("{v}");
+            let _ = format!("{v:?}");
+        }
+    }
+
+    #[test]
+    fn test_invalid_input_helper() {
+        let err = ActaError::invalid_input("bad param");
+        match err {
+            ActaError::InvalidInput(msg) => assert_eq!(msg, "bad param"),
+            _ => panic!("Expected InvalidInput, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_capability_unsupported_helper() {
+        let err = ActaError::capability_unsupported("snapshot_read_at", "SPEC");
+        assert_eq!(
+            err.to_string(),
+            "Capability unsupported: snapshot_read_at - SPEC"
+        );
+        match err {
+            ActaError::CapabilityUnsupported { capability, reason } => {
+                assert_eq!(capability, "snapshot_read_at");
+                assert_eq!(reason, "SPEC");
+            }
+            _ => panic!("Expected CapabilityUnsupported, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_from_try_from_slice_error() {
+        let slice: &[u8] = &[1, 2, 3];
+        let try_from_res: std::result::Result<[u8; 4], _> = slice.try_into();
+        assert!(try_from_res.is_err());
+
+        let parse_err: ActaError = try_from_res.unwrap_err().into();
+        match parse_err {
+            ActaError::ParseError(msg) => {
+                assert!(msg.contains("could not convert slice to array") || msg.contains("slice"));
+            }
+            _ => panic!("Expected ParseError, got {:?}", parse_err),
+        }
+    }
+
+    #[test]
+    fn test_error_display_all_variants() {
+        // Core & Logic
+        assert_eq!(
+            ActaError::Internal("test".into()).to_string(),
+            "Internal error: test"
+        );
+        assert_eq!(
+            ActaError::InvalidInput("test".into()).to_string(),
+            "Invalid input: test"
+        );
+        assert_eq!(
+            ActaError::NotFound("doc_1".into()).to_string(),
+            "Not found: doc_1"
+        );
+        assert_eq!(
+            ActaError::PolicyViolation("test".into()).to_string(),
+            "Policy violation: test"
+        );
+
+        // Storage Engine
+        assert_eq!(
+            ActaError::Storage("test".into()).to_string(),
+            "Storage error: test"
+        );
+        assert_eq!(
+            ActaError::WalCorruption {
+                offset: 1024,
+                reason: "invalid header".into()
+            }
+            .to_string(),
+            "WAL corruption detected at offset 1024: invalid header"
+        );
+        assert_eq!(
+            ActaError::ChecksumMismatch {
+                path: "f".into(),
+                block_id: 1
+            }
+            .to_string(),
+            "Checksum mismatch: file=f, block=1"
+        );
+
+        // Transactions & Consistency
+        assert_eq!(
+            ActaError::Transaction("test".into()).to_string(),
+            "Transaction error: test"
+        );
+        assert_eq!(
+            ActaError::TransactionTimeout {
+                tx_id: 1,
+                elapsed_ms: 50
+            }
+            .to_string(),
+            "Transaction 1 timed out after 50ms"
+        );
+        assert_eq!(
+            ActaError::Conflict("test".into()).to_string(),
+            "Conflict: test"
+        );
+        assert_eq!(
+            ActaError::InvalidSequenceNumber(42).to_string(),
+            "Invalid sequence number: 42"
+        );
+
+        // Index & Search
+        assert_eq!(
+            ActaError::Index("test".into()).to_string(),
+            "Index error: test"
+        );
+        assert_eq!(
+            ActaError::EmbeddingDimensionMismatch {
+                expected: 1536,
+                got: 768
+            }
+            .to_string(),
+            "Embedding dimension mismatch: expected 1536, got 768"
+        );
+        assert_eq!(
+            ActaError::HnswConnectivityDegraded {
+                deleted_ratio: 25.0
+            }
+            .to_string(),
+            "HNSW graph connectivity degraded: 25.0% deleted nodes"
+        );
+        assert_eq!(
+            ActaError::Text("test".into()).to_string(),
+            "Text engine error: test"
+        );
+
+        // Resources & Sandbox
+        assert_eq!(
+            ActaError::MemoryBudgetExceeded {
+                used_mb: 100,
+                limit_mb: 50
+            }
+            .to_string(),
+            "Memory budget exceeded: 100MB / 50MB"
+        );
+        assert_eq!(
+            ActaError::Sandbox("test".into()).to_string(),
+            "Sandbox error: test"
+        );
+        assert_eq!(
+            ActaError::MemoryLimitExceeded("test".into()).to_string(),
+            "Memory limit exceeded in sandbox: test"
+        );
+        assert_eq!(
+            ActaError::SandboxTimeout("test".into()).to_string(),
+            "Timeout exceeded in sandbox: test"
+        );
+
+        // Infrastructure
+        assert_eq!(
+            ActaError::Serialization("test".into()).to_string(),
+            "Serialization error: test"
+        );
+        assert_eq!(
+            ActaError::Crypto("test".into()).to_string(),
+            "Crypto error: test"
+        );
+        assert_eq!(
+            ActaError::CheckpointNotFound.to_string(),
+            "Checkpoint not found"
+        );
+        assert_eq!(
+            ActaError::Cluster("test".into()).to_string(),
+            "Cluster error: test"
+        );
+        assert_eq!(
+            ActaError::ParseError("test".into()).to_string(),
+            "Parse error: test"
+        );
+        let bincode_err: bincode::Error = Box::new(bincode::ErrorKind::Custom("test".into()));
+        assert_eq!(
+            ActaError::Bincode(bincode_err).to_string(),
+            "Bincode error: test"
+        );
+    }
+
+    #[test]
+    fn test_from_conversions() {
+        use std::error::Error;
+
+        // Io
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let m_err: ActaError = io_err.into();
+        assert!(matches!(m_err, ActaError::Io(_)));
+        assert!(m_err.source().is_some());
+
+        // Json
+        let json_str = "{ invalid }";
+        let json_err: serde_json::Error =
+            serde_json::from_str::<serde_json::Value>(json_str).unwrap_err();
+        let m_err2: ActaError = json_err.into();
+        assert!(matches!(m_err2, ActaError::Json(_)));
+        assert!(m_err2.source().is_some());
+
+        // Bincode
+        let bincode_err: bincode::Error =
+            Box::new(bincode::ErrorKind::Custom("test bincode".into()));
+        let m_err_bc: ActaError = bincode_err.into();
+        assert!(matches!(m_err_bc, ActaError::Bincode(_)));
+        assert!(m_err_bc.source().is_some());
+
+        // Other variants should return None for source()
+        let m_err3 = ActaError::Internal("test".into());
+        assert!(m_err3.source().is_none());
+    }
+
+    #[test]
+    fn test_result_alias() {
+        fn fail() -> Result<()> {
+            Err(ActaError::Internal("failed".to_string()))
+        }
+        let res = fail();
+        assert!(res.is_err());
+    }
+
+    /// Mutation-robustness test: verifies that `From<std::io::Error>` preserves the
+    /// original I/O error message in the Display output.
+    ///
+    /// # Anti-Mirroring
+    /// Expected string `"I/O error: "` is a hand-written prefix, independent of the format
+    /// impl string `"I/O error: {0}"`. If the format string changed (e.g. prefix dropped),
+    /// this test would catch it.
+    ///
+    /// # Mutation robustness
+    /// Removing the `#[from]` attribute would break this test (Io variant would stop matching).
+    /// Changing the prefix from "I/O error" to anything else would break the `starts_with` assert.
+    #[test]
+    fn test_io_error_message_preserved() {
+        let sentinel = "unique_sentinel_message_for_mutation_test_42";
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, sentinel);
+        let mf_err: ActaError = io_err.into();
+
+        // Must be the Io variant — not Internal or Storage
+        assert!(
+            matches!(mf_err, ActaError::Io(_)),
+            "Expected ActaError::Io, got: {:?}",
+            mf_err
+        );
+
+        // The original message must survive in the Display output (no message loss)
+        let display = mf_err.to_string();
+        assert!(
+            display.contains(sentinel),
+            "io::Error message must be preserved. Display was: {:?}",
+            display
+        );
+        // The ActaError prefix must also be present (structural check)
+        assert!(
+            display.starts_with("I/O error:"),
+            "Expected 'I/O error:' prefix, got: {:?}",
+            display
+        );
+    }
+
+    /// Mutation-robustness test: verifies `From<serde_json::Error>` carries the parse error info.
+    ///
+    /// # Anti-Mirroring
+    /// `"JSON error:"` is a hand-written known-stable string; not derived from the format macro.
+    #[test]
+    fn test_json_error_message_preserved() {
+        let sentinel_json = "{\"key\": }"; // Valid JSON prefix, invalid tail
+        let json_err = serde_json::from_str::<serde_json::Value>(sentinel_json).unwrap_err();
+        let original_msg = json_err.to_string();
+        let mf_err: ActaError = json_err.into();
+
+        assert!(matches!(mf_err, ActaError::Json(_)));
+
+        let display = mf_err.to_string();
+        // Message from the JSON parser must survive in the output
+        assert!(
+            display.contains(&original_msg) || display.contains("expected value"),
+            "Json error detail must be preserved. Display: {:?}, original: {:?}",
+            display,
+            original_msg
+        );
+        assert!(
+            display.starts_with("JSON error:"),
+            "Expected 'JSON error:' prefix, got: {:?}",
+            display
+        );
+    }
+
+    /// Mutation-robustness test: WalCorruption fields must not be transposed.
+    ///
+    /// # Invariant
+    /// Swapping `offset` and `reason` in the struct definition would break this test.
+    /// Using the same value for both fields (lazy test) would not — this test uses distinct
+    /// types to make field-swapping impossible, and distinct values to catch display-level bugs.
+    #[test]
+    fn test_wal_corruption_fields_not_transposed() {
+        let err = ActaError::WalCorruption {
+            offset: 98765,
+            reason: "corrupted hmac chain".to_string(),
+        };
+        let display = err.to_string();
+
+        // The numeric offset must appear in the display — not be silently replaced by the reason
+        assert!(
+            display.contains("98765"),
+            "WalCorruption offset must appear in display: {:?}",
+            display
+        );
+        // The reason text must also appear
+        assert!(
+            display.contains("corrupted hmac chain"),
+            "WalCorruption reason must appear in display: {:?}",
+            display
+        );
+        // The offset must NOT accidentally appear where the reason should be
+        // (catches field-transposition bug in format string)
+        assert!(
+            !display.starts_with("WAL corruption detected at offset corrupted"),
+            "Offset and reason must not be transposed: {:?}",
+            display
+        );
+    }
+
+    /// Mutation-robustness test: ChecksumMismatch fields must not be transposed.
+    #[test]
+    fn test_checksum_mismatch_fields_not_transposed() {
+        let err = ActaError::ChecksumMismatch {
+            path: "data_segment_003.sst".to_string(),
+            block_id: 887766,
+        };
+        let display = err.to_string();
+
+        // Check path and block_id are present
+        assert!(
+            display.contains("data_segment_003.sst"),
+            "ChecksumMismatch path must appear in display: {:?}",
+            display
+        );
+        assert!(
+            display.contains("887766"),
+            "ChecksumMismatch block_id must appear in display: {:?}",
+            display
+        );
+
+        // Verify correct field positions (path shouldn't be formatted into block position)
+        assert!(
+            display.contains("file=data_segment_003.sst"),
+            "Path formatted incorrectly: {:?}",
+            display
+        );
+        assert!(
+            display.contains("block=887766"),
+            "Block ID formatted incorrectly: {:?}",
+            display
+        );
+    }
+
+    /// Mutation-robustness test: TransactionTimeout fields must not be transposed.
+    #[test]
+    fn test_transaction_timeout_fields_not_transposed() {
+        let err = ActaError::TransactionTimeout {
+            tx_id: 112233,
+            elapsed_ms: 998877,
+        };
+        let display = err.to_string();
+
+        assert!(
+            display.contains("112233"),
+            "TransactionTimeout tx_id must appear in display: {:?}",
+            display
+        );
+        assert!(
+            display.contains("998877"),
+            "TransactionTimeout elapsed_ms must appear in display: {:?}",
+            display
+        );
+
+        // Position checks
+        assert!(
+            display.starts_with("Transaction 112233 timed out"),
+            "Transaction ID formatted in wrong place: {:?}",
+            display
+        );
+        assert!(
+            display.contains("after 998877ms"),
+            "Elapsed ms formatted in wrong place: {:?}",
+            display
+        );
+    }
+
+    /// Mutation-robustness test: MemoryBudgetExceeded fields must not be transposed.
+    #[test]
+    fn test_memory_budget_exceeded_fields_not_transposed() {
+        let err = ActaError::MemoryBudgetExceeded {
+            used_mb: 4096,
+            limit_mb: 8192,
+        };
+        let display = err.to_string();
+
+        assert!(
+            display.contains("4096"),
+            "MemoryBudgetExceeded used_mb must appear in display: {:?}",
+            display
+        );
+        assert!(
+            display.contains("8192"),
+            "MemoryBudgetExceeded limit_mb must appear in display: {:?}",
+            display
+        );
+
+        // Position checks
+        assert!(
+            display.contains("4096MB / 8192MB"),
+            "Used and limit MB fields are transposed or misformatted: {:?}",
+            display
+        );
+    }
+
+    /// Mutation-robustness test: asserts HnswConnectivityDegraded deleted_ratio is preserved as-is.
+    ///
+    /// Checks that the deleted_ratio is preserved without scaling (not divided/multiplied by 100)
+    /// and that the formatting accurately reflects the ratio.
+    #[test]
+    fn test_hnsw_connectivity_degraded_preserves_ratio() {
+        let sentinel_ratio = 37.42;
+        let err = ActaError::HnswConnectivityDegraded {
+            deleted_ratio: sentinel_ratio,
+        };
+
+        if let ActaError::HnswConnectivityDegraded { deleted_ratio } = err {
+            assert!(
+                (deleted_ratio - sentinel_ratio).abs() < f64::EPSILON,
+                "deleted_ratio must be preserved as-is: expected {}, got {}",
+                sentinel_ratio,
+                deleted_ratio
+            );
+        } else {
+            panic!("Expected ActaError::HnswConnectivityDegraded");
+        }
+
+        let display = err.to_string();
+        assert!(
+            display.contains("37.4%"),
+            "Display formatting must contain '37.4%': got {:?}",
+            display
+        );
+    }
+
+    #[test]
+    fn test_error_constructor_helpers() {
+        let err_cap = ActaError::capability_unsupported("vector_search", "no_gpu");
+        assert!(matches!(
+            err_cap,
+            ActaError::CapabilityUnsupported {
+                ref capability,
+                ref reason
+            } if capability == "vector_search" && reason == "no_gpu"
+        ));
+
+        let err_inv = ActaError::invalid_input("key cannot be empty");
+        assert!(
+            matches!(err_inv, ActaError::InvalidInput(ref msg) if msg == "key cannot be empty")
+        );
+
+        let err_wal = ActaError::wal_corruption(1024, "bad crc");
+        assert!(matches!(
+            err_wal,
+            ActaError::WalCorruption { offset: 1024, ref reason } if reason == "bad crc"
+        ));
+
+        let err_chk = ActaError::checksum_mismatch("/var/data.sst", 7);
+        assert!(matches!(
+            err_chk,
+            ActaError::ChecksumMismatch { ref path, block_id: 7 } if path == "/var/data.sst"
+        ));
+    }
+
+    #[test]
+    fn test_dto_with_details_override() {
+        use crate::error_dto::ActaErrorDto;
+        let dto = ActaErrorDto::with_details(
+            "CustomKind",
+            "Custom message",
+            serde_json::json!({"trace_id": "12345"}),
+        );
+        assert_eq!(dto.kind, "CustomKind");
+        assert_eq!(dto.message, "Custom message");
+        assert_eq!(
+            dto.details.expect("details present").get("trace_id"),
+            Some(&serde_json::json!("12345"))
+        );
+    }
+
+    #[test]
+    fn test_model_load_and_orphaned_vector_display() {
+        let err_model = ActaError::model_load("/models/llama3.gguf", "invalid tensor layout");
+        assert_eq!(
+            err_model.to_string(),
+            "Model load error for /models/llama3.gguf: invalid tensor layout"
+        );
+        match err_model {
+            ActaError::ModelLoad { path, reason } => {
+                assert_eq!(path, "/models/llama3.gguf");
+                assert_eq!(reason, "invalid tensor layout");
+            }
+            _ => panic!("Expected ModelLoad, got {:?}", err_model),
+        }
+
+        let err_orphan = ActaError::orphaned_vector_reference("doc_99", "vec_1001");
+        assert_eq!(
+            err_orphan.to_string(),
+            "Orphaned vector reference: index_id=vec_1001 -> doc_id=doc_99"
+        );
+        match err_orphan {
+            ActaError::OrphanedVectorReference { doc_id, index_id } => {
+                assert_eq!(doc_id, "doc_99");
+                assert_eq!(index_id, "vec_1001");
+            }
+            _ => panic!("Expected OrphanedVectorReference, got {:?}", err_orphan),
+        }
+    }
+
+    #[test]
+    fn test_step_id_and_cache_directive() {
+        let step = StepId::new(42);
+        assert_eq!(step.inner(), 42);
+        assert_eq!(format!("{step}"), "StepId(42)");
+        assert_eq!(StepId::from(42), step);
+
+        let dir_auto = CacheDirective::default();
+        assert_eq!(dir_auto, CacheDirective::Auto);
+
+        let dir_pin = CacheDirective::Pin { ttl: None };
+        assert!(matches!(dir_pin, CacheDirective::Pin { ttl: None }));
+
+        let dir_step = CacheDirective::ReleaseAfterStep { step_id: step };
+        assert!(
+            matches!(dir_step, CacheDirective::ReleaseAfterStep { step_id: s } if s.inner() == 42)
+        );
+    }
+
+    #[test]
+    fn test_pin_budget_exceeded_display_and_helper() {
+        let err = ActaError::pin_budget_exceeded("Tenant 10 requested 100MB");
+        assert_eq!(
+            err.to_string(),
+            "Pin budget exceeded: Tenant 10 requested 100MB"
+        );
+        match err {
+            ActaError::PinBudgetExceeded(msg) => assert_eq!(msg, "Tenant 10 requested 100MB"),
+            _ => panic!("Expected PinBudgetExceeded variant"),
+        }
+    }
+
+    #[test]
+    fn test_cross_device_link_display_and_helper() {
+        let err = ActaError::cross_device_link("/mnt/a/1.sst", "/mnt/b/1.sst");
+        assert_eq!(
+            err.to_string(),
+            "Cross-device link failed: cannot hard link '/mnt/a/1.sst' to '/mnt/b/1.sst' across distinct filesystems/mounts"
+        );
+        match err {
+            ActaError::CrossDeviceLink {
+                source_path,
+                target_path,
+            } => {
+                assert_eq!(source_path, "/mnt/a/1.sst");
+                assert_eq!(target_path, "/mnt/b/1.sst");
+            }
+            _ => panic!("Expected CrossDeviceLink variant"),
+        }
+    }
+
+    #[test]
+    fn test_is_occ_conflict() {
+        let stale = ActaError::StaleRead("OCC conflict".into());
+        let conflict = ActaError::Conflict("Key conflict".into());
+        let not_found = ActaError::NotFound("Key not found".into());
+
+        assert!(stale.is_occ_conflict());
+        assert!(conflict.is_occ_conflict());
+        assert!(!not_found.is_occ_conflict());
+    }
+}

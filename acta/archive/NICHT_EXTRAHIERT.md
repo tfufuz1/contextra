@@ -5,7 +5,6 @@ oder widersprechen ausdruecklich einer Festlegung. Sie liegen nicht im Archiv.
 
 | Altquelle (Crate) | Grund |
 |---|---|
-| `graph` (23,6k LOC) | Graphindex und PPR kommen in der Spezifikation nicht vor (Prinzip 1: Anforderung vor Mechanismus) |
 | `kvcache` | KV-/Prefix-Cache gehoert in den separaten Inferenzdienst (11.2); persistente Prompt-Caches sind fuer P verboten |
 | `cognition`, `agent` | autonome Agenten/Memory-Konsolidierung sind Nicht-Ziel (1.4) |
 | `router`, `adapt` | Bandit-/Kaskadenrouting ohne Anforderung; Inferenzwahl ist Betreiberentscheidung (11.3) |
@@ -22,3 +21,5 @@ oder widersprechen ausdruecklich einer Festlegung. Sie liegen nicht im Archiv.
 Luecken ohne Altquelle (**Neubau**): `acta-access` (ABAC), `acta-pstore`, Git-Objektmodell in `acta-history`,
 `acta-decision`, Fachfunktionen FF1-FF9, `acta-api` (axum/OIDC/mTLS), `acta-sink-net`, `acta-cli`, `acta-server`,
 Landlock/seccomp-Sandbox, Festkomma-`fx_ln`, DE/EN-Stemmer nach 9.2.
+
+**Aenderung:** `graph` (CSR, PPR, Pfad-RAG, Entitaetsextraktion) ist auf Entscheidung des Auftraggebers als `acta-graph` extrahiert (`archive/acta-graph/`, Erweiterungen in `archive/_reserve/graph-ext/`). Die Spezifikation fuehrt keinen Graphindex; Aufnahme in den Workspace erst nach ADR (`docs/ADR-VORSCHLAG-graph.md`).

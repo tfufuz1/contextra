@@ -3,7 +3,7 @@
 **Aufgabe:** Parser PDF/Office/HTML/Text/Archive (nicht vertrauenswuerdige Eingaben)  
 **Level:** L1 · **Budget:** 5000 LOC · **Spezifikation:** docs/SPEC.md Kap. 9.1, 13.2  
 **Interne Abhaengigkeiten (Soll):** acta-base  
-**Umfang des Archivs:** 126 Dateien, 20772 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 126 Dateien, 21530 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -95,51 +95,51 @@
 | `ingest/src/safe/mod.rs` | 24 |  |
 | `ingest/src/safe/opc.rs` | 259 |  |
 | `ingest/src/safe/xml.rs` | 366 |  |
-| `ingest/tests/corpus/sample.adoc` | 0 |  |
-| `ingest/tests/corpus/sample.csv` | 0 |  |
-| `ingest/tests/corpus/sample.eml` | 0 |  |
-| `ingest/tests/corpus/sample.html` | 0 |  |
-| `ingest/tests/corpus/sample.json` | 0 |  |
-| `ingest/tests/corpus/sample.jsonl` | 0 |  |
-| `ingest/tests/corpus/sample.mbox` | 0 |  |
+| `ingest/tests/corpus/sample.adoc` | 9 |  |
+| `ingest/tests/corpus/sample.csv` | 4 |  |
+| `ingest/tests/corpus/sample.eml` | 13 |  |
+| `ingest/tests/corpus/sample.html` | 15 |  |
+| `ingest/tests/corpus/sample.json` | 10 |  |
+| `ingest/tests/corpus/sample.jsonl` | 2 |  |
+| `ingest/tests/corpus/sample.mbox` | 17 |  |
 | `ingest/tests/corpus/sample.md` | 19 |  |
-| `ingest/tests/corpus/sample.rst` | 0 |  |
-| `ingest/tests/corpus/sample.rtf` | 0 |  |
-| `ingest/tests/corpus/sample.tex` | 0 |  |
+| `ingest/tests/corpus/sample.rst` | 9 |  |
+| `ingest/tests/corpus/sample.rtf` | 1 |  |
+| `ingest/tests/corpus/sample.tex` | 8 |  |
 | `ingest/tests/corpus/sample.toml` | 6 |  |
-| `ingest/tests/corpus/sample.txt` | 0 |  |
-| `ingest/tests/corpus/sample.xml` | 0 |  |
-| `ingest/tests/corpus/sample.yaml` | 0 |  |
+| `ingest/tests/corpus/sample.txt` | 3 |  |
+| `ingest/tests/corpus/sample.xml` | 8 |  |
+| `ingest/tests/corpus/sample.yaml` | 9 |  |
 | `ingest/tests/detect_proptest.rs` | 34 |  |
 | `ingest/tests/detect_tests.rs` | 368 | panic=6 |
 | `ingest/tests/docx_support/mod.rs` | 122 |  |
 | `ingest/tests/docx_test.rs` | 436 | panic=11, std_fs=1 |
 | `ingest/tests/email_golden_tests.rs` | 504 | panic=11 |
-| `ingest/tests/fixtures/chunk_email/sample_mail_with_attachment.eml` | 0 |  |
+| `ingest/tests/fixtures/chunk_email/sample_mail_with_attachment.eml` | 11 |  |
 | `ingest/tests/fixtures/chunk_prose/mod.rs` | 117 |  |
-| `ingest/tests/fixtures/chunk_structured/sample_kunden.json` | 0 |  |
-| `ingest/tests/fixtures/structured/sample.json` | 0 |  |
-| `ingest/tests/fixtures/structured/sample.jsonl` | 0 |  |
+| `ingest/tests/fixtures/chunk_structured/sample_kunden.json` | 20 |  |
+| `ingest/tests/fixtures/structured/sample.json` | 14 |  |
+| `ingest/tests/fixtures/structured/sample.jsonl` | 2 |  |
 | `ingest/tests/fixtures/structured/sample.toml` | 10 |  |
-| `ingest/tests/fixtures/structured/sample.xml` | 0 |  |
-| `ingest/tests/fixtures/structured/sample.yaml` | 0 |  |
+| `ingest/tests/fixtures/structured/sample.xml` | 12 |  |
+| `ingest/tests/fixtures/structured/sample.yaml` | 8 |  |
 | `ingest/tests/fuzz_regression_tests.rs` | 187 | panic=4, std_fs=1 |
-| `ingest/tests/golden/sample.adoc.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.csv.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.eml.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.html.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.json.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.jsonl.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.mbox.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.md.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.rst.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.rtf.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.tex.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.toml.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.tsv.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.txt.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.xml.golden.json` | 0 |  |
-| `ingest/tests/golden/sample.yaml.golden.json` | 0 |  |
+| `ingest/tests/golden/sample.adoc.golden.json` | 36 |  |
+| `ingest/tests/golden/sample.csv.golden.json` | 43 |  |
+| `ingest/tests/golden/sample.eml.golden.json` | 33 |  |
+| `ingest/tests/golden/sample.html.golden.json` | 29 |  |
+| `ingest/tests/golden/sample.json.golden.json` | 28 |  |
+| `ingest/tests/golden/sample.jsonl.golden.json` | 32 |  |
+| `ingest/tests/golden/sample.mbox.golden.json` | 57 |  |
+| `ingest/tests/golden/sample.md.golden.json` | 56 |  |
+| `ingest/tests/golden/sample.rst.golden.json` | 35 |  |
+| `ingest/tests/golden/sample.rtf.golden.json` | 28 |  |
+| `ingest/tests/golden/sample.tex.golden.json` | 51 |  |
+| `ingest/tests/golden/sample.toml.golden.json` | 28 |  |
+| `ingest/tests/golden/sample.tsv.golden.json` | 42 |  |
+| `ingest/tests/golden/sample.txt.golden.json` | 28 |  |
+| `ingest/tests/golden/sample.xml.golden.json` | 29 |  |
+| `ingest/tests/golden/sample.yaml.golden.json` | 28 |  |
 | `ingest/tests/golden_extraction_tests.rs` | 176 | panic=17, serde=1, std_fs=1 |
 | `ingest/tests/inv_ingest_archive_bomb_tests.rs` | 120 | panic=8 |
 | `ingest/tests/odf_tests.rs` | 583 | panic=18 |

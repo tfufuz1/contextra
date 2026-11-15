@@ -3,7 +3,7 @@
 **Aufgabe:** Anwendungsfaelle: Ingest, Antwort, Fachfunktionen, Loeschung, Szenario, Aufbewahrung, Wartung  
 **Level:** L6 · **Budget:** 12000 LOC · **Spezifikation:** docs/SPEC.md Kap. 10, 19  
 **Interne Abhaengigkeiten (Soll):** acta-base, acta-crypto, acta-fs, acta-sys, acta-gate, acta-access, acta-infer, acta-pii, acta-ingest, acta-ledger, acta-vault, acta-seg, acta-pstore, acta-history, acta-text, acta-vec, acta-erasure, acta-decision, acta-rag, acta-reports  
-**Umfang des Archivs:** 19 Dateien, 7206 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 22 Dateien, 8139 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -40,6 +40,9 @@
 | `db/src/background_workers/orphan_workers.rs` | 196 | async=10 |
 | `db/src/export.rs` | 395 | panic=33, async=6, float=2, serde=9 |
 | `db/src/import.rs` | 144 | async=2, serde=1 |
+| `engine/tests/metrics_instrumentation.rs` | 248 |  |
+| `engine/tests/tx_fault_injection.rs` | 337 |  |
+| `engine/tests/tx_recovery_and_erasure.rs` | 348 |  |
 | `privacy/src/audit_trace.rs` | 123 | async=1 |
 | `privacy/src/bulk_exfiltration_detector.rs` | 458 | panic=1, async=4, serde=1 |
 | `privacy/src/context_edit_audit.rs` | 380 | serde=1 |

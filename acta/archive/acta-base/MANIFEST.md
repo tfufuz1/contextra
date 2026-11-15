@@ -3,7 +3,7 @@
 **Aufgabe:** Newtypes (Ids, Ordinale), DataClass, ErrorClass/ClassifiedError, Ports Clock/CryptoRng, kanonische Kodierung, Festkomma fx  
 **Level:** L0 · **Budget:** 2500 LOC · **Spezifikation:** docs/SPEC.md Kap. 2.2, 2.4, 3.5, 3.7, 4.6  
 **Interne Abhaengigkeiten (Soll):** keine  
-**Umfang des Archivs:** 9 Dateien, 1673 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 13 Dateien, 3725 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -37,5 +37,9 @@
 | `env/src/rng.rs` | 282 | float=8 |
 | `env/tests/conformance_env.rs` | 51 |  |
 | `ids/src/lib.rs` | 720 | serde=1 |
+| `ids/tests/differential_ids.rs` | 0 |  |
 | `ids/tests/golden_tombstone_bit.rs` | 108 |  |
 | `ids/tests/ids_tests.rs` | 77 | panic=5 |
+| `types/src/error.rs` | 1177 |  |
+| `types/src/types/domain/tests/ids_tests.rs` | 473 |  |
+| `types/tests/newtype_invariants_suite.rs` | 402 |  |

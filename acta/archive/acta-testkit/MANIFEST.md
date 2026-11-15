@@ -1,7 +1,7 @@
 # Extraktion fuer `acta-testkit`
 
 **Aufgabe:** Entwicklungs-Crate: ManualClock, SeededRng, Fehlerinjektion, Konformitaetstests.  
-**Umfang des Archivs:** 15 Dateien, 3312 Zeilen (inkl. Tests)  
+**Umfang des Archivs:** 16 Dateien, 4235 Zeilen (inkl. Tests)  
 
 ## Herkunft und Umbauauftrag
 
@@ -42,3 +42,4 @@
 | `testkit/src/manual_clock.rs` | 172 | float=2 |
 | `testkit/src/mocks.rs` | 690 | async=10, float=13, unsafe=2 |
 | `testkit/src/reference_model.rs` | 283 |  |
+| `testkit/tests/in_memory_doubles.rs` | 923 |  |

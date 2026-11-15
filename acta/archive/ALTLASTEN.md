@@ -26,3 +26,7 @@ Zeitreise-Filter, Lizenzbindungs-Tests, Modellinfo des Inferenz-Clients. Neu ang
 ## Bereinigung (Pruefskript `scripts/check-no-legacy.sh`)
 
 Ergaenzend entfernt bzw. umbenannt: Alt-Magic-Bezeichner (`SSTABLE_MAGIC_MFSX` zu `SSTABLE_MAGIC_ASGX`, `MFRLBK` zu `AROLLB`), Alt-Kennungen (`INV-*` zu `T-*`, `ADR-N*` und `ADR-024` zu SPEC-Verweisen) in Kommentaren und Meldungen, Binaer-Goldens (`*.bin`) und die beiden `.wal_integrity_key`-Dateien. Das Skript meldet jede neue Altspur (Projektname, Alt-Magics, Alt-IDs, Schluesseldateien ohne `TODO(acta-altlast)`-Marker, `*.bin`); Exit-Code 1 bei Treffern.
+
+## Graph (`acta-graph`, `_reserve/graph-ext`)
+
+Extrahiert auf Entscheidung des Auftraggebers, **ohne** Aufnahme in den Workspace (SPEC 3.3 kennt kein Graph-Crate; ADR-Entwurf: `docs/ADR-VORSCHLAG-graph.md`). Offene Punkte: Gleitkomma in PPR/Gewichten (Z7: Festkomma), `serde`/`bincode`-Plattenformate, Whitelist-fremde Abhaengigkeiten (`parking_lot`, `arc-swap`, `scc`, `ahash`, `tracing`, `bytes`, `bincode`, `blake3`), `compat/` als Brueckenmodul (HR-6, Marker `TODO(acta-altlast)`), Zugriffs-Filterung der Traversierung (Z16), Entitaetsextraktion aus P nur in DP-Segmenten.
