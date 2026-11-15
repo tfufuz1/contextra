@@ -147,7 +147,19 @@ impl StoreError {
 
 impl From<contextra_crypto::CryptoError> for StoreError {
     fn from(err: contextra_crypto::CryptoError) -> Self {
-        StoreError::Storage(format!("Crypto error: {err}"))
+        match err {
+            contextra_crypto::CryptoError::WalCorruption { offset, reason } => {
+                StoreError::WalCorruption { offset, reason }
+            }
+            contextra_crypto::CryptoError::WalTruncationDetected => {
+                StoreError::WalTruncationDetected {
+                    expected_hmac: [0u8; 32],
+                    actual_hmac: [0u8; 32],
+                }
+            }
+            contextra_crypto::CryptoError::InvalidInput(s) => StoreError::InvalidInput(s),
+            other => StoreError::Storage(format!("Crypto error: {other}")),
+        }
     }
 }
 

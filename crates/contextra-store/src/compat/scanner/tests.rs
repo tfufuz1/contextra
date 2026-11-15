@@ -10,8 +10,10 @@
 #![forbid(unsafe_code)]
 
 use super::*;
+use std::sync::Arc;
 use crate::lsm::{LsmConfig, LsmStorage};
 use crate::tenant_codec::TenantKeyCodec;
+use crate::wal::{Wal, WalOp};
 use contextra_ports::clock::SystemClock;
 use contextra_ports::scanner::{ScanTarget, ScanTechnique};
 use contextra_ports::StorageEngine;
@@ -367,4 +369,98 @@ async fn test_worker_panic_mapped_to_err() {
         err_str.contains("Simulierter Worker Panic"),
         "Error message must contain panic payload message, got: {err_str}"
     );
+}
+
+#[tokio::test]
+async fn test_wal_purge_with_retained_records_preserves_hmac_chain_and_replays_cleanly() {
+    let (storage, _dir) = create_test_storage().await;
+    let clock = SystemClock::new();
+
+    let tenant_to_purge = TenantId::try_new(50).unwrap();
+    let tenant_to_keep = TenantId::try_new(51).unwrap();
+
+    let codec_purge = TenantKeyCodec::new(tenant_to_purge);
+    let codec_keep = TenantKeyCodec::new(tenant_to_keep);
+
+    // Write alternating entries to WAL for both tenants without flushing to SSTable
+    for i in 1..=4 {
+        let key_p = codec_purge.encode_chunk_key(
+            &contextra_types::CollectionId(1),
+            contextra_types::DocId(i),
+        );
+        let key_k = codec_keep.encode_chunk_key(
+            &contextra_types::CollectionId(1),
+            contextra_types::DocId(i),
+        );
+
+        let tx_p = TxId(100 + i);
+        let tx_k = TxId(200 + i);
+
+        storage.put(tx_p, &key_p, format!("purge_val_{i}").as_bytes()).await.unwrap();
+        storage.commit(tx_p).await.unwrap();
+
+        storage.put(tx_k, &key_k, format!("keep_val_{i}").as_bytes()).await.unwrap();
+        storage.commit(tx_k).await.unwrap();
+    }
+
+    // Target context for tenant_to_purge
+    let ctx_purge = RequestContext::new(tenant_to_purge, TxId(999));
+    let target_purge = ScanTarget::new(format!("t:{}:", tenant_to_purge.inner()), [0x50; 32]);
+
+    // Target context for tenant_to_keep
+    let ctx_keep = RequestContext::new(tenant_to_keep, TxId(999));
+    let target_keep = ScanTarget::new(format!("t:{}:", tenant_to_keep.inner()), [0x51; 32]);
+
+    let scanners = lsm_scanners(&storage);
+    let wal_scanner = &scanners[2];
+
+    // Verify both tenants are visible in WAL before purge
+    let witness_p_before = wal_scanner
+        .scan(&ctx_purge, target_purge.clone(), ScanTechnique::Structural, &clock)
+        .unwrap();
+    assert_eq!(witness_p_before.remaining(), 4);
+
+    let witness_k_before = wal_scanner
+        .scan(&ctx_keep, target_keep.clone(), ScanTechnique::Structural, &clock)
+        .unwrap();
+    assert_eq!(witness_k_before.remaining(), 4);
+
+    // Execute purge on tenant_to_purge
+    let purgers = lsm_purgers(&storage);
+    let stats = purgers[0]
+        .purge(&ctx_purge, &target_purge)
+        .expect("Purge of tenant_to_purge must succeed");
+    assert_eq!(stats.purged_units, 4);
+
+    // Verify tenant_to_purge is completely removed from WAL
+    let witness_p_after = wal_scanner
+        .scan(&ctx_purge, target_purge, ScanTechnique::Structural, &clock)
+        .unwrap();
+    assert_eq!(witness_p_after.remaining(), 0);
+
+    // Verify tenant_to_keep is preserved with intact entries in WAL
+    let witness_k_after = wal_scanner
+        .scan(&ctx_keep, target_keep, ScanTechnique::Structural, &clock)
+        .unwrap();
+    assert_eq!(witness_k_after.remaining(), 4);
+
+    // Replay WAL directly to verify HMAC chain continuity (INV-WAL-HMAC)
+    let wal_path = storage.data_path().join("wal.log");
+    let wal = Wal::open_read_only(&wal_path, None).await.expect("open rewritten WAL");
+    let replayed = wal.replay().await.expect("replay rewritten WAL with valid HMAC chain");
+
+    // All replayed Put operations must belong strictly to tenant_to_keep
+    let put_entries: Vec<_> = replayed
+        .into_iter()
+        .filter_map(|(_seq, entry, _pos)| match entry.op {
+            WalOp::Put { key, value, .. } => Some((key, value)),
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(put_entries.len(), 4, "Must contain exactly the 4 kept entries");
+    for (key, val) in put_entries {
+        assert!(key.starts_with(codec_keep.scan_prefix()), "Key must belong to tenant_to_keep");
+        assert!(!key.starts_with(codec_purge.scan_prefix()), "Key must NOT belong to tenant_to_purge");
+    }
 }

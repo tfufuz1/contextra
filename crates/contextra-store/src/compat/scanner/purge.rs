@@ -163,86 +163,117 @@ impl Purger for LsmPurger {
             }
 
             for wal_path in wal_files {
-                if let Ok(wal) = Wal::open_read_only(&wal_path, None).await {
-                    if let Ok(entries) = wal.replay().await {
-                        let has_target =
-                            entries.iter().any(|(_seq, entry, _pos)| match &entry.op {
-                                WalOp::Put { key, .. } | WalOp::Delete { key, .. } => {
-                                    key.starts_with(&target_prefix)
-                                }
-                                WalOp::TxEnd { .. } => false,
-                            });
+                let wal = Wal::open_read_only(&wal_path, None).await
+                    .map_err(|e| ContextraError::Storage(format!("Failed to open WAL {}: {e}", wal_path.display())))?;
+                let entries = wal.replay().await
+                    .map_err(|e| ContextraError::Storage(format!("Failed to replay WAL {}: {e}", wal_path.display())))?;
+                let has_target =
+                    entries.iter().any(|(_seq, entry, _pos)| match &entry.op {
+                        WalOp::Put { key, .. } | WalOp::Delete { key, .. } => {
+                            key.starts_with(&target_prefix)
+                        }
+                        WalOp::TxEnd { .. } => false,
+                    });
 
-                        if has_target {
-                            let retained_wal: Vec<_> = entries
-                                .into_iter()
-                                .filter_map(|(_seq, entry, _pos)| match entry.op {
-                                    WalOp::Put { key, value, tx_id }
-                                        if !key.starts_with(&target_prefix) =>
-                                    {
-                                        Some((
-                                            WalOp::Put {
-                                                key: key.clone(),
-                                                value: value.clone(),
-                                                tx_id,
-                                            },
-                                            entry.seq_no,
-                                        ))
-                                    }
-                                    WalOp::Delete { key, tx_id }
-                                        if !key.starts_with(&target_prefix) =>
-                                    {
-                                        Some((
-                                            WalOp::Delete {
-                                                key: key.clone(),
-                                                tx_id,
-                                            },
-                                            entry.seq_no,
-                                        ))
-                                    }
-                                    WalOp::TxEnd { committed, tx_id } => {
-                                        Some((WalOp::TxEnd { committed, tx_id }, entry.seq_no))
-                                    }
-                                    _ => None,
-                                })
-                                .collect();
-
-                            if retained_wal.is_empty() {
-                                // WAL enthielt nur Target -> Nullen und Entfernen
-                                if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
-                                    let len = metadata.len();
-                                    let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
-                                    let _ = tokio::fs::write(&wal_path, zeros).await;
-                                    let _ = tokio::fs::remove_file(&wal_path).await;
-                                    bytes_freed += len;
-                                }
-                            } else {
-                                // WAL neu schreiben ohne Target-Records
-                                let tmp_wal_path = wal_path.with_extension("purged.log");
-                                let integrity_key = Wal::load_or_create_integrity_key(&wal_path)
-                                    .await
-                                    .unwrap_or([0u8; 32]);
-                                let mut file_bytes = Vec::new();
-                                file_bytes.extend_from_slice(&WAL_V3_HEADER);
-                                for (op, seq_no) in retained_wal {
-                                    if let Ok(entry) =
-                                        WalEntry::try_new(op, seq_no, &integrity_key, [0u8; 32])
-                                    {
-                                        if let Ok(ebytes) = entry.to_bytes() {
-                                            file_bytes.extend_from_slice(&ebytes);
-                                        }
-                                    }
-                                }
-
-                                if tokio::fs::write(&tmp_wal_path, file_bytes).await.is_ok() {
-                                    if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
-                                        let len = metadata.len();
-                                        let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
-                                        let _ = tokio::fs::write(&wal_path, zeros).await;
-                                    }
-                                    let _ = self.storage.vfs().rename(&tmp_wal_path, &wal_path);
-                                }
+                if has_target {
+                    let retained_wal: Vec<_> = entries
+                        .into_iter()
+                        .filter_map(|(_seq, entry, _pos)| match entry.op {
+                            WalOp::Put { key, value, tx_id }
+                                if !key.starts_with(&target_prefix) =>
+                            {
+                                Some((
+                                    WalOp::Put {
+                                        key: key.clone(),
+                                        value: value.clone(),
+                                        tx_id,
+                                    },
+                                    entry.seq_no,
+                                ))
                             }
+                            WalOp::Delete { key, tx_id }
+                                if !key.starts_with(&target_prefix) =>
+                            {
+                                Some((
+                                    WalOp::Delete {
+                                        key: key.clone(),
+                                        tx_id,
+                                    },
+                                    entry.seq_no,
+                                ))
+                            }
+                            WalOp::TxEnd { committed, tx_id } => {
+                                Some((WalOp::TxEnd { committed, tx_id }, entry.seq_no))
+                            }
+                            _ => None,
+                        })
+                        .collect();
+
+                    if retained_wal.is_empty() {
+                        // WAL enthielt nur Target -> Nullen und Entfernen
+                        let metadata = tokio::fs::metadata(&wal_path)
+                            .await
+                            .map_err(ContextraError::Io)?;
+                        let len = metadata.len();
+                        let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
+                        tokio::fs::write(&wal_path, &zeros)
+                            .await
+                            .map_err(ContextraError::Io)?;
+                        tokio::fs::remove_file(&wal_path)
+                            .await
+                            .map_err(ContextraError::Io)?;
+                        bytes_freed += len;
+                    } else {
+                        // WAL neu schreiben ohne Target-Records
+                        let tmp_wal_path = wal_path.with_extension("purged.log");
+                        let integrity_key = Wal::load_or_create_integrity_key(&wal_path)
+                            .await
+                            .map_err(|e| ContextraError::Storage(format!("Failed to load integrity key for {}: {e}", wal_path.display())))?;
+                        let mut file_bytes = Vec::new();
+                        file_bytes.extend_from_slice(&WAL_V3_HEADER);
+                        let mut prev_hmac = [0u8; 32];
+                        for (op, seq_no) in retained_wal {
+                            let entry = WalEntry::try_new(op, seq_no, &integrity_key, prev_hmac)
+                                .map_err(|e| ContextraError::Storage(format!("Failed to construct WalEntry during purge: {e}")))?;
+                            prev_hmac = entry.checksum;
+                            let ebytes = entry.to_bytes()
+                                .map_err(|e| ContextraError::Storage(format!("Failed to serialize WalEntry during purge: {e}")))?;
+                            file_bytes.extend_from_slice(&ebytes);
+                        }
+
+                        // Temp-Datei schreiben und per fsync sichern
+                        {
+                            use tokio::io::AsyncWriteExt;
+                            let mut tmp_file = tokio::fs::OpenOptions::new()
+                                .write(true)
+                                .create(true)
+                                .truncate(true)
+                                .open(&tmp_wal_path)
+                                .await
+                                .map_err(ContextraError::Io)?;
+                            tmp_file.write_all(&file_bytes)
+                                .await
+                                .map_err(ContextraError::Io)?;
+                            tmp_file.sync_all()
+                                .await
+                                .map_err(ContextraError::Io)?;
+                        }
+
+                        // Atomar ersetzen: Erst alt nach .trash umbenennen, tmp nach wal_path, dann .trash nullen und löschen
+                        let trash_wal_path = wal_path.with_extension("trash.log");
+                        tokio::fs::rename(&wal_path, &trash_wal_path)
+                            .await
+                            .map_err(ContextraError::Io)?;
+                        tokio::fs::rename(&tmp_wal_path, &wal_path)
+                            .await
+                            .map_err(ContextraError::Io)?;
+
+                        if let Ok(metadata) = tokio::fs::metadata(&trash_wal_path).await {
+                            let len = metadata.len();
+                            let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
+                            let _ = tokio::fs::write(&trash_wal_path, &zeros).await;
+                            let _ = tokio::fs::remove_file(&trash_wal_path).await;
+                            bytes_freed += len.saturating_sub(file_bytes.len() as u64);
                         }
                     }
                 }
