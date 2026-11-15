@@ -1,6 +1,8 @@
-// Konnektivitäts-Prüfung und Score-Berechnung.
-// Invarianten: Zero-Panic; BFS auf Layer 0; Fail-Closed bei isolierten Knoten.
+// FILE-CONTEXT
+// ZWECK: Konnektivitäts-Prüfung und Score-Berechnung.
+// INVARIANTEN: Zero-Panic; BFS auf Layer 0; Fail-Closed bei isolierten Knoten.
 // HOTSPOTS: connectivity_score, check_connectivity
+// STAND: 2026-11-12
 
 //! Konnektivitäts- und Graph-Integritätsprüfungen für HNSW.
 
@@ -35,6 +37,7 @@ impl HnswIndexCore {
     /// Gibt [`VectorError::Conflict`][crate::error::VectorError::Conflict]
     /// mit Fehlermeldung `"connectivity"` zurück, falls der Graph isolierte aktive Knoten
     /// aufweist oder kein Einstiegspunkt für vorhandene Knoten existiert.
+    // ANCHOR[acta-vec:HNSW-CHECK-CONNECTIVITY]
     pub fn check_connectivity(&self) -> crate::error::Result<()> {
         let deleted = self.cold.deleted_nodes.read();
         let doc_map = self.hot.doc_to_node.read();

@@ -1,7 +1,9 @@
-// Recall- und Kalibrierungsmessung von RaBitQ (1-Bit) im Vergleich zu 4-Bit Scalar Quantization.
-// Invarianten: 4-Bit Recall >= 1-Bit RaBitQ Recall - 1e-5.
+// FILE-CONTEXT
+// ZWECK: Recall- und Kalibrierungsmessung von RaBitQ (1-Bit) im Vergleich zu 4-Bit Scalar Quantization.
+// INVARIANTEN: 4-Bit Recall >= 1-Bit RaBitQ Recall - 1e-5.
 // DATENSATZ: 1000 Vektoren, Dim: 64, 50 Queries, TestRng Seed: 42.
 // HOTSPOTS: 35-125
+// STAND: 2026-11-12
 
 #![cfg(feature = "experimental-rabitq")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]

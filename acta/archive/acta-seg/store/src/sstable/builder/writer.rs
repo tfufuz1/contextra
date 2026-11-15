@@ -1,6 +1,8 @@
+//! # SSTable-Writer & Dateifinalisierung (Ring 1)
 //!
 //! Zweck: Sequentieller Aufbau vollständiger SSTables (V4 ASGX / Legacy V3 ASGT)
 //! inklusive Index-Block, Bloom-Filter, Trailer und atomarem Schreiben (tmp -> rename -> fsync).
+// ANCHOR[acta-seg:SST-BLD-102]
 
 use super::block::BlockBuilder;
 use super::meta::SstableMetadata;

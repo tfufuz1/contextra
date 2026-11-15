@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Inhaltsbasierte Formaterkennung anhand Magic Bytes, Strukturmerkmalen und Hints (WP M3 / P01).
-// Invarianten: Zero-Panic, deterministisch, signature-fest, feste Obergrenze (max 64 KiB analysiert).
+// FILE-CONTEXT
+// ZWECK: Inhaltsbasierte Formaterkennung anhand Magic Bytes, Strukturmerkmalen und Hints (WP M3 / P01).
+// INVARIANTEN: Zero-Panic, deterministisch, signature-fest, feste Obergrenze (max 64 KiB analysiert).
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::error::IngestError;
 use crate::format::FormatId;

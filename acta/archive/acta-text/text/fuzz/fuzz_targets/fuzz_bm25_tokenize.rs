@@ -1,6 +1,7 @@
 //! Fuzz-Target für BM25-Tokenisierung mit beliebigen UTF-8-Zeichenketten.
 //!
 //! # Ring-Zuordnung
+//! Ring LAB / Fuzzing.
 //!
 //! # Invariante
 //! Panik- und Endlosschleifen-Freiheit für beliebige Eingabestrings bei der Tokenisierung.
@@ -9,6 +10,7 @@
 use libfuzzer_sys::fuzz_target;
 use acta_text::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 
+// ANCHOR[acta-text:FUZZ-001]
 // Fuzzing-Harnisch zur Prüfung der Robustheit von Standard- und deutschem Morphologie-Tokenizer.
 fuzz_target!(|data: &str| {
     // Arbiträre UTF-8-Strings an die reale Tokenizer-Einstiegsfunktion.

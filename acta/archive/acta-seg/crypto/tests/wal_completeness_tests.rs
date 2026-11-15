@@ -3,8 +3,9 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `wal_completeness_tests`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// Unit & proptest verification for WAL chain completeness checks.
-// Invarianten: Zero false negatives, zero false positives, constant-time verification.
+// FILE-CONTEXT
+// ZWECK: Unit & proptest verification for WAL chain completeness checks.
+// INVARIANTEN: Zero false negatives, zero false positives, constant-time verification.
 
 #![forbid(unsafe_code)]
 

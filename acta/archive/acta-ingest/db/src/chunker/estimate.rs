@@ -2,11 +2,14 @@
 //!
 //! **Zweck:** Heuristische Token- und Zeichengrößen-Schätzung für Chunks.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// Heuristische Token-Schätzung für Fließtext, Codeblöcke und Tabellen.
-// Invarianten: Deterministisches BPE-Verhältnis (4 Zeichen pro Token Grundwert).
+// FILE-CONTEXT
+// ZWECK: Heuristische Token-Schätzung für Fließtext, Codeblöcke und Tabellen.
+// INVARIANTEN: Deterministisches BPE-Verhältnis (4 Zeichen pro Token Grundwert).
 // NICHT-OFFENSICHTLICH: Codeblöcke nutzen erhöhten Multiplikator (1.8x).
+// STAND: TS:2026-10-29T00:00:00Z
 
 use super::blocks::{is_closing_fence, parse_opening_fence, CodeFence};
 

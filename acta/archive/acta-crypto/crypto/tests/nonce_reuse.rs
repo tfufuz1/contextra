@@ -3,8 +3,10 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `nonce_reuse`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// Nonce reuse demonstration and mitigation verification suite.
-// Invarianten: Unique random nonces generated per encrypt_auto_nonce call even across identical KeyManager instances.
+// FILE-CONTEXT
+// ZWECK: Nonce reuse demonstration and mitigation verification suite.
+// INVARIANTEN: Unique random nonces generated per encrypt_auto_nonce call even across identical KeyManager instances.
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 use acta_crypto::crypto::KeyManager;
 

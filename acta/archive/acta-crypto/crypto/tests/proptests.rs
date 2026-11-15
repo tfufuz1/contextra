@@ -3,8 +3,10 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `proptests`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// Property-based testing suite for acta-crypto using proptest.
-// Invarianten: Roundtrip invariant: decrypt(encrypt(pt)) == pt. Authenticity invariant: 1-bit ciphertext flip must fail decryption.
+// FILE-CONTEXT
+// ZWECK: Property-based testing suite for acta-crypto using proptest.
+// INVARIANTEN: Roundtrip invariant: decrypt(encrypt(pt)) == pt. Authenticity invariant: 1-bit ciphertext flip must fail decryption.
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 use acta_crypto::wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot, WalHmac};
 use acta_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};

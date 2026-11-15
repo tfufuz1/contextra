@@ -1,11 +1,14 @@
 //! Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// Root-Modul für Chunking-Strategien und Infrastructure (WP M3).
-// Invarianten: Zero-Panic, deterministisch.
+// FILE-CONTEXT
+// ZWECK: Root-Modul für Chunking-Strategien und Infrastructure (WP M3).
+// INVARIANTEN: Zero-Panic, deterministisch.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub mod common;
 pub mod config;
@@ -42,6 +45,7 @@ use std::ops::Range;
 
 /// Entwurf eines Chunks vor der Finalisierung.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[acta-ingest:CHK-0214]
 // struct `ChunkDraft` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub struct ChunkDraft {
     pub text: String,
@@ -53,6 +57,7 @@ pub struct ChunkDraft {
 }
 
 /// Trait für strategie-spezifische IrChunker.
+// ANCHOR[acta-ingest:CHK-0215]
 // trait `IrChunker` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub trait IrChunker: Send + Sync {
     fn strategy(&self) -> ChunkStrategy;
@@ -65,6 +70,7 @@ pub trait IrChunker: Send + Sync {
 }
 
 /// Erzeugt ChunkDrafts aus einer `DocumentIr` und deren `CanonicalText`.
+// ANCHOR[acta-ingest:CHK-0216]
 // fn `draft_document` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub fn draft_document(
     ir: &DocumentIr,
@@ -85,6 +91,7 @@ pub fn draft_document(
 }
 
 /// Erzeugt ChunkDrafts für einen Teilbereich von Blöcken einer `DocumentIr`.
+// ANCHOR[acta-ingest:CHK-0217]
 // fn `draft_block_range` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub fn draft_block_range(
     ir: &DocumentIr,

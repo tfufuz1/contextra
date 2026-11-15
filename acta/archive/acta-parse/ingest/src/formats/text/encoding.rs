@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Kodierungserkennung (BOM, UTF-8, UTF-16, Windows-1252) und Sanitization (WP M4).
-// Invarianten: Zero-Panic, typisierte Warnungen, Sanitization über canonical::sanitize_text.
+// FILE-CONTEXT
+// ZWECK: Kodierungserkennung (BOM, UTF-8, UTF-16, Windows-1252) und Sanitization (WP M4).
+// INVARIANTEN: Zero-Panic, typisierte Warnungen, Sanitization über canonical::sanitize_text.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::canonical::sanitize_text;
 use crate::ir::{ExtractWarning, WarningCode};

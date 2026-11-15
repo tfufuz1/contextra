@@ -1,5 +1,6 @@
 //! # Signal-Fusions-Subsystem (`fusion`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Dieses Modul bündelt alle Algorithmen zur Zusammenführung (Fusion) mehrdimensionaler
 //! Suchergebnisse aus verschiedenen Retrieval-Kanälen (Dense Vector, BM25-Volltext,

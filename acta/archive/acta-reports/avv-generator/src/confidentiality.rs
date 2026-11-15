@@ -10,10 +10,12 @@
 //! oder einer gesetzlichen Verschwiegenheitspflicht (z. B. Berufsgeheimnis) unterliegen.
 //!
 //! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung). Reines Text-Rendering ohne Nebenwirkungen.
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
+// ANCHOR[acta-reports:CONF-001]
 /// Rendert Abschnitt 5: „Vertraulichkeitsverpflichtung“.
 ///
 /// Schreibt den Textblock zur Wahrung des Datengeheimnisses in den Markdown-Ausgabepuffer.

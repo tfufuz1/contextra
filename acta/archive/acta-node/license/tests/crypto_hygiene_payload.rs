@@ -40,6 +40,7 @@ fn generate_deterministic_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey)
     (signing_key, verifying_key)
 }
 
+// ANCHOR[acta-license:TEST-CRYPTO-CT-MATCH]
 // Prüft, dass constant_time_eq_32 bei identischen 32-Byte-Arrays true liefert.
 #[test]
 fn test_constant_time_eq_32_matching() {
@@ -48,6 +49,7 @@ fn test_constant_time_eq_32_matching() {
     assert!(constant_time_eq_32(&a, &b));
 }
 
+// ANCHOR[acta-license:TEST-CRYPTO-CT-MISMATCH-SINGLE]
 // Prüft, dass constant_time_eq_32 bei einer Abweichung in einem einzelnen Byte false liefert.
 #[test]
 fn test_constant_time_eq_32_mismatch_single_byte() {
@@ -57,6 +59,7 @@ fn test_constant_time_eq_32_mismatch_single_byte() {
     assert!(!constant_time_eq_32(&a, &b));
 }
 
+// ANCHOR[acta-license:TEST-CRYPTO-CT-MISMATCH-ALL]
 // Prüft, dass constant_time_eq_32 bei vollständig unterschiedlichen Byte-Arrays false liefert.
 #[test]
 fn test_constant_time_eq_32_mismatch_all_bytes() {
@@ -65,6 +68,7 @@ fn test_constant_time_eq_32_mismatch_all_bytes() {
     assert!(!constant_time_eq_32(&a, &b));
 }
 
+// ANCHOR[acta-license:TEST-CRYPTO-MAX-BYTES-EXCEEDED]
 // Prüft, dass Payloads, die 64 KiB überschreiten, sofort mit InvalidSignature abgewiesen werden.
 #[test]
 fn test_payload_exceeding_max_bytes_fails() {
@@ -86,6 +90,7 @@ fn test_payload_exceeding_max_bytes_fails() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[acta-license:TEST-CRYPTO-CUSTOM-MAX-BYTES]
 // Prüft konfigurierbare Payload-Größenlimits über SignedLicenseOptions.
 #[test]
 fn test_custom_max_payload_bytes_limit() {
@@ -122,6 +127,7 @@ fn test_custom_max_payload_bytes_limit() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[acta-license:TEST-CRYPTO-REJECT-TRAILING-BYTES]
 // Prüft, dass Bincode-Deserialisierung mit angehängten überflüssigen Bytes (Trailing Garbage) fehlschlägt.
 #[test]
 fn test_canonical_serialization_rejects_trailing_garbage() {

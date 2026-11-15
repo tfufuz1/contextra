@@ -1,6 +1,8 @@
-// Quantisierung (f32 -> u8) für ScalarQuantizer (SQ8).
-// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); Clamp auf [0, 255].
+// FILE-CONTEXT
+// ZWECK: Quantisierung (f32 -> u8) für ScalarQuantizer (SQ8).
+// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Clamp auf [0, 255].
 // HOTSPOTS: quantize
+// STAND: 2026-11-12
 
 //! # Scalar Quantizer Encoding Module
 //!
@@ -12,6 +14,7 @@ use std::sync::atomic::Ordering;
 
 impl ScalarQuantizer {
     /// Quantisiert einen `f32` Vektor in ein `u8` Slice.
+    // ANCHOR[acta-vec:SQ8-QUANTIZE]
     pub fn quantize(&self, vector: &[f32]) -> Result<Vec<u8>> {
         if self.mins.len() < self.dimension
             || self.maxes.len() < self.dimension

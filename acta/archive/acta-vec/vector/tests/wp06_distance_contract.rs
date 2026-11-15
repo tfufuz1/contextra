@@ -1,5 +1,7 @@
-// Integrations- und Vertragstests für Distanzfunktionen.
-// Invarianten: Längenprüfung, NaN/Inf-Abweisung, Dreiecksungleichung, Symmetrie, SIMD vs Skalar.
+// FILE-CONTEXT
+// ZWECK: Integrations- und Vertragstests für Distanzfunktionen.
+// INVARIANTEN: Längenprüfung, NaN/Inf-Abweisung, Dreiecksungleichung, Symmetrie, SIMD vs Skalar.
+// STAND: 2026-11-12
 
 use acta_vec::distance::{
     compute_distance, cosine_distance, dot_product_distance, euclidean_distance, validate_vector,

@@ -1,6 +1,7 @@
 //! # SSTable-Metadaten
 //!
 //! Zweck: Metadaten über eine erstellte SSTable (Schlüsselgrenzen, Offsets, Prüfsummen).
+// ANCHOR[acta-seg:SST-BLD-101]
 
 use bytes::Bytes;
 use std::path::PathBuf;

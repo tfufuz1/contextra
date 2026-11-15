@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-acl-main,epic=sys-acl,seq=0] Zugriffskontrolle und Besitzverifikation
 // =========================================================================
 // NOTE: Win32 & POSIX ACL restriction and file ownership verification wrappers.
 // Invariante: Safe Rust facade; zero panic; cross-platform file permissions enforcement.
@@ -11,6 +12,7 @@
 //! Write-Ahead-Logs (WAL).
 //!
 //! ## Ring-Zugehörigkeit und Zweck
+//! - **Ring 0 / Ebene E0 (Systemnaher Kern):** Kapselt FFI-Aufrufe (Foreign Function Interface) nach POSIX (`libc`)
 //!   und Windows (`windows-sys`).
 //! - **Sicherheitsziel (Fail-Closed):** Eine Datei mit sensiblen Daten darf nicht von
 //!   anderen Benutzern des Betriebssystems gelesen oder modifiziert werden können. Kann dies nicht
@@ -27,6 +29,7 @@
 use std::path::Path;
 
 // SECTION POSIX ACL & Permissions
+// ANCHOR[id=sys-acl-unix,epic=sys-acl,seq=1] Unix Chmod 0600 & UID-Prüfung
 
 #[cfg(unix)]
 /// Beschränkt die Zugriffsrechte der angegebenen Datei unter Unix auf den Besitzer (`0600` / `-rw-------`).
@@ -109,6 +112,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 // !SECTION POSIX ACL & Permissions
 
 // SECTION Windows Win32 DACL
+// ANCHOR[id=sys-acl-win32,epic=sys-acl,seq=2] Windows DACL & SID-Verifikation
 
 #[cfg(windows)]
 /// RAII-Wächter (Resource Acquisition Is Initialization) für Windows-Prozesstoken-Handles (`HANDLE`).
@@ -397,6 +401,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 // !SECTION Windows Win32 DACL
 
 // SECTION Fallback Platforms
+// ANCHOR[id=sys-acl-fallback,epic=sys-acl,seq=3] Fallback für Nicht-Unix & Nicht-Windows
 
 #[cfg(not(any(unix, windows)))]
 /// Best-Effort-Fallback für Zielarchitekturen, die weder Unix noch Windows sind (No-Op).
@@ -414,6 +419,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 // !SECTION Fallback Platforms
 
 // SECTION Unit Tests
+// ANCHOR[id=sys-acl-tests,epic=sys-acl,seq=4] Modultests für Dateiberechtigungen
 #[cfg(test)]
 mod tests {
     use super::*;

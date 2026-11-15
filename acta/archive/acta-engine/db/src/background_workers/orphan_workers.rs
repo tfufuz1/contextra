@@ -2,10 +2,12 @@
 //!
 //! **Zweck:** Bereinigung verwaister Vektor- und Graphknoten nach unvollständigen Transaktionen.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// Worker-Tasks zur Bereinigung verwaister Transaktionen (Orphan Cleanup) und HNSW-Index-Rebuilds.
-// Invarianten: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Waisen.
+// FILE-CONTEXT
+// ZWECK: Worker-Tasks zur Bereinigung verwaister Transaktionen (Orphan Cleanup) und HNSW-Index-Rebuilds.
+// INVARIANTEN: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Waisen.
 
 use super::config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
 use acta_history::tx_buffer::TxBuffer;

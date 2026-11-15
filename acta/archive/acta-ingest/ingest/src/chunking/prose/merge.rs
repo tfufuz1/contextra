@@ -1,11 +1,14 @@
 //! Zusammenfuehrung von Teilbloecken unter Einhaltung des Token-Budgets.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// Zusammenführen kleiner Chunks (min_tokens) und Durchsetzung der Überschriften-Klebepflicht.
-// Invarianten: Zero-Panic, Überschrift klebt immer an Folgeblock, Merge nur innerhalb derselben Hauptsektion.
+// FILE-CONTEXT
+// ZWECK: Zusammenführen kleiner Chunks (min_tokens) und Durchsetzung der Überschriften-Klebepflicht.
+// INVARIANTEN: Zero-Panic, Überschrift klebt immer an Folgeblock, Merge nur innerhalb derselben Hauptsektion.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::chunking::common::token_count;
 use crate::chunking::config::ChunkingConfig;
@@ -13,6 +16,7 @@ use crate::chunking::ChunkDraft;
 use serde_json::{json, Value};
 
 /// Wendet Zusammenführungsregeln (Heading-Attachment und min_tokens-Merge) auf Drafts an.
+// ANCHOR[acta-ingest:CHK-0225]
 // fn `merge_small_chunks` fuer Zusammenfuehrung von Teilbloecken unter Einhaltung des Token-Budgets.
 pub fn merge_small_chunks(
     drafts: Vec<ChunkDraft>,

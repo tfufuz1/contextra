@@ -15,9 +15,18 @@ acta-fs: Vfs-Port, DurableVfs, FaultVfs, Scrub, O_DIRECT-Ruecklesen.
 - **Referenz im Quelltext:** Level L1 · Budget 2500 LOC · Spezifikation docs/SPEC.md Kap. 3.7, 5.6
 
 ## Status
-- **Stand:** Gerüst (nur Fehlertyp)
-- **Produktionscode (ohne Tests/Leerzeilen/Kommentare):** 17 LOC
-- **Archiv-Quelle:** `archive/acta-fs/` (siehe `archive/acta-fs/MANIFEST.md`)
+- **Stand:** implementiert (Teil)
+- **Produktionscode (ohne Tests/Leerzeilen/Kommentare):** 437 LOC von 2500 Budget
+- **Umgesetzt nach SPEC 3.7 (neu geschrieben, nicht aus dem Archiv übernommen):**
+  - `vfs`: Ports `Vfs` und `VFile` mit den Signaturen aus Kap. 3.7.
+  - `error`: `FsyncFailed` (Klasse `Integrity`, Code `fs.fsync_failed`).
+  - `durable`: `DurableVfs` mit atomarem Ersetzen (rename + Verzeichnis-fsync, WP-5), Scrub (WP-6), `O_DIRECT`-Rücklesen auf 4096-Byte-Blöcken mit ausgerichtetem Puffer und fsync-Entwertung (WP-7). Nur hier steht `std::fs` (G-FS).
+  - `fault`: `FaultVfs<V>` mit Plan (`FaultPoint`, `FaultAction`: Fehlerbild, zerrissener Schreibvorgang, Absturz).
+- **Tests:** `tests/durable_vfs.rs` (8), `tests/fault_vfs.rs` (5, u. a. Absturzmatrix über Erstellen, Schreiben, Sync, Umbenennen; Fsync-Entwertung; ENOSPC; zerrissener Schreibvorgang).
+- **Mutationsprüfung:** Entfernen der Fsync-Entwertung und der `O_DIRECT`-Ausrichtung lässt die jeweiligen Tests scheitern.
+- **Annahmen:** `O_DIRECT`-Wert `0o40000` gilt für x86_64 und aarch64 (Linux). Auf aarch64 ist das auf Hardware nicht geprüft [A]. Andere Architekturen liefern `Unsupported`.
+- **Offen:** Scrub gegen Flash-Reste bleibt Annahme A-FLASH. Journal (`durable-fs/src/journal.rs`), Gesundheitszustand und Fault-Injektor-Matrix aus dem Archiv sind nicht übernommen; sie gehören in acta-seg bzw. werden neu gebaut.
+- **Archiv-Quelle:** `archive/acta-fs/` (siehe `archive/acta-fs/MANIFEST.md`). Der Archivordner bleibt bestehen, bis das Crate vollständig überführt ist.
 
 ## Regeln für diesen Crate
 - Abhängigkeiten nur nach unten: `level(A) > level(B)`; keine Querkanten (G1).

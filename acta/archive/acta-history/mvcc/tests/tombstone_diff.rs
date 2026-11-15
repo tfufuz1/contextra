@@ -1,3 +1,4 @@
+// ANCHOR[acta-history:TEST-TOMBSTONE-DIFF]
 #![allow(unexpected_cfgs)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

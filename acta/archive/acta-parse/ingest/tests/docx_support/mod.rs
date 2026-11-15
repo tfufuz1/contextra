@@ -4,8 +4,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Hilfsfunktionen zum Erzeugen von DOCX-ZIP-Dateien im Speicher für Integrationstests.
-// Invarianten: Zero-Panic in Testhelfern.
+// FILE-CONTEXT
+// ZWECK: Hilfsfunktionen zum Erzeugen von DOCX-ZIP-Dateien im Speicher für Integrationstests.
+// INVARIANTEN: Zero-Panic in Testhelfern.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use std::io::Write;
 use zip::write::FileOptions;

@@ -1,5 +1,6 @@
 #![cfg(feature = "workspace")]
-// Testet, dass ein Follower, der per Timeout aus der Group-Commit-Queue ausscheidet, keine HMAC-Kette korrumpiert.
+// FILE-CONTEXT
+// ZWECK: Testet, dass ein Follower, der per Timeout aus der Group-Commit-Queue ausscheidet, keine HMAC-Kette korrumpiert.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Sicheres Entpacken und Lesen von ZIP-Archiven mit Zip-Bomb-Schutz (P00B/P04).
-// Invarianten: Zero-Panic, ResourceBudget-Prüfung, keine Unsafe-Islands.
+// FILE-CONTEXT
+// ZWECK: Sicheres Entpacken und Lesen von ZIP-Archiven mit Zip-Bomb-Schutz (P00B/P04).
+// INVARIANTEN: Zero-Panic, ResourceBudget-Prüfung, keine Unsafe-Islands.
+// STAND: TS:2026-11-08T00:00:00Z
 
 use crate::error::{IngestError, LimitKind};
 use crate::extractor::ResourceBudget;

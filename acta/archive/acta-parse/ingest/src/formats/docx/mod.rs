@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Word DOCX Extractor (Docx).
-// Invarianten: DocumentExtractor-Impl, Zero-Panic, Fail-Closed bei Beschädigungen.
+// FILE-CONTEXT
+// ZWECK: Word DOCX Extractor (Docx).
+// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl, Zero-Panic, Fail-Closed bei Beschädigungen.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub mod document;
 pub mod notes;

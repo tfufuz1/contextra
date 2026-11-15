@@ -1,6 +1,8 @@
-// Zentrales Fehler-Enum VectorError für acta-vec (B4/R3-Konformität).
-// Invarianten: Zero-Panic, thiserror, non_exhaustive, saubere Zuordnung lokaler Fehler.
+// FILE-CONTEXT
+// ZWECK: Zentrales Fehler-Enum VectorError für acta-vec (B4/R3-Konformität).
+// INVARIANTEN: Zero-Panic, thiserror, non_exhaustive, saubere Zuordnung lokaler Fehler.
 // HOTSPOTS: VectorError, Result<T>
+// STAND: 2026-11-11
 
 //! # Fehlerbehandlung für `acta-vec` (B4- & R3-Konformität)
 //!
@@ -11,6 +13,7 @@ use thiserror::Error;
 
 // SECTION Fehler-Definitionen
 
+// ANCHOR[acta-vec:ERR-VECTOR-ERROR]
 /// Fehlerzustände von `acta-vec`.
 #[derive(Debug, Error, PartialEq, Clone)]
 #[non_exhaustive]
@@ -79,6 +82,7 @@ impl VectorError {
     }
 }
 
+// ANCHOR[acta-vec:ERR-RESULT]
 /// Standardmäßiger Result-Typ für `acta-vec`.
 pub type Result<T> = std::result::Result<T, VectorError>;
 

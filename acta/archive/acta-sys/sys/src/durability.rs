@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-durability-main,epic=sys-durability,seq=0] Haltbare Dateisystem-Synchronisation
 // =========================================================================
 // NOTE: Platform-aware low-level durability primitives for file and directory flushes.
 // Invariante: Zero panic; typed error propagation; fail-closed on unsupported targets; EINTR retry only; Handle-Poisoning on sync failure.
@@ -11,6 +12,7 @@
 //! (SSD/HDD) dauerhaft persistiert werden (Durability gemäß ACID-Kriterien).
 //!
 //! ## Ring-Zugehörigkeit und Zweck
+//! - **Ring 0 / Ebene E0 (Kern):** Kapselt direkte Betriebssystem-Aufrufe (`libc::fsync`, `libc::fdatasync`,
 //!   `libc::fcntl(F_FULLFSYNC)`, `FlushFileBuffers`).
 //! - **Verwendung im System:** Wird von `acta-seg` (Write-Ahead-Log WAL und LSM-SSTables)
 //!   sowie `acta-fs` genutzt.
@@ -35,6 +37,7 @@ use std::path::Path;
 use crate::error::{Error, Result};
 
 // SECTION Fault Injection Harness
+// ANCHOR[id=sys-durability-fault,epic=sys-durability,seq=1] Test-Fehlerinjektion
 #[cfg(test)]
 pub(crate) mod fault_injection {
     use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
@@ -58,6 +61,7 @@ pub(crate) mod fault_injection {
 // !SECTION Fault Injection Harness
 
 // SECTION OS Sync Primitives
+// ANCHOR[id=sys-durability-os-sync,epic=sys-durability,seq=2] raw_os_sync_file
 
 /// Führt den rohen Betriebssystem-Sync-Syscall auf einem Dateideskriptor.
 ///
@@ -163,6 +167,7 @@ fn raw_os_sync_file(_file: &File, _metadata_changed: bool) -> Result<()> {
 // !SECTION OS Sync Primitives
 
 // SECTION High-level Flush Functions
+// ANCHOR[id=sys-durability-flush,epic=sys-durability,seq=3] durable_flush_file & durable_flush_dir
 
 /// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Eigenschaften der Zielplattform.
 pub fn durable_flush_file(file: &File, metadata_changed: bool) -> IoResult<()> {
@@ -193,6 +198,7 @@ pub fn durable_flush_dir(path: &Path) -> IoResult<()> {
     }
 }
 
+// ANCHOR[id=sys-durability-write,epic=sys-durability,seq=4] write_all_durable
 
 /// Schreibt die gesamten Bytes aus `buf` zuverlässig in `file`, unter robuster Behandlung partieller Schreibvorgänge und Signal-Unterbrechungen.
 pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
@@ -218,6 +224,7 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> IoResult<()> {
 // !SECTION High-level Flush Functions
 
 // SECTION Durable File Wrapper
+// ANCHOR[id=sys-durability-durable-file,epic=sys-durability,seq=5] DurableFile (Handle-Poisoning)
 
 /// Ein sicherer RAII-Wrapper um [`std::fs::File`], der die Invariante **** erzwingt
 /// Sobald ein `fsync`/`fdatasync` oder Flush-Aufruf fehlschlägt, wird das Handle dauerhaft vergiftet (`is_poisoned() == true`).
@@ -290,6 +297,7 @@ impl DurableFile {
 // !SECTION Durable File Wrapper
 
 // SECTION Unit Tests
+// ANCHOR[id=sys-durability-tests,epic=sys-durability,seq=6] Durability-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;

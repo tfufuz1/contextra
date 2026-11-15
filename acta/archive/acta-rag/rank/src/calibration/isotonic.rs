@@ -1,5 +1,6 @@
 //! # Isotonische Kalibrierung via PAVA (`isotonic`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Implementiert die nicht-parametrische isotonische Regression über den
 //! Pool-Adjacent Violators Algorithm (PAVA) sowie die ECE-Berechnung.

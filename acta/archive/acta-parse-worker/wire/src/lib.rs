@@ -1,8 +1,11 @@
-// Main entrypoint for IPC framing, zero-copy wire adapters, and unified error handling
+// FILE-CONTEXT
+// STAND: 2026-11-08T12:00:00Z
+// ZWECK: Main entrypoint for IPC framing, zero-copy wire adapters, and unified error handling
 // RELEVANTE SPEZIFIKATION: P7 (Zero-Panic), P2 (Unsafe-Inseln), B4 (Unified Error), REQ-QA-010
 
 //! # Crate `acta-parse-worker`
 //!
+//! **Ring & Klasse:** Ring 0 (Unsafe-Insel 3 von 3), Klasse A.
 //!
 //! ## Zweck
 //! `acta-parse-worker` stellt performante Zero-Copy-Serialisierungs- und Deserialisierungs-Primitiven
@@ -23,6 +26,8 @@
 //! Die Crate erzwingt `#![deny(clippy::unwrap_used)]`, `#![deny(clippy::expect_used)]` und
 //! `#![deny(clippy::panic)]`. Fehler werden konsequent über `Result` gemeldet (Fail-Closed).
 
+// ANCHOR[acta-parse-worker:LIB-001]
+// NOTE: Compiler-Lints zur Absicherung von Ring 0. Unsafe-Code ist in handgeschriebenem Code
 // strikt untersagt und wird ausschließlich im isolierten Submodul `generated` für FlatBuffers erlaubt.
 #![deny(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
@@ -30,9 +35,11 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 
+// ANCHOR[acta-parse-worker:LIB-002]
 // NOTE: Kapselt den extern generierten FlatBuffers-Code ab, um Warnungen zu isolieren.
 pub mod generated;
 
+// ANCHOR[acta-parse-worker:LIB-003]
 // NOTE: Öffentliche Submodule für Zero-Copy-Buffer, JSON-RPC und Verifikation.
 pub mod adapter;
 pub mod jsonrpc;
@@ -45,6 +52,7 @@ pub use generated::acta_generated::acta::ipc::*;
 pub use jsonrpc::*;
 pub use verification::*;
 
+// ANCHOR[acta-parse-worker:LIB-004]
 /// Zentraler, typisierter Fehlertyp für `acta-parse-worker` gemäß SPEC v4.0 (B4).
 ///
 /// Fasst FlatBuffers-Verifikationsfehler und JSON-RPC-Protokollfehler zusammen.

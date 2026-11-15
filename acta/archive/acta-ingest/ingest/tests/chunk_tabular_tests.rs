@@ -4,8 +4,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Akzeptanz- und Property-Tests für Tabular Chunker ( / P00A / P06).
-// Invarianten: Zero-Panic, deterministisch, Spans im kanonischen Text.
+// FILE-CONTEXT
+// ZWECK: Akzeptanz- und Property-Tests für Tabular Chunker ( / P00A / P06).
+// INVARIANTEN: Zero-Panic, deterministisch, Spans im kanonischen Text.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -21,6 +23,7 @@ use acta_ingest::format::FormatId;
 use acta_ingest::ir::{BlockKind, Boundary, DocumentIr, Locator, Table};
 use proptest::prelude::*;
 
+// ANCHOR[acta-ingest:TST-0332]
 // Testet die Funktionsfaehigkeit von `test_tabular_1_three_column_small_table`.
 #[test]
 fn test_tabular_1_three_column_small_table() {
@@ -79,6 +82,7 @@ fn test_tabular_1_three_column_small_table() {
     assert!(draft.span.end <= canon.block_spans[1].end);
 }
 
+// ANCHOR[acta-ingest:TST-0333]
 // Testet die Funktionsfaehigkeit von `test_tabular_2_ten_thousand_rows_row_groups`.
 #[test]
 fn test_tabular_2_ten_thousand_rows_row_groups() {
@@ -140,6 +144,7 @@ fn test_tabular_2_ten_thousand_rows_row_groups() {
     assert_eq!(last_seen_row, 10_000);
 }
 
+// ANCHOR[acta-ingest:TST-0334]
 // Testet die Funktionsfaehigkeit von `test_tabular_3_forty_columns_record_rows`.
 #[test]
 fn test_tabular_3_forty_columns_record_rows() {
@@ -177,6 +182,7 @@ fn test_tabular_3_forty_columns_record_rows() {
     assert!(!first_text.contains("|---|")); // RecordRows formatting, not GFM table
 }
 
+// ANCHOR[acta-ingest:TST-0335]
 // Testet die Funktionsfaehigkeit von `test_tabular_4_table_without_headers_generic_letters`.
 #[test]
 fn test_tabular_4_table_without_headers_generic_letters() {
@@ -211,6 +217,7 @@ fn test_tabular_4_table_without_headers_generic_letters() {
     );
 }
 
+// ANCHOR[acta-ingest:TST-0336]
 // Testet die Funktionsfaehigkeit von `test_tabular_5_gigantic_cell_window_split`.
 #[test]
 fn test_tabular_5_gigantic_cell_window_split() {
@@ -246,6 +253,7 @@ fn test_tabular_5_gigantic_cell_window_split() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0337]
 // Testet die Funktionsfaehigkeit von `test_tabular_6_two_sheets_hard_boundary`.
 #[test]
 fn test_tabular_6_two_sheets_hard_boundary() {
@@ -288,6 +296,7 @@ fn test_tabular_6_two_sheets_hard_boundary() {
     assert_eq!(drafts[1].locator.sheet.as_deref(), Some("SheetB"));
 }
 
+// ANCHOR[acta-ingest:TST-0338]
 // Testet die Funktionsfaehigkeit von `test_tabular_7_mini_sheets_merging`.
 #[test]
 fn test_tabular_7_mini_sheets_merging() {
@@ -338,6 +347,7 @@ fn test_tabular_7_mini_sheets_merging() {
     assert_eq!(sheets[1], "Mini2");
 }
 
+// ANCHOR[acta-ingest:TST-0339]
 // Testet die Funktionsfaehigkeit von `test_tabular_8_skip_empty_rows_and_drop_empty_cols`.
 #[test]
 fn test_tabular_8_skip_empty_rows_and_drop_empty_cols() {
@@ -380,6 +390,7 @@ fn test_tabular_8_skip_empty_rows_and_drop_empty_cols() {
     );
 }
 
+// ANCHOR[acta-ingest:TST-0340]
 // Testet die Funktionsfaehigkeit von `test_tabular_9_origin_5_3_range_d6`.
 #[test]
 fn test_tabular_9_origin_5_3_range_d6() {
@@ -415,6 +426,7 @@ fn test_tabular_9_origin_5_3_range_d6() {
     );
 }
 
+// ANCHOR[acta-ingest:TST-0341]
 // Testet die Funktionsfaehigkeit von `test_tabular_10_german_umlauts_and_pipe_masking`.
 #[test]
 fn test_tabular_10_german_umlauts_and_pipe_masking() {
@@ -447,6 +459,7 @@ fn test_tabular_10_german_umlauts_and_pipe_masking() {
     assert!(text.contains(r"Aktiv \| 100% \| OK"));
 }
 
+// ANCHOR[acta-ingest:TST-0342]
 // Testet die Funktionsfaehigkeit von `test_tabular_searchability_200x8_table`.
 #[test]
 fn test_tabular_searchability_200x8_table() {
@@ -508,6 +521,7 @@ fn test_tabular_searchability_200x8_table() {
 
 // Proptest Suite
 proptest! {
+// ANCHOR[acta-ingest:TST-0343]
 // Testet die Funktionsfaehigkeit von `proptest_tabular_row_coverage_and_span_bounds`.
     #[test]
     fn proptest_tabular_row_coverage_and_span_bounds(

@@ -1,5 +1,7 @@
-// Tombstone-Set und WAL-Verwaltung für gelöschte Dokumente.
-// Invarianten: Zero-Panic bei WAL-Lesezugriff; HMAC-Integritätsprüfung.
+// FILE-CONTEXT
+// ZWECK: Tombstone-Set und WAL-Verwaltung für gelöschte Dokumente.
+// INVARIANTEN: Zero-Panic bei WAL-Lesezugriff; HMAC-Integritätsprüfung.
+// STAND: 2026-11-11
 
 use std::io::Read;
 use subtle::ConstantTimeEq;

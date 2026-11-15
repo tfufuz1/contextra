@@ -1,6 +1,8 @@
-// Gebündelte Dateizugriffe und Durability-Primitive für DiskANN ( / S-80).
-// Invarianten: Strengste Durability-Reihenfolge: tmp sync_all -> rename -> parent dir sync_all; Zero-Panic.
+// FILE-CONTEXT
+// ZWECK: Gebündelte Dateizugriffe und Durability-Primitive für DiskANN ( / S-80).
+// INVARIANTEN: Strengste Durability-Reihenfolge: tmp sync_all -> rename -> parent dir sync_all; Zero-Panic.
 // HOTSPOTS: atomic_replace, append_wal, read_all, remove_if_exists, open_mmap_readonly
+// STAND: 2026-11-11
 
 //! E/A- und Durability-Primitive für `DiskANN`.
 //!
@@ -13,6 +15,7 @@ use std::path::Path;
 
 use crate::error::{Result, VectorError};
 
+// ANCHOR[acta-vec:W07-IO-001]
 /// Führt ein atomares Ersetzen von `dest` durch `tmp` durch.
 ///
 /// Reihenfolge (strengste vorhandene Variante):
@@ -42,6 +45,7 @@ pub(crate) fn atomic_replace(tmp: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-vec:W07-IO-002]
 /// Entfernt eine Datei, falls sie existiert.
 pub(crate) fn remove_if_exists(path: &Path) -> Result<()> {
     if path.exists() {
@@ -50,6 +54,7 @@ pub(crate) fn remove_if_exists(path: &Path) -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-vec:W07-IO-003]
 /// Liest den gesamten Inhalt einer Datei als Bytevektor.
 pub(crate) fn read_all(path: &Path) -> Result<Vec<u8>> {
     if !path.exists() {
@@ -64,6 +69,7 @@ pub(crate) fn read_all(path: &Path) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
+// ANCHOR[acta-vec:W07-IO-004]
 /// Schreibt Daten an das Ende einer WAL-Datei, inkl. optionalem Header bei Neuerstellung und Datei-`sync_all`.
 pub(crate) fn append_wal(
     path: &Path,
@@ -94,11 +100,13 @@ pub(crate) fn append_wal(
     Ok(())
 }
 
+// ANCHOR[acta-vec:W07-IO-005]
 /// Öffnet eine Datei nur lesend.
 pub(crate) fn open_read(path: &Path) -> Result<File> {
     File::open(path).map_err(VectorError::from)
 }
 
+// ANCHOR[acta-vec:W07-IO-006]
 /// Erstellt eine Datei neu oder schneidet sie ab zum Schreiben.
 pub(crate) fn create_truncate(path: &Path) -> Result<File> {
     OpenOptions::new()
@@ -109,11 +117,13 @@ pub(crate) fn create_truncate(path: &Path) -> Result<File> {
         .map_err(VectorError::from)
 }
 
+// ANCHOR[acta-vec:W07-IO-007]
 /// Öffnet ein sicheres Nur-Lese-Memory-Mapping über `acta_sys::mmap_readonly`.
 pub(crate) fn open_mmap_readonly(file: &File) -> Result<memmap2::Mmap> {
     acta_sys::mmap_readonly(file).map_err(VectorError::from)
 }
 
+// ANCHOR[acta-vec:W07-IO-008]
 /// Schreibt Bytes in eine Datei (nur für Initialisierungs-/Testzwecke).
 pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = create_truncate(path)?;

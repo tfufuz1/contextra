@@ -1,6 +1,8 @@
+//! # Block-Builder (Ring 1)
 //!
 //! Zweck: Baut einzelne SSTable-Datenblöcke auf mit Restriktion auf `block_size`
 //! und kodiert Schlüssel-Wert-Einträge samt Offsets und Trailer.
+// ANCHOR[acta-seg:SST-BLD-100]
 
 use crate::sstable::bloom::BloomFilter;
 use bytes::{BufMut, Bytes, BytesMut};

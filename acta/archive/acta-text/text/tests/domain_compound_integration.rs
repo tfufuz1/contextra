@@ -1,11 +1,14 @@
 //! Testsuite `domain_compound_integration.rs` für acta-text.
 //!
 //! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
 
-// Verifiziert, dass der GermanCompoundSplitter mit den ausgebauten Vokabularen mindestens 20 reprasentative Komposita je Domaene (Recht & Medizin) korrekt zerlegt und geschuetzte Begriffe unangetastet laesst.
+// FILE-CONTEXT: Integrationspruefung fuer GermanCompoundSplitter mit Domaenenvokabularen.
+// ZWECK: Verifiziert, dass der GermanCompoundSplitter mit den ausgebauten Vokabularen mindestens 20 reprasentative Komposita je Domaene (Recht & Medizin) korrekt zerlegt und geschuetzte Begriffe unangetastet laesst.
 
 use acta_text::morphology::{GermanCompoundSplitter, MorphologicalTokenizer};
 
+// ANCHOR[acta-text:TEST-156]
 // Testfall `test_legal_compounds_decomposition_at_least_20_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_legal_compounds_decomposition_at_least_20_cases() {
@@ -52,6 +55,7 @@ fn test_legal_compounds_decomposition_at_least_20_cases() {
     }
 }
 
+// ANCHOR[acta-text:TEST-157]
 // Testfall `test_medical_compounds_decomposition_at_least_20_cases`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_medical_compounds_decomposition_at_least_20_cases() {
@@ -98,6 +102,7 @@ fn test_medical_compounds_decomposition_at_least_20_cases() {
     }
 }
 
+// ANCHOR[acta-text:TEST-158]
 // Testfall `test_protected_terms_are_not_decomposed`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_protected_terms_are_not_decomposed() {

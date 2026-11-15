@@ -1,3 +1,4 @@
+//! # Manifest-Kernlogik (Ring 1)
 //!
 //! Serialisiert und deserialisiert Manifest-Eintraege fuer Dateiaustausch und Compaction.
 //! Verwaltet Ladevorgänge, Tail-Truncation Recovery und die Re-Exporte der Teilmodule.

@@ -1,9 +1,12 @@
-// Liefert BM25-Kandidaten in Batches à 16 (oder konfigurierbar) via geometrisches Nachladen.
-// Invarianten: #![forbid(unsafe_code)], zero panic/unwrap, Snapshot-Isolation via max_seq, max_depth = MAX_SEARCH_K.
+// FILE-CONTEXT: On-demand candidate streaming for BM25 search.
+// ZWECK: Liefert BM25-Kandidaten in Batches à 16 (oder konfigurierbar) via geometrisches Nachladen.
+// INVARIANTEN: #![forbid(unsafe_code)], zero panic/unwrap, Snapshot-Isolation via max_seq, max_depth = MAX_SEARCH_K.
+// STAND: TS:2026-09-14T00:00:00Z
 
 //! Asynchrones, bedarfsgesteuertes Streaming von BM25-Suchkandidaten.
 //!
 //! # Ring-Zuordnung
+//! Ring 0 (Kern).
 //!
 //! # Funktionsweise
 //! Stellt mit [`Bm25CandidateStream`] einen Pull-basierten Iterator bereit, der
@@ -19,9 +22,11 @@ use std::collections::{BTreeSet, VecDeque};
 
 use crate::inverted::InvertedIndex;
 
+// ANCHOR[acta-text:STREAM-001]
 /// Standard-Batch-Größe für das Nachladen von Kandidaten (16 Dokumente).
 pub const DEFAULT_STREAM_BATCH_SIZE: usize = 16;
 
+// ANCHOR[acta-text:STREAM-002]
 /// Asynchroner Pull-Stream zum bedarfsgerechten Nachladen von BM25-Kandidaten.
 pub struct Bm25CandidateStream<'a, S: PostingStore> {
     index: &'a InvertedIndex<S>,
@@ -36,6 +41,7 @@ pub struct Bm25CandidateStream<'a, S: PostingStore> {
 }
 
 impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
+    // ANCHOR[acta-text:STREAM-003]
     /// Erzeugt einen neuen Kandidaten-Stream für die übergebene Abfrage und Index-Snapshot.
     pub fn new(
         index: &'a InvertedIndex<S>,
@@ -55,12 +61,14 @@ impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
         }
     }
 
+    // ANCHOR[acta-text:STREAM-004]
     /// Konfiguriert eine benutzerdefinierte Batch-Größe (mindestens 1).
     pub fn with_batch_size(mut self, n: usize) -> Self {
         self.batch_size = n.max(1);
         self
     }
 
+    // ANCHOR[acta-text:STREAM-005]
     /// Holt den nächsten Batch von Kandidaten-Dokumenten (bis zu `batch_size`).
     pub async fn next_batch(&mut self) -> Result<Vec<(DocId, f32)>> {
         while self.buffer.len() < self.batch_size && !self.exhausted {
@@ -78,6 +86,7 @@ impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
         Ok(batch)
     }
 
+    // ANCHOR[acta-text:STREAM-006]
     /// Holt die nächste einzelne Dokument-ID aus dem Stream.
     pub async fn next_doc(&mut self) -> Result<Option<DocId>> {
         if self.buffer.is_empty() && !self.exhausted {
@@ -92,21 +101,25 @@ impl<'a, S: PostingStore> Bm25CandidateStream<'a, S> {
         }
     }
 
+    // ANCHOR[acta-text:STREAM-007]
     /// Liefert die Gesamtzahl aller bisher an den Aufrufer herausgegebenen Treffer.
     pub fn yielded(&self) -> usize {
         self.yielded
     }
 
+    // ANCHOR[acta-text:STREAM-008]
     /// Prüft, ob der Stream vollständig erschöpft ist (keine gepufferten oder nachladbaren Elemente mehr).
     pub fn is_exhausted(&self) -> bool {
         self.exhausted && self.buffer.is_empty()
     }
 
+    // ANCHOR[acta-text:STREAM-009]
     /// Liefert die maximale Suchtiefe für Kandidaten ([`MAX_SEARCH_K`]).
     pub const fn max_depth() -> usize {
         MAX_SEARCH_K
     }
 
+    // ANCHOR[acta-text:STREAM-010]
     async fn refill(&mut self) -> Result<()> {
         if self.exhausted {
             return Ok(());

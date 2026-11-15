@@ -1,5 +1,6 @@
 //! # Score-Normalisierte Fusion (`normalized`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Implementiert die lineare Score-Kombination nach Min-Max-Normalisierung.
 

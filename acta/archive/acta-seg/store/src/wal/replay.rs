@@ -1,4 +1,5 @@
 // TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
+//! # WAL Replay & Wiederherstellung (Ring 1)
 //!
 //! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
 //!

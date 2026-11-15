@@ -12,6 +12,7 @@
 //! - **Verschlüsselter KV-Cache:** Schutz flüchtiger Kontexte im Arbeitsspeicher mit rotierenden Schlüsseln.
 //!
 //! # Einbindung & Abhängigkeiten
+//! - **Ring-Einstufung:** Ring 4 (Erweiterung / `[E]`).
 //! - **Abhängigkeiten (normal):**
 //!   - `thiserror`: Strukturierte Fehlerbehandlung über [`AvvError`].
 //!   - `serde` (optional): Serialisierung und Deserialisierung des Kontexts [`AvvContext`].
@@ -38,6 +39,7 @@ use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[acta-reports:ID-TENANT]
 /// Mandanten-Identifikator im Rahmen der AVV-Generierung.
 ///
 /// Autarker 64-Bit-Ganzzahl-Typ zur Identifikation des Mandanten im Vertragskontext.
@@ -92,6 +94,7 @@ impl From<u64> for TenantId {
     }
 }
 
+// ANCHOR[acta-reports:CTX-001]
 /// Kontext- und Konfigurationsparameter zur Generierung einer AVV-Vorlage gemäß Art. 28 DSGVO.
 ///
 /// Enthält alle variablen Vertragsbestandteile, wie Namen der Vertragsparteien,
@@ -163,6 +166,7 @@ impl Default for AvvContext {
 }
 
 impl AvvContext {
+    // ANCHOR[acta-reports:CTX-002]
     /// Erzeugt einen neuen [`AvvContext`] mit den Pflichtparametern und Standard-Optionen.
     ///
     /// # Parameter
@@ -192,18 +196,21 @@ impl AvvContext {
         }
     }
 
+    // ANCHOR[acta-reports:CTX-003]
     /// Setzt ein explizites Vertragsdatum für die AVV-Vorlage (Builder-Muster).
     pub fn with_contract_date(mut self, contract_date: impl Into<String>) -> Self {
         self.contract_date = Some(contract_date.into());
         self
     }
 
+    // ANCHOR[acta-reports:CTX-004]
     /// Konfiguriert die grundsätzliche Zulässigkeit von Unterauftragsverarbeitern (Builder-Muster).
     pub fn with_subprocessors_allowed(mut self, allowed: bool) -> Self {
         self.subprocessors_allowed = Some(allowed);
         self
     }
 
+    // ANCHOR[acta-reports:CTX-005]
     /// Validiert alle Kontextfelder gegen rechtliche und logische Mindestanforderungen.
     ///
     /// # Prüfschritte
@@ -272,6 +279,7 @@ impl AvvContext {
     }
 }
 
+// ANCHOR[acta-reports:TOM-001]
 /// Beschreibung einer technischen und organisatorischen Maßnahme (TOM) gemäß Art. 32 DSGVO.
 ///
 /// TOMs beschreiben die Sicherheitsmechanismen, die zum Schutz der Vertraulichkeit,
@@ -287,6 +295,7 @@ pub struct TechnicalMeasure {
     pub reference_article: String,
 }
 
+// ANCHOR[acta-reports:PUB-001]
 /// Rendert das vollständige AVV-Dokument im Markdown-Format anhand des übergebenen [`AvvContext`].
 ///
 /// # Ablauf
@@ -301,6 +310,7 @@ pub fn render_avv_markdown(ctx: &AvvContext) -> Result<String, AvvError> {
     template::render(ctx)
 }
 
+// ANCHOR[acta-reports:PUB-002]
 /// Rendert das AVV-Dokument im Markdown-Format mit einem explizit vorgegebenen Vertragsdatum.
 ///
 /// # Ablauf
@@ -314,6 +324,7 @@ pub fn render_avv_markdown_with_date(ctx: &AvvContext, date: &str) -> Result<Str
     template::render_with_date(ctx, date)
 }
 
+// ANCHOR[acta-reports:PUB-003]
 /// Liefert die standardmäßig implementierten technischen Schutzmaßnahmen von Acta zurück.
 ///
 /// Diese Liste spiegelt die Kern-Sicherheitsfeatures des Acta-Systems wider:

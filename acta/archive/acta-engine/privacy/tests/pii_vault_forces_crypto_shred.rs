@@ -1,10 +1,12 @@
 //! Tests für die kryptografische Löschung von PII-Daten im Egress-Vault.
-// Test PII vault forces CryptoShred under DeploymentTier::EdgeMinimal
+// FILE-CONTEXT
+// ZWECK: Test PII vault forces CryptoShred under DeploymentTier::EdgeMinimal
 #![allow(deprecated)]
 
 use acta_pii::egress_gateway::pii_vault_forces_crypto_shred;
 
 #[test]
+// ANCHOR[acta-pii:TEST-SHRED-001]
 // Prüft: Prüft das Schredder-Kriterium bei PII-Übereinstimmungen und Nicht-Memory-Only-Speicherung.
 fn test_pii_vault_forces_crypto_shred_edge_minimal() {
     let is_pii_match = true;

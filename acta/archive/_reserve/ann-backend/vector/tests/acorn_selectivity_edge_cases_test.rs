@@ -1,6 +1,8 @@
-// ACORN Filtered Search unter extremen Selektivitätsbedingungen (0% und 100%).
-// Invarianten: Korrekte Behandlung leerer Treffermengen und vollständiger Selektion.
+// FILE-CONTEXT
+// ZWECK: ACORN Filtered Search unter extremen Selektivitätsbedingungen (0% und 100%).
+// INVARIANTEN: Korrekte Behandlung leerer Treffermengen und vollständiger Selektion.
 // HOTSPOTS: 20-75
+// STAND: 2026-11-12
 use acta_base::VectorIndex; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_base::{DistanceMetric, DocId, TxId}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_vec::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};

@@ -1,5 +1,6 @@
-// Validierung der autarken Baustein-Architektur und Schnittstellen-Integrität für acta-sys.
-// Invarianten: Deterministische Differential-Konsistenz, Safe API, Fail-Closed Fehlerbehandlung.
+// FILE-CONTEXT
+// ZWECK: Validierung der autarken Baustein-Architektur und Schnittstellen-Integrität für acta-sys.
+// INVARIANTEN: Deterministische Differential-Konsistenz, Safe API, Fail-Closed Fehlerbehandlung.
 
 use acta_sys::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted, validate_vector,

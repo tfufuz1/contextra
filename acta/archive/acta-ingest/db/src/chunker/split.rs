@@ -2,17 +2,21 @@
 //!
 //! **Zweck:** Niedrigstufige Texttrennungs- und Split-Algorithmen.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// Aufspaltung übergroßer Abschnitte unter Erhalt atomarer Blöcke und Syntax-Fences.
-// Invarianten: Codeblock-Fences und Tabellenköpfe werden bei Aufspaltung in Teil-Chunks wiederholt.
+// FILE-CONTEXT
+// ZWECK: Aufspaltung übergroßer Abschnitte unter Erhalt atomarer Blöcke und Syntax-Fences.
+// INVARIANTEN: Codeblock-Fences und Tabellenköpfe werden bei Aufspaltung in Teil-Chunks wiederholt.
 // NICHT-OFFENSICHTLICH: Verwendet Sliding-Window-Fallback für übergroße Absätze.
+// STAND: TS:2026-10-29T00:00:00Z
 
 use super::blocks::{parse_markdown_blocks, MarkdownBlock};
 use super::estimate::estimate_tokens;
 use super::sections::RawSection;
 use super::windows::chunk_text_with_overlap;
 
+// ANCHOR[acta-engine:SPL-001]
 /// Teilt einen Rohabschnitt in atomare Chunks.
 pub(crate) fn split_raw_section(
     sec: RawSection,

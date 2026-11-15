@@ -3,6 +3,7 @@
 //! Dieses Modul ermöglicht schnelles Klonen von SSTables auf Dateisystem-Ebene via Hardlinks.
 //!
 //! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. SSTables (Sorted String Tables) sind die unveränderlichen
 //! Datendateien der LSM-Speicherengine. Dieses Modul erlaubt O(1) Copy-on-Write Klone beim
 //! Forking von Agenten-Zuständen.
 //!
@@ -20,8 +21,10 @@
 
 #![allow(unexpected_cfgs)]
 
-// Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
-// Invarianten: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
+// FILE-CONTEXT
+// STAND: 2026-09-28T00:00:00Z
+// ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
+// INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
 
 /// Trait zur Abstraktion von Snapshot-Pinning-Mechanismen während des SSTable-Klonens.
 pub trait SnapshotPinner: Send + Sync {
@@ -110,6 +113,7 @@ mod fs {
     pub struct LoomMetadata;
 }
 
+// ANCHOR[acta-history:CLONE-001]
 /// Ergebnisstruktur einer durchgeführten Hardlink-Klon-Operation für SSTables.
 ///
 /// # Zweck
@@ -135,6 +139,7 @@ pub struct HardlinkCloneResult {
     pub wal_tail_offset: Option<u64>,
 }
 
+// ANCHOR[acta-history:CLONE-002]
 /// Trait für die Schnittstelle zum physischen SSTable-Klonen via Hardlinks.
 ///
 /// # Zweck
@@ -165,6 +170,7 @@ pub trait CheckpointHardlinkCloner: Send + Sync {
     ) -> BoxFuture<'a, Result<HardlinkCloneResult>>;
 }
 
+// ANCHOR[acta-history:CLONE-003]
 /// Produktive Implementierung von [`CheckpointHardlinkCloner`] basierend auf `tokio::fs`.
 ///
 /// Nutzt asynchrone Dateisystem-Operationen ohne den Haupt-Thread zu blockieren.
@@ -179,6 +185,7 @@ impl DefaultHardlinkCloner {
 }
 
 impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
+    // ANCHOR[acta-history:CLONE-004]
     // Ablauf von `clone_sstable_hardlinks`:
     // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Bereinigung).
     // 2. Zielverzeichnis anlegen falls noch nicht vorhanden.
@@ -270,6 +277,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     }
 }
 
+// ANCHOR[acta-history:CLONE-005]
 /// Hilfsfunktion zur Erkennung plattformspezifischer Cross-Device-Link-Fehler (z. B. EXDEV).
 ///
 /// # Ablauf:

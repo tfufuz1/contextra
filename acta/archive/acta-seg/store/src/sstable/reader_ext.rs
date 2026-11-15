@@ -1,3 +1,4 @@
+//! # Erweiterte SSTable-Leseoperationen (Ring 1)
 //!
 //! Stellt Scanner und Hilfsiteratoren fuer Snapshot-orientierte Abfragen bereit.
 

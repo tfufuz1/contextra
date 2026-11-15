@@ -5,8 +5,8 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs).
-// Invarianten: (marginal coverage guarantee, strict determinism, zero-panic input validation).
+// ZWECK: Integration and invariant verification test suite for Adaptive Conformal Prediction (conformal.rs).
+// INVARIANTEN: (marginal coverage guarantee, strict determinism, zero-panic input validation).
 
 use acta_rank::ConfigFingerprint;
 use acta_rank::{AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError};

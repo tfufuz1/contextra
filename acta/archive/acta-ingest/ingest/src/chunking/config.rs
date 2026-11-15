@@ -1,11 +1,14 @@
 //! Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// Konfiguration für das Ingestion-Chunking und Fingerprinting (WP M3).
-// Invarianten: Zero-Panic, blake3-Fingerprint für Caching, SPEC-Abweichungen isoliert.
+// FILE-CONTEXT
+// ZWECK: Konfiguration für das Ingestion-Chunking und Fingerprinting (WP M3).
+// INVARIANTEN: Zero-Panic, blake3-Fingerprint für Caching, SPEC-Abweichungen isoliert.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::format::ChunkStrategy;
 use blake3::Hasher;
@@ -14,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// Gesamtkonfiguration für das Ingestion-Chunking.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0204]
 // struct `ChunkingConfig` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct ChunkingConfig {
     pub strategy: Option<ChunkStrategy>,
@@ -33,6 +37,7 @@ pub struct ChunkingConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0205]
 // struct `ProseOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct ProseOptions {
     pub sentence_aware_windows: bool,
@@ -52,6 +57,7 @@ impl Default for ProseOptions {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0206]
 // enum `TabularMode` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub enum TabularMode {
     Auto,
@@ -61,6 +67,7 @@ pub enum TabularMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0207]
 // struct `TabularOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct TabularOptions {
     pub mode: TabularMode,
@@ -82,6 +89,7 @@ impl Default for TabularOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0208]
 // struct `PagedOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct PagedOptions {
     pub merge_small_pages: bool,
@@ -101,6 +109,7 @@ impl Default for PagedOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0209]
 // struct `StructuredOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct StructuredOptions {
     pub group_depth: u32,
@@ -118,6 +127,7 @@ impl Default for StructuredOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-ingest:CHK-0210]
 // struct `EmailOptions` fuer Konfiguration der Chunking-Parameter (Groesse, Overlap, Min-Groesse).
 pub struct EmailOptions {
     pub include_quoted: bool,

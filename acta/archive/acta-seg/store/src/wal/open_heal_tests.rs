@@ -1,3 +1,4 @@
+//! # Tests fuer Open-Heal im WAL (Ring 1)
 //!
 //! Prueft die automatische Kuerzung und Reparatur beschaedigter WAL-Dateien am Dateiende.
 

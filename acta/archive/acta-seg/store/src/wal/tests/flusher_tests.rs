@@ -1,3 +1,4 @@
+//! # Tests fuer den WAL-Flusher (Ring 1)
 //!
 //! Prueft Flush-Backpressure, Batch-Grouping und Fehlerweitergabe.
 

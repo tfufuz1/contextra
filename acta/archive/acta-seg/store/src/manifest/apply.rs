@@ -1,3 +1,4 @@
+//! Manifest Edit-Anwendung, atomares Anhängen und Snapshot-Umschaltung (Ring 1)
 //!
 //! Stellt atomare Append-Batch-Operationen mit Flush-before-Visible- und fsync-Garantien
 //! bereit. Vergiftet das Handle bei fsync-Fehlern sofort fail-closed.

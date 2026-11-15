@@ -4,8 +4,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Akzeptanz- und Proptests für EmailChunker.
-// Invarianten: Zero-Panic in Produktion, Test-First, Lints eingehalten.
+// FILE-CONTEXT
+// ZWECK: Akzeptanz- und Proptests für EmailChunker.
+// INVARIANTEN: Zero-Panic in Produktion, Test-First, Lints eingehalten.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -21,6 +23,7 @@ use acta_ingest::format::FormatId;
 use acta_ingest::ir::{BlockKind, Boundary, DocumentIr, Locator, MessageHeader, Table};
 use proptest::prelude::*;
 
+// ANCHOR[acta-ingest:TST-0301]
 // Testet die Funktionsfaehigkeit von `test_email_3_messages_isolation`.
 #[test]
 fn test_email_3_messages_isolation() {
@@ -61,6 +64,7 @@ fn test_email_3_messages_isolation() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0302]
 // Testet die Funktionsfaehigkeit von `test_email_quoted_replies_toggle`.
 #[test]
 fn test_email_quoted_replies_toggle() {
@@ -112,6 +116,7 @@ fn test_email_quoted_replies_toggle() {
     assert!(drafts_quoted[0].text.contains("Bob wrote"));
 }
 
+// ANCHOR[acta-ingest:TST-0303]
 // Testet die Funktionsfaehigkeit von `test_email_60000_char_body_window_split`.
 #[test]
 fn test_email_60000_char_body_window_split() {
@@ -142,6 +147,7 @@ fn test_email_60000_char_body_window_split() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0304]
 // Testet die Funktionsfaehigkeit von `test_email_attachments_table_and_prose`.
 #[test]
 fn test_email_attachments_table_and_prose() {
@@ -222,6 +228,7 @@ fn test_email_attachments_table_and_prose() {
     );
 }
 
+// ANCHOR[acta-ingest:TST-0305]
 // Testet die Funktionsfaehigkeit von `test_email_empty_message_header_only`.
 #[test]
 fn test_email_empty_message_header_only() {
@@ -246,6 +253,7 @@ fn test_email_empty_message_header_only() {
 }
 
 proptest! {
+// ANCHOR[acta-ingest:TST-0306]
 // Testet die Funktionsfaehigkeit von `prop_email_chunker_determinism_and_spans`.
     #[test]
     fn prop_email_chunker_determinism_and_spans(

@@ -1,6 +1,7 @@
 //! Rauchtest-Fuzz-Target für Tokenizer und reguläre Schutzmuster-Kompilierung.
 //!
 //! # Ring-Zuordnung
+//! Ring LAB / Fuzzing.
 //!
 //! # Invariante
 //! Garantierte Panik-Freiheit (Fail-Closed) bei Regex-Kompilierung und Tokenisierung.
@@ -13,6 +14,7 @@ use acta_text::tokenizer::{
 };
 use libfuzzer_sys::fuzz_target;
 
+// ANCHOR[acta-text:FUZZ-002]
 // Fuzzing-Harnisch zur Prüfung der Regex-Validierung und Tokenizer-Stabilität.
 fuzz_target!(|data: &str| {
     // 1. Default Tokenizer execution with arbitrary string

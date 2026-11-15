@@ -24,12 +24,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::types::{Clock, FeatureRing, LicenseError, LicenseGate, SystemClock, TenantId};
 
+// ANCHOR[acta-node:CONST-MAX-PAYLOAD]
 /// Maximale zulässige Payload-Größe in Bytes (64 KiB) für die Lizenzverifikation.
 ///
 /// **Zweck:** Schutz vor Speicher- und CPU-Erschöpfungsangriffen (Denial of Service)
 /// durch übergroße oder manipulierte Nutzlasten bei der Deserialisierung.
 pub const MAX_PAYLOAD_BYTES: usize = 65_536;
 
+// ANCHOR[acta-node:FN-CONSTANT-TIME-EQ]
 /// Vergleicht zwei 32-Byte-Arrays in konstanter Laufzeit (Constant-Time).
 ///
 /// **Zweck:** Verhindert Seitenkanal-Angriffe (Timing Attacks) beim Prüfen von kryptografischen
@@ -51,6 +53,7 @@ pub fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
     res == 0
 }
 
+// ANCHOR[acta-node:STRUCT-OPTIONS]
 /// Konfigurationsoptionen für die Prüfung signierter Payloads und Rückwärtskompatibilität.
 ///
 /// Ermöglicht es, die maximale Nutzlastgröße anzupassen oder alte Payload-Schemata
@@ -73,6 +76,7 @@ impl Default for SignedLicenseOptions {
     }
 }
 
+// ANCHOR[acta-node:ENUM-STEP-ERROR]
 /// Detaillierte Fehlerursache während der 7-stufigen Lizenz- und Aktivierungsprüfung.
 ///
 /// **Zweck:** Ermöglicht intern eine präzise Diagnose, welcher Schritt fehlgeschlagen ist,
@@ -103,6 +107,7 @@ pub enum StepVerificationError {
 }
 
 impl StepVerificationError {
+    // ANCHOR[acta-node:FN-STEP-ERROR-CONV]
     /// Überführt den internen Schrittfehler in den kanonischen [`LicenseError`].
     ///
     /// **Garantie gegen Informationslecks:** Hardware-Hashes, Maschinendaten oder genaue
@@ -118,6 +123,7 @@ impl StepVerificationError {
     }
 }
 
+// ANCHOR[acta-node:MOD-BYTES64]
 /// Hilfsmodul für die Serde-Serialisierung und -Deserialisierung von 64-Byte-Arrays (Signaturen).
 mod bytes_64 {
     use super::*;
@@ -142,6 +148,7 @@ mod bytes_64 {
     }
 }
 
+// ANCHOR[acta-node:STRUCT-SIGNED-ACTIVATION]
 /// Signierter Aktivierungsdatensatz zur Bindung eines Feature-Rings an eine Maschinenidentität (§10.2, §15).
 ///
 /// Verbindet kryptografisch den freizuschaltenden Feature-Ring, einen 32-Byte-BLAKE3-Hash
@@ -160,6 +167,7 @@ pub struct SignedActivation {
 }
 
 impl SignedActivation {
+    // ANCHOR[acta-node:FN-ACTIVATION-PAYLOAD-BYTES]
     /// Berechnet die binäre Repräsentation der Aktivierungsfelder zur Signaturerstellung/-prüfung.
     ///
     /// **Ablauf:** Serialisiert das Tripel `(ring, installation_id_hash, expires_at_unix)` mittels Bincode.
@@ -172,6 +180,7 @@ impl SignedActivation {
         bincode::serialize(&(ring, installation_id_hash, expires_at_unix)).unwrap_or_default()
     }
 
+    // ANCHOR[acta-node:FN-ACTIVATION-CREATE-SIGNED]
     /// Erstellt und signiert einen neuen Aktivierungsdatensatz mit dem privaten Ed25519-Schlüssel.
     ///
     /// **Ablauf:**
@@ -194,6 +203,7 @@ impl SignedActivation {
         }
     }
 
+    // ANCHOR[acta-node:FN-ACTIVATION-VERIFY-SIG]
     /// Verifiziert die Ed25519-Signatur dieses Datensatzes anhand des öffentlichen Schlüssels.
     ///
     /// **Rückgabe:** `true` genau dann, wenn die Signatur gültig ist und den Daten entspricht.
@@ -205,6 +215,7 @@ impl SignedActivation {
     }
 }
 
+// ANCHOR[acta-node:FN-DERIVE-INSTALLATION-ID]
 /// Ermittelt oder erzeugt deterministisch den 32-Byte-BLAKE3-Hash der lokalen Installation.
 ///
 /// # Status
@@ -244,6 +255,7 @@ pub fn derive_local_installation_id_hash(storage_path: Option<&std::path::Path>)
     *blake3::hash(FALLBACK_SEED).as_bytes()
 }
 
+// ANCHOR[acta-node:STRUCT-LICENSE-PAYLOAD]
 /// Strukturierter Lizenznutzlast-Datensatz (Payload).
 ///
 /// Enthält Mandantenbindung ([`TenantId`]), freigeschaltete Feature-Ringe, optionales Ablaufdatum,
@@ -262,6 +274,7 @@ pub struct LicensePayload {
     pub installation_id_hash: Option<[u8; 32]>,
 }
 
+// ANCHOR[acta-node:STRUCT-LEGACY-PAYLOAD]
 /// Altes Lizenz-Payload-Schema ohne `installation_id_hash` zur Rückwärtskompatibilität.
 #[derive(Deserialize)]
 struct LegacyLicensePayload {
@@ -288,6 +301,7 @@ impl From<LegacyLicensePayload> for LicensePayload {
 // Sieben Verifikationsschritte (Fail-Closed Sequenz)
 // ============================================================================
 
+// ANCHOR[acta-node:STEP-1-FAST-RING]
 /// Schritt 1: Prüfung auf Fast-Ring-Bypass.
 ///
 /// **Garantie:** Der freie Standard-Ring `FeatureRing::Fast` benötigt niemals eine Lizenz
@@ -296,6 +310,7 @@ pub fn verify_step_1_fast_ring(ring: FeatureRing) -> bool {
     ring == FeatureRing::Fast
 }
 
+// ANCHOR[acta-node:STEP-2-PRESENCE]
 /// Schritt 2: Vorhandenseinsprüfung von Aktivierungsdatensatz oder Lizenzpayload.
 ///
 /// **Vorbedingung:** Schritt 1 war `false` (Ring ist nicht `Fast`).
@@ -312,6 +327,7 @@ pub fn verify_step_2_presence(
     Ok(())
 }
 
+// ANCHOR[acta-node:STEP-3-INSTALLATION]
 /// Schritt 3: Prüfung auf Übereinstimmung der lokalen Installations-ID.
 ///
 /// Vergleicht den Hash der aktuellen Maschinenumgebung in konstanter Zeit mit dem in der Lizenz
@@ -352,6 +368,7 @@ pub fn verify_step_3_installation(
     }
 }
 
+// ANCHOR[acta-node:STEP-4-SIGNATURE]
 /// Schritt 4: Kryptografische Ed25519-Signaturprüfung.
 ///
 /// Prüft, ob der Aktivierungsdatensatz mit dem angegebenen öffentlichen Schlüssel (`verifying_key`)
@@ -379,6 +396,7 @@ pub fn verify_step_4_signature(
     Ok(())
 }
 
+// ANCHOR[acta-node:STEP-5-EXPIRATION]
 /// Schritt 5: Ablaufdatumsprüfung über den Zeit-Port oder Clock-Trait ([`Clock`]).
 ///
 /// Liest die aktuelle Zeit über `clock.now_unix_nanos()` (B11: keine direkte Wanduhr in Kernlogik).
@@ -412,6 +430,7 @@ pub fn verify_step_5_expiration(
     Ok(())
 }
 
+// ANCHOR[acta-node:STEP-6-RING-PERMISSION]
 /// Schritt 6: Prüfung der Ring-Berechtigung.
 ///
 /// Prüft, ob der konkret angeforderte Feature-Ring in der Lizenz enthalten ist.
@@ -437,6 +456,7 @@ pub fn verify_step_6_ring_permission(
     Ok(())
 }
 
+// ANCHOR[acta-node:STEP-7-SUCCESS]
 /// Schritt 7: Bestätigung des erfolgreichen Verifikationsabschlusses.
 ///
 /// Dient als finaler Schlusspunkt der 7-stufigen Verifikationskette.
@@ -444,6 +464,7 @@ pub fn verify_step_7_success() -> Result<(), StepVerificationError> {
     Ok(())
 }
 
+// ANCHOR[acta-node:STRUCT-SIGNED-LICENSE-GATE]
 /// Kryptografisches Lizenz-Gate zur Durchsetzung von Feature-Ringen.
 ///
 /// Verifiziert Ed25519-Signaturen über Aktivierungsdatensätze ([`SignedActivation`])
@@ -469,6 +490,7 @@ impl std::fmt::Debug for SignedLicenseGate {
 }
 
 impl SignedLicenseGate {
+    // ANCHOR[acta-node:GATE-NO-ACTIVATION]
     /// Erzeugt ein leeres Gate ohne aktive Lizenz (nur der `Fast`-Ring ist freigeschaltet).
     pub fn no_activation() -> Self {
         Self {
@@ -480,12 +502,14 @@ impl SignedLicenseGate {
         }
     }
 
+    // ANCHOR[acta-node:GATE-FROM-ACTIVATION]
     /// Konstruiert ein Gate aus einem [`SignedActivation`]-Datensatz und dem öffentlichen Ed25519-Schlüssel.
     /// Nutzt standardmäßig die [`SystemClock`].
     pub fn from_activation(activation: SignedActivation, verifying_key: VerifyingKey) -> Self {
         Self::from_activation_with_clock(activation, verifying_key, Arc::new(SystemClock::new()))
     }
 
+    // ANCHOR[acta-node:GATE-FROM-ACTIVATION-CLOCK]
     /// Konstruiert ein Gate aus einem [`SignedActivation`]-Datensatz mit injiziertem [`Clock`]-Port.
     pub fn from_activation_with_clock(
         activation: SignedActivation,
@@ -501,6 +525,7 @@ impl SignedLicenseGate {
         }
     }
 
+    // ANCHOR[acta-node:GATE-FROM-SIGNED-PAYLOAD]
     /// Konstruiert ein Gate durch Signaturprüfung eines Roh-Payloads mit Standardeinstellungen.
     ///
     /// # Fehler
@@ -519,6 +544,7 @@ impl SignedLicenseGate {
         )
     }
 
+    // ANCHOR[acta-node:GATE-FROM-SIGNED-PAYLOAD-CLOCK]
     /// Konstruiert ein Gate aus signierten Payload-Bytes mit injiziertem [`Clock`]-Port.
     pub fn from_signed_payload_with_clock(
         payload_bytes: &[u8],
@@ -535,6 +561,7 @@ impl SignedLicenseGate {
         )
     }
 
+    // ANCHOR[acta-node:GATE-FROM-SIGNED-PAYLOAD-OPTS]
     /// Konstruiert ein Gate aus signierten Payload-Bytes mit Optionen und Zeit-Port.
     ///
     /// **Ablauf:**
@@ -588,12 +615,14 @@ impl SignedLicenseGate {
         Err(LicenseError::InvalidSignature)
     }
 
+    // ANCHOR[acta-node:GATE-WITH-LOCAL-ID]
     /// Bindet einen lokalen 32-Byte-Installations-Hash an diese Gate-Instanz.
     pub fn with_local_installation_id(mut self, id_hash: [u8; 32]) -> Self {
         self.local_installation_id = Some(id_hash);
         self
     }
 
+    // ANCHOR[acta-node:GATE-GETTERS]
     /// Gibt eine Referenz auf das geprüfte [`LicensePayload`] zurück, falls vorhanden.
     pub fn license_payload(&self) -> Option<&LicensePayload> {
         self.license_payload.as_ref()
@@ -609,6 +638,7 @@ impl SignedLicenseGate {
         self.verifying_key.as_ref()
     }
 
+    // ANCHOR[acta-node:GATE-STEP-CHECKS]
     /// Führt Schritt 1 (Fast Ring Bypass) auf dieser Instanz.
     pub fn check_step_1_fast_ring(&self, ring: FeatureRing) -> bool {
         verify_step_1_fast_ring(ring)
@@ -671,11 +701,13 @@ impl SignedLicenseGate {
         verify_step_7_success()
     }
 
+    // ANCHOR[acta-node:GATE-VERIFY-RING]
     /// Überprüft die Berechtigung für einen Feature-Ring über die [`LicenseGate`]-Schnittstelle.
     pub fn verify_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
         self.check_ring(ring)
     }
 
+    // ANCHOR[acta-node:GATE-CREATE-TEST-PAYLOAD]
     /// Erzeugt Testdaten (Payload-Bytes, Signatur und Verifying-Key-Bytes) für Unit- und Integrationstests.
     pub fn create_test_signed_payload(
         rings: Vec<FeatureRing>,
@@ -700,6 +732,7 @@ impl SignedLicenseGate {
     }
 }
 
+// ANCHOR[acta-node:IMPL-LICENSE-GATE]
 impl LicenseGate for SignedLicenseGate {
     /// Überprüft, ob der angeforderte Feature-Ring nach dem 7-stufigen Fail-Closed-Verfahren freigeschaltet ist.
     ///

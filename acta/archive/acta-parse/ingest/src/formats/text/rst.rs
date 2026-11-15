@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// reStructuredText Extractor (WP M4).
-// Invarianten: Zero-Panic, Adornment-Hierarchie, Blöcke für Code, Listen, Tabellen.
+// FILE-CONTEXT
+// ZWECK: reStructuredText Extractor (WP M4).
+// INVARIANTEN: Zero-Panic, Adornment-Hierarchie, Blöcke für Code, Listen, Tabellen.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::format::FormatId;
 use crate::ir::{BlockKind, DocumentIr, Locator, Table};

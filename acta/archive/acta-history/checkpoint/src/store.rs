@@ -3,6 +3,7 @@
 //! Dieses Modul stellt den zentralen Speicher für benannte Checkpoints ([`PersistentCheckpointStore`]) bereit.
 //!
 //! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. Verwaltet Metadaten und MVCC-Sequenznummern konsistent über Neustarts hinweg
 //! und synchronisiert diese mit der physischen Speicher-Engine ([`SnapshotSource`]).
 //!
 //! ## Hauptkomponenten
@@ -39,6 +40,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+// ANCHOR[acta-history:STO-001]
 /// Trait für die erweiterte Checkpoint-Verwaltung inklusive Orphan-Recovery.
 ///
 /// Definiert die Schnittstelle zum Speichern, Laden und Bereinigen von Checkpoints.
@@ -76,6 +78,7 @@ pub trait CheckpointRegistry: Send + Sync {
 /// Schützt sowohl die Sequenz-zu-Metadata Map (`by_seq`) als auch die Name-zu-Sequenz Map (`by_name`)
 /// atomar innerhalb einer einzigen Datenstruktur unter einem gemeinsamen `parking_lot::RwLock`.
 ///
+/// **Architektur- und Sicherheitsvorteil (P-23):**
 /// Durch die Vereinigung zweier ehemals separater Maps/Locks in ein einziges `CheckpointIndex`-RwLock
 /// werden potenzielle Deadlock-Fenster durch unterschiedliche Lock-Erwerbsreihenfolgen (Name-First vs. Seq-First)
 /// vollständig ausgeschlossen. Säufige Mutationen (`insert`, `remove_by_name`, `remove_by_seq`, `clear`)
@@ -218,6 +221,7 @@ async fn persist_hwm_internal<S: SnapshotSource>(
     Ok(())
 }
 
+// ANCHOR[acta-history:STO-002]
 /// Registry für gespeicherte Checkpoints mit Thread-sicherem Zustand.
 ///
 /// # Zweck
@@ -255,6 +259,7 @@ pub struct PersistentCheckpointStore<S: SnapshotSource> {
 }
 
 impl<S: SnapshotSource> PersistentCheckpointStore<S> {
+    // ANCHOR[acta-history:STO-003]
     /// Öffnet einen PersistentCheckpointStore und führt eine vollständige Orphan-Recovery für Pins und Checkpoints durch.
     ///
     /// # Ablauf von `open_and_recover`:
@@ -397,6 +402,8 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
 
     // INVARIANT: Checkpoint TxIds use INTERNAL_BASE+n range to avoid
     // collision with Collection-sequenced TxIds [1, ~10^12].
+    // See: DECISIONS.md AGT-GRAPH-001, TxId::INTERNAL_BASE
+    // ANCHOR[acta-history:STO-004]
     /// Reserviert eine neue Transaktions-ID aus dem reservierten internen Bereich (`INTERNAL_BASE`).
     ///
     /// # Ablauf von `allocate_tx`:
@@ -477,6 +484,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
             .max(wall_ms)
     }
 
+    // ANCHOR[acta-history:STO-005]
     /// Creates an ephemeral transactional checkpoint RAII guard.
     /// If the returned guard is dropped without calling `.commit()`, the underlying storage
     /// is automatically rolled back to `tx_id`.
@@ -497,6 +505,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         .with_metrics_sink_opt(self.metrics_sink.clone()))
     }
 
+    // ANCHOR[acta-history:STO-006]
     /// Creates a new persistent checkpoint.
     ///
     /// # Ablauf von `create_checkpoint`:
@@ -593,6 +602,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         Ok(())
     }
 
+    // ANCHOR[acta-history:STO-007]
     /// Deletes a persistent checkpoint by name.
     ///
     /// # Ablauf von `drop_checkpoint`:
@@ -692,6 +702,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         }
     }
 
+    // ANCHOR[acta-history:STO-008]
     /// Listet alle persistent gespeicherten Checkpoints im konfigurierten Namespace auf.
     ///
     /// # Ablauf von `list_checkpoints`:
@@ -739,6 +750,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         self.get_checkpoint_internal(name).await
     }
 
+    // ANCHOR[acta-history:STO-009]
     /// Restores the system to a specific checkpoint by name.
     /// This will rollback the underlying storage to the transaction ID of the checkpoint.
     ///
@@ -827,6 +839,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         self.orphan_registry.clear_all();
     }
 
+    // ANCHOR[acta-history:STO-010]
     /// Recovers all registered/persisted orphaned sequence pins.
     ///
     /// # Ablauf von `recover_orphaned_pins`:
@@ -848,6 +861,7 @@ impl<S: SnapshotSource> PersistentCheckpointStore<S> {
         Ok(recovered)
     }
 
+    // ANCHOR[acta-history:STO-011]
     /// Recovers all registered/persisted orphaned checkpoints during controlled startup or recovery.
     /// Checks the serialization barrier (`last_tx <= cp.tx_id`) before executing rollback.
     ///

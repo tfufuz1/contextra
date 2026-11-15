@@ -4,7 +4,9 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Randfall- und Performance-Smoke-Tests für ProseChunker.
+// FILE-CONTEXT
+// ZWECK: Randfall- und Performance-Smoke-Tests für ProseChunker.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -18,6 +20,7 @@ use acta_ingest::chunking::draft_document;
 use acta_ingest::format::FormatId;
 use acta_ingest::ir::{BlockKind, DocumentIr, Locator};
 
+// ANCHOR[acta-ingest:TST-0318]
 // Testet die Funktionsfaehigkeit von `test_heading_inside_tilde_fence_is_not_heading`.
 #[test]
 fn test_heading_inside_tilde_fence_is_not_heading() {
@@ -41,6 +44,7 @@ fn test_heading_inside_tilde_fence_is_not_heading() {
     );
 }
 
+// ANCHOR[acta-ingest:TST-0319]
 // Testet die Funktionsfaehigkeit von `test_5000_char_paragraph_without_punctuation`.
 #[test]
 fn test_5000_char_paragraph_without_punctuation() {
@@ -63,6 +67,7 @@ fn test_5000_char_paragraph_without_punctuation() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0320]
 // Testet die Funktionsfaehigkeit von `test_code_block_3000_lines`.
 #[test]
 fn test_code_block_3000_lines() {
@@ -99,6 +104,7 @@ fn test_code_block_3000_lines() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0321]
 // Testet die Funktionsfaehigkeit von `test_table_500_lines_header_repetition`.
 #[test]
 fn test_table_500_lines_header_repetition() {
@@ -135,6 +141,7 @@ fn test_table_500_lines_header_repetition() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0322]
 // Testet die Funktionsfaehigkeit von `test_empty_ir_yields_no_drafts`.
 #[test]
 fn test_empty_ir_yields_no_drafts() {
@@ -146,6 +153,7 @@ fn test_empty_ir_yields_no_drafts() {
     assert!(drafts.is_empty());
 }
 
+// ANCHOR[acta-ingest:TST-0323]
 // Testet die Funktionsfaehigkeit von `test_headings_only_document`.
 #[test]
 fn test_headings_only_document() {
@@ -165,6 +173,7 @@ fn test_headings_only_document() {
     assert!(!drafts.is_empty());
 }
 
+// ANCHOR[acta-ingest:TST-0324]
 // Testet die Funktionsfaehigkeit von `test_performance_smoke_8mib_linear_time`.
 #[test]
 fn test_performance_smoke_8mib_linear_time() {

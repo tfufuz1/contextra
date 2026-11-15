@@ -1,6 +1,8 @@
-// Dispatcher für Distanzberechnung (SIMD vs. Scalar) mit flexiblen Metrik-Parametern.
-// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); Saubere Feature-Trennung von acta-sys.
+// FILE-CONTEXT
+// ZWECK: Dispatcher für Distanzberechnung (SIMD vs. Scalar) mit flexiblen Metrik-Parametern.
+// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Saubere Feature-Trennung von acta-sys.
 // HOTSPOTS: compute_distance, compute_distance_trusted, compute_distance_f32_bytes_trusted
+// STAND: 2026-11-12
 
 //! # Distance Dispatch Module
 //!
@@ -17,6 +19,7 @@ use crate::error::Result;
 use crate::error::VectorError;
 use crate::types::DistanceMetric;
 
+// ANCHOR[acta-vec:DIST-COMPUTE-DISTANCE]
 /// Berechnet die Distanz zwischen zwei Vektoren nach Endlichkeitsvalidierung.
 #[inline]
 pub fn compute_distance<M: Into<DistanceMetric>>(a: &[f32], b: &[f32], metric: M) -> Result<f32> {
@@ -33,6 +36,7 @@ pub fn compute_distance<M: Into<DistanceMetric>>(a: &[f32], b: &[f32], metric: M
     }
 }
 
+// ANCHOR[acta-vec:DIST-COMPUTE-TRUSTED]
 /// Berechnet die Distanz zwischen zwei vorvalidierten f32-Slices.
 #[inline]
 pub fn compute_distance_trusted<M: Into<DistanceMetric>>(
@@ -62,6 +66,7 @@ pub fn compute_distance_trusted<M: Into<DistanceMetric>>(
     }
 }
 
+// ANCHOR[acta-vec:DIST-COMPUTE-BYTES-TRUSTED]
 /// Berechnet die Distanz zwischen vorvalidiertem f32-Slice und Little-Endian f32 Byte-Slice.
 #[inline]
 pub fn compute_distance_f32_bytes_trusted<M: Into<DistanceMetric>>(

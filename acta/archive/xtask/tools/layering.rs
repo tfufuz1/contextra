@@ -1,4 +1,6 @@
-// Gate G1 Layering & Isolation Enforcement Test.
+// FILE-CONTEXT
+// STAND: 2026-11-10T12:00:00Z
+// ZWECK: Gate G1 Layering & Isolation Enforcement Test.
 // Delegiert die Prüfung an das kanonische Python-Prüfwerkzeug `tools/gate_layering.py`.
 
 use std::path::PathBuf;

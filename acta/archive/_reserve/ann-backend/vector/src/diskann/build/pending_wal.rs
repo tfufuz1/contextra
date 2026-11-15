@@ -1,5 +1,7 @@
-// Pending-WAL für inkrementelle Vektor-Inserts in DiskANN.
-// Invarianten: Obergrenzenprüfung MAX_PENDING_WAL_DIM vor Vektor-Allokation; HMAC-Schutz.
+// FILE-CONTEXT
+// ZWECK: Pending-WAL für inkrementelle Vektor-Inserts in DiskANN.
+// INVARIANTEN: Obergrenzenprüfung MAX_PENDING_WAL_DIM vor Vektor-Allokation; HMAC-Schutz.
+// STAND: 2026-11-11
 
 use std::io::Read;
 use subtle::ConstantTimeEq;

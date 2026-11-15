@@ -1,6 +1,8 @@
-// Vorberechnung von HNSW-Einfügungen (Greedy Search, Nachbarwahl, Heuristik).
-// Invarianten: Zero-Panic; Dimension-Check; keine direkte Mutation vor apply_insert.
+// FILE-CONTEXT
+// ZWECK: Vorberechnung von HNSW-Einfügungen (Greedy Search, Nachbarwahl, Heuristik).
+// INVARIANTEN: Zero-Panic; Dimension-Check; keine direkte Mutation vor apply_insert.
 // HOTSPOTS: compute_insert_with_context
+// STAND: 2026-11-12
 
 //! Berechnung von Verbindungen und Schichten für neue HNSW-Knoten.
 
@@ -64,11 +66,13 @@ impl HnswIndexCore {
         Ok(Cow::Owned(conns))
     }
 
+    // ANCHOR[acta-vec:HNSW-COMPUTE-INSERT]
     pub fn compute_insert(&self, id: DocId, vector: &[f32]) -> Result<PreparedInsert> {
         let mut batch_ctx = BatchContext::new(self);
         self.compute_insert_with_context(id, vector, 0, &mut [], &mut batch_ctx)
     }
 
+    // ANCHOR[acta-vec:HNSW-COMPUTE-INSERT-CTX]
     pub fn compute_insert_with_context(
         &self,
         id: DocId,

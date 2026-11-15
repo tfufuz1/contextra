@@ -86,7 +86,7 @@ Die Überführungsreihenfolge und Arbeitspakete stehen in `README.md` (Abschnitt
 
 ## Stand der Implementierung
 
-- **Implementiert:** `acta-base` (Teil: Ids, Klassen, Fehler, Ports, Festkomma), `acta-testkit` (Teil), `xtask` (sieben Gates).
+- **Implementiert:** `acta-base` (Teil: Ids, Klassen, Fehler, Ports, Festkomma), `acta-testkit` (Teil), `acta-fs` (Teil: Vfs/VFile-Ports, DurableVfs, FaultVfs), `acta-crypto` (Teil: Umschlag v1, Ableitungen, HashChain, Padding, Ed25519), `xtask` (sieben Gates).
 - **Gerüst mit Fehlertyp:** die übrigen Crates.
 - **Offene Gates:** G2, G3, G-CRY, G-FS, G-ERA, G-READ, G-NOSERDE-DISK, G-SUPPLY, G-ZUSAGE.
 

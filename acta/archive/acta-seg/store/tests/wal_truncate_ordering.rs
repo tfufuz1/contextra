@@ -1,4 +1,5 @@
-// Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität.
+// FILE-CONTEXT
+// ZWECK: Audit-Test B-7 — Proof WAL-Truncate-Ordering & Size-Counter-Integrität.
 // INVARIANT 1: WAL-Size-Zähler (self.size) DARF erst NACH erfolgreichem set_len() aktualisiert werden.
 //              Beweis: FAIL_TRUNCATE_ONCE lässt flusher-seitiges set_len() scheitern BEVOR size.store().
 // INVARIANT 2: truncate() und append_batch() sind über truncate_lock serialisiert.

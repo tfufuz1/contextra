@@ -5,8 +5,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Golden- & DoS-Integrationstests für SheetsExtractor (Xlsx, Ods, Csv, Tsv).
-// Invarianten: All-features Lints einhalten, Test-First, programmatic fixture generation.
+// FILE-CONTEXT
+// ZWECK: Golden- & DoS-Integrationstests für SheetsExtractor (Xlsx, Ods, Csv, Tsv).
+// INVARIANTEN: All-features Lints einhalten, Test-First, programmatic fixture generation.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -188,6 +190,7 @@ fn create_sparse_xlsx() -> Vec<u8> {
     buf
 }
 
+// ANCHOR[acta-ingest:TST-0405]
 // Testet die Funktionsfaehigkeit von `test_golden_xlsx_extraction`.
 #[test]
 fn test_golden_xlsx_extraction() {
@@ -214,6 +217,7 @@ fn test_golden_xlsx_extraction() {
     assert!(canon.text.contains("München"));
 }
 
+// ANCHOR[acta-ingest:TST-0406]
 // Testet die Funktionsfaehigkeit von `test_golden_hidden_sheet_policy`.
 #[test]
 fn test_golden_hidden_sheet_policy() {
@@ -259,6 +263,7 @@ fn test_golden_hidden_sheet_policy() {
     assert!(canon2.text.contains("Geheim"));
 }
 
+// ANCHOR[acta-ingest:TST-0407]
 // Testet die Funktionsfaehigkeit von `test_golden_csv_semicolon_and_quotes`.
 #[test]
 fn test_golden_csv_semicolon_and_quotes() {
@@ -286,6 +291,7 @@ fn test_golden_csv_semicolon_and_quotes() {
     assert!(combined_chunks.contains("München"));
 }
 
+// ANCHOR[acta-ingest:TST-0408]
 // Testet die Funktionsfaehigkeit von `test_golden_tsv_and_windows_1252`.
 #[test]
 fn test_golden_tsv_and_windows_1252() {
@@ -316,6 +322,7 @@ fn test_golden_tsv_and_windows_1252() {
     assert!(combined_chunks.contains("Groß"));
 }
 
+// ANCHOR[acta-ingest:TST-0409]
 // Testet die Funktionsfaehigkeit von `test_dos_sparse_sheet_triggers_limit_exceeded`.
 #[test]
 fn test_dos_sparse_sheet_triggers_limit_exceeded() {
@@ -347,6 +354,7 @@ fn test_dos_sparse_sheet_triggers_limit_exceeded() {
     ));
 }
 
+// ANCHOR[acta-ingest:TST-0410]
 // Testet die Funktionsfaehigkeit von `test_dos_zip_bomb_triggers_limit_exceeded`.
 #[test]
 fn test_dos_zip_bomb_triggers_limit_exceeded() {
@@ -387,6 +395,7 @@ fn test_dos_zip_bomb_triggers_limit_exceeded() {
     ));
 }
 
+// ANCHOR[acta-ingest:TST-0411]
 // Testet die Funktionsfaehigkeit von `test_csv_injection_prefixes_preserved`.
 #[test]
 fn test_csv_injection_prefixes_preserved() {

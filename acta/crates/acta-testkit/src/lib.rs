@@ -1,7 +1,10 @@
-//! acta-testkit: `ManualClock`, `SeededRng`, Fehlerinjektion, Konformitaetstests (Spec 16.1, 16.2).
+//! acta-testkit: `ManualClock`, `SeededRng`, `FailingRng`, Konformitaetstests (Spec 16.1, 16.2).
 //!
-//! Extraktionsarchiv: `archive/acta-testkit/MANIFEST.md`.
+//! Extraktionsarchiv: `archive/acta-testkit/MANIFEST.md`. Umgesetzt sind bisher die
+//! Konformitätsbausteine in [`conformance`]; Fehlerinjektion für `Vfs` ist `acta_fs::fault::FaultVfs`.
 #![forbid(unsafe_code)]
+
+pub mod conformance;
 
 use acta_base::{Clock, CryptoRng, EntropyError};
 use std::sync::atomic::{AtomicU64, Ordering};

@@ -1,6 +1,8 @@
-// Adaptive ef-Suche (Ada-ef) und iterative Suchtiefen-Anpassung.
-// Invarianten: Zero-Panic; Konvergenzprüfung; Policy-Einhaltung.
+// FILE-CONTEXT
+// ZWECK: Adaptive ef-Suche (Ada-ef) und iterative Suchtiefen-Anpassung.
+// INVARIANTEN: Zero-Panic; Konvergenzprüfung; Policy-Einhaltung.
 // HOTSPOTS: search_adaptive_with_stats
+// STAND: 2026-11-12
 
 //! Adaptive ef-Suche für dynamische Latenz- und Recall-Optimierung.
 
@@ -42,6 +44,7 @@ impl HnswIndex {
     }
 
     /// Führt eine adaptive Suche aus und liefert Ausführungsstatistiken zurück.
+    // ANCHOR[acta-vec:HNSW-SEARCH-ADAPTIVE-STATS]
     pub async fn search_adaptive_with_stats(
         &self,
         query: &[f32],

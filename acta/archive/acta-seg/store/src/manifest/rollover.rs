@@ -1,3 +1,4 @@
+//! # Manifest-Rollover (Ring 1)
 //!
 //! Schreibt periodisch kompakte Manifest-Snapshots, um Logdateien klein zu halten.
 

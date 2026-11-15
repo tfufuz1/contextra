@@ -1,4 +1,5 @@
 //! Rauchtest für den autarken Kern ohne `workspace` oder Ports-Abhängigkeiten (Gate G-A).
+// ANCHOR[acta-text:CORE-SMOKE-001]
 
 use bytes::Bytes;
 use acta_ids::{DocId, TxId, TOMBSTONE_BIT};

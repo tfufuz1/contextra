@@ -1,6 +1,8 @@
-// Unit-Tests für atomare Persistenzoperationen (write_atomic).
-// Invarianten: Atomares Ersetzen, Rollback bei Fehlern, kein unvollstaendiger Zustand.
+// FILE-CONTEXT
+// ZWECK: Unit-Tests für atomare Persistenzoperationen (write_atomic).
+// INVARIANTEN: Atomares Ersetzen, Rollback bei Fehlern, kein unvollstaendiger Zustand.
 // HOTSPOTS: test_write_atomic_basic, test_write_atomic_overwrite
+// STAND: TS:2026-11-12T00:00:00Z
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

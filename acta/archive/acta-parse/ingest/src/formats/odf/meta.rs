@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// XML-Parser für OpenDocument-Metadaten (meta.xml / office:meta).
-// Invarianten: Zero-Panic, Budgetierung, strikte Beachtung der ExtractPolicy (keep_personal_metadata).
+// FILE-CONTEXT
+// ZWECK: XML-Parser für OpenDocument-Metadaten (meta.xml / office:meta).
+// INVARIANTEN: Zero-Panic, Budgetierung, strikte Beachtung der ExtractPolicy (keep_personal_metadata).
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::error::IngestError;
 use crate::extractor::ExtractContext;

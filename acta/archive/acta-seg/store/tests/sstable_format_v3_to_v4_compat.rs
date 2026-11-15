@@ -1,5 +1,5 @@
 #![cfg(feature = "workspace")]
-// Format v3 und v4 Kompatibilitäts-Integrationstests (S-04 Phase 3).
+// ZWECK: Format v3 und v4 Kompatibilitäts-Integrationstests (S-04 Phase 3).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use acta_seg::sstable::{BlockCache, SstableBuilder, SstableReader};

@@ -8,6 +8,7 @@
 //!    wobei die Zuordnung für die spätere Rehydrierung sitzungsgebunden im Speicher gehalten wird.
 //!
 //! # Ring-Zugehörigkeit
+//! Ring 3 (Domain-Sicherheit).
 //!
 //! # Invarianten
 //! - **Fail-Closed**: Jede Klassifikation terminiert innerhalb des konfigurierten Timeouts. Bei Timeouts,
@@ -25,12 +26,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use zeroize::{Zeroize, Zeroizing};
 
+// ANCHOR[acta-pii:EV-001]
 /// Trait zur Erkennung benannter Entitäten (NER) im Text ohne Abhängigkeit von Machine-Learning-Crates.
 pub trait EntityRecognizer: Send + Sync {
     /// Recognizes entities in the text and returns byte ranges and category labels.
     fn recognize(&self, text: &str) -> Vec<(std::ops::Range<usize>, String)>;
 }
 
+// ANCHOR[acta-pii:EV-002]
 /// No-Op-Implementierung von [`EntityRecognizer`], die keine Entitäten erkennt (Null-Objekt-Muster).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoOpRecognizer;
@@ -41,6 +44,7 @@ impl EntityRecognizer for NoOpRecognizer {
     }
 }
 
+// ANCHOR[acta-pii:EV-003]
 /// Sitzungsgebundener Tresor zur bidirektionalen Abbildung zwischen Klartext-PII und Surrogat-Tokens.
 ///
 /// Alle kryptografischen Schlüssel, Salts und Zuordnungen werden bei Drop flüchtig genullt (Zeroization).
@@ -59,6 +63,7 @@ impl std::fmt::Debug for SurrogateVault {
 }
 
 impl SurrogateVault {
+    // ANCHOR[acta-pii:EV-004]
     /// Erstellt einen neuen `SurrogateVault` mit dem übergebenen 16-Byte Sitzungssalz.
     pub fn new(session_salt: [u8; 16]) -> Self {
         Self {
@@ -67,6 +72,7 @@ impl SurrogateVault {
         }
     }
 
+    // ANCHOR[acta-pii:EV-005]
     /// Erstellt einen neuen `SurrogateVault` mit einem kryptografisch sicheren Zufallssalz.
     pub fn random_salt() -> Self {
         let mut salt = [0u8; 16];
@@ -74,6 +80,7 @@ impl SurrogateVault {
         Self::new(salt)
     }
 
+    // ANCHOR[acta-pii:EV-006]
     /// Generates a session-stable surrogate identifier for `entity_text` and stores the surrogate -> entity mapping.
     ///
     /// # Backward Compatibility & Token Format Note
@@ -111,6 +118,7 @@ impl SurrogateVault {
         Ok(surrogate)
     }
 
+    // ANCHOR[acta-pii:EV-007]
     /// Retrieves the original entity text for a given surrogate key if present.
     pub fn get_entity(&self, surrogate: &str) -> Option<String> {
         self.map
@@ -119,6 +127,7 @@ impl SurrogateVault {
             .and_then(|guard| guard.get(surrogate).cloned())
     }
 
+    // ANCHOR[acta-pii:EV-008]
     /// Returns the current count of stored surrogate mappings.
     pub fn len(&self) -> usize {
         self.map.lock().map(|m| m.len()).unwrap_or(0)
@@ -129,6 +138,7 @@ impl SurrogateVault {
         self.len() == 0
     }
 
+    // ANCHOR[acta-pii:EV-019]
     /// Clears and zeroizes all cached surrogate mappings (neutral maintenance / B8 /).
     pub fn clear(&self) {
         if let Ok(mut guard) = self.map.lock() {
@@ -140,6 +150,7 @@ impl SurrogateVault {
         }
     }
 
+    // ANCHOR[acta-pii:EV-020]
     /// Compacts the internal mapping storage (neutral maintenance /).
     pub fn compact(&self) {
         if let Ok(mut guard) = self.map.lock() {
@@ -162,9 +173,11 @@ impl Drop for SurrogateVault {
     }
 }
 
+// ANCHOR[acta-pii:EV-009]
 /// Typalias für gepinnte, sende-fähige dynamische Zukunfts-Futures.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+// ANCHOR[acta-pii:EV-010]
 /// Policy-Kategorie für Audit-Logging und Zugriffskontrolle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -175,6 +188,7 @@ pub enum PolicyCategory {
     CloudEgress,
 }
 
+// ANCHOR[acta-pii:EV-011]
 /// Grund für das Blockieren einer Egress-Anfrage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -201,6 +215,7 @@ impl BlockReason {
     }
 }
 
+// ANCHOR[acta-pii:EV-012]
 /// Klassifikationsergebnis der Egress-Prüfung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -211,6 +226,7 @@ pub enum EgressClassification {
     Block(BlockReason),
 }
 
+// ANCHOR[acta-pii:EV-013]
 /// Ein vorkompiliertes Regex-Muster für die Egress-Klassifikation.
 #[derive(Debug, Clone)]
 pub struct CompiledPattern {
@@ -235,6 +251,7 @@ impl CompiledPattern {
     }
 }
 
+// ANCHOR[acta-pii:EV-014]
 /// Fehler beim Erstellen oder Laden des EgressVaults.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -270,6 +287,7 @@ pub enum EgressVaultError {
     },
 }
 
+// ANCHOR[acta-pii:EV-015]
 /// Maximale zulässige Payload-Länge in Bytes für Layer-1-Klassifikation (64 KiB = 65.536 Bytes).
 pub const MAX_CLASSIFY_PAYLOAD_BYTES: usize = 65_536;
 
@@ -349,6 +367,7 @@ pub async fn classify_layer1_arc(
     }
 }
 
+// ANCHOR[acta-pii:EV-016]
 /// Cloud Egress Vault zur Abhandlung und Bündelung von Layer-1-Klassifikationen.
 #[derive(Debug, Clone)]
 pub struct EgressVault {
@@ -532,6 +551,7 @@ impl EgressVault {
     }
 }
 
+// ANCHOR[acta-pii:EV-017]
 /// Schnittstelle für Downstream-Crates (`acta-api`, `acta-engine`).
 pub trait EgressClassifier: Send + Sync {
     /// Klassifiziert einen Text-Payload für den Egress-Export.
@@ -556,6 +576,7 @@ impl Default for EgressVault {
     }
 }
 
+// ANCHOR[acta-pii:EV-018]
 // Implementierung des EgressClassifier-Traits für EgressVault.
 impl EgressClassifier for EgressVault {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {

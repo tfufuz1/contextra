@@ -4,6 +4,7 @@
 //! unterstützt werden. Es ist vollständig frei von internen Abhängigkeiten.
 
 // SECTION METRIC-ENUM
+// ANCHOR[acta-sys:METRIC-ENUM]
 /// Unterstützte Distanzmetriken für Vektorberechnungen.
 ///
 /// Definiert als geschlossenes Wert-Enum (B09-Entscheidung).

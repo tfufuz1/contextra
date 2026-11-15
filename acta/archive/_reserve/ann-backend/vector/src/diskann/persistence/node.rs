@@ -1,5 +1,7 @@
-// Dekodieren und Laden einzelner Graphknoten aus dem Mmap.
-// Invarianten: Zero-Panic bei unvollständigen Knoten oder korrupten Nachbarlisten.
+// FILE-CONTEXT
+// ZWECK: Dekodieren und Laden einzelner Graphknoten aus dem Mmap.
+// INVARIANTEN: Zero-Panic bei unvollständigen Knoten oder korrupten Nachbarlisten.
+// STAND: 2026-11-11
 
 use super::super::types::{CachedNode, DiskAnnIndex};
 use crate::error::{Result, VectorError};

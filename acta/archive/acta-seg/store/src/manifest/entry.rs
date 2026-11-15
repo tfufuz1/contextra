@@ -1,8 +1,11 @@
+//! # Manifest-Eintraege (Ring 1)
 //!
 //! Modelliert Hinzufuegen und Entfernen von SSTables sowie Snapshot-Zustaende.
 
-// Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry).
-// Invarianten: Binäre Abwärtskompatibilität der Serialisierung; CRC32-Integritätsprüfung für jeden Eintrag.
+// FILE-CONTEXT
+// STAND: 2026-09-29 (S-01 / T-04)
+// ZWECK: Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry).
+// INVARIANTEN: Binäre Abwärtskompatibilität der Serialisierung; CRC32-Integritätsprüfung für jeden Eintrag.
 // HOTSPOTS: to_bytes, from_bytes
 // FORMATABKÜNDIGUNG (S-01 / T-04): Der Schreibpfad schreibt kein rank mehr in Replace-Einträge (schreibt stets 0u64 für binäre Nutzlastkompatibilität).
 // Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.

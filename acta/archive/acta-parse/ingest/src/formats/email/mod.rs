@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// E-Mail Extractor (Eml und Mbox) (WP M4).
-// Invarianten: DocumentExtractor-Impl mit Zero-Panic Garantien.
+// FILE-CONTEXT
+// ZWECK: E-Mail Extractor (Eml und Mbox) (WP M4).
+// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl mit Zero-Panic Garantien.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub mod eml;
 pub mod html;

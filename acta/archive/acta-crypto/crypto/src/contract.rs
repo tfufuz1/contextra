@@ -1,6 +1,8 @@
-// Minimaler Umwelt-Vertrag und Referenz-Implementierungen für acta-crypto.
-// Invarianten: I/O-frei, Zero-Panic, deterministische Entropie/KMS-Abstraktionen.
+// FILE-CONTEXT
+// ZWECK: Minimaler Umwelt-Vertrag und Referenz-Implementierungen für acta-crypto.
+// INVARIANTEN: I/O-frei, Zero-Panic, deterministische Entropie/KMS-Abstraktionen.
 // HOTSPOTS: [1-40]
+// STAND: TS:2026-11-11
 
 //! # Umwelt-Vertrag für `acta-crypto`
 //!

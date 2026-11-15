@@ -1,10 +1,13 @@
+//! # Storage Layer Scanner & Maintenance Ports (Ring 0 / Class B)
 //!
 //!
+//! // ANCHOR[acta-base:SCANNER-001]
 //! // SECTION scanner-witness-contracts
 //! // NOTE: Verifiziert physische Bereinigungen und Restmengen-Messungen.
 
 #![forbid(unsafe_code)]
 
+// ANCHOR[acta-base:SCANNER-MODS-001]
 /// Layer and technique descriptor types.
 pub mod layer;
 /// ScanSession state and finish gate.
@@ -19,6 +22,7 @@ pub use witness::*;
 use crate::clock::Clock;
 use crate::Result;
 
+// ANCHOR[acta-base:LAYER-SCANNER-001]
 /// Trait für Storage-Scanner zur Durchführung von Restmengen-Messungen.
 ///
 /// # Doctests (Compile Fail Checks)

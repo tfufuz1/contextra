@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-mmap-main,epic=sys-mmap,seq=0] Read-Only Memory Mapping Fassade
 // =========================================================================
 // NOTE: Read-only memory mapping facade over memmap2.
 // Invariante: Zero panic; typed error propagation; read-only mapping; bounds checks.
@@ -10,6 +11,7 @@
 //! bereit, basierend auf der Crate `memmap2`.
 //!
 //! ## Ring-Zugehörigkeit und Verwendung
+//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Kapselt den `unsafe`-Aufruf `memmap2::Mmap::map(file)`.
 //! - **Verwendung im System:** Wird von `acta-vec` (DiskANN-Vektorindizes) und
 //!   `acta-seg` (SSTables) verwendet, um große Datenmengen speichereffizient
 //!   direkt aus dem Betriebssystem-Seitencache (Page Cache) ohne Heap-Kopien (Zero-Copy) zu lesen.
@@ -26,6 +28,7 @@ use std::io;
 use crate::error::{Error, Result};
 
 // SECTION Raw Readonly Mapping
+// ANCHOR[id=sys-mmap-raw,epic=sys-mmap,seq=1] mmap_readonly
 
 /// Erstellt eine unveränderliche Nur-Lese-Speicherabbildung (Read-Only Memory Map) für eine geöffnete Datei.
 ///
@@ -43,6 +46,7 @@ pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
 // !SECTION Raw Readonly Mapping
 
 // SECTION Sealed File Abstraction
+// ANCHOR[id=sys-mmap-sealed,epic=sys-mmap,seq=2] Typisierte Versiegelung (Typestate)
 
 /// Typzustands-Marker: Zeigt an, dass eine Datei vollständig versiegelt, unveränderlich
 /// und prüfsummenverifiziert ist.
@@ -104,6 +108,7 @@ impl SealedFile<SealedReadOnly> {
 // !SECTION Sealed File Abstraction
 
 // SECTION Sealed Map Abstraction
+// ANCHOR[id=sys-mmap-sealed-map,epic=sys-mmap,seq=3] SealedMap
 
 /// Sichere Nur-Lese-Speicherabbildung für versiegelte, unveränderliche Dateien.
 #[derive(Debug)]
@@ -177,6 +182,7 @@ impl AsRef<[u8]> for SealedMap {
 // !SECTION Sealed Map Abstraction
 
 // SECTION Unit Tests
+// ANCHOR[id=sys-mmap-tests,epic=sys-mmap,seq=4] Mmap-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;

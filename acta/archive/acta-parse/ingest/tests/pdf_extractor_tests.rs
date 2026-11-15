@@ -5,9 +5,11 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Integrationstests für PdfExtractor (WP ING-08).
-// Invarianten: #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)],
+// FILE-CONTEXT
+// ZWECK: Integrationstests für PdfExtractor (WP ING-08).
+// INVARIANTEN: #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)],
 //              Programmatische Erzeugung von PDF-Fixtures mit lopdf.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -149,6 +151,7 @@ fn create_test_pdf(
     buffer
 }
 
+// ANCHOR[acta-ingest:TST-0397]
 // Testet die Funktionsfaehigkeit von `test_pdf_extractor_basic_multi_page`.
 #[test]
 fn test_pdf_extractor_basic_multi_page() {
@@ -192,6 +195,7 @@ fn test_pdf_extractor_basic_multi_page() {
     assert_eq!(pages, vec![1, 2]);
 }
 
+// ANCHOR[acta-ingest:TST-0398]
 // Testet die Funktionsfaehigkeit von `test_pdf_extractor_headers_footers_policy`.
 #[test]
 fn test_pdf_extractor_headers_footers_policy() {
@@ -256,6 +260,7 @@ fn test_pdf_extractor_headers_footers_policy() {
     assert_eq!(header_notes, vec!["Kopfzeile Firma"]);
 }
 
+// ANCHOR[acta-ingest:TST-0399]
 // Testet die Funktionsfaehigkeit von `test_pdf_extractor_no_extractable_text`.
 #[test]
 fn test_pdf_extractor_no_extractable_text() {
@@ -286,6 +291,7 @@ fn test_pdf_extractor_no_extractable_text() {
     );
 }
 
+// ANCHOR[acta-ingest:TST-0400]
 // Testet die Funktionsfaehigkeit von `test_pdf_extractor_corrupt_bytes`.
 #[test]
 fn test_pdf_extractor_corrupt_bytes() {

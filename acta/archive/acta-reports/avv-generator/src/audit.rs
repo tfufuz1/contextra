@@ -11,10 +11,12 @@
 //! beauftragte Prüfer dulden und unterstützen.
 //!
 //! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung).
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
+// ANCHOR[acta-reports:AUD-001]
 /// Rendert Abschnitt 11: „Nachweis- und Kontrollrechte“.
 ///
 /// Schreibt die Klauseln zu Auskunftsrechten und Vor-Ort- bzw. Fern-Audits in den Ausgabepuffer.

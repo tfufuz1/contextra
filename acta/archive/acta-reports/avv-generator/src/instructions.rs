@@ -10,10 +10,12 @@
 //! den Verantwortlichen unverzüglich warnen, falls eine Weisung gegen Datenschutzrecht verstößt.
 //!
 //! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung). Reines Template-Fragment ohne Systemabhängigkeiten oder Zustand.
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
+// ANCHOR[acta-reports:INST-001]
 /// Rendert Abschnitt 4: „Pflichten und Rechte des Verantwortlichen & Weisungsbindung“.
 ///
 /// Schreibt den formatierten Markdown-Abschnitt in den übergebenen Ausgabe-Puffer.

@@ -1,12 +1,14 @@
 #![allow(deprecated)]
-// Stellt den Purger für physical deletion per document and per collection bereit.
-// Invarianten: Atomar gegenüber Lesern; entfernt leere Term-Dictionary-Einträge; korrigiert BM25-Statistik.
+// FILE-CONTEXT: TextIndex Physical Purger & BM25 Corpus Statistics Recalculation (§12.7.4).
+// ZWECK: Stellt den Purger für physical deletion per document and per collection bereit.
+// INVARIANTEN: Atomar gegenüber Lesern; entfernt leere Term-Dictionary-Einträge; korrigiert BM25-Statistik.
 // NICHT-OFFENSICHTLICH: Document purge purges postings, dl, fw, tbs, empties plb keys and updates atomic stats.
 // HOTSPOTS: purge_document_internal, purge_collection_internal
 
 //! Physische Bereinigung (Purge) für Dokumente und Kollektionen im Textindex.
 //!
 //! # Ring-Zuordnung
+//! Ring 0 (Kern).
 //!
 //! # Zweck
 //! Stellt sicher, dass bei physischer Bereinigung sämtliche Spuren
@@ -32,6 +34,7 @@ where
     futures::executor::block_on(f)
 }
 
+// ANCHOR[acta-text:PURGE-001]
 /// Detaillierter Ausführungsbericht eines Purge-Laufs mit Einheiten, freigegebenem Speicher und Fehlern.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[deprecated(
@@ -50,6 +53,7 @@ pub struct PurgeReport {
 }
 
 impl PurgeReport {
+    // ANCHOR[acta-text:PURGE-002]
     /// Erzeugt einen leeren Purge-Bericht.
     pub fn new() -> Self {
         Self {
@@ -60,11 +64,13 @@ impl PurgeReport {
         }
     }
 
+    // ANCHOR[acta-text:PURGE-003]
     /// Liefert `true`, wenn die Bereinigung fehlerfrei und vollständig war.
     pub fn is_success(&self) -> bool {
         self.units_failed == 0 && self.errors.is_empty()
     }
 
+    // ANCHOR[acta-text:PURGE-004]
     /// Konvertiert den Bericht in [`PurgeStats`] oder liefert einen Fehler bei Teilabbrüchen.
     pub fn to_purge_stats(&self) -> Result<PurgeStats> {
         if self.is_success() {
@@ -87,6 +93,7 @@ impl Default for PurgeReport {
     }
 }
 
+// ANCHOR[acta-text:PURGE-005]
 /// Physischer Purger für den Textindex zur Bereinigung von Storage und Metadaten.
 #[deprecated(
     since = "0.1.0",
@@ -489,6 +496,7 @@ impl<S: StorageEngine + 'static> Purger for TextPurger<S> {
     }
 }
 
+// ANCHOR[acta-text:PURGE-006]
 /// Erzeugt eine instanziierte Implementierung des [`Purger`]-Ports für den Textindex.
 #[deprecated(
     since = "0.1.0",

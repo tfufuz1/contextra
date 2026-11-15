@@ -3,6 +3,7 @@
 //! Dieses Modul behandelt unvollständige Transaktionen und gepinnte Sequenznummern nach Abstürzen oder Panics.
 //!
 //! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. Verhindert Ressourcenlecks im MVCC-Speicher (durch nie entpinnte
 //! Snapshots) und räumt Transaktionen auf, deren `CheckpointGuard` gedroppt wurde, ohne dass ein
 //! explizites `commit()` oder `rollback()` stattfand.
 //!
@@ -23,9 +24,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+// ANCHOR[acta-history:ORP-001]
 /// Typ-Alias für Sequenznummern, die als gepinnte Checkpoint-Identifikatoren verwaltet werden.
 pub type PinId = u64;
 
+// ANCHOR[acta-history:ORP-002]
 /// Bericht über wiederhergestellte und aufgeräumte verwaiste Pins und Checkpoints.
 ///
 /// # Felder
@@ -61,6 +64,7 @@ fn warn_deprecated_global_orphan_path() {
     });
 }
 
+// ANCHOR[acta-history:ORP-003]
 /// Veralteter globaler Zugriff auf die Orphan-Registry.
 ///
 /// # Historie &
@@ -87,6 +91,7 @@ fn default_data_dir() -> std::path::PathBuf {
     std::env::temp_dir()
 }
 
+// ANCHOR[acta-history:ORP-004]
 /// Liest einen Millisekunden-Zeitstempel deterministisch über die übergebene Clock-Port-Instanz.
 ///
 /// # Parameter
@@ -96,6 +101,7 @@ pub fn monotonic_timestamp_ms_with(clock: &dyn Clock) -> u64 {
     clock.now_unix_nanos() / 1_000_000
 }
 
+// ANCHOR[acta-history:ORP-005]
 /// Liest den Millisekunden-Zeitstempel über die standardmäßige SystemClock.
 pub fn monotonic_timestamp_ms() -> u64 {
     let clock = SystemClock::new();
@@ -112,6 +118,7 @@ fn orphan_pin_file_path() -> std::path::PathBuf {
     default_data_dir().join("acta_orphaned_pins.json")
 }
 
+// ANCHOR[acta-history:ORP-006]
 /// Persistente Append-Only-Registry für verwaiste Sequenz-Pins.
 ///
 /// Veraltet zugunsten von [`InstanceOrphanRegistry`].
@@ -196,6 +203,7 @@ fn orphan_file_path() -> std::path::PathBuf {
     default_data_dir().join("acta_orphaned_checkpoints.json")
 }
 
+// ANCHOR[acta-history:ORP-007]
 /// Verwaiste gepinnte Sequenznummer — wird beim Recovery verarbeitet.
 ///
 /// # Felder
@@ -222,6 +230,7 @@ pub fn register_pinned_seq_no_orphan(orphan: PinnedSeqNoOrphan) {
     );
 }
 
+// ANCHOR[acta-history:ORP-008]
 /// Serialisierbarer Gesamtzustand aller verwaisten Checkpoints und Pins einer Instanz.
 ///
 /// # Felder
@@ -288,6 +297,7 @@ impl OrphanState {
     }
 }
 
+// ANCHOR[acta-history:ORP-009]
 /// Instanz-gebundene Orphan-Registry für Checkpoints und gepinnte Sequenznummern.
 ///
 /// # Thread-Sicherheit & Nebenläufigkeit
@@ -421,6 +431,7 @@ impl InstanceOrphanRegistry {
         }
     }
 
+    // ANCHOR[acta-history:ORP-010]
     /// Registriert einen verwaisten Sequenz-Pin rein im Arbeitsspeicher ohne blockierendes Disk-I/O.
     ///
     /// # Crash-Safety & RAII Drop Semantik
@@ -442,6 +453,7 @@ impl InstanceOrphanRegistry {
         }
     }
 
+    // ANCHOR[acta-history:ORP-011]
     /// Registriert einen verwaisten Checkpoint rein im Arbeitsspeicher ohne blockierendes Disk-I/O.
     ///
     /// # Crash-Safety & RAII Drop Semantik
@@ -461,6 +473,7 @@ impl InstanceOrphanRegistry {
         }
     }
 
+    // ANCHOR[acta-history:ORP-012]
     /// Flusht die In-Memory-Einträge asynchron auf Festplatte, sofern Änderungen vorliegen (`is_dirty`).
     ///
     /// # Ablauf von `flush_orphan_registry`:

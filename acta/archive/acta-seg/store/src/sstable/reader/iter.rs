@@ -1,4 +1,5 @@
 //! SSTable Reader: Iteration und Streaming über alle SSTable-Einträge.
+// ANCHOR[acta-seg:SST-RDR-130]
 
 use super::parse_block_trailer;
 use super::SstableReader;

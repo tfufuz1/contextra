@@ -9,16 +9,20 @@
 //! der relationale (`Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`, `NotIn`, `Exists`)
 //! und logische Operatoren (`And`, `Or`, `Not`) rein im Speicher gegen `serde_json::Value` auswertet.
 
-// Kanonische Metadata Filter DSL (FilterExpr) und Evaluierungs-Engine.
-// Invarianten: Reines In-Memory Evaluieren gegen serde_json::Value ohne Nebenwirkungen.
+// FILE-CONTEXT
+// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
+// ZWECK: Kanonische Metadata Filter DSL (FilterExpr) und Evaluierungs-Engine.
+// INVARIANTEN: Reines In-Memory Evaluieren gegen serde_json::Value ohne Nebenwirkungen.
 // HOTSPOTS: 20-220
 // NICHT-OFFENSICHTLICH: Legacy MetadataFilter aus acta-db konvertiert verlustfrei in FilterExpr.
+// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
 
 use serde::{Deserialize, Serialize};
 
 /// Metadata filter expressions for pre/post filtering.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-types:FILTER-EXPR]
 pub enum FilterExpr {
     /// Exact match: field == value
     Eq {

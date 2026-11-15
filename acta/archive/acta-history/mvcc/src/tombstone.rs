@@ -1,3 +1,4 @@
+// ANCHOR[id=tombstone-origin]
 // gemäß SPEC-v2 §6.2 "mvcc", Commit A (additiv).
 
 //! # Tombstone-Semantikprüfung für Sequenzprotokolle und Indizes
@@ -10,6 +11,7 @@
 use acta_base::TOMBSTONE_BIT;
 
 // SECTION Tombstone Interface
+// ANCHOR[id=tombstone-semantics-trait]
 /// Trait zur Bestimmung und Erzeugung von Tombstones in Sequenzprotokollen und Indizes.
 ///
 /// NOTE: In Acta wird das höchstwertige Bit (`TOMBSTONE_BIT` = 1 << 63) als
@@ -25,6 +27,7 @@ pub trait TombstoneSemanticsCheck {
 // !SECTION Tombstone Interface
 
 // SECTION Reference Implementation
+// ANCHOR[id=seqbit-tombstone-impl]
 /// Standard-Referenzimplementierung für [`TombstoneSemanticsCheck`].
 ///
 /// Nutzt bitweise ODER-Verknüpfung mit [`TOMBSTONE_BIT`] sowie Flag-Prüfung auf Bit 0.
@@ -32,12 +35,14 @@ pub trait TombstoneSemanticsCheck {
 pub struct SeqBitTombstone;
 
 impl TombstoneSemanticsCheck for SeqBitTombstone {
+    // ANCHOR[id=seqbit-is-tombstone]
     #[inline]
     fn is_tombstone(seq: u64, flags: u8) -> bool {
         // NOTE: Bitprüfung ist O(1) und allokationsfrei
         (seq & TOMBSTONE_BIT) != 0 || (flags & 0x01) != 0
     }
 
+    // ANCHOR[id=seqbit-make-tombstone]
     #[inline]
     fn make_tombstone(seq: u64) -> Vec<u8> {
         // NOTE: Setzen des MSB kennzeichnet den Eintrag irreversibel als Soft-Delete

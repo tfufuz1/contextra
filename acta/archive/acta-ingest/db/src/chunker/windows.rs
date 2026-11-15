@@ -2,12 +2,16 @@
 //!
 //! **Zweck:** Gleitende Fenster (Sliding Windows) für überlappende Chunks.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// Hilfsfunktionen für Zeichen-basiertes und Überlappendes Chunken.
-// Invarianten: Beachtet strikt UTF-8-Codepoint-Grenzen; schneidet nie in Unicode-Zeichen. Indexfrei & Panikfrei.
+// FILE-CONTEXT
+// ZWECK: Hilfsfunktionen für Zeichen-basiertes und Überlappendes Chunken.
+// INVARIANTEN: Beachtet strikt UTF-8-Codepoint-Grenzen; schneidet nie in Unicode-Zeichen. Indexfrei & Panikfrei.
 // NICHT-OFFENSICHTLICH: chunk_text_with_overlap erzeugt Gleitfenster für übergroße Absätze.
+// STAND: TS:2026-10-29T00:00:00Z
 
+// ANCHOR[acta-engine:WIN-001]
 /// Erzeugt überlappende Text-Chunks mit definierter Fenstergröße und Überlappung.
 pub fn chunk_text_with_overlap<'a>(
     text: &'a str,
@@ -54,6 +58,7 @@ pub fn chunk_text_with_overlap<'a>(
     chunks
 }
 
+// ANCHOR[acta-engine:WIN-002]
 /// Segmentiert Text in Abschnitte bis zur Maximallänge ohne Überlappung.
 pub fn chunk_text(text: &str, chunk_size: usize) -> Vec<&str> {
     if text.is_empty() || chunk_size == 0 {

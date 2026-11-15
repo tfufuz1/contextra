@@ -9,10 +9,12 @@
 //!   sodass Entfernungen oder Vertauschungen sofort erkannt werden.
 //! - **KMS-Wrapping:** Dateischlüssel werden per Key Management Service (KMS) geschützt gewrappt.
 
-// Transparent encrypted WAL chunk provider and constant-time HMAC-SHA256 integrity verifier.
-// Invarianten: EncryptedWal prepends 12-byte nonce to ciphertext. IntegrityVerifier checks sequence HMAC chain in constant time.
+// FILE-CONTEXT
+// ZWECK: Transparent encrypted WAL chunk provider and constant-time HMAC-SHA256 integrity verifier.
+// INVARIANTEN: EncryptedWal prepends 12-byte nonce to ciphertext. IntegrityVerifier checks sequence HMAC chain in constant time.
 // NICHT-OFFENSICHTLICH: Subtle constant-time byte comparisons prevent timing attacks. All operations lock-free & I/O-free.
 // HOTSPOTS: [35-180]
+// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 //! Encryption at Rest layer for LSM/WAL components (.2)
 //!

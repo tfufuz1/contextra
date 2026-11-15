@@ -1,5 +1,7 @@
+//! # SSTable-Builder (Ring 1)
 //!
 //! Erstellt SSTables aus sortierten Key-Value-Paaren.
+// ANCHOR[acta-seg:SST-BLD-103]
 
 mod block;
 mod meta;

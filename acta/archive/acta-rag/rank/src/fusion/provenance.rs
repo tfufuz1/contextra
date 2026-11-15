@@ -1,5 +1,6 @@
 //! # Provenance-Builder für Herkunftsnachweise (`provenance`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Ermöglicht die schrittweise Konstruktion von `ProvenanceRecord`-Instanzen.
 

@@ -1,5 +1,6 @@
 #![cfg(feature = "fault-injection")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// FILE-CONTEXT: Integration test verifying concurrent commit lock serialization during WAL HMAC rollback. (TS: 2026-09-08) (SESSION: b448084)
 //! Integration test for WAL HMAC rollback concurrency and lock serialization.
 //!
 //! Verifies that `commit_mutex` serialization prevents race conditions between

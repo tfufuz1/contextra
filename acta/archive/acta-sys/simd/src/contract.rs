@@ -1,6 +1,8 @@
-// Vertragsdatei für acta-sys (Eingefrorener Crate-Vertrag Klasse A).
-// Invarianten: Zero-Panic, autarker Baustein ohne interne Pflicht-Dependencies.
+// FILE-CONTEXT
+// ZWECK: Vertragsdatei für acta-sys (Eingefrorener Crate-Vertrag Klasse A).
+// INVARIANTEN: Zero-Panic, autarker Baustein ohne interne Pflicht-Dependencies.
 // HOTSPOTS: DistanceMetric, DistanceFn, SimdError, Result
+// STAND: 2026-11-11
 
 //! Vertragsdatei für `acta-sys` (Eingefrorener Crate-Vertrag Klasse A).
 //!
@@ -11,6 +13,7 @@ pub use crate::error::{Error, Result, SimdError};
 pub use crate::metric::DistanceMetric;
 
 // SECTION CONTRACT-DISTANCE-FN
+// ANCHOR[acta-sys:CONTRACT-DISTANCE-FN]
 /// Abstrakte Distanzfunktions-Schnittstelle zur dynamischen oder externen Injektion von Berechnungen.
 ///
 /// Ermöglicht es Vektor-Konsumenten (wie `acta-vec`), beliebige Distanz-Backends

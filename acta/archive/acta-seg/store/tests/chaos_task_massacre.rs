@@ -1,4 +1,5 @@
 #![cfg(feature = "workspace")]
+// FILE-CONTEXT: Chaos task massacre test for concurrent writer aborts and recovery determinism.
 //! Chaos test verifying resilience against concurrent task aborts, no partial state corruption,
 //! and deterministic recovery after restart.
 

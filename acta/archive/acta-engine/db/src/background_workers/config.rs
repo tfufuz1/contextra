@@ -2,10 +2,12 @@
 //!
 //! **Zweck:** Konfiguration der Hintergrund-Worker-Intervalle und Schwellenwerte.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// Konfiguration und Trait für Orphan-Cleanup-Backoff und HNSW-Index-Rebuild.
-// Invarianten: Berechnet exponentielle Cooldown-Zeiten für Rebuild-Versuche.
+// FILE-CONTEXT
+// ZWECK: Konfiguration und Trait für Orphan-Cleanup-Backoff und HNSW-Index-Rebuild.
+// INVARIANTEN: Berechnet exponentielle Cooldown-Zeiten für Rebuild-Versuche.
 
 use std::time::Duration;
 

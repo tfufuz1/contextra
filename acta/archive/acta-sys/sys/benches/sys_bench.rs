@@ -1,5 +1,5 @@
-// Criterion benchmarks for acta-sys low-level OS primitives
-// Invarianten: Zero panic; reliable benchmarking of lock, flush, vault, and mmap operations.
+// ZWECK: Criterion benchmarks for acta-sys low-level OS primitives
+// INVARIANTEN: Zero panic; reliable benchmarking of lock, flush, vault, and mmap operations.
 
 //! # Benchmark-Suite: `sys_bench`
 //!

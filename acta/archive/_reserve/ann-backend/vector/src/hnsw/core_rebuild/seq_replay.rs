@@ -1,6 +1,8 @@
-// Phase-2 Delta-Replay via MVCC-Sequenzlog und atomarer Swap unter write_mutex.
-// Invarianten: (born_seq/died_seq Filterung); SSI-Determinismus; Swap unter write_mutex.
+// FILE-CONTEXT
+// ZWECK: Phase-2 Delta-Replay via MVCC-Sequenzlog und atomarer Swap unter write_mutex.
+// INVARIANTEN: (born_seq/died_seq Filterung); SSI-Determinismus; Swap unter write_mutex.
 // HOTSPOTS: replay_delta_and_swap, ReplayDecision, compute_replay_decisions
+// STAND: TS:2026-11-11T02:00:00Z
 
 //! Sequenzlog-Wiedergabe für den HNSW-Rebuild (Phase 2).
 //!

@@ -1,4 +1,4 @@
-// Block-Bloom FPR Test (S-04).
+// ZWECK: Block-Bloom FPR Test (S-04).
 // INVARIANTE: Block-Bloom FPR muss bei nicht vorhandenen deterministischen Keys unter 2% liegen.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

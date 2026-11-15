@@ -1,5 +1,6 @@
-// ACORN Prädikats-gefilterte Graph-Suche (Patel et al. 2024) für HnswIndex.
-// Invarianten: Zero Panic; Traversal über Brücken-Knoten gestattet; Zero Cross-Contamination im Ergebnis;
+// FILE-CONTEXT
+// ZWECK: ACORN Prädikats-gefilterte Graph-Suche (Patel et al. 2024) für HnswIndex.
+// INVARIANTEN: Zero Panic; Traversal über Brücken-Knoten gestattet; Zero Cross-Contamination im Ergebnis;
 //              Hot-Path Kandidatenspeicher & Visited-Tracking über Vec.
 
 use std::borrow::Cow;

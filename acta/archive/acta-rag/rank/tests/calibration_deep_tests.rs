@@ -5,8 +5,8 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// Deep integration, proptest, and adversarial test suite for acta-rank calibration.
-// Invarianten: (no silent fallback before warmup), (invalidation resets observations/weights), P8 compliance.
+// ZWECK: Deep integration, proptest, and adversarial test suite for acta-rank calibration.
+// INVARIANTEN: (no silent fallback before warmup), (invalidation resets observations/weights), P8 compliance.
 
 use acta_rank::ConfigFingerprint;
 use acta_rank::{IsotonicCalibrator, PlattScaler};

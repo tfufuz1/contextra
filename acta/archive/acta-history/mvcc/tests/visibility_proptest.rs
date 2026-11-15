@@ -1,3 +1,4 @@
+// ANCHOR[acta-history:TEST-VISIBILITY-PROPTEST-ROOT]
 //! # Eigenschaftstest: MVCC-Sichtbarkeitsinvariante
 //!
 //! Verifiziert die mathematische Äquivalenz der O(1)-Sichtbarkeitsprüfung

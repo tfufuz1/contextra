@@ -1,4 +1,5 @@
-// Proptest für die mathematische Fehlergrenze von SQ8.
+// FILE-CONTEXT
+// ZWECK: Proptest für die mathematische Fehlergrenze von SQ8.
 
 use acta_vec::quantize::{ScalarQuantizer, SQ8_MAX_ERROR_FACTOR_PER_DIM};
 use proptest::prelude::*;

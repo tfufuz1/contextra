@@ -1,15 +1,18 @@
+//! # KeyMaterialSource — Port-Trait für kryptografisches Schlüsselmaterial (Ring 0)
 //!
 //!
 //! Trennt kryptografische Schlüssel- und Saltquellen von nicht-geheimem Pseudo-Zufall
 //! (vgl. `RngPort`). Fail-closed: Entropieerschöpfung oder OS-Fehler werden als
 //! harter Fehler propagiert, nie durch einen Fallback ersetzt.
 //!
+//! // ANCHOR[acta-base:KEY-MAT-001]
 //! // SECTION key-material-contracts
 //! // NOTE: Fail-Closed: Keine unsicheren Fallbacks bei Entropiemangel.
 
 use acta_base::Result; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use std::fmt::Debug;
 
+// ANCHOR[acta-base:KEY-MAT-TRAIT-001]
 /// Port-Trait für kryptografisch sichere Schlüssel- und Salt-Generierung.
 ///
 /// Implementierungen **müssen** fail-closed sein: Bei Entropieerschöpfung oder

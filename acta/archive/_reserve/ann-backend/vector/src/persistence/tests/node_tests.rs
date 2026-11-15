@@ -1,6 +1,8 @@
-// Unit-Tests für NodeRecord-Serialisierung und Längenvalidierung.
-// Invarianten: Zero-Panic bei unzureichenden Bytes.
+// FILE-CONTEXT
+// ZWECK: Unit-Tests für NodeRecord-Serialisierung und Längenvalidierung.
+// INVARIANTEN: Zero-Panic bei unzureichenden Bytes.
 // HOTSPOTS: test_node_record_roundtrip_and_errors
+// STAND: TS:2026-11-12T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,

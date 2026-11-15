@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Limits und Extraktions-Policies für acta-ingest (WP M2).
-// Invarianten: Defensiver Startzustand, Zero-Panic, #[non_exhaustive], Serialize/Deserialize.
+// FILE-CONTEXT
+// ZWECK: Limits und Extraktions-Policies für acta-ingest (WP M2).
+// INVARIANTEN: Defensiver Startzustand, Zero-Panic, #[non_exhaustive], Serialize/Deserialize.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use serde::{Deserialize, Serialize};
 

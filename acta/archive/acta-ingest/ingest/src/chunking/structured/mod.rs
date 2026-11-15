@@ -1,11 +1,14 @@
 //! Strukturiertes Chunking fuer JSON-, YAML-, TOML- und XML-Baeume.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// StructuredChunker für flache Record-Blöcke (JSON, JSONL, XML, YAML, TOML) (WP M4 / ).
-// Invarianten: Zero-Panic, deterministisch, Monotone Spans im kanonischen Text.
+// FILE-CONTEXT
+// ZWECK: StructuredChunker für flache Record-Blöcke (JSON, JSONL, XML, YAML, TOML) (WP M4 / ).
+// INVARIANTEN: Zero-Panic, deterministisch, Monotone Spans im kanonischen Text.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::canonical::CanonicalText;
 use crate::chunking::common::token_count;
@@ -19,6 +22,7 @@ use std::ops::Range;
 
 /// Chunker für strukturelle Datenformate (JSON, JSONL, YAML, TOML, XML).
 #[derive(Debug, Default)]
+// ANCHOR[acta-ingest:CHK-0235]
 // struct `StructuredChunker` fuer Strukturiertes Chunking fuer JSON-, YAML-, TOML- und XML-Baeume.
 pub struct StructuredChunker;
 

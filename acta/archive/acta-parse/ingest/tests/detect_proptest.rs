@@ -4,8 +4,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Property-basierter Fuzz-Test für detect (WP M3 / P01): "detect paniert nie".
-// Invarianten: Zero-Panic für beliebige Eingabe-Bytes und Dateinamen/MIME Hints.
+// FILE-CONTEXT
+// ZWECK: Property-basierter Fuzz-Test für detect (WP M3 / P01): "detect paniert nie".
+// INVARIANTEN: Zero-Panic für beliebige Eingabe-Bytes und Dateinamen/MIME Hints.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use acta_ingest::detect::{detect, DetectHints};
 use proptest::prelude::*;
@@ -13,6 +15,7 @@ use proptest::prelude::*;
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(500))]
 
+// ANCHOR[acta-ingest:TST-0352]
 // Testet die Funktionsfaehigkeit von `test_detect_never_panics_arbitrary_bytes`.
     #[test]
     fn test_detect_never_panics_arbitrary_bytes(

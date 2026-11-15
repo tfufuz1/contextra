@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-integration-tests,epic=sys-tests,seq=0] Integrations- und Vertragstests
 // =========================================================================
 // NOTE: Comprehensive integration tests for acta-sys public API and invariants.
 // Invariante: Zero panic in test harness; verify cross-module contracts and invariants.
@@ -20,6 +21,7 @@ use acta_sys::{
 };
 
 // SECTION Durability Integration Tests
+// ANCHOR[id=test-durability-integration,epic=sys-tests,seq=1] Durability Tests
 
 #[test]
 fn test_durability_file_and_directory_lifecycle() {
@@ -73,6 +75,7 @@ fn test_durable_file_poisoning_contract() {
 // !SECTION Durability Integration Tests
 
 // SECTION Mmap Integration Tests
+// ANCHOR[id=test-mmap-integration,epic=sys-tests,seq=2] Mmap & SealedMap Tests
 
 #[test]
 fn test_mmap_and_sealed_map_lifecycle() {
@@ -120,6 +123,7 @@ fn test_mmap_and_sealed_map_lifecycle() {
 // !SECTION Mmap Integration Tests
 
 // SECTION Memory Locking & Vault Integration Tests
+// ANCHOR[id=test-vault-integration,epic=sys-tests,seq=3] Memory Locking & Vault Tests
 
 #[test]
 fn test_memory_locking_and_vault() {
@@ -172,6 +176,7 @@ fn test_vault_buffer_allocation_and_zeroize() {
 // !SECTION Memory Locking & Vault Integration Tests
 
 // SECTION File ACL Integration Tests
+// ANCHOR[id=test-acl-integration,epic=sys-tests,seq=4] File ACL Tests
 
 #[test]
 fn test_file_acl_restriction_and_verification() {
@@ -197,6 +202,7 @@ fn test_file_acl_restriction_and_verification() {
 // !SECTION File ACL Integration Tests
 
 // SECTION POSIX Limits & Error Mapping Integration Tests
+// ANCHOR[id=test-posix-and-error-integration,epic=sys-tests,seq=5] POSIX Limits & Error Mapping
 
 #[test]
 fn test_posix_resource_limits() {

@@ -24,6 +24,7 @@ fn generate_deterministic_keypair(seed_byte: u8) -> (SigningKey, ed25519_dalek::
     (signing_key, verifying_key)
 }
 
+// ANCHOR[acta-node:TEST-ROTATION-KEY-A-REJECTED-BY-KEY-B]
 // Prüft, dass ein mit Schlüssel A signiertes Token von einem mit Schlüssel B konfigurierten Gate
 // strikt fail-closed mit `LicenseError::InvalidSignature` abgelehnt wird.
 #[test]
@@ -54,6 +55,7 @@ fn test_token_from_key_a_rejected_by_key_b() {
     assert_eq!(err, LicenseError::InvalidSignature);
 }
 
+// ANCHOR[acta-node:TEST-ROTATION-PAYLOAD-KEY-A-REJECTED-BY-KEY-B]
 // Prüft, dass ein signiertes LicensePayload mit falschem Schlüssel bereits im Konstruktor abgewiesen wird.
 #[test]
 fn test_signed_payload_from_key_a_rejected_by_key_b() {
@@ -76,6 +78,7 @@ fn test_signed_payload_from_key_a_rejected_by_key_b() {
     assert!(matches!(res, Err(LicenseError::InvalidSignature)));
 }
 
+// ANCHOR[acta-node:TEST-ROTATION-SUCCESSFUL-KEY-SWAP]
 // Prüft den determinierten Wechselprozess: Neues Gate mit Schlüssel B akzeptiert Token B und verwirft Token A.
 #[test]
 fn test_successful_key_swap_procedure() {
@@ -117,6 +120,7 @@ fn test_successful_key_swap_procedure() {
     assert_eq!(err, LicenseError::InvalidSignature);
 }
 
+// ANCHOR[acta-node:TEST-ROTATION-ERROR-NO-KEY-LEAK]
 // Prüft, dass Fehlermeldungen bei Signatur- und Schlüsseldiskrepanzen keine Schlüsseldaten enthalten.
 #[test]
 fn test_invalid_signature_error_contains_no_key_details() {
@@ -155,6 +159,7 @@ fn test_invalid_signature_error_contains_no_key_details() {
     assert_eq!(display_str, "activation signature verification failed");
 }
 
+// ANCHOR[acta-node:TEST-ROTATION-TAMPERED-SIGNATURE-REJECTED]
 // Prüft, dass ein manipulierter Signaturwert sofort abgewiesen wird.
 #[test]
 fn test_tampered_signature_rejected() {
@@ -181,6 +186,7 @@ fn test_tampered_signature_rejected() {
     assert_eq!(err, LicenseError::InvalidSignature);
 }
 
+// ANCHOR[acta-node:TEST-ROTATION-STRUCTURAL-NO-KEY-ID]
 // Prüft strukturell, dass weder SignedActivation noch LicensePayload eine Schlüsselkennung (key_id) besitzen.
 #[test]
 fn test_structural_absence_of_key_id_in_tokens() {

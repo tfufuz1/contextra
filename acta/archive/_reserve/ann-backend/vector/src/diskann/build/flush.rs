@@ -1,5 +1,7 @@
-// Inkrementelles Pruning und Index-Erweiterung.
-// Invarianten: RobustPrune mit Alpha-Kriterium; NAN/INF-Filterung.
+// FILE-CONTEXT
+// ZWECK: Inkrementelles Pruning und Index-Erweiterung.
+// INVARIANTEN: RobustPrune mit Alpha-Kriterium; NAN/INF-Filterung.
+// STAND: 2026-11-11
 
 use super::super::format::DiskAnnHeader;
 use super::super::types::DiskAnnIndex;
@@ -112,6 +114,7 @@ impl DiskAnnIndex {
     /// Phase 4: Rückwärts-Kanten hinzufügen und ggf. Nachbarschaft überschrittener Nachbarn re-prunen.
     /// Phase 5: Geänderte Graph-Struktur und neue Knoten atomar auf Disk schreiben.
     ///
+    /// AI-TAG[RESOLVED] Echte inkrementelle Streaming-DiskANN Implementierung mit Beam-Search, RNG-Pruning und Rückwärts-Kanten-Kompression. (TS:2026-09-07T06:15:00Z) (SESSION: f04imm01)
     pub(crate) fn write_incremental_to_file_sync(
         &self,
         tmp_path: &std::path::Path,

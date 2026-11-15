@@ -1,6 +1,8 @@
 #![cfg(feature = "workspace")]
-// Runtime stall test for WAL recovery replay to detect non-linear (O(n²)) complexity regressions.
-// Invarianten: Replay throughput across subsequent windows MUST NOT drop below 50% of the baseline throughput (first 10%).
+// FILE-CONTEXT
+// ZWECK: Runtime stall test for WAL recovery replay to detect non-linear (O(n²)) complexity regressions.
+// INVARIANTEN: Replay throughput across subsequent windows MUST NOT drop below 50% of the baseline throughput (first 10%).
+// STAND: TS:2026-09-26T00:00:00Z
 
 use acta_seg::wal::{ReplayProgressSink, Wal, WalEntry, WalOp, WalSeq, WAL_V3_HEADER};
 use acta_base::TxId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

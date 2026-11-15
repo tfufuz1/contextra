@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 // =========================================================================
 // SECTION: ManualClock Implementation
+// ANCHOR[id=manual-clock-root,epic=clock,seq=9]
 // NOTE: Steuerbare Test-Uhr zur exakten Determinismusprüfung und Zeitsimulation.
 // =========================================================================
 

@@ -1,3 +1,4 @@
+//! # Low-Level Dateisystem-I/O fuer WAL (Ring 1)
 //!
 //! Fuehrt sequentielle Appends und fsync-Befehle auf dem physischen Dateisystem durch.
 

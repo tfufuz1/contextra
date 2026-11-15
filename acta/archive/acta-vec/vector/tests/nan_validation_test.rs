@@ -1,4 +1,5 @@
-// Strikte Validierung der NaN/Infinity-Abweisung an der Distanz-API-Grenze.
+// FILE-CONTEXT
+// ZWECK: Strikte Validierung der NaN/Infinity-Abweisung an der Distanz-API-Grenze.
 
 use acta_vec::distance::ScalarDistance;
 use acta_vec::distance::contract::{DistanceFn, Metric};

@@ -1,11 +1,14 @@
 //! Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// Satzsegmentierung für übergroße Absätze mit Abkürzungsbehandlung (de/en).
-// Invarianten: Zero-Panic, UTF-8-sicher, keine Satzteilung bei bekannten Abkürzungen.
+// FILE-CONTEXT
+// ZWECK: Satzsegmentierung für übergroße Absätze mit Abkürzungsbehandlung (de/en).
+// INVARIANTEN: Zero-Panic, UTF-8-sicher, keine Satzteilung bei bekannten Abkürzungen.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use std::ops::Range;
 use unicode_segmentation::UnicodeSegmentation;
@@ -19,6 +22,7 @@ const ABBREVIATIONS: &[&str] = &[
 
 /// Repräsentiert einen Satz innerhalb eines Textes mit dessen Byte-Span.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[acta-ingest:CHK-0228]
 // struct `SentenceSpan` fuer Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 pub struct SentenceSpan {
     pub text: String,
@@ -26,6 +30,7 @@ pub struct SentenceSpan {
 }
 
 /// Zerlegt einen Text unter Berücksichtigung von Abkürzungen in Sätze.
+// ANCHOR[acta-ingest:CHK-0229]
 // fn `split_sentences` fuer Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 pub fn split_sentences(text: &str, base_offset: usize) -> Vec<SentenceSpan> {
     if text.is_empty() {

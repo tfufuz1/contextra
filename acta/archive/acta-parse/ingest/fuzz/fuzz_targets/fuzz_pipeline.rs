@@ -20,4 +20,5 @@ fuzz_target!(|data: &[u8]| {
     let _ = acta_ingest::pipeline::ingest(&req, &cfg, &registry);
 });
 
+// ANCHOR[acta-ingest:FUZZ-0457]
 // Fuzzing-Target-Definition fuer fuzz_pipeline.rs.

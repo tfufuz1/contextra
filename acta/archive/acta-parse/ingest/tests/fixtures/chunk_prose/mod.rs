@@ -4,7 +4,9 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// 10 typische Markdown-Fixtures für ProseChunker Paritäts- und Vertragstests.
+// FILE-CONTEXT
+// ZWECK: 10 typische Markdown-Fixtures für ProseChunker Paritäts- und Vertragstests.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub struct Fixture {
     pub name: &'static str,

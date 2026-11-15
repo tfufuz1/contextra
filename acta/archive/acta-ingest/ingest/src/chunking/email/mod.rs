@@ -1,11 +1,14 @@
 //! E-Mail-spezifisches Chunking fuer Header, Body und Anhaenge.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// EmailChunker für E-Mail-Nachrichten und Anhänge (EML, MBOX, MSG) (WP M4 / ).
-// Invarianten: Zero-Panic, deterministisch, keine nachrichtenübergreifende Bündelung.
+// FILE-CONTEXT
+// ZWECK: EmailChunker für E-Mail-Nachrichten und Anhänge (EML, MBOX, MSG) (WP M4 / ).
+// INVARIANTEN: Zero-Panic, deterministisch, keine nachrichtenübergreifende Bündelung.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::canonical::CanonicalText;
 use crate::chunking::common::{token_count, window_split};
@@ -20,6 +23,7 @@ use std::ops::Range;
 
 /// Chunker für E-Mail-Formate (EML, MBOX, MSG).
 #[derive(Debug, Default)]
+// ANCHOR[acta-ingest:CHK-0211]
 // struct `EmailChunker` fuer E-Mail-spezifisches Chunking fuer Header, Body und Anhaenge.
 pub struct EmailChunker;
 

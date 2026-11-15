@@ -5,8 +5,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Golden-Tests, Kodierungstests und RTF-Spezialtests für Text-Extraktoren (WP M4).
-// Invarianten: Zero-Panic, JSON-Snapshots, UTF-16/Windows-1252/Unicode-Tag Handling.
+// FILE-CONTEXT
+// ZWECK: Golden-Tests, Kodierungstests und RTF-Spezialtests für Text-Extraktoren (WP M4).
+// INVARIANTEN: Zero-Panic, JSON-Snapshots, UTF-16/Windows-1252/Unicode-Tag Handling.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -50,6 +52,7 @@ fn extract_doc(format: FormatId, bytes: &[u8], policy: ExtractPolicy) -> Documen
 
 // --- GOLDEN TESTS (mit Umlauten äöü, ß, Emoji 🦀) ---
 
+// ANCHOR[acta-ingest:TST-0426]
 // Testet die Funktionsfaehigkeit von `test_golden_txt`.
 #[test]
 fn test_golden_txt() {
@@ -63,6 +66,7 @@ fn test_golden_txt() {
     assert_eq!(ir.blocks.len(), 2);
 }
 
+// ANCHOR[acta-ingest:TST-0427]
 // Testet die Funktionsfaehigkeit von `test_golden_markdown`.
 #[test]
 fn test_golden_markdown() {
@@ -81,6 +85,7 @@ fn test_golden_markdown() {
     assert_eq!(ir.canonical().text, text);
 }
 
+// ANCHOR[acta-ingest:TST-0428]
 // Testet die Funktionsfaehigkeit von `test_golden_rst`.
 #[test]
 fn test_golden_rst() {
@@ -92,6 +97,7 @@ fn test_golden_rst() {
     assert!(json_snapshot.contains("rust"));
 }
 
+// ANCHOR[acta-ingest:TST-0429]
 // Testet die Funktionsfaehigkeit von `test_golden_asciidoc`.
 #[test]
 fn test_golden_asciidoc() {
@@ -110,6 +116,7 @@ fn test_golden_asciidoc() {
         .any(|b| matches!(b.kind, BlockKind::Table(_))));
 }
 
+// ANCHOR[acta-ingest:TST-0430]
 // Testet die Funktionsfaehigkeit von `test_golden_tex`.
 #[test]
 fn test_golden_tex() {
@@ -120,6 +127,7 @@ fn test_golden_tex() {
     assert!(ir.canonical().text.contains("a^2 + b^2 = c^2"));
 }
 
+// ANCHOR[acta-ingest:TST-0431]
 // Testet die Funktionsfaehigkeit von `test_golden_rtf`.
 #[test]
 fn test_golden_rtf() {
@@ -131,6 +139,7 @@ fn test_golden_rtf() {
 
 // --- KODIERUNGSTESTS ---
 
+// ANCHOR[acta-ingest:TST-0432]
 // Testet die Funktionsfaehigkeit von `test_encoding_utf16le_with_bom`.
 #[test]
 fn test_encoding_utf16le_with_bom() {
@@ -143,6 +152,7 @@ fn test_encoding_utf16le_with_bom() {
     assert!(ir.canonical().text.contains("Hallo UTF-16LE äöü"));
 }
 
+// ANCHOR[acta-ingest:TST-0433]
 // Testet die Funktionsfaehigkeit von `test_encoding_windows1252_fallback`.
 #[test]
 fn test_encoding_windows1252_fallback() {
@@ -157,6 +167,7 @@ fn test_encoding_windows1252_fallback() {
         .any(|w| w.code == WarningCode::EncodingGuessed));
 }
 
+// ANCHOR[acta-ingest:TST-0434]
 // Testet die Funktionsfaehigkeit von `test_encoding_unicode_tags_removed_and_reported`.
 #[test]
 fn test_encoding_unicode_tags_removed_and_reported() {
@@ -174,6 +185,7 @@ fn test_encoding_unicode_tags_removed_and_reported() {
 
 // --- RTF SPEZIALTESTS ---
 
+// ANCHOR[acta-ingest:TST-0435]
 // Testet die Funktionsfaehigkeit von `test_rtf_nesting_depth_limit`.
 #[test]
 fn test_rtf_nesting_depth_limit() {
@@ -203,6 +215,7 @@ fn test_rtf_nesting_depth_limit() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0436]
 // Testet die Funktionsfaehigkeit von `test_rtf_unicode_escapes_and_tables`.
 #[test]
 fn test_rtf_unicode_escapes_and_tables() {
@@ -220,6 +233,7 @@ fn test_rtf_unicode_escapes_and_tables() {
         .any(|b| matches!(b.kind, BlockKind::Table(_))));
 }
 
+// ANCHOR[acta-ingest:TST-0437]
 // Testet die Funktionsfaehigkeit von `test_rtf_hidden_text_policy`.
 #[test]
 fn test_rtf_hidden_text_policy() {

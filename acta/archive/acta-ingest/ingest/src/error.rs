@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Fehler-Typen und Limit-Kategorien für acta-ingest (WP M2).
-// Invarianten: Zero-Panic, #[non_exhaustive], deutschsprachige thiserror-Meldungen, Mapping zu ActaError.
+// FILE-CONTEXT
+// ZWECK: Fehler-Typen und Limit-Kategorien für acta-ingest (WP M2).
+// INVARIANTEN: Zero-Panic, #[non_exhaustive], deutschsprachige thiserror-Meldungen, Mapping zu ActaError.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::format::FormatId;
 use serde::{Deserialize, Serialize};

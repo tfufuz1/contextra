@@ -1,6 +1,7 @@
 //! Ephemerer RAM-Puffer für volatile, sensitive Byte-Daten.
 //!
 //! # Architektur & Ring-Zugehörigkeit
+//! `VolatileContextVault` gehört zu Ring 1 (Ebene 1, Kern-Closure `{acta-sys}`)
 //! und implementiert einen flüchtigen Zwischenspeicher für sensible flüchtige In-Memory-Daten.
 //!
 //! # Funktionsweise & Garantien

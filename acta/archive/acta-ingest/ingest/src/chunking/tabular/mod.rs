@@ -1,11 +1,14 @@
 //! Tabellen-Chunking fuer Zeilen-, Spalten- und Zellensegmente.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// Tabular Chunking Strategy Implementation ( / P00A / P06).
-// Invarianten: Zero-Panic, deterministisch, Spans im kanonischen Text, Fail-Closed.
+// FILE-CONTEXT
+// ZWECK: Tabular Chunking Strategy Implementation ( / P00A / P06).
+// INVARIANTEN: Zero-Panic, deterministisch, Spans im kanonischen Text, Fail-Closed.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub mod helpers;
 
@@ -35,6 +38,7 @@ struct TableContext<'a> {
     block_span: &'a Range<usize>,
 }
 
+// ANCHOR[acta-ingest:CHK-0241]
 // fn `draft_tabular` fuer Tabellen-Chunking fuer Zeilen-, Spalten- und Zellensegmente.
 pub fn draft_tabular(
     ir: &DocumentIr,

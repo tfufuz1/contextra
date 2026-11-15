@@ -1,5 +1,7 @@
-// Initialisierung des HNSW-Fallbacks für DiskANN.
-// Invarianten: Gekapselte Erstellung über hnsw_bridge; saubere Fehlerweiterleitung.
+// FILE-CONTEXT
+// ZWECK: Initialisierung des HNSW-Fallbacks für DiskANN.
+// INVARIANTEN: Gekapselte Erstellung über hnsw_bridge; saubere Fehlerweiterleitung.
+// STAND: 2026-11-11
 
 use super::super::hnsw_bridge::{create_hnsw_fallback, HnswFallbackBridge};
 use super::super::types::DiskAnnIndex;

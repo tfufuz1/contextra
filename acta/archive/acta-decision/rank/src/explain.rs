@@ -1,5 +1,6 @@
 //! # Erklärbarkeitsmodul (`explain`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Dieses Modul transformiert maschinenlesbare Herkunftsnachweise (`ProvenanceRecord`)
 //! in strukturierte Erklärungen (`RetrievalExplanation`) sowie in verständliche,

@@ -1,10 +1,13 @@
-// Hardened FlatBuffers buffer verification and safe accessor functions
+// FILE-CONTEXT
+// STAND: 2026-10-27T00:00:00Z
+// ZWECK: Hardened FlatBuffers buffer verification and safe accessor functions
 // RELEVANTE SPEZIFIKATION: REQ-WIR-001, REQ-WIR-002, P7 (Zero-Panic)
 
 //! Safe and hardened FlatBuffers verification wrappers.
 //!
 //! # FlatBuffers Verifikations- und Zugriffs-Primitiven
 //!
+//! **Ring & Klasse:** Ring 0, Klasse Kern `[K]`.
 //!
 //! ## Zweck
 //! Dieses Modul implementiert gehärtete Verifikationsprüfungen für eingehende FlatBuffers-Nachrichten.
@@ -23,6 +26,7 @@ use crate::generated::acta_generated::acta::ipc::{
 use flatbuffers::VerifierOptions;
 use std::fmt;
 
+// ANCHOR[acta-parse-worker:VER-001]
 /// Error type for FlatBuffers verification failures.
 ///
 /// Signalisiert Verletzungen der Spezifikation oder Sicherheitsgrenzen beim Einlesen von Byte-Puffern.
@@ -60,6 +64,7 @@ impl fmt::Display for FlatBufferError {
 
 impl std::error::Error for FlatBufferError {}
 
+// ANCHOR[acta-parse-worker:VER-002]
 /// Configuration parameters for FlatBuffers verification.
 ///
 /// Definiert Schutzgrenzen gegen Denial-of-Service-Angriffe (DoS) durch übergroße oder
@@ -78,6 +83,7 @@ pub struct FlatBufferConfig {
 }
 
 impl Default for FlatBufferConfig {
+    // ANCHOR[acta-parse-worker:VER-003]
     /// Erzeugt Standardwerte mit sicheren Obergrenzen für den Produktionseinsatz.
     fn default() -> Self {
         Self {
@@ -88,6 +94,7 @@ impl Default for FlatBufferConfig {
     }
 }
 
+// ANCHOR[acta-parse-worker:VER-004]
 /// Generic verified root accessor for any FlatBuffers root table `T`.
 ///
 /// # Ablauf von `verify_flatbuffer`:
@@ -129,6 +136,7 @@ where
         .map_err(|e| FlatBufferError::VerificationFailed(format!("{e:?}")))
 }
 
+// ANCHOR[acta-parse-worker:VER-005]
 /// Verifies and parses a `SearchResponse` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_search_response`:
@@ -142,6 +150,7 @@ pub fn verify_and_parse_search_response<'a>(
     verify_flatbuffer::<SearchResponse<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-006]
 /// Verifies and parses an `Embedding` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_embedding`:
@@ -155,6 +164,7 @@ pub fn verify_and_parse_embedding<'a>(
     verify_flatbuffer::<Embedding<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-007]
 /// Verifies and parses a `ScoredDocument` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_scored_document`:
@@ -168,6 +178,7 @@ pub fn verify_and_parse_scored_document<'a>(
     verify_flatbuffer::<ScoredDocument<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-008]
 /// Verifies and parses a `VectorIndexUpdate` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_vector_index_update`:
@@ -181,6 +192,7 @@ pub fn verify_and_parse_vector_index_update<'a>(
     verify_flatbuffer::<VectorIndexUpdate<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-009]
 /// Verifies and parses a `RoleId` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_role_id`:
@@ -194,6 +206,7 @@ pub fn verify_and_parse_role_id<'a>(
     verify_flatbuffer::<RoleId<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-010]
 /// Verifies and parses a `HyperEdgeId` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_hyper_edge_id`:
@@ -207,6 +220,7 @@ pub fn verify_and_parse_hyper_edge_id<'a>(
     verify_flatbuffer::<HyperEdgeId<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-011]
 /// Verifies and parses a `RoleBinding` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_role_binding`:
@@ -220,6 +234,7 @@ pub fn verify_and_parse_role_binding<'a>(
     verify_flatbuffer::<RoleBinding<'a>>(buf, config)
 }
 
+// ANCHOR[acta-parse-worker:VER-012]
 /// Verifies and parses a `HyperEdge` root table from bytes.
 ///
 /// # Ablauf von `verify_and_parse_hyper_edge`:

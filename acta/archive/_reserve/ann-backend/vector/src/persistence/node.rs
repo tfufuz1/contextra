@@ -1,6 +1,8 @@
-// Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - NodeRecord-Format.
-// Invarianten: Zero-Panic bei Deserialisierung; checked Slicing und Getter für sichere Zugriffe.
+// FILE-CONTEXT
+// ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - NodeRecord-Format.
+// INVARIANTEN: Zero-Panic bei Deserialisierung; checked Slicing und Getter für sichere Zugriffe.
 // HOTSPOTS: NodeRecord::from_bytes, NodeRecord::to_bytes
+// STAND: TS:2026-11-12T00:00:00Z
 
 use crate::error::{Result, VectorError};
 

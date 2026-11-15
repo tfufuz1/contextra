@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Extractor-Implementierung für generisches XML Format (P00B-Reader) (WP M4).
-// Invarianten: Zero-Panic, kein DOCTYPE/Entity, Pfade `root.kind[2].name`, `@attr`.
+// FILE-CONTEXT
+// ZWECK: Extractor-Implementierung für generisches XML Format (P00B-Reader) (WP M4).
+// INVARIANTEN: FILE-CONTEXT Kopf, Zero-Panic, kein DOCTYPE/Entity, Pfade `root.kind[2].name`, `@attr`.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use super::path::{append_index, append_key};
 use crate::error::{IngestError, LimitKind};

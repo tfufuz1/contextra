@@ -1,6 +1,8 @@
-// DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (.3).
-// Invarianten: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// FILE-CONTEXT
+// ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (.3).
+// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an acta-sys::mmap_readonly.
+// STAND: 2026-11-11
 
 use super::config::{DiskAnnFallbackPolicy, VectorData};
 use super::format::DiskAnnHeader;

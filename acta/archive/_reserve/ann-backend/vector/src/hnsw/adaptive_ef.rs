@@ -1,5 +1,6 @@
-// Adaptives ef_search (Ada-ef) Richtlinien & Zustandsautomat für HNSW-Suche.
-// Invarianten: Zero-Panic, keine Zufallsquellen/Systemzeit (deterministisch).
+// FILE-CONTEXT
+// ZWECK: Adaptives ef_search (Ada-ef) Richtlinien & Zustandsautomat für HNSW-Suche.
+// INVARIANTEN: Zero-Panic, keine Zufallsquellen/Systemzeit (deterministisch).
 // NICHT-OFFENSICHTLICH: Bricht Suche ab, sobald sich die Top-k-Kandidaten über das Konvergenzfenster stabilisieren.
 
 use crate::error::{Result, VectorError};

@@ -1,5 +1,6 @@
 #![cfg(feature = "workspace")]
-// Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit.
+// FILE-CONTEXT
+// ZWECK: Regressionstest — WAL HMAC-Kette enthält keine Gabelungen nach Group-Commit.
 // INVARIANT: Jeder Entry hat eindeutigen prev_hmac; Sequenznummern sind strikt monoton.
 // ERSTELLT: 2026-09-13 (Audit-Befund P-1, Architektur-Review 2026-09-13)
 // ABHÄNGIG VON: prepare_batch → append_batch Aufruf-Reihenfolge in LsmStorage::commit()

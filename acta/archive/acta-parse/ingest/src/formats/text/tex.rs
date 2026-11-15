@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Leichtgewichtiger TeX/LaTeX Extractor (WP M4).
-// Invarianten: Zero-Panic, Doku-Limitationen im Modulkopf, Kommentare entfernen, Formeln wörtlich.
+// FILE-CONTEXT
+// ZWECK: Leichtgewichtiger TeX/LaTeX Extractor (WP M4).
+// INVARIANTEN: Zero-Panic, Doku-Limitationen im Modulkopf, Kommentare entfernen, Formeln wörtlich.
+// STAND: TS:2026-10-31T00:00:00Z
 
 //! # TeX / LaTeX Extractor
 //!

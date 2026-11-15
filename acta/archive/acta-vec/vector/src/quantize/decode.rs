@@ -1,6 +1,8 @@
-// Dekodierung (u8 -> f32) für ScalarQuantizer (SQ8).
-// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); Exakte Rekonstruktion mit inv_scales.
+// FILE-CONTEXT
+// ZWECK: Dekodierung (u8 -> f32) für ScalarQuantizer (SQ8).
+// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Exakte Rekonstruktion mit inv_scales.
 // HOTSPOTS: dequantize
+// STAND: 2026-11-12
 
 //! # Scalar Quantizer Decoding Module
 //!
@@ -11,6 +13,7 @@ use crate::error::{Result, VectorError};
 
 impl ScalarQuantizer {
     /// Rekonstruiert einen `u8` Vektor zurück in `f32`.
+    // ANCHOR[acta-vec:SQ8-DEQUANTIZE]
     pub fn dequantize(&self, vector: &[u8]) -> Result<Vec<f32>> {
         if self.inv_scales.len() < self.dimension || self.mins.len() < self.dimension {
             return Err(VectorError::invalid_input(

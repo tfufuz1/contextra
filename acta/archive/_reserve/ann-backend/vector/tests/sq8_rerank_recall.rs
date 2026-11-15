@@ -1,7 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
-// Recall-Verbesserung durch 2-Stufen-Suche (SQ8 Vorfilterung + f32 Reranking).
-// Invarianten: Rerank Recall@10 erreicht >= 0.98 des reinen f32-Index.
+// FILE-CONTEXT
+// ZWECK: Recall-Verbesserung durch 2-Stufen-Suche (SQ8 Vorfilterung + f32 Reranking).
+// INVARIANTEN: Rerank Recall@10 erreicht >= 0.98 des reinen f32-Index.
 // HOTSPOTS: 30-120
+// STAND: 2026-11-12
 
 use acta_base::SeededRng; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_base::VectorIndex; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

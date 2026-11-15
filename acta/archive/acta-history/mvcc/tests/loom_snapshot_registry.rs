@@ -1,3 +1,4 @@
+// ANCHOR[acta-history:TEST-LOOM-ROOT]
 //! # Loom-Modell- und Nebenläufigkeitstests für `SnapshotRegistry`
 //!
 //! Verifiziert die atomare Mindestwert-Berechnung und Lock-Freiheit der SnapshotRegistry:

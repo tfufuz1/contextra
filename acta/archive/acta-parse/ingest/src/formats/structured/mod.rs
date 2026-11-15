@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Extractor für strukturierte Formate (Json, Jsonl, Xml, Yaml, Toml) (WP M4).
-// Invarianten: DocumentExtractor-Impl für 5 strukturierte Formate.
+// FILE-CONTEXT
+// ZWECK: Extractor für strukturierte Formate (Json, Jsonl, Xml, Yaml, Toml) (WP M4).
+// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl für 5 strukturierte Formate.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub mod json;
 pub mod path;

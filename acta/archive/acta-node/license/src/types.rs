@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[acta-node:TYPE-FEATURE-RING]
 /// Einteilung der Acta-Funktionsringe (§14.6).
 ///
 /// Definiert die Sicherheits- und Isolationsstufen von Acta-Instanzen.
@@ -30,6 +31,7 @@ impl std::fmt::Display for FeatureRing {
     }
 }
 
+// ANCHOR[acta-node:TYPE-AUTHORIZED-RING]
 /// Bestätigungstoken für einen erfolgreich autorisierten Feature-Ring (§15).
 ///
 /// Kann nur durch erfolgreiches Durchlaufen eines [`LicenseGate`] erzeugt werden.
@@ -50,6 +52,7 @@ impl AuthorizedRing {
     }
 }
 
+// ANCHOR[acta-node:TYPE-TENANT-ID]
 /// Kanonischer 64-Bit-Ganzzahl-Mandantenidentifikator.
 ///
 /// Zur Gewährleistung binärer Kompatibilität mit gespeicherten Lizenznutzlasten
@@ -93,6 +96,7 @@ impl From<TenantId> for u64 {
     }
 }
 
+// ANCHOR[acta-node:TYPE-ERROR]
 /// Typisierter Fehler für Lizenz- und Aktivierungsprüfungen (B4,).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -111,6 +115,7 @@ pub enum LicenseError {
 /// Kanonischer Result-Typ für das `acta-node`-Crate.
 pub type Result<T> = core::result::Result<T, LicenseError>;
 
+// ANCHOR[acta-node:TRAIT-CLOCK]
 /// Crate-lokaler Trait für deterministische Zeitabfragen (B11, P28).
 ///
 /// Verhindert direkte und nicht-deterministische Betriebssystem-Zeitaufrufe im Kern.
@@ -136,6 +141,7 @@ where
     }
 }
 
+// ANCHOR[acta-node:STRUCT-SYSTEM-CLOCK]
 /// Standard-Wanduhr basierend auf der Systemzeit für produktive Umgebungen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct SystemClock;
@@ -157,6 +163,7 @@ impl Clock for SystemClock {
     }
 }
 
+// ANCHOR[acta-node:STRUCT-FIXED-CLOCK]
 /// Feste Test-Uhr für deterministische Tests und Benchmarks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedClock(pub u64);
@@ -167,6 +174,7 @@ impl Clock for FixedClock {
     }
 }
 
+// ANCHOR[acta-node:TRAIT-LICENSE-GATE]
 /// Trait für die Offline-Prüfung und Autorisierung von Feature-Ringen (§15).
 pub trait LicenseGate: Send + Sync {
     /// Prüft, ob der angeforderte Feature-Ring aktiviert und zugänglich ist.
@@ -179,6 +187,7 @@ pub trait LicenseGate: Send + Sync {
     }
 }
 
+// ANCHOR[acta-node:STRUCT-OPEN-FAST-GATE]
 /// Standard-Gate ohne Lizenzbeschränkung für den freien `Fast`-Ring.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct OpenFastGate;

@@ -1,5 +1,6 @@
 #![cfg(feature = "experimental-rabitq")]
-// Recall- und Kalibrierungstests für RaBitQ (randomisierte binäre Quantisierung).
+// FILE-CONTEXT
+// ZWECK: Recall- und Kalibrierungstests für RaBitQ (randomisierte binäre Quantisierung).
 
 use acta_vec::quantize_rabitq::RaBitQQuantizer;
 

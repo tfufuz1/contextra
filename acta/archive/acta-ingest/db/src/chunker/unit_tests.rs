@@ -2,10 +2,13 @@
 //!
 //! **Zweck:** Unit-Tests für Textsegmentierung und Randbedingungen.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// Unittests für den Markdown-Chunker.
-// Invarianten: Stellt sicher, dass Grundfunktionen des Chunkers korrekt arbeiten.
+// FILE-CONTEXT
+// ZWECK: Unittests für den Markdown-Chunker.
+// INVARIANTEN: Stellt sicher, dass Grundfunktionen des Chunkers korrekt arbeiten.
+// STAND: TS:2026-10-29T00:00:00Z
 
 use super::*;
 

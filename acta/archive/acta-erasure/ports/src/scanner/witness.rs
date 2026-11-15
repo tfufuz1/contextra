@@ -1,5 +1,6 @@
-// Unveränderlicher LayerWitness für gemessene Restbestände nach einer Bereinigung.
-// Invarianten: Der LayerWitness hat keinen öffentlichen Konstruktor außerhalb von `ScanSession::finish` in `acta-base/src/scanner`. Kein Default, kein Deserialize, kein From<usize>.
+// FILE-CONTEXT
+// ZWECK: Unveränderlicher LayerWitness für gemessene Restbestände nach einer Bereinigung.
+// INVARIANTEN: Der LayerWitness hat keinen öffentlichen Konstruktor außerhalb von `ScanSession::finish` in `acta-base/src/scanner`. Kein Default, kein Deserialize, kein From<usize>.
 // HOTSPOTS: [1-70]
 
 #![forbid(unsafe_code)]

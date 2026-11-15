@@ -9,6 +9,7 @@ use acta_fs::{
 };
 use tempfile::tempdir;
 
+// ANCHOR[acta-fs:TEST-SCRUB-JOURNAL-HARDLINK]
 /// Prüft die Verweigerung des Nullen-Überschreibens bei mehreren Hardlinks.
 #[test]
 fn test_scrub_if_safe_hardlink_refusal() -> std::io::Result<()> {
@@ -54,6 +55,7 @@ fn test_scrub_if_safe_hardlink_refusal() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-fs:TEST-SCRUB-JOURNAL-DISABLED]
 /// Prüft die direkte Entfernung ohne Überschreiben bei deaktivierter Richtlinie.
 #[test]
 fn test_scrub_if_safe_policy_disabled() -> std::io::Result<()> {
@@ -68,6 +70,7 @@ fn test_scrub_if_safe_policy_disabled() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-fs:TEST-SCRUB-JOURNAL-RECOVERY]
 /// Prüft die Crash-Recovery des PendingDeleteJournals bei unvollständiger Bereinigung.
 #[test]
 fn test_pending_delete_journal_crash_recovery() -> std::io::Result<()> {

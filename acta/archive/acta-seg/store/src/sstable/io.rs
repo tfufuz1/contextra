@@ -1,3 +1,4 @@
+//! # SSTable I/O-Routinen (Ring 1)
 //!
 //! Kapselt Low-Level Datei- und Lesevorgänge über [`crate::io_seam::VfsFile`]
 //! innerhalb von Block-Level I/O-Grenzen.

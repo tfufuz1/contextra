@@ -1,5 +1,6 @@
 //! # Konforme Prädiktion & Adaptive Kalibrierung (`conformal`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Bietet quantilbasierte Online-Schwellenwertschätzung mit mathematischen
 //! Finite-Sample-Abdeckungsgarantien (Coverage Guarantees).

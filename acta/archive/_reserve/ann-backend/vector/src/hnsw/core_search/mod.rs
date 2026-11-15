@@ -1,6 +1,8 @@
-// Suchtraversierung auf Schichten (Layer Search), gefilterte Suche und adaptive ef-Suche.
-// Invarianten: Zero-Panic; deterministische Sortierung (Score absteigend, DocId aufsteigend); k <= MAX_SEARCH_K.
+// FILE-CONTEXT
+// ZWECK: Suchtraversierung auf Schichten (Layer Search), gefilterte Suche und adaptive ef-Suche.
+// INVARIANTEN: Zero-Panic; deterministische Sortierung (Score absteigend, DocId aufsteigend); k <= MAX_SEARCH_K.
 // HOTSPOTS: search_layer_with_context, search_filtered_internal, search_adaptive_with_stats
+// STAND: 2026-11-12
 
 //! Suchpfad-Implementierung für den HNSW-Index.
 //!

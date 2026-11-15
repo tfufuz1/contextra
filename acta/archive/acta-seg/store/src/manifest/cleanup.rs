@@ -1,3 +1,4 @@
+//! Manifest Validierung, Rekonstruktion und Bereinigung toter SSTables (Ring 1)
 //!
 //! Berechnet die Menge der gültigen und toten SSTables ohne Auferstehungsrisiko
 //! und extrahiert den WAL High-Water-Mark Checkpoint.

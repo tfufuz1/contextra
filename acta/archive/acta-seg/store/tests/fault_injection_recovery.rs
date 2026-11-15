@@ -1,4 +1,5 @@
 #![cfg(feature = "workspace")]
+// ANCHOR[TEST:STO-002] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
 use acta_base::StorageEngine; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_seg::lsm::{LsmConfig, LsmStorage};
 use acta_base::TxId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

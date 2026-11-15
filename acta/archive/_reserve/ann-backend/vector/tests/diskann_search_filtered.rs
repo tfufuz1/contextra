@@ -1,7 +1,9 @@
 //! Integration tests for DiskAnnIndex::search_filtered via adaptive oversampling.
-// DiskANN gefilterte Suche mit Prädikatsprüfung.
-// Invarianten: Alle gelieferten DocIds erfüllen das Filterprädikat; Recall@k bleibt gewahrt.
+// FILE-CONTEXT
+// ZWECK: DiskANN gefilterte Suche mit Prädikatsprüfung.
+// INVARIANTEN: Alle gelieferten DocIds erfüllen das Filterprädikat; Recall@k bleibt gewahrt.
 // HOTSPOTS: 25-100
+// STAND: 2026-11-12
 
 #![cfg(feature = "experimental-diskann")]
 

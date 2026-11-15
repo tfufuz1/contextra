@@ -1,4 +1,7 @@
+//! # Sperrenregister & Rangbasierte Lock-Hierarchie (Ring 1)
 //!
+//! // FILE-CONTEXT
+//! // STAND: 2026-11-11
 //! // ZWECK: Formale Definition der globalen Lock-Akquisitionsreihenfolge im LSM-Speicher
 //! // INVARIANTEN:, MV-08
 //! // HOTSPOTS: commit_mutex, wal.truncate_lock, state, memtable.shards

@@ -9,8 +9,9 @@
 //! - Grenzen: Physische Speicherabbilder, RAM-Reste vor Zeroization, externe Backups
 //!   sind außerhalb des kryptographischen Einflussbereichs dieses Bausteins.
 
-// Envelope Encryption und Key-Registry für KV-Crypto-Shredding.
-// Invarianten: CryptoShred vernichtet KEK (Gruppenbereinigung) oder DEK-Wrap (Einzelbereinigung) in O(1).
+// FILE-CONTEXT
+// ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding.
+// INVARIANTEN: CryptoShred vernichtet KEK (Gruppenbereinigung) oder DEK-Wrap (Einzelbereinigung) in O(1).
 // Zero-Panic, deterministische Fehlerpfade, ZeroizeOnDrop für alle Schlüsseltypen.
 
 #![forbid(unsafe_code)]

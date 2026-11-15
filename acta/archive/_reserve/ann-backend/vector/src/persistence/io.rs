@@ -1,6 +1,8 @@
-// Dateisystem-Naht fuer HNSW-Persistenzpfad (Vorbereitung fuer VFS-Entkopplung).
-// Invarianten: Buendelt alle verbleibenden std::fs-Zugriffe des HNSW-Persistenzpfads.
+// FILE-CONTEXT
+// ZWECK: Dateisystem-Naht fuer HNSW-Persistenzpfad (Vorbereitung fuer VFS-Entkopplung).
+// INVARIANTEN: Buendelt alle verbleibenden std::fs-Zugriffe des HNSW-Persistenzpfads.
 // HOTSPOTS: open_readonly, create_tmp, rename, sync_dir
+// STAND: TS:2026-11-12T00:00:00Z
 
 use std::fs::{File, OpenOptions};
 use std::io;

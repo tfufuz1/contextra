@@ -5,8 +5,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Missbrauchs- und Proptest-Tests für strukturierte Extraktoren (P00B/WP M4).
-// Invarianten: Zero-Panic, LimitExceeded bei Tiefen- und Textgrößenüberschreitungen.
+// FILE-CONTEXT
+// ZWECK: Missbrauchs- und Proptest-Tests für strukturierte Extraktoren (P00B/WP M4).
+// INVARIANTEN: Zero-Panic, LimitExceeded bei Tiefen- und Textgrößenüberschreitungen.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -38,6 +40,7 @@ fn create_ctx<'a>(
     }
 }
 
+// ANCHOR[acta-ingest:TST-0412]
 // Testet die Funktionsfaehigkeit von `test_json_depth_limit_exceeded`.
 #[test]
 fn test_json_depth_limit_exceeded() {
@@ -71,6 +74,7 @@ fn test_json_depth_limit_exceeded() {
     ));
 }
 
+// ANCHOR[acta-ingest:TST-0413]
 // Testet die Funktionsfaehigkeit von `test_yaml_deep_nesting_limit`.
 #[test]
 fn test_yaml_deep_nesting_limit() {
@@ -103,6 +107,7 @@ fn test_yaml_deep_nesting_limit() {
     ));
 }
 
+// ANCHOR[acta-ingest:TST-0414]
 // Testet die Funktionsfaehigkeit von `test_xml_billion_laughs_and_entities_discarded`.
 #[test]
 fn test_xml_billion_laughs_and_entities_discarded() {
@@ -128,6 +133,7 @@ fn test_xml_billion_laughs_and_entities_discarded() {
     assert!(!ir.blocks.is_empty());
 }
 
+// ANCHOR[acta-ingest:TST-0415]
 // Testet die Funktionsfaehigkeit von `test_text_bytes_limit_exceeded`.
 #[test]
 fn test_text_bytes_limit_exceeded() {
@@ -158,6 +164,7 @@ fn test_text_bytes_limit_exceeded() {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
+// ANCHOR[acta-ingest:TST-0416]
 // Testet die Funktionsfaehigkeit von `test_property_zero_panic_arbitrary_bytes`.
     #[test]
     fn test_property_zero_panic_arbitrary_bytes(

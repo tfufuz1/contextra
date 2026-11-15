@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Text-Nachbearbeitung für PDF-Extraktion (Ligaturen, Hyphenation, Absätze, Header/Footer).
-// Invarianten: Zero-Panic, deterministisch (BTreeMap), keine unsafe operations.
+// FILE-CONTEXT
+// ZWECK: Text-Nachbearbeitung für PDF-Extraktion (Ligaturen, Hyphenation, Absätze, Header/Footer).
+// INVARIANTEN: FILE-CONTEXT Kopf, Zero-Panic, deterministisch (BTreeMap), keine unsafe operations.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use std::collections::BTreeMap;
 

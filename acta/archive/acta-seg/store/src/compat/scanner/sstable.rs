@@ -1,8 +1,10 @@
+//! # SSTable-Scanner (Ring 1)
 //!
 //! Ermoeglicht geordnete Bereichsscans ueber eine oder mehrere SSTables.
 
-// SSTable-Scanner für SsTableAllLevels-Schicht.
-// Invarianten: liest Roh-SSTables und Waisen-Dateien (Altdateien) via Block-Reader statt Merge-Iterator.
+// FILE-CONTEXT
+// ZWECK: SSTable-Scanner für SsTableAllLevels-Schicht.
+// INVARIANTEN: liest Roh-SSTables und Waisen-Dateien (Altdateien) via Block-Reader statt Merge-Iterator.
 // HOTSPOTS: [1-100]
 
 #![forbid(unsafe_code)]

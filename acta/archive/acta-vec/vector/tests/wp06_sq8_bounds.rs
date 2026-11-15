@@ -1,5 +1,7 @@
-// Fehlerschranken-, Serialisierungs- und Stabilitätstests für SQ8.
-// Invarianten: Rekonstruktionsfehler <= Delta / 510 je Dimension; Bincode/Serde Roundtrip.
+// FILE-CONTEXT
+// ZWECK: Fehlerschranken-, Serialisierungs- und Stabilitätstests für SQ8.
+// INVARIANTEN: Rekonstruktionsfehler <= Delta / 510 je Dimension; Bincode/Serde Roundtrip.
+// STAND: 2026-11-12
 
 use acta_vec::quantize::{ScalarQuantizer, SQ8_MAX_ERROR_FACTOR_PER_DIM};
 use proptest::prelude::*;

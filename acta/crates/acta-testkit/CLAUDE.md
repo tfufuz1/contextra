@@ -16,8 +16,12 @@ acta-testkit: `ManualClock`, `SeededRng`, Fehlerinjektion, Konformitaetstests (S
 
 ## Status
 - **Stand:** implementiert (Teil)
-- **Produktionscode (ohne Tests/Leerzeilen/Kommentare):** 77 LOC
-- **Archiv-Quelle:** `archive/acta-testkit/` (siehe `archive/acta-testkit/MANIFEST.md`)
+- **Produktionscode (ohne Tests/Leerzeilen/Kommentare):** 155 LOC
+- **Umgesetzt:** `ManualClock`, `SeededRng`, `FailingRng` (Kern); `conformance/failure` und `conformance/macros` (1:1 aus dem Archiv, nur Dokumentation auf SPEC 16.1 umgestellt); `conformance/crypto_rng` (neu, auf den Vertrag `CryptoRng::try_fill` ausgerichtet, Z10). Die Archiv-Vorlage `rng.rs` nutzt die alte API `next_u64`/`fill_bytes` und wurde nicht übernommen.
+- **Bewusst nicht umgesetzt:** Clock-Suite aus dem Archiv. Der Port garantiert nach A-CLOCK nur `now_ms`, keine Monotonie. Die Archiv-Suite würde eine nicht zugesicherte Eigenschaft prüfen.
+- **Offen:** Suiten für `Vfs`, Textindex, Vektorindex und Speicher (im Archiv fehlen die Quellen `conformance/{vfs,text,vector,storage}`). Fehlerinjektion `FaultVfs` liegt in `acta-fs` (`acta_fs::fault`).
+- **Tests:** Einheitstests in den Modulen und Integrationstest `tests/conformance_export.rs` (Prüfung über die exportierte Crate-Wurzel).
+- **Archiv-Quelle:** `archive/acta-testkit/` (siehe `archive/acta-testkit/MANIFEST.md`). Der Archivordner bleibt bestehen, bis das Crate vollständig überführt ist (CLAUDE.md, Abschnitt Archiv und Überführung).
 
 ## Regeln für diesen Crate
 - Abhängigkeiten nur nach unten: `level(A) > level(B)`; keine Querkanten (G1).

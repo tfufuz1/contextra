@@ -8,6 +8,7 @@
 //! dass interne Dokumente unbefugt an externe Cloud-Dienste weitergeleitet werden.
 //!
 //! # Ring-Zugehörigkeit
+//! Ring 3 (Domain-Sicherheit).
 //!
 //! # Invarianten
 //! - **Fail-Closed-Doktrin**: Tritt ein Index-Fehler, uninitialisierter Zustand, leere Treffermenge
@@ -20,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
+// ANCHOR[acta-pii:EG-001]
 /// Vereinfachtes Kandidaten-Ergebnis einer Text- bzw. Vektorähnlichkeitssuche.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextSearchResult {
@@ -29,6 +31,7 @@ pub struct TextSearchResult {
     pub score: f32,
 }
 
+// ANCHOR[acta-pii:EG-002]
 /// Abstraktions-Trait für die Textähnlichkeitssuche zur Entkopplung von konkreten Datenbank-Engines.
 pub trait TextSearchEngine: Send + Sync {
     /// Führt eine Textsuche nach relevanten Dokumenten durch.
@@ -39,13 +42,17 @@ pub trait TextSearchEngine: Send + Sync {
     ) -> BoxFuture<'a, Result<Vec<TextSearchResult>, String>>;
 }
 
+// ANCHOR[acta-pii:EG-003]
 /// Standard-Timeout für EgressGuard Vector-Search (200 ms).
 pub const DEFAULT_EGRESS_GUARD_TIMEOUT: Duration = Duration::from_millis(200);
+// ANCHOR[acta-pii:EG-004]
 /// Standard-Schwellwert für Cosine-Similarity-Übereinstimmung (0.85 = 85 % Ähnlichkeit).
 pub const DEFAULT_EGRESS_GUARD_THRESHOLD: f32 = 0.85;
+// ANCHOR[acta-pii:EG-005]
 /// Minimale Byte-Länge des Payloads, ab der die Ähnlichkeitsprüfung durchgeführt wird (128 Bytes).
 pub const DEFAULT_EGRESS_GUARD_MIN_BYTES: usize = 128;
 
+// ANCHOR[acta-pii:EG-006]
 /// Layer-4 EgressGuard zur Erkennung und Blockierung von Bulk-Exfiltrationen.
 ///
 /// Baut auf einem Text-Sucher (`TextSearchEngine`) auf.
@@ -61,6 +68,7 @@ pub struct EgressGuard {
 }
 
 impl EgressGuard {
+    // ANCHOR[acta-pii:EG-007]
     /// Erstellt eine neue `EgressGuard`-Instanz mit Standard-Timeout (200 ms).
     pub fn new(search_engine: Arc<dyn TextSearchEngine>, threshold: f32, min_bytes: usize) -> Self {
         Self {
@@ -71,27 +79,32 @@ impl EgressGuard {
         }
     }
 
+    // ANCHOR[acta-pii:EG-008]
     /// Setzt ein benutzerdefiniertes Timeout für die Index-Abfrage.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    // ANCHOR[acta-pii:EG-009]
     /// Gibt den gesetzten Schwellwert für Ähnlichkeitsprüfungen zurück.
     pub fn threshold(&self) -> f32 {
         self.threshold
     }
 
+    // ANCHOR[acta-pii:EG-010]
     /// Gibt die minimale Payload-Länge in Bytes zurück.
     pub fn min_bytes(&self) -> usize {
         self.min_bytes
     }
 
+    // ANCHOR[acta-pii:EG-011]
     /// Gibt das konfigurierte Abfrage-Timeout zurück.
     pub fn timeout(&self) -> Duration {
         self.timeout
     }
 
+    // ANCHOR[acta-pii:EG-012]
     /// Prüft einen an einen Mandanten gebundenen Payload ([`crate::types::TenantScoped`]) mit Mandantenisolationsprüfung.
     ///
     /// Liefert `Block(BlockReason::PolicyDenied(...))` bei Mandantenkonflikten.
@@ -106,6 +119,7 @@ impl EgressGuard {
         }
     }
 
+    // ANCHOR[acta-pii:EG-013]
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
     /// Gemäß **v17 Teil 10.3** (Priorität P1, "Fail-Closed-Randfall"), Invariante ****
@@ -170,6 +184,7 @@ impl EgressGuard {
     }
 }
 
+// ANCHOR[acta-pii:EG-014]
 // Implementierung des EgressClassifier-Traits zur nahtlosen Einbindung in die Schutz-Pipeline.
 impl EgressClassifier for EgressGuard {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {

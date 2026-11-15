@@ -1,6 +1,8 @@
-// Begrenzter ComputePool für CPU-intensive Tasks (z. B. HNSW-Index-Rebuild).
-// Invarianten: Zero-Panic Doctrine; feste Obergrenze an Worker-Threads; begrenzter Kanal; sauberes Beenden bei Drop ohne JoinHandle-Leck.
+// FILE-CONTEXT
+// ZWECK: Begrenzter ComputePool für CPU-intensive Tasks (z. B. HNSW-Index-Rebuild).
+// INVARIANTEN: Zero-Panic Doctrine; feste Obergrenze an Worker-Threads; begrenzter Kanal; sauberes Beenden bei Drop ohne JoinHandle-Leck.
 // HOTSPOTS: compute_pool.rs (Job-Queue & Task-Dispatch)
+// STAND: 2026-11-12
 
 use crate::error::{Result as VectorResult, VectorError};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -15,6 +17,7 @@ pub const DEFAULT_QUEUE_CAPACITY_PER_WORKER: usize = 128;
 
 // SECTION TaskHandle
 
+// ANCHOR[acta-vec:POOL-TASK-HANDLE]
 /// Handle zum Abwarten des Ergebnisses eines an den [`ComputePool`] übergebenen Tasks.
 pub struct TaskHandle<T> {
     rx: Receiver<VectorResult<T>>,
@@ -49,6 +52,7 @@ struct PoolState {
     worker_handles: parking_lot::Mutex<Vec<thread::JoinHandle<()>>>,
 }
 
+// ANCHOR[acta-vec:POOL-COMPUTE-POOL]
 /// Begrenzter Compute-Threadpool für Hintergrundberechnungen und rechenintensive Indizierung.
 /// Erzwingt eine strikte Obergrenze für Worker-Threads und eine beschränkte Auftragswarteschlange.
 #[derive(Clone)]
@@ -74,6 +78,7 @@ impl Drop for PoolState {
 
 impl ComputePool {
     /// Erzeugt einen neuen [`ComputePool`] mit fester Worker-Thread-Grenze und beschränktem Puffer.
+    // ANCHOR[acta-vec:POOL-NEW]
     pub fn new(max_workers: usize) -> Self {
         Self::with_queue_capacity(
             max_workers,

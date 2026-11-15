@@ -1,4 +1,5 @@
 // =========================================================================
+// ANCHOR[id=sys-vault-main,epic=sys-vault,seq=0] Tresor-Speicherverwaltung
 // =========================================================================
 // NOTE: RAII manager for RAM memory-locked sensitive buffer regions, protected page allocations, and zeroization.
 // Invariante: Zero panic; VaultBuffer protected allocation; non-optimizable volatile zeroize + compiler fence; mlock + MADV_DONTDUMP; munlock after zeroize.
@@ -10,6 +11,7 @@
 //! für sensible kryptografische Puffer im Arbeitsspeicher bereit.
 //!
 //! ## Ring-Zugehörigkeit und Sicherheitsarchitektur
+//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Baut auf [`crate::mlock`] auf und kapselt flüchtiges
 //!   Überschreiben (Volatile Memory Zeroization) via `write_volatile` in Kombination mit
 //!   einer sequenziellen Compiler-Fence (`std::sync::atomic::compiler_fence(Ordering::SeqCst)`).
 //! - **Verwendung im System:** Wird von Kryptografie- und Schlüsselverwaltungsmodulen
@@ -29,6 +31,7 @@ use crate::mlock::{
 };
 
 // SECTION Locked Regions Tracker
+// ANCHOR[id=sys-vault-tracker,epic=sys-vault,seq=1] LockedRegions
 
 /// Kapselt und verfolgt im RAM gesperrte Speicherbereiche (Adressen und Längen) für sensible Schlüsseldaten.
 #[derive(Debug, Default)]
@@ -113,6 +116,7 @@ impl Drop for LockedRegions {
 // !SECTION Locked Regions Tracker
 
 // SECTION Protected Vault Buffer
+// ANCHOR[id=sys-vault-buffer,epic=sys-vault,seq=2] VaultBuffer
 
 /// Ein im RAM verankerter, geschützter Speicherpuffer für hochsensible kryptografische Schlüsseldaten.
 #[derive(Debug)]
@@ -197,6 +201,7 @@ impl std::ops::DerefMut for VaultBuffer {
     }
 }
 
+// ANCHOR[id=sys-vault-drop,epic=sys-vault,seq=3] RAII Drop-Säuberung
 // NOTE: Führt volatile zeroize vor munlock.
 impl Drop for VaultBuffer {
     fn drop(&mut self) {
@@ -212,6 +217,7 @@ impl Drop for VaultBuffer {
 // !SECTION Protected Vault Buffer
 
 // SECTION Unit Tests
+// ANCHOR[id=sys-vault-tests,epic=sys-vault,seq=4] Vault-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;

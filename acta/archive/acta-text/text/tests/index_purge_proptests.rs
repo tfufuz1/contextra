@@ -2,6 +2,7 @@
 //! Testsuite `index_purge_proptests.rs` für acta-text.
 //!
 //! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
 
 use acta_ports::{BoxFuture, StorageEngine, StorageStats, TextIndex};
 use acta_text::morphology::{
@@ -150,6 +151,7 @@ fn deterministic_config() -> proptest::test_runner::Config {
 proptest! {
     #![proptest_config(deterministic_config())]
 
+// ANCHOR[acta-text:TEST-168]
 // Testfall `prop_compound_splitter_umlauts_and_sz_never_panic`: Prüft das Verhalten und Invarianten der Textverarbeitung.
     #[test]
     fn prop_compound_splitter_umlauts_and_sz_never_panic(s in "[a-zA-ZäöüÄÖÜß-]{1,50}") {
@@ -159,6 +161,7 @@ proptest! {
         prop_assert!(!decomp.is_empty());
     }
 
+// ANCHOR[acta-text:TEST-169]
 // Testfall `prop_compound_splitter_hyphenated_never_panic`: Prüft das Verhalten und Invarianten der Textverarbeitung.
     #[test]
     fn prop_compound_splitter_hyphenated_never_panic(s in "[a-z]{3,10}-[a-z]{3,10}") {
@@ -167,6 +170,7 @@ proptest! {
         prop_assert!(!decomp.is_empty());
     }
 
+// ANCHOR[acta-text:TEST-170]
 // Testfall `prop_tokenizer_case_and_normalization_determinism`: Prüft das Verhalten und Invarianten der Textverarbeitung.
     #[test]
     fn prop_tokenizer_case_and_normalization_determinism(s in "[a-zäöüßA-ZÄÖÜ]{1,30}") {
@@ -188,6 +192,7 @@ proptest! {
     }
 }
 
+// ANCHOR[acta-text:TEST-171]
 // Testfall `test_index_purge_search_never_returns_purged_doc`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_index_purge_search_never_returns_purged_doc() -> Result<()> {
@@ -224,6 +229,7 @@ async fn test_index_purge_search_never_returns_purged_doc() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-text:TEST-172]
 // Testfall `test_purge_search_non_retrieval_after_reload`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_search_non_retrieval_after_reload() -> Result<()> {
@@ -252,6 +258,7 @@ async fn test_purge_search_non_retrieval_after_reload() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-text:TEST-173]
 // Testfall `test_compound_splitter_edge_case_exact_128_bytes`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_compound_splitter_edge_case_exact_128_bytes() {
@@ -265,6 +272,7 @@ fn test_compound_splitter_edge_case_exact_128_bytes() {
     assert_eq!(parts_over.len(), 1);
 }
 
+// ANCHOR[acta-text:TEST-174]
 // Testfall `test_compound_splitter_edge_case_empty_and_short`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_compound_splitter_edge_case_empty_and_short() {
@@ -274,6 +282,7 @@ fn test_compound_splitter_edge_case_empty_and_short() {
     assert_eq!(splitter.decompose("ab"), vec!["ab"]);
 }
 
+// ANCHOR[acta-text:TEST-175]
 // Testfall `test_compound_splitter_edge_case_hyphenated_words`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_compound_splitter_edge_case_hyphenated_words() {
@@ -282,6 +291,7 @@ fn test_compound_splitter_edge_case_hyphenated_words() {
     assert!(!parts.is_empty());
 }
 
+// ANCHOR[acta-text:TEST-176]
 // Testfall `test_compound_splitter_edge_case_german_umlauts_and_sz`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_compound_splitter_edge_case_german_umlauts_and_sz() {
@@ -291,6 +301,7 @@ fn test_compound_splitter_edge_case_german_umlauts_and_sz() {
     assert!(!parts.is_empty());
 }
 
+// ANCHOR[acta-text:TEST-177]
 // Testfall `test_tokenizer_try_new_fallible_and_deprecated_new`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_tokenizer_try_new_fallible_and_deprecated_new() {
@@ -309,6 +320,7 @@ fn test_tokenizer_try_new_fallible_and_deprecated_new() {
     assert!(!german_tok.tokenize("datenschutzrichtlinie").is_empty());
 }
 
+// ANCHOR[acta-text:TEST-178]
 // Testfall `test_purge_report_default_and_new_equivalence`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_purge_report_default_and_new_equivalence() {
@@ -323,6 +335,7 @@ fn test_purge_report_default_and_new_equivalence() {
     assert!(r1.errors.is_empty());
 }
 
+// ANCHOR[acta-text:TEST-179]
 // Testfall `test_purge_report_partial_failure_error_formatting`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_purge_report_partial_failure_error_formatting() {
@@ -343,6 +356,7 @@ fn test_purge_report_partial_failure_error_formatting() {
     }
 }
 
+// ANCHOR[acta-text:TEST-180]
 // Testfall `test_compile_protected_regex_valid_pattern`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_compile_protected_regex_valid_pattern() {
@@ -353,6 +367,7 @@ fn test_compile_protected_regex_valid_pattern() {
     assert!(re.is_match("user@test.com"));
 }
 
+// ANCHOR[acta-text:TEST-181]
 // Testfall `test_german_compound_splitter_with_min_length_boundaries`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_german_compound_splitter_with_min_length_boundaries() {
@@ -363,6 +378,7 @@ fn test_german_compound_splitter_with_min_length_boundaries() {
     assert_eq!(splitter_4.min_component_len(), 4);
 }
 
+// ANCHOR[acta-text:TEST-182]
 // Testfall `test_german_compound_splitter_extend_vocabulary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_german_compound_splitter_extend_vocabulary() {
@@ -372,6 +388,7 @@ fn test_german_compound_splitter_extend_vocabulary() {
     assert_eq!(decomp, vec!["customstem", "customroot"]);
 }
 
+// ANCHOR[acta-text:TEST-183]
 // Testfall `test_german_compound_splitter_language_code`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_german_compound_splitter_language_code() {
@@ -379,6 +396,7 @@ fn test_german_compound_splitter_language_code() {
     assert_eq!(splitter.language(), "de");
 }
 
+// ANCHOR[acta-text:TEST-184]
 // Testfall `test_collection_purge_report_and_reloaded_search`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_collection_purge_report_and_reloaded_search() -> Result<()> {

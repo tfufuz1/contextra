@@ -1,10 +1,13 @@
-// RAII-Guards fuer Rebuild-Synchronisation und Snapshot-Pinning im SequenceLog.
-// Invarianten: RebuildGuard setzt atomar rebuilding=false und signalisiert Condvar beim Drop.
+// FILE-CONTEXT
+// ZWECK: RAII-Guards fuer Rebuild-Synchronisation und Snapshot-Pinning im SequenceLog.
+// INVARIANTEN: RebuildGuard setzt atomar rebuilding=false und signalisiert Condvar beim Drop.
 // HOTSPOTS: RebuildGuard::drop, SnapshotPinGuard::drop
+// STAND: TS:2026-11-12T00:00:00Z
 
 use super::core::HnswIndexCore;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+// ANCHOR[acta-vec:HNSW-REBUILD-GUARD]
 /// Guard, der das `rebuilding`-Flag auf `false` zuruecksetzt und wartende Threads weckt.
 pub struct RebuildGuard<'a>(pub &'a AtomicBool, pub &'a parking_lot::Condvar);
 
@@ -16,6 +19,7 @@ impl<'a> Drop for RebuildGuard<'a> {
     }
 }
 
+// ANCHOR[acta-vec:HNSW-SNAPSHOT-PIN-GUARD]
 /// Guard, der einen Snapshot im `SequenceLog` pinnt und beim Drop wieder freigibt.
 pub struct SnapshotPinGuard<'a>(pub &'a HnswIndexCore, pub(crate) u64);
 

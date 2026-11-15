@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Markdown Extractor mit Raw-Identitätsinvariante und Titel-Extraktion (WP M4).
-// Invarianten: Ein BlockKind::Raw, kanonischer Text byte-identisch zum Eingabetext.
+// FILE-CONTEXT
+// ZWECK: Markdown Extractor mit Raw-Identitätsinvariante und Titel-Extraktion (WP M4).
+// INVARIANTEN: Ein BlockKind::Raw, kanonischer Text byte-identisch zum Eingabetext.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::format::FormatId;
 use crate::ir::{BlockKind, DocumentIr, Locator};

@@ -6,6 +6,7 @@
 //! Entscheidung bzw. Regel-ID und den Zeitstempel deterministisch miteinander.
 //!
 //! # Ring-Zugehörigkeit
+//! Ring 3 (Domain / Audit-Dienste).
 //!
 //! # Invarianten
 //! - Der Hash-Trace ist vollkommen deterministisch aus Payload, Regel-ID und injiziertem Clock-Zeitstempel.
@@ -15,6 +16,7 @@
 use crate::egress_vault::{BlockReason, BoxFuture, EgressClassification, EgressClassifier};
 use crate::types::Clock;
 
+// ANCHOR[acta-pii:AT-001]
 /// Extrahiert eine stabile, nicht-leere Regel-Kennung aus einer [`EgressClassification`].
 ///
 /// # Ablauf
@@ -44,6 +46,7 @@ pub fn extract_rule_id(classification: &EgressClassification) -> String {
     }
 }
 
+// ANCHOR[acta-pii:AT-002]
 /// Berechnet einen deterministischen 32-Byte-BLAKE3-Hash-Trace für eine Klassifikationsentscheidung.
 ///
 /// Segmente werden in fester Byte-Reihenfolge mit 8-Byte Little-Endian Längenpräfixen serialisiert:
@@ -77,6 +80,7 @@ pub fn compute_audit_trace(payload: &str, rule_id: &str, nanos: u64) -> [u8; 32]
     *hasher.finalize().as_bytes()
 }
 
+// ANCHOR[acta-pii:AT-003]
 /// Erweiterter Trait für Egress-Klassifikatoren mit kryptografischem Audit-Trace.
 ///
 /// Kombiniert die reguläre Klassifikation mit der deterministischen Trace-Berechnung über einen Zeitstempel-Port.
@@ -100,6 +104,7 @@ pub trait EgressClassifierTrace: EgressClassifier {
     ) -> BoxFuture<'a, (EgressClassification, [u8; 32])>;
 }
 
+// ANCHOR[acta-pii:AT-004]
 // Automatische Implementierung für alle Typen, die EgressClassifier implementieren.
 impl<T: EgressClassifier + ?Sized> EgressClassifierTrace for T {
     fn classify_with_trace<'a>(

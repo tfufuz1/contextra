@@ -1,8 +1,10 @@
 //! Proptest-Suite für ScalarQuantizer und compute_distance.
 //! Verifiziert mathematische Invarianten über zufällige Eingaben.
-// Proptest für SQ8 Quantisierungs- und Dequantisierungs-Fehlerschranken.
-// Invarianten: Rekonstruktionsfehler je Dimension <= (max - min) / 255.0.
+// FILE-CONTEXT
+// ZWECK: Proptest für SQ8 Quantisierungs- und Dequantisierungs-Fehlerschranken.
+// INVARIANTEN: Rekonstruktionsfehler je Dimension <= (max - min) / 255.0.
 // HOTSPOTS: 20-80
+// STAND: 2026-11-12
 
 use acta_base::DistanceMetric; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_vec::distance::compute_distance;

@@ -22,6 +22,7 @@ use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+// ANCHOR[acta-testkit:STAGED-VECTOR-OP-ENUM-001]
 /// Staging-Operation für Vektor-Modifikationen innerhalb einer offenen Transaktion.
 #[derive(Debug, Clone)]
 enum StagedVectorOp {
@@ -36,6 +37,7 @@ type VectorMap = BTreeMap<DocId, Vec<f32>>;
 /// Transaktions-ID -> (Dokument-ID -> StagedVectorOp).
 type StagedVectorTxMap = BTreeMap<TxId, BTreeMap<DocId, StagedVectorOp>>;
 
+// ANCHOR[acta-testkit:IN-MEM-VECTOR-STRUCT-001]
 /// Thread-sichere Referenzimplementierung von [`VectorIndex`] für Tests.
 ///
 /// **Zweck:** Ermöglicht semantische Vektorsuchen in Unit- und Integrationstests,
@@ -58,6 +60,7 @@ pub struct InMemoryVectorIndex {
 }
 
 impl InMemoryVectorIndex {
+    // ANCHOR[acta-testkit:IN-MEM-VECTOR-NEW-001]
     /// Erstellt einen neuen `InMemoryVectorIndex` mit der erwarteten Vektordimension `dim`.
     pub fn new(dim: usize) -> Self {
         Self {
@@ -69,6 +72,7 @@ impl InMemoryVectorIndex {
     }
 }
 
+// ANCHOR[acta-testkit:IN-MEM-VECTOR-TRAIT-IMPL-001]
 impl VectorIndex for InMemoryVectorIndex {
     /// Stellt das Einfügen eines Vektors für Dokument `id` im Transaktionskontext bereit.
     ///
@@ -157,6 +161,7 @@ impl VectorIndex for InMemoryVectorIndex {
         Ok(data.keys().copied().collect())
     }
 
+    // ANCHOR[acta-testkit:IN-MEM-VECTOR-SEARCH-001]
     /// Führt einen linearen Exact-kNN-Scan (k-Nearest Neighbors) durch.
     ///
     /// **Ablauf:**

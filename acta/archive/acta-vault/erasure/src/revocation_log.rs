@@ -6,8 +6,9 @@
 //! - Einmal widerrufene Schlüsselgruppen können niemals wiederhergestellt oder reaktiviert werden.
 //! - Bei Erkennung von Manipulationen am Log versagt das System fail-closed.
 
-// Persistierter, Ed25519-signierter, manipulationssicherer Append-Only Widerrufslog (v17 Teil 16.1).
-// Invarianten: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag.
+// FILE-CONTEXT
+// ZWECK: Persistierter, Ed25519-signierter, manipulationssicherer Append-Only Widerrufslog (v17 Teil 16.1).
+// INVARIANTEN: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag.
 // ABGRENZUNG PROMPT 10: Prompt 10 definiert KEK/DEK Envelope-Datenstrukturen; revocation_log stellt die persistierte Widerrufs-Engine bereit.
 // ABGRENZUNG PROMPT 12: Prompt 12 betrifft die Audit-Hash-Kette, die diesen Revocation-Log als Eingabequelle referenzieren kann, aber ein eigenständiges, separates System-Artefakt ist.
 // HOTSPOTS: [RevocationLog::open_or_create, RevocationLog::append, RevocationLog::verify_chain]
@@ -122,6 +123,7 @@ pub fn compute_entry_hash(
 }
 
 /// Thread-sicherer, persistierter, Ed25519-signierter Widerrufslog.
+// ANCHOR[acta-crypto:REV-001]
 /// Persistentes Protokoll über widerrufene Schlüsselgruppen.
 pub struct RevocationLog {
     storage: Option<(Arc<dyn Vfs>, PathBuf)>,

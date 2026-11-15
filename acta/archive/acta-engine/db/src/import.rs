@@ -2,10 +2,13 @@
 //!
 //! **Zweck:** Import-Pipeline zur Wiederherstellung von Snapshots und Bestandsdaten.
 //!
+//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
-// Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0").
-// Invarianten: Schema-Versionsprüfung (Pflicht); Idempotenz bezüglich ID (Upsert); Transaktionale Verlässlichkeit.
+// FILE-CONTEXT
+// ZWECK: Import-Funktionalität & Zusammenfassung für Memory-Export-Format v1 (Schema Version "1.0").
+// INVARIANTEN: Schema-Versionsprüfung (Pflicht); Idempotenz bezüglich ID (Upsert); Transaktionale Verlässlichkeit.
+// STAND: TS:2026-09-12
 
 use crate::collection::Collection;
 use crate::export::{ExportCollectionV1, ExportDocumentV1, SCHEMA_VERSION_V1};

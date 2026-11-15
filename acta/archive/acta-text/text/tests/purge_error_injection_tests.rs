@@ -2,6 +2,7 @@
 //! Testsuite `purge_error_injection_tests.rs` für acta-text.
 //!
 //! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
 
 use acta_ports::{BoxFuture, StorageEngine, StorageStats, TextIndex};
 use acta_text::{InvertedIndex, TextPurger};
@@ -151,6 +152,7 @@ impl StorageEngine for FaultyStorage {
     }
 }
 
+// ANCHOR[acta-text:TEST-185]
 // Testfall `test_purge_report_success_on_clean_document`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_report_success_on_clean_document() -> Result<()> {
@@ -178,6 +180,7 @@ async fn test_purge_report_success_on_clean_document() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[acta-text:TEST-186]
 // Testfall `test_purge_report_catches_corrupted_posting_list_bytes`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_report_catches_corrupted_posting_list_bytes() -> Result<()> {
@@ -218,6 +221,7 @@ async fn test_purge_report_catches_corrupted_posting_list_bytes() -> Result<()> 
     Ok(())
 }
 
+// ANCHOR[acta-text:TEST-187]
 // Testfall `test_purge_report_catches_storage_deletion_failure`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_report_catches_storage_deletion_failure() -> Result<()> {

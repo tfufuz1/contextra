@@ -21,6 +21,7 @@
 //! [`escape_markdown`] bereinigt und maskiert.
 //!
 //! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung). Reines String-Building im Arbeitsspeicher ohne I/O.
 
 use crate::error::AvvError;
 use crate::{
@@ -29,6 +30,7 @@ use crate::{
 };
 use std::fmt::Write;
 
+// ANCHOR[acta-reports:TPL-001]
 /// Maskiert Markdown-Steuerzeichen in Benutzereingaben zur Verhinderung von Formatierungs-Injections.
 ///
 /// Ersetzt Zeichen mit spezieller Markdown-Bedeutung (wie `*`, `_`, `#`, `\`, `|` usw.)
@@ -70,6 +72,7 @@ pub fn escape_markdown(input: &str) -> String {
     escaped
 }
 
+// ANCHOR[acta-reports:TPL-002]
 /// Rendert das AVV-Markdown-Dokument basierend auf den Parametern in [`AvvContext`].
 ///
 /// Falls kein explizites Vertragsdatum in `ctx.contract_date` hinterlegt ist,
@@ -89,6 +92,7 @@ pub fn render(ctx: &AvvContext) -> Result<String, AvvError> {
     render_with_date(ctx, date_str)
 }
 
+// ANCHOR[acta-reports:TPL-003]
 /// Rendert das AVV-Markdown-Dokument mit einer expliziten Datumsangabe.
 ///
 /// # Ablauf
@@ -128,6 +132,7 @@ pub fn render_with_date(ctx: &AvvContext, date: &str) -> Result<String, AvvError
     Ok(out)
 }
 
+// ANCHOR[acta-reports:TPL-004]
 // Rendert den Dokumentkopf mit Titel, rechtlichem Haftungsausschluss (Disclaimer),
 // den Vertragsparteien (Verantwortlicher, Verarbeiter), der Mandanten-ID und dem Vertragsdatum.
 fn render_header(out: &mut String, ctx: &AvvContext, date: &str) -> Result<(), AvvError> {
@@ -168,6 +173,7 @@ fn render_header(out: &mut String, ctx: &AvvContext, date: &str) -> Result<(), A
     Ok(())
 }
 
+// ANCHOR[acta-reports:TPL-005]
 // Rendert Abschnitt 1: Gegenstand (Nutzung der Acta RAG- & Vektordatenbank)
 // sowie Dauer der Verarbeitung (gekoppelt an den Hauptvertrag).
 fn render_scope_and_duration(out: &mut String) -> Result<(), AvvError> {
@@ -186,6 +192,7 @@ fn render_scope_and_duration(out: &mut String) -> Result<(), AvvError> {
     Ok(())
 }
 
+// ANCHOR[acta-reports:TPL-006]
 // Rendert Abschnitt 2: Art und Zweck der Verarbeitung
 // (automatisierte Vektorisierung, Indexierung, RAG = Retrieval-Augmented Generation).
 fn render_nature_and_purpose(out: &mut String) -> Result<(), AvvError> {
@@ -199,6 +206,7 @@ fn render_nature_and_purpose(out: &mut String) -> Result<(), AvvError> {
     Ok(())
 }
 
+// ANCHOR[acta-reports:TPL-007]
 // Rendert Abschnitt 3: Kategorien der verarbeiteten personenbezogenen Daten
 // und die Kategorien betroffener Personen (Kunden, Mitarbeiter, Mandanten usw.).
 fn render_data_and_subjects(out: &mut String) -> Result<(), AvvError> {
@@ -220,6 +228,7 @@ fn render_data_and_subjects(out: &mut String) -> Result<(), AvvError> {
     Ok(())
 }
 
+// ANCHOR[acta-reports:TPL-008]
 // Rendert Abschnitt 6: Technische und organisatorische Maßnahmen (TOM) nach Art. 32 DSGVO.
 // Gibt entweder eine Hinweisklausel bei leerer Liste aus oder listet jede Maßnahme mit
 // Überschrift, gesetzlichem Referenzartikel und Detailbeschreibung auf.
@@ -260,6 +269,7 @@ fn render_technical_measures(
     Ok(())
 }
 
+// ANCHOR[acta-reports:TPL-009]
 // Rendert Abschnitt 7: Regelungen für Unterauftragsverarbeiter nach Art. 28 Abs. 2 und 4 DSGVO.
 // Definiert die Genehmigungspflicht, Informationspflicht bei Wechseln und listet
 // entweder bestehende Unterauftragnehmer auf oder stellt klar, dass keine Dritten eingesetzt werden.

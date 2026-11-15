@@ -5,12 +5,14 @@ use super::trie::Trie;
 use crate::domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
 use std::collections::HashSet;
 
+// ANCHOR[acta-text:MORPH-016]
 /// KMU-Fachvokabular und allgemeiner deutscher Wortschatz.
 ///
 /// Zur Kompilierzeit eingebettetes Wörterbuch (aus `data/german_words.txt`).
 /// Verhindert Hartcodierung im Quelltext und ermöglicht einfache Erweiterbarkeit.
 const DEFAULT_GERMAN_WORDS: &str = include_str!("../data/german_words.txt");
 
+// ANCHOR[acta-text:MORPH-017]
 /// Trait für morphologische Zerlegung von Wörtern in ihre Grundbestandteile.
 ///
 /// # Eingabevertrag
@@ -27,6 +29,7 @@ pub trait MorphologicalTokenizer: Send + Sync {
     fn language(&self) -> &str;
 }
 
+// ANCHOR[acta-text:MORPH-018]
 /// Deutscher Komposita-Zerleger basierend auf Dynamischer Programmierung und Fugenanalyse.
 ///
 /// # Funktionsweise & Algorithmus
@@ -46,11 +49,13 @@ pub struct GermanCompoundSplitter {
 }
 
 impl GermanCompoundSplitter {
+    // ANCHOR[acta-text:MORPH-019]
     /// Erzeugt einen neuen Zerleger mit der Standard-Mindestlänge (3 Zeichen) und Basis-Wortschatz.
     pub fn new() -> Self {
         Self::with_min_length(3)
     }
 
+    // ANCHOR[acta-text:MORPH-020]
     /// Erzeugt einen Zerleger mit konfigurierbarer Mindest-Segmentlänge.
     pub fn with_min_length(min_len: usize) -> Self {
         let mut trie = Trie::new();
@@ -71,6 +76,7 @@ impl GermanCompoundSplitter {
         }
     }
 
+    // ANCHOR[acta-text:MORPH-021]
     /// Erzeugt einen Zerleger mit benutzerdefiniertem Wörterbuch.
     pub fn with_dictionary(min_len: usize, custom_words: HashSet<String>) -> Self {
         let mut trie = Trie::new();
@@ -87,6 +93,7 @@ impl GermanCompoundSplitter {
         }
     }
 
+    // ANCHOR[acta-text:MORPH-022]
     /// Erzeugt einen Zerleger erweitert um spezifische Fachvokabulare (z. B. Recht, Medizin).
     pub fn with_domains(min_len: usize, domains: &[&dyn DomainVocabulary]) -> Self {
         let mut splitter = Self::with_min_length(min_len);
@@ -107,6 +114,7 @@ impl GermanCompoundSplitter {
         splitter
     }
 
+    // ANCHOR[acta-text:MORPH-023]
     /// Erzeugt einen Zerleger mit allen eingebauten Fachdomänen (Recht & Medizin).
     pub fn new_with_all_domains() -> Self {
         let legal = LegalDomainVocabulary;
@@ -114,6 +122,7 @@ impl GermanCompoundSplitter {
         Self::with_domains(3, &[&legal, &medical])
     }
 
+    // ANCHOR[acta-text:MORPH-024]
     /// Erweitert das Wörterbuch des Zerlegers dynamisch um zusätzliche Begriffe.
     pub fn extend_vocabulary(&mut self, words: impl IntoIterator<Item = impl AsRef<str>>) {
         for word in words {
@@ -124,6 +133,7 @@ impl GermanCompoundSplitter {
         }
     }
 
+    // ANCHOR[acta-text:MORPH-025]
     /// Liefert die Mindestlänge für Teilkomponenten.
     pub fn min_component_len(&self) -> usize {
         self.min_component_len
@@ -140,6 +150,7 @@ impl GermanCompoundSplitter {
         self.max_depth
     }
 
+    // ANCHOR[acta-text:MORPH-026]
     // Prüft, ob ein Teilabschnitt ein gültiges Wörterbuch-Wort oder Stamm + Fugenelement darstellt.
     fn is_valid_component(&self, sub: &str, is_last: bool) -> bool {
         let norm_sub = normalize_umlauts(sub);
@@ -190,6 +201,7 @@ struct PathNode {
 }
 
 impl MorphologicalTokenizer for GermanCompoundSplitter {
+    // ANCHOR[acta-text:MORPH-027]
     // Ablauf der Komposita-Zerlegung:
     // 1. Validierung: Abbruch falls Großbuchstaben vorhanden, Token zu kurz (<= min_component_len) oder > 128 Bytes.
     // 2. DP-Tabelle initialisieren (dp[i] speichert besten Pfad bis Byte-Offset i).
@@ -296,6 +308,7 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
         vec![token]
     }
 
+    // ANCHOR[acta-text:MORPH-028]
     fn language(&self) -> &str {
         "de"
     }

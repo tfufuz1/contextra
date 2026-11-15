@@ -1,4 +1,5 @@
-// Bit-Determinismus-Test für skalare Distanzen.
+// FILE-CONTEXT
+// ZWECK: Bit-Determinismus-Test für skalare Distanzen.
 
 use acta_vec::distance::ScalarDistance;
 use acta_vec::distance::contract::{DistanceFn, Metric};

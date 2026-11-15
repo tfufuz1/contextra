@@ -38,6 +38,7 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
+// ANCHOR[acta-license:TEST-ISOLATION-COPIED-FAILS]
 // Prüft, dass das Kopieren eines Aktivierungsdatensatzes auf einen fremden Host fehlschlägt.
 #[test]
 fn test_copied_activation_to_foreign_host_fails() {
@@ -70,6 +71,7 @@ fn test_copied_activation_to_foreign_host_fails() {
     assert!(!err_fmt.contains("BB"));
 }
 
+// ANCHOR[acta-license:TEST-ISOLATION-NO-RAW-HASH-LEAK]
 // Prüft, dass Fehlerkonvertierung bei Installations-Mismatch keine Roh-Hashes offenlegt.
 #[test]
 fn test_installation_mismatch_step_error_conversion_leaks_no_raw_hash() {
@@ -83,6 +85,7 @@ fn test_installation_mismatch_step_error_conversion_leaks_no_raw_hash() {
     assert!(!display_str.contains("hardware"));
 }
 
+// ANCHOR[acta-license:TEST-ISOLATION-HASH-STABILITY]
 // Prüft die deterministische Stabilität von derive_local_installation_id_hash über wiederholte Aufrufe.
 #[test]
 fn test_derive_local_installation_id_hash_stability() {

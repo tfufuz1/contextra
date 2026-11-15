@@ -1,3 +1,4 @@
+//! # Binaersuche in SSTable-Bloecken (Ring 1)
 //!
 //! Stellt hochoptimierte Binaersuchroutinen ueber geordnete Schluessel-Offsets
 //! innerhalb eines SSTable-Datenblocks bereit.

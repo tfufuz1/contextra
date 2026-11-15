@@ -1,11 +1,14 @@
 //! Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 //!
 //! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// Aufspaltung übergroßer Blöcke (Code, Tabelle, Absatz, Liste) über dem Hard-Limit.
-// Invarianten: Zero-Panic, UTF-8-sicher, Sprachsynthese von Code-Fences und Tabellenköpfen, Deterministisch.
+// FILE-CONTEXT
+// ZWECK: Aufspaltung übergroßer Blöcke (Code, Tabelle, Absatz, Liste) über dem Hard-Limit.
+// INVARIANTEN: Zero-Panic, UTF-8-sicher, Sprachsynthese von Code-Fences und Tabellenköpfen, Deterministisch.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use super::markdown_parse::ParsedListItem;
 use super::sentence::{split_sentences, SentenceSpan};
@@ -18,6 +21,7 @@ use std::ops::Range;
 
 /// Kontextdaten für das Aufspalten übergroßer Blöcke.
 #[derive(Debug, Clone)]
+// ANCHOR[acta-ingest:CHK-0230]
 // struct `SplitContext` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub struct SplitContext<'a> {
     pub span: Range<usize>,
@@ -29,6 +33,7 @@ pub struct SplitContext<'a> {
 }
 
 /// Erzeugt Teil-Drafts für einen übergroßen Codeblock.
+// ANCHOR[acta-ingest:CHK-0231]
 // fn `split_oversized_code` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_code(
     fence_head: &str,
@@ -115,6 +120,7 @@ pub fn split_oversized_code(
 }
 
 /// Erzeugt Teil-Drafts für eine übergroße Tabelle.
+// ANCHOR[acta-ingest:CHK-0232]
 // fn `split_oversized_table` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_table(
     header_lines: &[String],
@@ -210,6 +216,7 @@ pub fn split_oversized_table(
 }
 
 /// Erzeugt Teil-Drafts für eine übergroße Liste an Item-Grenzen.
+// ANCHOR[acta-ingest:CHK-0233]
 // fn `split_oversized_list` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_list(items: &[ParsedListItem], sctx: &SplitContext<'_>) -> Vec<ChunkDraft> {
     let mut drafts = Vec::new();
@@ -280,6 +287,7 @@ pub fn split_oversized_list(items: &[ParsedListItem], sctx: &SplitContext<'_>) -
 }
 
 /// Erzeugt Teil-Drafts für einen übergroßen Absatz.
+// ANCHOR[acta-ingest:CHK-0234]
 // fn `split_oversized_paragraph` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_paragraph(para_text: &str, sctx: &SplitContext<'_>) -> Vec<ChunkDraft> {
     let mut drafts = Vec::new();

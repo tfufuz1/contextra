@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,11 +9,13 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// Extractor für MS-OXMSG (Outlook Message .msg Format) (WP M4).
-// Invarianten: Zero-Panic, substg-Properties (ANSI/UTF-16LE), E-Mail Header/Body,
+// FILE-CONTEXT
+// ZWECK: Extractor für MS-OXMSG (Outlook Message .msg Format) (WP M4).
+// INVARIANTEN: Zero-Panic, substg-Properties (ANSI/UTF-16LE), E-Mail Header/Body,
 //              FILETIME-Datumsdekodierung (ISO-8601 UTC, ohne Systemzeit),
 //              Grobes HTML-Stripping bei reine HTML-Bodys, Anhangs-Extraktion über ctx.extract_nested,
 //              Anhang-Fehler fangen als AttachmentSkipped, rekursive eingebettete Nachrichten.
+// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::error::IngestError;
 use crate::extractor::ExtractContext;

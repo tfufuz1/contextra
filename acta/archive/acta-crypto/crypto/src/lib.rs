@@ -1,18 +1,22 @@
-// Acta cryptographic kernel - Layer 1 crate for AEAD block encryption, HKDF key derivation, and WAL integrity.
-// Invarianten: Cryptographic primitives strictly isolated to this crate. All key operations zeroized on drop. Lock-free & I/O-free in src/.
+// FILE-CONTEXT
+// ZWECK: Acta cryptographic kernel - Layer 1 crate for AEAD block encryption, HKDF key derivation, and WAL integrity.
+// INVARIANTEN: Cryptographic primitives strictly isolated to this crate. All key operations zeroized on drop. Lock-free & I/O-free in src/.
 // NICHT-OFFENSICHTLICH: KeyManager uses AES-256-GCM-SIV with OsRng 8-byte random suffix + 4-byte prefix to prevent nonce-reuse key leakage.
 // HOTSPOTS: [1-25]
+// STAND: TS:2026-11-09
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 #![allow(clippy::indexing_slicing)]
 
+//! # Kryptographie-Kern für Acta (Ring 0)
 //!
 //! Dieses Modul bildet die kryptographische Basis des gesamten Acta-Systems.
 //! Als Ring-0-Komponente (Kern) stellt es grundlegende Sicherheitsprimitive bereit,
 //! ohne selbst von höheren Schichten abzuhängen.
 //!
 //! ## Ring-Zugehörigkeit und Einbindung
+//! - **Ring:** Ring 0 (Kern / Foundation)
 //! - **Abhängigkeiten (ausgehend):** `acta-base`, `acta-base`
 //! - **Wird eingebunden von:** `acta`, `acta-engine`, `acta-engine`,
 //!   `acta-infer`, `acta-engine`, `acta-api`, `acta-pii`,
@@ -34,6 +38,7 @@
 //! - **I/O- und Lock-Freiheit in `src/crypto`:** Reine Kryptographie-Routinen führen keine
 //!   Dateisystem- oder Netzwerk-I/O durch.
 
+// SECTION [epic=crypto-core,seq=1] Modul-Deklarationen (Ring 0 Bausteine)
 // NOTE: Autarke kryptographische Module ohne zyklische Abhängigkeiten (TS:2026-11-11)
 pub mod aead;
 pub mod anti_tamper;
@@ -54,6 +59,7 @@ pub mod wal_crypto;
 // !SECTION
 
 // SECTION [epic=crypto-core,seq=2] Re-Exports & Primäre Schnittstellen
+// ANCHOR[acta-crypto:LIB-001] Zentraler Einstiegspunkt für Baustein-Nutzer
 pub use aead::*;
 pub use contract::*;
 pub use dek::{derive_dek, AncestorSalts, Dek, UnitKey};

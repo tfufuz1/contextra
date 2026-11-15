@@ -1,7 +1,9 @@
-// Cryptographic deletion proof for GDPR Article 17 compliance verification across storage layers.
-// Invarianten: : DeletionProof::create MUST only be invoked AFTER physical layer sanitization.
+// FILE-CONTEXT
+// ZWECK: Cryptographic deletion proof for GDPR Article 17 compliance verification across storage layers.
+// INVARIANTEN:: DeletionProof::create MUST only be invoked AFTER physical layer sanitization.
 // NICHT-OFFENSICHTLICH: V1 signiert nur scope, key-hash und tx_id via HMAC-SHA256; V2 signiert scope, key-hash, tx_id, covered_layers, excluded_scopes und wal_receipt via HMAC-SHA256; V3 signiert mit Ed25519 und nutzt längenpräfixierte Key-Hashes. verify() nutzt bei HMAC-Versionen Constant-Time-Vergleiche.
 // HOTSPOTS: [40-130]
+// STAND: TS:2026-09-07T00:00:00Z
 
 #![forbid(unsafe_code)]
 
@@ -427,6 +429,7 @@ pub enum DeletionScope {
 
 /// Cryptographic proof of data deletion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+// AI-TAG[SMELL][RESOLVED] audit-R3-1: DeletionProof signature_version 2 erweitert Signatur-Payload um covered_layers & excluded_scopes zur Vermeidung von Cross-Context-Fälschungen.
 pub struct DeletionProof {
     /// Version der Signatur-Payload-Konstruktion.
     ///

@@ -51,6 +51,7 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
+// ANCHOR[acta-node:TEST-CLOCK-EXPIRATION-BOUNDARY]
 // Prüft exakte Sekundengrenzen: Gültig bis t-1, abgelaufen ab t (current_time >= expires_at).
 #[test]
 fn test_expiration_exact_boundary_conditions() {
@@ -86,6 +87,7 @@ fn test_expiration_exact_boundary_conditions() {
     );
 }
 
+// ANCHOR[acta-node:TEST-CLOCK-DRIFT-SKEW]
 // Prüft das Verhalten des Lizenz-Gates bei simulierter Zeitdrift über den injizierten Clock-Port.
 #[test]
 fn test_clock_drift_and_skew_tolerance() {
@@ -118,6 +120,7 @@ fn test_clock_drift_and_skew_tolerance() {
     );
 }
 
+// ANCHOR[acta-node:TEST-CLOCK-ROLLBACK]
 // Prüft das Verhalten bei Zurückdrehen der Uhrzeit (Rollback) im Zusammenspiel mit dem Clock-Port.
 #[test]
 fn test_system_clock_rollback_behavior() {

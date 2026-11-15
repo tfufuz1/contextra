@@ -1,4 +1,5 @@
 //! SSTable Reader: Block-Leseoperationen und Zero-Copy-Block-Dekodierung.
+// ANCHOR[acta-seg:SST-RDR-110]
 
 use super::SstableReader;
 use crate::error::{StoreError as ActaError, StoreResult as Result};

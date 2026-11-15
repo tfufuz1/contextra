@@ -1,8 +1,10 @@
 //! # Benchmark-Suite: Kryptographische Kernoperationen (`benches/crypto_benchmarks.rs`)
 //!
 //! Misst Durchsatz und Latenz von AES-256-GCM-SIV, HKDF-Schlüsselableitung und KV-Sharding.
-// Criterion benchmark suite for acta-crypto throughput and latency measurement.
-// Invarianten: Measures AES-256-GCM-SIV throughput at 1KB/64KB/1MB/16MB, HKDF derivation, HMAC throughput, and nonce overhead.
+// FILE-CONTEXT
+// ZWECK: Criterion benchmark suite for acta-crypto throughput and latency measurement.
+// INVARIANTEN: Measures AES-256-GCM-SIV throughput at 1KB/64KB/1MB/16MB, HKDF derivation, HMAC throughput, and nonce overhead.
+// STAND: TS:2026-08-30T19:50:00Z (SESSION: 20260830)
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

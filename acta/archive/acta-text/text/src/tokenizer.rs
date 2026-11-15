@@ -1,11 +1,14 @@
-// Zerschneidet Eingabetexte in normalisierte Wort-Tokens mit optionaler deutscher Morphologie.
-// Invarianten: Tokenisierung muss deterministisch zwischen Indexierung und Query-Pfad identisch sein.
+// FILE-CONTEXT: Tokenisierung & Stopword-Filterung.
+// ZWECK: Zerschneidet Eingabetexte in normalisierte Wort-Tokens mit optionaler deutscher Morphologie.
+// INVARIANTEN: Tokenisierung muss deterministisch zwischen Indexierung und Query-Pfad identisch sein.
 // NICHT-OFFENSICHTLICH: Stoppwörter werden per OnceLock geladen; DefaultTokenizer filtert Alphatoken + Stoppwörter.
 // HOTSPOTS: tokenize, DefaultTokenizer::tokenize, GermanMorphTokenizer::tokenize
+// STAND: TS:2026-09-10T19:25:46Z (SESSION: c844907e)
 
 //! Tokenisierung, Stoppwort-Filterung und Schutz atomarer Token (URLs, E-Mails).
 //!
 //! # Ring-Zuordnung
+//! Ring 0 (Kern).
 //!
 //! # Funktionsweise
 //! Zerlegt Text in einzelne Wort-Token unter Verwendung von `unicode-segmentation`.
@@ -23,6 +26,7 @@ static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 static PROTECTED_REGEX: OnceLock<std::result::Result<Regex, String>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
+// ANCHOR[acta-text:TOK-001]
 /// Kompiliert ein reguläres Muster für geschützte Token mit Fail-Closed-Fehlerbehandlung.
 ///
 /// # Fehler
@@ -32,6 +36,7 @@ pub fn compile_protected_regex(pattern: &str) -> Result<Regex> {
         .map_err(|e| TextError::Text(format!("Invalid protected regex pattern '{pattern}': {e}")))
 }
 
+// ANCHOR[acta-text:TOK-002]
 /// Liefert den gecachten regulären Standardausdruck für geschützte URLs und E-Mail-Adressen.
 pub fn get_protected_regex() -> Result<&'static Regex> {
     let res = PROTECTED_REGEX.get_or_init(|| {
@@ -123,16 +128,19 @@ fn get_stopwords() -> &'static HashSet<String> {
     })
 }
 
+// ANCHOR[acta-text:TOK-003]
 /// Trait für Text-Tokenizer mit unterschiedlichen Filter- oder Zerlegungsstrategien.
 pub trait Tokenizer: Send + Sync {
     /// Zerlegt den übergebenen Text in kleingeschriebene Wort-Token und filtert Stoppwörter heraus.
     fn tokenize(&self, text: &str) -> Vec<String>;
 }
 
+// ANCHOR[acta-text:TOK-004]
 /// Standard-Tokenizer basierend auf Unicode-Wortgrenzen und generischen Stoppwörtern.
 pub struct DefaultTokenizer;
 
 impl DefaultTokenizer {
+    // ANCHOR[acta-text:TOK-005]
     /// Fallible Konstruktion eines `DefaultTokenizer` mit Validierung des regulären Schutzmusters.
     pub fn try_new() -> Result<Self> {
         let _ = get_stopwords();
@@ -140,6 +148,7 @@ impl DefaultTokenizer {
         Ok(Self)
     }
 
+    // ANCHOR[acta-text:TOK-006]
     /// Konstruiert einen `DefaultTokenizer`.
     #[deprecated(
         since = "0.1.0",
@@ -158,6 +167,7 @@ impl Default for DefaultTokenizer {
 }
 
 impl Tokenizer for DefaultTokenizer {
+    // ANCHOR[acta-text:TOK-007]
     // Ablauf von tokenize (DefaultTokenizer):
     // 1. Text segmentieren (geschützte URLs/E-Mails separat erfassen).
     // 2. Reguläre Abschnitte nach Unicode-Wörtern trennen, klein schreiben und Stoppwörter verwerfen.
@@ -186,12 +196,14 @@ impl Tokenizer for DefaultTokenizer {
     }
 }
 
+// ANCHOR[acta-text:TOK-008]
 /// Deutscher Tokenizer mit morphologischer Zerlegung von Wortzusammensetzungen.
 pub struct GermanMorphTokenizer {
     splitter: Arc<crate::morphology::GermanCompoundSplitter>,
 }
 
 impl GermanMorphTokenizer {
+    // ANCHOR[acta-text:TOK-009]
     /// Erzeugt eine neue Instanz des deutschen morphologischen Tokenizers.
     pub fn try_new() -> Result<Self> {
         let _ = get_protected_regex()?;
@@ -200,6 +212,7 @@ impl GermanMorphTokenizer {
         })
     }
 
+    // ANCHOR[acta-text:TOK-010]
     /// Erzeugt einen deutschen Tokenizer mit geteiltem Standard-Splitter.
     #[deprecated(
         since = "0.1.0",
@@ -220,6 +233,7 @@ impl Default for GermanMorphTokenizer {
 }
 
 impl Tokenizer for GermanMorphTokenizer {
+    // ANCHOR[acta-text:TOK-011]
     // Ablauf von tokenize (GermanMorphTokenizer):
     // 1. Text segmentieren (geschützte URLs/Mails isolieren).
     // 2. Wörter extrahieren, normalisieren und gegen Stoppwortliste prüfen.
@@ -280,11 +294,13 @@ impl Tokenizer for GermanMorphTokenizer {
     }
 }
 
+// ANCHOR[acta-text:TOK-012]
 /// Hilfsfunktion zur Tokenisierung mit dem [`DefaultTokenizer`].
 pub fn tokenize(text: &str) -> Vec<String> {
     DefaultTokenizer.tokenize(text)
 }
 
+// ANCHOR[acta-text:TOK-013]
 /// Repräsentiert ein strukturiertes Token aus der Textanalyse-Pipeline.
 ///
 /// Ein Token umfasst den extrahierten Term, Byte-Offsets in den Originaltext
@@ -319,6 +335,7 @@ impl Token {
     }
 }
 
+// ANCHOR[acta-text:TOK-014]
 /// Strategie bei Überschreitung konfigurierter Kapazitätsgrenzen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum OverflowPolicy {
@@ -329,6 +346,7 @@ pub enum OverflowPolicy {
     Error,
 }
 
+// ANCHOR[acta-text:TOK-015]
 /// Konfigurierbare Ressourcen- und Sicherheitsgrenzen der Analyse-Pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PipelineLimits {
@@ -353,6 +371,7 @@ impl Default for PipelineLimits {
     }
 }
 
+// ANCHOR[acta-text:TOK-016]
 /// Konfigurierbare Normalisierungsrichtlinie für Textanalyse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum NormalizationPolicy {
@@ -406,6 +425,7 @@ impl NormalizationPolicy {
     }
 }
 
+// ANCHOR[acta-text:TOK-017]
 /// Trait für Token-Filter in einer Analyse-Pipeline.
 pub trait TokenFilter: Send + Sync {
     /// Wendet den Filter auf eine Sequenz von Tokens an.
@@ -414,6 +434,7 @@ pub trait TokenFilter: Send + Sync {
     fn filter_id(&self) -> &str;
 }
 
+// ANCHOR[acta-text:TOK-018]
 /// Trait für vollständige Textanalyse-Pipelines (`Tokenizer -> Filter* -> Stemmer`).
 ///
 /// Definiert den identischen Ergebnisvertrag für Dokumenten-Indexierung und Abfrage.
@@ -426,6 +447,7 @@ pub trait Analyzer: Send + Sync {
     fn fingerprint(&self) -> String;
 }
 
+// ANCHOR[acta-text:TOK-019]
 /// Modulare, konfigurierbare Textanalyse-Pipeline.
 pub struct AnalyzerPipeline {
     name: String,

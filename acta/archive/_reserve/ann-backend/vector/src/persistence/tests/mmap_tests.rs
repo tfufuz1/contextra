@@ -1,6 +1,8 @@
-// Unit-Tests für MmapIndex (Boundary Checks, Asynchrones Oeffnen, Error-Paths).
-// Invarianten: Zero-Panic; Bounds-Pruefungen auf Slices; fehlerhafte Dateien werden abgefangen.
+// FILE-CONTEXT
+// ZWECK: Unit-Tests für MmapIndex (Boundary Checks, Asynchrones Oeffnen, Error-Paths).
+// INVARIANTEN: Zero-Panic; Bounds-Pruefungen auf Slices; fehlerhafte Dateien werden abgefangen.
 // HOTSPOTS: test_mmap_index_boundary_checks, test_mmap_open_async
+// STAND: TS:2026-11-12T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,

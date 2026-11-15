@@ -4,8 +4,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Minimal-Writer für OLE/CFB Test-Fixtures (Doc, Ppt, Msg).
-// Invarianten: Zero-Dependency CFB-Writer via cfb-Crate, deterministische Test-Bytes.
+// FILE-CONTEXT
+// ZWECK: Minimal-Writer für OLE/CFB Test-Fixtures (Doc, Ppt, Msg).
+// INVARIANTEN: Zero-Dependency CFB-Writer via cfb-Crate, deterministische Test-Bytes.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,

@@ -12,10 +12,13 @@
 //! - Atomare Zähler mit `Ordering::Acquire`, `Ordering::Release` und `compare_exchange_weak`.
 //! - Sättigende Subtraktion (`saturating_sub`) verhindert Underflow-Wrapping bei Speicherfreigaben.
 
-// Token- und Resource-Budget-Management mit atomarem Tracking & Memory Backpressure.
-// Invarianten: Atomares Memory Tracking; MemoryBudgetExceeded bei >95% Kapazität.
+// FILE-CONTEXT
+// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
+// ZWECK: Token- und Resource-Budget-Management mit atomarem Tracking & Memory Backpressure.
+// INVARIANTEN: Atomares Memory Tracking; MemoryBudgetExceeded bei >95% Kapazität.
 // HOTSPOTS: 40-220
 // NICHT-OFFENSICHTLICH: TokenBudget reserviert Puffer für System-Prompts & Antworten in ContextManager.
+// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
 
 //! # Architektur
 //! Implementiert den `ResourceTracker`, der den Speicherverbrauch überwacht
@@ -32,6 +35,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 /// Strategie für Token-Budget-Management.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[acta-types:BUDGET-STRAT]
 pub enum BudgetStrategy {
     /// Konservativ: 80% des Limits als sicherer Puffer (Standard)
     Conservative,
@@ -43,6 +47,7 @@ pub enum BudgetStrategy {
 
 /// Token budget configuration for LLM context management.
 #[derive(Debug)]
+// ANCHOR[acta-types:BUDGET-TOKEN]
 pub struct TokenBudget {
     /// Maximum total token limit.
     pub limit: usize,
@@ -122,6 +127,7 @@ impl<'de> Deserialize<'de> for TokenBudget {
 
 /// RAII reservation structure for guaranteed atomicity & drop-refund against double-spend.
 #[derive(Debug)]
+// ANCHOR[acta-types:BUDGET-RESERVE]
 pub struct Reservation<'a> {
     budget: &'a TokenBudget,
     amount: usize,
@@ -331,6 +337,7 @@ impl Default for TokenBudget {
 
 /// Resource budget for memory management.
 #[derive(Debug, Clone, Copy)]
+// ANCHOR[acta-types:BUDGET-RESOURCE]
 pub struct ResourceBudget {
     /// Maximum allowed memory usage in bytes.
     pub memory_limit: u64,
@@ -346,6 +353,7 @@ impl Default for ResourceBudget {
 
 /// Tracks resource usage against a budget.
 #[derive(Debug)]
+// ANCHOR[acta-types:BUDGET-TRACKER]
 pub struct ResourceTracker {
     /// The configured budget.
     budget: ResourceBudget,

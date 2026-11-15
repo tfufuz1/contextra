@@ -20,7 +20,7 @@ hkdf.workspace = true
 hmac.workspace = true
 sha2.workspace = true
 ed25519-dalek.workspace = true
-argon2.workspace = true
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 

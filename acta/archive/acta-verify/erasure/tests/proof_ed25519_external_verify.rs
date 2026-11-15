@@ -5,8 +5,9 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `ed25519_proof_external_verify`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// Integration tests for external verification of Ed25519 deletion proofs (version 3).
-// Invarianten: Zero internal state required for verification. Injected deterministic RNGs only.
+// FILE-CONTEXT
+// ZWECK: Integration tests for external verification of Ed25519 deletion proofs (version 3).
+// INVARIANTEN: Zero internal state required for verification. Injected deterministic RNGs only.
 
 use acta_erasure::ed25519_proof::{
     sign_deletion_proof_v3, verify_deletion_proof_v3, DeletionProofError, DeletionProofKeyPair,

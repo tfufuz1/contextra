@@ -1,8 +1,10 @@
-// Synchronous ghost-free node deletion with budgeted neighborhood repair and zeroization for HNSW graph.
-// Invarianten: : Graph connectivity is preserved post deletion via neighborhood repair.
+// FILE-CONTEXT
+// ZWECK: Synchronous ghost-free node deletion with budgeted neighborhood repair and zeroization for HNSW graph.
+// INVARIANTEN:: Graph connectivity is preserved post deletion via neighborhood repair.
 //: Deleted vector slots and arena connections are zeroized in memory.
 //: Deleted slots are NOT reused before full index rebuild (rebuild_sync).
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
+// STAND: TS:2026-11-11T02:00:00Z
 
 use crate::error::{Result, VectorError};
 use crate::types::DocId;
@@ -14,6 +16,7 @@ use super::types::{Candidate, HnswIndex, VectorData};
 
 // SECTION Hilfstraits (IntoDocId)
 
+// ANCHOR[acta-vec:DEL-INTO-DOCID]
 /// Trait for types convertible to [`DocId`] for deletion APIs.
 pub trait IntoDocId {
     /// Converts the type into a [`DocId`].
@@ -41,6 +44,7 @@ impl IntoDocId for &u64 {
 
 // SECTION Ghost-Free Deletion & Graph-Reparatur
 
+// ANCHOR[acta-vec:DEL-STATS]
 /// Statistics returned after a ghost-free node deletion and neighborhood repair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeletionStats {
@@ -54,6 +58,7 @@ pub struct DeletionStats {
     pub verified_no_ghost_pointers: bool,
 }
 
+// ANCHOR[acta-vec:DEL-GHOST-FREE-TRAIT]
 /// Trait providing ghost-free vector index deletion with synchronous neighborhood graph repair.
 pub trait GhostFreeVectorIndex {
     /// Deletes `doc_id` and synchronously repairs all neighborhood pointers across all layers
@@ -66,6 +71,7 @@ pub trait GhostFreeVectorIndex {
 }
 
 impl GhostFreeVectorIndex for HnswIndex {
+    // ANCHOR[acta-vec:DEL-REMOVE-WITH-REPAIR]
     fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats> {
         // Lock hierarchy: 1. write_mutex
         let _write_lock = self.inner.hot.write_mutex.lock();
@@ -347,6 +353,7 @@ impl HnswIndex {
 
     /// Internal helper method to perform a verification scan across the 2nd-order neighborhood
     /// bounded by `budget` to ensure zero residual pointers to `target_idx` remain.
+    // ANCHOR[acta-vec:DEL-VERIFY-NO-GHOSTS]
     fn verify_no_ghost_pointers(&self, target_idx_u32: u32, budget: usize) -> usize {
         let mmap_node_count = self
             .inner
@@ -428,6 +435,7 @@ impl HnswIndex {
     /// Markiert den Knoten deterministisch als inaktiv, nullt den Vektorspeicher im Slot
     /// und entfernt die ID aus der Dokumentenzuordnung.
     /// Gibt `Ok(true)` zurück, falls das Dokument existierte, andernfalls `Ok(false)`.
+    // ANCHOR[acta-vec:DEL-REMOVE-O1]
     pub fn remove<D: IntoDocId>(&self, doc_id: D) -> Result<bool> {
         let doc_id = doc_id.into_doc_id();
         let _write_lock = self.inner.hot.write_mutex.lock();

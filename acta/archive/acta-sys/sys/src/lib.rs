@@ -1,13 +1,18 @@
 // =========================================================================
+// ANCHOR[id=sys-lib-main,epic=sys-core,seq=0] Crate-Wurzel und Baukasten-Export
 // =========================================================================
+// NOTE: Low-level unsafe system abstractions and FFI island for Acta (E0 / Ring 0).
 // Invariante: Autarkes Crate (0 interne Abhängigkeiten).
 // Keine unzulässigen Garantieversprechen. Zero panic in Produktion.
 
 #![allow(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![deny(missing_docs)]
+#![doc = "Acta Unsafe System Abstraction Crate (Ring 0 / E0 - Unsafe-Insel)"]
 
+//! # Acta-Sys: Low-Level-Systemabstraktionen und Unsafe-Insel (E0 / Ring 0)
 //!
+//! Dieses Modul bildet die hardware- und betriebssystemnahe Basis (Ring 0, Ebene E0) für das Acta-System
 //! und externe Konsumenten im Baustein-Ökosystem.
 //! Es kapselt alle systemweiten Zugriffe, die betriebssystemspezifische FFI-Aufrufe (Foreign Function Interface,
 //! Schnittstelle zu betriebssystemeigenem C-Code) oder `unsafe`-Code erfordern, in sicheren, typisierten Rust-Schnittstellen.
@@ -34,6 +39,7 @@
 //! 8. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`], [`VaultBuffer`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen (Zeroize).
 
 // SECTION Submodule
+// ANCHOR[id=sys-submodules,epic=sys-core,seq=1] Deklaration der internen Module
 pub mod acl_win32;
 pub mod contract;
 pub mod durability;
@@ -45,6 +51,7 @@ pub mod vault;
 // !SECTION Submodule
 
 // SECTION Baukasten-Zielmodule
+// ANCHOR[id=sys-building-blocks,epic=sys-core,seq=2] Modulare Baukasten-Namespaces
 
 /// Baukasten-Zielmodul `mem`: Kapselt Memory-Locking, Vault-Speicher und Zeroization.
 pub mod mem {
@@ -67,6 +74,7 @@ pub mod map {
 // !SECTION Baukasten-Zielmodule
 
 // SECTION Public Re-exports
+// ANCHOR[id=sys-reexports,epic=sys-core,seq=3] Ergonomische Direktzugriffe
 // NOTE: Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. acta-seg, acta-vec, acta-sys).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use contract::{MemoryLocker, NoopMemoryLocker, OsMemoryLocker};

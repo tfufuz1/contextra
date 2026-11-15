@@ -9,6 +9,7 @@
 //! 5. **Audit-Trace-Protokollierung**: Deterministische BLAKE3-Prüfspur für jede Entscheidung.
 //!
 //! # Ring-Zugehörigkeit
+//! Ring 3 (Domain-Gateway).
 //!
 //! # Invarianten
 //! - **APM-EGRESS-BYPASS**: Keine Cloud-Anfrage darf ohne Prüfung versendet werden.
@@ -32,18 +33,22 @@ use crate::types::{Clock, SystemClock, TenantId, TenantScoped};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+// ANCHOR[acta-pii:EGW-001]
 /// Standardmäßiger Klassifikator auf Basis von [`EgressVault`].
 pub type DefaultEgressClassifier = EgressVault;
 
+// ANCHOR[acta-pii:EGW-002]
 /// Maximale Suchanfragengröße in Bytes (64 KiB = 65.536 Bytes).
 pub const MAX_SEARCH_QUERY_BYTES: usize = 64 * 1024;
 
+// ANCHOR[acta-pii:EGW-003]
 /// Trait-Vertrag für Layer-4 k-NN Vektor-Ähnlichkeitsprüfungen gegen Bulk-Exfiltration.
 pub trait EgressGuardCheck: Send + Sync {
     /// Evaluates the outbound payload against vector index / similarity models.
     fn check<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;
 }
 
+// ANCHOR[acta-pii:EGW-004]
 /// Standardmäßiger Pass-Through Guard, falls kein separater L4-Vektor-Guard konfiguriert ist.
 pub struct DefaultEgressGuard;
 
@@ -53,12 +58,14 @@ impl EgressGuardCheck for DefaultEgressGuard {
     }
 }
 
+// ANCHOR[acta-pii:EGW-005]
 /// Trait zur Prüfung auf Prompt-Injection in eingehenden Cloud-Antworten.
 pub trait InjectionDetector: Send + Sync {
     /// Prüft den Text auf Muster.
     fn detect(&self, text: &str) -> Option<String>;
 }
 
+// ANCHOR[acta-pii:EGW-006]
 /// Einheitliches Egress-Gateway zur Durchsetzung der 5-stufigen Schutzpipeline:
 /// 1. Policy/Guard check
 /// 2. Entity recognition
@@ -82,6 +89,7 @@ impl std::fmt::Debug for EgressGateway {
 
 /// Builder for constructing an `EgressGateway` with mandatory components.
 #[derive(Default)]
+// ANCHOR[acta-pii:EGW-007]
 /// Builder zur typsicheren Konstruktion einer [`EgressGateway`]-Instanz.
 pub struct EgressGatewayBuilder {
     classifier: Option<Arc<dyn EgressClassifier>>,
@@ -297,6 +305,7 @@ impl EgressGateway {
 
 /// Inbound Layer 5 Re-Hydrator replacing surrogate tokens with original vault entities.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[acta-pii:EGW-008]
 /// Rehydrierer zur sicheren Rückübersetzung von Surrogat-Tokens in Cloud-Antworten.
 pub struct CloudResponseRehydrator {
     vault_map: BTreeMap<String, String>,
@@ -374,12 +383,14 @@ impl CloudResponseRehydrator {
     }
 }
 
+// ANCHOR[acta-pii:EGW-021]
 /// Evaluates whether PII vault data requires isolated retention mode for an affected document (neutral API).
 pub fn pii_vault_requires_isolated_retention(is_pii_match: bool, is_memory_only: bool) -> bool {
     is_pii_match && !is_memory_only
 }
 
 /// Evaluates whether PII vault data forces CryptoShred mode for an affected document.
+// ANCHOR[acta-pii:EGW-009]
 /// Entscheidet anhand von PII-Match und Speichermodus, ob kryptografisches Schreddern erzwungen wird.
 ///
 /// Hinweis: Veralteter Bezeichner; bitte zukünftig `pii_vault_requires_isolated_retention` verwenden.
@@ -388,6 +399,7 @@ pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -
     pii_vault_requires_isolated_retention(is_pii_match, is_memory_only)
 }
 
+// ANCHOR[acta-pii:EGW-022]
 /// Resolves the effective retention mode given PII status and storage configuration (neutral API).
 pub fn resolve_effective_retention_mode<D, K>(
     is_pii_match: bool,
@@ -410,6 +422,7 @@ where
 /// Read-only check for PII Vault coupling:
 /// If a document contains a PII match AND `durability_mode` is not `MemoryOnly`,
 /// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
+// ANCHOR[acta-pii:EGW-010]
 /// Bestimmt den effektiven Löschmodus (Shredding vs. Tombstone) unter Berücksichtigung von PII-Vorgaben.
 ///
 /// Hinweis: Veralteter Bezeichner; bitte zukünftig `resolve_effective_retention_mode` verwenden.
@@ -433,6 +446,7 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[acta-pii:EGW-011]
 /// Anfrage-Struktur für ausgehende Cloud-Queries.
 pub struct CloudQueryRequest {
     /// Die ausgehende Anfrage.
@@ -444,6 +458,7 @@ pub struct CloudQueryRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[acta-pii:EGW-012]
 /// Antwort-Struktur nach erfolgreicher Bereinigung und Durchlauf der Egress-Pipeline.
 pub struct CloudQueryResponse {
     /// Status der Ausführung.
@@ -458,6 +473,7 @@ pub struct CloudQueryResponse {
     pub abstraction_notice: Option<String>,
 }
 
+// ANCHOR[acta-pii:EGW-013]
 /// Verarbeitet eine ausgehende Cloud-Query über die Standard-Schutz-Pipeline.
 pub async fn handle_cloud_query(
     request: CloudQueryRequest,
@@ -470,6 +486,7 @@ pub async fn handle_cloud_query(
 }
 
 /// Handles a cloud query request bound to a tenant scope, enforcing matching `TenantId` and the standard 5-stage pipeline.
+// ANCHOR[acta-pii:EGW-014]
 /// Verarbeitet eine mandantengebundene Cloud-Query ([`TenantScoped`]).
 pub async fn handle_cloud_query_scoped(
     request: TenantScoped<CloudQueryRequest>,
@@ -492,6 +509,7 @@ pub async fn handle_cloud_query_scoped(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[acta-pii:EGW-015]
 /// Verarbeitet eine mandantengebundene Cloud-Query mit zusätzlichem Layer-4 Vektor-Guard.
 pub async fn handle_cloud_query_scoped_with_guard(
     request: TenantScoped<CloudQueryRequest>,
@@ -515,6 +533,7 @@ pub async fn handle_cloud_query_scoped_with_guard(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[acta-pii:EGW-016]
 /// Vollständige Prüfung inklusive Mandantenisolation, L4-Guard und Bulk-Exfiltrations-Detektor.
 pub async fn handle_cloud_query_scoped_with_bulk_detector(
     request: TenantScoped<CloudQueryRequest>,
@@ -544,6 +563,7 @@ pub async fn handle_cloud_query_scoped_with_bulk_detector(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[acta-pii:EGW-017]
 /// Verarbeitet eine Cloud-Query mit zusätzlichem Layer-4 Vektor-Guard.
 pub async fn handle_cloud_query_with_guard(
     request: CloudQueryRequest,
@@ -558,6 +578,7 @@ pub async fn handle_cloud_query_with_guard(
 }
 
 /// Evaluates a query payload against the `BulkExfiltrationDetector` for a specific `SessionId`.
+// ANCHOR[acta-pii:EGW-018]
 /// Überprüft eine Anfrage gegen den Bulk-Exfiltrations-Detektor.
 pub fn check_bulk_exfiltration(
     detector: &BulkExfiltrationDetector,
@@ -579,6 +600,7 @@ pub fn check_bulk_exfiltration(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[acta-pii:EGW-019]
 /// Führt die Cloud-Query-Prüfung mit L4-Guard und Bulk-Exfiltrations-Detektor durch.
 pub async fn handle_cloud_query_with_bulk_detector(
     request: CloudQueryRequest,
@@ -602,6 +624,7 @@ pub async fn handle_cloud_query_with_bulk_detector(
 
 /// Processes inbound responses from cloud LLMs by checking for prompt injections
 /// and rehydrating surrogate tokens back to original values.
+// ANCHOR[acta-pii:EGW-020]
 /// Verarbeitet die Antwort einer Cloud-Query (Rehydrierung und Prompt-Injection-Erkennung).
 pub async fn process_cloud_response(
     raw_response: &str,

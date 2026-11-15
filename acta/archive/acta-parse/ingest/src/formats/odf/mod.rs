@@ -1,6 +1,7 @@
 //! Modul
 //!
 //! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -8,8 +9,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// OpenDocument Extractor (ODT, ODP und Flat-ODF .fodt/.fodp) (WP M4).
-// Invarianten: Zero-Panic, Fail-Closed, Zip-Bomb & Budgetierungsschutz, Verschlüsselungserkennung.
+// FILE-CONTEXT
+// ZWECK: OpenDocument Extractor (ODT, ODP und Flat-ODF .fodt/.fodp) (WP M4).
+// INVARIANTEN: Zero-Panic, Fail-Closed, Zip-Bomb & Budgetierungsschutz, Verschlüsselungserkennung.
+// STAND: TS:2026-10-31T00:00:00Z
 
 pub mod content;
 pub mod meta;

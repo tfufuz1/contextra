@@ -1,6 +1,8 @@
-// Aufteilung des HNSW-Graphzustands in Hot- und Cold-Datenstrukturen (Cache-Line-Alignment).
-// Invarianten: Lock-Hierarchie: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes -> arena.
+// FILE-CONTEXT
+// ZWECK: Aufteilung des HNSW-Graphzustands in Hot- und Cold-Datenstrukturen (Cache-Line-Alignment).
+// INVARIANTEN: Lock-Hierarchie: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes -> arena.
 // HOTSPOTS: HnswHotCore, HnswColdCore, HnswIndexCore
+// STAND: TS:2026-11-12T00:00:00Z
 
 use roaring::RoaringTreemap;
 use std::collections::BTreeMap;
@@ -13,6 +15,7 @@ use crate::hnsw::arena::HnswArena;
 use crate::hnsw::config::HnswConfig;
 use crate::hnsw::sq8_bias::Sq8Bias;
 
+// ANCHOR[acta-vec:HNSW-HOT-CORE]
 /// Heisser Kern des HNSW-Index (fuer Lese- und Schreibpfade im Graph optimiert).
 #[repr(align(64))]
 pub struct HnswHotCore {
@@ -83,6 +86,7 @@ impl HnswHotCore {
     }
 }
 
+// ANCHOR[acta-vec:HNSW-COLD-CORE]
 /// Kalter Kern des HNSW-Index (Konfiguration, Puffer, Metriken, Quantisierer).
 pub struct HnswColdCore {
     pub config: HnswConfig,
@@ -109,6 +113,7 @@ pub struct HnswColdCore {
     pub fault_injection_insert_count: AtomicU64,
 }
 
+// ANCHOR[acta-vec:HNSW-INDEX-CORE]
 /// Die Kern-Implementierung des HNSW-Index aus Hot- und Cold-Strukturen.
 pub struct HnswIndexCore {
     pub hot: HnswHotCore,

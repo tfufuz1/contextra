@@ -1,6 +1,8 @@
-// Hauptstruktur GenericHnswIndex und oeffentliche Abfrage-Methoden.
-// Invarianten: Lock-Hierarchie: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes -> arena.
+// FILE-CONTEXT
+// ZWECK: Hauptstruktur GenericHnswIndex und oeffentliche Abfrage-Methoden.
+// INVARIANTEN: Lock-Hierarchie: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes -> arena.
 // HOTSPOTS: GenericHnswIndex::node_idx_for_doc, GenericHnswIndex::layer0_connections
+// STAND: TS:2026-11-12T00:00:00Z
 
 #[cfg(feature = "partial-index-rebuild")]
 use std::collections::BTreeMap;
@@ -14,6 +16,7 @@ use crate::types::DocId;
 use super::core::{HnswIndexCore, RebuildStatus};
 use crate::hnsw::sq8_bias::Sq8Bias;
 
+// ANCHOR[acta-vec:HNSW-GENERIC-INDEX]
 /// Generischer HNSW (Hierarchical Navigable Small World) Vektorindex parametrisiert ueber DistanceKernel.
 pub struct GenericHnswIndex<K: DistanceKernel = ScalarKernel> {
     pub(crate) inner: std::sync::Arc<HnswIndexCore>,

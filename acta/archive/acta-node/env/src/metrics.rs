@@ -14,6 +14,7 @@ use std::sync::{Arc, RwLock};
 
 // =========================================================================
 // SECTION: MetricsSink Port Trait
+// ANCHOR[id=metrics-root,epic=metrics,seq=1]
 // NOTE: Primäre Schnittstelle für Telemetrie und Performance-Monitoring.
 // =========================================================================
 
@@ -51,6 +52,7 @@ pub trait MetricsSink: Send + Sync + 'static {
 
 // =========================================================================
 // SECTION: NoopMetricsSink Null-Object Adapter
+// ANCHOR[id=metrics-noop,epic=metrics,seq=2]
 // NOTE: Discard-Implementierung ohne Overhead für Produktion ohne Metriken oder Tests.
 // =========================================================================
 
@@ -73,6 +75,7 @@ impl MetricsSink for NoopMetricsSink {
 
 // =========================================================================
 // SECTION: MetricKey Domain Model
+// ANCHOR[id=metrics-key,epic=metrics,seq=3]
 // NOTE: Eindeutiger Identifikator bestehend aus Name und normalisierten Labels.
 // =========================================================================
 
@@ -106,6 +109,7 @@ impl MetricKey {
 
 // =========================================================================
 // SECTION: Snapshots & Internal State
+// ANCHOR[id=metrics-snapshot,epic=metrics,seq=4]
 // NOTE: Unveränderliche Momentaufnahmen der Metriken für Tests und Assertionen.
 // =========================================================================
 
@@ -214,6 +218,7 @@ impl HistogramState {
 
 // =========================================================================
 // SECTION: InMemoryMetricsSink Implementation
+// ANCHOR[id=metrics-inmemory,epic=metrics,seq=5]
 // NOTE: Lokale threadsichere Senke ohne externe Netzwerk-Exports (Privacy-Preserving).
 // =========================================================================
 
@@ -317,6 +322,7 @@ impl MetricsSink for InMemoryMetricsSink {
 
 // =========================================================================
 // SECTION: Blanket Implementation for Arc<T>
+// ANCHOR[id=metrics-arc,epic=metrics,seq=6]
 // NOTE: Erlaubt direkte Nutzung von `Arc<dyn MetricsSink>` ohne Wrapper.
 // =========================================================================
 
@@ -341,6 +347,7 @@ impl<T: MetricsSink + ?Sized> MetricsSink for Arc<T> {
 
 // =========================================================================
 // SECTION: Unit Tests
+// ANCHOR[id=metrics-tests,epic=metrics,seq=7]
 // =========================================================================
 
 #[cfg(test)]

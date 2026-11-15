@@ -1,6 +1,8 @@
-// Unit-Tests für HnswHeader-Serialisierung, Checksumme und Validierung.
-// Invarianten: Zero-Panic; bitgleiche Header-Struktur.
+// FILE-CONTEXT
+// ZWECK: Unit-Tests für HnswHeader-Serialisierung, Checksumme und Validierung.
+// INVARIANTEN: Zero-Panic; bitgleiche Header-Struktur.
 // HOTSPOTS: test_hnsw_header_roundtrip_and_errors, test_hnsw_header_version_and_checksum_verification
+// STAND: TS:2026-11-12T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,

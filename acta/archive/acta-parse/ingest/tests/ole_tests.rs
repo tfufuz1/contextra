@@ -5,8 +5,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Golden & Contract Tests für OLE Formate (Doc, Ppt, Msg) (WP M4).
-// Invarianten: Zero-Panic, deterministische Extraktion, Limit- und Fehlerprüfungen.
+// FILE-CONTEXT
+// ZWECK: Golden & Contract Tests für OLE Formate (Doc, Ppt, Msg) (WP M4).
+// INVARIANTEN: Zero-Panic, deterministische Extraktion, Limit- und Fehlerprüfungen.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -32,6 +34,7 @@ fn create_test_context(limits: &IngestLimits) -> (ResourceBudget, ExtractorRegis
     (budget, registry)
 }
 
+// ANCHOR[acta-ingest:TST-0390]
 // Testet die Funktionsfaehigkeit von `test_doc_golden_ansi_utf16_field_code`.
 #[test]
 fn test_doc_golden_ansi_utf16_field_code() {
@@ -78,6 +81,7 @@ fn test_doc_golden_ansi_utf16_field_code() {
     assert!(full_text.contains("DisplayResult"));
 }
 
+// ANCHOR[acta-ingest:TST-0391]
 // Testet die Funktionsfaehigkeit von `test_ppt_golden_slides_and_notes`.
 #[test]
 fn test_ppt_golden_slides_and_notes() {
@@ -138,6 +142,7 @@ fn test_ppt_golden_slides_and_notes() {
     assert!(speaker_notes[0].contains("Sprechernotiz"));
 }
 
+// ANCHOR[acta-ingest:TST-0392]
 // Testet die Funktionsfaehigkeit von `test_msg_golden_subject_sender_body_attachment`.
 #[test]
 fn test_msg_golden_subject_sender_body_attachment() {
@@ -202,6 +207,7 @@ fn test_msg_golden_subject_sender_body_attachment() {
     assert_eq!(attachment_boundaries[0], "bericht.doc");
 }
 
+// ANCHOR[acta-ingest:TST-0393]
 // Testet die Funktionsfaehigkeit von `test_msg_nested_msg_attachment`.
 #[test]
 fn test_msg_nested_msg_attachment() {
@@ -265,6 +271,7 @@ fn test_msg_nested_msg_attachment() {
     assert!(full_text.contains("Details zur Unteraufgabe"));
 }
 
+// ANCHOR[acta-ingest:TST-0394]
 // Testet die Funktionsfaehigkeit von `test_encrypted_doc_and_ppt_returns_encrypted_error`.
 #[test]
 fn test_encrypted_doc_and_ppt_returns_encrypted_error() {
@@ -301,6 +308,7 @@ fn test_encrypted_doc_and_ppt_returns_encrypted_error() {
     ));
 }
 
+// ANCHOR[acta-ingest:TST-0395]
 // Testet die Funktionsfaehigkeit von `generate_fuzz_corpus_seeds`.
 #[test]
 fn generate_fuzz_corpus_seeds() {
@@ -360,6 +368,7 @@ fn generate_fuzz_corpus_seeds() {
     }
 }
 
+// ANCHOR[acta-ingest:TST-0396]
 // Testet die Funktionsfaehigkeit von `test_corrupt_cfb_returns_corrupt_error_without_panic`.
 #[test]
 fn test_corrupt_cfb_returns_corrupt_error_without_panic() {

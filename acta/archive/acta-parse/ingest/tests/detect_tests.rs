@@ -4,8 +4,10 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// Inhaltsbasierte Formaterkennungs-Tests für detect (WP M3 / P01).
-// Invarianten: Keine eingecheckten Binärdateien, Zero-Panic, deterministische Fixture-Erzeugung.
+// FILE-CONTEXT
+// ZWECK: Inhaltsbasierte Formaterkennungs-Tests für detect (WP M3 / P01).
+// INVARIANTEN: Keine eingecheckten Binärdateien, Zero-Panic, deterministische Fixture-Erzeugung.
+// STAND: TS:2026-10-31T00:00:00Z
 
 #![allow(
     clippy::unwrap_used,
@@ -18,6 +20,7 @@ use acta_ingest::detect::{detect, Confidence, DetectHints};
 use acta_ingest::format::FormatId;
 
 /// Testet positive Erkennung aller Formate über synthetisch generierte minimale Byte-Fixtures.
+// ANCHOR[acta-ingest:TST-0353]
 // Testet die Funktionsfaehigkeit von `test_detect_positive_fixtures`.
 #[test]
 fn test_detect_positive_fixtures() {
@@ -228,6 +231,7 @@ fn test_detect_positive_fixtures() {
 }
 
 /// Testet Widerspruchsfälle: Content Magic gewinnt vor falscher Dateiendung/MIME.
+// ANCHOR[acta-ingest:TST-0354]
 // Testet die Funktionsfaehigkeit von `test_detect_contradiction_magic_overrides_hint`.
 #[test]
 fn test_detect_contradiction_magic_overrides_hint() {
@@ -255,6 +259,7 @@ fn test_detect_contradiction_magic_overrides_hint() {
 }
 
 /// Testet Erkennung ohne Hints (nur aus Content-Bytes).
+// ANCHOR[acta-ingest:TST-0355]
 // Testet die Funktionsfaehigkeit von `test_detect_content_only_no_hints`.
 #[test]
 fn test_detect_content_only_no_hints() {
@@ -265,6 +270,7 @@ fn test_detect_content_only_no_hints() {
 }
 
 /// Testet Edge-Cases: Leere Eingabe, 1-Byte Eingabe, abgeschnittener Header.
+// ANCHOR[acta-ingest:TST-0356]
 // Testet die Funktionsfaehigkeit von `test_detect_edge_cases`.
 #[test]
 fn test_detect_edge_cases() {

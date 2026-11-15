@@ -1,8 +1,10 @@
-// AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen.
-// Invarianten: Target-Feature "avx2", "fma" vor Aufruf via Feature-Check verifiziert.
+// FILE-CONTEXT
+// ZWECK: AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen.
+// INVARIANTEN: Target-Feature "avx2", "fma" vor Aufruf via Feature-Check verifiziert.
 
 //! # Modul `kernels::avx2`
 //!
+//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
 //!
 //! **Zweck:**
 //! Hochoptimierte Vektordistanzberechnung auf x86_64-Prozessoren mit AVX2 (Advanced Vector Extensions 2)
@@ -22,6 +24,7 @@ use std::arch::x86_64::*;
 use crate::kernels::scalar::CosineSimilarityPartsU8;
 
 // SECTION AVX2-F32-KERNELS
+// ANCHOR[acta-sys:AVX2-COSINE-F32]
 /// Calculates cosine distance between two float vectors using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -92,6 +95,7 @@ pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
+// ANCHOR[acta-sys:AVX2-EUCLIDEAN-F32]
 /// Calculates Euclidean distance between two float vectors using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -142,6 +146,7 @@ pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     sum.sqrt()
 }
 
+// ANCHOR[acta-sys:AVX2-DOT-F32]
 /// Calculates dot product between two float vectors using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -191,6 +196,7 @@ pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 // !SECTION AVX2-F32-KERNELS
 
 // SECTION AVX2-BYTES-KERNELS
+// ANCHOR[acta-sys:AVX2-COSINE-F32-BYTES]
 /// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -272,6 +278,7 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -
     1.0 - sim
 }
 
+// ANCHOR[acta-sys:AVX2-EUCLIDEAN-F32-BYTES]
 /// Calculates Euclidean distance between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -334,6 +341,7 @@ pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]
     sum.sqrt()
 }
 
+// ANCHOR[acta-sys:AVX2-DOT-F32-BYTES]
 /// Calculates dot product between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
 ///
 /// # Safety
@@ -393,6 +401,7 @@ pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
     -dot
 }
 
+// ANCHOR[acta-sys:AVX2-HSUM256-PS]
 /// Horizontal sum of 8 x f32 values in a 256-bit AVX vector register.
 ///
 /// # Safety
@@ -417,6 +426,7 @@ pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
 // !SECTION AVX2-BYTES-KERNELS
 
 // SECTION AVX2-U8-KERNELS
+// ANCHOR[acta-sys:AVX2-DOT-U8]
 /// Calculates dot product between two byte vectors using AVX2 instructions.
 ///
 /// # Safety
@@ -480,6 +490,7 @@ pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     sum
 }
 
+// ANCHOR[acta-sys:AVX2-EUCLIDEAN-SQ-U8]
 /// Calculates squared Euclidean distance between two byte vectors using AVX2 instructions.
 ///
 /// # Safety
@@ -548,6 +559,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     sum
 }
 
+// ANCHOR[acta-sys:AVX2-COSINE-PARTS-U8]
 /// Calculates cosine similarity parts (dot, norm_a_sq, norm_b_sq) for byte vectors using AVX2 instructions.
 ///
 /// # Safety
@@ -633,6 +645,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
     }
 }
 
+// ANCHOR[acta-sys:AVX2-HSUM256-EPI32]
 /// Horizontal sum of 8 x 32-bit signed integers in a 256-bit AVX2 vector register.
 ///
 /// # Safety

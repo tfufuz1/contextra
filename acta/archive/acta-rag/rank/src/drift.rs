@@ -1,5 +1,6 @@
 //! # Drift-Erkennung (`drift`)
 //!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Dieses Modul überwacht die statistische Verteilung von Retrieval-Scores im Zeitverlauf.
 //! Wenn sich die Verteilung der Ähnlichkeitsscores einer Signalquelle (z. B. BM25-Text

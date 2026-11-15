@@ -9,6 +9,7 @@
 
 // =========================================================================
 // SECTION: Module Declarations & Core Architecture
+// ANCHOR[id=env-modules,epic=env-core,seq=1]
 // NOTE: Alle Submodule sind autark und verwenden ausschließlich die Rust-Standardbibliothek.
 // =========================================================================
 
@@ -36,6 +37,7 @@ pub mod manual_clock;
 
 // =========================================================================
 // SECTION: Public Re-exports & Convenience API
+// ANCHOR[id=env-reexports,epic=env-core,seq=2]
 // NOTE: Bietet direkten Zugriff auf alle kanonischen Typen an der Crate-Wurzel.
 // =========================================================================
 
@@ -52,6 +54,7 @@ pub use manual_clock::ManualClock;
 
 // =========================================================================
 // SECTION: Time Utility Functions
+// ANCHOR[id=env-time-utils,epic=clock,seq=1]
 // NOTE: Verbindliche Hilfsfunktion gemäß SPEC-v2 §4.2 / B02.
 // =========================================================================
 

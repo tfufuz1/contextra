@@ -37,6 +37,7 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
 }
 
 /// (1) check_ring(Fast) == Ok for every state (correct ID, wrong ID, missing ID, expired)
+// ANCHOR[acta-license:TEST-BIND-FAST-RING-ALWAYS-ALLOWED]
 // Prüft, dass der Fast-Ring unabhängig von Hardware-Bindungen oder Fehlern stets erlaubt ist.
 #[test]
 fn test_fast_ring_always_allowed_across_all_states() {
@@ -97,6 +98,7 @@ fn test_fast_ring_always_allowed_across_all_states() {
 }
 
 /// (2) ManualClock after expires_at -> Expired
+// ANCHOR[acta-license:TEST-BIND-EXPIRED-AFTER-TIME]
 // Prüft, dass eine an eine Installation gebundene Lizenz nach Ablaufdatum ungültig wird.
 #[test]
 fn test_expired_after_expiration_time() {
@@ -133,6 +135,7 @@ fn test_expired_after_expiration_time() {
 }
 
 /// (3) Flipped bit in payload -> construction fails with InvalidSignature
+// ANCHOR[acta-license:TEST-BIND-FLIPPED-BIT-FAILS]
 // Prüft, dass Bitmanipulationen in signierten Payloads zur Abweisung der Gate-Erstellung führen.
 #[test]
 fn test_flipped_bit_in_payload_fails_construction() {
@@ -169,6 +172,7 @@ fn test_flipped_bit_in_payload_fails_construction() {
 }
 
 /// (4) Wrong installation ID -> NotActivated
+// ANCHOR[acta-license:TEST-BIND-MISMATCHED-ID-FAILS]
 // Prüft, dass eine unpassende lokale Installations-ID mit NotActivated abgewiesen wird.
 #[test]
 fn test_mismatched_installation_id_returns_not_activated() {
@@ -207,6 +211,7 @@ fn test_mismatched_installation_id_returns_not_activated() {
 }
 
 /// (5) Payload without installation_id_hash (legacy bytes) requires allow_legacy option
+// ANCHOR[acta-license:TEST-BIND-LEGACY-PAYLOAD-BYTES]
 // Prüft die Behandlung von Alt-Payloads ohne hinterlegten Installations-Hash.
 #[test]
 fn test_legacy_payload_bytes_without_installation_id_hash() {
@@ -253,6 +258,7 @@ fn test_legacy_payload_bytes_without_installation_id_hash() {
 }
 
 /// (6) Payload with Hash, but gate without local installation ID -> NotActivated
+// ANCHOR[acta-license:TEST-BIND-MISSING-LOCAL-ID-FAILS]
 // Prüft, dass eine gebundene Lizenz ohne konfigurierten lokalen ID-Hash abgewiesen wird.
 #[test]
 fn test_payload_with_hash_gate_without_local_id_returns_not_activated() {

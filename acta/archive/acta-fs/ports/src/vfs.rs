@@ -1,3 +1,4 @@
+//! # Virtual File System (VFS) Port (Ring 0 / Class B)
 //!
 //! LINK crates/acta-ports/src/lib.rs
 //! LINK crates/acta-ports/src/fs.rs
@@ -7,6 +8,7 @@
 //! all file system I/O operations in storage, engine, and index layers must interact
 //! exclusively through this abstract VFS interface.
 //!
+//! // ANCHOR[acta-ports:VFS-001]
 //! // SECTION vfs-contracts
 //! // NOTE: Vfs ist synchron gehalten, um Blockaden im async-Kontext
 //! // via spawn_blocking handhabbar zu machen und deterministische Durability zu sichern.
@@ -18,6 +20,7 @@ use crate::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+// ANCHOR[acta-ports:VFS-TYPES-001]
 /// Method via which medium verification was performed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VerifiedVia {
@@ -65,6 +68,7 @@ impl VfsOpenOptions {
     }
 }
 
+// ANCHOR[acta-ports:VFS-FILE-001]
 /// Abstract file handle providing positional I/O without modifying internal file offsets.
 pub trait VfsFile: Send + Sync {
     /// Reads data from byte offset `offset` into `buf` without moving the file pointer.
@@ -151,6 +155,7 @@ pub trait VfsFile: Send + Sync {
     fn sync_all(&self) -> std::io::Result<()>;
 }
 
+// ANCHOR[acta-ports:VFS-TRAIT-001]
 /// Abstract object-safe Virtual File System interface.
 ///
 /// Implements required file operations for LSM storage engine, SSTables, WAL sidecars,

@@ -20,9 +20,11 @@ use crate::error::EgressError;
 use std::collections::BTreeSet;
 use std::ops::Range;
 
+// ANCHOR[acta-pii:]
 /// Standardmäßige maximale Eingabelänge in Bytes für die Entitätserkennung (65.536 Bytes = 64 KiB).
 pub const DEFAULT_MAX_INPUT_LENGTH: usize = MAX_CLASSIFY_PAYLOAD_BYTES;
 
+// ANCHOR[acta-pii:]
 /// Alias für [`RuleBasedEntityRecognizer`] als standardmäßiger Mustererkenner.
 pub type PatternRecognizer = RuleBasedEntityRecognizer;
 
@@ -40,6 +42,7 @@ pub struct EntityMatch {
     pub confidence: f32,
 }
 
+// ANCHOR[acta-pii:]
 /// Erweiterungspunkt für benutzerdefinierte Begriff-, Namens- oder Unternehmenslisten (Wörterbuch-Abgleich).
 #[derive(Debug, Clone, Default)]
 pub struct Gazetteer {
@@ -47,6 +50,7 @@ pub struct Gazetteer {
 }
 
 impl Gazetteer {
+    // ANCHOR[acta-pii:]
     /// Erstellt eine neue leere [`Gazetteer`]-Instanz.
     pub fn new() -> Self {
         Self {
@@ -54,6 +58,7 @@ impl Gazetteer {
         }
     }
 
+    // ANCHOR[acta-pii:]
     /// Fügt dem Verzeichnis einen Begriff hinzu (wird für case-insensitiven Abgleich in Kleinbuchstaben normalisiert).
     pub fn add_term(&mut self, term: impl Into<String>) {
         let t = term.into().trim().to_lowercase();
@@ -62,6 +67,7 @@ impl Gazetteer {
         }
     }
 
+    // ANCHOR[acta-pii:]
     /// Prüft, ob das Begriffsverzeichnis leer ist.
     pub fn is_empty(&self) -> bool {
         self.terms.is_empty()
@@ -73,6 +79,7 @@ impl Gazetteer {
     }
 }
 
+// ANCHOR[acta-pii:]
 /// Regelbasierter PII-Erkenner ohne externe Regex-Laufzeitabhängigkeit.
 ///
 /// Erkennt Kategorien personenbezogener Daten: EMAIL, IBAN, BIC, PHONE, CREDIT_CARD, STEUER_ID, IPV4, IPV6, PLZ, PLZ_ORT, LICENSE_PLATE, GAZETTEER.
@@ -92,11 +99,13 @@ impl Default for RuleBasedEntityRecognizer {
 }
 
 impl RuleBasedEntityRecognizer {
+    // ANCHOR[acta-pii:]
     /// Erstellt eine neue Instanz von [`RuleBasedEntityRecognizer`] mit Standard-Längenlimit und leerem Gazetteer.
     pub fn new() -> Self {
         Self::default()
     }
 
+    // ANCHOR[acta-pii:]
     /// Erstellt einen Erkenner mit einem vorkonfigurierten Begriffsverzeichnis ([`Gazetteer`]).
     pub fn with_gazetteer(gazetteer: Gazetteer) -> Self {
         Self {
@@ -105,23 +114,27 @@ impl RuleBasedEntityRecognizer {
         }
     }
 
+    // ANCHOR[acta-pii:]
     /// Konfiguriert das maximale Längenlimit in Bytes zur Begrenzung von DoS-Risiken.
     pub fn with_max_input_length(mut self, limit: usize) -> Self {
         self.max_input_length = limit;
         self
     }
 
+    // ANCHOR[acta-pii:]
     /// Liefert die Obergrenze für Eingabetexte in Bytes.
     pub fn max_input_length(&self) -> usize {
         self.max_input_length
     }
 
+    // ANCHOR[acta-pii:]
     /// Ergänzt einen Begriff für das Verzeichnis über ein Builder-Muster.
     pub fn add_gazetteer_term(mut self, term: impl Into<String>) -> Self {
         self.gazetteer.add_term(term);
         self
     }
 
+    // ANCHOR[acta-pii:]
     /// Führt die Erkennung auf dem übergebenen Text aus und liefert Byte-Bereiche und Kategorielabels.
     pub fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
         EntityRecognizer::recognize(self, text)
@@ -132,6 +145,7 @@ impl RuleBasedEntityRecognizer {
         self.scan_entities_internal(text)
     }
 
+    // ANCHOR[acta-pii:]
     /// Führt die Erkennung mit strikter Längenprüfung aus und liefert `Err(EgressError::CapacityExceeded)` bei Überschreitung.
     ///
     /// Gemäß wird bei Limitüberschreitung sofort blockiert.
@@ -209,6 +223,7 @@ impl RuleBasedEntityRecognizer {
     }
 }
 
+// ANCHOR[acta-pii:]
 // Implementierung des allgemeinen EntityRecognizer-Traits für den EgressVault.
 impl EntityRecognizer for RuleBasedEntityRecognizer {
     fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
@@ -286,6 +301,7 @@ impl Normalizer {
     }
 }
 
+// ANCHOR[acta-pii:]
 // Prüft auf unsichtbare Steuerzeichen, Zero-Width-Zeichen und diakritische Markierungen (Zalgo) zur Verhinderung von Obfuskation.
 fn is_zero_width_or_control(c: char) -> bool {
     matches!(
@@ -303,6 +319,7 @@ fn is_zero_width_or_control(c: char) -> bool {
     )
 }
 
+// ANCHOR[acta-pii:]
 // Normalisiert kyrillische, griechische und lateinische Homoglyphen sowie Fullwidth- und Mathe-Zeichen auf ASCII.
 fn fold_homoglyph(c: char) -> char {
     match c {
@@ -375,6 +392,7 @@ fn fold_homoglyph(c: char) -> char {
 // ============================================================================
 
 /// Detects email addresses.
+// ANCHOR[acta-pii:]
 // Zustandsbasierte Erkennung von E-Mail-Adressen (Local-Part, @, Domain, TLD-Prüfung).
 fn detect_emails(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -458,6 +476,7 @@ fn is_email_domain_char(c: char) -> bool {
 }
 
 /// Detects IBANs (country length check + Mod-97 checksum, optional spaces/hyphens).
+// ANCHOR[acta-pii:]
 // Erkennt internationale Bankkontonummern (IBAN) mit länderspezifischer Längen- und Modulo-97-Prüfziffernvalidierung.
 fn detect_ibans(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -580,6 +599,7 @@ fn validate_iban_checksum(iban: &str) -> bool {
 }
 
 /// Detects credit card numbers (13-19 digits, optional spaces/hyphens, Luhn algorithm).
+// ANCHOR[acta-pii:]
 // Erkennt Kreditkartennummern (Visa, MasterCard, Amex) und validiert sie via Luhn-Algorithmus (Modulo 10).
 fn detect_credit_cards(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -653,6 +673,7 @@ fn validate_luhn_checksum(digits: &[u8]) -> bool {
 }
 
 /// Detects German Steuer-ID (11 digits, TIN Mod 11 checksum).
+// ANCHOR[acta-pii:]
 // Erkennt 11-stellige deutsche steuerliche Identifikationsnummern (IdNr) mit Ziffernverteilung und ISO-7064-Prüfziffer.
 fn detect_steuer_ids(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -767,6 +788,7 @@ fn validate_german_steuer_id(digits: &[u64]) -> bool {
 }
 
 /// Detects DE/EU phone numbers (+49..., 0049..., 0170...).
+// ANCHOR[acta-pii:]
 // Erkennt deutsche und internationale Telefonnummern mit Ländervorwahlen (+49, 0049) und Formatierungszeichen.
 fn detect_phone_numbers(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -834,6 +856,7 @@ fn detect_phone_numbers(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
 }
 
 /// Detects IPv4 and IPv6 addresses.
+// ANCHOR[acta-pii:]
 // Erkennt IPv4-Adressen (mit Oktettbereichsprüfung 0..=255) und IPv6-Adressen.
 fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -961,6 +984,7 @@ fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
 }
 
 /// Detects BIC / SWIFT codes (ISO 9362: 8 or 11 alphanumeric characters).
+// ANCHOR[acta-pii:]
 // Erkennt Business Identifier Codes (BIC / SWIFT) im 8- oder 11-stelligen Format mit gültigem Ländercode.
 fn detect_bics(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -1161,6 +1185,7 @@ fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<
 }
 
 /// Detects German PLZ (5-digit), German PLZ + Ort (e.g. 10115 Berlin), and German license plates (e.g. B-MW 1234).
+// ANCHOR[acta-pii:]
 // Erkennt deutsche Postleitzahlen (PLZ / PLZ_ORT) sowie Kfz-Kennzeichen.
 fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<EntityMatch>) {
     let len = norm.len();
@@ -1293,6 +1318,7 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<EntityMatc
 }
 
 /// Detects custom gazetteer terms in the text using character index alignment.
+// ANCHOR[acta-pii:]
 // Gleicht Wörterbuch-Begriffe des Gazetteers mit dem normalisierten Text ab.
 fn detect_gazetteer(norm: &Normalizer, gazetteer: &Gazetteer, results: &mut Vec<EntityMatch>) {
     if gazetteer.is_empty() {
