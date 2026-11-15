@@ -83,4 +83,53 @@ candle-transformers = { version = "0.11", features = ["metal"] }
 [[test]]
 name = "golden_test"
 path = "tests/golden_test.rs"
-required-features = ["test-utils"]
+required-features = ["test-utils", "workspace"]
+
+[[test]]
+name = "attention_exporter_bounded_memory"
+required-features = ["workspace"]
+
+[[test]]
+name = "embedding_normalization_proptest"
+required-features = ["workspace"]
+
+[[test]]
+name = "embedding_provider_conformance"
+required-features = ["workspace"]
+
+[[test]]
+name = "gasp_mutant_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "kv_bridge_and_stress_test"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_bridge_roundtrip"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_bridge_tenant_key_separation"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_bridge_version_mismatch"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_prefix_reuse_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "kv_stage_b_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "proptest_candle"
+required-features = ["workspace"]
+
+[[test]]
+name = "real_inference_test"
+required-features = ["workspace"]
+

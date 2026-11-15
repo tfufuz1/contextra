@@ -43,11 +43,11 @@ async fn main() -> Result<()> {
     let (channel, mut rx) = InMemoryCognitiveChannel::new(16);
     let tenant_id = TenantId::new(1001);
     let input = PreCondensedInput {
+        tenant_id: tenant_id.clone(),
+        source_label: "Projektstatus Q4".to_string(),
         text_digest: "digest_1001_demo".to_string(),
-        abstract_label: "Projektstatus Q4".to_string(),
-        source_provenance: vec!["doc_42".to_string()],
-        estimated_importance: 0.95,
-        embedding: vec![0.1, 0.2, 0.3, 0.4],
+        token_count: 42,
+        provenance: vec![contextra_types::DocId::from(42)],
     };
 
     let segments = channel.send_pre_condensed(&tenant_id, &[input]).await?;

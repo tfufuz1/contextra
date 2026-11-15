@@ -4,7 +4,7 @@
 //! with state transitions, token budget management, and tool dispatching.
 
 use contextra_agent::{
-    AgentContext, AgentNode, AgentTool, NodeType, StateGraph, StepResult, WorkflowEdge,
+    AgentContext, AgentTool, NodeType, StateGraph, StepResult,
 };
 use contextra_ports::BoxFuture;
 use contextra_types::Result;
@@ -36,42 +36,12 @@ fn main() -> Result<()> {
     println!("contextra-agent: Minimal Pipeline Example");
 
     let mut graph = StateGraph::new();
-    graph.try_add_node(AgentNode {
-        id: "start".to_string(),
-        description: "Start step".to_string(),
-        node_type: NodeType::Start,
-        handler: None,
-    })?;
+    graph.try_add_node("start", "Start step", NodeType::Start, None)?;
+    graph.try_add_node("step1", "Execution step", NodeType::Task, Some("echo_tool"))?;
+    graph.try_add_node("end", "End step", NodeType::End, None)?;
 
-    graph.try_add_node(AgentNode {
-        id: "step1".to_string(),
-        description: "Execution step".to_string(),
-        node_type: NodeType::Task,
-        handler: Some("echo_tool".to_string()),
-    })?;
-
-    graph.try_add_node(AgentNode {
-        id: "end".to_string(),
-        description: "End step".to_string(),
-        node_type: NodeType::End,
-        handler: None,
-    })?;
-
-    graph.try_add_edge(WorkflowEdge {
-        from: "start".to_string(),
-        to: "step1".to_string(),
-        condition: None,
-        priority: 1,
-        goal_condition: None,
-    })?;
-
-    graph.try_add_edge(WorkflowEdge {
-        from: "step1".to_string(),
-        to: "end".to_string(),
-        condition: None,
-        priority: 1,
-        goal_condition: None,
-    })?;
+    graph.try_add_edge("start", "step1", None, 1)?;
+    graph.try_add_edge("step1", "end", None, 1)?;
 
     println!(
         "StateGraph successfully initialized with {} nodes.",
