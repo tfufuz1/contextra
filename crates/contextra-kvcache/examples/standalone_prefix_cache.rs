@@ -18,7 +18,7 @@
 //! vollkommen ohne Inferenz-Frameworks oder Modell-Gewichte.
 
 use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
-use contextra_types::TenantId;
+use contextra_kvcache::types::TenantId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== contextra-kvcache: Standalone Prefix-Cache Example ===");

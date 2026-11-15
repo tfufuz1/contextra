@@ -2,7 +2,7 @@ use std::ops::Bound;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use contextra_ports::StorageEngine;
+use contextra_store::StorageEngine;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::TxId;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};

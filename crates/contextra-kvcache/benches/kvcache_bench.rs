@@ -13,7 +13,7 @@
 )]
 
 use contextra_kvcache::{KvReusePolicy, KvSegment, PrefixRadixTree, TenantIsolatedKvStore};
-use contextra_kvcache::TenantId;
+use contextra_kvcache::types::TenantId;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_radix_tree_lookup_and_insert(c: &mut Criterion) {
