@@ -1,880 +1,941 @@
-# Acta – Normative Gesamtspezifikation (Fassung 3.0 Final)
+# Acta – Spezifikation
 
-*Einheitliche und finale Spezifikation: Architektur, Datenmodelle, Kryptografie, Löschkette, Zeitreise und rechtliche Synthese*  
-*Stand: 2026-11-15 · Bezug: Repository `tfufuz1/acta` (HEAD `bbfad85`) · Autorisierte Quelle: Ausschließlich `docs/` (`Acta_Architekturanalyse_Loeschung.md`, DSGVO-Rechts- und Architektursynthesen, SPEC 2.0-E / 3.0-Entwurf)*  
-*Geltung: Ersetzt `docs/SPEC.md` (Fassung 2.0-E) und `docs/SPEC(13).md`. Alle Crate-spezifischen `SPEC.md` sowie `AGENTS.md` sind ungültig und ignoriert.*
+*Wissens- und Entscheidungsplattform mit versionierbarem Unternehmenswissen und entkoppeltem Personendatenschutz*
+*Fassung 1.0 · Stand 2026-11-15 · Status: normativ für alle Acta-Repositories*
 
 Normative Schlüsselwörter nach RFC 2119: **MUSS**, **DARF NICHT**, **SOLL**, **KANN**.
 
----
-
-## 0. Status, Methode, Beweisstand und Geltung
-
-### 0.1 Beweismarken
+Kennzeichnung der Aussagen:
 
 | Marke | Bedeutung |
-|---|---|
-| **\[V\]** | Am Quelltext des Repositorys verifiziert (HEAD `bbfad85`, Dateipfad und Zeilen genannt). |
-| **\[M\]** | Durch Messung/Experiment in der Toolchain (Rust 1.89.0, Linux x86_64) verifiziert. |
-| **\[D\]** | Aus den autorisierten Analysen in `docs/` übernommen. |
-| **\[E\]** | Normative Festlegung / Architekturentscheidung dieser Spezifikation. |
-| **\[R\]** | Datenschutzrechtliche Anforderung gemäß EU-DSGVO / Rechtsprechung / Aufsichtsbehörden. |
-
-### 0.2 Befundregister des Ist-Zustands (HEAD `bbfad85`)
-
-Die Spezifikation behebt sämtliche verifizierten Mängel des bestehenden Codes und schließt alle Lücken vorheriger Entwürfe:
-
-| ID | Schwere | Befund | Quelltext-Beleg \[V\] |
-|---|---|---|---|
-| **V-01** | Kritisch | **Crypto-Shredding im Sealer unwirksam und fehlermaskiert.** `resolve_dek` setzt Hierarchietags fehlerhaft (`tenant = coll = doc`, `subject = None`). Bei Nichterreichbarkeit eines Slots (insb. gelöschter Slot) liefert `else` `blake3::keyed_hash(&self.k_unit, key)`. `VaultSealer::new()` initialisiert `k_unit = [0x55; 32]`. Jeder DEK ist ohne Tresor aus einer Konstante rekonstruierbar. Nach Slot-Löschung liefert `open` Datenmüll statt `Err(Erased)`. | `acta-erasure/src/vault/sealer.rs:98-105, 249-285` |
-| **V-02** | Kritisch | **Unsichere Stromchiffre statt AEAD.** Siegelung erfolgt per XOR mit 32-Byte-Strom aus `blake3::keyed_hash(dek, …)`. Keine Nonce, kein MAC-Tag, keine AAD; `SealCtx` ignoriert. Gleicher DEK leckt das XOR zweier Klartexte (`C1 ⊕ C2 = P1 ⊕ P2`). | `acta-erasure/src/vault/sealer.rs:299-345` |
-| **V-03** | Kritisch | **Löschkern isoliert.** `acta-erasure` fehlt in `[workspace] members` und `default-members`. Einziger `ErasureLayer`-Implementierer ist ein Test-Mock. `async` (tokio) im Default-Feature-Set. | Root `Cargo.toml`, `acta-erasure/Cargo.toml` |
-| **V-04** | Kritisch | **Tresor-Salts im Klartext, Epochenmaskierung tot.** `derive_dek_from_vault` liest Payload der Slots T/C/S/D unmaskiert. `mask_epoch_key` ist toter Code ohne Aufrufer. Eine alte Tresor-Sicherung plus langlebiger `K_unit` leitet vernichtete DEKs erneut ab (Backup-Wiederbelebung). | `acta-erasure/src/vault/sealer.rs:204-233`, `keyring.rs:33-55` |
-| **V-05** | Hoch | **Fehlerbehandlung im Kryptopfad schluckt Fehler (S7 verletzt).** `seal_record` endet auf `unwrap_or_default()`; `derive_dek` verwirft HKDF-Fehler mit `let _ =` und substituiert fehlenden Subject-Salt mit Nullen `[0u8; 32]`; `ErasureConfig::default().k_idx` nutzt Nullschlüssel; `VaultKeyring::new_in_memory` nutzt `[0x42; 32]`. | `acta-crypto/src/aead.rs:24-71`, `dek.rs:68-89`, `saga/core.rs:72` |
-| **V-06** | Hoch | **Store verschlüsselt keine Nutzdaten.** `RecordSealer`/`RecordAuthenticator` sind Dummy-Traits nur in Tests. Schlüssel sind Klartext-ASCII (`t:{tenant}:{collection}:chunk:{doc}`). | `acta-store/src/util.rs:47-135`, `tenant_codec.rs:37-100` |
-| **V-07** | Mittel | **Klassentrennung im Store fehlt.** `PartitionId = u32` mit `DEFAULT_PARTITION` („solange Store nur eine physische Partition kennt“). Keine Trennung N/P/D im Speicherpfad; kein `ReadGate` in `may_drop_version`. | `acta-store/src/history.rs`, `lsm/ops/compaction.rs:11,154` |
-| **V-08** | Hoch | **Lösch-Barriere unverdrahtet.** `FlushPurgeFence::enter_purge` hat im gesamten Workspace keinen einzigen Aufrufer. | `acta-store/src/lsm/fence.rs:59` |
-| **V-09** | Hoch | **Fehlende Lineage-Konzepte.** Keine Implementierung von Herkunftsketten, Ordinalen oder Segment-Zuordnungen. Zusagen S10 und S9 sind im Datenmodell nicht verankert. | Grep `crates/` (0 Treffer) |
-| **V-10** | Hoch | **Unkontrollierte SST-Hardlinks.** `CheckpointHardlinkCloner` verlinkt physische Dateien ohne Registrierung in einer `CopyRegistry`. | `acta-checkpoint/src/hardlink_cloner.rs:194-250` |
-| **V-11** | Info | **Tresor-Grabstein nullt Tag (Code übertrifft alte SPEC).** Der Code nullt `tag` und `payload` bei Grabsteinen (nur `status = 0x02` und MAC bleiben). Dies verhindert, dass das Tag als permanentes Pseudonym überdauert. | `acta-erasure/src/vault/slot.rs:294-306` |
-| **V-12** | Mittel | **Fehlende Batch-Vernichtung im Tresor.** `FileVault::destroy` führt Meta-Schreibvorgang und `sync_data` je Einzelslot aus. Unzureichend für Sweeper-Durchsatz (`destroy_many` erforderlich). | `acta-erasure/src/vault/durable.rs:480-530` |
-| **V-13** | Mittel | **Golden-Vektor-Drift.** Checksummen-Drift bei `canonical_report_v1.golden` und `sample_report_v1.*`. | `tests/golden_erasure_test.rs` |
-| **V-14** | Hoch | **Abnahme-Tests nicht kompilierbar.** `proof_crash_resume_matrix` (67 Fehler) und `proof_fail_closed_and_consistency` (13 Fehler) referenzieren nicht-existierende oder private Symbole. | Integrationstests `acta-erasure` |
-| **V-15** | Hoch | **Rohkennungen im Widerrufs-Log.** `revocation_log` speichert Kennungen append-only; verletzt Linkability-Schutz. Erfordert keyed Commitments. | `acta-erasure/src/revocation_log.rs` |
-| **V-16** | Mittel | **Feature-Default-Zirkelschluss.** Workspace enthielt `default = [workspace]`. Features müssen rein additiv sein. | Workspace-Konfiguration |
-| **V-17** | Mittel | **Store Compaction Deadlock/Hänger.** `test_compaction_stress_and_gc` verharrt im Unendlichen auf Single-Core-Umgebungen. | `acta-store/src/lsm/ops/compaction.rs` |
-
-### 0.3 Geltungsbereich und Hierarchie
-
-Diese Spezifikation ist das alleinige, verbindliche Referenzdokument für die gesamte Acta-Architektur. Sie ersetzt alle vorherigen Fassungen. Widersprüche innerhalb des Repositories werden zugunsten dieser Spezifikation aufgelöst.
+| --- | --- |
+| **[E]** | Verbindliche Architekturentscheidung dieser Spezifikation |
+| **[R]** | Rechtliche Anforderung, aus der eine technische Eigenschaft folgt |
+| **[Q]** | Messbares Qualitätsziel. Die Zahl ist ein Startwert; freigegeben wird nur nach gemessenem Bericht |
+| **[A]** | Annahme über die Umgebung, die im Betrieb zu bestätigen und im Bericht auszuweisen ist |
 
 ---
 
-## 1. Zweck, Mission, Zusagen und Nicht-Zusagen
+## 1. Produkt
 
-### 1.1 Mission \[E, R\]
+### 1.1 Zweck
 
-Personenbezogene Daten MÜSSEN von ihrer Erfassung an konstruktiv so modelliert werden, dass sie jederzeit **atomar, physisch und kryptografisch rückstandsfrei** aus dem gesamten RAG-System entfernt werden können (Primärspeicher, Indizes, Caches, Ableitungen, Acta-eigene Kopien und Sicherungen).
+Acta ist eine eigenständige Software für **Behörden und mittelständische Unternehmen**, mit der Organisationen ihr Wissen verwalten, ordnen und durch ein Sprachmodell nutzbar machen. Drei Eigenschaften machen Acta besonders:
 
-Gleichzeitig MUSS das System eine **bitemporale Zeitreise (MVCC)** über nicht-personenbezogene Sachverhalte bereitstellen. Unternehmen und Regulatoren müssen lückenlos nachvollziehen können, auf Basis welcher Normen, Gesetze, Richtlinien, Prompt-Versionen, Modell-Stände und Grenzwerte ein LLM eine Entscheidung getroffen hat.
+1. **Belegtes Antworten (RAG).** Jede Antwort stützt sich auf konkrete, zitierte Quellen. Fehlt der Beleg, enthält sich das System.
+2. **Versionskontrolle für Wissen („Git für RAG“).** Der gesamte nicht personenbezogene Wissensbestand samt Richtlinien, Prompts, Modellständen und Grenzwerten ist unveränderlich versioniert. Damit lassen sich alte Entscheidungen nachvollziehen und „Wenn-Dann“-Szenarien auf Verzweigungen des Wissens durchspielen.
+3. **Entkoppeltes, nachweisbares Löschen personenbezogener Daten.** Personenbezogene Daten liegen getrennt vom versionierten Wissen, sind verschlüsselt und werden durch Schlüsselvernichtung und physische Bereinigung unlesbar gemacht, ohne die Versionsgeschichte zu verändern.
 
-**Kernparadoxon und Lösung:**  
-Eine klassische Zeitreise erfordert unveränderliche Historien (Append-Only / WORM). Ein datenschutzkonformes Löschen erfordert die absolute Vernichtung von Informationen. Beide Anforderungen sind **nur dadurch vereinbar, dass personenbezogene Daten und Zeitreise-Metadaten strikt entkoppelt werden**:
-1. Personenbezogene Nutzdaten liegen im kryptografischen Tresor (Ebene P) und werden über flüchtige Schlüssel vernichtet.
-2. Sach- und Entscheidungszusammenhänge liegen in der Chronik (Ebene N), sind streng anonymisiert und bitemporal abfragbar.
-3. Der Löscherfolg triumphiert absolut über historische Zeitreiseabfragen: Ein `as_of(t)` in die Vergangenheit liefert für gelöschte Personendaten niemals Klartext, sondern belegt den Löschzustand (`Erased`).
+### 1.2 Zielgruppen und Einsatzrahmen
 
-### 1.2 Normative Zusagen (S1 bis S12)
+| Merkmal | Festlegung [E] |
+| --- | --- |
+| Betreiber | Behörden, Kommunen, Mittelstand; Betrieb On-Premise oder in einer vom Kunden kontrollierten EU-Umgebung |
+| Mandanten | Mehrere Organisationseinheiten je Installation (z. B. Ämter, Gesellschaften), strikt getrennt |
+| Nutzer | Sachbearbeitung, Fachabteilungen, Datenschutzbeauftragte, Administratoren, Revision |
+| Inferenz | Lokal oder in vom Kunden kontrollierter Infrastruktur; externe Dienste nur durch ausdrückliche Freigabe |
+| Plattform | Linux x86_64 und aarch64; ein Knoten pro Installation (Hochverfügbarkeit siehe 14.5) |
+| Netz | Betrieb ohne ausgehende Verbindungen ist der Standard und voll funktionsfähig |
 
-Jede Zusage MUSS durch automatisierte Tests nachgewiesen werden. Eine Zusage ohne Test gilt als nicht erfüllt.
+### 1.3 Mission und Umsetzung
 
-| ID | Normative Zusage | Verifikationstest |
-|---|---|---|
-| **S1** | **Sofortige Lesesperre.** Nach Rückkehr von `erase()` mit Status `Gated` liefert kein Lesepfad des Gesamtsystems Klartext des Ziels, auch nicht über Zeitreiseabfragen (`as_of`). Schreibvorgänge auf das Ziel werden sofort verweigert. | `T-DEL-1`, `T-CONC-1`, `T-TT-1..8` |
-| **S2** | **Kryptografische Isolation.** Jeder persistierte Klartext eines Betroffenen liegt vor dem Schreiben in den WAL in einem AEAD-Umschlag unter Schlüsseln, die nach der Vernichtung physisch nicht mehr existieren. | `T-CRY-1`, `T-SEAL-1..4`, `T-WAL-ENC` |
-| **S3** | **Mehrbetroffenen-Konsistenz.** Teilt ein Dokument mehrere Betroffene und ist nicht verlustfrei trennbar, wird es unlesbar, sobald ein Betroffener gelöscht wird (Modus `DeleteAll`; Mitbetroffene werden im Audit-Bericht deklariert). | `T-MULTI-1` |
-| **S4** | **Crash-Invarianz.** Ein Systemabsturz an jedem beliebigen Durabilitätspunkt führt nach Wiederanlauf entweder zur Vollendung der Löschung oder zu einem Zustand `Pending` mit dauerhaft aktivem Gate. Ein einmal gesetztes Gate geht niemals verloren. | `T-CRASH-C1..C12` |
-| **S5** | **Freiheit der Chronik von Personenbezug.** Die bitemporale Chronik (Ebene N) enthält weder direkt noch indirekt identifizierende personenbezogene Daten. Jeder Schreibversuch mit Personenbezug scheitert hart (Fail-Closed). | `T-CHR-1`, `T-ANON-1..3` |
-| **S6** | **Zeitreise-Determinismus.** Historische Abfragen über Ebene N liefern bei identischen Parametern byte-identische Ergebnisse. Eine Löschung in Ebene P verändert die Hash-Kette von Ebene N nicht. | `T-CHR-2`, `T-RANK-1` |
-| **S7** | **Fail-Closed Krypto-Semantik.** Kein Fehler im Schlüssel-, Zufalls-, KDF- oder Siegelpfad darf jemals zu einem Ersatzwert, Fallback-Schlüssel oder Klartext führen. Es gibt keine Default-Schlüssel. | `T-NOFALLBACK-*`, `T-RNG-1`, Gate `G-CRY-1` |
-| **S8** | **Typestate-Beweisführung.** Ein Löschnachweis kann ausschließlich durch eine Messung mit bestandener Positivkontrolle erzeugt werden. Nicht implementierte Prüfungen liefern `NotImplemented`, niemals Erfolg. | `T-EVID-1`, `T-STUB-1` |
-| **S9** | **Anti-Wiederauferstehung (Restore-Schutz).** Das Einspielen einer alten Datensicherung kann gelöschte Daten nicht wiederbeleben. Tresor-Sicherungen älter als `T_ROT_BACKUP` (72 h) werden hart abgewiesen. | `T-REST-1..3`, `RestoreGuard` |
-| **S10** | **Herkunfts-Typzwang (Lineage).** Jede abgeleitete Struktur (Vektor-Segment, Posting, Graph-Kante) trägt zwingend eine Herkunftsinformation. Löschung der Quelle tilgt die Ableitung. Ableitungen ohne Herkunft können typbedingt nicht konstruiert werden. | `T-DERIV-1`, Compile-Fail-Tests |
-| **S11** | **Container-Schlüsselisolation (Invariante I-17).** Zwei Datensätze verschiedener Verschlüsselungseinheiten teilen niemals denselben Chiffrierschlüssel innerhalb eines persistierten Containers (SST, WAL). Es gibt keine Block-Verschlüsselung über Dokumentgrenzen. | Property-Tests, `Sealed<P>` |
-| **S12** | **Pseudonymitätsfreie Audit-Protokolle.** Weder Schlüsselmaterial noch rohe Kennungen dürfen im Klartext in Append-Only-Protokollen (Ledger, Widerrufs-Log) erscheinen. Protokolle verwenden rotierte, keyed Commitments. | `T-LOG-1` |
+| Säule | Umsetzung in Acta | Abschnitt |
+| --- | --- | --- |
+| Souveränes Unternehmenswissen | On-Premise, Schlüssel beim Kunden, kein Egress im Standard, lokale Inferenz | 4, 12 |
+| Transparenz und Nachvollziehbarkeit | Versionierung, Entscheidungsprotokoll, Hash-Kette, unabhängiger Prüfer | 6, 7, 15 |
+| Präzision und Kontrolle | Belegpflicht, Hybridsuche mit Reranking, Zugriffskontrolle vor der Suche, Messbarkeit | 9, 10 |
+| Effizienz und Ressourcenschonung | Segmentierte Indizes, Rebuild statt Vollversiegelung, Batch-Vernichtung, kleine Binärdatei | 5, 9, 13 |
+| Schutz personenbezogener Daten | Ebene P, Schlüsselhierarchie, Lesesperre, versiegelte Ableitungen | 2, 4, 8 |
+| Verwaltung und Organisation von Daten | Mandanten, Sammlungen, Metadatenschema, Aufbewahrungsklassen, Löschkonzept | 10, 11 |
+| Entscheidungs- und Verwaltungshilfe | Entscheidungsprotokoll, Zeitreise, Szenarien, Berichte | 6, 7, 16 |
+| Europäischer Datenschutz | Abläufe zu Art. 5, 12, 16 bis 19, 25, 30, 32 DSGVO, Berichte mit Annahmen | 8, 16, 17 |
 
-### 1.3 Verbotene Aussagen und Grenzen (G-WORD) \[E, R\]
+### 1.4 Nicht-Ziele (Version 1)
 
-Es ist ausnahmslos **verboten**, in Berichten, Dokumentationen, Schnittstellen oder Marketingunterlagen folgende Formulierungen zu verwenden:
-- „DSGVO-konform“ oder „DSGVO-zertifiziert“ (datenschutzrechtlich unzulässig; Konformität ist ein Gesamtbetriebszustand, keine Software-Eigenschaft).
-- „100 % gelöscht“, „garantiert vernichtet“, „unwiederbringlich“, „revisionssicher“, „fehlerfrei“.
-- „Löscht aus allen Backups“ (technisch unzutreffend bei Offline- oder Bandmedien).
+- Kein Dokumentenmanagementsystem für Originale und keine Langzeitarchivierung (Schnittstelle zu vorhandenen Systemen).
+- Keine Mehrknoten-Replikation (14.5).
+- Keine autonomen Agenten und keine Werkzeugausführung durch das Sprachmodell.
+- Keine grafische Oberfläche als Teil dieser Spezifikation; Referenzoberflächen sind eigene Projekte über die API.
+- Keine Zertifizierungsaussage (1.6).
 
-**Verbindliche Berichterstattung:**  
-Acta berichtet ausschließlich objektiv messbare technische Erfüllungsklassen (**G, K, P, D, C**) mit dem Status `reached` oder `not_reached` unter Ausweisung expliziter Grenzannahmen (**A-FLASH, A-RAM, A-ANCHOR, A-CRYPTO, A-EXT**).
+### 1.5 Normative Zusagen
 
-### 1.4 Anonymitätskriterien für Ebene N \[R\]
+Jede Zusage MUSS durch automatisierte Tests belegt sein. Eine Zusage ohne Test gilt als nicht erfüllt.
 
-Gemäß Gutachten der Art.-29-Datenschutzgruppe (WP 216) und EDPB-Leitlinien müssen anonyme Daten drei Risiken ausschließen:
-1. **Aussonderung (Singling Out):** Es darf unmöglich sein, einen Datensatz einer Einzelperson zuzuordnen.
-2. **Verknüpfbarkeit (Linkability):** Es darf unmöglich sein, zwei Datensätze derselben betroffenen Person zuzuordnen.
-3. **Ableitbarkeit (Inference):** Es darf unmöglich sein, aus dem Gesamtzustand Eigenschaften einer Person mit hoher Wahrscheinlichkeit zu errechnen.
+| ID | Zusage | Primärer Nachweis |
+| --- | --- | --- |
+| **Z1** | **Sofortige Lesesperre.** Nach Rückkehr einer Löschung im Zustand `Gated` liefert kein Pfad des Systems Klartext des Ziels: nicht Suche, Antwort, Zeitreise, Szenario, Cache, Export oder Sitzung. Schreibzugriffe auf das Ziel werden verweigert. | `T-GATE-*` |
+| **Z2** | **Kryptografische Isolation.** Jeder persistierte Klartext personenbezogener Daten und jede daraus abgeleitete Struktur liegt vor dem Schreiben in einem AEAD-Umschlag unter Schlüsseln, die nach der Vernichtung nicht mehr existieren. | `T-CRY-*`, `T-DERIVED-SEALED` |
+| **Z3** | **Mehrbetroffenen-Konsistenz.** Betrifft ein Datensatz mehrere Betroffene, wird er unlesbar, sobald einer von ihnen gelöscht wird (Modus `DeleteAll`); Mitbetroffene werden im Bericht deklariert. | `T-MULTI-*` |
+| **Z4** | **Crash-Invarianz.** Ein Absturz an jedem Durabilitätspunkt führt nach dem Neustart entweder zur Vollendung der Löschung oder zu `Pending` bei dauerhaft aktiver Sperre. Eine gesetzte Sperre geht nie verloren. | `T-CRASH-*` |
+| **Z5** | **Trennung von Wissen und Personendaten.** Die versionierte Wissensebene K enthält keine personenbezogenen Daten. Verweise auf Personendaten sind zufällige Handles ohne Inhaltsbezug. Ein Schreibversuch mit erkanntem Personenbezug scheitert (Fail-Closed). | `T-SEP-*`, `T-ANON-*` |
+| **Z6** | **Löschung berührt die Versionskontrolle nicht.** Eine Löschung in Ebene P ändert weder Objekt-IDs noch Commit-Hashes noch die Hash-Kette der Wissensebene. | `T-VCS-ERASE-*` |
+| **Z7** | **Zeitreise-Determinismus.** Abfragen der Wissensebene zu einem Stand liefern bei gleichen Parametern byte-identische Inhalte. | `T-TT-*` |
+| **Z8** | **Entscheidungsnachvollziehbarkeit.** Zu jeder Antwort existiert ein Entscheidungsprotokoll mit Wissensstand, Prompt-Version, Modellstand, Parametern und Belegen. Nach Löschung einer Person bleibt die Begründungskette erhalten; personenbezogene Eingaben liefern `Erased`. | `T-DEC-*` |
+| **Z9** | **Szenario-Isolation.** Ein Szenario verändert weder die Hauptlinie des Wissens noch Ebene P. | `T-SCEN-*` |
+| **Z10** | **Fail-Closed-Kryptografie.** Kein Fehler im Schlüssel-, Zufalls-, Ableitungs- oder Siegelpfad führt zu Ersatzwert, Fallback-Schlüssel oder Klartext. Es gibt keine Standardschlüssel. | `T-NOFALLBACK-*`, `T-RNG-*` |
+| **Z11** | **Nachweis nur mit Positivkontrolle.** Ein Löschnachweis entsteht ausschließlich aus einer Messung, deren Messverfahren seine Funktionsfähigkeit an einem synthetischen Treffer bewiesen hat. Nicht implementierte Prüfungen liefern `NotImplemented`. | `T-EVID-*` |
+| **Z12** | **Restore-Schutz.** Das Einspielen einer alten Sicherung kann gelöschte Daten nicht wiederbeleben. | `T-REST-*` |
+| **Z13** | **Herkunftszwang.** Jede abgeleitete Struktur trägt ihre Herkunft; Ableitungen ohne Herkunft sind nicht konstruierbar. | Compile-Fail-Tests |
+| **Z14** | **Schlüsselisolation je Dokument.** Zwei Dokumente der Ebene P teilen niemals denselben Datenschlüssel. | Property-Test |
+| **Z15** | **Pseudonymitätsfreie Protokolle.** Protokolle enthalten weder Schlüsselmaterial noch Roh-Kennungen von Personen. | `T-LOG-*` |
+| **Z16** | **Zugriffskontrolle vor der Suche.** Ein Nutzer erhält nie Treffer, Belege oder Texte, auf die er keinen Zugriff hat; die Prüfung wirkt auf die Kandidatenmenge, nicht erst auf die Ausgabe. | `T-ACL-*` |
+| **Z17** | **Belegpflicht.** Jede inhaltliche Aussage einer Antwort trägt einen Quellenverweis auf einen abgerufenen Beleg, oder die Antwort enthält die ausdrückliche Enthaltung „nicht belegt“. | `T-GROUND-*` |
+| **Z18** | **Kein Egress im Standard.** Ohne ausdrückliche, protokollierte Freigabe verlässt kein Inhalt die Installation. | `T-EGRESS-*` |
 
-Ebene N erzwingt diese Kriterien technisch über den **N-Validator** (Whitelist, Entropie-Check, k-Anonymitäts-Schwelle $K_{\text{MIN}} \ge 5$ für Aggregationen, kryptografisch zufällige Entscheidungs-Handles).
+### 1.6 Sprachregeln und Berichtsgrenzen [R]
+
+In Berichten, Oberflächen, Dokumentation und Werbematerial sind **verboten**: „DSGVO-konform“, „DSGVO-zertifiziert“, „100 % gelöscht“, „garantiert vernichtet“, „unwiederbringlich“, „revisionssicher“, „fehlerfrei“, „löscht aus allen Backups“, „perfekte Antworten“. Konformität ist ein Betriebszustand der Organisation, keine Eigenschaft einer Software.
+
+Acta berichtet ausschließlich **messbare Erfüllungsklassen** (8.7) mit `reached` oder `not_reached` und weist die **Annahmen** A-FLASH, A-RAM, A-ANCHOR, A-CRYPTO und A-EXT (17.3) aus. Ein Wortfilter (Gate G-WORD) prüft Quelltext, Texte und Berichtsvorlagen.
 
 ---
 
-## 2. Begriffe, Ebenen und Datenklassen
+## 2. Grundmodell
 
-### 2.1 Die drei Systemebenen
+### 2.1 Vier Ebenen
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        Ebene N: Chronik (WORM)                         │
-│  - Gesetze, Richtlinien, Grenzwerte, Prompt-Versionen, Modellstände    │
-│  - Audit-Quittungen (keyed Commitments), Hash-Kette                    │
-│  - Streng frei von personenbezogenen Daten (PII)                      │
-│  - Bitemporale Zeitreise: unbegrenzt, deterministisch                  │
-│  - Löschung: Niemals im Normalbetrieb; Ausnahme nur juristischer       │
-│    Takedown per Vier-Augen-Prinzip (NormKey-Vernichtung)               │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Referenz nur über zufällige Handles
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                   Ebene P: Tresor (Personal Vault)                     │
-│  - Personenbezogene Nutzdaten (Texte, Metadaten, Vektor-Embeddings)    │
-│  - Jeder Datensatz verschlüsselt unter Dokument-DEK (Umschlag v3)      │
-│  - Schlüsselhierarchie: Anker -> Epoche -> Mandant -> Coll -> Subj ->  │
-│    Dokument -> DEK                                                     │
-│  - Zeitreise: Streng begrenzt auf Horizont (max. 30 Tage)              │
-│  - Löschung: Crypto-Shredding (O(1)) -> Physischer Purge (Hygiene)     │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Lineage: monotone doc_ord Bitmaps
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                    Ebene D: Ableitungen (Indizes)                      │
-│  - HNSW-Vektorgraph, BM25-Postings, Wissensgraph, Caches               │
-│  - Tragen zwingend Herkunft (`Lineage { source: RoaringBitmap }`)      │
-│  - Zwei Betriebsmodi:                                                  │
-│      * Rebuild (Standard): Maskierung im Gate, Segment-Neubau          │
-│      * Sealed (Spezialfall): Verschlüsselt unter ArtKey (≤ 50k Vekt.) │
-│  - Löschung: Sofortige Maskierung im Gate -> Bereinigung/Rebuild       │
-└────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Ebene K – Wissen (versioniert, unveränderlich, ohne Personenbezug)        │
+│   Blobs, Trees, Commits, Branches, Tags, Entscheidungsprotokolle          │
+│   Verweise auf Personendaten nur als zufällige PersonalRef-Handles        │
+├───────────────────────────────────────────────────────────────────────────┤
+│ Ebene P – Personendaten (verschlüsselt, löschbar, nicht Teil der Hashes)  │
+│   Datensätze unter Dokument- und Betroffenenschlüsseln                    │
+│   Kurzer Versionsverlauf nur für Berichtigung und Fristen                 │
+├───────────────────────────────────────────────────────────────────────────┤
+│ Ebene D – Ableitungen (Indizes, Caches, Embeddings)                       │
+│   Tragen Herkunft (Lineage); aus P abgeleitete Segmente sind versiegelt   │
+├───────────────────────────────────────────────────────────────────────────┤
+│ Ebene E – Nachweise (Löschjournal, Ledger, Berichte, Schlüsseltresor)     │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Kerngedanke [E]:** Versionskontrolle und Löschung sind **konstruktiv entkoppelt**. Die Versionsgeschichte (K) enthält nie Inhalte, die gelöscht werden müssen. Sie enthält an deren Stelle ein **PersonalRef**, ein zufälliges 128-Bit-Handle ohne Ableitung aus dem Inhalt. Der Hash eines Trees oder Commits wird über das Handle gebildet, nie über Personendaten. Die Löschung vernichtet den Schlüssel in Ebene P; das Handle bleibt gültig und löst nach der Löschung zu `Erased` auf.
 
 ### 2.2 Datenklassen (Regel R-CLS)
 
-Jeder Schreibvorgang MUSS explizit eine Datenklasse deklarieren. Fehlt die Angabe, bricht die Operation mit `ClassViolation` ab.
+Jeder Schreibvorgang MUSS eine Datenklasse deklarieren. Fehlt sie, bricht die Operation mit `ClassViolation` ab.
 
-| Datenklasse | Ebene | Standard-Aufbewahrung | Primärer Löschmechanismus | Retention-Policy |
-|---|---|---|---|---|
-| `Norm` | N | Unbegrenzt | Juristischer Takedown | `KeepAll` |
-| `Evidence` | N | Unbegrenzt | Unlöschbar (garantiert PII-frei) | `KeepAll` |
-| `Personal` | P | Max. 30 Tage oder `retain_until` | Crypto-Shredding (Slot-Vernichtung) + Purge | `LiveWhileKeyAlive` |
-| `Special` (Art. 9/10 DSGVO) | P | 0 Tage (keine Karenz) | Sofortiges Crypto-Shredding + Prioritärer Purge | `StrictZero` |
-| `Derived` | D | Keine eigenständige Frist | Herkunftsbasierter Purge / Segment-Rebuild | `Windowed` |
-| `Unclassified` | P | Quarantäne (max. 24 h) | Wie Personal; automatische Sperre bei Fristablauf | `Quarantine` |
+| Klasse | Ebene | Beschreibung | Aufbewahrung (Standard) | Löschmechanismus |
+| --- | --- | --- | --- | --- |
+| `Wissen` | K | Sachinhalte ohne Personenbezug: Vorschriften, Richtlinien, Handbücher, Vorlagen, Konfigurationen, Prompts | unbegrenzt (versioniert) | Takedown (7.6) |
+| `Beleg` | K | Entscheidungsprotokolle ohne Personenbezug | unbegrenzt | nicht löschbar außer Takedown |
+| `Personal` | P | Personenbezogene Daten | nach Aufbewahrungsklasse | Schlüsselvernichtung und Bereinigung |
+| `Besonders` | P | Daten nach Art. 9 und 10 DSGVO | 0 Tage Karenz | sofortige Schlüsselvernichtung, priorisierte Bereinigung |
+| `Abgeleitet` | D | Indizes, Caches, Embeddings | keine eigene Frist | herkunftsbasierte Bereinigung, Rebuild |
+| `Unklassifiziert` | P | Eingang ohne Entscheidung | Quarantäne, max. 24 h | wie `Personal`; Sperre bei Fristablauf |
 
----
+### 2.3 Dokumente mit gemischtem Inhalt [E]
 
-## 3. Systemarchitektur, Ringmodell und Ports
+Ein Dokument kann Sach- und Personenbezug mischen. Der Ingest wählt je Dokument genau einen Modus:
 
-### 3.1 Ringarchitektur (Abhängigkeitsinvariante)
+| Modus | Wirkung | Wann |
+| --- | --- | --- |
+| `Whole` (Standard bei erkanntem Personenbezug) | Das gesamte Dokument liegt in Ebene P. In K entsteht höchstens ein PersonalRef. | Akten, Fallbearbeitung, Schreiben an Personen |
+| `Split` | Personenbezogene Spannen werden entfernt und in P abgelegt; K enthält den bereinigten Text mit Platzhaltern `⟦P:<handle>⟧`. Pflicht: bestandene Prüfung des N-Validators (7.5) | nur bei ausdrücklicher Richtlinie des Mandanten |
+| `Open` | Das Dokument ist vollständig `Wissen` | Dokument besitzt bestätigt keinen Personenbezug (Vorschrift, Handbuch) |
 
-Abhängigkeiten zeigen streng hierarchisch von höheren Ringen zu niedrigeren Ringen. Querverbindungen innerhalb eines Ringes sind verboten.
+**Begründung:** Eine automatische Erkennung kann Personenbezug übersehen. Deshalb ist `Whole` der sichere Standard, und `Split` und `Open` setzen eine bestandene Validierung voraus. Verbleibendes Restrisiko behandelt der Takedown (7.6).
 
-```
-       R7: API & Schnittstellen (acta, acta-cli, acta-mcp)
-                                │
-       R6: Composition Root (acta-node)
-                                │
-       R5: Orchestrierung (acta-chronicle, acta-engine)
-                                │
-       R4: Adapter-Brücke (acta-erasure-adapters)
-               /                                \
-              ▼                                  ▼
-   R3: Löschkern (acta-erasure)        R1: Persistenz & Indizes
-                                       (acta-store, acta-mvcc,
-                                        acta-vector, acta-text,
-                                        acta-graph, acta-rank,
-                                        acta-checkpoint)
-              \                                  /
-               ▼                                ▼
-       R2: Systemverträge (acta-types, acta-ports)
-                                │
-       R0: Fundament (acta-ids, acta-crypto, acta-env, acta-sys,
-                      acta-durable-fs, acta-simd, acta-wire)
-```
+### 2.4 Identifikatoren
 
-**Regel R-DEP:**  
-Gate-Lint `G1` prüft in der CI automatisiert via `cargo metadata`, dass keine unzulässigen Abhängigkeitskanten existieren.
+| Typ | Größe | Bildung | Zweck |
+| --- | --- | --- | --- |
+| `TenantTag` | 16 B | HMAC-SHA256(`k_idx`-Teilschlüssel, `acta/tag/v1` ‖ „tenant“ ‖ externe ID), gekürzt | Mandant |
+| `SubjectTag` | 16 B | wie oben, Teilschlüssel je Mandant | Betroffener |
+| `DocRef` | 16 B | zufällig (`CryptoRng`) | Dokument in Ebene P |
+| `PersonalRef` | 16 B | zufällig | Verweis aus K auf Personendaten |
+| `DocOrd` | u32 | dicht, monoton je Mandant, nie wiederverwendet | Herkunft (Lineage), nur intern |
+| `KOrd` | u64 | dicht, monoton je Installation | Sichtbarkeitsmengen (6.5), nur intern |
+| `ObjectId` | 32 B | SHA-256 über kanonische Bytes mit Domänenpräfix | Objekte der Ebene K |
 
-### 3.2 Workspace- und Crate-Hygiene
-
-1. `acta-erasure` MUSS zwingend in `[workspace] members` und `default-members` geführt werden (Behebung V-03).
-2. Features sind rein additiv. Die Verwendung von `default = [workspace]` ist untersagt.
-3. Im gesamten Produktionscode sind `#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::let_underscore_must_use)]` verbindlich aktiviert.
-4. `unsafe`-Blöcke sind ausschließlich in `acta-sys`, `acta-simd` und generiertem `acta-wire`-Code gestattet. Jeder `unsafe`-Block erfordert einen formalen `// SAFETY:`-Kommentar.
-5. Verbotene Standardfunktionen: Direkte Aufrufe von `std::fs::remove_file`, `std::fs::hard_link`, `std::fs::copy`, `std::time::SystemTime::now` und `rand::thread_rng` sind im Kernpfad per `clippy.toml` verboten (Prinzip P6). Alle Zugriffe müssen über die R0-Ports erfolgen.
-
-### 3.3 Port-Spezifikation (Regel R-PORT)
-
-Jeder logische Port besitzt im Produktionsbetrieb genau eine Implementierung:
-
-| Port-Trait | Konsumierendes Crate | Produktionsimplementierung | Bereitstellendes Crate |
-|---|---|---|---|
-| `Clock`, `Rng`, `IdGen` | Alle | `OsClock`, `CryptoRng`, `MonotonicIdGen` | `acta-env` |
-| `Vfs` | Persistenz, Tresor | `DurableVfs` (O_DIRECT, sync) | `acta-durable-fs` |
-| `CryptoPrimitives` | Löschkern, Store | `ChaChaCrypto`, `Blake3Hasher` | `acta-crypto` |
-| `KeyAnchor` | Löschkern (Keyring) | `HsmAnchor` / `KmsAnchor` (Prod), `FileAnchor` (Dev) | `acta-crypto` |
-| `ErasureLayer` | Löschkern | `StoreLayer`, `VectorLayer`, `TextLayer`, `GraphLayer`, `CacheLayer`, `CheckpointLayer` | `acta-erasure-adapters` |
-| `SnapshotRevoker` | Löschkern (Gate) | `MvccRevoker` | `acta-mvcc` |
-| `ResidueScanner` | Löschkern (Messung) | `ForensicScanner` | `acta-erasure` |
-| `ReportSigner` | Löschkern (Audit) | `Ed25519HsmSigner` | `acta-crypto` |
-
-Die historische Duplizierung zwischen `acta-erasure::types_local` und `acta-ports` ist aufgehoben; alle Löschtypen sind kanonisch im Löschkern verankert.
+`k_idx` ist ein 256-Bit-Geheimnis ohne Standardwert, geliefert durch den Schlüsselanker (4.4). Ein Start ohne `k_idx` wird verweigert. Tags sind niemals in Ebene K sichtbar.
 
 ---
 
-## 4. Kryptografie, Schlüsselmodell und Tresor (normativ)
+## 3. Systemarchitektur
 
-### 4.1 Kryptografische Primitive
+### 3.1 Prinzipien [E]
 
-| Zweck | Algorithmus / Standard | Parameter / Spezifikation |
-|---|---|---|
-| Datensatz-Verschlüsselung | XChaCha20-Poly1305 | 256-Bit Schlüssel, 192-Bit Zufallsnonce aus `Rng` (kein API-Parameter, I-15) |
-| Schlüsselableitung (KDF) | HKDF-SHA256 | RFC 5869; Fehler zwingend propagiert, strikt ohne Fallback |
-| Passwortbasierte Ableitung | Argon2id | RFC 9106; $m \ge 19\,456\text{ KiB}$, $t \ge 2$, $p \ge 1$ |
-| Integritäts-MACs (WAL, Slots)| HMAC-SHA256 | FIPS 198-1; 256-Bit Schlüssel, gekürzt auf 64 Bit im Slot |
-| Identifikatoren & Commitments| BLAKE3 Keyed | 256-Bit Domänentrennung |
-| Berichtssignatur | Ed25519 | PureEd25519 (RFC 8032); Domänen-Präfix `ctx/report/v1` |
+1. **Anforderung vor Mechanismus.** Kein Bauteil ohne Zusage oder Produktanforderung.
+2. **Eigenbau nur dort, wo physische Kontrolle erforderlich ist** (Segmentspeicher, Schlüsseltresor, Löschkern, Versionskontrolle). Sonst bewährte Bibliotheken.
+3. **Fehler unmöglich machen statt verbieten:** Typzwang (`Sealed<P>`, `Derived<T>`, Schlüsseltypen ohne `Default`).
+4. **Eine Lösung je Problem:** ein Hash-Ketten-Typ, ein Zeit- und Zufallsport, ein Fehlerklassifikator.
+5. **Kleine Crates, harte Größenbudgets, keine Sammel-Crates** mit Fremdwissen.
+6. **`unsafe` nur in `acta-sys`.**
+7. **Kern synchron.** `tokio` nur an den Rändern (Netzwerk, Inferenzclient), nie in Level 0 bis 6.
 
-### 4.2 Die einheitliche Schlüsselhierarchie (Entscheidung D-05)
+### 3.2 Level-Modell [E]
 
-Die Ableitung von Nutzdaten-Schlüsseln erfolgt strikt deterministisch über eine hierarchische Kette von Zufalls-Salts im Tresor:
+Eine Abhängigkeit `A → B` ist erlaubt genau dann, wenn `level(A) > level(B)`. Die Level stehen in `rings.toml`; das Gate G1 prüft sie gegen `cargo metadata`. Querkanten auf gleichem Level sind verboten.
 
-```
-                           [ Hardware-Sicherheitsmodul / KeyAnchor ]
-                                              │
-                      ┌───────────────────────▼────────────────────────┐
-                      │    Epochenschlüssel E_e (K_enc, K_vm, K_commit) │  (Rotation alle 24h)
-                      └───────────────────────┬────────────────────────┘
-                                              │ Maskierung (HKDF-Strom) & MAC
-          ┌───────────────────────────────────┼──────────────────────────────────┐
-          ▼                                   ▼                                  ▼
-     [ Slot U ]                          [ Slot T ]                         [ Slot C ]
-  Mandanten-Schlüssel                   Mandanten-Salt                   Collection-Salt
-     (K_unit, 256b)                       (Salt_T, 256b)                     (Salt_C, 256b)
-          │                                   │                                  │
-          └─────────────────┬─────────────────┴──────────────────────────────────┘
-                            │
-              ┌─────────────▼─────────────┐
-              │         [ Slot S ]        │  Betroffenen-Salt (Subject)
-              │       (Salt_S, 256b)      │  (Wird bei Art.-17-Löschung vernichtet!)
-              └─────────────┬─────────────┘
-                            │
-              ┌─────────────▼─────────────┐
-              │         [ Slot D ]        │  Dokument-Salt
-              │       (Salt_D, 256b)      │  (Wird bei Dokument-Löschung vernichtet!)
-              └─────────────┬─────────────┘
-                            │
-                            ▼
-          Dokument-DEK (Data Encryption Key, 256 Bit)
-```
+### 3.3 Crate-Verteilung
 
-**Normative Ableitungsvorschrift:**
-$$\text{Salt}_{\text{comb}} = \text{SHA-256}\Big(\text{"acta/kdf/v3"} \parallel \text{Salt}_T \parallel \text{Salt}_C \parallel n_{\text{u16}} \parallel \text{Salt}_{S,1} \dots \text{Salt}_{S,n} \parallel \text{Salt}_D\Big)$$
-$$\text{DEK}(\text{doc}) = \text{HKDF-SHA256}\Big(\text{IKM} = K_{\text{unit}},\, \text{Salt} = \text{Salt}_{\text{comb}},\, \text{Info} = \text{"acta/dek/v3"} \parallel \text{doc\_tag}\Big)$$
+Größenbudgets sind harte Obergrenzen für Produktionscode (ohne Tests); Überschreitung erfordert eine dokumentierte Entscheidung.
 
-**Hierarchie-Regeln (H1 bis H5):**
-- **H1:** $T$, $C$, $S$, $D$ sind physisch getrennte Slots. `resolve_dek` MUSS `tenant_tag`, `collection_tag`, `subject_tag` und `doc_tag` getrennt auflösen (Behebung V-01).
-- **H2:** Fehlt ein Slot in der Kette (Status Grabstein oder leer), MUSS das Ergebnis `Err(ErasureError::Erased(SlotType))` lauten. Ein Fallback ist absolut verboten (Fail-Closed).
-- **H3:** Fehlt der Betroffenen-Salt $S$ bei einem Dokument mit Personenbezug, liegt ein schwerer Integritätsfehler vor.
-- **H4:** Die Vernichtung wirkt kaskadierend nach oben: Vernichtung von $S$ macht augenblicklich alle DEKs sämtlicher Dokumente der betroffenen Person unberechenbar. Vernichtung von $D$ tilgt ein Einzeldokument. Vernichtung von $C$ tilgt eine Collection. Vernichtung von $U$ oder $T$ tilgt den gesamten Mandanten.
-- **H5:** $K_{\text{unit}}$ liegt im Tresor als eigener Slot-Typ **U** (Tag = `tenant_id`).
+| Level | Crate | Aufgabe | Budget (LOC) | Interne Abhängigkeiten |
+| --- | --- | --- | --- | --- |
+| L0 | `acta-base` | Newtypes (Tags, Refs, Ordinale), `DataClass`, `ErrorClass`, `ClassifiedError`, Ports `Clock` und `CryptoRng` (fallibel), kanonische Kodierung (sicheres Lesen/Schreiben von Big-Endian-Feldern), Grenzwerte | 2 500 | – |
+| L1 | `acta-crypto` | AEAD (XChaCha20-Poly1305), HKDF, HMAC, Ed25519, `Sealed<P>`, Schlüsseltypen (`Zeroizing`), `HashChain` | 4 000 | base |
+| L1 | `acta-fs` | `Vfs`-Port, `DurableVfs` (fsync, atomares Ersetzen, Scrub), `FaultVfs` (Fehlerinjektion) | 2 500 | base |
+| L1 | `acta-sys` | Einziges `unsafe`: `mlock`, `MADV_DONTDUMP`, `RLIMIT_CORE`, `SecureBuf`; `SystemClock`, `OsCryptoRng` | 1 200 | base |
+| L1 | `acta-gate` | `ReadGate` (Roaring-Bitmap, Epoche), Traits `ErasedView`, `ErasureLayer`, `LayerAck` | 900 | base |
+| L1 | `acta-access` | Mandanten, Rollen, Attribute, Richtlinienauswertung (ABAC), Sichtbarkeitsmengen je Gruppe | 3 000 | base |
+| L1 | `acta-infer` | Verträge `Embedder`, `Reranker`, `Generator`, `ModelFingerprint`, Kostenbeschreibung | 600 | base |
+| L1 | `acta-pii` | Erkennung personenbezogener Muster (Regeln, Wörterbücher, Prüfsummen), N-Validator-Bausteine | 4 000 | base |
+| L1 | `acta-ingest` | Parser (nicht vertrauenswürdige Eingaben), Chunking, Ressourcenlimits | 8 000 | base |
+| L2 | `acta-ledger` | Append-only-Protokoll mit Hash-Kette, signierten Checkpoints, keyed Commitments | 2 500 | base, crypto, fs |
+| L2 | `acta-vault` | Schlüsseltresor, `KeyAnchor`-Trait, `FileAnchor`, Wurzelrotation, Vernichtung | 4 500 | base, crypto, fs |
+| L2 | `acta-seg` | Versiegelter Segmentspeicher: Journal, Segmente, Manifest, Aufräumen, Kopienregister | 7 000 | base, crypto, fs, gate |
+| L3 | `acta-history` | Versionskontrolle der Ebene K: Objekte, Refs, Sichtbarkeitsmengen, Diff, Merge | 6 000 | base, crypto, ledger, seg, gate |
+| L3 | `acta-erasure` | Löschkern: Gate-Journal, Zustandsmaschine, Messung, Bericht, Restore-Schutz | 8 000 | base, crypto, fs, gate, ledger, vault |
+| L3 | `acta-text` | Segmentierter Volltextindex (BM25) mit Lineage, DE/EN-Normalisierung | 5 000 | base, crypto, gate, seg |
+| L3 | `acta-vec` | Segmentierter Vektorindex (Flat, später ANN-Backend), Lineage | 4 000 | base, crypto, gate, seg |
+| L4 | `acta-decision` | Entscheidungsprotokoll, Szenarien (Wenn-Dann), Vergleich | 4 000 | base, history, access, infer |
+| L4 | `acta-rag` | Abrufpipeline: Hybridsuche, Fusion, Reranking, Belegprüfung, Bewertungswerkzeug | 7 000 | base, text, vec, history, gate, access, infer |
+| L4 | `acta-reports` | Löschbericht (JCS), Verzeichnis nach Art. 30, Fristen- und Aufbewahrungsberichte, Wortfilter | 3 500 | base, erasure, ledger, history |
+| L5 | `acta-engine` | Anwendungsfälle: Ingest, Antwort, Löschung, Szenario, Aufbewahrung, Wartung | 12 000 | alle darunter |
+| L6 | `acta-node` | Composition Root: Konfiguration, Verdrahtung, Selbsttest beim Start, Hintergrundaufgaben | 3 000 | engine, alle Adapter |
+| L6 | `acta-infer-http` | Client für lokale und freigegebene Inferenzdienste (OpenAI-kompatible Schnittstelle); darf `tokio` nutzen | 3 000 | base, infer |
+| L7 | `acta-api` | HTTP/JSON-Schnittstelle, Authentifizierung (OIDC, mTLS), Streaming; darf `tokio` nutzen | 6 000 | node |
+| L8 | `acta-server` (Binary) | Prozessstart, Signalbehandlung | 500 | api, node |
+| L8 | `acta-cli` (Binary) | Administration: Betroffenenanfragen, Szenarien, Berichte, Prüfung | 3 000 | node |
+| – | `acta-verify` (Binary) | Unabhängige Prüfung von Löschberichten und Ledger; **keine** interne Abhängigkeit | 800 | – |
+| dev | `acta-testkit` | `ManualClock`, `SeededRng`, Fehlerinjektion, Konformitätstests, Testdaten | 5 000 | base, crypto, fs |
+| dev | `xtask` | `cargo xtask gates`: Architektur- und Hygieneprüfungen | 3 000 | – |
 
-### 4.3 Epochenrotation (Backup-Härtung)
+Zusammen sind es 24 Produktions- und 2 Entwicklungs-Crates; Binaries sind `acta-server`, `acta-cli`, `acta-verify`.
 
-Um alte Tresor-Sicherungen gegen nachträgliche Entschlüsselung abzusichern, erzwingt Acta eine rollierende Epochenrotation:
-1. Alle $T_{\text{ROT}} = 24\text{ h}$ oder nach jeweils $N_{\text{SHRED}} = 10\,000$ Slot-Vernichtungen erzeugt das System einen neuen Epochenschlüssel $E_{e+1} = (K_{\text{enc}}, K_{\text{vm}}, K_{\text{commit}})_{e+1}$ im Anker.
-2. Alle lebenden Slots werden unter $E_{e+1}$ neu maskiert und atomar in eine neue Tresordatei überführt (`fsync`, `rename`, `fsync(dir)`). Die DEKs der Nutzdaten verändern sich dabei **nicht**.
-3. Der alte Epochenschlüssel $E_e$ wird im `KeyAnchor` unwiederbringlich physisch zerstört.
-4. Ein Journal-Eintrag `EpochSealed { epoch: e }` wird festgeschrieben.
+### 3.4 Hub-Regeln [E]
 
-**Garantie:** Eine physische Kopie des Tresors aus Epoche $\le e$ ist nach Vernichtung von $E_e$ mathematisch unlesbar. Backup-Wiederbelebungen sind damit ausgeschlossen (Behebung V-04).
+Es gibt **keinen** Sammel-Crate für „Typen“ oder „Ports“. Gemeinsame Verträge sind kleine, einem Zweck gewidmete Crates (`acta-base`, `acta-gate`, `acta-infer`).
 
-### 4.4 Datensatz-Umschlag v3 (AEAD Envelope)
+| Regel | Inhalt |
+| --- | --- |
+| HR-1 | Ein Vertrags-Crate hat genau einen Zweck und bleibt unter seinem Budget |
+| HR-2 | Ein Trait gehört dem Crate, das ihn **braucht**, wenn der Erbringer in einem höheren Level liegt (Dependency Inversion); liegt der Erbringer tiefer, besitzt der Erbringer ihn |
+| HR-3 | Nutzen Erbringer und Nutzer einen Vertrag aus verschiedenen Richtungen, entsteht ein eigenes kleines Vertrags-Crate auf dem niedrigsten tragfähigen Level |
+| HR-4 | Ein Fehlertyp je Crate (`thiserror`, `#[non_exhaustive]`, kein `Other(String)`); Aggregation erst ab L5 |
+| HR-5 | `default = []`; Features sind additiv und haben keine Rückkante nach oben |
+| HR-6 | Keine Alias-Re-Exports, kein `include!`, kein `#[deprecated]`, keine Brücken-Module |
+| HR-7 | `acta-node` ist die einzige Stelle, die konkrete Implementierungen verdrahtet; jeder Port hat im Betrieb genau eine Implementierung |
+| HR-8 | Fan-in-Limit: Von `acta-engine` hängen höchstens `acta-node` und `acta-cli` ab |
 
-Jeder Datensatz in Ebene P wird vor der Übergabe an den Store versiegelt:
+### 3.5 Fehlerarchitektur
 
-```
-┌──────────┬──────────┬─────────────┬────────────┬────────────────────────┬──────────┐
-│ ver (u8) │ alg (u8) │ doc_tag(16) │ nonce (24) │   ciphertext (varlen)  │ tag (16) │
-│  0x03    │  0x01    │             │            │                        │ Poly1305 │
-└──────────┴──────────┴─────────────┴────────────┴────────────────────────┴──────────┘
-```
-- **Zusätzliche authentifizierte Daten (AAD):**  
-  $\text{AAD} = \text{"acta/rec/v3"} \parallel \text{tenant\_tag} \parallel \text{class\_u8} \parallel \text{keyspace\_u16} \parallel \text{user\_key} \parallel \text{seq\_u64be}$
-- Das Öffnen (`open`) liefert `Zeroizing<Vec<u8>>`. Jeder Fehler (Länge, MAC-Bruch, fehlender Slot) führt ohne Orakel zu `Err(CryptoError::DecryptionFailed)`. Ist der Slot nachweislich vernichtet, liefert der Pfad `Err(CryptoError::Erased)`.
-- **Invariante I-17:** Jeder Datensatz besitzt seinen eigenen Umschlag. Persistierte Blöcke (SST-Blöcke, WAL-Frames) teilen niemals Schlüssel über verschiedene Dokumente hinweg.
-
-### 4.5 Tresor-Layout (Vault Format)
-
-Der Tresor besteht aus 16 Shards (`shard-00` bis `shard-15`):
-- **Dateikopf (64 Byte):** Magic `CTXFILE\0`, `format_version = 3`, `kind = 10`, `alg_ids`, `file_id` (16B Zufall), `created_seq`, `epoch` (u32), `header_tag` (16B Poly1305).
-- **Metablock (64 Byte):** `vault_id`, `shard_no`, `capacity_log2`, `live_count`, `tombstone_count`, `generation`, `scrub_cursor`, `meta_mac`.
-- **Slots (jeweils 64 Byte ab Offset 128):**
-  ```
-  [slot_type u8][status u8][gen u48][tag 16][payload 32][mac 8]
-  ```
-  * `slot_type`: 0x01 U, 0x02 T, 0x03 C, 0x04 S, 0x05 D, 0x06 F, 0x07 E.
-  * `status`: 0x00 Leer, 0x01 Aktiv, 0x02 Grabstein (Tombstone).
-  * `payload`: Zwingend maskiert mit $\text{Salt} \oplus \text{HKDF}(K_{\text{enc}}, \text{"ctx/slotmask/v1"} \parallel \text{epoch} \parallel \text{tag})$.
-  * `mac`: HMAC-SHA256 unter $K_{\text{vm}}$ gekürzt auf 8 Byte.
-- **Grabstein-Invariante (Bestätigung V-11):**  
-  Bei der Vernichtung werden `tag` und `payload` vollständig mit Nullen überschrieben (`0x00`). Nur `status = 0x02`, die erhöhte `gen` und der gültige `mac` bleiben erhalten. Dadurch wird verhindert, dass das Tag als permanentes Personen-Pseudonym überdauert.
-- **Batch-Löschung:** Zur Entlastung des I/O bei Sweeper-Läufen stellt der Tresor `destroy_many(&[SlotRef])` bereit, welches Metadaten und `fsync` bündelt (Behebung V-12).
-
-### 4.6 Ableitungssegmente (Modi Rebuild vs. Sealed)
-
-1. **Modus `Rebuild` (Standard für Vektoren & Text):**  
-   Segmente besitzen keinen Einzelschlüssel. Sie sind rein abgeleitete Daten. Nach dem Setzen des Gates (E2) maskiert der Index Anfragen über die Roaring-Bitmap `ErasedOrds`. Das betroffene Segment wird asynchron ohne die gelöschten Einheiten neu synthetisiert. Es entsteht kein Verfügbarkeitsverlust für fremde Betroffene (Behebung F-5).
-2. **Modus `Sealed` (Spezialmodus für statische Archive):**  
-   Segmente werden unter einem eigenen `ArtKey` (Slot-Typ E) versiegelt. Vernichtung des `ArtKey` macht das Segment sofort unlesbar. Erlaubt nur für Segmente mit maximal $50\,000$ Vektoren.
-
----
-
-## 5. Das normative Löschprotokoll (Saga)
-
-### 5.1 Löschziele und Geltung
-
-| Ziel (`KeyScope`) | Auslöser / Rechtsgrundlage | Vernichteter Slot | Physische Auswirkung |
-|---|---|---|---|
-| `Subject` | DSGVO Art. 17 (Widerruf, Zweckfortfall) | **S** (Subject) | Sämtliche Dokumente und Ableitungen der Person |
-| `Document` | Gezielte Einzellöschung | **D** (Document) | Einzelnes Dokument in allen Versionen |
-| `Collection` | Fachliche Bereinigung | **C** (Collection) | Alle Dokumente der Collection |
-| `Tenant` | Mandantenkündigung (Off-Boarding) | **T** und **U** | Vollständige Tilgung des Mandanten |
-| `Expired` | Fristablauf (DSGVO Art. 5 Abs. 1 lit. e) | Entsprechender Slot | Durch Sweeper automatisiert getilgt |
-| `Restrict` | DSGVO Art. 18 (Einschränkung) | *Keiner* | Sperre im Gate (`Restricted`), Daten bleiben erhalten |
-| `Supersede` | DSGVO Art. 16 (Berichtigung) | *Keiner* | Alte Version physisch getilgt, DEK bleibt identisch |
-| `Replace` | Vollständiger Dokumentaustausch | **D** (alt) | Neuer Datensatz vorab dauerhaft gespeichert |
-
-### 5.2 Zustandsautomat (Saga Monotonie)
-
-Der externe Löschzustand schreitet streng monoton voran. Es gibt **keinen Zustand `Failed`**.
-
-```
-  [Requested] ──────► [Gated] ──────► [KeyDestroyed] ──────► [Purging] ──────► [Verifying] ──────► [Completed]
-       │
-       ├──────────────► [Refused] (Terminal vor E2: Aufbewahrungspflicht greift)
-       ├──────────────► [Restricted] (DSGVO Art. 18)
-       └──────────────► [Pending(Grund)] / [Escalated(Grund)] (Automatische Wiederaufnahme)
-```
-
-Ein einmal gesetztes Gate (`Gated`) wird unter keinen Umständen wieder aufgehoben.
-
-### 5.3 Die normativen Einzelschritte (E0 bis E9)
-
-Zur Einhaltung der $O(1)$-Latenzzusage bis zum Rücksprung und zur Vermeidung von Klartextfenstern im RAM ist die Reihenfolge der Schritte exakt normiert (Behebung F-1 und F-2):
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ E0: Validierung & Autorisierung                                       │
-│     Prüfung Aufbewahrungspflichten; Auflösung Subject -> Dokumente     │
-├────────────────────────────────────────────────────────────────────────┤
-│ E1: Absichtsprotokollierung (fsync #1)                                │
-│     Verschlüsselte Scope-Datei + Journal-Eintrag `Requested+Intent`    │
-├────────────────────────────────────────────────────────────────────────┤
-│ E2: Sofortige Torsperre: ReadGate setzen (fsync #2, Gruppen-Commit)   │
-│     gate_epoch += 1; GateLog-Append; ErasedOrds aktualisieren;         │
-│     Snapshot-Revocation.                                               │
-│     ==> AB HIER: Kein Lesepfad liefert mehr Daten! O(1) garantiert!   │
-├────────────────────────────────────────────────────────────────────────┤
-│ E2a: Nadelstichprobe entnehmen (im Gate)                               │
-│     Entnahme stratifizierter Klartextfenster (max. NEEDLE_MAX = 4096)  │
-│     ausschließlich für spätere Forensik-Messung. Speicher im mlock.    │
-├────────────────────────────────────────────────────────────────────────┤
-│ E2b: Schicht-Quittung (on_gate Ack Pflicht!)                          │
-│     Alle Schichten nullen flüchtige Caches & RAM-Vektoren. Fehlt Ack   │
-│     einer Schicht, verharrt Saga in Pending(LayerNotAcked).           │
-├────────────────────────────────────────────────────────────────────────┤
-│ E3: Kryptografischer Commit (fsync #3 & #4)                           │
-│     Slot-Grabstein im Tresor schreiben; Direct-Read-Verifikation;      │
-│     Journal-Eintrag `KeyDestroyed`. Schlüssel ist physisch weg!        │
-│     ==> Rückkehr an den Aufrufer mit Status Gated / KeyDestroyed       │
-├────────────────────────────────────────────────────────────────────────┤
-│ E4: Audit-Quittung & Chronik-Receipt                                  │
-│     Ledger-Hash-Kette fortführen; Quittung in Ebene N eintragen        │
-│     (ausschließlich keyed Commitments, strikt keine Roh-IDs!).         │
-├────────────────────────────────────────────────────────────────────────┤
-│ E5: Physisches Purge-Fenster (Reihenfolge a bis h, asynchron)         │
-│     Compaction-Barriere; gefilterte Rewrites; Drop ganzer SSTs.        │
-├────────────────────────────────────────────────────────────────────────┤
-│ E6: Ableitungs-Synthese                                                │
-│     Index-Segmente im Rebuild-Modus neu erzeugen; ArtKeys vernichten. │
-├────────────────────────────────────────────────────────────────────────┤
-│ E7: Forensische Typestate-Messung                                      │
-│     Messklassen MK1, MK2, MK3 mit Positivkontrolle (LayerWitness).     │
-├────────────────────────────────────────────────────────────────────────┤
-│ E8: Audit-Bericht & Abschluss                                         │
-│     ErasureReport signieren; Journal `Completed`; Scope-Datei scrubben.│
-├────────────────────────────────────────────────────────────────────────┤
-│ E9: Benachrichtigung & Bereinigung                                    │
-│     Art.-19-Signalisierung an Empfänger; Gate-Kompaktion nach 90 Tagen.│
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-**Normative Regeln:**
-- **R-E2-E3:** Schritt E3 DARF ERST DANN ausgeführt werden, wenn E2 durabel persistiert ist und E2b von allen Schichten bestätigt wurde.
-- **R-O1:** Die Dauer bis zum Abschluss von E2 ist strikt unabhängig von der Datenmenge. Im synchronen Blockierpfad liegen ausschließlich E2 und E3.
-- **R-RET:** `erase()` kehrt nach maximal `erase_return_timeout` ($500\text{ ms}$) mit dem Zustand `Gated` (oder `Pending(Timeout)` bei I/O-Stau) zurück.
-
-### 5.4 Durabilitätspunkte und Crash-Recovery-Matrix
-
-| Absturzpunkt | Zustand beim Crash | Wiederanlaufverhalten (Recovery) |
-|---|---|---|
-| **C1** | Scope-Datei geschrieben, kein Intent im Journal | Waise; `scope_purge` entfernt Datei. Vorgang gilt als nie beantragt. |
-| **C2** | Intent im Journal, Gate noch nicht aktiv | Recovery setzt bei Schritt E2 fort. |
-| **C3** | Gate im RAM/Puffer, vor dem fsync | Gate ging verloren; Recovery liest Intent und führt E2 erneut aus. |
-| **C4** | Gate gefsynct, Schlüssel noch lebendig | Gate ist aktiv; Recovery erzwingt E2b-Ack und führt E3 aus. |
-| **C5** | Grabstein geschrieben, fsync nicht bestätigt | Recovery liest Slot physisch vom Medium; fehlt Grabstein, Wiederholung E3. |
-| **C6** | Slot vernichtet, Journal `KeyDestroyed` fehlt | Recovery erkennt Grabstein am Medium und ergänzt `KeyDestroyed`. |
-| **C7** | Während E5: Temporäre SST-Datei existiert | Temporäre Datei wird verworfen; Purge-Phase wird neu aufgesetzt. |
-| **C8** | Manifest-Batch geschrieben, Altdatei noch da | Recovery gleicht obsolete Dateien mit Manifest ab; löscht Altdatei. |
-| **C9** | Messung E7 schlägt fehl (`matches > 0`) | Status verbleibt in `Pending(WitnessMissing)`; E5 wird wiederholt. |
-| **C10**| Vor Fertigstellung von Bericht oder Ledger | Zeugen liegen im Journal; Bericht wird determiniert nacherzeugt. |
-| **C11**| Während Epochenrotation: Zwei Epochen vorhanden | Rotation wird wiederaufgenommen; alter Epochenschlüssel vernichtet. |
-| **C12**| Nach Neustart fehlt Schicht-Quittung (E2b) | Status `Pending(LayerNotAcked)`; `on_gate` wird erneut getriggert. |
-
-### 5.5 Physisches Purge-Fenster (Schritt E5, Reihenfolge a bis h)
-
-Das Bereinigen persistierter Chiffrate erfolgt in festgelegter Priorität (`PurgePriority`):
-1. **Phase a (Snapshots):** `revoke_covering` sperrt aktive MVCC-Leser; Checkpoint-Pins lösen.
-2. **Phase b (Text-Index):** Term-Postings ohne Ziel-Ordinale neu schreiben.
-3. **Phase c (Memtable & WAL):** Aktive Memtable drainen; WAL bis `gated_seq` recyceln (Scrub & Unlink).
-4. **Phase d (SSTables):** Gefilterter Rewrite betroffener SSTs. Bei Betroffenen-Isolation (`cluster = subject_tag`) erfolgt direkter **Datei-Drop** ohne Rewrite (Behebung F-4).
-5. **Phase e (Vektoren):** HNSW-Vektorslots nullen; Segmente im Rebuild-Modus neu kompilieren.
-6. **Phase f (Tresor):** D-Slots abräumen; Rehash bei Shard-Lastfaktor $> 0{,}60$.
-7. **Phase g (Caches):** Block-, Prompt-, KV- und Embedding-Caches vollständig invalidieren und nullen.
-8. **Phase h (Kopien):** `CopyRegistry` aktualisieren; Chiffrat-Kopien bereinigen.
-
----
-
-## 6. Datenmodell, Lineage und Indizes (normativ)
-
-### 6.1 Schlüsselraum KeyV2 (Behebung V-06 und F-4)
-
-Jeder Primärschlüssel im Store besitzt ein fixes, binäres Layout von 78 Byte (kein ASCII!):
-
-```
-┌──────────┬─────────────────┬─────────────────────┬─────────────┬────────────┬───────────┬──────────┬──────────┐
-│ kind(u8) │ tenant_tag(16B) │ collection_tag(16B) │ cluster(16B)│ doc_tag(16)│ !seq(u64) │ flags(u8)│ rsv(4B)  │
-└──────────┴─────────────────┴─────────────────────┴─────────────┴────────────┴───────────┴──────────┴──────────┘
-◄─────────────────────────── Präfix: 65 Byte ────────────────────────────────►◄────── Suffix: 13 Byte ────────►
-```
-- `kind`: Exhaustives Enum (`0x01 DATA`, `0x02 DOCMAP`, `0x03 REL`, `0x04 INTENT`, `0x05 TEXT`, `0x06 GRAPH`, `0x07 VECTOR`, `0x08 CHRONICLE`, `0x09 JOURNAL`).
-- **Verbindliche Cluster-Belegung (F-4):**  
-  `cluster = subject_tag` des Hauptbetroffenen (Fallback bei betroffenenlosen Dokumenten: `doc_tag`).  
-  *Wirkung:* Sämtliche Datensätze einer Person liegen im LSM-Baum strikt lokal beieinander. Bei einer Löschung können ganze SSTables per atomarem Manifest-Drop entfernt werden, statt teure I/O-Rewrites zu erzwingen.
-- `!seq`: Bitweise invertierte Sequenznummer (neueste Versionen sortieren zuerst).
-- `flags`: Bits 0–1 kodieren die `horizon_class`.
-
-### 6.2 Lineage über monotone Ordinale und Roaring-Bitmaps (F-3)
-
-Zur lückenlosen Verfolgung von Ableitungen gilt ein striktes, mathematisches Mengenmodell:
-1. Jedes Dokument erhält beim Ingest ein dichtes, monotones **`doc_ord: u32`** je Mandant. Ordinale werden niemals wiederverwendet.
-2. Jede abgeleitete Struktur (SST-Footer, HNSW-Knoten, Posting-Liste, Graph-Kante) führt ein `source_set: RoaringBitmap` aller enthaltenen `doc_ord`.
-3. Das globale Gate führt **`ErasedOrds: RoaringBitmap`**.
-4. **Gate-Prüfung:** `ReadGate::contains(doc_ord)` erfolgt in $O(1)$ ohne I/O.
-5. **Purge-Entscheidung:** Eine Datei oder ein Segment ist genau dann betroffen, wenn:
-   $$\text{source\_set} \cap \text{ErasedOrds} \neq \emptyset$$
-6. **Typzwang (S10):** Der Typ `Derived<T>` kapselt Nutzdaten untrennbar mit seiner `Lineage`. Das Ablegen im Index verlangt zwingend `put_derived(Derived<T>)`. Ableitungen ohne Herkunft sind unkonstruierbar.
-7. `doc_ord` ist rein intern und verschwindet mit dem D-Slot. Es erscheint niemals in Berichten oder Ebene N.
-
-### 6.3 Store-Partitionen und Manifest v3
-
-- Der Store erzwingt getrennte Partitionen **N, P, D** je Mandant (Behebung V-07). Compaction mischt niemals Daten verschiedener Partitionen (Invariante I-7).
-- **Manifest v3 Einträge:** `AddSst { path, max_tx, partition, tag_min, tag_max }`, `RemoveSst { path }`, `SeqHwm { seq, tx }`, `HistoryFloor { partition, seq }`, `HorizonUntil { doc_tag, date }`.
-- Rewrites erfolgen über atomare Batches `AddSst + RemoveSst`. Ein Schreibfehler im Manifest vergiftet den Store sofort (Fail-Closed).
-
-### 6.4 SSTable (Format 5) und WAL-Frame v2
-
-- **SSTable Format 5:** Footer enthält zwingend das `source_set` als Roaring-Bitmap sowie sortierte `doc_tag`-Grenzen (`tag_min`, `tag_max`).
-- **WAL-Frame v2:**
-  ```
-  [magic u8][flags u8][len u32][hdr_crc32c u32][payload len][chain_tag 32]
-  ```
-  * `chain_tag` bildet eine HMAC-SHA256-Kette über alle bisherigen Frames.
-  * Nutzlasten der Klasse P im WAL liegen ausnahmslos als Umschlag v3 vor.
-
-### 6.5 Indizes (Vektor HNSW, Text, Graph)
-
-- **HNSW Ghost Vectors:** Reines Soft-Delete via Bitmaske genügt den Anforderungen an eine Löschung nicht (EDPB/DSK-Verstoß). Acta kombiniert:
-  1. Sofortiges logisches Ausblenden via `ErasedOrds` im Suchpfad.
-  2. Physisches Nullen der Vektordaten im Segment.
-  3. Neuaufbau der Graph-Topologie im Hintergrund-Rebuild ohne die gelöschten Knoten.
-- **Vec2Text Inversionsschutz:** Vektor-Embeddings sind rechtlich als personenbezogene Daten (Ebene P) eingestuft. Rohe Embeddings dürfen niemals unverschlüsselt auf Speichermedien verbleiben.
-
-### 6.6 Pseudonymitätsfreie Protokolle und Ledger (Behebung V-15)
-
-- Protokolleinträge im Widerrufs-Log (`RevocationLog`) und Ledger dürfen keine Klartext-IDs enthalten.
-- **Commitment-Vorschrift:**  
-  $$\text{Commitment} = \text{HMAC-SHA256}\big(K_{\text{commit}}[e],\, \text{canonical}(\text{id})\big)$$
-- $K_{\text{commit}}[e]$ wird mit jeder Epoche rotiert und nach Ablauf von `gate_compaction_delay` (90 Tage) physisch vernichtet. Danach sind historische Protokolleinträge selbst für den Betreiber mathematisch irreversibel anonymisiert.
-
----
-
-## 7. Zeitreise (MVCC) und Entkopplung (normativ)
-
-### 7.1 Drei orthogonale Zeitachsen
-
-Acta verwaltet Versionen über drei unabhängige Zeitachsen:
-1. **Gültigkeitszeit ($T_{\text{valid}}$):** Fachlicher Zeitraum, in dem ein Sachverhalt in der realen Welt Gültigkeit besitzt (`[valid_from, valid_to)`).
-2. **Transaktionszeit ($T_{\text{tx}}$ / Sequenznummer):** Systemzeitpunkt, an dem die Information im Store erfasst wurde. Bildet die Basis für bitemporale Zeitreisen.
-3. **Löschzeitpunkt ($T_{\text{erase}}$):** Physikalischer Zeitpunkt, an dem das Gate aktiviert und der Schlüssel zerstört wurde.
-
-### 7.2 MVCC-Sichtbarkeit vs. Lösch-Gate
-
-```
-Abfrage: as_of(t_past)
-   │
-   ├─── 1. Prüfung ReadGate: Ist das Dokument in `ErasedOrds` enthalten?
-   │         │
-   │         ├── JA  ──► Sofortiger Abbruch: Err(RecordErased) !
-   │         │           (Erase triumphiert ausnahmslos über historische Zeitreise!)
-   │         │
-   │         └── NEIN ─► 2. Standard MVCC-Sichtbarkeit:
-   │                        Suche Version mit max(seq) <= t_past.
-   │                        Prüfung MVCC-Tombstone.
-```
-
-Ein MVCC-Tombstone markiert lediglich das fachliche Überschreiben oder Entfernen einer Version. Er ist **keine Löschung im Sinne des Datenschutzes**. Eine echte Löschung sperrt das Gate für alle Zeitpunkte der Historie.
-
-### 7.3 Store-Retention-Schnittstelle (F-8)
-
-Die Bereinigung historischer Versionen im Store erfolgt entkoppelt von Fachlogik:
 ```rust
-pub trait ErasedView: Send + Sync {
-    fn is_erased(&self, ord: u32) -> bool;
-}
+#[non_exhaustive]
+pub enum ErrorClass { Transient, Integrity, Crypto, Erased, Policy, Invalid }
 
-impl RetentionPolicy {
-    pub fn may_drop_version(&self, v: VersionRef<'_>, gate: &dyn ErasedView) -> bool {
-        if gate.is_erased(v.doc_ord()) {
-            return true; // Chiffrat gelöschter Betroffener wird sofort verworfen!
-        }
-        self.check_retention_horizon(v)
-    }
+pub trait ClassifiedError: std::error::Error {
+    fn class(&self) -> ErrorClass;
+    fn code(&self) -> &'static str; // stabil, ohne Nutzdaten und Kennungen
 }
 ```
 
-### 7.4 Entscheidungsnachvollziehbarkeit ohne Personendaten
+`Integrity` und `Crypto` lösen Vergiftung aus (13.2). `Display` und `code()` DÜRFEN keine Personendaten oder Roh-Kennungen enthalten (Z15).
 
-Ebene N speichert strukturierte Entscheidungs-Datensätze:
-```rust
-pub struct ChronicleEntry {
-    pub id: u128,
-    pub kind: ChronicleKind, // Norm | Policy | Config | Model | Rule | Receipt
-    pub matter: String,
-    pub valid_range: Range<Timestamp>,
-    pub recorded_seq: u64,
-    pub content_hash: [u8; 32],
-    pub payload_ref: BlobRef, // Verschlüsselt unter NormKey
-    pub supersedes: Option<u128>,
-    pub prev_hash: [u8; 32],
-}
-```
-Wurde eine LLM-Entscheidung unter Zuhilfenahme von Personendaten getroffen, referenziert der Chronicle-Eintrag lediglich das flüchtige Handle $H_d$. Nach der Löschung der Person bleibt die Begründungskette (Gesetzesstand, Leitlinien, Prompt, Modell) zu 100 % nachvollziehbar; die Eingabe-Referenz liefert `Erased`.
+### 3.6 Laufzeitmodell [E]
 
-### 7.5 Takedown in Ebene N (Vier-Augen-Prinzip)
-
-Muss ein Eintrag in Ebene N aufgrund eines rechtskräftigen Gerichtsbeschlusses getilgt werden:
-1. Vernichtung des spezifischen `NormKey` im Anker.
-2. Zwei autorisierte Administratoren müssen die Aktion kryptografisch signieren.
-3. Der Payload-Blob wird unlesbar; die kryptografische Hash-Kette des Chronik-Ledgers bleibt vollständig intakt.
+Der Kern (Level 0 bis 6) ist **synchron** und nutzt Threads. **Begründung:** Durabilitätspunkte lassen sich in synchronem Code deterministisch durch Fehlerinjektion prüfen; es entfällt der Nachweis der Abbruchsicherheit an jedem `fsync`; Modelltests (Loom) sind direkt anwendbar. Netzwerk und Inferenzclients laufen asynchron und rufen den Kern über einen begrenzten Thread-Pool auf. **Preis:** Brücke am Rand. **Revisionstrigger:** Messung zeigt, dass die Bestätigung der Sperre (`erase_return_timeout`) unter Last verletzt wird.
 
 ---
 
-## 8. Messung, Nachweis und Verifikation (normativ)
+## 4. Kryptografie und Schlüsselverwahrung
 
-### 8.1 Messklassen
+### 4.1 Primitive [E]
+
+| Zweck | Verfahren | Bibliothek |
+| --- | --- | --- |
+| Datensatz-Verschlüsselung | XChaCha20-Poly1305, 256-Bit-Schlüssel, 192-Bit-Zufallsnonce aus `CryptoRng` (kein API-Parameter) | `chacha20poly1305` |
+| Schlüsselableitung | HKDF-SHA256 (RFC 5869); Fehler werden propagiert | `hkdf`, `sha2` |
+| Passwortbasierte Ableitung (nur `FileAnchor`) | Argon2id, m ≥ 19 456 KiB, t ≥ 2, p ≥ 1 | `argon2` |
+| Integrität und Commitments | HMAC-SHA256 | `hmac` |
+| Objekt- und Kettenhashes | SHA-256 | `sha2` |
+| Signatur (Berichte, Checkpoints) | Ed25519 (RFC 8032), Domänenpräfix `acta/report/v1` bzw. `acta/checkpoint/v1` | `ed25519-dalek` |
+| Speicherhygiene | `Zeroizing`, konstante Zeit beim Vergleich | `zeroize`, `subtle` |
+
+**Begründung der Auswahl:** Ein einziger Primitivsatz (SHA-2-Familie, ChaCha, Ed25519) hält den unabhängigen Prüfer klein (≤ 800 LOC) und das Krypto-Audit überschaubar. Die 192-Bit-Zufallsnonce macht zufällige Wahl unproblematisch. **Preis:** XChaCha20-Poly1305 ist kein FIPS-140-Algorithmus. Das Umschlagformat trägt ein Algorithmus-Byte (`alg`); `0x02` ist für AES-256-GCM reserviert und wird nur auf schriftliche Anforderung implementiert. Eigene Primitive sind verboten.
+
+Alle Domänenpräfixe haben die Form `acta/<zweck>/v<N>`.
+
+### 4.2 Schlüsselhierarchie [E]
+
+```
+              KeyAnchor (HSM, KMS oder FileAnchor)
+                        │  liefert Tresor-Master M_g (Generation g)
+              ┌─────────▼──────────┐
+              │   Schlüsseltresor   │   Einträge sind einzeln versiegelt unter M_g
+              └─────────┬──────────┘
+        ┌───────────────┼───────────────────────────┐
+   SubjectKey(s)    DocumentKey(d)             SegmentKey(x)
+   je Betroffener   je Dokument der Ebene P    je versiegeltem Segment (K, D)
+        └───────┬────────┘
+                ▼
+   DEK(d) = HKDF-SHA256( IKM  = DocumentKey(d) ‖ SubjectKey(s₁) ‖ … ‖ SubjectKey(sₙ),
+                         salt = DocRef(d),
+                         info = "acta/dek/v1" )          s₁ … sₙ aufsteigend nach SubjectTag
+```
+
+**Wirkung:**
+- Wird `SubjectKey(sᵢ)` vernichtet, sind **alle** Dokumente dieser Person und alle Dokumente, an denen sie mitbeteiligt ist, unlesbar (Z3, Modus `DeleteAll`, ohne Sonderlogik).
+- Wird `DocumentKey(d)` vernichtet, ist genau dieses Dokument unlesbar (Einzellöschung).
+- Zwei Dokumente haben nie denselben DEK (Z14).
+- Für ein Dokument sind höchstens `max_subjects_per_doc` = 64 Betroffene zulässig; darüber behandelt der Ingest es als Sammelakte unter einem Gruppenschlüssel (`SubjectKey` einer Gruppe).
+
+**Alternative verworfen:** Salts mit Maskierung im Tresor. Das erzeugt zusätzliche Spezialformate und eine eigene Rotationslogik. Die gewählte Ableitung braucht pro Schlüssel einen versiegelten Eintrag und nutzt Wurzelrotation (4.3).
+
+Fehlt ein erforderlicher Schlüssel, ist das Ergebnis `Err(Erased)`. Ist der Zustand nicht eindeutig (Tresor nicht lesbar), ist das Ergebnis `Err(Crypto)` mit Vergiftung. Ein Fallback ist ausgeschlossen (Z10).
+
+### 4.3 Tresor und Wurzelrotation
+
+**Eintrag (Klartext):** `[kind u8][status u8][id 16][key 32]` = 50 Byte; versiegelt zu `[len u16][nonce 24][ciphertext 50][tag 16]` mit AAD `acta/vault/v1 ‖ generation u32 ‖ id`. `kind`: 0x01 `SubjectKey`, 0x02 `DocumentKey`, 0x03 `SegmentKey`, 0x04 `TenantKey` (Reserve). `status`: 0x01 aktiv, 0x02 vernichtet (Schlüssel genullt).
+
+**Vernichtung:** Der Eintrag wird durch einen Grabstein ersetzt (`status = 0x02`, `id` genullt, `key` genullt), die Datei wird synchronisiert, und der Zustand wird direkt vom Datenträger zurückgelesen (Direct-Read-Verifikation). Ein Grabstein trägt keine Kennung, damit er kein dauerhaftes Pseudonym darstellt.
+
+**Wurzelrotation (Backup-Härtung):** Alle `T_ROT` = 24 h oder nach `N_SHRED` = 10 000 Vernichtungen erzeugt der Anker eine neue Generation `M_{g+1}`. Alle lebenden Einträge werden neu versiegelt, atomar in eine neue Tresordatei überführt (`fsync`, `rename`, `fsync` des Verzeichnisses), danach vernichtet der Anker `M_g`. Eine Kopie des Tresors aus Generation ≤ g ist danach nicht mehr lesbar. Journal-Eintrag `RootRotated { generation }`.
+
+**Batch-Vernichtung:** `destroy_many(&[KeyId])` bündelt Schreibvorgänge und `fsync` (Durchsatz bei Fristablauf-Läufen).
+
+**Tresorgröße:** 92 Byte je Eintrag; bei 50 Mio. Dokument- und Personenschlüsseln ca. 4,6 GB. Der Tresor wird sortiert in Shards gehalten und über einen Speicherindex (`KeyId → Offset`) bedient. **[Q]** Startwert: Öffnen des Tresors mit 10 Mio. Einträgen unter 30 s; Messung vor Freigabe.
+
+### 4.4 KeyAnchor
+
+```rust
+pub trait KeyAnchor: Send + Sync {
+    fn current_generation(&self) -> Result<u32, AnchorError>;
+    fn master(&self, generation: u32) -> Result<MasterKey, AnchorError>;   // MasterKey: Zeroizing, kein Clone/Default
+    fn rotate(&self) -> Result<u32, AnchorError>;                           // neue Generation
+    fn destroy(&self, generation: u32) -> Result<DestroyProof, AnchorError>;
+    fn index_secret(&self) -> Result<IndexSecret, AnchorError>;             // k_idx
+}
+```
+
+Implementierungen: `FileAnchor` (Entwicklung und kleine Installationen; Wurzel durch Passphrase und Argon2id geschützt; Kennzeichnung im Bericht als geringe Vertrauensstufe), `Pkcs11Anchor` und `KmsAnchor` (Produktion; getrennte Crates oder Features, additiv). **[A] A-ANCHOR:** Der Anker kann ein Generationsgeheimnis innerhalb einer deklarierten Frist `anchor_destroy_max` unwiderruflich vernichten. Besitzt ein KMS eine Pflicht-Löschfrist, MUSS `anchor_destroy_max` diese Frist enthalten, und der Bericht weist die tatsächliche Frist aus. `destroy` liefert einen `DestroyProof`, den der Bericht übernimmt.
+
+### 4.5 Umschlag v1
+
+```
+┌──────────┬──────────┬──────────────┬────────────┬──────────────────────┬──────────┐
+│ ver (u8) │ alg (u8) │ key_class u8 │ nonce (24) │  ciphertext (varlen) │ tag (16) │
+│   0x01   │   0x01   │ 0x01 P/0x02 K│            │                      │ Poly1305 │
+└──────────┴──────────┴──────────────┴────────────┴──────────────────────┴──────────┘
+AAD = "acta/rec/v1" ‖ tenant_tag ‖ class_u8 ‖ keyspace_u16 ‖ record_ref(16) ‖ version_u64be
+```
+
+`open` liefert `Zeroizing<Vec<u8>>`. Jeder Fehler (Länge, MAC, Schlüssel) führt ohne unterscheidbares Orakel zu `DecryptionFailed`; ist der Schlüssel nachweislich vernichtet, zu `Erased`. Die Nonce ist **kein** Parameter der öffentlichen Schnittstelle.
+
+### 4.6 Zufall, Zeit, Geheimnisse
+
+`CryptoRng::try_fill(&self, dst) -> Result<(), EntropyError>` ist fehlbar; ein Entropiefehler erzeugt nie einen Umschlag (`T-RNG-*`). `Clock` ist ein Port; `SystemTime::now` und `thread_rng` sind im Kern verboten. Geheimnisse (`Dek`, `MasterKey`, `IndexSecret`, `SubjectKey`, `DocumentKey`) besitzen weder `Default`, `Clone`, `Debug` noch `Serialize`.
+
+---
+
+## 5. Speicher
+
+### 5.1 Segmentspeicher (`acta-seg`) [E]
+
+Der Speicher ist ein **append-only Segmentspeicher**, kein allgemeiner LSM-Baum. **Begründung:** Die Last ist „einmal schreiben, häufig lesen, gezielt nach Betroffenem löschen“; Aktualisierungen in der Fläche kommen nicht vor. Segmente lassen sich als Ganzes versiegeln, gezielt ersetzen oder entfernen.
+
+Zwei Siegelmodi:
+
+| Modus | Schlüssel | Einsatz | Löschwirkung |
+| --- | --- | --- | --- |
+| `RecordSealed` | DEK je Dokument (4.2) | Ebene P: Datensätze | Schlüsselvernichtung macht Datensätze sofort unlesbar |
+| `SegmentSealed` | `SegmentKey` je Segment | Ebene K (Packs) und Ebene D (Indexsegmente) | Ersatzsegment schreiben, alten `SegmentKey` vernichten, Altdatei bereinigen |
+
+**Aufbau:** Journal (`wal`), Segmente (`seg-<n>`), Manifest. Alle Dateizugriffe laufen ausschließlich über `acta-fs`.
+
+- **Journal-Rahmen:** `[magic u8][flags u8][len u32][hdr_crc32c u32][payload][chain_tag 32]`; `chain_tag` ist eine HMAC-SHA256-Kette über alle Rahmen. Nutzlasten der Klasse P liegen ausnahmslos als Umschlag vor; das Journal enthält nie Klartext.
+- **Segmentkopf:** Magic `ACTASEG\0`, `format_version`, `partition` (K, P, D), `seal_mode`, `file_id` (16 B Zufall), `created_seq`, Kopf-MAC. Der Fußabschnitt enthält bei P- und D-Segmenten das `source_set` (Roaring-Bitmap der `DocOrd`).
+- **Manifest:** atomare Batches `AddSegment`, `RemoveSegment`, `SeqHwm`, `Partition`. Ein fehlgeschlagener Manifest-Schreibvorgang vergiftet den Speicher sofort (Fail-Closed).
+- **Partitionen:** K, P und D werden niemals in derselben Datei gemischt (Invariante I-PART).
+- **Ordnung der Datensatzschlüssel:** `[kind u8][tenant_tag 16][partition u8][cluster 16][doc_ref 16][!seq u64][flags u8]`. `cluster` ist der `SubjectTag` des Hauptbetroffenen (bei Dokumenten ohne Betroffenen die `DocRef`). **Wirkung:** Alle Daten einer Person liegen zusammen; bei Löschung genügt häufig das Entfernen ganzer Segmente (Datei-Drop) statt eines Umschreibens.
+- **Handkodierte Formate:** Alle Plattenformate werden von Hand mit geprüften Feldzugriffen kodiert (`from_be_bytes`, `get(..)`); `serde` und `bincode` sind für Plattenformate verboten. **Begründung:** Ein Plattenformat ist eine über Jahre stabile Schnittstelle und darf nicht aus Strukturlayouts folgen. Jedes Format hat Golden-Tests und ein Fuzz-Target.
+
+**Entscheidungsregel Eigenbau [E]:** Eine bestehende eingebettete Speicher-Engine wird nur dann verwendet, wenn sie (1) gezieltes Entfernen und Überschreiben der Dateien eines Betroffenen ohne globale Verdichtung erlaubt, (2) deterministisch unter `FaultVfs` prüfbar ist, (3) Werte vor dem Schreiben im Journal bereits als Umschlag entgegennimmt und (4) keine FFI-Fläche mitbringt. Das Ergebnis dieser Prüfung wird vor Beginn der Speicherimplementierung als Messbericht dokumentiert; fällt sie negativ aus, gilt diese Spezifikation unverändert (Eigenbau, Budget 7 000 LOC).
+
+### 5.2 Ordinale und Herkunft (Lineage) [E]
+
+1. Jedes Dokument der Ebene P erhält beim Ingest eine `DocOrd` (u32, monoton je Mandant, nie wiederverwendet). Sie ist rein intern, verschwindet mit dem Dokumentschlüssel und erscheint nie in Ebene K, Berichten oder Protokollen.
+2. Jede abgeleitete Struktur (Indexsegment, Cache-Eintrag, Embedding-Block) trägt `source_set: RoaringBitmap` der `DocOrd`, aus denen sie entstanden ist.
+3. `ReadGate` führt `ErasedOrds: RoaringBitmap` und eine Epoche. `contains(ord)` ist O(1) ohne E/A.
+4. Ein Segment ist betroffen genau dann, wenn `source_set ∩ ErasedOrds ≠ ∅`.
+5. **Typzwang:** Der Typ `Derived<T>` kapselt Nutzdaten untrennbar mit ihrer `Lineage` (nicht leer). Indizes nehmen Daten nur über `put_derived(Derived<T>)` an. Eine Ableitung ohne Herkunft ist nicht konstruierbar (Z13).
+
+---
+
+## 6. Versionskontrolle der Wissensebene („Git für RAG“)
+
+### 6.1 Objektmodell [E]
+
+Alle Objekte sind unveränderlich und inhaltsadressiert: `ObjectId = SHA-256(Domänenpräfix ‖ kanonische Bytes)`.
+
+| Objekt | Inhalt |
+| --- | --- |
+| **Blob** | Bytes eines Wissensdokuments oder einer Konfiguration. Präfix `acta/blob/v1`. Keine Personendaten (Z5) |
+| **Tree** | Sortierte Einträge `{name, kind, id, meta}`; `kind ∈ {Blob, Tree, PersonalRef}`. Bei `PersonalRef` ist `id` das 16-Byte-Handle, **nie** ein Inhaltshash. Präfix `acta/tree/v1` |
+| **Commit** | `{tree, parents[], tx_seq, tx_time, valid_from?, valid_to?, author: ActorRef, kind, note_tag}`. Präfix `acta/commit/v1` |
+| **Ref** | Benannter Zeiger auf einen Commit: Branch (`main`, `szenario/<id>`) oder Tag (unveränderlich) |
+
+`ActorRef` ist ein zufälliges Handle auf eine Identität in Ebene P (die Identität von Mitarbeitenden ist selbst personenbezogen und löschbar). `note_tag` ist eine strukturierte Kennung aus einer Whitelist; freier Text wird nicht in Commits gespeichert, sondern als Blob mit Validierung abgelegt.
+
+**Wissensobjekte im Tree:** Dokumente (nach Chunking als Kind-Blobs oder Chunk-Tabelle), Aufbewahrungs- und Sichtbarkeitsmetadaten, Prompt-Vorlagen, Abrufkonfiguration, Modellbeschreibungen (`ModelFingerprint`), Schwellenwerte und Regeln. **Alles, was eine Entscheidung beeinflusst, ist versioniert.**
+
+### 6.2 Globales Protokoll und Integrität
+
+Jede Veränderung der Ebene K (neuer Commit, Ref-Bewegung, Tag, Takedown-Vermerk) wird als Eintrag in das **Ledger** (`acta-ledger`) geschrieben: `entry_hash = SHA-256(prev_hash ‖ kanonischer Eintrag)`. Alle `checkpoint_every` = 1 024 Einträge entsteht ein Ed25519-signierter Checkpoint. Damit lässt sich die Geschichte ohne Zugriff auf Inhalte prüfen und nicht unbemerkt umschreiben. Das Ledger enthält keine Personendaten (Z15).
+
+### 6.3 Zeitachsen [E]
+
+| Achse | Bedeutung | Abfrageparameter |
+| --- | --- | --- |
+| **Gültigkeitszeit** `valid` | Fachliche Geltung einer Vorschrift oder Regel: `[valid_from, valid_to)` | `valid_at: Date` |
+| **Transaktionszeit** `tx` | Wann Acta den Stand erfasst hat; Commit-Folge | `as_of: CommitId \| Zeitpunkt` |
+| **Löschzeit** `erase` | Wann Ebene P ein Ziel gesperrt hat; nur im Löschjournal | – |
+
+Beispiel: „Welche Fassung der Satzung galt am 1.3. (`valid_at`) und was wusste das System am 15.3. (`as_of`)?“ Die Antwort ist deterministisch (Z7).
+
+### 6.4 Operationen
+
+| Operation | Bedeutung |
+| --- | --- |
+| `commit` | Neuer Stand aus Änderungen; Pflichtprüfungen: N-Validator (7.5), Klassendeklaration |
+| `branch`, `tag` | Verzweigung für Szenarien, unveränderliche Markierung |
+| `checkout(as_of, valid_at)` | Lesender Stand (Sicht), keine Kopie |
+| `diff(a, b)` | Unterschied zweier Stände auf Dokument-, Chunk- und Metadatenebene |
+| `merge(src, dst)` | Drei-Wege-Zusammenführung; Konflikte pro Pfad; Freigabe nach Vier-Augen-Prinzip konfigurierbar; `PersonalRef`-Einträge werden nach Handle verglichen |
+| `retire(branch)` | Szenario-Verzweigung freigeben; nicht mehr erreichbare Objekte werden nach `branch_retention` (Standard 90 Tage, anpinnbar) bereinigt |
+
+### 6.5 Sichtbarkeitsmengen und versionsbewusste Suche [E]
+
+Jeder Wissens-Blob erhält eine `KOrd`. Je Commit gibt es eine **Sichtbarkeitsmenge** (Roaring-Bitmap der `KOrd` im Tree). Sie wird als Basismenge plus Deltas zum Elterncommit gespeichert (Schnappschuss alle 256 Commits). Die Suche arbeitet auf **globalen, unveränderlichen Indexsegmenten** und filtert die Kandidaten mit der Sichtbarkeitsmenge des gewählten Standes. So kostet ein Branch oder Zeitpunkt keinen eigenen Index, und eine Suche „wie am Stichtag“ ist exakt (Z7).
+
+### 6.6 Zeitreise über Personendaten (Ebene P) [E]
+
+Ebene P hat **keine** allgemeine Zeitreise. Sie führt je Dokument eine kurze Versionskette ausschließlich für Berichtigung (Art. 16) und Aufbewahrungsfristen, begrenzt durch `history_horizon` (Standard `Personal`: 30 Tage; `Besonders`: 0). Abfragen mit `as_of` auf P prüfen **zuerst** das Gate; ein gelöschtes Ziel liefert `Erased`, nie Klartext (Z1). **Begründung:** Eine unbegrenzte Historie personenbezogener Inhalte widerspricht dem Zweck der Löschung; Nachvollziehbarkeit gelingt über die Begründungskette in K (7).
+
+### 6.7 Garbage Collection
+
+Erreichbarkeit: Objekte, die von keinem Ref und keinem aufbewahrten Entscheidungsprotokoll erreichbar sind, werden nach `branch_retention` entfernt. Pack-Segmente werden dabei ohne unerreichbare Blobs neu geschrieben (neuer `SegmentKey`, alter wird vernichtet). Die Hash-Kette bleibt unberührt, weil sie nur Commits und Refs enthält.
+
+---
+
+## 7. Entscheidungsprotokoll, Szenarien und Entkopplung
+
+### 7.1 Entscheidungsprotokoll [E]
+
+Zu jeder Antwort und jedem Szenariolauf entsteht ein Eintrag der Klasse `Beleg` in K:
+
+```rust
+pub struct DecisionRecord {
+    pub id: [u8; 16],               // zufällig
+    pub kind: DecisionKind,         // Query | ScenarioRun | Review | Release
+    pub commit: ObjectId,           // Wissensstand
+    pub valid_at: Option<Date>,
+    pub prompt: ObjectId,           // Prompt-Version (Blob in K)
+    pub retrieval_cfg: ObjectId,    // Abrufkonfiguration (Blob in K)
+    pub model: ModelFingerprint,    // Anbieter, Name, Digest, Parameter, Seed
+    pub evidence: Vec<EvidenceRef>, // siehe unten
+    pub answer: AnswerRef,
+    pub actor: ActorRef,            // Handle, löschbar
+    pub scenario: Option<[u8; 16]>,
+    pub prev_hash: [u8; 32],        // Kette im Ledger
+}
+pub enum EvidenceRef { Knowledge { blob: ObjectId, chunk: u32 }, Personal(PersonalRef) }
+pub enum AnswerRef  { Open(ObjectId), Sealed(PersonalRef) }
+```
+
+- Antworten, die aus rein öffentlichem Wissen entstehen und den N-Validator bestehen, liegen als `Open` in K.
+- Antworten, die Personendaten benutzen, liegen als `Sealed` in Ebene P. Ihr Dokumentschlüssel wird über alle beteiligten Betroffenen abgeleitet (4.2). Wird eine beteiligte Person gelöscht, ist die Antwort unlesbar.
+- Nach einer Löschung bleibt die Begründungskette **vollständig sichtbar**: Wissensstand, Prompt, Modell, Wissensbelege. Eingaben mit Personenbezug lösen zu `Erased` auf.
+
+### 7.2 Nachvollziehen einer alten Entscheidung
+
+`explain(decision_id)` liefert: Stand der Wissensebene (Commit, `valid_at`), Prompt, Modell und Parameter, jeden Beleg (soweit nicht gelöscht und nicht durch Zugriffsrechte verborgen), die gespeicherte Antwort. Optional `replay(decision_id)`: erneuter Lauf mit denselben Parametern. **Grenze [A]:** Byte-identische Wiederholung ist nur möglich, wenn das Inferenzsystem deterministische Dekodierung unterstützt; die **gespeicherte Antwort** ist der Beleg, der Wiederholungslauf ein Vergleich. Der Bericht weist aus, ob der Wiederholungslauf identisch war.
+
+### 7.3 Szenarien („Wenn-Dann“) [E]
+
+Ein **Szenario** besteht aus: Basis-Commit, Szenario-Branch mit Änderungen (z. B. geänderte Vorschrift, anderer Schwellenwert, anderer Prompt, anderes Modell), einem **Fragenset** (Blob in K) und den Ergebnissen. Ablauf: (1) Branch aus Basis-Commit, (2) Änderungen als Commits, (3) Fragenset gegen Basis und Szenario laufen lassen, (4) Vergleich: Unterschiede in Belegen und Antworten, (5) bei Bedarf `merge` oder `retire`.
+
+Z9 gilt: Ein Szenario schreibt nie in `main` und nie in Ebene P. Personendaten dürfen in einem Szenario nur gelesen werden, wenn Zugriffsrecht und Gate es erlauben; Ergebnisse mit Personenbezug werden `Sealed`. Szenarien verändern keine Zugriffsrechte.
+
+### 7.4 Akteure und Mitarbeitende
+
+Nutzer sind selbst Betroffene. Protokolle enthalten daher `ActorRef`-Handles; die Zuordnung zu Klarnamen liegt in Ebene P unter dem Schlüssel der Person. Eine Löschung oder Auskunft über Mitarbeitende folgt denselben Mechanismen wie jede andere Betroffenenanfrage. **[A]** Personalvertretung und interne Regeln zur Auswertung von Nutzungsdaten liegen beim Betreiber.
+
+### 7.5 N-Validator (Schutz der Ebene K) [E]
+
+Vor jedem Schreiben in K prüft der Validator: (1) **Schema-Whitelist** für strukturierte Felder, (2) **Mustererkennung** (Namen, Anschriften, Kennnummern, E-Mail, Telefon, Kontonummern, Aktenzeichen mit Personenbezug) über `acta-pii`, (3) **Entropie- und Handle-Prüfung** für Kennungen, (4) bei Aggregaten **k-Anonymität** mit `K_MIN` ≥ 5. Ein Treffer über der Schwelle blockiert das Schreiben (Fail-Closed). **Grenze [A]:** Automatische Erkennung ist nicht vollständig; deshalb Standardmodus `Whole` (2.3), Vier-Augen-Freigabe für `Open` und `Split` und Takedown (7.6).
+
+### 7.6 Takedown in Ebene K
+
+Wird in K irrtümlich Personenbezug festgestellt oder ordnet ein Gericht die Entfernung an: (1) Vier-Augen-Freigabe, kryptografisch signiert; (2) Pack-Segment ohne den Blob neu schreiben, `SegmentKey` vernichten; (3) im Ledger einen Vermerk `Redacted { object_id, grund_code }` anfügen. Die Objekt-ID und die Kette bleiben erhalten, der Inhalt nicht. **Restrisiko [A]:** Die Objekt-ID ist ein Hash über den entfernten Inhalt; bei niedriger Entropie ist ein Wörterbuchtest theoretisch möglich. Der Bericht weist das aus.
+
+---
+
+## 8. Löschen
+
+### 8.1 Ziele
+
+| Ziel | Auslöser | Vernichteter Schlüssel | Wirkung |
+| --- | --- | --- | --- |
+| `Subject` | Art. 17, Widerruf, Zweckfortfall | `SubjectKey` | alle Dokumente der Person und aller Mitbetroffenen (Z3) |
+| `Document` | Einzellöschung | `DocumentKey` | ein Dokument in allen Versionen |
+| `Collection` | Fachliche Bereinigung | alle `DocumentKey` der Sammlung | Sammlung |
+| `Tenant` | Off-Boarding | alle Schlüssel des Mandanten, `SegmentKey`s | gesamter Mandant |
+| `Expired` | Fristablauf (Art. 5 Abs. 1 lit. e) | zuständiger Schlüssel | automatisch durch Sweeper |
+| `Restrict` | Art. 18 | keiner | Sperre im Gate (`Restricted`), Daten bleiben |
+| `Supersede` | Art. 16 | keiner | alte Version bereinigt, Schlüssel bleibt |
+| `Actor` | Löschung von Mitarbeitendendaten | `SubjectKey` der Person | Handles in K lösen zu `Erased` auf |
+
+### 8.2 Invarianten [E]
+
+- **I1** Die Sperre ist durabel, bevor etwas Physisches geschieht.
+- **I2** Schlüsselvernichtung erst, nachdem alle Schichten bestätigt haben, dass flüchtige Kopien (RAM, Caches, laufende Sitzungen) geleert sind.
+- **I3** Jeder Zwischenzustand ist nach einem Absturz wiederaufnehmbar; es gibt keinen Zustand `Failed`.
+- **I4** Ein Nachweis entsteht nur aus einer Messung mit Positivkontrolle.
+- **I5** Eine gesetzte Sperre wird nie aufgehoben (Ausnahme: dokumentierte Administratorentscheidung mit Vier-Augen-Prinzip nach Fehlauslösung, vor Schlüsselvernichtung).
+- **I6** Die Versionsgeschichte in K wird durch keinen Schritt verändert (Z6).
+
+### 8.3 Zustandsautomat
+
+```
+Requested ─► Gated ─► KeyDestroyed ─► Purging ─► Verifying ─► Completed
+    │
+    ├─► Refused           (Aufbewahrungspflicht oder Rechtsvorbehalt vor Sperre)
+    ├─► Restricted        (Art. 18)
+    └─► Pending(Grund) / Escalated(Grund)   (automatische Wiederaufnahme)
+```
+
+### 8.4 Schritte
+
+| Schritt | Inhalt |
+| --- | --- |
+| **E0** | Validierung und Autorisierung; Prüfung auf Aufbewahrungspflicht, Rechtsvorbehalt (`legal_hold`), Archivierungspflicht (Hook zu vorhandenem Archivsystem); Auflösung Betroffener → Dokumente |
+| **E1** | Absicht protokollieren: verschlüsselte Scope-Datei und Journal-Eintrag `Requested` (`fsync`) |
+| **E2** | **Sperre setzen:** `ErasedOrds` erweitern, Epoche erhöhen, Gate-Log anfügen (`fsync`, Gruppen-Commit). Ab hier liefert kein Pfad Daten (Z1) |
+| **E2a** | **Quittung aller Schichten** (`on_gate`): Indizes, Caches, Prompt-Caches, laufende Sitzungen leeren; fehlt eine Quittung, bleibt der Vorgang in `Pending(LayerNotAcked)` |
+| **E2b** | **Nadeln entnehmen:** stratifizierte Klartextfenster (max. `NEEDLE_MAX` = 4 096) im `mlock`-Speicher für die spätere Messung |
+| **E3** | **Schlüsselvernichtung:** Grabstein im Tresor, `fsync`, Direct-Read-Verifikation, Journal `KeyDestroyed`. Rückkehr an den Aufrufer mit `Gated`/`KeyDestroyed` |
+| **E4** | Ledger-Quittung mit keyed Commitments (keine Roh-Kennungen) |
+| **E5** | Physische Bereinigung (8.5) |
+| **E6** | Ableitungen neu aufbauen (Rebuild-Segmente, 9.3) |
+| **E7** | Messung MK1 bis MK3 mit Positivkontrolle (8.6) |
+| **E8** | Bericht erzeugen und signieren; Scope-Datei überschreiben und löschen; Journal `Completed` |
+| **E9** | Benachrichtigung der Empfänger (Art. 19); Gate-Verdichtung nach `gate_compaction_delay` |
+
+**Regeln:** E3 darf erst nach durabler E2 und vollständiger E2a ausgeführt werden (R-E2-E3). Die Dauer bis zum Abschluss von E2 ist unabhängig von der Datenmenge (R-O1). Der synchrone Aufruf kehrt nach spätestens `erase_return_timeout` = 500 ms mit `Gated` zurück (oder `Pending(Timeout)`).
+
+### 8.5 Physische Bereinigung (E5), Reihenfolge
+
+a) Leser-Snapshots widerrufen, Kopien lösen · b) Textindex-Segmente ohne Ziel-Ordinale neu schreiben · c) Speicher- und Journalpuffer entleeren, Journal bis zur Sperrfolge recyceln (überschreiben, dann entfernen) · d) Segmente: Datei-Drop bei Betroffenen-Isolation, sonst gefilterter Rewrite · e) Vektorindex: Vektoren nullen, Segmente neu bauen · f) Tresor verdichten · g) Caches invalidieren und nullen · h) Kopienregister aktualisieren, Kopien bereinigen. Reservierung `min_free_bytes` vor Rewrites.
+
+### 8.6 Messung [E]
 
 | Klasse | Prüfbereich | Methode |
-|---|---|---|
-| **MK1** | Logische Strukturen | Verifikation von Indizes, Manifesten, Katalogen und Bitmaps auf Abwesenheit von Ziel-IDs. |
-| **MK2** | Forensischer Rohbyte-Scan | Mustererkennung ohne Format-Parser über alle Datendateien, WAL-Segmente und den Heap. |
-| **MK3** | Physische Schlüsselprüfung | Byteweise Prüfung des Tresor-Slots am Datenträger (`VerifiedVia::Direct`). |
+| --- | --- | --- |
+| **MK1** | Logische Strukturen | Manifest, Indizes, Bitmaps, Kataloge auf Abwesenheit der Ziel-IDs |
+| **MK2** | Rohbyte-Scan | Musterscan ohne Formatparser über alle Datendateien, Journalsegmente, Temporärdateien und Heap |
+| **MK3** | Schlüsselprüfung | Byteweise Prüfung des Tresor-Eintrags am Datenträger (`VerifiedVia::Direct`) |
 
-### 8.2 Nachweisklassen und Beziehung zur DSGVO-Synthese
+**Typestate (Z11):** `Scanner<Unarmed>` → `arm_with_synthetic_positive_control()` → `Scanner<Armed>` → `scan_layer()` → `ScanResult` → `into_witness()` nur bei exakt 0 Treffern.
 
-| Nachweisklasse | Technische Aussage | Äquivalente Klasse der DSGVO-Synthese |
-|---|---|---|
-| **G** | Sämtliche Lesepfade und Schnittstellen sind gesperrt. | **L** (Logisch gesperrt) |
-| **K** | Schlüsselmaterial im Tresor physisch vernichtet (MK3). | **C** (Kryptografisch geschreddert, primär) |
-| **P** | Chiffrate und Klartexte physisch aus WAL/SST überschrieben/entfernt (MK2).| **P** (Physisch bereinigt) |
-| **D** | Ableitungen in Indizes (HNSW, Text, Graph) bereinigt (`LayerWitness`). | **P** (Teilbereich Indizes) |
-| **C** | Registrierte Kopien und Checkpoints bereinigt (`CopyRegistry`). | **C** (Kopienbereich) |
+### 8.7 Berichtsklassen
 
-Klasse **E** („Vollständig gelöscht“) gilt genau dann als erreicht, wenn alle Klassen **G, K, P, D und C** den Status `reached` aufweisen.
+| Klasse | Aussage |
+| --- | --- |
+| **G** | Alle Lesepfade gesperrt |
+| **K** | Schlüsselmaterial vernichtet (MK3) |
+| **P** | Chiffrate und Klartexte physisch entfernt (MK2) |
+| **D** | Ableitungen bereinigt (Zeugen der Indexschichten) |
+| **C** | Registrierte Kopien bereinigt (Kopienregister) |
 
-### 8.3 Typestate-Messung mit Positivkontrolle (S8)
+Die Klasse **E** („vollständig gelöscht“) gilt genau dann als erreicht, wenn G, K, P, D und C `reached` sind. Der Bericht (JCS, RFC 8785, siehe Anhang B) enthält Klassen, Zeugen, Zeitstempel, Mitbetroffenenzahl und die Annahmen A-FLASH, A-RAM, A-ANCHOR, A-CRYPTO, A-EXT.
 
-Ein `LayerWitness` kann ausschließlich über einen typgesicherten Ablauf erzeugt werden:
+### 8.8 Restore-Schutz [E]
 
-```rust
-// 1. Scanner instanziieren (Unbewaffnet)
-let scanner: Scanner<Unarmed> = Scanner::new(target_needle);
-
-// 2. Positivkontrolle erzwingen: Scanner MUSS Testmuster im Puffer finden
-let armed_scanner: Scanner<Armed> = scanner.arm_with_synthetic_positive_control()?;
-
-// 3. Echte Durchsuchung der Schicht
-let scan_result = armed_scanner.scan_layer(&layer)?;
-
-// 4. Zeuge kann NUR bei exakt 0 Treffern instanziiert werden!
-let witness: LayerWitness = scan_result.into_witness()?;
-```
-
-### 8.4 Unabhängiges Verifikationstool `acta-verify`
-
-Zur Prüfung von Löschnachweisen dient das eigenständige Tool `acta-verify` ($\le 800$ Zeilen Rust, ohne Abhängigkeit zu Acta-Interna). Es prüft:
-1. Gültigkeit der Ed25519-Signatur des Berichts gegen den hinterlegten Notar-Schlüssel.
-2. Integrität der Ledger-Hash-Kette.
-3. Direktes Auslesen des Tresors zur Verifikation des Grabsteins (`0x00`-Payloads).
-
-### 8.5 Automatisierte CI-Architektur-Gates
-
-Alle Gates laufen in der CI und lokal über `cargo xtask gates`:
-- **G1:** Abhängigkeitsprüfung Ringmodell (`cargo metadata`).
-- **G2:** Dead-Port-Check: Jeder Port besitzt genau eine aktive Verdrahtung.
-- **G3:** Determinismus: Verbot nicht-injizierter Zeit- und Zufallsquellen.
-- **G-CRY-1:** Lint-Verbot aller Krypto-Fallbacks (`clippy::let_underscore_must_use`, Verbot von `Default` für Schlüssel).
-- **G-FS-1:** Verbot von `std::fs::remove_file` ohne vorherigen sicheren Scrub.
-- **G-ERA-1:** Löschungen ausschließlich über `ErasureCore::execute`.
-- **G-READ-1:** Öffentliche Lesepfade zwingend über gegateten Reader.
-- **G-DEF-1:** Alle Workspace-Crates in `default-members`.
-- **G-WORD:** Wortfilter gegen verbotene Marketing-Aussagen (Abschnitt 1.3).
-- **G-SUPPLY:** Lizenz- und MSRV-Prüfung (`cargo deny`).
+Der Tresor trägt seine Generation `g`. Der Anker kennt die gültige Mindestgeneration. Ein Tresor einer vernichteten Generation ist nicht lesbar. Sicherungen des Tresors sind höchstens `T_BACKUP` = 72 h gültig; ältere werden abgewiesen. Nach jedem Einspielen läuft ein **Erase-Replay**: Das Ledger enthält die keyed Commitments aller Löschungen; jede im Ledger vermerkte Löschung, deren Schlüssel im wiederhergestellten Tresor noch aktiv ist, wird erneut vollzogen, bevor das System Anfragen annimmt. **Datensicherungen der Segmente** (ohne Tresor) dürfen beliebig lange aufbewahrt werden: Ohne vernichtete Schlüssel sind sie unlesbar. **[A] A-FLASH:** Medienreste auf Flash und Dateisystem-Journalen sind durch den Schlüsselentzug abgedeckt, nicht durch Überschreiben.
 
 ---
 
-## 9. Rechtliche Synthese und Betreibergrenzen
+## 9. Abgeleitete Daten und Abruf (RAG)
 
-### 9.1 Europäischer Rechtsrahmen (DSGVO)
+### 9.1 Ingest
 
-- **Art. 17 DSGVO (Recht auf Löschung):** Die Löschung ist eine Form der Verarbeitung (Art. 4 Nr. 2 DSGVO). Das Gesetz schreibt kein spezifisches technisches Verfahren vor (Technologieneutralität). Ziel ist das irreversible Aufheben der Personenbeziehbarkeit.
-- **Art. 5 Abs. 1 lit. e (Speicherbegrenzung):** Daten dürfen nur so lange in identifizierbarer Form existieren, wie es der Zweck erfordert.
-- **Art. 5 Abs. 1 lit. c (Datenminimierung) & Art. 25 (Privacy by Design):** RAG-Systeme müssen Chunks und Kontextfenster von vornherein so strukturieren, dass personenbezogene Anteile isolierbar bleiben.
+1. **Annahme** (nicht vertrauenswürdig): Parser mit Ressourcenlimits (Größe, Tiefe, Zeit, Speicher); Fuzzing für jeden Parser; Isolation in einen Kindprozess ist über die Parser-Schnittstelle (`parse(bytes, limits) -> Result<Chunks>`) vorbereitet.
+2. **Klassifikation:** Datenklasse und Modus (2.3) werden vom Mandanten per Richtlinie oder Handentscheidung vorgegeben; `acta-pii` liefert Hinweise.
+3. **Chunking:** strukturbewusst (Überschriften, Absätze, Tabellen), Chunk-Größe und Überlappung konfigurierbar, jeder Chunk trägt Quellverweis (Dokument, Seite, Abschnitt).
+4. **Ablage:** Wissen → Blob/Tree-Commit in K; Personendaten → versiegelter Datensatz in P mit `DocOrd`; Ableitungen → Indexsegmente.
+5. **Idempotenz:** erneuter Ingest desselben Inhalts erzeugt in K keine neuen Objekte (Inhaltsadressierung).
 
-### 9.2 Behördenpraxis und Rechtsprechung zu Crypto-Shredding
+### 9.2 Indizes
 
-1. **EDPB Guidelines 02/2025 v2 (07.07.2026):**  
-   Verschlüsselte Daten bleiben datenschutzrechtlich personenbezogen, solange ein Schlüssel existiert. Die Vernichtung des Schlüssels hebt den Personenbezug auf, birgt jedoch das Restrisiko künftiger Algorithmenbrüche. Der EDPB verlangt daher Krypto-Agilität, dokumentierte Risikobewertungen und flankierende physische Löschkonzepte.
-2. **EuGH Rechtsprechung (Rs. C-582/14 *Breyer*, Rs. C-413/23 P *EDPS/SRB*):**  
-   Der Personenbezug ist relativ. Wenn der Verantwortliche über keinerlei Mittel mehr verfügt, die Daten mit verhältnismäßigem Aufwand zu re-identifizieren, entfällt der Personenbezug für diese Stelle.
-3. **DSK Orientierungshilfe RAG (10/2025):**  
-   Für Vektordatenbanken fordern deutsche Aufsichtsbehörden die tatsächliche Unzugänglichkeit von Einträgen. Reines logisches Ausblenden (Soft-Delete) ohne physische Bereinigung wird ausdrücklich abgelehnt.
-4. **Unanwendbarkeit von § 35 BDSG:**  
-   Die Ausnahmeregelung des § 35 BDSG (Löschung wegen unverhältnismäßigem Aufwand durch Sperrung ersetzbar) gilt nach herrschender Auslegung **nicht** für moderne, automatisierte IT- und Vektordatenbanken. Systeme dürfen nicht auf § 35 BDSG aufbauen.
+- **Text (`acta-text`):** segmentierter BM25-Index, Tokenisierung und Normalisierung für Deutsch und Englisch (Zerlegung von Komposita, Flexion), Phrasen- und Feldsuche.
+- **Vektor (`acta-vec`):** zunächst exakte Flat-Suche über unveränderliche Segmente; ein ANN-Backend wird nur eingesetzt, wenn die Flat-Suche die Latenzziele (9.6) auf dem Referenzkorpus nicht erreicht. Der Embedder ist ein austauschbarer Vertrag (`acta-infer`); Embeddings tragen den `ModelFingerprint`; ein Modellwechsel erzeugt neue Segmente, alte bleiben bis zur Ablösung lesbar.
+- Eigenbau eines Graph-Index gehört nicht zu Version 1.
 
-### 9.3 Standard-Datenschutzmodell (SDM Baustein 60)
+### 9.3 Versiegelung der Ableitungen [E]
 
-Acta implementiert die Kontrollanforderungen des SDM-Bausteins 60:
-- **Unkenntlichmachung:** Vollständiger Verlust des semantischen Informationsgehalts durch Schlüsselvernichtung.
-- **Vollständigkeit:** Einbeziehung sämtlicher Nebenstrukturen (Indizes, Caches, WAL).
-- **Protokollierung:** Lösch-Paradoxon-konformer Nachweis über keyed Commitments.
-- **Wiederanlaufschutz:** `RestoreGuard` verhindert das Wiedereinspielen gelöschter Stände.
+Jedes persistierte Indexsegment, das aus Ebene-P-Quellen entsteht, ist `SegmentSealed` unter einem eigenen `SegmentKey`. Segmente, die ausschließlich aus `Wissen` bestehen, sind ebenfalls versiegelt (Vertraulichkeit auf dem Medium), unterliegen aber keiner Löschlogik. **Begründung:** Z2 verlangt AEAD für jeden persistierten Klartext von Personen. Terme und Embeddings aus Personendaten sind selbst personenbezogen. Außerdem werden Sicherungen von Indexdateien mit der Vernichtung des alten `SegmentKey` automatisch unlesbar.
 
-### 9.4 Deklarierte Annahmen und Systemgrenzen (Custody Boundary)
+`Rebuild` ist die **Löschstrategie** (Standard): sofortige Maske über `ErasedOrds`, Ersatzsegment ohne gelöschte Ordinale unter neuem `SegmentKey`, atomarer Austausch, danach alten `SegmentKey` vernichten und Altdatei bereinigen. Fremdbetroffene bleiben verfügbar. Die Strategie `Sealed` (Segment sofort unlesbar, Rest neu aus Ebene P) ist für statische Archive zulässig, höchstens `segment_max_vectors` = 50 000.
 
-Folgende technische Randbedingungen werden im Audit-Bericht offengelegt:
-- **A-FLASH:** Wear-Leveling auf SSDs und Dateisystem-Journale können physische Datenblöcke unkontrolliert vorhalten. Gegen diesen Restbestand wirkt der Entzug des Schlüssels (D-02, D-15).
-- **A-RAM:** Flüchtige Reste im Arbeitsspeicher werden durch `mlock`, `Zeroizing`, `MADV_DONTDUMP` und `RLIMIT_CORE = 0` minimiert, sind jedoch nicht manipulationssicher gegen Kernel-Angriffe.
-- **A-ANCHOR:** Das zugrundeliegende HSM / KMS erfüllt die zugesagte Vernichtungsgarantie für Schlüsselmaterial.
-- **A-CRYPTO:** Die eingesetzten mathematischen Krypto-Primitive (XChaCha20, Poly1305, HKDF, BLAKE3) bleiben im geforderten Zeithorizont ungebrochen.
-- **A-EXT:** Daten, die an externe Verarbeiter (Zone Z4, z. B. externe LLM-APIs) oder in Kundendokumenten (Zone Z5) liegen, befinden sich außerhalb der Einflusssphäre von Acta.
+**Preis:** Segmente werden zum Lesen entschlüsselt und im Arbeitsspeicher gehalten (kein Klartext-`mmap`); Speicher in `mlock`-Seiten. **Revisionstrigger:** Ladezeit oder Speicherbedarf verfehlen die Betriebsziele; dann Entschlüsselung blockweise.
 
----
-
-## 10. Nebenläufigkeit, Fehlertaxonomie und Konfiguration
-
-### 10.1 Sperrenordnung (Deadlock-Freiheit)
-
-Sperren dürfen ausschließlich in strikt aufsteigender Rangfolge akquiriert werden:
-
-| Rang | Sperre | Geltungsbereich | Haltezeit |
-|---|---|---|---|
-| **1** | `CommitBarrier` | Committer (Shared), Gate-Setzer (Exclusive) | Extrem kurz: nur für `gate_epoch += 1` und Bitmap-Insert. Niemals über I/O oder fsync! |
-| **2** | `PurgeBarrier` | Purge-Worker (Exclusive), Compaction (Shared) | Über das gesamte Purge-Fenster einer Phase. |
-| **3** | `ErasureFence` | Schreibzulassung je Partition/Bereich | Ticket-basiert. |
-| **4** | `TxBufferShards` | Sharded Transaktionspuffer | Streng aufsteigend nach Shard-Index. |
-| **5** | `SnapshotRegistry` | Registrierung aktiver MVCC-Leser | Nur O(1) In-Memory Operationen. |
-| **6** | `FileVaultShardLock` | Tresor-Shard-Zugriff | Niemals über `.await` halten! |
-| **7** | `ReadGateLock` | Aktualisierung von `ErasedOrds` | RwLock; Leser ohne I/O. |
-
-### 10.2 Fehlertaxonomie und Vergiftung (Poisoning)
-
-- **Transiente Fehler:** I/O-Timeouts, temporärer Ressourcenmangel $\rightarrow$ `Pending(Grund)` mit exponentiellem Backoff ($1\text{ s}, 2\text{ s}, 4\text{ s} \dots \max 15\text{ min}$). Das gesetzte Gate bleibt aktiv.
-- **Integritäts- & Krypto-Fehler:** MAC-Fehlschlag, ungültige Prüfsummen, Krypto-Ableitungsfehler $\rightarrow$ **Sofortige Vergiftung (Poisoning).** Der Store blockiert alle Schreibvorgänge; Lesezugriffe auf Ebene P werden gesperrt. Aufhebung nur durch Administrator-Eingriff und Recovery.
-- **SLA-Überschreitung:** Dauer der Saga überschreitet 72 Stunden $\rightarrow$ Status `Escalated(SlaExceeded)` mit Alarmierung.
-
-### 10.3 Normative Systemkonfiguration
-
-| Parameter | Normativer Standardwert | Bedeutung / Zweck |
-|---|---|---|
-| `erase_return_timeout` | $500\text{ ms}$ | Maximale Blockierzeit im synchronen API-Aufruf bis zum Zustand `Gated`. |
-| `erase_sla` | $24\text{ h}$ | Zielzeit bis zum Erreichen von Phase E8 (`Completed`). |
-| `escalate_after` | $72\text{ h}$ | Automatische Alarmauslösung bei verzögerten Löschungen. |
-| `legal_max` | $30\text{ Tage}$ | Gesetzliche Höchstfrist nach Art. 12 Abs. 3 DSGVO. |
-| `batch_window` | $60\text{ s}$ | Bündelungsfenster für nachgelagerte Purge-Läufe. |
-| `min_free_bytes` | $1\text{ GiB}$ | Notwendige Festplattenreserve vor Ausführung von Rewrites. |
-| `T_ROT` | $24\text{ h}$ | Intervall der Epochenrotation im Tresor. |
-| `N_SHRED` | $10\,000$ | Maximale Anzahl an Slot-Löschungen vor erzwungener Epochenrotation. |
-| `T_ROT_BACKUP` | $72\text{ h}$ | Maximales Alter einer zulässigen Tresor-Sicherung. |
-| `K_MIN` | $5$ | Minimale Gruppengröße (k-Anonymität) für Aggregationen in Ebene N. |
-| `NEEDLE_MAX` | $4\,096$ | Obergrenze stratifizierter Klartextfenster für die Forensik-Stichprobe. |
-| `history_default_days` | $30\text{ Tage}$ | Aufbewahrungshorizont für Datenklasse `Personal`. |
-| `checkpoint_every` | $1\,024$ | Anzahl Chronik-Einträge zwischen zwei signierten Checkpoints. |
-| `segment_max_vectors` | $50\,000$ | Maximale Vektoranzahl für Indizes im Modus `Sealed`. |
-| `derived_mode` | `Rebuild` | Standardmodus für abgeleitete Vektor- und Textsegmente. |
-| `vault_shards` | $16$ | Fixe Anzahl Shards im physischen Tresor. |
-| `gate_compaction_delay`| $90\text{ Tage}$ | Frist bis zur endgültigen Tilgung rotierter Commitment-Schlüssel. |
-| `boot_selftest` | `true` | Nicht abschaltbarer Selbsttest beim Systemstart. |
-| `k_idx` | **Kein Default!** | Systemstart ohne explizite Konfiguration verweigert (Behebung V-05). |
-
----
-
-## 11. Teststrategie und Pflichttests
-
-### 11.1 Matrix: Zusage zu Abnahmetests
-
-| Zusage | Primäre Abnahmetests |
-|---|---|
-| **S1** (Lesesperre) | `T-DEL-1` (Lesepfade nach Gate), `T-CONC-1` (Loom Gate-Linearisierung), `T-TT-1..8` (Zeitreise-Szenarien) |
-| **S2** (Krypto-Isolation) | `T-CRY-1` (Bytes-Grep), `T-SEAL-1..4` (AEAD, AAD, Manipulation), `T-WAL-ENC` (WAL-Chiffrat) |
-| **S3** (Mehrbetroffene) | `T-MULTI-1` (Unlesbarkeit bei Tilgung eines Subjekts) |
-| **S4** (Crash-Invarianz) | `T-CRASH-C1..C12` (Vollständige Crash-Matrix mit `FaultVfs`) |
-| **S5** (PII-Freiheit N) | `T-CHR-1` (N-Validator, Schema-Whitelist), `T-ANON-1..3` (Singling Out, Linkability, Inference) |
-| **S6** (Determinismus N) | `T-CHR-2` (Identische Hashes bei Replay), `T-RANK-1` |
-| **S7** (Fail-Closed) | `T-NOFALLBACK-*`, `T-RNG-1`, Gate `G-CRY-1` |
-| **S8** (Typestate) | `T-EVID-1` (Positivkontrolle Pflicht), `T-STUB-1` (`NotImplemented` bei Lücken) |
-| **S9** (Restore-Schutz) | `T-REST-1..3` (Abweisung alter Tresor-Backups, Erase-Replay) |
-| **S10** (Lineage) | `T-DERIV-1`, Compile-Fail Test `derived_requires_lineage` |
-| **S11** (I-17 Isolation) | Property-Test `no_shared_dek_in_container` |
-| **S12** (Audit-Schutz) | `T-LOG-1` (Bytes-Grep über Ledger und Log mit bekannten DEKs und PII-IDs) |
-
-### 11.2 Pflichttests für Ist-Defekte (vor Release zwingend grün)
-
-| Defekt | Verbindlicher Testfall |
-|---|---|
-| **V-01** | `vault_missing_slot_is_erased`: Vernichteter Slot MUSS nach Neuerzeugung des Sealers `Err(Erased)` liefern, niemals Datenmüll oder Fallback. |
-| **V-01** | `no_default_sealer_in_release`: `VaultSealer::new()` existiert ausschließlich unter `#[cfg(test)]`. |
-| **V-02** | `envelope_is_aead`: Manipulation jedes beliebigen Bytes im Chiffretext führt zu Authentifizierungsfehler. Zwei Datensätze unter gleichem DEK teilen keinen XOR-Strom. |
-| **V-04** | `slot_payload_masked_at_rest`: Binärer Bytes-Grep über die Tresordatei findet zu keinem Zeitpunkt unmaskierte Salts. |
-| **V-13** | `golden_match_code`: Sämtliche Golden-Audit-Berichte stimmen exakt mit dem Serialisierungs-Code überein. |
-| **V-14** | `proof_targets_compile_and_pass`: `proof_crash_resume_matrix` und `proof_fail_closed_and_consistency` kompilieren fehlerfrei und bestehen. |
-| **V-15** | `revocation_log_has_no_raw_ids`: Binär-Scan des Widerrufs-Logs bestätigt die Abwesenheit von Klartext-Kennungen. |
-
----
-
-## 12. Verbindlicher Umsetzungsplan (Walking Skeleton zuerst)
-
-Der Umbau folgt dem Prinzip **„Dünner vertikaler Durchstich vor horizontaler Breite“**, um das Schnittstellenrisiko zwischen Löschkern und Speicher frühzeitig zu eliminieren.
+### 9.4 Abrufpipeline [E]
 
 ```
-       [ R0: Stop-the-Line Hygiene ]
-                     │
-       [ R1: Krypto-Kern & Tresor ]
-                     │
-       [ R2: Walking Skeleton Durchstich ]  <── Erstes Ende-zu-Ende Löschen!
-                     │
-       [ R3: Datenmodell & Lineage ]
-                     │
-        ┌────────────┴────────────┐
-        ▼                         ▼
- [ R4: Store-Fähigkeiten ]  [ R5: Indizes & Schichten ]
-        └────────────┬────────────┘
-                     │
-       [ R6: Chronik & Orchestrierung ]
-                     │
-       [ R7: Audit, HSM & Verifikation ]
+Frage ─► Normalisierung ─► (optional) Umformulierung
+   ─► Kandidatenmenge = Sichtbarkeit(commit/valid_at) ∩ Zugriff(Nutzer) ∩ ¬ErasedOrds ∩ Aufbewahrung
+   ─► Textsuche (BM25)  ┐
+   ─► Vektorsuche       ├─► Fusion (Reciprocal Rank Fusion)
+                         ┘
+   ─► Reranking (Cross-Encoder, optional)
+   ─► Kontextaufbau (Budget, Deduplizierung, Quellverweise)
+   ─► Generierung mit Belegpflicht
+   ─► Belegprüfung (jede Aussage → Beleg) ─► Antwort oder Enthaltung
+   ─► Entscheidungsprotokoll
 ```
 
-| Stufe | Fokus | Behobene Befunde | Verbindliche Abnahmekriterien |
-|---|---|---|---|
-| **R0: Stop-the-Line** | Workspace-Integration, Beseitigung aller Krypto-Fallbacks und Dummy-Schlüssel, Reparatur der Integrations-Tests. | V-01, V-03, V-05, V-13, V-14 | `acta-erasure` in Workspace; Pflichttests V-01, V-05 grün; `cargo test` baut sauber. |
-| **R1: Krypto-Kern** | Umschlag v3 (XChaCha20-Poly1305), Hierarchie H1–H5, Epochenmaskierung und Epochenrotation, `destroy_many`. | V-02, V-04, V-12, V-16 | Testvektoren Umschlag v3; Rotation mit Crash C11; Bytes-Grep auf Tresor-Dateien. |
-| **R2: Walking Skeleton** | Minimaler Pfad: Ingest (`Sealed<P>`) $\rightarrow$ WAL $\rightarrow$ ein Index (`acta-text`) mit Lineage $\rightarrow$ `ErasureCore` synchron $\rightarrow$ E2, E2a, E2b, E3 $\rightarrow$ Messung MK2 $\rightarrow$ Bericht. | V-08, V-09 (Teil), V-15 | `T-DEL-1` grün; Kanarien-Test Ende-zu-Ende lauffähig; Crash-Tests C1 bis C6 bestanden. |
-| **R3: Datenmodell** | Monotone `doc_ord`-Lineage; KeyV2 mit `cluster = subject_tag`; Partitionen N/P/D im Manifest; Wert-Verschlüsselung vor WAL. | V-06, V-07, B-04 | Invarianten I-5, I-6, I-7; Tests `no_ascii_keys`, `no_v2_envelope_in_P`. |
-| **R4: Store-Fähigkeiten** | Asymmetrisches `FlushPurgeFence`, Verdrahtung von `enter_purge`; gefilterter Rewrite mit Datei-Drop; WAL-Frame v2. | V-08, B-09, B-19 | Loom-Modelle für Flush/Purge-Nebenläufigkeit; Crash-Tests C7 und C8; Behebung V-17. |
-| **R5: Indizes & Schichten**| `VectorLayer` (HNSW Zeroing & Rebuild), `TextLayer`, `GraphLayer`, `CacheLayer`, `CheckpointLayer` mit `CopyRegistry`. | V-09, V-10 | Tests `T-VEC`, `T-TEXT`, `T-GRAPH`, `T-REST`; Bestätigung `hnsw_no_residue_after_erase`. |
-| **R6: Chronik & Node** | `acta-chronicle`, N-Validator mit PII-Filter, `acta-engine`, `acta-node` Composition Root, Boot-Selbsttest. | V-14 (Rest) | Architektur-Gates G1, G2, G-ERA-1, G-READ-1; Tests `T-CHR-1..2`. |
-| **R7: Audit & Härtung** | `acta-verify` Standalone-Tool, Notary, HSM-Signatur (A1), Replik-Commit, externe Krypto-Prüfung (G4) und Rechtsfreigabe (G5). | D-12 | Unabhängiges Audit ohne Acta-Code besteht; Messwerte statt Zielwerte belegt. |
+- **Kandidatenmenge vor der Suche (Z16):** Zugriff, Sichtbarkeit und Sperre wirken als Bitmap-Schnitt auf die Kandidaten; es gibt keine nachträgliche Filterung der Ausgabe.
+- **Prompt-Injection:** Abgerufene Inhalte sind Daten, nie Anweisungen. Systemanweisungen und Belege werden strukturell getrennt; Ausgaben werden gegen die Belege geprüft; das Modell führt keine Werkzeuge aus.
+- **Enthaltung:** Liegt kein hinreichender Beleg vor (Schwelle aus der Abrufkonfiguration), antwortet das System „nicht belegt“ und nennt, welche Quellen geprüft wurden.
+
+### 9.5 Belegprüfung [E]
+
+Die Antwort wird in Aussagen zerlegt; jede Aussage verweist auf mindestens einen Beleg-Chunk. Eine unabhängige Prüfung (Regelprüfung auf Zitat-Übereinstimmung, optional Entailment-Modell) bestätigt Stützung. Aussagen ohne Stützung werden entfernt oder markiert; ist danach nichts übrig, folgt die Enthaltung (Z17). Prüfmodelle sind austauschbare Verträge und werden im Entscheidungsprotokoll mit Fingerprint geführt.
+
+### 9.6 Qualitätsziele und Bewertung [Q]
+
+Acta liefert ein **Bewertungswerkzeug** (`acta-rag::eval`), das auf einem mandantenspezifischen Prüfkorpus (Fragen, erwartete Quellen, erwartete Enthaltungen) Messwerte erzeugt. Startwerte für die Freigabe:
+
+| Messgröße | Startwert |
+| --- | --- |
+| Recall@20 der Kandidaten (erwartete Quelle unter den Kandidaten) | ≥ 0,95 |
+| Zitiergenauigkeit (zitierte Aussage durch Beleg gestützt) | ≥ 0,98 |
+| Korrekte Enthaltung bei fehlendem Beleg | ≥ 0,90 |
+| Latenz Abruf bis erstes Token, 95. Perzentil | wird je Referenzkorpus festgelegt und gemessen |
+| Bestätigung der Sperre bei Löschung, 99. Perzentil | ≤ 500 ms (R-RET) |
+
+Die Zahlen sind keine Zusage, sondern die **Mindestanforderung für die Freigabe** einer Konfiguration; der Bericht nennt Korpus, Messdatum und Konfigurationsstand (als Commit in K). Eine Konfigurationsänderung ohne neuen Messbericht kann nicht in `main` zusammengeführt werden, wenn die Richtlinie „Bewertung vor Freigabe“ des Mandanten aktiv ist.
 
 ---
 
-## Anhang A – Testvektoren und Kanonische Formate
+## 10. Zugriff, Mandanten, Organisation
 
-### A.1 Kanonisches JSON des Audit-Berichts (`ErasureReport` v1)
+### 10.1 Mandanten [E]
 
-Der Bericht wird zur Signaturprüfung streng deterministisch nach RFC 8785 (JSON Canonicalization Scheme, JCS) in UTF-8 formatiert:
+Jeder Mandant hat eigene Tags, eigene Schlüssel im Tresor, eigene Partitionen und Ordinalräume. Es gibt keine mandantenübergreifende Suche. Off-Boarding ist ein Löschziel (8.1).
+
+### 10.2 Zugriffsmodell
+
+- **Rollen** (z. B. Sachbearbeitung, Fachadministration, Datenschutz, Revision, Betrieb) und **Attribute** (Organisationseinheit, Verschlusssachen-Stufe, Sammlung, Projekt).
+- **Schutzstufen** je Dokument (konfigurierbar, z. B. offen, intern, vertraulich, VS-NfD). Acta setzt Stufen technisch durch; eine Zulassung für Verschlusssachen ist nicht Gegenstand dieser Spezifikation.
+- **Auswertung:** Richtlinien werden je Nutzer zu einer Bitmap-Menge erlaubter Dokumente aufgelöst und mit Sichtbarkeit und Sperre geschnitten (9.4).
+- **Trennung der Pflichten:** Betrieb (Administratoren) hat keinen Zugriff auf Klartext von Ebene P; Schlüssel liegen im Anker, den der Betreiber getrennt verwaltet. Datenschutzfunktion und Revision sind eigene Rollen.
+- **Vier-Augen-Prinzip** (konfigurierbar) für: `merge` nach `main`, Takedown, `Open`/`Split`-Freigabe, Aufhebung einer Fehlauslösung, Änderung von Richtlinien.
+
+### 10.3 Verwaltung und Aufbewahrung
+
+- **Sammlungen** mit Metadatenschema (Pflichtfelder, Typen), Verantwortlichen und Aufbewahrungsklasse.
+- **Aufbewahrungsklassen** mit Frist, Auslöser (Erstellung, Abschluss, Ereignis), Folge (Löschung, Anbietung an Archiv, Prüfung) und `legal_hold`.
+- **Sweeper** erkennt Fristabläufe, plant `Expired`-Löschungen und meldet Konflikte mit Aufbewahrungspflichten.
+- **Löschkonzept** als Konfiguration in K: je Datenklasse Frist, Verfahren, Verantwortliche. Änderungen sind versioniert und nachvollziehbar.
+
+---
+
+## 11. Inferenz und Egress
+
+### 11.1 Verträge [E]
+
+`Embedder`, `Reranker` und `Generator` sind Traits in `acta-infer`. Jede Implementierung liefert einen `ModelFingerprint` (Anbieter, Modellname, Digest oder Version, relevante Parameter). Der Fingerprint ist Teil jedes Entscheidungsprotokolls und jeder Embedding-Segmentbeschreibung.
+
+### 11.2 Betriebsformen
+
+| Form | Beschreibung | Standard |
+| --- | --- | --- |
+| Lokaler Dienst | Inferenzserver im selben Netz (z. B. OpenAI-kompatible Schnittstelle) über `acta-infer-http` | ja |
+| Prozessintern | Embedding/Reranking über eine Bibliothek, optional später | nein |
+| Freigegebener Dritter | Externer Dienst | nein |
+
+### 11.3 Egress-Kontrolle (Z18)
+
+Ausgehende Verbindungen sind standardmäßig gesperrt. Eine Freigabe nennt Ziel, Zweck, zulässige Datenklassen und Mandanten und ist selbst ein versionierter, vier-Augen-freigegebener Eintrag in K. Ein Egress-Wächter implementiert `Generator`/`Embedder` als **Dekorator**, prüft die Freigabe, blockiert Inhalte der Ebene P (außer freigegeben) und protokolliert jeden Aufruf (ohne Inhalt). Der Bericht weist Zone Z4 (extern) als Annahme A-EXT aus.
+
+---
+
+## 12. Schnittstellen und Betrieb
+
+### 12.1 API [E]
+
+HTTP/JSON mit Streaming (SSE) für Antworten. Authentifizierung über OIDC oder mTLS; Autorisierung durch `acta-access`. Ressourcen: Mandanten, Sammlungen, Dokumente, Commits, Branches, Szenarien, Fragen und Antworten, Entscheidungen (`explain`, `replay`), Betroffenenanfragen (Auskunft, Berichtigung, Einschränkung, Löschung), Berichte, Verwaltung. Eine Versionskennung in der URL; die Schnittstelle ist Teil der Stabilitätszusage ab Version 1.
+
+### 12.2 Betroffenenanfragen
+
+Auskunft (Art. 15) liefert alle zum `SubjectTag` auffindbaren Datensätze unter Beachtung der Rechte Dritter (Mitbetroffene). Berichtigung (Art. 16) als `Supersede`. Einschränkung (Art. 18) als `Restrict`. Löschung (Art. 17) als `Subject`. Fristüberwachung mit `legal_max` = 30 Tage und Eskalation. Alle Anfragen haben Ticket-Handles; das Ticket enthält keine Klarnamen im Ledger.
+
+### 12.3 Selbsttest beim Start (nicht abschaltbar)
+
+Prüft: Konfiguration vollständig (`k_idx` vorhanden), Anker erreichbar, Tresor lesbar und Generation gültig, Erase-Replay ohne offene Punkte, Journal und Manifest konsistent, Positivkontrolle des Scanners, synthetischer Ende-zu-Ende-Lösch-Test auf einem Prüf-Mandanten, Zeit- und Zufallsquelle funktionsfähig. Schlägt ein Punkt fehl, startet der Knoten nicht (Fail-Closed).
+
+### 12.4 Beobachtbarkeit
+
+Metriken (Prometheus-Format) und strukturierte Protokolle **ohne** Personendaten und ohne Roh-Kennungen (Z15). Gesundheitsendpunkte. Alarme bei `Escalated`, `Poisoned`, Ankerausfall, Rotationsverzug, fehlenden Schichtquittungen.
+
+### 12.5 Betrieb, Sicherung, Aktualisierung
+
+- **Sicherung:** Segmente und Ledger beliebig lange; Tresor höchstens `T_BACKUP`; Wiederherstellung nur mit Erase-Replay (8.8). Eine Anleitung und ein Werkzeug (`acta-cli backup`, `restore`) gehören zum Lieferumfang.
+- **Aktualisierung:** Jedes Plattenformat trägt eine Versionsnummer. Neuere Formate werden von älterer Software abgelehnt. Migrationen laufen offline mit Vorab-Sicherung und Prüfsummenvergleich.
+- **Lieferkette:** reproduzierbare Builds, `cargo vendor` für Offline-Bau, SBOM (CycloneDX), signierte Releases, `cargo deny` und `cargo audit` in der CI.
+
+---
+
+## 13. Nebenläufigkeit, Fehler, Konfiguration
+
+### 13.1 Sperrenordnung
+
+Sperren dürfen nur in aufsteigender Rangfolge genommen werden:
+
+| Rang | Sperre | Haltezeit |
+| --- | --- | --- |
+| 1 | `CommitBarrier` (Schreiber gemeinsam, Gate-Setzer exklusiv) | nur für `epoch += 1` und Bitmap-Einfügen; nie über E/A |
+| 2 | `PurgeBarrier` (Bereinigung exklusiv, Verdichtung gemeinsam) | über eine Bereinigungsphase |
+| 3 | `ErasureFence` | ticketbasiert |
+| 4 | `RefLock` (Ref-Bewegung in K) | kurz |
+| 5 | `SnapshotRegistry` | O(1), nur Speicher |
+| 6 | `VaultShardLock` | kurz, keine Blockierung durch Netzwerk |
+| 7 | `ReadGateLock` | `RwLock`, Leser ohne E/A |
+
+Die Rangfolge wird durch `OrderedMutex<const RANK: u8>` (Debug-Assertion) und Loom-Modelle geprüft.
+
+### 13.2 Fehlertaxonomie und Vergiftung
+
+- **Transient** (Zeitüberschreitung, Ressourcenmangel): `Pending(Grund)` mit Backoff 1 s, 2 s, 4 s … höchstens 15 min; Sperre bleibt.
+- **Integrität und Krypto** (MAC-Fehler, ungültige Prüfsumme, Ableitungsfehler): **Vergiftung**. Der Speicher blockiert Schreibzugriffe und sperrt Lesezugriffe auf Ebene P; Aufhebung nur durch Administratoreingriff und Wiederherstellung.
+- **SLA-Überschreitung:** Dauer einer Löschung über `escalate_after` → `Escalated(SlaExceeded)` mit Alarm.
+
+### 13.3 Standardwerte
+
+| Parameter | Wert | Bedeutung |
+| --- | --- | --- |
+| `erase_return_timeout` | 500 ms | maximale Blockierzeit bis `Gated` |
+| `erase_sla` | 24 h | Ziel bis `Completed` |
+| `escalate_after` | 72 h | Eskalation |
+| `legal_max` | 30 Tage | Frist nach Art. 12 Abs. 3 DSGVO |
+| `batch_window` | 60 s | Bündelung nachgelagerter Bereinigung |
+| `min_free_bytes` | 1 GiB | Reserve vor Rewrites |
+| `T_ROT` / `N_SHRED` | 24 h / 10 000 | Wurzelrotation |
+| `T_BACKUP` | 72 h | maximales Alter einer Tresor-Sicherung |
+| `K_MIN` | 5 | k-Anonymität für Aggregate in K |
+| `NEEDLE_MAX` | 4 096 | Nadeln für die Messung |
+| `history_horizon` | `Personal` 30 Tage, `Besonders` 0 | Versionskette in P |
+| `checkpoint_every` | 1 024 | Ledger-Einträge je signiertem Checkpoint |
+| `branch_retention` | 90 Tage | Aufbewahrung nicht angepinnter Szenario-Branches |
+| `segment_max_vectors` | 50 000 | Obergrenze für `Sealed`-Strategie |
+| `max_subjects_per_doc` | 64 | Betroffene je Dokument |
+| `gate_compaction_delay` | 90 Tage | Vernichtung rotierter Commitment-Schlüssel |
+| `boot_selftest` | `true` | nicht abschaltbar |
+| `k_idx` | **kein Standardwert** | Start ohne Angabe verweigert |
+
+---
+
+## 14. Entscheidungsregister
+
+| ID | Entscheidung | Begründung | Preis / Kompromiss |
+| --- | --- | --- | --- |
+| **ADR-01** | Vier Ebenen K, P, D, E; PersonalRef als zufälliges Handle | Versionierung und Löschung konstruktiv entkoppeln (Z5, Z6) | Dokumente mit Personenbezug sind in der Wissenssuche nur über P erreichbar |
+| **ADR-02** | Standardmodus `Whole` bei erkanntem Personenbezug | Automatische Erkennung ist unvollständig; sicherer Standard | Weniger Wissen in der Versionsgeschichte |
+| **ADR-03** | Zeitreise nur über K, kurze Versionskette in P | Nachvollziehbarkeit braucht Entscheidungsgrundlagen, nicht dauerhafte Personendaten | Keine historische Rekonstruktion von Personendaten |
+| **ADR-04** | Sichtbarkeitsmengen (Roaring) je Commit statt Index je Stand | Branches und Stichtage ohne Indexkopien | Rechenaufwand bei jedem Filter; Messung nötig |
+| **ADR-05** | XChaCha20-Poly1305, SHA-2-Familie, Ed25519; Algorithmus-Byte | Kleiner Primitivsatz, kleiner Prüfer, sichere Zufallsnonce | Kein FIPS-Algorithmus; AES-GCM nachrüstbar |
+| **ADR-06** | DEK = HKDF über Dokument- und Betroffenenschlüssel | Mehrbetroffenen-Löschung ohne Sonderlogik, kein Schlüssel-Wrapping je Datensatz | 92 Byte je Dokument-/Personenschlüssel im Tresor |
+| **ADR-07** | Wurzelrotation mit Generationen statt Maskierung je Slot | Ein Mechanismus, einfacher zu prüfen; macht alte Tresor-Kopien unlesbar | Anker muss Vernichtung innerhalb deklarierter Frist leisten |
+| **ADR-08** | Append-only Segmentspeicher statt LSM | Lastprofil, gezielte Löschung, einfachere Prüfung | Kein allgemeiner Schlüssel-Wert-Speicher; Eigenbau nach Prüfregel (5.1) |
+| **ADR-09** | Ableitungen aus P sind at rest versiegelt | Z2 verlangt AEAD für jeden persistierten Klartext von Personen | Kein Klartext-`mmap`, höherer Speicherbedarf, längerer Kaltstart |
+| **ADR-10** | Kern synchron, async nur am Rand | Deterministische Fehlerinjektion, Loom, keine Abbruchsicherheitsnachweise | Thread-Pool-Brücke |
+| **ADR-11** | `unsafe` nur in `acta-sys`; keine SIMD-Handoptimierung in Version 1 | Kleine auditierbare Fläche; Messung vor Optimierung | Geringere Spitzenleistung der Vektorsuche |
+| **ADR-12** | Flat-Vektorsuche zuerst, ANN nur nach Messung | Löschung per Segment-Rebuild braucht nur Bauen und Suchen | Mehr Rechenzeit bei sehr großen Beständen |
+| **ADR-13** | Level-Modell mit `rings.toml` | Strikte Schichtung prüfbar, auch bei Geschwister-Abhängigkeiten | Zusätzliche Konfigurationsdatei |
+| **ADR-14** | Keine Sammel-Crates; Fehler je Crate | Verhindert wachsende Hubs und Fremdwissen | Mehr `From`-Code in Aggregatoren |
+| **ADR-15** | Deterministische Tags aus `k_idx` für Mandant, Sammlung und Betroffene; zufällige `DocRef` und Handles | Betroffene ohne Zuordnungstabelle auffindbar; Dokumente nicht verknüpfbar | `k_idx`-Verlust ermöglicht Wörterbuchtests auf externe Kennungen; `k_idx` liegt im Anker |
+| **ADR-16** | Handkodierte Plattenformate | Stabilität, Prüfbarkeit, kein `unsafe` | Mehr Code |
+| **ADR-17** | Egress-Standard gesperrt, Freigabe als versionierter Eintrag | Souveränität, Z18 | Aufwand bei der Einrichtung externer Dienste |
+| **ADR-18** | Nutzer sind Betroffene: `ActorRef` in Protokollen | Auskunfts- und Löschrechte auch für Mitarbeitende | Auswertungen nach Person erfordern Auflösung über P |
+| **ADR-19** | Belegpflicht mit Enthaltung statt Antwort ohne Beleg | Präzision und Kontrolle | Mehr Enthaltungen bei dünner Wissensbasis |
+
+---
+
+## 15. Teststrategie
+
+### 15.1 Prinzipien
+
+Eine Zusage ohne automatisierten Test gilt als nicht erfüllt. Orakel sind **unabhängig vom System**: Testvektoren aus RFCs und Entwürfen, eine unabhängige Referenzimplementierung im Test, **Modelltests** der Löschzustandsmaschine (zustandsbasiertes Property-Testing mit Absturzinjektion an jedem `fsync`), Properties (Hin- und Rückumwandlung, Invarianten), Fuzzing aller Parser und Formate, Compile-Fail-Tests für Typzwang.
+
+### 15.2 Matrix
+
+| Zusage | Primäre Tests |
+| --- | --- |
+| Z1 | `T-GATE-1` (alle Lesepfade nach `Gated`: Suche, Antwort, `as_of`, Szenario, Cache, Export), `T-CONC-1` (Loom: Linearisierung des Gates) |
+| Z2 | `T-CRY-1` (Bytes-Grep über alle Dateien mit bekannten Klartexten), `T-SEAL-1..4`, `T-DERIVED-SEALED` (Terme und Embeddings nicht im Klartext auf Platte) |
+| Z3 | `T-MULTI-1` |
+| Z4 | `T-CRASH-*`: Absturz an jedem Durabilitätspunkt von E1 bis E8, Rotation, Rewrite-Austausch |
+| Z5 | `T-SEP-1` (Wissensebene enthält keine Muster aus dem Personenkorpus), `T-ANON-1..3` (Aussonderung, Verknüpfbarkeit, Ableitbarkeit) |
+| Z6 | `T-VCS-ERASE-1`: Hashes, Commits, Ledger vor und nach Löschung identisch |
+| Z7 | `T-TT-*`: gleiche Parameter, byte-identische Ergebnisse; Stichtagsabfragen |
+| Z8 | `T-DEC-1`: Begründungskette nach Löschung vollständig; Personeneingaben `Erased` |
+| Z9 | `T-SCEN-1`: `main` und Ebene P vor und nach Szenario identisch |
+| Z10 | `T-NOFALLBACK-*`, `T-RNG-1` (Entropiefehler → kein Umschlag) |
+| Z11 | `T-EVID-1`, `T-STUB-1` |
+| Z12 | `T-REST-1..3` (alter Tresor abgewiesen, Erase-Replay) |
+| Z13 | Compile-Fail `derived_requires_lineage` |
+| Z14 | Property `no_shared_dek` |
+| Z15 | `T-LOG-1` (Bytes-Grep über Ledger, Protokolle, Fehlertexte) |
+| Z16 | `T-ACL-1..n` (Nutzer ohne Recht erhält weder Treffer noch Hinweise noch Zählwerte) |
+| Z17 | `T-GROUND-*` (Aussagen ohne Beleg werden entfernt; Enthaltung) |
+| Z18 | `T-EGRESS-1` (kein ausgehender Verkehr im Standard, Netzwerk-Sandbox) |
+
+### 15.3 Architektur-Gates (`cargo xtask gates`)
+
+| Gate | Prüfung |
+| --- | --- |
+| G1 | Level-Modell gegen `cargo metadata` (negative Fixtures) |
+| G2 | Jeder Port genau einmal verdrahtet |
+| G3 | Keine nicht injizierte Zeit- oder Zufallsquelle |
+| G-CRY | Keine `Default`-Implementierung für Schlüsseltypen; kein `unwrap_or_default()` und kein `let _ =` auf `Result` in `acta-crypto`, `acta-vault`, `acta-seg`, `acta-erasure`, `acta-history` |
+| G-FS | Dateizugriffe nur in `acta-fs` |
+| G-ERA | Löschungen nur über den Löschkern |
+| G-READ | Öffentliche Lesepfade nur über den gegateten Leser |
+| G-UNSAFE | `unsafe` nur in `acta-sys`, jeder Block mit `// SAFETY:` |
+| G-NOTOKIO | Kein `tokio` in Level 0 bis 6 |
+| G-NOSERDE-DISK | Kein `serde`/`bincode` in Plattenformaten |
+| G-HUB | Größenbudgets, HR-1 bis HR-8 |
+| G-WORD | Wortfilter nach 1.6 |
+| G-SUPPLY | Lizenzen, bekannte Schwachstellen, Mindest-Compilerversion (`cargo deny`, `cargo audit`) |
+| G-DEF | Alle Crates in `default-members` |
+
+Alle Gates laufen in der CI und lokal. Lints im Produktionscode: `deny(clippy::unwrap_used, expect_used, panic, indexing_slicing, let_underscore_must_use)`.
+
+---
+
+## 16. Berichte und Nachweise
+
+| Bericht | Inhalt | Empfänger |
+| --- | --- | --- |
+| **Löschbericht** | Klassen G, K, P, D, C, Zeugen, Annahmen, Mitbetroffenenzahl, Zeitstempel; signiert | Verantwortlicher, Aufsicht |
+| **Verzeichnis von Verarbeitungstätigkeiten (Art. 30)** | Aus Sammlungen, Datenklassen, Aufbewahrungsklassen, Empfängern und Egress-Freigaben erzeugter Entwurf | Datenschutzfunktion |
+| **Auftragsverarbeitung (Art. 28)** | Vorlage aus Konfiguration | Betreiber |
+| **Entscheidungsbericht** | `explain` für eine Entscheidung oder ein Szenario mit Vergleich | Fachbereich, Revision |
+| **Qualitätsbericht** | Messwerte nach 9.6 mit Korpus und Konfigurationsstand | Fachbereich |
+| **Betriebsbericht** | Rotation, Eskalationen, Selbsttest, Vergiftungen | Betrieb |
+
+Alle Berichte verwenden die Sprachregeln aus 1.6. Dieser Text ist keine Rechtsberatung; die Rechtsfreigabe liegt beim Betreiber und beim Hersteller (Abschnitt 17.4).
+
+---
+
+## 17. Rechtliche Einordnung und Betreibergrenzen
+
+### 17.1 Rechtsgrundlagen, aus denen Eigenschaften folgen [R]
+
+- **Art. 17 DSGVO:** Löschung als Aufheben der Personenbeziehbarkeit; kein vorgeschriebenes technisches Verfahren.
+- **Art. 5 Abs. 1 lit. c, e:** Datenminimierung, Speicherbegrenzung → Aufbewahrungsklassen, Sweeper, Trennung K/P.
+- **Art. 25:** Datenschutz durch Technikgestaltung → Entkopplung als Grundarchitektur.
+- **Art. 32:** Sicherheit der Verarbeitung → Verschlüsselung, Zugriffskontrolle, Protokollierung, Selbsttest.
+- **Art. 12 Abs. 3, 19:** Fristen und Mitteilung an Empfänger.
+- **Art. 30, 28:** Verzeichnis und Auftragsverarbeitung als Berichtsfunktion.
+
+### 17.2 Einordnung der Schlüsselvernichtung [R]
+
+Verschlüsselte Daten bleiben personenbezogen, solange ein Schlüssel existiert. Die Vernichtung aller Schlüssel entzieht dem Verantwortlichen die Mittel zur Wiederherstellung des Personenbezugs; das Restrisiko künftiger Algorithmenbrüche ist zu dokumentieren und durch Kryptoagilität (`alg`-Byte) und physische Bereinigung zu flankieren. Reines logisches Ausblenden (Soft-Delete) genügt für Indizes und Vektoren nicht; Acta kombiniert Sperre, Schlüsselentzug und physische Bereinigung. Auf § 35 BDSG (Ersatz der Löschung durch Sperrung bei unverhältnismäßigem Aufwand) baut Acta nicht auf.
+
+### 17.3 Deklarierte Annahmen
+
+| Kürzel | Annahme |
+| --- | --- |
+| **A-FLASH** | Wear-Leveling und Dateisystem-Journale können physische Blöcke unkontrolliert vorhalten; dagegen wirkt der Schlüsselentzug |
+| **A-RAM** | Flüchtige Reste im Speicher werden durch `mlock`, `Zeroizing`, `MADV_DONTDUMP` und `RLIMIT_CORE = 0` minimiert, sind aber gegen Kernel-Angriffe nicht gesichert |
+| **A-ANCHOR** | Der Schlüsselanker vernichtet Generationsgeheimnisse innerhalb der deklarierten Frist `anchor_destroy_max` |
+| **A-CRYPTO** | Die eingesetzten Primitive bleiben im geforderten Zeithorizont ungebrochen |
+| **A-EXT** | Daten bei externen Verarbeitern oder in Kundendokumenten außerhalb von Acta liegen außerhalb der Einflusssphäre |
+| **A-DETECT** | Die automatische Erkennung von Personenbezug ist unvollständig; Standardmodus und Freigabeprozesse kompensieren das |
+| **A-LLM** | Sprachmodelle sind nicht deterministisch; die gespeicherte Antwort ist der Beleg |
+
+### 17.4 Freigabepflichten vor dem Produktivbetrieb
+
+(1) Unabhängige kryptografische Prüfung, (2) Rechtsprüfung der Berichtsvorlagen und Sprachregeln, (3) Penetrationstest der API und der Parser, (4) Messbericht nach 9.6 auf dem Kundenkorpus, (5) Wiederherstellungsübung mit Erase-Replay.
+
+---
+
+## 18. Umsetzungsreihenfolge
+
+Prinzip: **dünner vertikaler Durchstich vor horizontaler Breite.** Eine Stufe beginnt erst, wenn die Abnahme der vorherigen grün ist.
+
+| Stufe | Inhalt | Abnahme |
+| --- | --- | --- |
+| **S0 Fundament** | Workspace, Toolchain 1.89.0 (gepinnt), `rings.toml`, `xtask gates`, CI; `acta-base`, `acta-sys`, `acta-fs` mit `FaultVfs`, `acta-testkit` | Gates grün; Fehlerinjektion funktioniert; negative Gate-Fixtures rot |
+| **S1 Krypto und Tresor** | `acta-crypto` (Testvektoren), `acta-vault` mit `FileAnchor`, Wurzelrotation, `destroy_many` | `T-CRY`, `T-NOFALLBACK`, `T-RNG`, Rotation mit Absturz, Bytes-Grep über Tresor |
+| **S2 Speicher und Gate** | `acta-gate`, `acta-seg` (Journal, Segmente, Manifest, beide Siegelmodi) | `T-CRASH` für Speicher, `no_shared_dek`, Golden-Formate |
+| **S3 Versionskontrolle** | `acta-ledger`, `acta-history` (Objekte, Refs, Sichtbarkeitsmengen, Diff) | `T-TT`, Hash-Ketten-Test, Stichtagsabfragen |
+| **S4 Durchstich Löschen** | `acta-erasure` (E0 bis E3, MK2, Bericht), `acta-text` mit Lineage, `acta-verify` | `T-GATE-1`, `T-VCS-ERASE-1`, Crash C-Matrix E1 bis E3, Bericht mit `acta-verify` prüfbar |
+| **S5 Abruf und Entscheidungen** | `acta-vec`, `acta-rag`, `acta-decision`, `acta-access`, `acta-infer`, `acta-infer-http` | `T-ACL`, `T-GROUND`, `T-DEC`, Qualitätsbericht auf Referenzkorpus |
+| **S6 Vollständiges Löschen** | E4 bis E9, Rebuild, Restore-Schutz, Takedown, Aufbewahrung | `T-REST`, `T-MULTI`, `T-DERIVED-SEALED`, vollständige Crash-Matrix |
+| **S7 Szenarien und Merge** | `acta-decision` Szenarien, `merge`, `retire`, Vier-Augen-Prozesse | `T-SCEN`, Szenario-Vergleich |
+| **S8 Betrieb** | `acta-engine`, `acta-node`, `acta-api`, `acta-server`, `acta-cli`, Selbsttest, Berichte, Sicherung/Wiederherstellung | Selbsttest, Restore-Übung, `T-EGRESS`, Lasttest |
+| **S9 Härtung** | Fuzzing aller Parser, externe Prüfungen (17.4), Dokumentation | Freigabepflichten erfüllt |
+
+Parallele Spuren ab S2: **Ingest und Erkennung** (`acta-ingest`, `acta-pii` mit Fuzzing), **Berichte** (`acta-reports`), **Qualität** (Prüfkorpus, Messwerkzeug).
+
+---
+
+## Anhang A – Kanonische Objektformate (Auszug)
+
+**Commit (kanonische Bytes):** `"acta/commit/v1" ‖ tree(32) ‖ n_parents u8 ‖ parents(32·n) ‖ tx_seq u64be ‖ tx_time i64be ‖ valid_from i32be (Tage, 0 = keiner) ‖ valid_to i32be ‖ kind u8 ‖ author(16) ‖ note_tag u16be`.
+
+**Tree-Eintrag:** `kind u8 ‖ name_len u16be ‖ name (UTF-8, NFC) ‖ id (32 oder 16) ‖ meta_len u16be ‖ meta`. Einträge sind aufsteigend nach Name (Bytevergleich) sortiert; doppelte Namen sind ungültig. `kind = 0x03` (`PersonalRef`) hat `id` von 16 Byte.
+
+**Ledger-Eintrag:** `[seq u64be][kind u8][len u32be][payload][entry_hash 32]` mit `entry_hash = SHA-256("acta/ledger/v1" ‖ prev_hash ‖ seq ‖ kind ‖ len ‖ payload)`.
+
+## Anhang B – Löschbericht (kanonisches JSON, RFC 8785)
 
 ```json
 {
-  "assumptions": [
-    "A-FLASH",
-    "A-RAM",
-    "A-ANCHOR",
-    "A-CRYPTO",
-    "A-EXT"
-  ],
-  "attestation_class": "A1",
-  "classes_reached": {
-    "C": true,
-    "D": true,
-    "G": true,
-    "K": true,
-    "P": true
-  },
-  "collateral": [],
+  "assumptions": ["A-ANCHOR", "A-CRYPTO", "A-EXT", "A-FLASH", "A-RAM"],
+  "classes_reached": { "C": true, "D": true, "G": true, "K": true, "P": true },
+  "collateral_count": 0,
   "erasure_id": "018f4a2b-8c3d-7e9a-b1c2-d3e4f5a6b7c8",
   "mode": "DeleteAll",
-  "notary_key_id": "hsm-slot-4-key-1",
-  "public_fingerprint": "ed25519:6fbc8a...",
-  "residual_risks": [
-    "Flash wear-leveling slack blocks retained without key (A-FLASH)"
-  ],
-  "scope_commitment": "blake3:9a8b7c...",
+  "notary_key_id": "anchor-key-1",
+  "public_fingerprint": "ed25519:…",
+  "residual_risks": ["Flash wear-leveling slack blocks retained without key (A-FLASH)"],
+  "scope_commitment": "hmac-sha256:…",
   "target_type": "Subject",
-  "timestamps": {
-    "completed_at": 1731632460,
-    "gated_at": 1731632400,
-    "key_destroyed_at": 1731632401,
-    "requested_at": 1731632399
-  },
+  "timestamps": { "completed_at": 0, "gated_at": 0, "key_destroyed_at": 0, "requested_at": 0 },
   "witnesses": [
-    {
-      "layer": "Store",
-      "matches": 0,
-      "method": "ForensicRawScan",
-      "scanned_bytes": 104857600
-    },
-    {
-      "layer": "Vector",
-      "matches": 0,
-      "method": "TopologyAndNeedleScan",
-      "scanned_nodes": 45000
-    }
+    { "layer": "Segments", "matches": 0, "method": "ForensicRawScan", "scanned_bytes": 0 },
+    { "layer": "Vector",   "matches": 0, "method": "NeedleScan",      "scanned_segments": 0 }
   ]
 }
 ```
 
-Die Signatur wird über `ctx/report/v1` $\parallel$ `kanonische_bytes_ohne_signature` gebildet und als `signature: "base64url:..."` angehängt.
+Die Signatur wird über `acta/report/v1 ‖ kanonische_bytes_ohne_signature` gebildet und als `"signature": "base64url:…"` angehängt. Werte `0` und `…` sind Platzhalter des Formats. `acta-verify` prüft Signatur, Ledger-Kette und den Tresor-Eintrag am Datenträger ohne Rückgriff auf andere Acta-Crates.
 
----
+## Anhang C – Verzeichnisstruktur des Repositorys
 
-## Anhang B – Matrix der Unterschiede zur Vorgängerfassung 2.0-E
-
-| Architektur-Aspekt | Vorgängerfassung (2.0-E) | Fassung 3.0 Final (Normativ) | Begründung / Behobene Lücke |
-|---|---|---|---|
-| **Schrittfolge der Saga** | Nadelmenge-Extraktion (E1) vor dem Gate. | **Gate (E2) zuerst**, Nadelstichprobe (E2a) nachgelagert und gedeckelt. | Beseitigt $O(\text{Datenmenge})$-Latenz vor dem Gate; garantiert $O(1)$ bis `Gated` (F-1). |
-| **Klartext im RAM vs. Key** | Schlüsselvernichtung (E3) ohne Schicht-Bestätigung. | **Pflicht-Ack von `on_gate` (E2b)** als zwingende Vorbedingung für E3. | Verhindert das Zeitfenster „Schlüssel vernichtet, aber Klartext-Vektoren im RAM lesbar“ (F-2). |
-| **Container-Verschlüsselung** | Nicht normiert; Blockverschlüsselung möglich. | **Invariante I-17:** Strikt ein Umschlag je Record; niemals Multi-Record-Blöcke. | Ermöglicht gefilterte SST-Rewrites über Chiffretext nach Schlüsselvernichtung (F-2). |
-| **Lineage-Modell** | Uneinheitliche Tag-Listen und XOR-Filter (`tag_set`). | **Monotone `doc_ord: u32` mit Roaring-Bitmaps** (`source_set`, `ErasedOrds`). | Eliminiert Falsch-Positive; $O(1)$ Mengenoperationen über alle Indizes (F-3). |
-| **Schlüsselraum KeyV2** | Schlüsselfeld `cluster` undefiniert. | **`cluster = subject_tag`** verbindlich festgelegt. | Schafft physische Datenlokalität; erlaubt Datei-Drop ganzer SSTables (F-4). |
-| **Ableitungs-Vektoren** | Segmente unter gemeinsamem `ArtKey` sofort vernichtet. | **Standardmodus `Rebuild`** mit maskiertem Abfragefenster; `Sealed` nur opt-in. | Verhindert massiven Verfügbarkeitsausfall für fremde Betroffene bei Vektorlöschung (F-5). |
-| **Audit-Protokolle** | Widerrufs-Log speicherte Klartext-IDs. | **Keyed Commitments** unter epochenbasiertem $K_{\text{commit}}$ und rotiertem $K_{\text{scope}}$. | Behebt Linkability-Risiko und schließt das Lösch-Paradoxon (F-6, V-15). |
-| **Tresor-Grabstein** | SPEC forderte „`tag` bleibt zur Sondierung“. | **Code bestätigt (V-11):** `tag` und `payload` werden vollständig genullt. | Verhindert, dass das Tag als permanentes Pseudonym überdauert. |
-| **Tresor-Maskierung** | Payloads T/C/S/D im Klartext auf Platte. | **Payloads zwingend unter Epochenschlüssel maskiert; Epochenrotation.** | Verhindert Wiederbelebung gelöschter Daten aus alten Tresor-Sicherungen (V-04). |
-| **Klassifizierung L/C/P/E** | Unklares Verhältnis zwischen L/C/P/E und G/K/P/D/C. | **Kanonisches Mapping (Abschnitt 8.2)**; Klasse E = G+K+P+D+C erreicht. | Schafft einheitliches rechtlich-technisches Berichtsvokabular. |
-| **Rechtliche Einordnung** | Kapitel 13 und 14 fehlten vollständig. | **Vollständige Integration** von Rechtsprechung, EDPB/DSK-Praxis und Betreibergrenzen. | Erfüllt das Vollständigkeits-Gate G-DOC; klärt UWG-Risiko und § 35 BDSG. |
-
----
-
-## Anhang C – Quellenverzeichnis (ausschließlich docs/)
-
-Dieses Dokument wurde unter strenger Exklusion von `AGENTS.md` und Crate-spezifischen `SPEC.md` ausschließlich aus den folgenden verifizierten Dokumenten synthetisiert:
-1. `docs/Acta_Architekturanalyse_Loeschung.md` (Principal-Review zu HEAD `bbfad85`, Befunde V-01..V-12, Architektur-Findings F-1..F-8, Konstruktionsprinzipien P1..P10, Roadmap R0..R7).
-2. `docs/dsgvo/Crypto-Shredding_RAG_Rechts-und-Architektursynthese.md` (Umfassende Rechts- und Architektursynthese, SDM Baustein 60, EDPB/DSK-Analysen).
-3. `docs/dsgvo/Analyse der Rechtslage zum Löschen personenbezogener Daten in RAG-Systemen.md` & `docs/dsgvo/Analyse der Rechtslage zum Löschen personenbezogener Daten.md`.
-4. `docs/dsgvo/Systemische Rechts- und Architektur-Analyse zur Evaluation der Schlüsselvernichtung.md`.
-5. `docs/dsgvo/Löschen personenbezogener Daten in RAG-Systemen durch Schlüsselvernichtung (Cryp.md`.
-6. `docs/SPEC.md` (Fassung 2.0-E) und `docs/SPEC(13).md` (Fassung 3.0 Entwurf).
+```
+acta/
+├─ Cargo.toml                 Workspace (Mitglieder = default-members), resolver = "3"
+├─ rust-toolchain.toml        1.89.0, rustfmt, clippy
+├─ rings.toml                 Level je Crate (Quelle für Gate G1)
+├─ clippy.toml  deny.toml  .cargo/config.toml  (Alias: xtask)
+├─ docs/  SPEC.md  adr/  betrieb/  datenschutz/
+├─ crates/
+│   acta-base  acta-crypto  acta-fs  acta-sys  acta-gate  acta-access
+│   acta-infer  acta-pii  acta-ingest  acta-ledger  acta-vault  acta-seg
+│   acta-history  acta-erasure  acta-text  acta-vec
+│   acta-decision  acta-rag  acta-reports  acta-engine
+│   acta-node  acta-infer-http  acta-api  acta-server  acta-cli  acta-testkit
+├─ tools/ acta-verify         (eigenständig, ohne interne Abhängigkeiten)
+└─ xtask/
+```
