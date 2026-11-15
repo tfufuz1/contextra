@@ -1,4 +1,3 @@
-//! Manifest-Handle, Öffnen, Vergiftungsschutz und Lifecycle (Ring 1)
 //!
 //! Verwaltet die geöffnete Manifest-Datei mit atomarem Schreibpuffer, fsync-Semantik
 //! und Vergiftungszustand bei fsync-Fehlern.

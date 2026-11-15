@@ -1,6 +1,5 @@
 //! # Globale korpusweite Fusionsstrategie (`global`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Implementiert eine themenbasierte, korpusweite Fusion über zusammengefasste
 //! Wissensgraph-Knoten (LeanRAG / Leiden-Community-Cluster).

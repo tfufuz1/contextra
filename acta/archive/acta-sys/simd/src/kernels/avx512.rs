@@ -1,10 +1,8 @@
-// FILE-CONTEXT
-// ZWECK: AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen.
-// INVARIANTEN: Target-Features guaranteed by caller or feature-checks.
+// AVX-512 SIMD-Intrinsics für f32, f32_bytes und u8 VNNI Distanzberechnungen.
+// Invarianten: Target-Features guaranteed by caller or feature-checks.
 
 //! # Modul `kernels::avx512`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
 //!
 //! **Zweck:**
 //! Höchstleistungs-Vektordistanzberechnungen auf modernen x86_64-Serverprozessoren mittels
@@ -24,7 +22,6 @@ use std::arch::x86_64::*;
 use crate::kernels::scalar::CosineSimilarityPartsU8;
 
 // SECTION AVX512-F32-KERNELS
-// ANCHOR[acta-sys:AVX512-COSINE-F32]
 /// Calculates cosine distance between two float vectors using AVX-512 instructions.
 ///
 /// # Safety
@@ -94,7 +91,6 @@ pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
-// ANCHOR[acta-sys:AVX512-EUCLIDEAN-F32]
 /// Calculates Euclidean distance between two float vectors using AVX-512 instructions.
 ///
 /// # Safety
@@ -145,7 +141,6 @@ pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     sum.sqrt()
 }
 
-// ANCHOR[acta-sys:AVX512-DOT-F32]
 /// Calculates dot product between two float vectors using AVX-512 instructions.
 ///
 /// # Safety
@@ -195,7 +190,6 @@ pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 // !SECTION AVX512-F32-KERNELS
 
 // SECTION AVX512-BYTES-KERNELS
-// ANCHOR[acta-sys:AVX512-COSINE-F32-BYTES]
 /// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
 ///
 /// # Safety
@@ -277,7 +271,6 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8])
     1.0 - sim
 }
 
-// ANCHOR[acta-sys:AVX512-EUCLIDEAN-F32-BYTES]
 /// Calculates Euclidean distance between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
 ///
 /// # Safety
@@ -340,7 +333,6 @@ pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u
     sum.sqrt()
 }
 
-// ANCHOR[acta-sys:AVX512-DOT-F32-BYTES]
 /// Calculates dot product between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
 ///
 /// # Safety
@@ -400,7 +392,6 @@ pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> 
     -dot
 }
 
-// ANCHOR[acta-sys:AVX512-HSUM512-PS]
 /// Horizontal sum of 16 x f32 values in a 512-bit AVX-512 vector register.
 ///
 /// # Safety
@@ -427,7 +418,6 @@ pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
 // !SECTION AVX512-BYTES-KERNELS
 
 // SECTION AVX512-U8-KERNELS
-// ANCHOR[acta-sys:AVX512-DOT-U8-VNNI]
 /// Calculates dot product between two byte vectors using AVX-512 VNNI instructions.
 ///
 /// # Safety
@@ -489,7 +479,6 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     sum
 }
 
-// ANCHOR[acta-sys:AVX512-EUCLIDEAN-SQ-U8]
 /// Calculates squared Euclidean distance between two byte vectors using AVX-512 instructions.
 ///
 /// # Safety
@@ -558,7 +547,6 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 
     sum
 }
 
-// ANCHOR[acta-sys:AVX512-COSINE-PARTS-U8]
 /// Calculates cosine similarity parts (dot, norm_a_sq, norm_b_sq) for byte vectors using AVX-512 VNNI instructions.
 ///
 /// # Safety
@@ -652,7 +640,6 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
     }
 }
 
-// ANCHOR[acta-sys:AVX512-HSUM512-EPI32]
 /// Horizontal sum of 16 x 32-bit signed integers in a 512-bit AVX-512 vector register.
 ///
 /// # Safety

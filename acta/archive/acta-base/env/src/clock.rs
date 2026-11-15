@@ -5,7 +5,6 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 // =========================================================================
 // SECTION: Clock Port Trait
-// ANCHOR[id=clock-root,epic=clock,seq=2]
 // NOTE: Primäre Zeiterfassungsabstraktion zur Entkopplung von Systemzeit und Tests.
 // =========================================================================
 
@@ -44,7 +43,6 @@ pub trait Clock: Send + Sync + 'static {
 
 // =========================================================================
 // SECTION: SystemClock Adapter Implementation
-// ANCHOR[id=clock-system,epic=clock,seq=3]
 // NOTE: Einzige autorisierte Stelle für direkte Systemzeit-Aufrufe (OS System/Instant).
 // =========================================================================
 
@@ -64,7 +62,6 @@ impl SystemClock {
     #[allow(clippy::disallowed_methods)]
     pub fn new() -> Self {
         Self {
-            // ANCHOR[id=time-call-1,epic=clock,seq=4]
             // DIRECT TIME CALL (1/3): Authorized baseline monotonic instant for SystemClock.
             start_instant: Instant::now(),
         }
@@ -84,7 +81,6 @@ impl Clock for SystemClock {
     /// Bei Zeitständen vor `UNIX_EPOCH` (z. B. fehlerhafte Systemuhr) wird fail-closed `0` zurückgegeben.
     #[allow(clippy::disallowed_methods)]
     fn now_unix_nanos(&self) -> u64 {
-        // ANCHOR[id=time-call-2,epic=clock,seq=5]
         // DIRECT TIME CALL (2/3): Authorized OS wall-clock access encapsulated within SystemClock adapter.
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -97,7 +93,6 @@ impl Clock for SystemClock {
     /// Verwendet `saturating_duration_since`, um arithmetische Überläufe und Unterläufe auszuschließen.
     #[allow(clippy::disallowed_methods)]
     fn monotonic_nanos(&self) -> u64 {
-        // ANCHOR[id=time-call-3,epic=clock,seq=6]
         // DIRECT TIME CALL (3/3): Authorized OS monotonic clock access encapsulated within SystemClock adapter.
         let nanos = Instant::now()
             .saturating_duration_since(self.start_instant)
@@ -110,7 +105,6 @@ impl Clock for SystemClock {
 
 // =========================================================================
 // SECTION: Blanket Implementation for Arc<T>
-// ANCHOR[id=clock-arc,epic=clock,seq=7]
 // NOTE: Erlaubt direkte Nutzung von `Arc<dyn Clock>` oder `Arc<ClockImpl>` ohne Wrapper.
 // =========================================================================
 
@@ -130,7 +124,6 @@ impl<T: Clock + ?Sized> Clock for Arc<T> {
 
 // =========================================================================
 // SECTION: Unit Tests
-// ANCHOR[id=clock-tests,epic=clock,seq=8]
 // =========================================================================
 
 #[cfg(test)]

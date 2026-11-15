@@ -5,10 +5,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Property-based Tests (proptest) für Identitätsinvariante und Zero-Panic (WP M4).
-// INVARIANTEN: Zero-Panic bei beliebigen Bytes, Identität bei Markdown/Txt.
-// STAND: TS:2026-10-31T00:00:00Z
+// Property-based Tests (proptest) für Identitätsinvariante und Zero-Panic (WP M4).
+// Invarianten: Zero-Panic bei beliebigen Bytes, Identität bei Markdown/Txt.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -25,7 +23,6 @@ proptest! {
     /// Identitätsinvariante für Markdown:
     /// Saubere UTF-8 Strings ohne \r und Steuerzeichen (außer \n/\t) müssen
     /// bei Markdown byte-identisch in canonical().text enthalten sein.
-// ANCHOR[acta-ingest:TST-0438]
 // Testet die Funktionsfaehigkeit von `prop_markdown_identity`.
     #[test]
     fn prop_markdown_identity(s in "[a-zA-Z0-9 \\n\\täöüß🦀#=-]+") {
@@ -49,7 +46,6 @@ proptest! {
     }
 
     /// Zero-Panic Garantie: Beliebige Bytes in alle 6 Textformate dürfen NIEMALS panikieren.
-// ANCHOR[acta-ingest:TST-0439]
 // Testet die Funktionsfaehigkeit von `prop_zero_panic_arbitrary_bytes`.
     #[test]
     fn prop_zero_panic_arbitrary_bytes(bytes in proptest::collection::vec(any::<u8>(), 0..2048)) {

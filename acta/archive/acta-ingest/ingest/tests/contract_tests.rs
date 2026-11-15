@@ -4,10 +4,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Integrationstests für Verträge, Formate, Kanonisierung, Pipeline & Fallback-Chunker (WP M5).
-// INVARIANTEN: All-targets / All-features Lints strikt einhalten.
-// STAND: TS:2026-10-31T00:00:00Z
+// Integrationstests für Verträge, Formate, Kanonisierung, Pipeline & Fallback-Chunker (WP M5).
+// Invarianten: All-targets / All-features Lints strikt einhalten.
 
 #![allow(
     clippy::unwrap_used,
@@ -82,7 +80,6 @@ impl DocumentExtractor for PanickingExtractor {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0344]
 // Testet die Funktionsfaehigkeit von `test_contract_1_format_id_consistency`.
 #[test]
 fn test_contract_1_format_id_consistency() {
@@ -112,7 +109,6 @@ fn test_contract_1_format_id_consistency() {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0345]
 // Testet die Funktionsfaehigkeit von `test_contract_2_canonical_golden_and_slicing`.
 #[test]
 fn test_contract_2_canonical_golden_and_slicing() {
@@ -207,7 +203,6 @@ fn test_contract_2_canonical_golden_and_slicing() {
     );
 }
 
-// ANCHOR[acta-ingest:TST-0346]
 // Testet die Funktionsfaehigkeit von `test_contract_3_sanitize_text_cases`.
 #[test]
 fn test_contract_3_sanitize_text_cases() {
@@ -217,7 +212,6 @@ fn test_contract_3_sanitize_text_cases() {
     assert!(count >= 5);
 }
 
-// ANCHOR[acta-ingest:TST-0347]
 // Testet die Funktionsfaehigkeit von `test_contract_4_pipeline_mock_end_to_end_determinism`.
 #[test]
 fn test_contract_4_pipeline_mock_end_to_end_determinism() {
@@ -246,7 +240,6 @@ fn test_contract_4_pipeline_mock_end_to_end_determinism() {
     assert_eq!(meta1["chunk_id"], meta2["chunk_id"]);
 }
 
-// ANCHOR[acta-ingest:TST-0348]
 // Testet die Funktionsfaehigkeit von `test_contract_5_panic_catching`.
 #[test]
 fn test_contract_5_panic_catching() {
@@ -271,7 +264,6 @@ fn test_contract_5_panic_catching() {
     );
 }
 
-// ANCHOR[acta-ingest:TST-0349]
 // Testet die Funktionsfaehigkeit von `test_contract_6_error_mapping`.
 #[test]
 fn test_contract_6_error_mapping() {
@@ -285,7 +277,6 @@ fn test_contract_6_error_mapping() {
         .contains("Ressourcenlimit überschritten"));
 }
 
-// ANCHOR[acta-ingest:TST-0350]
 // Testet die Funktionsfaehigkeit von `test_contract_7_fallback_chunker_markdown_chunker_equality`.
 #[test]
 fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
@@ -335,7 +326,6 @@ fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0351]
 // Testet die Funktionsfaehigkeit von `test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free`.
 #[test]
 fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {

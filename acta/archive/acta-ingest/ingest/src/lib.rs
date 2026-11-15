@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -10,10 +9,8 @@
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
 #![forbid(unsafe_code)]
-// FILE-CONTEXT
-// ZWECK: Root-Modul von acta-ingest (Adapter-Crate für Format-Extraktion und Chunking).
-// INVARIANTEN: Zero-Panic, deterministisch, kein I/O nach außen, #![forbid(unsafe_code)].
-// STAND: TS:2026-10-31T00:00:00Z
+// Root-Modul von acta-ingest (Adapter-Crate für Format-Extraktion und Chunking).
+// Invarianten: Zero-Panic, deterministisch, kein I/O nach außen, #![forbid(unsafe_code)].
 
 #[cfg(feature = "workspace")]
 pub mod compat;

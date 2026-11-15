@@ -1,11 +1,9 @@
 //! Integration test for DiskANN Vamana graph build and Recall@10 accuracy (BEFUND 1).
 //! Verifies that DiskANN achieves Recall@10 >= 0.95 on synthetic dataset.
 //! Ground-truth top-10 neighbors are computed via an independent brute-force reference implementation.
-// FILE-CONTEXT
-// ZWECK: DiskANN Graph-Recall-Verifikation gegen Brute-Force-Oracle.
-// INVARIANTEN: Recall@10 >= 0.90; Datensatz: 1000 Vektoren, Dim: 64, StdRng Seed: 0xDEAD_BEEF_CAFE_BABE.
+// DiskANN Graph-Recall-Verifikation gegen Brute-Force-Oracle.
+// Invarianten: Recall@10 >= 0.90; Datensatz: 1000 Vektoren, Dim: 64, StdRng Seed: 0xDEAD_BEEF_CAFE_BABE.
 // HOTSPOTS: 30-120
-// STAND: 2026-11-12
 
 #![cfg(feature = "experimental-diskann")]
 

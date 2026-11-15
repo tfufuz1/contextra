@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Extractor-Implementierung für JSON und JSONL Formate (WP M4).
-// INVARIANTEN: FILE-CONTEXT Kopf, Zero-Panic, Erhalt doppelter Schlüssel in Dokumentreihenfolge.
-// STAND: TS:2026-10-31T00:00:00Z
+// Extractor-Implementierung für JSON und JSONL Formate (WP M4).
+// Invarianten: Zero-Panic, Erhalt doppelter Schlüssel in Dokumentreihenfolge.
 
 use super::path::{append_index, append_key};
 use crate::error::{IngestError, LimitKind};

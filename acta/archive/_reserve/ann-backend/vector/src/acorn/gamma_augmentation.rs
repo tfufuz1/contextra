@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Algorithmische Kantenbudget-Berechnung (γ-Augmentierung) für ACORN (Patel et al. 2024).
-// INVARIANTEN: Ring-0 kompatibel (kein I/O, kein tokio); Zero Panic; monotone Eigenschaft bezüglich Selectivity.
+// Algorithmische Kantenbudget-Berechnung (γ-Augmentierung) für ACORN (Patel et al. 2024).
+// Invarianten: Ring-0 kompatibel (kein I/O, kein tokio); Zero Panic; monotone Eigenschaft bezüglich Selectivity.
 
 /// Maximum gamma multiplier factor for edge degree augmentation.
 const MAX_GAMMA_MULTIPLIER: f32 = 16.0;

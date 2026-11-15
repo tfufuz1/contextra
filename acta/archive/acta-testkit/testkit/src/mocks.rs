@@ -16,14 +16,11 @@
 //! - Kein `unsafe` (`#![forbid(unsafe_code)]`).
 //! - Thread-sichere Aufzeichnung von Metriken über Mutex-geschützte Ereignislisten.
 
-// FILE-CONTEXT
-// STAND: 2026-10-25
-// ZWECK: Mock implementations for testing (MockEmbedder, TestMetricsSink, MetricEvent).
-// INVARIANTEN: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
+// Mock implementations for testing (MockEmbedder, TestMetricsSink, MetricEvent).
+// Invarianten: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
 
 use acta_base::{BoxFuture, EmbeddingError, EmbeddingProvider, MetricsSink}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 
-// ANCHOR[acta-testkit:MOCK-EMBEDDER-STRUCT-001]
 /// Deterministischer Mock-Embedding-Provider für Testläufe.
 ///
 /// **Zweck:** Ermöglicht semantische Vektortests ohne teure oder nicht-deterministische
@@ -40,7 +37,6 @@ pub struct MockEmbedder {
 }
 
 impl MockEmbedder {
-    // ANCHOR[acta-testkit:MOCK-EMBEDDER-NEW-001]
     /// Erzeugt einen `MockEmbedder` mit der vorgegebenen Dimension.
     ///
     /// Standardmäßig wird ein Vektor aus `0.1f32` der Länge `dim` erzeugt.
@@ -51,7 +47,6 @@ impl MockEmbedder {
         }
     }
 
-    // ANCHOR[acta-testkit:MOCK-EMBEDDER-FIXED-001]
     /// Erzeugt einen `MockEmbedder` mit einem festen Vektor.
     ///
     /// Die Dimension wird automatisch aus der Länge von `fixed_output` abgeleitet.
@@ -64,7 +59,6 @@ impl MockEmbedder {
     }
 }
 
-// ANCHOR[acta-testkit:MOCK-EMBEDDER-TRAIT-IMPL-001]
 impl EmbeddingProvider for MockEmbedder {
     /// Gibt den festen Provider-Namen `"mock"` zurück.
     fn provider_name(&self) -> &str {
@@ -91,7 +85,6 @@ impl EmbeddingProvider for MockEmbedder {
     }
 }
 
-// ANCHOR[acta-testkit:METRIC-EVENT-ENUM-001]
 /// Ein einzelnes aufgezeichnetes Metrik-Ereignis aus [`TestMetricsSink`].
 ///
 /// **Zweck:** Dient in Test-Assertions der genauen Überprüfung, ob Instrumentierungen
@@ -127,7 +120,6 @@ pub enum MetricEvent {
     },
 }
 
-// ANCHOR[acta-testkit:TEST-METRICS-SINK-STRUCT-001]
 /// In-Memory-Implementierung von [`acta_base::MetricsSink`] für Tests.
 ///
 /// **Zweck:** Fängt alle Metrik-Aufrufe ab und speichert sie chronologisch
@@ -139,13 +131,11 @@ pub struct TestMetricsSink {
 }
 
 impl TestMetricsSink {
-    // ANCHOR[acta-testkit:TEST-METRICS-SINK-NEW-001]
     /// Erstellt eine leere [`TestMetricsSink`].
     pub fn new() -> Self {
         Self::default()
     }
 
-    // ANCHOR[acta-testkit:TEST-METRICS-SINK-EVENTS-001]
     /// Erstellt einen Schnappschuss (Snapshot) aller bisher aufgezeichneten Ereignisse.
     ///
     /// Behandelt vergiftete Mutexe (`PoisonError`) defensiv via `into_inner()`.
@@ -156,7 +146,6 @@ impl TestMetricsSink {
             .clone()
     }
 
-    // ANCHOR[acta-testkit:TEST-METRICS-SINK-CLEAR-001]
     /// Leert die Liste aller aufgezeichneten Metrik-Ereignisse.
     pub fn clear(&self) {
         self.events
@@ -166,7 +155,6 @@ impl TestMetricsSink {
     }
 }
 
-// ANCHOR[acta-testkit:TEST-METRICS-SINK-TRAIT-IMPL-001]
 impl MetricsSink for TestMetricsSink {
     /// Zeichnet ein Zähler-Ereignis (Counter) auf.
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
@@ -222,7 +210,6 @@ mod tests {
     use super::*;
     use acta_base::TextEmbeddingEngine; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 
-    // ANCHOR[acta-testkit:TEST-MOCKS-EMBEDDER-001]
     // Prüft Einbettungs-Dimension und deterministische Vektorerzeugung von MockEmbedder.
     #[tokio::test]
     async fn test_mock_embedder_methods() -> Result<(), Box<dyn std::error::Error>> {
@@ -241,7 +228,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[acta-testkit:TEST-MOCKS-BATCH-001]
     // Prüft Batch-Verarbeitung und Blanket-Trait-Implementierung für TextEmbeddingEngine.
     #[tokio::test]
     async fn test_embedding_provider_batch_and_blanket_trait(
@@ -260,7 +246,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[acta-testkit:TEST-MOCKS-SINK-001]
     // Prüft die chronologische Aufzeichnung und das Leeren von Counter-, Gauge- und Histogramm-Ereignissen.
     #[test]
     fn test_test_metrics_sink() {
@@ -320,7 +305,6 @@ use std::sync::Arc;
 type TxStagingMap = BTreeMap<TxId, BTreeMap<Vec<u8>, Bytes>>;
 type KvPrefixEntryMap = BTreeMap<(u64, String), (Vec<u32>, Vec<KvBlock>)>;
 
-// ANCHOR[acta-testkit:KV-BRIDGE-FAKES-001]
 /// Deterministische In-Memory-Implementierung von [`KvBridgeStorage`].
 #[derive(Debug, Default, Clone)]
 pub struct InMemoryKvBridgeStorage {
@@ -379,7 +363,6 @@ impl KvBridgeStorage for InMemoryKvBridgeStorage {
     }
 }
 
-// ANCHOR[acta-testkit:ATTENTION-FAKES-001]
 /// Skriptbare, deterministische Implementierung von [`AttentionExporter`].
 #[derive(Debug, Default, Clone)]
 pub struct ScriptedAttentionExporter {
@@ -409,7 +392,6 @@ impl AttentionExporter for ScriptedAttentionExporter {
     }
 }
 
-// ANCHOR[acta-testkit:KV-PREFIX-FAKES-001]
 /// Deterministische In-Memory-Implementierung von [`KvPrefixStore`].
 #[derive(Debug, Default, Clone)]
 pub struct InMemoryKvPrefixStore {
@@ -480,7 +462,6 @@ impl KvPrefixStore for InMemoryKvPrefixStore {
     }
 }
 
-// ANCHOR[acta-testkit:ROUTING-FAKES-001]
 /// Skriptbare, deterministische Implementierung von [`HybridSearchProvider`].
 #[derive(Debug, Default, Clone)]
 pub struct ScriptedHybridSearchProvider {
@@ -523,7 +504,6 @@ impl HybridSearchProvider for ScriptedHybridSearchProvider {
     }
 }
 
-// ANCHOR[acta-testkit:ROUTING-FAKES-002]
 /// Statische, deterministische Implementierung von [`CommunityResolver`].
 #[derive(Debug, Default, Clone)]
 pub struct StaticCommunityResolver {
@@ -551,7 +531,6 @@ impl CommunityResolver for StaticCommunityResolver {
     }
 }
 
-// ANCHOR[acta-testkit:ROUTING-FAKES-003]
 /// Deterministische Implementierung von [`ContextPreparer`].
 #[derive(Debug, Default, Clone)]
 pub struct BudgetTruncatingContextPreparer;
@@ -604,7 +583,6 @@ impl ContextPreparer for BudgetTruncatingContextPreparer {
     }
 }
 
-// ANCHOR[acta-testkit:ROUTING-FAKES-004]
 /// Statische Implementierung von [`DriftStatusProvider`].
 #[derive(Debug, Clone)]
 pub struct StaticDriftStatusProvider {
@@ -644,7 +622,6 @@ impl DriftStatusProvider for StaticDriftStatusProvider {
     }
 }
 
-// ANCHOR[acta-testkit:ROUTING-FAKES-005]
 /// Skriptbare Implementierung von [`EgressPolicy`].
 #[derive(Debug, Default, Clone)]
 pub struct ScriptedEgressPolicy {

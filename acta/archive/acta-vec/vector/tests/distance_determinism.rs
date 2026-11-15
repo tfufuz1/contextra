@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Proptest-Verifikation der numerischen Äquivalenz von SIMD- und Skalarkernen.
-// INVARIANTEN: Relative Differenz |SIMD - Skalar| <= EPSILON * sqrt(len).
+// Proptest-Verifikation der numerischen Äquivalenz von SIMD- und Skalarkernen.
+// Invarianten: Relative Differenz |SIMD - Skalar| <= EPSILON * sqrt(len).
 // HOTSPOTS: 15-60
-// STAND: 2026-11-12
 use acta_base::DistanceMetric; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_vec::distance::{
     compute_distance, cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,

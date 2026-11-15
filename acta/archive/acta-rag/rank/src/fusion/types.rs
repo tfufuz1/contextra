@@ -1,6 +1,5 @@
 //! # Typdefinitionen der Signal-Fusion (`types`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Enthält grundlegende Datenstrukturen für Retrieval-Ergebnisse, aggregierte Fusionsergebnisse,
 //! Herkunftsnachweise (Provenance) und Fehlerrichtlinien bei Signalausfällen.

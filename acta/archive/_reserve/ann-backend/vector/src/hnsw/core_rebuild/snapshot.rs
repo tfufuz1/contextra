@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Phase-1 Rebuild: Snapshot des Index nehmen, Quantisierer re-kalibrieren und neuen Kern aufbauen.
-// INVARIANTEN: Deterministische Nachbarschaftsauswahl und Distanzberechnung;.
+// Phase-1 Rebuild: Snapshot des Index nehmen, Quantisierer re-kalibrieren und neuen Kern aufbauen.
+// Invarianten: Deterministische Nachbarschaftsauswahl und Distanzberechnung;.
 // HOTSPOTS: rebuild_phase1_snapshot_and_build, select_neighbors_heuristic_with_batch
-// STAND: TS:2026-11-11T02:00:00Z
 
 use std::sync::atomic::Ordering;
 
@@ -324,7 +322,6 @@ impl HnswIndexCore {
         Ok(result.iter().map(|c| c.index as u32).collect())
     }
 
-    // ANCHOR[acta-vec:REBUILD-PHASE1]
     pub(super) fn rebuild_phase1_snapshot_and_build(&self) -> Result<(HnswIndex, u64)> {
         let (all_nodes, config, snapshot_tx) = {
             let nodes = self.hot.nodes.read();

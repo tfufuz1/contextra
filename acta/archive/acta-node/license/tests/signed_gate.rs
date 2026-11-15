@@ -35,7 +35,6 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
-// ANCHOR[acta-node:TEST-GATE-VALID-SOVEREIGN]
 // Prüft erfolgreiche Freigabe des Sovereign-Rings bei gültiger Signatur und passender Lizenz.
 #[test]
 fn test_valid_signature_allowed_ring_sovereign() {
@@ -67,7 +66,6 @@ fn test_valid_signature_allowed_ring_sovereign() {
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
-// ANCHOR[acta-node:TEST-GATE-MISSING-COMPLIANCE]
 // Prüft Abweisung des Compliance-Rings, wenn dieser in der signierten Lizenz nicht enthalten ist.
 #[test]
 fn test_valid_signature_missing_ring_compliance() {
@@ -102,7 +100,6 @@ fn test_valid_signature_missing_ring_compliance() {
     );
 }
 
-// ANCHOR[acta-node:TEST-GATE-INVALID-SIG-REJECTED]
 // Prüft Abweisung des Zugriffs bei manipulierter Signatur.
 #[test]
 fn test_invalid_signature_rejected() {
@@ -127,7 +124,6 @@ fn test_invalid_signature_rejected() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
-// ANCHOR[acta-node:TEST-GATE-EXPIRED-REJECTED]
 // Prüft Abweisung des Zugriffs bei abgelaufener Lizenz.
 #[test]
 fn test_expired_license() {
@@ -164,7 +160,6 @@ fn test_expired_license() {
     );
 }
 
-// ANCHOR[acta-node:TEST-GATE-FAST-RING-ALWAYS-OK]
 // Prüft Invariante: Fast-Ring ist selbst bei abgelaufener Lizenz immer erlaubt.
 #[test]
 fn test_inv_license_2_fast_ring_always_allowed() {

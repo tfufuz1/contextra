@@ -14,7 +14,6 @@
 use super::failure::{ConformanceFailure, ConformanceResult};
 use acta_base::Rng; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 
-// ANCHOR[acta-testkit:CONF-RNG-SUITE-001]
 /// Führt die vollständige Konformitätsprüfung für einen [`Rng`]-Port durch.
 ///
 /// **Ablauf:**

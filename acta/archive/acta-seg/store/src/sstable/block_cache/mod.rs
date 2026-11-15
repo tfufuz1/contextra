@@ -1,7 +1,5 @@
-//! # Geshardeter Block-Cache (Ring 1)
 //!
 //! Zweck: Zentraler Block-Cache für dekomprimierte SSTable-Datenblöcke mit Sharding.
-// ANCHOR[acta-seg:SST-RDR-144]
 
 mod lru;
 mod quick;

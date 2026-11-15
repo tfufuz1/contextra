@@ -3,7 +3,6 @@
 //! Dieses Modul definiert Hilfsmakros zur vereinfachten Auswertung von
 //! [`crate::conformance::ConformanceResult`] in Testläufen.
 
-// ANCHOR[acta-testkit:CONF-MACRO-ASSERT-001]
 /// Überprüft, ob ein Konformitätsprüfungsergebnis erfolgreich war.
 ///
 /// **Verhalten:**

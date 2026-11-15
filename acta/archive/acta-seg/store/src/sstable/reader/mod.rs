@@ -1,4 +1,3 @@
-//! # SSTable-Reader (Ring 1)
 //!
 //! Ermoeglicht wahlfreien und sequentiellen Lesezugriff auf unveraenderliche SSTables
 //! mit Block-Caching und Bloom-Filter-Abfragen.
@@ -220,7 +219,6 @@ pub(super) fn may_contain_key_in_block_bloom(
 }
 
 /// A reader for existing SSTables.
-// ANCHOR[acta-seg:SST-RDR-001]
 /// Liest SSTable-Dateien mit Block-Cache und Bloom-Filter-Unterstuetzung.
 pub struct SstableReader {
     pub(super) file: Arc<dyn VfsFile>,

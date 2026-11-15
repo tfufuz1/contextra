@@ -1,4 +1,3 @@
-//! # Unit-Tests fuer SSTables (Ring 1)
 //!
 //! Testet Serialisierung, Deserialisierung, Block-Caching und Filter-Korrektheit.
 

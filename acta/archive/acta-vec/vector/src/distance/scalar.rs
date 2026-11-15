@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Skalare Referenzimplementierung aller Distanzmetriken (bitgleich zum SIMD-Orakel).
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Exakt reproduzierbare Akkumulation.
+// Skalare Referenzimplementierung aller Distanzmetriken (bitgleich zum SIMD-Orakel).
+// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); Exakt reproduzierbare Akkumulation.
 // HOTSPOTS: ScalarKernel, ScalarDistance, cosine_distance, dot_product_distance, euclidean_distance
-// STAND: 2026-11-12
 
 //! # Scalar Distance Module
 //!
@@ -16,7 +14,6 @@ use crate::types::DistanceMetric;
 
 // SECTION Skalare Referenz-Implementierung (ScalarKernel)
 
-// ANCHOR[acta-vec:DIST-SCALAR-KERNEL]
 /// Vollständige skalare Referenz-Implementierung mit sicheren Iteratoren.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ScalarKernel;
@@ -345,7 +342,6 @@ impl DistanceKernel for ScalarKernel {
     }
 }
 
-// ANCHOR[acta-vec:DIST-SCALAR-DISTANCE]
 /// Schnittstellenadapter für [`DistanceFn`] über [`ScalarKernel`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScalarDistance {

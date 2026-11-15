@@ -1,6 +1,5 @@
 //! # Größenbeschränkter Min-Heap für Top-K-Selektion (`topk`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Bietet einen größenbeschränkten Min-Heap (`BoundedTopK`), um während der Rangfusion
 //! speichereffizient die K besten Elemente beizubehalten.

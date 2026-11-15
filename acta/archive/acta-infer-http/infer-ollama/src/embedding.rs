@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// STAND: 2026-08-30T18:54:39Z (SESSION: ed7b7b38)
-// ZWECK: `TextEmbeddingEngine`-Implementierung für Ollama Embedding API
-// INVARIANTEN: Validiert Embedding-Dimensionen beim ersten Aufruf und sperrt diese fest gegen spätere Abweichungen
+// `TextEmbeddingEngine`-Implementierung für Ollama Embedding API
+// Invarianten: Validiert Embedding-Dimensionen beim ersten Aufruf und sperrt diese fest gegen spätere Abweichungen
 // NICHT-OFFENSICHTLICH: Mismatch bei Embedding-Dimensionen liefert `OllamaError::Internal` um stille Index-Korruption zu verhindern
 // HOTSPOTS: embed, embed_batch
 

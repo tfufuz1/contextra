@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Additiver, rein lesender Prototyp für prädikatsbewusste Graph-Traversierung (ACORN-γ-Prinzip).
-// INVARIANTEN: Rein additiv & lesend, verändert den bestehenden Graph/Index NICHT.
+// Additiver, rein lesender Prototyp für prädikatsbewusste Graph-Traversierung (ACORN-γ-Prinzip).
+// Invarianten: Rein additiv & lesend, verändert den bestehenden Graph/Index NICHT.
 //              Bei gamma = 0 verhält sich die Suche identisch zu search_filtered_internal.
 //              Deterministische Sortierung (Score absteigend, DocId aufsteigend), Schranke MAX_SEARCH_K.
 

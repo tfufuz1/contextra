@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: ACORN Filtered Recall Vergleich gegen naiven Referenz-Scan.
-// INVARIANTEN: Recall@10 >= 0.95; Datensatz: 500 Vektoren, Dim: 32, Seed: deterministisch.
+// ACORN Filtered Recall Vergleich gegen naiven Referenz-Scan.
+// Invarianten: Recall@10 >= 0.95; Datensatz: 500 Vektoren, Dim: 32, Seed: deterministisch.
 // HOTSPOTS: 20-80
-// STAND: 2026-11-12
 use acta_base::DocId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_vec::acorn::{compute_gamma_edge_budget, FilteredIndex, NaiveReferenceIndex};
 

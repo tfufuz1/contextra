@@ -4,10 +4,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Akzeptanz- und Proptests für StructuredChunker.
-// INVARIANTEN: Zero-Panic in Produktion, Test-First, Lints eingehalten.
-// STAND: TS:2026-10-31T00:00:00Z
+// Akzeptanz- und Proptests für StructuredChunker.
+// Invarianten: Zero-Panic in Produktion, Test-First, Lints eingehalten.
 
 #![allow(
     clippy::unwrap_used,
@@ -23,7 +21,6 @@ use acta_ingest::format::FormatId;
 use acta_ingest::ir::{BlockKind, DocumentIr, Locator};
 use proptest::prelude::*;
 
-// ANCHOR[acta-ingest:TST-0327]
 // Testet die Funktionsfaehigkeit von `test_structured_5000_customers_bundling_and_coverage`.
 #[test]
 fn test_structured_5000_customers_bundling_and_coverage() {
@@ -73,7 +70,6 @@ fn test_structured_5000_customers_bundling_and_coverage() {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0328]
 // Testet die Funktionsfaehigkeit von `test_structured_large_record_windowing`.
 #[test]
 fn test_structured_large_record_windowing() {
@@ -112,7 +108,6 @@ fn test_structured_large_record_windowing() {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0329]
 // Testet die Funktionsfaehigkeit von `test_structured_jsonl_10000_lines`.
 #[test]
 fn test_structured_jsonl_10000_lines() {
@@ -146,7 +141,6 @@ fn test_structured_jsonl_10000_lines() {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0330]
 // Testet die Funktionsfaehigkeit von `test_structured_deep_paths_and_special_characters`.
 #[test]
 fn test_structured_deep_paths_and_special_characters() {
@@ -178,7 +172,6 @@ fn test_structured_deep_paths_and_special_characters() {
 }
 
 proptest! {
-// ANCHOR[acta-ingest:TST-0331]
 // Testet die Funktionsfaehigkeit von `prop_structured_chunker_determinism_and_monotone_spans`.
     #[test]
     fn prop_structured_chunker_determinism_and_monotone_spans(

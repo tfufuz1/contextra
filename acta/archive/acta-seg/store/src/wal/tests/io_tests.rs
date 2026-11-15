@@ -1,4 +1,3 @@
-//! # Tests fuer WAL-Dateisystem-I/O (Ring 1)
 //!
 //! Ueberprueft Persistenz, Dateigroessen und Verzeichnis-Syncs.
 

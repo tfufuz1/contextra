@@ -1,6 +1,5 @@
 //! # Information Retrieval Evaluierungsmetriken (`metrics`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Reines, deterministisches Berechnungsmodul zur Offline- und Online-Evaluation
 //! von Retrieval- und Ranking-Ergebnissen (Reciprocal Rank / MRR, Precision@k, Recall@k, nDCG@k).

@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: MBOX (RFC 4155) Extractor-Implementierung.
-// INVARIANTEN: Zero-Panic, isolierte Nachrichtenverarbeitung, max_archive_entries Limitierung.
-// STAND: TS:2026-10-31T00:00:00Z
+// MBOX (RFC 4155) Extractor-Implementierung.
+// Invarianten: Zero-Panic, isolierte Nachrichtenverarbeitung, max_archive_entries Limitierung.
 
 use crate::error::{IngestError, LimitKind};
 use crate::extractor::ExtractContext;

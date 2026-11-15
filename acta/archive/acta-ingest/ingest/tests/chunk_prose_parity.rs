@@ -4,10 +4,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Paritätstests zwischen ProseChunker und MarkdownChunker (Engine).
-// INVARIANTEN: Dieselbe Wortfolge (split_whitespace), passende Breadcrumbs/Heading-Levels.
-// STAND: TS:2026-10-31T00:00:00Z
+// Paritätstests zwischen ProseChunker und MarkdownChunker (Engine).
+// Invarianten: Dieselbe Wortfolge (split_whitespace), passende Breadcrumbs/Heading-Levels.
 
 #![allow(
     clippy::unwrap_used,
@@ -24,7 +22,6 @@ use acta_ingest::chunking::draft_document;
 use acta_ingest::format::FormatId;
 use acta_ingest::ir::{BlockKind, DocumentIr, Locator};
 
-// ANCHOR[acta-ingest:TST-0325]
 // Testet die Funktionsfaehigkeit von `test_prose_chunker_engine_parity_fixtures`.
 #[test]
 fn test_prose_chunker_engine_parity_fixtures() {

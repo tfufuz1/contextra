@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Fail-closed LayerScanner für WitnessLayer::HnswIndex (Vertrag V1, Welle 2/3).
-// INVARIANTEN: Scanner vertraut Tombstones nie — prüft tatsächliche Vektorbytes (f32/u8), Arena-Nachbarlisten, Freelisten & mmap.
+// Fail-closed LayerScanner für WitnessLayer::HnswIndex (Vertrag V1, Welle 2/3).
+// Invarianten: Scanner vertraut Tombstones nie — prüft tatsächliche Vektorbytes (f32/u8), Arena-Nachbarlisten, Freelisten & mmap.
 // NICHT-OFFENSICHTLICH: Positivkontrolle validiert, dass scan_index_content die Canary-Einheiten in der Session aufzeichnet.
 
 #![cfg(feature = "ports-compat")]

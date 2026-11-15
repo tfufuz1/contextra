@@ -4,8 +4,6 @@
 //! dass Transaktionen entweder explizit committet werden oder andernfalls ein sicheres Rollback auslösen.
 //!
 //! ## Ring & Rolle
-//! Gehört zu **Ring 1 (Persistenz)**. Bildet die Brücke zwischen laufenden Transaktionen der Anwendungslogik
-//! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`SnapshotSource`]).
 //!
 //! ## Hauptkomponenten
 //! - [`PinGuard`]: Schützt gepinnte MVCC-Sequenznummern vor versehentlichem Löschen durch den LSM-Compactor.
@@ -26,7 +24,6 @@ use acta_base::TxId;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-// ANCHOR[acta-history:GRD-001]
 /// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ).
 ///
 /// # Zweck
@@ -48,7 +45,6 @@ pub struct PinGuard<S: SnapshotSource> {
 }
 
 impl<S: SnapshotSource> PinGuard<S> {
-    // ANCHOR[acta-history:GRD-002]
     /// Pinnt eine Sequenznummer in der Storage-Engine unter Verwendung der Clock aus der Orphan-Registry.
     ///
     /// # Parameter
@@ -64,7 +60,6 @@ impl<S: SnapshotSource> PinGuard<S> {
         Self::pin_with_clock(storage, seq_no, orphan_registry, clock).await
     }
 
-    // ANCHOR[acta-history:GRD-003]
     /// Pinnt eine Sequenznummer mit explizit übergebenem Clock-Port.
     ///
     /// # Ablauf von `pin_with_clock`:
@@ -100,7 +95,6 @@ impl<S: SnapshotSource> PinGuard<S> {
         self.seq_no.take();
     }
 
-    // ANCHOR[acta-history:GRD-004]
     /// Entpinnt die Sequenznummer explizit und asynchron bei einem abgefangenen Fehler.
     ///
     /// # Ablauf von `unpin`:
@@ -119,7 +113,6 @@ impl<S: SnapshotSource> PinGuard<S> {
 }
 
 impl<S: SnapshotSource> Drop for PinGuard<S> {
-    // ANCHOR[acta-history:GRD-005]
     // Ablauf von `PinGuard::drop`:
     // Wenn `seq_no` noch gesetzt ist (Guard wurde nicht defused oder unpinned):
     // 1. Zeitstempel über Clock-Port lesen.
@@ -142,7 +135,6 @@ impl<S: SnapshotSource> Drop for PinGuard<S> {
     }
 }
 
-// ANCHOR[acta-history:GRD-006]
 /// RAII Guard, der explizit über [`commit`](Self::commit) oder [`rollback`](Self::rollback) finalisiert werden MUSS.
 ///
 /// # RAII-Kontrakt und Betriebshinweise
@@ -267,7 +259,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         &self.clock
     }
 
-    // ANCHOR[acta-history:GRD-007]
     /// Erstellt einen neuen CheckpointGuard für einen Agenten-Schritt mit SystemClock.
     pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {
         let clock = Arc::new(SystemClock::new());
@@ -319,7 +310,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
             .ok_or_else(|| CheckpointError::Internal("Checkpoint already consumed".into()))
     }
 
-    // ANCHOR[acta-history:GRD-008]
     /// Überführt den Guard in einen dauerhaften Zustand (Commit) und konsumiert ihn.
     ///
     /// # Ablauf von `commit`:
@@ -356,7 +346,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         Ok(cp)
     }
 
-    // ANCHOR[acta-history:GRD-009]
     /// Führt ein manuelles, asynchrones Rollback des Checkpoints.
     /// Nach Aufruf von `rollback()` ist der Guard konsumiert, sodass beim Drop kein erneutes Rollback ausgelöst wird.
     ///
@@ -405,7 +394,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
         }
     }
 
-    // ANCHOR[acta-history:GRD-010]
     /// Führt ein synchrones, blockierendes Rollback des Checkpoints.
     ///
     /// # Einschränkung
@@ -464,7 +452,6 @@ impl<S: SnapshotSource> CheckpointGuard<S> {
 }
 
 impl<S: SnapshotSource> Drop for CheckpointGuard<S> {
-    // ANCHOR[acta-history:GRD-011]
     // Ablauf von `CheckpointGuard::drop`:
     // Wenn `checkpoint` noch vorhanden ist (kein explizites commit() oder rollback()):
     // 1. Rollback-Dauermetrik protokollieren.

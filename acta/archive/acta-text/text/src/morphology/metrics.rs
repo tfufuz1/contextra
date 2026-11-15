@@ -1,6 +1,5 @@
 //! Metriken zur Quantifizierung morphologischer Zerlegungseffekte.
 
-// ANCHOR[acta-text:MORPH-001]
 /// Metriken zur Erfassung der Token-Expansions- und Zerlegungswirkung.
 #[derive(Debug, Clone, Copy)]
 pub struct TokenReductionMetrics {
@@ -11,7 +10,6 @@ pub struct TokenReductionMetrics {
 }
 
 impl TokenReductionMetrics {
-    // ANCHOR[acta-text:MORPH-002]
     /// Berechnet das Expansionsverhältnis der Token-Menge.
     ///
     /// Ein Wert > 1,0 bedeutet eine Erhöhung der Tokenanzahl durch Komposita-Splitting.

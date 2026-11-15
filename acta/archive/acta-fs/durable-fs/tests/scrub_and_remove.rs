@@ -35,7 +35,6 @@ impl Drop for TestDir {
     }
 }
 
-// ANCHOR[acta-fs:TEST-SCRUB-HARDLINK-OVERWRITE]
 /// Prüft das Überschreiben und Entfernen von Dateien bei einfachen Hardlinks.
 #[test]
 fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
@@ -64,7 +63,6 @@ fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
     Ok(())
 }
 
-// ANCHOR[acta-fs:TEST-SCRUB-LARGE-UNALIGNED]
 /// Prüft das Scrubbing großer, nicht block-ausgerichteter Dateien.
 #[test]
 fn test_scrub_and_remove_large_unaligned_file() -> std::io::Result<()> {
@@ -83,7 +81,6 @@ fn test_scrub_and_remove_large_unaligned_file() -> std::io::Result<()> {
 }
 
 #[cfg(unix)]
-// ANCHOR[acta-fs:TEST-SCRUB-SYMLINK-REJECTED]
 /// Prüft, dass Symlinks beim Scrubbing sicher abgewiesen werden.
 #[test]
 fn test_scrub_and_remove_symlink_rejected() -> std::io::Result<()> {
@@ -108,7 +105,6 @@ fn test_scrub_and_remove_symlink_rejected() -> std::io::Result<()> {
     Ok(())
 }
 
-// ANCHOR[acta-fs:TEST-SCRUB-NOT-FOUND]
 /// Prüft die Fehlerbehandlung bei nicht existierenden Pfaden.
 #[test]
 fn test_scrub_and_remove_not_found() -> std::io::Result<()> {
@@ -124,7 +120,6 @@ fn test_scrub_and_remove_not_found() -> std::io::Result<()> {
     Ok(())
 }
 
-// ANCHOR[acta-fs:TEST-SCRUB-EMPTY-FILE]
 /// Prüft das Bereinigen und Entfernen leerer Dateien (0 Bytes).
 #[test]
 fn test_scrub_and_remove_empty_file() -> std::io::Result<()> {

@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: XML-Streaming-Parser für ODP-Präsentationen (draw:page, Titel, Notizen, versteckte Folien).
-// INVARIANTEN: Zero-Panic, Slide-Boundary Invarianten, Policy-Beachtung für versteckte Folien.
-// STAND: TS:2026-10-31T00:00:00Z
+// XML-Streaming-Parser für ODP-Präsentationen (draw:page, Titel, Notizen, versteckte Folien).
+// Invarianten: Zero-Panic, Slide-Boundary Invarianten, Policy-Beachtung für versteckte Folien.
 
 use crate::error::IngestError;
 use crate::extractor::ExtractContext;

@@ -10,7 +10,6 @@
 
 use std::fmt;
 
-// ANCHOR[acta-testkit:CONF-FAILURE-STRUCT-001]
 /// Repräsentiert einen aufgetretenen Fehler während einer Konformitätsprüfung.
 ///
 /// **Zweck:** Enthält den Suitenamen, den konkreten Testfall und eine menschenlesbare
@@ -27,7 +26,6 @@ pub struct ConformanceFailure {
 }
 
 impl ConformanceFailure {
-    // ANCHOR[acta-testkit:CONF-FAILURE-NEW-001]
     /// Erstellt eine neue [`ConformanceFailure`]-Instanz.
     pub fn new(
         suite_name: &'static str,
@@ -42,7 +40,6 @@ impl ConformanceFailure {
     }
 }
 
-// ANCHOR[acta-testkit:CONF-FAILURE-DISPLAY-001]
 impl fmt::Display for ConformanceFailure {
     /// Formatiert den Konformitätsfehler übersichtlich mit Suite und Testfall.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,6 +53,5 @@ impl fmt::Display for ConformanceFailure {
 
 impl std::error::Error for ConformanceFailure {}
 
-// ANCHOR[acta-testkit:CONF-RESULT-TYPE-001]
 /// Spezialisierter Result-Typ für Konformitätsläufe: `Ok(())` oder `Err(ConformanceFailure)`.
 pub type ConformanceResult = Result<(), ConformanceFailure>;

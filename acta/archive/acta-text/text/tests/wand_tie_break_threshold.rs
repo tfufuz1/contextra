@@ -2,10 +2,8 @@
 //! Testsuite `wand_tie_break_threshold.rs` für acta-text.
 //!
 //! # Ring-Zuordnung
-//! Ring LAB / Testbereich.
 
-// FILE-CONTEXT: WAND Tie-Break & Threshold Boundary Test (tests/wand_tie_break_threshold.rs).
-// ZWECK: Verifiziert, dass WAND bei Score-Gleichstand an der k-ten Abbruchschwelle deterministisch nach aufsteigender DocId sortiert, exakt mit dem Brute-Force-Referenzergebnis uebereinstimmt und keine Dokumente durch accum_max_score > threshold faelschlich verwirft.
+// Verifiziert, dass WAND bei Score-Gleichstand an der k-ten Abbruchschwelle deterministisch nach aufsteigender DocId sortiert, exakt mit dem Brute-Force-Referenzergebnis uebereinstimmt und keine Dokumente durch accum_max_score > threshold faelschlich verwirft.
 
 use acta_base::{BoxFuture, StorageEngine, TextIndex}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_text::inverted::InvertedIndex;
@@ -132,7 +130,6 @@ impl StorageEngine for MockStorage {
     }
 }
 
-// ANCHOR[acta-text:TEST-193]
 // Testfall `test_wand_tie_break_at_threshold_boundary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
@@ -210,7 +207,6 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[acta-text:TEST-194]
 // Testfall `test_wand_tie_break_heterogeneous_scores_threshold_boundary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_tie_break_heterogeneous_scores_threshold_boundary() -> Result<()> {

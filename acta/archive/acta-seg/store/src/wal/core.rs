@@ -41,7 +41,6 @@ pub static FAIL_APPEND_AFTER_PARTIAL_BYTES: std::sync::atomic::AtomicU64 =
 pub static FAIL_APPEND_PARTIAL_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-// ANCHOR[acta-seg:WAL-CORE-002]
 /// Hauptstruktur fuer das Write-Ahead-Log mit Append- und Replay-Operationen.
 pub struct Wal {
     pub(crate) path: PathBuf,

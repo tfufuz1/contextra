@@ -1,14 +1,11 @@
 //! Seitenbasiertes Chunking fuer PDF- und Praesentationsdokumente.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: PagedChunker für seitenbasierte Dokumente (PDF, PPTX, ODP, PPT).
-// INVARIANTEN: Zero-Panic, deterministisch, präzise Zitierbarkeit (page/slide locators), Spans monoton.
-// STAND: TS:2026-10-31T00:00:00Z
+// PagedChunker für seitenbasierte Dokumente (PDF, PPTX, ODP, PPT).
+// Invarianten: Zero-Panic, deterministisch, präzise Zitierbarkeit (page/slide locators), Spans monoton.
 
 pub mod page;
 
@@ -21,7 +18,6 @@ use crate::ir::DocumentIr;
 
 /// Chunker für seitenbasierte Formate (PDF, Präsentationen).
 #[derive(Debug, Default)]
-// ANCHOR[acta-ingest:CHK-0218]
 // struct `PagedChunker` fuer Seitenbasiertes Chunking fuer PDF- und Praesentationsdokumente.
 pub struct PagedChunker;
 
@@ -41,7 +37,6 @@ impl IrChunker for PagedChunker {
 }
 
 /// Hauptfunktion für das Paged-Chunking.
-// ANCHOR[acta-ingest:CHK-0219]
 // fn `draft_paged` fuer Seitenbasiertes Chunking fuer PDF- und Praesentationsdokumente.
 pub fn draft_paged(
     ir: &DocumentIr,

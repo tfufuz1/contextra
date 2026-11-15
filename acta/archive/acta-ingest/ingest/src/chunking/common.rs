@@ -1,14 +1,11 @@
 //! Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: Hilfsfunktionen für Token-Zählung, Window-Splitting und Finalisierung von ContextChunk (WP M3).
-// INVARIANTEN: Zero-Panic, UTF-8-sicher, Reagiert auf ResourceBudget/Limits.
-// STAND: TS:2026-10-31T00:00:00Z
+// Hilfsfunktionen für Token-Zählung, Window-Splitting und Finalisierung von ContextChunk (WP M3).
+// Invarianten: Zero-Panic, UTF-8-sicher, Reagiert auf ResourceBudget/Limits.
 
 use crate::canonical::CanonicalText;
 use crate::chunking::config::ChunkingConfig;
@@ -21,7 +18,6 @@ use crate::limits::IngestLimits;
 use std::ops::Range;
 
 /// Schätzt die Token-Anzahl eines Textes mit heuristischen Regeln (autark ohne Engine-Kopplung).
-// ANCHOR[acta-ingest:CHK-0201]
 // fn `token_count` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn token_count(text: &str) -> usize {
     estimate_tokens(text)
@@ -95,7 +91,6 @@ pub fn estimate_tokens(text: &str) -> usize {
 }
 
 /// UTF-8-sicheres Window-Splitting mit Overlap (Span-Mapping).
-// ANCHOR[acta-ingest:CHK-0202]
 // fn `window_split` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn window_split(text: &str, window_chars: usize, overlap_chars: usize) -> Vec<Range<usize>> {
     if text.is_empty() || window_chars == 0 {
@@ -160,7 +155,6 @@ pub fn chunk_text_with_overlap(text: &str, window_chars: usize, overlap_chars: u
 
 /// Wandelt ChunkDrafts in fertige `ContextChunk`-Instanzen um. Verwirft leere Drafts
 /// und erzwingt das Limit `max_chunks_per_document`.
-// ANCHOR[acta-ingest:CHK-0203]
 // fn `finalize` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn finalize(
     drafts: Vec<ChunkDraft>,

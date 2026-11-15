@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Zwischenrepräsentation (DocumentIr) für extrahierte Dokumente (WP M2).
-// INVARIANTEN: Flache Blockliste, Anhang-Einbettung, keine std::collections::{HashMap,HashSet} (BTreeMap/Vec).
-// STAND: TS:2026-10-31T00:00:00Z
+// Zwischenrepräsentation (DocumentIr) für extrahierte Dokumente (WP M2).
+// Invarianten: Flache Blockliste, Anhang-Einbettung, keine std::collections::{HashMap,HashSet} (BTreeMap/Vec).
 
 use crate::format::FormatId;
 use serde::{Deserialize, Serialize};

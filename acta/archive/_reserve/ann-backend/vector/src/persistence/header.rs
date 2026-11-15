@@ -1,15 +1,12 @@
-// FILE-CONTEXT
-// ZWECK: Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - Header-Format.
-// INVARIANTEN: Zero-Panic bei Deserialisierung; HNSW_MAGIC = 0x484E5357; HNSW_VERSION = 2.
+// Persistenz-Schicht für HNSW-Dateiserialisierung (`.hnsw`) - Header-Format.
+// Invarianten: Zero-Panic bei Deserialisierung; HNSW_MAGIC = 0x484E5357; HNSW_VERSION = 2.
 // HOTSPOTS: HnswHeader::try_from_bytes, HnswHeader::to_bytes, HnswHeader::checksum
-// STAND: TS:2026-11-12T00:00:00Z
 
 use crate::error::{Result, VectorError};
 use crate::hnsw::Sq8Bias;
 
 // SECTION Konstanten
 
-// ANCHOR[acta-vec:PERSIST-MAGIC]
 /// Magic number for HNSW files (0x484E5357 = "HNSW").
 pub const HNSW_MAGIC: u32 = 0x484E5357;
 /// Current file format version.
@@ -18,7 +15,6 @@ pub const HNSW_VERSION: u16 = 2;
 
 // SECTION HnswHeader Struktur & Deserialisierung
 
-// ANCHOR[acta-vec:PERSIST-HEADER-STRUCT]
 /// The header of an HNSW persistent file.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HnswHeader {
@@ -237,7 +233,6 @@ impl HnswHeader {
         (self.q_min, self.q_max)
     }
 
-    // ANCHOR[acta-vec:PERSIST-TRY-FROM-BYTES]
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 64 {
             return Err(VectorError::Storage("Header too small".into()));
@@ -420,7 +415,6 @@ impl HnswHeader {
     }
 
     /// Computes the cryptographic BLAKE3 checksum of the serialized header.
-    // ANCHOR[acta-vec:PERSIST-CHECKSUM]
     pub fn checksum(&self) -> [u8; 32] {
         *blake3::hash(&self.to_bytes()).as_bytes()
     }
@@ -438,7 +432,6 @@ impl HnswHeader {
         Ok(())
     }
 
-    // ANCHOR[acta-vec:PERSIST-TO-BYTES]
     pub fn to_bytes(&self) -> [u8; Self::SIZE] {
         let mut buf = [0u8; Self::SIZE];
         buf[0..4].copy_from_slice(&self.magic.to_le_bytes());

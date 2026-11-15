@@ -1,6 +1,5 @@
 use acta_vec::types::DistanceMetric;
-// FILE-CONTEXT
-// ZWECK: Golden Values Testtabelle und Differentialtests für DistanceKernel / ScalarKernel.
+// Golden Values Testtabelle und Differentialtests für DistanceKernel / ScalarKernel.
 
 use acta_vec::distance::{
     compute_distance, compute_distance_f32_bytes_trusted, compute_distance_trusted,

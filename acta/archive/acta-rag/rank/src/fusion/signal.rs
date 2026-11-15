@@ -1,6 +1,5 @@
 //! # Signaldefinitionen & Metadaten-Handling (`signal`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Behandelt Klassifikationen von Suchsignalen (`SignalKind`), Kontextinformationen
 //! über Modellreife und Drift sowie Prioritätsregeln für Metadaten-Merges.

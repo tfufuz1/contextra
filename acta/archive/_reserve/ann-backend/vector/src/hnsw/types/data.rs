@@ -1,29 +1,23 @@
-// FILE-CONTEXT
-// ZWECK: Konstanten und Datenstrukturen fuer Vektordaten, Knoten und Suchkandidaten in HNSW.
-// INVARIANTEN: Candidate implementiert Ord basierend auf total_cmp fuer deterministische Sortierung.
+// Konstanten und Datenstrukturen fuer Vektordaten, Knoten und Suchkandidaten in HNSW.
+// Invarianten: Candidate implementiert Ord basierend auf total_cmp fuer deterministische Sortierung.
 // HOTSPOTS: Candidate::cmp, VectorData
-// STAND: TS:2026-11-12T00:00:00Z
 
 use crate::types::DocId;
 
 // SECTION HNSW-Konstanten
 
-// ANCHOR[acta-vec:HNSW-SENTINEL-ENTRY]
 /// Sentinel-Wert fuer ungueltigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
 
-// ANCHOR[acta-vec:HNSW-REBUILD-RATIO]
 /// Standard-Loeschanteil (0.10 = 10 % geloeschte Knoten), ab dem ein Rebuild getriggert wird.
 pub const HNSW_REBUILD_DELETION_RATIO: f64 = 0.10;
 
-// ANCHOR[acta-vec:HNSW-DEFAULT-SEED]
 /// Default-Seed fuer die deterministische HNSW-Ebenenzuweisung (wie in hnswlib ueblich).
 pub const DEFAULT_LAYER_SEED: u64 = 100;
 // !SECTION
 
 // SECTION Vektordaten & Graphknoten
 
-// ANCHOR[acta-vec:HNSW-VECTOR-DATA]
 #[derive(Debug, Clone)]
 pub enum VectorData {
     /// Standard 32-bit floating point vectors.
@@ -32,7 +26,6 @@ pub enum VectorData {
     U8(Vec<u8>),
 }
 
-// ANCHOR[acta-vec:HNSW-NODE]
 /// A node in the HNSW graph.
 #[derive(Debug)]
 pub struct HnswNode {
@@ -42,7 +35,6 @@ pub struct HnswNode {
     pub(crate) committed_tx: u64,
 }
 
-// ANCHOR[acta-vec:HNSW-CANDIDATE]
 /// Search candidate.
 #[derive(Clone, Copy, Debug)]
 pub struct Candidate {

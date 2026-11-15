@@ -1,4 +1,3 @@
-//! # WAL-Frame-Kodierung (Ring 1)
 //!
 //! Kodiert und dekodiert WAL-Einträge mit Längenfeldern, Sequenznummern, Prüfsummen (CRC32C)
 //! und kryptografischer HMAC-Verkettung.

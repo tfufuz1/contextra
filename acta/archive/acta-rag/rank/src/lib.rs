@@ -1,6 +1,5 @@
 //! # Acta Rank (`acta-rag`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung / Kernlogik)
 //! **Klasse:** Rand `[R]`
 //! **Reifegrad:** Experimentell / Aktiv (Kern v1)
 //!
@@ -22,7 +21,6 @@
 //!   und Kanalbudgets.
 //!
 //! ## Einbindung und Abhängigkeiten
-//! - **Konsumiert (Ring 0):** `acta-base` (Domain-Typen), `acta-base` (Hardware-Abstraktionen).
 //! - **Wird eingebunden von:** `acta`, `acta-engine`, `acta-engine`,
 //!   `acta-infer`, `acta-infer-http`, `acta-infer`,
 //!   `acta-api`, `acta-py`.

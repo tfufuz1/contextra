@@ -19,5 +19,4 @@ fuzz_target!(|data: &[u8]| {
     acta_ingest::fuzz_support::run(fmt, payload);
 });
 
-// ANCHOR[acta-ingest:FUZZ-0453]
 // Fuzzing-Target-Definition fuer fuzz_email.rs.

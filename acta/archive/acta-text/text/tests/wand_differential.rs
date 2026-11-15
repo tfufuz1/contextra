@@ -1,7 +1,6 @@
 #![cfg(feature = "types-compat")]
-// FILE-CONTEXT: WAND Differential Test Suite against Exhaustive BM25 Reference.
-// ZWECK: Verifiziert Block-Max WAND Optimierung gegen naive, vollstaendige BM25-Berechnung ueber alle Dokumente.
-// INVARIANTEN: Zero-Panic Doctrine, deterministische Seeds (Regel 3: keine Systemzeit/Systemzufall), identische Rangfolge.
+// Verifiziert Block-Max WAND Optimierung gegen naive, vollstaendige BM25-Berechnung ueber alle Dokumente.
+// Invarianten: Zero-Panic Doctrine, deterministische Seeds (Regel 3: keine Systemzeit/Systemzufall), identische Rangfolge.
 
 use acta_base::{BoxFuture, StorageEngine, TextIndex}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_text::bm25::score_term;

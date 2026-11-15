@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Konfiguration und Builder für den HNSW-Index (Hyperparameter, Resource Limits).
-// INVARIANTEN: ef_construction >= m, M-Werte begrenzt (4..256), Rebuild-Threshold im Intervall (0.0..1.0).
+// Konfiguration und Builder für den HNSW-Index (Hyperparameter, Resource Limits).
+// Invarianten: ef_construction >= m, M-Werte begrenzt (4..256), Rebuild-Threshold im Intervall (0.0..1.0).
 // HOTSPOTS: HnswConfig::validate, HnswConfigBuilder::build
-// STAND: 2026-11-12
 
 use crate::error::{Result, VectorError};
 use crate::types::DistanceMetric;
@@ -11,7 +9,6 @@ use super::types::HNSW_REBUILD_DELETION_RATIO;
 
 // SECTION HnswConfig
 
-// ANCHOR[acta-vec:HNSW-CONFIG-STRUCT]
 /// Konfiguration für den HNSW-Graph-Index.
 #[derive(Debug, Clone)]
 pub struct HnswConfig {
@@ -78,7 +75,6 @@ pub(super) fn validate_vector(vec: &[f32]) -> Result<()> {
 
 impl HnswConfig {
     /// Validates that the configuration parameters are within acceptable bounds.
-    // ANCHOR[acta-vec:HNSW-CONFIG-VALIDATE]
     pub fn validate(&self) -> Result<()> {
         if self.dimension == 0 {
             return Err(VectorError::invalid_input(
@@ -118,7 +114,6 @@ impl HnswConfig {
 
 // SECTION HnswConfigBuilder
 
-// ANCHOR[acta-vec:HNSW-CONFIG-BUILDER]
 /// Builder for HnswConfig with resource limit enforcements to prevent OOM.
 #[derive(Debug, Clone)]
 pub struct HnswConfigBuilder {
@@ -219,7 +214,6 @@ impl HnswConfigBuilder {
     }
 
     /// Build the configuration after validating bounds.
-    // ANCHOR[acta-vec:HNSW-CONFIG-BUILD]
     pub fn build(self) -> Result<HnswConfig> {
         self.config.validate()?;
         Ok(self.config)

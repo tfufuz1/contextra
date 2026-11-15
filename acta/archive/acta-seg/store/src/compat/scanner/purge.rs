@@ -1,10 +1,8 @@
-//! # Purge-Implementierung (Ring 1)
 //!
 //! Bereinigt endgueltig physische Spuren geloeschter Daten auf Platten- und Speicher-Ebene.
 
-// FILE-CONTEXT
-// ZWECK: Physischer Purger für LSM Storage (§12.7.4, Verträge W1-P01).
-// INVARIANTEN: Nullt und unlinkt verwaiste SSTable- und WAL-Segmente; atomarer Memtable-Flush.
+// Physischer Purger für LSM Storage (§12.7.4, Verträge W1-P01).
+// Invarianten: Nullt und unlinkt verwaiste SSTable- und WAL-Segmente; atomarer Memtable-Flush.
 // HOTSPOTS: [1-100]
 
 #![forbid(unsafe_code)]

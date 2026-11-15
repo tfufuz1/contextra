@@ -5,10 +5,8 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_hash_collision`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Tests verifying collision prevention via length-prefixed hashing for DeletionProof.
-// INVARIANTEN: Key sets ["ab", "c"] and ["a", "bc"] MUST produce distinct deleted_keys_hash values.
-// STAND: TS:2026-09-27T00:00:00Z
+// Tests verifying collision prevention via length-prefixed hashing for DeletionProof.
+// Invarianten: Key sets ["ab", "c"] and ["a", "bc"] MUST produce distinct deleted_keys_hash values.
 
 use acta_erasure::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,

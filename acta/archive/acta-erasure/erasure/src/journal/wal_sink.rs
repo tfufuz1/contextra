@@ -4,7 +4,6 @@
 //! Sämtliche I/O- und Storage-Adapter liegen außerhalb dieses Bausteins.
 //!
 //! // SECTION WalSink
-//! // ANCHOR[acta-erasure:WAL-SINK-001]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

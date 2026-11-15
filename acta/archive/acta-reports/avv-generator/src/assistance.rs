@@ -13,12 +13,10 @@
 //!   etwaige vorherige Konsultationen der Aufsichtsbehörde.
 //!
 //! # Ring-Zugehörigkeit
-//! Teil von Ring 4 (Erweiterung).
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
-// ANCHOR[acta-reports:ASST-001]
 /// Rendert Abschnitt 10: „Unterstützung bei Einhaltung der Pflichten gemäß Art. 32–36 DSGVO“.
 ///
 /// Schreibt die detaillierten Unterstützungspflichten für Datensicherheit, Breach-Notification

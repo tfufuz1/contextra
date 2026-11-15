@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Hilfsfunktionen für die Pfadformatierung in strukturierten Dokumenten (Json, Xml, Yaml, Toml).
-// INVARIANTEN: FILE-CONTEXT Kopf, Zero-Panic, deterministische Pfadsyntax.
-// STAND: TS:2026-10-31T00:00:00Z
+// Hilfsfunktionen für die Pfadformatierung in strukturierten Dokumenten (Json, Xml, Yaml, Toml).
+// Invarianten: Zero-Panic, deterministische Pfadsyntax.
 
 /// Prüft, ob ein Objektschlüssel in `["..."]` gefasst werden muss.
 /// Ein Schlüssel benötigt `["..."]`, wenn er leer ist, mit einer Ziffer beginnt,

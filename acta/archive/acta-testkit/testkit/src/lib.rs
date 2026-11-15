@@ -28,46 +28,35 @@
 //!   `acta-engine`, `acta-crypto`, `acta-engine`, `acta-engine`,
 //!   `acta-engine`, `acta-history`, `acta-pii`, `acta-seg`.
 
-// FILE-CONTEXT
-// STAND: 2026-10-29
-// ZWECK: Deterministic test utilities, ManualClock, InMemoryStorageEngine, InMemoryVectorIndex, InMemoryTextIndex, InMemoryGraphIndex, FaultVfs, ReferenceModel, Mocks, and Conformance suites.
-// INVARIANTEN: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
+// Deterministic test utilities, ManualClock, InMemoryStorageEngine, InMemoryVectorIndex, InMemoryTextIndex, InMemoryGraphIndex, FaultVfs, ReferenceModel, Mocks, and Conformance suites.
+// Invarianten: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
 
 #![forbid(unsafe_code)]
 
-// ANCHOR[acta-testkit:MOD-CONFORMANCE-001]
 /// Modul mit standardisierten Konformitätsprüfsuiten für Acta-Port-Traits.
 pub mod conformance;
 
-// ANCHOR[acta-testkit:MOD-FAULT-VFS-001]
 /// Virtuelles Dateisystem mit deterministischer Fehlerinjektion (I/O- und fsync-Failures).
 pub mod fault_vfs;
 
-// ANCHOR[acta-testkit:MOD-IN-MEM-GRAPH-001]
 /// Deterministische In-Memory-Referenzimplementierung des `GraphIndex`-Ports.
 pub mod in_memory_graph;
 
-// ANCHOR[acta-testkit:MOD-IN-MEM-]
 /// Transaktionale In-Memory-Referenzimplementierung des `StorageEngine`-Ports.
 pub mod in_memory_store;
 
-// ANCHOR[acta-testkit:MOD-IN-MEM-TEXT-001]
 /// Deterministische In-Memory-Referenzimplementierung des `TextIndex`-Ports.
 pub mod in_memory_text;
 
-// ANCHOR[acta-testkit:MOD-IN-MEM-VECTOR-001]
 /// Deterministische In-Memory-Referenzimplementierung des `VectorIndex`-Ports.
 pub mod in_memory_vector;
 
-// ANCHOR[acta-testkit:MOD-MANUAL-CLOCK-001]
 /// Manuell steuerbare Uhr zur reproduzierbaren Zeitmessung im `Clock`-Port.
 pub mod manual_clock;
 
-// ANCHOR[acta-testkit:MOD-MOCKS-001]
 /// Mocks für externe Provider wie Embedding-Generatoren und Metrik-Sinks.
 pub mod mocks;
 
-// ANCHOR[acta-testkit:MOD-REF-MODEL-001]
 /// Formales Referenzmodell zur Prüfung von MVCC- und Transaktionsisolationsgarantien.
 pub mod reference_model;
 
@@ -105,7 +94,6 @@ pub use manual_clock::ManualClock;
 pub use mocks::*;
 pub use reference_model::{RefOp, ReferenceModel};
 
-// ANCHOR[acta-testkit:MINT-WITNESS-001]
 /// Hilfsfunktion zum Erzeugen eines synthetischen [`acta_base::scanner::LayerWitness`].
 ///
 /// **Zweck:** Ermöglicht Testsuiten das Instanziieren von Bereinigungs- und Scan-Zeugen

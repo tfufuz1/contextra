@@ -1,5 +1,4 @@
 // TODO(acta-altlast): Legacy-Schluesselpfad (allow_legacy_integrity_key_fallback, legacy_integrity_key, Rekey/Migration) ersatzlos streichen; Journal-Schluessel nur als Parameter (5.1, Z10).
-//! # Tests fuer WAL Replay (Ring 1)
 //!
 //! Prueft deterministisches Replay ueber Sequenzgrenzen hinweg.
 

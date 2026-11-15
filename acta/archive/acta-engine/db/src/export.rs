@@ -2,13 +2,10 @@
 //!
 //! **Zweck:** Export-Funktionalität für Mandantendaten und Collections in standardisierte Formate.
 //!
-//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
-// FILE-CONTEXT
-// ZWECK: Export-Funktionalität für Memory-Export-Format v1 (Schema Version "1.0").
-// INVARIANTEN: Schema-Integrität; Vollständigkeit aller Memories & Relationen; Nur lesender Zugriff.
-// STAND: TS:2026-09-12
+// Export-Funktionalität für Memory-Export-Format v1 (Schema Version "1.0").
+// Invarianten: Schema-Integrität; Vollständigkeit aller Memories & Relationen; Nur lesender Zugriff.
 
 use crate::collection::{extract_effective_importance, extract_text, Collection, StoredDocument};
 use crate::filter::extract_memory_type;

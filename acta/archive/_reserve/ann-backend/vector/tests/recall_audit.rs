@@ -1,6 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Audit-Testsuite für HNSW & DiskANN Graph-Korrektheit & Brute-Force Recall
-// STAND: TS:2026-08-31T00:00:00Z
+// Audit-Testsuite für HNSW & DiskANN Graph-Korrektheit & Brute-Force Recall
 
 #![cfg(feature = "experimental-diskann")]
 

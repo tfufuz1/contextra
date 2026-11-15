@@ -4,8 +4,7 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Property-basierte Tests für PagedChunker.
+// Property-basierte Tests für PagedChunker.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -13,8 +12,7 @@
     clippy::panic,
     clippy::cast_possible_truncation
 )]
-// INVARIANTEN: Zero-Panic, Abdeckung aller Seiten, page <= page_end, monotone Spans, Determinismus.
-// STAND: TS:2026-10-31T00:00:00Z
+// Invarianten: Zero-Panic, Abdeckung aller Seiten, page <= page_end, monotone Spans, Determinismus.
 
 use acta_ingest::chunking::config::ChunkingConfig;
 use acta_ingest::chunking::paged::PagedChunker;
@@ -36,7 +34,6 @@ fn slide_locator(s: u32) -> Locator {
 }
 
 proptest! {
-// ANCHOR[acta-ingest:TST-0316]
 // Testet die Funktionsfaehigkeit von `prop_pdf_page_invariants`.
     #[test]
     fn prop_pdf_page_invariants(
@@ -122,7 +119,6 @@ proptest! {
         }
     }
 
-// ANCHOR[acta-ingest:TST-0317]
 // Testet die Funktionsfaehigkeit von `prop_presentation_slide_invariants`.
     #[test]
     fn prop_presentation_slide_invariants(

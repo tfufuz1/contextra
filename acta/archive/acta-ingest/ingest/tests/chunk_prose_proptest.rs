@@ -4,10 +4,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Property-Tests (proptest) für den ProseChunker.
-// INVARIANTEN: kein Inhaltsverlust, UTF-8-Grenzen, token_count <= hard_limit, exakter Span oder Synthese, Monotonie, Determinismus.
-// STAND: TS:2026-10-31T00:00:00Z
+// Property-Tests (proptest) für den ProseChunker.
+// Invarianten: kein Inhaltsverlust, UTF-8-Grenzen, token_count <= hard_limit, exakter Span oder Synthese, Monotonie, Determinismus.
 
 #![allow(
     clippy::unwrap_used,
@@ -26,7 +24,6 @@ use proptest::prelude::*;
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
-// ANCHOR[acta-ingest:TST-0326]
 // Testet die Funktionsfaehigkeit von `test_prose_chunker_properties`.
     #[test]
     fn test_prose_chunker_properties(

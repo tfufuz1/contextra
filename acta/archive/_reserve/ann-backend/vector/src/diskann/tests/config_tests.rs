@@ -1,6 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Modularisierte Testsuiten für DiskANN.
-// STAND: 2026-11-11
+// Modularisierte Testsuiten für DiskANN.
 
 use super::super::config::{DiskAnnConfig, DiskAnnFallbackPolicy};
 use super::super::format::{

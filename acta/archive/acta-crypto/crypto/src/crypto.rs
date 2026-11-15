@@ -9,12 +9,10 @@
 //! - Bei Speicherfreigabe (`Drop`) werden alle Schlüsselmaterialien genullt (`Zeroize`).
 //! - Strikte Panic-Freiheit in allen Produktionspfaden.
 
-// FILE-CONTEXT
-// ZWECK: Key Management and AES-256-GCM-SIV authenticated encryption for Acta data structures.
-// INVARIANTEN: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
+// Key Management and AES-256-GCM-SIV authenticated encryption for Acta data structures.
+// Invarianten: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
 // NICHT-OFFENSICHTLICH: AES-256-GCM-SIV provides nonce-misuse resistance (RFC 8452). Keys zeroized on drop. Lock-free & I/O-free.
 // HOTSPOTS: [50-150]
-// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 //! Encryption utilities for Acta.
 //!
@@ -31,7 +29,6 @@
 //! that even if two instances share a nonce counter value, they operate on
 //! cryptographically independent keys, making (key, nonce) collisions impossible.
 //!
-// AI-NOTE[BOUNDARY-MISSING][RESOLVED] AGT-CRYPTO-001: The former `encrypt(&self, data, nonce_val: u64)`
 // method has been removed (2026-08-24). It had zero callers (verified workspace-wide via
 // `grep -rn ".encrypt("`) and posed a latent nonce-reuse risk: callers could supply an
 // arbitrary u64 without any uniqueness guarantee. The ONLY safe encryption path is
@@ -57,7 +54,6 @@ use std::sync::OnceLock;
 use zeroize::Zeroizing;
 
 /// Manager for encryption keys and block encryption.
-// ANCHOR[acta-crypto:CRY-002]
 /// Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung.
 ///
 /// Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandantenspezifische
@@ -854,26 +850,18 @@ mod tests {
         );
     }
 
-    // ANCHOR[TEST:CRY-001] STATUS:DONE (TS:2026-08-31T21:13:05Z) (SESSION:8427f167) — Nonce-Uniqueness verification bei paralleler Verschlüsselung
-    // REVIEW-PASS[1/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:00:00Z) (SESSION: b8e4f1a2)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Parallel encryption nonce uniqueness verified across concurrent threads.
-    // REVIEW-PASS[2/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-30T19:05:00Z) (SESSION: c9f5e2b3)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Independent review pass verified no duplicate nonces generated.
-    // REVIEW-PASS[3/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-08-31T21:13:05Z) (SESSION: 8427f167)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Security review pass re-verified 100k parallel nonces without duplication.
-    // REVIEW-PASS[4/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-01T23:15:00Z) (SESSION: 88a840fb)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Re-verified 100k parallel nonces uniqueness in full crate audit.
-    // REVIEW-PASS[5/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-02T08:16:22Z) (SESSION: 881ec05e)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Re-verified zero-panic, zero-unsafe, and 85/85 tests green in acta-crypto audit session.
-    // REVIEW-PASS[6/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-06T11:17:31Z) (SESSION: 8157a40e)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Re-verified zero-panic, zero-unsafe, and full Tier-1 audit pass in acta-crypto depth-audit session.
-    // REVIEW-PASS[7/3] STATUS:PASS (ID: TEST:CRY-001) (TS: 2026-09-10T19:35:00Z) (SESSION: b434cc40)
     // PRÜFER-KONTEXT: FRESH
     // BEFUND: Verified AES-256-GCM-SIV nonce uniqueness, HKDF domain separation, and zero-unsafe invariants in acta-security audit session.
     #[test]
@@ -976,7 +964,6 @@ mod tests {
         Ok(())
     }
 
-    // REVIEW-PASS[8/3] STATUS:PASS (ID: AGT-CRYPTO-81653b64) (TS: 2026-09-13T01:35:00Z) (SESSION: dd990e1d) (PRÜFER-KONTEXT: FRESH)
 }
 
 #[cfg(test)]

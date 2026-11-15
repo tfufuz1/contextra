@@ -5,9 +5,8 @@
 //! ## Invarianten
 //! - Gibt Fehler zurück, wenn die berechnete HMAC-Kette nicht mit dem erwarteten Endwert übereinstimmt.
 
-// FILE-CONTEXT
-// ZWECK: Verification of WAL log tail completeness against checkpoint manifest high-water-mark to detect truncation attacks.
-// INVARIANTEN: Zero-I/O, zero async, zero non-determinism, constant-time HMAC comparison (subtle::ConstantTimeEq).
+// Verification of WAL log tail completeness against checkpoint manifest high-water-mark to detect truncation attacks.
+// Invarianten: Zero-I/O, zero async, zero non-determinism, constant-time HMAC comparison (subtle::ConstantTimeEq).
 // HOTSPOTS: [verify_wal_chain_completeness]
 
 #![forbid(unsafe_code)]
@@ -23,7 +22,6 @@ use subtle::ConstantTimeEq;
 // !SECTION
 
 // SECTION [epic=crypto-wal,seq=2] WAL-Vollständigkeitsprüfung
-// ANCHOR[acta-crypto:WAL-002] Verifikation des WAL-Tails gegen High-Water-Mark
 // NOTE: Erkennt Truncation-Angriffe und partielle Dateikorrumpierung (TS:2026-11-11)
 /// Verifiziert, dass der WAL-Tail nicht abgeschnitten wurde, indem der
 /// letzte bekannte WAL-HMAC mit der im Checkpoint-Manifest persistierten

@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Deterministischer Fixed-Hasher für Hot-Path Mengen/Maps mit reproduzierbarer Traversierung.
-// INVARIANTEN: Konstante Seeds, deterministische Iteration, Schutzschicht gegen HashMap-Drift.
+// Deterministischer Fixed-Hasher für Hot-Path Mengen/Maps mit reproduzierbarer Traversierung.
+// Invarianten: Konstante Seeds, deterministische Iteration, Schutzschicht gegen HashMap-Drift.
 // HOTSPOTS: fixed_hasher.rs:25-30 (fixed_hasher), fixed_hasher.rs:40-50 (new_fixed_hash*)
-// STAND: 2026-11-11
 
 //! Deterministischer Fixed Hasher für Hot-Path sets/maps where ordering or reproducible traversal is critical.
 //!
@@ -13,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 
 // SECTION Konstanten & Initialisierung
 
-// ANCHOR[acta-vec:HASHER-SEEDS]
 const FIXED_SEEDS: (u64, u64, u64, u64) = (
     0x2345_6789_abcd_ef01,
     0x3456_789a_bcde_f012,
@@ -21,7 +18,6 @@ const FIXED_SEEDS: (u64, u64, u64, u64) = (
     0x5678_9abc_def0_1234,
 );
 
-// ANCHOR[acta-vec:HASHER-BUILDER]
 /// Liefert einen deterministischen `RandomState` Build-Hasher mit fixierten Seeds.
 pub fn fixed_hasher() -> RandomState {
     RandomState::with_seeds(FIXED_SEEDS.0, FIXED_SEEDS.1, FIXED_SEEDS.2, FIXED_SEEDS.3)
@@ -30,7 +26,6 @@ pub fn fixed_hasher() -> RandomState {
 
 // SECTION Deterministische Kollektionen
 
-// ANCHOR[acta-vec:HASHER-COLLECTIONS]
 /// Deterministisches `HashSet` mit fixem Hasher.
 pub type FixedHashSet<T> = HashSet<T, RandomState>;
 

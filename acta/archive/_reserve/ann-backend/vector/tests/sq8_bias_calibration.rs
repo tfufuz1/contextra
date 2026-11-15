@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Mathematische Kalibrierung des SQ8 Asymmetric Distance Bias.
-// INVARIANTEN: Erwartungswert des Schätzfehlers konvergiert gegen 0.
+// Mathematische Kalibrierung des SQ8 Asymmetric Distance Bias.
+// Invarianten: Erwartungswert des Schätzfehlers konvergiert gegen 0.
 // HOTSPOTS: 15-25
-// STAND: 2026-11-12
 // Testpflicht AK-12
 
 use acta_base::DistanceMetric; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

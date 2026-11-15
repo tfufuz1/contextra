@@ -1,8 +1,7 @@
-//! # HMAC-Integritaetskette fuer WAL (Ring 1)
 //!
 //! Bietet kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
 
-// ZWECK: HMAC-Kette der Journal-Rahmen.
+// HMAC-Kette der Journal-Rahmen.
 // TODO(acta-altlast): `load_or_create_integrity_key*` legt eine Schluesseldatei im Datenverzeichnis an und widerspricht Z10/5.1; Schluessel nur als Parameter (HKDF `acta/wal/v1`).
 
 use crate::error::{StoreError, StoreResult as Result};

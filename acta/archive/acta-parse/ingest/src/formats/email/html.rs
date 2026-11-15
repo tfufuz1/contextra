@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Minimale, abhängigkeitsfreie Entfernung von HTML-Tags und Skripten für E-Mails.
-// INVARIANTEN: Zero-Panic, kein html5ever, Verwerfen von <script>/<style> samt Inhalt.
-// STAND: TS:2026-10-31T00:00:00Z
+// Minimale, abhängigkeitsfreie Entfernung von HTML-Tags und Skripten für E-Mails.
+// Invarianten: Zero-Panic, kein html5ever, Verwerfen von <script>/<style> samt Inhalt.
 
 /// Minimaler HTML-Entferner für E-Mail-Bodies, wenn nur HTML verfügbar ist.
 ///

@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Validierungsfunktionen für Vektoren und Bytes.
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); NaN und Inf werden zuverlässig abgewiesen.
+// Validierungsfunktionen für Vektoren und Bytes.
+// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); NaN und Inf werden zuverlässig abgewiesen.
 // HOTSPOTS: validate_vector, validate_slices, validate_bytes
-// STAND: 2026-11-12
 
 //! # Vector Validation Module
 //!
@@ -10,7 +8,6 @@
 
 use crate::error::{Result, VectorError};
 
-// ANCHOR[acta-vec:DIST-VALIDATE-VECTOR]
 /// Prüft, ob ein Vektor frei von NaN oder Unendlichkeitswerten ist.
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> Result<()> {

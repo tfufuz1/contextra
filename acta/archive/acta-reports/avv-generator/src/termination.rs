@@ -14,13 +14,11 @@
 //!   Entfernung der Daten aus Speicherschichten und Caches mathematisch nachweist.
 //!
 //! # Ring-Zugehörigkeit
-//! Teil von Ring 4 (Erweiterung).
 
 use crate::error::AvvError;
 use crate::AvvContext;
 use std::fmt::Write;
 
-// ANCHOR[acta-reports:TERM-001]
 /// Rendert Abschnitt 8: „Löschung von Daten und SLA“.
 ///
 /// Schreibt die Löschklausel unter Einbindung der Mandanten-ID ([`crate::TenantId`])

@@ -1,5 +1,4 @@
 //! Golden- und Orakel-Tests für acta-text (TX6.1 /).
-// ANCHOR[acta-text:TEST-195]
 
 use acta_text::bm25::score_term;
 use acta_text::contract::{Clock, DocKey};

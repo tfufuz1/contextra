@@ -1,5 +1,4 @@
 //! SSTable Reader: Punkt-Lookup und Bloom-Filter-Abfragen.
-// ANCHOR[acta-seg:SST-RDR-120]
 
 use super::may_contain_key_in_block_bloom;
 use super::parse_block_trailer;

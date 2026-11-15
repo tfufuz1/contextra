@@ -1,14 +1,11 @@
 //! Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: Stubs und Anbindung spezifischer Chunking-Strategien (WP M3/M4 / ).
-// INVARIANTEN: Zero-Panic, Delegierung an Strategie-Modul oder FallbackChunker.
-// STAND: TS:2026-10-31T00:00:00Z
+// Stubs und Anbindung spezifischer Chunking-Strategien (WP M3/M4 / ).
+// Invarianten: Zero-Panic, Delegierung an Strategie-Modul oder FallbackChunker.
 
 use crate::canonical::CanonicalText;
 use crate::chunking::config::ChunkingConfig;
@@ -23,7 +20,6 @@ pub mod prose_impl;
 pub use prose_impl::*;
 
 #[derive(Debug, Default)]
-// ANCHOR[acta-ingest:CHK-0236]
 // struct `ProseChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
 pub struct ProseChunker;
 
@@ -46,7 +42,6 @@ impl IrChunker for ProseChunker {
 mod tabular_impl;
 
 #[derive(Debug, Default)]
-// ANCHOR[acta-ingest:CHK-0237]
 // struct `TabularChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
 pub struct TabularChunker;
 

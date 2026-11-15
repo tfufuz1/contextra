@@ -5,7 +5,6 @@ use std::sync::OnceLock;
 
 static GERMAN_STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 
-// ANCHOR[acta-text:MORPH-007]
 /// Liefert die statische deutsche Stoppwort-Liste.
 ///
 /// Wird per [`OnceLock`] beim ersten Zugriff lazy initialisiert.
@@ -27,13 +26,11 @@ pub fn get_german_stopwords() -> &'static HashSet<String> {
     })
 }
 
-// ANCHOR[acta-text:MORPH-008]
 /// Prüft, ob ein kleingeschriebenes, normalisiertes Wort ein deutsches Stoppwort ist.
 pub fn is_german_stopword(word: &str) -> bool {
     get_german_stopwords().contains(word)
 }
 
-// ANCHOR[acta-text:MORPH-009]
 /// Normalisiert deutsche Umlaute und Sonderzeichen für robusten Volltextabgleich.
 ///
 /// # Ersetzungen

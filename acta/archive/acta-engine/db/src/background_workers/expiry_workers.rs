@@ -2,12 +2,10 @@
 //!
 //! **Zweck:** Worker zur automatischen Bereinigung abgelaufener TTL-Dokumente.
 //!
-//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// FILE-CONTEXT
-// ZWECK: Worker-Tasks zur TTL-Bereinigung abgelaufener Dokumente und Entropie-Pruning/Decay-Eviction.
-// INVARIANTEN: Intervallsteuerung und geordnete Task-Beendigung über CancellationToken.
+// Worker-Tasks zur TTL-Bereinigung abgelaufener Dokumente und Entropie-Pruning/Decay-Eviction.
+// Invarianten: Intervallsteuerung und geordnete Task-Beendigung über CancellationToken.
 
 use crate::collection::Collection;
 #[cfg(feature = "background-maintenance")]

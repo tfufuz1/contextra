@@ -1,10 +1,8 @@
-// FILE-CONTEXT
-// ZWECK: Recall-Kalibrierung von RaBitQ gegen Ground Truth auf synthetischem geclustertem Datensatz.
-// INVARIANTEN: Measured RaBitQ Recall@10 >= 0.95 unter Cosine-Metrik.
+// Recall-Kalibrierung von RaBitQ gegen Ground Truth auf synthetischem geclustertem Datensatz.
+// Invarianten: Measured RaBitQ Recall@10 >= 0.95 unter Cosine-Metrik.
 // DATENSATZ: 2000 Vektoren (10 Cluster), Dim: 128, 50 Queries, TestRng Seed: 42.
 // HERLEITUNG: Gemessener Recall 1.0000 auf geclustertem Datensatz, Schwelle 0.95 mit 0.05 Sicherheitsabstand.
 // HOTSPOTS: 35-135
-// STAND: 2026-11-12
 
 #![cfg(feature = "experimental-rabitq")]
 

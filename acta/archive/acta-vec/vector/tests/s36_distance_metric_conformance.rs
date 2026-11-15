@@ -1,11 +1,9 @@
 //! Konformitätstest für `DistanceMetric` (R4-Ausnahme).
 //! Prüft identische Varianten-Reihenfolge und serde-Serialisierung zwischen
 //! `acta_vec::types::DistanceMetric` und `acta_base::DistanceMetric`.
-// FILE-CONTEXT
-// ZWECK: Konformitätstest der Distanzmetriken über Ports- und Typgrenzen hinweg.
-// INVARIANTEN: Identische Distanzergebnisse unabhängig vom Interface-Pfad.
+// Konformitätstest der Distanzmetriken über Ports- und Typgrenzen hinweg.
+// Invarianten: Identische Distanzergebnisse unabhängig vom Interface-Pfad.
 // HOTSPOTS: 15-35
-// STAND: 2026-11-12
 
 #![cfg(feature = "ports-compat")]
 

@@ -1,14 +1,11 @@
 //! Metadaten-Verwaltung und Provenienz fuer generierte Chunks.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: Erzeugung des Metadaten-Schemas acta.chunk.v1 und BLAKE3 Chunk-IDs (WP M3).
-// INVARIANTEN: Schema "acta.chunk.v1", deterministische BLAKE3-Chunk-ID (32-Hex chars / 16 Byte), reservierte Schlüssel nie überschreiben.
-// STAND: TS:2026-10-31T00:00:00Z
+// Erzeugung des Metadaten-Schemas acta.chunk.v1 und BLAKE3 Chunk-IDs (WP M3).
+// Invarianten: Schema "acta.chunk.v1", deterministische BLAKE3-Chunk-ID (32-Hex chars / 16 Byte), reservierte Schlüssel nie überschreiben.
 
 use crate::chunking::ChunkDraft;
 use crate::format::ChunkStrategy;
@@ -17,7 +14,6 @@ use blake3::Hasher;
 use serde_json::{json, Map, Value};
 
 /// Generiert das standardisierte JSON-Metadatenobjekt unter dem Schema `"acta.chunk.v1"`.
-// ANCHOR[acta-ingest:CHK-0213]
 // fn `build_chunk_metadata` fuer Metadaten-Verwaltung und Provenienz fuer generierte Chunks.
 pub fn build_chunk_metadata(
     canonical_hash: &str,

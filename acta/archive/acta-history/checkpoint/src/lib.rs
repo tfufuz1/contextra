@@ -5,7 +5,6 @@
 //! Dieses Modul bildet die Wurzel der Crate `acta-checkpoint`.
 //!
 //! ## Zweck & Rolle im System
-//! Die Crate `acta-checkpoint` gehört zu **Ring 1 (Persistenz)** der Acta-Architektur.
 //! Sie koordiniert konsistente Snapshots über heterogene Storage-Komponenten hinweg (LSM-Tree,
 //! Vektor-Index, Graph-Speicher) und stellt deterministische Rollbacks für Agenten-Workflows bereit.
 //!

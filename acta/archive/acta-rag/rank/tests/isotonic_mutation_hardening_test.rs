@@ -5,8 +5,8 @@
 //! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// ZWECK: Mutation hardening test suite for IsotonicCalibrator (PAVA/ECE).
-// INVARIANTEN: (no fallback before warmup), (fingerprint reset), P8 compliance.
+// Mutation hardening test suite for IsotonicCalibrator (PAVA/ECE).
+// Invarianten: (no fallback before warmup), (fingerprint reset), P8 compliance.
 
 use acta_rank::IsotonicCalibrator;
 use proptest::prelude::*;

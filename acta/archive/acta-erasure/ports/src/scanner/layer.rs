@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Definition der Schichten, Scantechniken, Target-Deskriptoren und Purger-Traits (Vertrag V1, §12.7.4).
-// INVARIANTEN: Schichten und Scantechniken definieren typsichere Parameter für Nachweis-Sessions.
+// Definition der Schichten, Scantechniken, Target-Deskriptoren und Purger-Traits (Vertrag V1, §12.7.4).
+// Invarianten: Schichten und Scantechniken definieren typsichere Parameter für Nachweis-Sessions.
 // HOTSPOTS: [1-80]
 
 #![forbid(unsafe_code)]

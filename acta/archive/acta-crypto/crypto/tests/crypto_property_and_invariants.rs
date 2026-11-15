@@ -1,4 +1,3 @@
-//! Comprehensive Property and Invariant Tests for acta-crypto (Class A, Ring 0).
 //!
 //! Validates:
 //!

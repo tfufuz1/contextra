@@ -2,16 +2,12 @@
 //!
 //! **Zweck:** Hierarchische Abschnittsaufteilung anhand von Überschriften und Absätzen.
 //!
-//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// FILE-CONTEXT
-// ZWECK: Interne Datenstruktur für rohe Markdown-Abschnitte mit Brotkrumen und Metadaten.
-// INVARIANTEN: Hält Zeilen, Breadcrumb, Ebene, Zeilenbereich und Byte-Span eines Abschnitts.
+// Interne Datenstruktur für rohe Markdown-Abschnitte mit Brotkrumen und Metadaten.
+// Invarianten: Hält Zeilen, Breadcrumb, Ebene, Zeilenbereich und Byte-Span eines Abschnitts.
 // NICHT-OFFENSICHTLICH: Dient als Zwischenrepräsentation vor der Splitting- und Merge-Phase.
-// STAND: TS:2026-10-29T00:00:00Z
 
-// ANCHOR[acta-engine:SEC-001]
 /// Repräsentiert einen unsegmentierten Textabschnitt.
 #[derive(Debug, Clone)]
 pub(crate) struct RawSection {

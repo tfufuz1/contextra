@@ -9,12 +9,10 @@
 //!    oder Formatierungsfunktionen unerwartet fehlschlagen.
 //!
 //! # Ring-Zugehörigkeit
-//! Teil von Ring 4 (Erweiterung / Utility). Hält keine systemweiten Sperren und greift
 //! auf keine direkten I/O- oder Betriebssystem-Ressourcen zu.
 
 use thiserror::Error;
 
-// ANCHOR[acta-reports:ERR-001]
 /// Benannte Fehlerzustände während der AVV-Vorlagenvalidierung oder des Markdown-Renderings.
 ///
 /// Alle Varianten implementieren [`thiserror::Error`] und liefern deutschsprachige,
@@ -92,6 +90,5 @@ pub enum AvvError {
     RenderError(String),
 }
 
-// ANCHOR[acta-reports:ERR-002]
 /// Typ-Alias für Rückwärtskompatibilität mit älteren Schnittstellen ([`AvvGeneratorError`]).
 pub type AvvGeneratorError = AvvError;

@@ -13,7 +13,6 @@ use acta_reports::{
     AvvError, TechnicalMeasure, TenantId,
 };
 
-// ANCHOR[acta-reports:TEST-CTX-001]
 fn sample_context() -> AvvContext {
     AvvContext {
         controller_name: "Kanzlei Dr. Mustermann".to_string(),
@@ -27,7 +26,6 @@ fn sample_context() -> AvvContext {
     }
 }
 
-// ANCHOR[acta-reports:TEST-001]
 #[test]
 fn test_render_avv_markdown_contains_required_sections() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -59,7 +57,6 @@ fn test_render_avv_markdown_contains_required_sections() -> Result<(), Box<dyn s
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-002]
 #[test]
 fn test_empty_subprocessors_handling() -> Result<(), Box<dyn std::error::Error>> {
     let tenant_id = TenantId::try_new(100)?;
@@ -82,7 +79,6 @@ fn test_empty_subprocessors_handling() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-003]
 #[test]
 fn test_snapshot_rendering_output() -> Result<(), Box<dyn std::error::Error>> {
     let tenant_id = TenantId::try_new(999)?;
@@ -123,7 +119,6 @@ fn test_snapshot_rendering_output() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-004]
 #[test]
 fn test_art28_dsgvo_completeness_checklist() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -180,7 +175,6 @@ fn test_art28_dsgvo_completeness_checklist() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-005]
 #[test]
 fn test_disclaimer_present_in_header() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -189,7 +183,6 @@ fn test_disclaimer_present_in_header() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-006]
 #[test]
 fn test_golden_file_output_matches() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -203,7 +196,6 @@ fn test_golden_file_output_matches() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-007]
 #[test]
 fn test_validation_empty_controller_name() {
     let mut ctx = sample_context();
@@ -211,7 +203,6 @@ fn test_validation_empty_controller_name() {
     assert_eq!(ctx.validate(), Err(AvvError::EmptyControllerName));
 }
 
-// ANCHOR[acta-reports:TEST-008]
 #[test]
 fn test_validation_empty_processor_name() {
     let mut ctx = sample_context();
@@ -219,7 +210,6 @@ fn test_validation_empty_processor_name() {
     assert_eq!(ctx.validate(), Err(AvvError::EmptyProcessorName));
 }
 
-// ANCHOR[acta-reports:TEST-009]
 #[test]
 fn test_validation_empty_contract_date() {
     let mut ctx = sample_context();
@@ -227,7 +217,6 @@ fn test_validation_empty_contract_date() {
     assert_eq!(ctx.validate(), Err(AvvError::EmptyContractDate));
 }
 
-// ANCHOR[acta-reports:TEST-010]
 #[test]
 fn test_validation_invalid_deletion_sla_zero() {
     let mut ctx = sample_context();
@@ -241,7 +230,6 @@ fn test_validation_invalid_deletion_sla_zero() {
     );
 }
 
-// ANCHOR[acta-reports:TEST-011]
 #[test]
 fn test_validation_invalid_deletion_sla_too_high() {
     let mut ctx = sample_context();
@@ -255,7 +243,6 @@ fn test_validation_invalid_deletion_sla_too_high() {
     );
 }
 
-// ANCHOR[acta-reports:TEST-012]
 #[test]
 fn test_validation_missing_subprocessors_when_allowed() {
     let mut ctx = sample_context();
@@ -264,7 +251,6 @@ fn test_validation_missing_subprocessors_when_allowed() {
     assert_eq!(ctx.validate(), Err(AvvError::MissingSubprocessors));
 }
 
-// ANCHOR[acta-reports:TEST-013]
 #[test]
 fn test_validation_invalid_subprocessor_empty_string() {
     let mut ctx = sample_context();
@@ -277,7 +263,6 @@ fn test_validation_invalid_subprocessor_empty_string() {
     );
 }
 
-// ANCHOR[acta-reports:TEST-014]
 #[test]
 fn test_validation_invalid_technical_measure_empty_name() {
     let mut ctx = sample_context();
@@ -294,7 +279,6 @@ fn test_validation_invalid_technical_measure_empty_name() {
     );
 }
 
-// ANCHOR[acta-reports:TEST-015]
 #[test]
 fn test_validation_valid_context() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -302,7 +286,6 @@ fn test_validation_valid_context() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-016]
 #[test]
 fn test_markdown_escaping_user_inputs() -> Result<(), Box<dyn std::error::Error>> {
     let mut ctx = sample_context();
@@ -316,7 +299,6 @@ fn test_markdown_escaping_user_inputs() -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-017]
 #[test]
 fn test_markdown_escaping_injection_prevention() -> Result<(), Box<dyn std::error::Error>> {
     let mut ctx = sample_context();
@@ -330,7 +312,6 @@ fn test_markdown_escaping_injection_prevention() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-018]
 #[test]
 fn test_deterministic_rendering_with_fixed_date() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -342,7 +323,6 @@ fn test_deterministic_rendering_with_fixed_date() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-019]
 #[test]
 fn test_unicode_support_in_names_and_measures() -> Result<(), Box<dyn std::error::Error>> {
     let mut ctx = sample_context();
@@ -356,7 +336,6 @@ fn test_unicode_support_in_names_and_measures() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-020]
 #[test]
 fn test_subprocessor_change_notification_clause() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -366,7 +345,6 @@ fn test_subprocessor_change_notification_clause() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-021]
 #[test]
 fn test_audit_and_control_rights_clause() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -379,7 +357,6 @@ fn test_audit_and_control_rights_clause() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-022]
 #[test]
 fn test_data_subject_rights_and_assistance_clauses() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -391,7 +368,6 @@ fn test_data_subject_rights_and_assistance_clauses() -> Result<(), Box<dyn std::
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-023]
 #[test]
 fn test_confidentiality_clause_present() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();
@@ -402,7 +378,6 @@ fn test_confidentiality_clause_present() -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-// ANCHOR[acta-reports:TEST-024]
 #[test]
 fn test_instructions_clause_present() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = sample_context();

@@ -1,6 +1,5 @@
 //! # Platt-Scaling / Logistische Kalibrierung (`platt`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Implementiert das parametrische Platt-Scaling (`sigmoid(A * logit + B)`).
 //! Dient der Umrechnung von Logits in Wahrscheinlichkeiten via Kreuzentropie-Minimierung.

@@ -1,6 +1,5 @@
 //! # Resonanz-Kohärenz-Bonus (`resonance`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Dieses Modul belohnt Dokumente, die in mehreren voneinander unabhängigen Retrieval-Kanälen
 //! gleichzeitig gefunden wurden. Dies basiert auf dem Prinzip der inter-sensorischen Kohärenz.

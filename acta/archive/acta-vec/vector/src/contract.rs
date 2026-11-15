@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Vertragsdatei für acta-vec (Eingefrorener Crate-Vertrag Klasse A).
-// INVARIANTEN: Zero-Panic, autarker Baustein ohne interne Workspace-Kopplung.
+// Vertragsdatei für acta-vec (Eingefrorener Crate-Vertrag Klasse A).
+// Invarianten: Zero-Panic, autarker Baustein ohne interne Workspace-Kopplung.
 // HOTSPOTS: contract.rs:90-95 (DistanceFn), contract.rs:97-110 (Index), contract.rs:112-123 (Maintain), contract.rs:125-132 (BlockTransform)
-// STAND: 2026-11-11
 
 //! Vertragsdatei für `acta-vec` (Eingefrorener Crate-Vertrag Klasse A).
 //!
@@ -18,7 +16,6 @@
 
 // SECTION Vertragsfehler
 
-// ANCHOR[acta-vec:CONTRACT-ERROR]
 /// Lokales Fehler-Enum für Vertragsoperationen.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -55,14 +52,12 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 // SECTION Umwelt-Traits (Clock, Rng)
 
-// ANCHOR[acta-vec:CONTRACT-CLOCK]
 /// Trait zur Zeitabfrage.
 pub trait Clock: Send + Sync {
     /// Liefert die aktuelle Zeit in Unix-Millisekunden.
     fn now_unix_ms(&self) -> u64;
 }
 
-// ANCHOR[acta-vec:CONTRACT-RNG]
 /// Trait für deterministischen Zufall.
 pub trait Rng: Send {
     /// Liefert das nächste Pseudozufalls-`u64`.
@@ -72,7 +67,6 @@ pub trait Rng: Send {
 
 // SECTION Datentypen (ExternalId, Metric, ScoredPoint)
 
-// ANCHOR[acta-vec:CONTRACT-EXTERNAL-ID]
 /// Externe Identifikationsnummer (128-Bit für breite Kompatibilität).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ExternalId(pub u128); // 128 Bit erhält vorhandene Fähigkeit (E-05); From<u64> vorhanden
@@ -83,7 +77,6 @@ impl From<u64> for ExternalId {
     }
 }
 
-// ANCHOR[acta-vec:CONTRACT-METRIC]
 /// Unterstützte Distanzmetriken.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Metric {
@@ -95,7 +88,6 @@ pub enum Metric {
     DotProduct,
 }
 
-// ANCHOR[acta-vec:CONTRACT-SCORED-POINT]
 /// Trefferpunkt mit Distanz-/Ähnlichkeitsbewertung.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScoredPoint {
@@ -108,14 +100,12 @@ pub struct ScoredPoint {
 
 // SECTION Service-Schnittstellen (DistanceFn, Index, Maintain, BlockTransform)
 
-// ANCHOR[acta-vec:CONTRACT-DISTANCE-FN]
 /// Distanzfunktions-Schnittstelle zur externen Injektion von Berechnungen (z.B. SIMD).
 pub trait DistanceFn: Send + Sync {
     /// Berechnet die Distanz zwischen zwei gleich langen Vektoren.
     fn distance(&self, a: &[f32], b: &[f32]) -> f32;
 }
 
-// ANCHOR[acta-vec:CONTRACT-INDEX]
 /// Standardisierter Index-Trait für Klasse A Bausteine.
 pub trait Index<Id, Query> {
     /// Typ eines einzelnen Suchtreffers.
@@ -131,7 +121,6 @@ pub trait Index<Id, Query> {
     fn search(&self, query: &Query, limit: usize) -> Result<Vec<Self::Hit>>;
 }
 
-// ANCHOR[acta-vec:CONTRACT-MAINTAIN]
 /// Neutraler Wartungs-Trait für Klasse A Bausteine.
 pub trait Maintain {
     /// Typ der Wartungsstatistiken.
@@ -144,7 +133,6 @@ pub trait Maintain {
     fn vacuum(&mut self) -> Result<()>;
 }
 
-// ANCHOR[acta-vec:CONTRACT-BLOCK-TRANSFORM]
 /// Generischer Transformations-Hook (z. B. für optionale Verschlüsselung/Transformation).
 pub trait BlockTransform: Send + Sync {
     /// Transformiert einen Datenblock vor der Persistierung.

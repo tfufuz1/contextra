@@ -1,17 +1,14 @@
-// FILE-CONTEXT
-// ZWECK: ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen.
-// INVARIANTEN: Target-Architektur aarch64 / neon.
+// ARM NEON SIMD-Intrinsics für f32 Distanzberechnungen.
+// Invarianten: Target-Architektur aarch64 / neon.
 
 //! # Modul `kernels::neon`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
 //!
 //! **Zweck:**
 //! Hardwarespezifische Distanzberechnung für ARM 64-Bit-Prozessoren (AArch64) mittels ARM NEON-Intrinsics.
 //! NEON stellt 128-Bit breite Vektorregister (`float32x4_t`) bereit, womit vier 32-Bit Gleitkommazahlen
 //! parallel in einem einzigen Befehlstakt verarbeitet werden (`vld1q_f32`, `vfmaq_f32`, etc.).
 //!
-//! **Architektur und Invarianten:**
 //! - Nur aktiv unter `#[cfg(target_arch = "aarch64")]`.
 //! - Alle Kernel sind `unsichere Funktionen`, da der Aufrufer sicherstellen muss, dass die NEON-Erweiterung
 //!   vorhanden ist und die Vektorlängen übereinstimmen.
@@ -22,7 +19,6 @@
 use std::arch::aarch64::*;
 
 // SECTION NEON-F32-KERNELS
-// ANCHOR[acta-sys:NEON-COSINE-F32]
 /// Computes the cosine distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety
@@ -85,7 +81,6 @@ pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
-// ANCHOR[acta-sys:NEON-EUCLIDEAN-F32]
 /// Computes the Euclidean distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety
@@ -131,7 +126,6 @@ pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     sum.sqrt()
 }
 
-// ANCHOR[acta-sys:NEON-DOT-F32]
 /// Computes the dot product distance between two `f32` slices using ARM NEON intrinsics.
 ///
 /// # Safety

@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Öffentliche Einstiegspunkte für HNSW-Rebuild, Status, Wartefunktionen und Konnektivitätsprüfung.
-// INVARIANTEN: Rebuild atomar per Swap; Maintain-Trait Implementierung;.
+// Öffentliche Einstiegspunkte für HNSW-Rebuild, Status, Wartefunktionen und Konnektivitätsprüfung.
+// Invarianten: Rebuild atomar per Swap; Maintain-Trait Implementierung;.
 // HOTSPOTS: rebuild_sync_with_clock, verify_full_connectivity, do_delete
-// STAND: TS:2026-11-11T02:00:00Z
 
 use std::sync::atomic::Ordering;
 
@@ -14,7 +12,6 @@ use super::backoff::{get_last_rebuild_nanos, set_last_rebuild_nanos};
 use super::seq_replay::replay_delta_and_swap;
 
 impl HnswIndexCore {
-    // ANCHOR[acta-vec:REBUILD-STATUS]
     pub fn rebuild_status(&self) -> RebuildStatus {
         if self.hot.rebuilding.load(Ordering::SeqCst) {
             RebuildStatus::Running
@@ -23,7 +20,6 @@ impl HnswIndexCore {
         }
     }
 
-    // ANCHOR[acta-vec:REBUILD-WAIT-BLOCKING]
     pub fn wait_for_rebuild_blocking(
         &self,
         timeout: std::time::Duration,
@@ -195,7 +191,6 @@ impl HnswIndexCore {
         self.rebuild_sync_with_clock(clock.as_ref())
     }
 
-    // ANCHOR[acta-vec:REBUILD-SYNC-WITH-CLOCK]
     pub fn rebuild_sync_with_clock(&self, clock: &dyn crate::types::Clock) -> Result<()> {
         let now_nanos = clock.monotonic_nanos();
         {

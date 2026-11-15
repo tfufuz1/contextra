@@ -5,7 +5,6 @@
 use acta_fs::{atomic_replace, durable_remove};
 use tempfile::tempdir;
 
-// ANCHOR[acta-fs:TEST-BASIC-ATOMIC-REPLACE]
 /// Prüft, dass `atomic_replace` neue Dateien anlegt und bestehende Dateien atomar überschreibt.
 #[test]
 fn test_atomic_replace_writes_and_overwrites() -> std::io::Result<()> {
@@ -25,7 +24,6 @@ fn test_atomic_replace_writes_and_overwrites() -> std::io::Result<()> {
     Ok(())
 }
 
-// ANCHOR[acta-fs:TEST-BASIC-DURABLE-REMOVE]
 /// Prüft, dass `durable_remove` existierende Dateien dauerhaft entfernt und bei fehlenden Pfaden NotFound meldet.
 #[test]
 fn test_durable_remove_success_and_not_found() -> std::io::Result<()> {

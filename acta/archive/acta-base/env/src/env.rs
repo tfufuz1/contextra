@@ -5,7 +5,6 @@
 
 // =========================================================================
 // SECTION: Aggregated Port Re-exports
-// ANCHOR[id=env-root,epic=env-core,seq=3]
 // NOTE: Bündelt alle Kernports des Environment-Ökosystems für saubere Entkopplung.
 // =========================================================================
 
@@ -20,7 +19,6 @@ pub use crate::rng::{Rng, SeededRng};
 
 // =========================================================================
 // SECTION: Prelude Module
-// ANCHOR[id=env-prelude,epic=env-core,seq=4]
 // NOTE: Ergonomischer Wildcard-Import (`use acta_base::env::prelude::*;`).
 // =========================================================================
 

@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 // =========================================================================
 // SECTION: Module Statics & Constants
-// ANCHOR[id=rng-constants,epic=rng,seq=1]
 // NOTE: SplitMix64 verwendet den Goldenen Schnitt für 64-Bit-Ganzzahlen.
 // =========================================================================
 
@@ -22,7 +21,6 @@ const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
 
 // =========================================================================
 // SECTION: Rng Port Trait
-// ANCHOR[id=rng-root,epic=rng,seq=2]
 // NOTE: Primäre Zufallsabstraktion; entkoppelt Algorithmen von Systementropie.
 // =========================================================================
 
@@ -65,7 +63,6 @@ pub trait Rng: Send + Sync + 'static {
 
 // =========================================================================
 // SECTION: SeededRng (SplitMix64) Implementation
-// ANCHOR[id=rng-splitmix64,epic=rng,seq=3]
 // NOTE: Lock-freie, threadsichere SplitMix64-Implementierung mit atomarem Zustand.
 // =========================================================================
 
@@ -177,7 +174,6 @@ impl Rng for SeededRng {
 
 // =========================================================================
 // SECTION: Blanket Implementation for Arc<T>
-// ANCHOR[id=rng-arc,epic=rng,seq=4]
 // NOTE: Erlaubt direkte Nutzung von `Arc<dyn Rng>` ohne zusätzliche Allokationen.
 // =========================================================================
 
@@ -202,7 +198,6 @@ impl<T: Rng + ?Sized> Rng for Arc<T> {
 
 // =========================================================================
 // SECTION: Unit Tests
-// ANCHOR[id=rng-tests,epic=rng,seq=5]
 // =========================================================================
 
 #[cfg(test)]

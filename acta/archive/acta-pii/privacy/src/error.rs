@@ -7,7 +7,6 @@
 
 use thiserror::Error;
 
-// ANCHOR[acta-pii:ERR-001]
 /// Primärer Fehlertyp des Privacy- und Egress-Subsystems.
 ///
 /// Signalisiert spezifische Fehlerzustände bei der Analyse, Filterung und Weiterleitung
@@ -68,7 +67,6 @@ pub type Error = PrivacyError;
 /// Result-Typ für acta-pii.
 pub type Result<T> = std::result::Result<T, PrivacyError>;
 
-// ANCHOR[acta-pii:ERR-002]
 // Konvertierung von EgressVaultError in PrivacyError zur feingranularen Fehlerweitergabe.
 impl From<crate::egress_vault::EgressVaultError> for PrivacyError {
     fn from(err: crate::egress_vault::EgressVaultError) -> Self {
@@ -96,7 +94,6 @@ impl From<crate::egress_vault::EgressVaultError> for PrivacyError {
 }
 
 impl PrivacyError {
-    // ANCHOR[acta-pii:ERR-003]
     /// Konstruiert einen `PrivacyError::InvalidParams`.
     pub fn invalid_params(msg: impl Into<String>) -> Self {
         Self::InvalidParams(msg.into())
@@ -112,13 +109,11 @@ impl PrivacyError {
         Self::CapacityExceeded(msg.into())
     }
 
-    // ANCHOR[acta-pii:ERR-004]
     /// Konstruiert einen `PrivacyError::PolicyViolation`.
     pub fn policy_violation(msg: impl Into<String>) -> Self {
         Self::PolicyViolation(msg.into())
     }
 
-    // ANCHOR[acta-pii:ERR-005]
     /// Konstruiert einen `PrivacyError::InternalError`.
     pub fn internal_error(msg: impl Into<String>) -> Self {
         Self::InternalError(msg.into())

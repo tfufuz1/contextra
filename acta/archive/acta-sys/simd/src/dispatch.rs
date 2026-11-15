@@ -1,10 +1,8 @@
-// FILE-CONTEXT
-// ZWECK: Runtime Hardware Feature Detection & Dispatcher.
-// INVARIANTEN: Zero-Panic, sicherer Fallback auf Skalar, wenn CPU-Features fehlen.
+// Runtime Hardware Feature Detection & Dispatcher.
+// Invarianten: Zero-Panic, sicherer Fallback auf Skalar, wenn CPU-Features fehlen.
 
 //! # Modul `dispatch`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
 //!
 //! **Zweck:**
 //! Laufzeit-Erkennung von Hardware-Eigenschaften (CPU Feature Detection) und dynamische Weiterleitung (Dispatch)
@@ -26,7 +24,6 @@ use crate::error::SimdError;
 use crate::kernels::*;
 
 // SECTION TARGET-CONFIG
-// ANCHOR[acta-sys:DISP-TARGET-ENUM]
 /// Explicit hardware target configuration for the SIMD dispatcher.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SimdTarget {
@@ -45,7 +42,6 @@ pub enum SimdTarget {
 // !SECTION TARGET-CONFIG
 
 // SECTION OVERRIDES
-// ANCHOR[acta-sys:DISP-OVERRIDE-ENUM]
 /// SIMD path override options for testing purposes.
 #[cfg(test)]
 pub type SimdPathOverride = SimdTarget;
@@ -55,14 +51,12 @@ std::thread_local! {
     static OVERRIDE_PATH: std::cell::Cell<Option<SimdPathOverride>> = const { std::cell::Cell::new(None) };
 }
 
-// ANCHOR[acta-sys:DISP-SET-OVERRIDE]
 /// Sets thread-local SIMD dispatch path override for testing.
 #[cfg(test)]
 pub fn set_dispatch_override(path: Option<SimdPathOverride>) {
     OVERRIDE_PATH.with(|p| p.set(path));
 }
 
-// ANCHOR[acta-sys:DISP-GET-OVERRIDE]
 /// Retrieves the current thread-local SIMD dispatch path override.
 #[cfg(test)]
 pub fn get_dispatch_override() -> Option<SimdPathOverride> {
@@ -71,7 +65,6 @@ pub fn get_dispatch_override() -> Option<SimdPathOverride> {
 // !SECTION OVERRIDES
 
 // SECTION DISPATCHER-CORE
-// ANCHOR[acta-sys:DISP-STRUCT]
 /// Injectable and thread-safe SIMD dispatcher (Design by Contract).
 ///
 /// Encapsulates SIMD hardware target selection and execution without relying
@@ -635,7 +628,6 @@ impl Dispatcher {
 // !SECTION DISPATCHER-CORE
 
 // SECTION STATIC-DISPATCH-FNS
-// ANCHOR[acta-sys:DISP-COSINE-F32]
 /// Computes cosine distance ($1.0 - \text{cosine\_similarity}$) between two `f32` vectors.
 ///
 /// Dynamically dispatches to AVX-512, AVX2+FMA, or NEON based on runtime CPU feature detection,
@@ -667,7 +659,6 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     Dispatcher::auto().cosine_distance(a, b)
 }
 
-// ANCHOR[acta-sys:DISP-EUCLIDEAN-F32]
 /// Computes Euclidean distance ($\|a - b\|_2$) between two `f32` vectors.
 ///
 /// Dynamically dispatches to AVX-512, AVX2+FMA, or NEON based on runtime CPU feature detection,
@@ -698,7 +689,6 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     Dispatcher::auto().euclidean_distance(a, b)
 }
 
-// ANCHOR[acta-sys:DISP-DOT-F32]
 /// Computes dot product distance (negated dot product $-a \cdot b$) between two `f32` vectors.
 ///
 /// Dynamically dispatches to AVX-512, AVX2+FMA, or NEON based on runtime CPU feature detection,
@@ -729,7 +719,6 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32> {
     Dispatcher::auto().dot_product_distance(a, b)
 }
 
-// ANCHOR[acta-sys:DISP-COSINE-F32-BYTES]
 /// Computes cosine distance between an `f32` slice and raw little-endian `f32` byte slice.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2+FMA based on runtime CPU feature detection,
@@ -760,7 +749,6 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
     Dispatcher::auto().cosine_distance_f32_bytes(a, b_bytes)
 }
 
-// ANCHOR[acta-sys:DISP-EUCLIDEAN-F32-BYTES]
 /// Computes Euclidean distance between an `f32` slice and raw little-endian `f32` byte slice.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2+FMA based on runtime CPU feature detection,
@@ -791,7 +779,6 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> {
     Dispatcher::auto().euclidean_distance_f32_bytes(a, b_bytes)
 }
 
-// ANCHOR[acta-sys:DISP-DOT-F32-BYTES]
 /// Computes dot product distance between an `f32` slice and raw little-endian `f32` byte slice.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2+FMA based on runtime CPU feature detection,
@@ -822,7 +809,6 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32> 
     Dispatcher::auto().dot_product_distance_f32_bytes(a, b_bytes)
 }
 
-// ANCHOR[acta-sys:DISP-DOT-U8]
 /// Computes integer dot product between two `u8` byte slices.
 ///
 /// Dynamically dispatches to AVX-512 VNNI (`dpbusd`) or AVX2 (`madd_epi16`),
@@ -853,7 +839,6 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32> {
     Dispatcher::auto().dot_product_u8(a, b)
 }
 
-// ANCHOR[acta-sys:DISP-EUCLIDEAN-SQ-U8]
 /// Computes squared Euclidean distance ($\|a - b\|_2^2$) between two `u8` byte slices.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2 SIMD implementations,
@@ -884,7 +869,6 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32> {
     Dispatcher::auto().euclidean_distance_sq_u8(a, b)
 }
 
-// ANCHOR[acta-sys:DISP-COSINE-PARTS-U8]
 /// Computes cosine similarity component parts (dot product, norm_a_sq, norm_b_sq) for two `u8` byte slices.
 ///
 /// Dynamically dispatches to AVX-512 VNNI or AVX2 SIMD implementations,

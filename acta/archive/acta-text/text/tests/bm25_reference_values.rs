@@ -1,11 +1,9 @@
 //! Testsuite `bm25_reference_values.rs` für acta-text.
 //!
 //! # Ring-Zuordnung
-//! Ring LAB / Testbereich.
 
-// FILE-CONTEXT: Reference value verification tests for BM25 and BM25F implementation.
-// ZWECK: Verifiziert BM25 score_term_with_params und score_term_bm25f gegen unabhängig berechnete Referenzwerte der publizierten Formeln.
-// INVARIANTEN: #![forbid(unsafe_code)], alle Erwartungswerte werden unabhängig in Rust (f64) nachgerechnet.
+// Verifiziert BM25 score_term_with_params und score_term_bm25f gegen unabhängig berechnete Referenzwerte der publizierten Formeln.
+// Invarianten: #![forbid(unsafe_code)], alle Erwartungswerte werden unabhängig in Rust (f64) nachgerechnet.
 
 #![forbid(unsafe_code)]
 
@@ -112,7 +110,6 @@ fn compute_reference_bm25f_score(
     }
 }
 
-// ANCHOR[acta-text:TEST-147]
 // Testfall `test_bm25_known_reference_value`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25_known_reference_value() {
@@ -146,7 +143,6 @@ fn test_bm25_known_reference_value() {
     );
 }
 
-// ANCHOR[acta-text:TEST-148]
 // Testfall `test_bm25_reference_table`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25_reference_table() {
@@ -209,7 +205,6 @@ fn test_bm25_reference_table() {
     );
 }
 
-// ANCHOR[acta-text:TEST-149]
 // Testfall `test_bm25f_reference_value`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_reference_value() {

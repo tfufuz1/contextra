@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Sicheres XML-Parsing mit Event-Budgetierung, XML-Baumstrukturen und SafeXmlReader (P00B/P04).
-// INVARIANTEN: Zero-Panic, ResourceBudget-Prüfung, BTreeMap für Determinismus, XXE-Schutz.
-// STAND: TS:2026-11-08T00:00:00Z
+// Sicheres XML-Parsing mit Event-Budgetierung, XML-Baumstrukturen und SafeXmlReader (P00B/P04).
+// Invarianten: Zero-Panic, ResourceBudget-Prüfung, BTreeMap für Determinismus, XXE-Schutz.
 
 use crate::error::{IngestError, LimitKind};
 use crate::extractor::ResourceBudget;

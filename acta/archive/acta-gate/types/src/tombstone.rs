@@ -10,15 +10,12 @@
 //! Ist Bit 63 gesetzt (`TOMBSTONE_BIT`), handelt es sich um eine Soft-Deletion.
 //! Alternativ kann ein Flag-Byte mit gesetztem Bit 0 (`0x01`) als Indikator dienen.
 
-// FILE-CONTEXT
-// STAND: 2026-09-16T21:00:00Z (SESSION: IP-07)
-// ZWECK: Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ).
-// INVARIANTEN: Bit 63 der SeqNo kennzeichnet Tombstones (TOMBSTONE_BIT). Trait-Methoden paniken niemals.
+// Trait und Referenzimplementierung für Tombstone-Semantik (IP-07 / ).
+// Invarianten: Bit 63 der SeqNo kennzeichnet Tombstones (TOMBSTONE_BIT). Trait-Methoden paniken niemals.
 
 #[allow(deprecated)]
 use crate::types::TOMBSTONE_BIT;
 
-// ANCHOR[acta-types:TOMB-001]
 /// Trait defining tombstone semantics for index sequence numbers and key-value records.
 ///
 /// # Bit-Mask Convention (IP-07 / )
@@ -34,7 +31,6 @@ use crate::types::TOMBSTONE_BIT;
 /// # Zero-Panic Guarantees
 /// All methods in this trait perform purely bitwise operations and infallible memory allocations,
 /// guaranteeing zero panic across all input ranges.
-// ANCHOR[acta-types:TOMB-001]
 pub trait TombstoneSemanticsCheck {
     /// Returns `true` if the sequence number or flags indicate a soft-deleted tombstone.
     fn is_tombstone(seq: u64, flags: u8) -> bool;
@@ -43,17 +39,14 @@ pub trait TombstoneSemanticsCheck {
     fn make_tombstone(seq: u64) -> Vec<u8>;
 }
 
-// ANCHOR[acta-types:TOMB-002]
 /// Default reference implementation of [`TombstoneSemanticsCheck`].
 ///
 /// Uses bit 63 (`TOMBSTONE_BIT = 1 << 63`) in `seq: u64` or bit 0 in `flags: u8` (`flags & 0x01 != 0`)
 /// to identify and construct tombstones.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-// ANCHOR[acta-types:TOMB-002]
 pub struct SeqBitTombstone;
 
 impl TombstoneSemanticsCheck for SeqBitTombstone {
-    // ANCHOR[acta-types:TOMB-003]
     /// Returns `true` if `(seq & TOMBSTONE_BIT) != 0` OR if flag bit 0 (`(flags & 0x01) != 0`) is set.
     ///
     /// # Ablauf
@@ -65,7 +58,6 @@ impl TombstoneSemanticsCheck for SeqBitTombstone {
         (seq & TOMBSTONE_BIT) != 0 || (flags & 0x01) != 0
     }
 
-    // ANCHOR[acta-types:TOMB-004]
     /// Encodes `seq` with `TOMBSTONE_BIT` set into an 8-byte little-endian byte vector.
     ///
     /// If `seq` already has `TOMBSTONE_BIT` set, bit 63 remains set without double-wrapping or error.

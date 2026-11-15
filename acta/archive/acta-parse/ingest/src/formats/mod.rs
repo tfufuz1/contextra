@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Export-Modul für alle Format-Extraktor Stubs hinter #[cfg(feature)] Schaltern (WP M4).
-// INVARIANTEN: Zero-Panic, bedingte Kompilation je Format-Feature.
-// STAND: TS:2026-10-31T00:00:00Z
+// Export-Modul für alle Format-Extraktor Stubs hinter #[cfg(feature)] Schaltern (WP M4).
+// Invarianten: Zero-Panic, bedingte Kompilation je Format-Feature.
 
 #[cfg(feature = "fmt-text")]
 pub mod text;

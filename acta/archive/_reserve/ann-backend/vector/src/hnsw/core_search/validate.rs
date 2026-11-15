@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Validierung von Suchanfragen und Parametern (K-Grenzen, Dimension, NaN/Inf).
-// INVARIANTEN: Zero-Panic; k <= MAX_SEARCH_K; finite f32.
+// Validierung von Suchanfragen und Parametern (K-Grenzen, Dimension, NaN/Inf).
+// Invarianten: Zero-Panic; k <= MAX_SEARCH_K; finite f32.
 // HOTSPOTS: validate_search_params
-// STAND: 2026-11-12
 
 //! Validierungsroutinen für Vektorsuchanfragen.
 

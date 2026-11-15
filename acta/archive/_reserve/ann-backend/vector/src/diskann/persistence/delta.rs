@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Hintergrund- und Delta-Persistenz für DiskANN.
-// INVARIANTEN: Lock-Hierarchie; atomares Ersetzen von Delta-Dateien; fsync auf Verzeichnisebene.
-// STAND: 2026-11-11
+// Hintergrund- und Delta-Persistenz für DiskANN.
+// Invarianten: Lock-Hierarchie; atomares Ersetzen von Delta-Dateien; fsync auf Verzeichnisebene.
 
 use super::super::types::DiskAnnIndex;
 use crate::error::{Result, VectorError};

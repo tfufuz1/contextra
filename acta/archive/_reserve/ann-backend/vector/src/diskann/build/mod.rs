@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Graphaufbau (Vamana-Algorithmus) und Re-Exports für DiskANN.
-// INVARIANTEN: Lock-Hierarchie; atomares Ersetzen temporärer Dateien.
-// STAND: 2026-11-11
+// Graphaufbau (Vamana-Algorithmus) und Re-Exports für DiskANN.
+// Invarianten: Lock-Hierarchie; atomares Ersetzen temporärer Dateien.
 
 pub(crate) mod flush;
 pub(crate) mod pending_wal;

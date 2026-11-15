@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Trainingslogik und Min/Max/Scale-Berechnung für ScalarQuantizer (SQ8).
-// INVARIANTEN: Dividieren durch 0 geschützt (EPSILON Padding); DIM-Validierung; Outlier-Percentile Clipping.
+// Trainingslogik und Min/Max/Scale-Berechnung für ScalarQuantizer (SQ8).
+// Invarianten: Dividieren durch 0 geschützt (EPSILON Padding); DIM-Validierung; Outlier-Percentile Clipping.
 // HOTSPOTS: try_train_with_percentiles, calculate_vector_drift
-// STAND: 2026-11-12
 
 //! # Scalar Quantizer Training Module
 //!
@@ -24,7 +22,6 @@ impl ScalarQuantizer {
     }
 
     /// Trainiert einen `ScalarQuantizer` unter Berücksichtigung von Quantil-Grenzen.
-    // ANCHOR[acta-vec:SQ8-TRAIN]
     pub fn try_train_with_percentiles(
         batch: &[&[f32]],
         dimension: usize,
@@ -154,7 +151,6 @@ impl ScalarQuantizer {
     }
 
     /// Berechnet die relative Abweichung eines Vektors vom gelernten Wertebereich.
-    // ANCHOR[acta-vec:SQ8-CALC-DRIFT]
     pub fn calculate_vector_drift(&self, vector: &[f32]) -> f32 {
         if self.dimension == 0 || vector.is_empty() {
             return 0.0;

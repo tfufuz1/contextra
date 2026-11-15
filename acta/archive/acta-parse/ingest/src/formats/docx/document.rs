@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Parsing von word/document.xml für Absätze, Überschriften, Listen, Tabellen & Textboxen.
-// INVARIANTEN: Zero-Panic, LimitExceeded bei Budget-Überschreitung, AlternateContent ohne Dopplung.
-// STAND: TS:2026-10-31T00:00:00Z
+// Parsing von word/document.xml für Absätze, Überschriften, Listen, Tabellen & Textboxen.
+// Invarianten: Zero-Panic, LimitExceeded bei Budget-Überschreitung, AlternateContent ohne Dopplung.
 
 use crate::error::IngestError;
 use crate::extractor::ExtractContext;

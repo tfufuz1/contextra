@@ -1,11 +1,8 @@
-// FILE-CONTEXT
-// STAND: 2026-11-08T12:00:00Z
-// ZWECK: Zero-copy byte buffer slice wrapper (WireBuffer) with typestate verification for FlatBuffers IPC messages.
-// INVARIANTEN: No pointer transmutes or lifetime transmutations; reference counting via Bytes; (Unverified -> Verified).
+// Zero-copy byte buffer slice wrapper (WireBuffer) with typestate verification for FlatBuffers IPC messages.
+// Invarianten: No pointer transmutes or lifetime transmutations; reference counting via Bytes; (Unverified -> Verified).
 
 //! # Zero-Copy-Adapter-Abstraktionen für IPC-Drahtnachrichten
 //!
-//! **Ring:** Ring 0
 //! **Modulzweck:**
 //! Dieses Modul definiert den `WireBuffer`, einen leichtgewichtigen Wrapper um `bytes::Bytes`.
 //! Es ermöglicht das Weiterreichen von Byte-Puffern für FlatBuffers-Nachrichten über Modulgrenzen hinweg,
@@ -79,7 +76,6 @@ impl VerifiableRoot for crate::generated::acta_generated::acta::ipc::HyperEdge<'
     type Table<'a> = crate::generated::acta_generated::acta::ipc::HyperEdge<'a>;
 }
 
-// ANCHOR[acta-parse-worker:ADP-001]
 /// Zero-Copy Byte-Puffer-Wrapper für FlatBuffers-Nachrichten mit Typzustand.
 ///
 /// Kapselt eine Instanz von `bytes::Bytes`, um ein sicheres, referenzgezähltes Weiterreichen
@@ -97,7 +93,6 @@ pub struct WireBuffer<State = Unverified> {
 }
 
 impl WireBuffer<Unverified> {
-    // ANCHOR[acta-parse-worker:ADP-002]
     /// Erzeugt einen neuen `WireBuffer` im Zustand `Unverified`, der das übergebene `Bytes`-Objekt umhüllt.
     ///
     /// # Ablauf
@@ -174,7 +169,6 @@ impl<T: VerifiableRoot> WireBuffer<Verified<T>> {
 }
 
 impl<State> WireBuffer<State> {
-    // ANCHOR[acta-parse-worker:ADP-003]
     /// Gibt eine unveränderliche Slice-Referenz auf die zugrundeliegenden Rohdaten zurück.
     ///
     /// # Ablauf
@@ -188,7 +182,6 @@ impl<State> WireBuffer<State> {
         &self.data
     }
 
-    // ANCHOR[acta-parse-worker:ADP-004]
     /// Konsumiert den Wrapper und gibt das zugrundeliegende `Bytes`-Objekt frei.
     ///
     /// # Ablauf
@@ -212,7 +205,6 @@ impl<State> WireBuffer<State> {
     }
 }
 
-// ANCHOR[acta-parse-worker:ADP-005]
 // NOTE: Ermöglicht die Verwendung von `WireBuffer` überall dort, wo `AsRef<[u8]>` erwartet wird.
 impl<State> AsRef<[u8]> for WireBuffer<State> {
     #[inline]

@@ -7,10 +7,8 @@
 //! sichergestellt sein, dass bei nachfolgenden Abfragen oder Indexerweiterungen exakt
 //! dasselbe Modell und dieselbe Quantisierungsstufe (z. B. Q4_K_M, Q8_0) verwendet wird.
 
-// FILE-CONTEXT
-// STAND: 2026-11-10T00:00:00Z
-// ZWECK: Canonical ModelFingerprint type definition shared across workspace crates.
-// INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
+// Canonical ModelFingerprint type definition shared across workspace crates.
+// Invarianten: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
 //! Canonical `ModelFingerprint` definition for Acta.
 //!
@@ -22,13 +20,11 @@
 
 use serde::{Deserialize, Serialize};
 
-// ANCHOR[acta-base:FINGERPRINT-001]
 /// Uniquely identifies a model weight file and its quantization tier.
 ///
 /// Dient dazu, Modellgewicht-Dateien und Quantisierungsstufen auf Systemebene
 /// unverwechselbar zuzuordnen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[acta-base:MFP-001]
 /// Identifiziert eine Modelldatei und deren Quantisierungsstufe eindeutig.
 pub struct ModelFingerprint {
     /// SHA-256 hash digest over model weight blob and quantization tier string.
@@ -40,7 +36,6 @@ pub struct ModelFingerprint {
 }
 
 impl ModelFingerprint {
-    // ANCHOR[acta-base:FINGERPRINT-002]
     /// Creates a new `ModelFingerprint`.
     ///
     /// # Ablauf

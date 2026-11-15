@@ -1,7 +1,4 @@
-//! # Group-Commit Pipeline (Ring 1)
 //!
-//! // FILE-CONTEXT
-//! // STAND: 2026-11-11
 //! // ZWECK: Buendelt parallele Schreibanfragen deterministisch zur Reduktion von fsync-Aufrufen
 //! // INVARIANTEN: (Lock-Handoff), fail-closed
 

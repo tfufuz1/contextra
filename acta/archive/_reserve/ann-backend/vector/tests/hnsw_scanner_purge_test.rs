@@ -1,7 +1,6 @@
 #![allow(deprecated)]
-// FILE-CONTEXT
-// ZWECK: Tests für fail-closed HNSW Hard-Purge und LayerScanner (Welle 2/3).
-// INVARIANTEN: Tombstone-only meldet residual > 0; nach Hard-Purge residual == 0; Byte-Needle Test.
+// Tests für fail-closed HNSW Hard-Purge und LayerScanner (Welle 2/3).
+// Invarianten: Tombstone-only meldet residual > 0; nach Hard-Purge residual == 0; Byte-Needle Test.
 // HOTSPOTS: tests/hnsw_scanner_purge_test.rs
 
 use std::sync::Arc;

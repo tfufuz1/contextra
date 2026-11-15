@@ -6,9 +6,7 @@
 //! Leser sehen konsistente Snapshots (Schnappschüsse) zu einem logischen Zeitpunkt,
 //! während Schreiber isoliert neue Versionen im Staging-Puffer vorbereiten.
 //!
-//! ## Architektur-Rolle (Ring 0 / Ebene E1a — Kernkomponente)
 //!
-//! `acta-history` gehört zur innersten Systemschicht (Ring 0 / Ebene E1a). Es bietet fundamentale
 //! Isolationsgarantien für relationale und vektorielle Indexstrukturen und besitzt keinerlei
 //! Kenntnisse über Festplatten-Layouts oder Netzwerkprotokolle.
 //!
@@ -77,7 +75,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-// ANCHOR[id=acta-history-exports]
 pub use crate::mvcc_error::{MvccError, Result as MvccResult};
 pub use acta_base::{DocId, TenantId, TxId, TOMBSTONE_BIT};
 

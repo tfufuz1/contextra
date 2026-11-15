@@ -1,6 +1,5 @@
 //! Präfixbaum (Trie) für effiziente Wörterbuchabfragen und Teilwortsuche.
 
-// ANCHOR[acta-text:MORPH-010]
 /// Knoten im Präfixbaum zur Repräsentation von Buchstabenfolgen deutscher Wörter.
 #[derive(Default, Debug, Clone)]
 pub struct TrieNode {
@@ -10,7 +9,6 @@ pub struct TrieNode {
     pub children: std::collections::HashMap<char, TrieNode>,
 }
 
-// ANCHOR[acta-text:MORPH-011]
 /// Präfixbaum (Trie) für schnelle O(m)-Wörterbuchabfragen (m = Wortlänge).
 #[derive(Default, Debug, Clone)]
 pub struct Trie {
@@ -18,13 +16,11 @@ pub struct Trie {
 }
 
 impl Trie {
-    // ANCHOR[acta-text:MORPH-012]
     /// Erzeugt einen leeren Präfixbaum.
     pub fn new() -> Self {
         Self::default()
     }
 
-    // ANCHOR[acta-text:MORPH-013]
     /// Fügt ein Wort zeichenweise in den Baum ein und markiert den Endknoten als terminal.
     pub fn insert(&mut self, word: &str) {
         let mut curr = &mut self.root;
@@ -34,7 +30,6 @@ impl Trie {
         curr.is_terminal = true;
     }
 
-    // ANCHOR[acta-text:MORPH-014]
     /// Prüft, ob ein Wort exakt als terminaler Eintrag im Baum enthalten ist.
     pub fn contains(&self, word: &str) -> bool {
         let mut curr = &self.root;
@@ -48,7 +43,6 @@ impl Trie {
         curr.is_terminal
     }
 
-    // ANCHOR[acta-text:MORPH-015]
     /// Prüft, ob im Baum mindestens ein Wort existiert, das mit dem übergebenen Präfix beginnt.
     pub fn starts_with(&self, prefix: &str) -> bool {
         let mut curr = &self.root;

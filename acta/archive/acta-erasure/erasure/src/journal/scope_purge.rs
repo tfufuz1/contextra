@@ -5,7 +5,6 @@
 //! Vernichtung des scope-spezifischen Integritäts-/Kryptoschlüssels.
 //!
 //! // SECTION ScopePurge
-//! // ANCHOR[acta-erasure:SCOPE-PURGE-001]
 
 use super::wal_sink::{WalDisposalMethod, WalDisposalReceipt, WalScope, WalSink, WalSinkError};
 

@@ -5,7 +5,6 @@
 //! Lizenz- und Aktivierungs-Gate-Schicht für optionale Acta-Feature-Ringe (§14.6, §15).
 //!
 //! # Ring-Zugehörigkeit und Architektur
-//! - **Ring:** Ring 4 (Erweiterung / Enterprise-Features)
 //! - **Klasse:** Baustein Klasse A (gemäß Spezifikation v4.0 §2, §5)
 //! - **Status:** Autarkes Lizenz-Validierungsmodul (bleibt erhalten, E-08).
 //! - **Sicherheit:** `#![forbid(unsafe_code)]` – kein `unsafe` im gesamten Crate erlaubt oder vorhanden.

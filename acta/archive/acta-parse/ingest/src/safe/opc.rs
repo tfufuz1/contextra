@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Open Packaging Convention (OPC) Beziehungsdaten (.rels), Pfad-Auflösung & OpcPackage (P00B/P04).
-// INVARIANTEN: Zero-Panic, Determinismus durch BTreeMap, sichere Pfad-Normierung.
-// STAND: TS:2026-11-08T00:00:00Z
+// Open Packaging Convention (OPC) Beziehungsdaten (.rels), Pfad-Auflösung & OpcPackage (P00B/P04).
+// Invarianten: Zero-Panic, Determinismus durch BTreeMap, sichere Pfad-Normierung.
 
 use crate::error::IngestError;
 use crate::extractor::ResourceBudget;

@@ -1,13 +1,10 @@
-// FILE-CONTEXT
-// STAND: 2026-10-27T00:00:00Z
-// ZWECK: Hardened JSON-RPC 2.0 protocol request/response processing for Acta IPC.
-// INVARIANTEN: Strict JSON-RPC 2.0 wire spec compliance; zero panic in production code; zero unsafe; zero unwrap/expect.
+// Hardened JSON-RPC 2.0 protocol request/response processing for Acta IPC.
+// Invarianten: Strict JSON-RPC 2.0 wire spec compliance; zero panic in production code; zero unsafe; zero unwrap/expect.
 
 //! Generic JSON-RPC 2.0 protocol types and hardened parser for `Acta` IPC.
 //!
 //! # Gehärtetes JSON-RPC-2.0-Protokoll-Modul
 //!
-//! **Ring:** Ring 0 (Unsafe-Insel 3 von 3), Klasse Kern `[K]`.
 //!
 //! ## Zweck
 //! Dieses Modul stellt Typen und Parser für das JSON-RPC-2.0-Drahtprotokoll bereit. Es wird für
@@ -25,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
-// ANCHOR[acta-parse-worker:RPC-001]
 /// Configurable limits and security parameters for JSON-RPC message processing.
 ///
 /// Konfigurierbare Obergrenzen und Sicherheitsparameter für die JSON-RPC-Verarbeitung.
@@ -46,7 +42,6 @@ pub struct JsonRpcConfig {
 }
 
 impl Default for JsonRpcConfig {
-    // ANCHOR[acta-parse-worker:RPC-002]
     /// Erzeugt Standardwerte mit sicheren Produktionsgrenzen.
     fn default() -> Self {
         Self {
@@ -58,7 +53,6 @@ impl Default for JsonRpcConfig {
     }
 }
 
-// ANCHOR[acta-parse-worker:RPC-003]
 /// Parsed JSON-RPC payload representing either a single request or a batch of requests.
 ///
 /// Geparste JSON-RPC-Payload: Repräsentiert entweder eine Einzelanfrage oder einen Batch von Anfragen.
@@ -73,7 +67,6 @@ pub enum JsonRpcPayload {
     Batch(Vec<JsonRpcRequest>),
 }
 
-// ANCHOR[acta-parse-worker:RPC-004]
 /// Incoming JSON-RPC 2.0 message (Request or Notification).
 ///
 /// Eingehende JSON-RPC 2.0-Nachricht (Anfrage oder Benachrichtigung).
@@ -96,7 +89,6 @@ pub struct JsonRpcRequest {
 }
 
 impl JsonRpcRequest {
-    // ANCHOR[acta-parse-worker:RPC-005]
     /// Validates that the request complies with the JSON-RPC 2.0 specification (fail-closed).
     ///
     /// # Ablauf
@@ -119,7 +111,6 @@ impl JsonRpcRequest {
     }
 }
 
-// ANCHOR[acta-parse-worker:RPC-006]
 /// Outgoing JSON-RPC 2.0 response.
 ///
 /// Ausgehende JSON-RPC 2.0-Antwort (Erfolg oder Fehler).
@@ -141,7 +132,6 @@ pub struct JsonRpcResponse {
     pub error: Option<JsonRpcError>,
 }
 
-// ANCHOR[acta-parse-worker:RPC-007]
 /// JSON-RPC 2.0 Error object.
 ///
 /// Standardisiertes JSON-RPC 2.0 Fehlerobjekt.
@@ -168,7 +158,6 @@ impl std::fmt::Display for JsonRpcError {
 impl std::error::Error for JsonRpcError {}
 
 impl JsonRpcError {
-    // ANCHOR[acta-parse-worker:RPC-008]
     /// Parse error (-32700): Invalid JSON received by server.
     /// Erzeugt einen Parse error (-32700): Ungültiges JSON empfangen.
     pub fn parse_error(message: impl Into<String>) -> Self {
@@ -179,7 +168,6 @@ impl JsonRpcError {
         }
     }
 
-    // ANCHOR[acta-parse-worker:RPC-009]
     /// Invalid Request (-32600): JSON sent is not a valid Request object.
     /// Erzeugt einen Invalid Request (-32600): Gesendetes JSON ist keine gültige Anfrage.
     pub fn invalid_request(message: impl Into<String>) -> Self {
@@ -190,7 +178,6 @@ impl JsonRpcError {
         }
     }
 
-    // ANCHOR[acta-parse-worker:RPC-010]
     /// Method not found (-32601): The method does not exist / is not available.
     /// Erzeugt einen Method not found (-32601): Methode existiert nicht oder ist nicht verfügbar.
     pub fn method_not_found(message: impl Into<String>) -> Self {
@@ -201,7 +188,6 @@ impl JsonRpcError {
         }
     }
 
-    // ANCHOR[acta-parse-worker:RPC-011]
     /// Invalid params (-32602): Invalid method parameter(s).
     /// Erzeugt einen Invalid params (-32602): Ungültige Methodenparameter übergeben.
     pub fn invalid_params(message: impl Into<String>) -> Self {
@@ -212,7 +198,6 @@ impl JsonRpcError {
         }
     }
 
-    // ANCHOR[acta-parse-worker:RPC-012]
     /// Internal error (-32603): Internal JSON-RPC error.
     /// Erzeugt einen Internal error (-32603): Interner JSON-RPC Serverfehler.
     pub fn internal_error(message: impl Into<String>) -> Self {
@@ -225,7 +210,6 @@ impl JsonRpcError {
 }
 
 impl JsonRpcResponse {
-    // ANCHOR[acta-parse-worker:RPC-013]
     /// Constructs a successful JSON-RPC response.
     ///
     /// Konstruiert eine erfolgreiche JSON-RPC 2.0-Antwort mit Ergebnisdaten.
@@ -242,7 +226,6 @@ impl JsonRpcResponse {
         }
     }
 
-    // ANCHOR[acta-parse-worker:RPC-014]
     /// Constructs an error JSON-RPC response.
     ///
     /// Konstruiert eine JSON-RPC 2.0-Fehlerantwort.
@@ -265,7 +248,6 @@ impl JsonRpcResponse {
     }
 }
 
-// ANCHOR[acta-parse-worker:RPC-015]
 /// Parses raw bytes into a `JsonRpcPayload` using default configuration limits.
 ///
 /// Parst rohe Bytes in ein `JsonRpcPayload` unter Verwendung der Standard-Konfiguration.
@@ -273,7 +255,6 @@ pub fn parse_jsonrpc_payload(raw: &[u8]) -> Result<JsonRpcPayload, JsonRpcError>
     parse_jsonrpc_payload_with_config(raw, &JsonRpcConfig::default())
 }
 
-// ANCHOR[acta-parse-worker:RPC-016]
 /// Parses raw bytes into a `JsonRpcPayload` with strict security and size validation.
 ///
 /// Parst rohe Bytes in ein `JsonRpcPayload` mit strikter Sicherheits- und Größenvalidierung.
@@ -349,7 +330,6 @@ pub fn parse_jsonrpc_payload_with_config(
     }
 }
 
-// ANCHOR[acta-parse-worker:RPC-017]
 /// Helper struct for tracking object state during JSON key scanning.
 ///
 /// Hilfsstruktur zur Zustandsverfolgung während des Scannens von JSON-Objektschlüsseln.
@@ -359,7 +339,6 @@ struct ObjectKeyScope {
     expecting_key: bool,
 }
 
-// ANCHOR[acta-parse-worker:RPC-018]
 /// Validates structural nesting depth and duplicate key constraints.
 ///
 /// Validiert Schachtelungstiefe und Duplikate von Schlüsseln in linearem Durchlauf.

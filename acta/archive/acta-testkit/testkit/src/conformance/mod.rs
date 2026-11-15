@@ -32,50 +32,39 @@
 //! }
 //! ```
 
-// ANCHOR[acta-testkit:CONF-MOD-CLOCK-001]
 /// Konformitätssuite für den `Clock`-Port.
 pub mod clock;
 
-// ANCHOR[acta-testkit:CONF-MOD-FAILURE-001]
 /// Typen zur detaillierten Erfassung von Konformitätsfehlschlägen.
 pub mod failure;
 
-// ANCHOR[acta-testkit:CONF-MOD-GRAPH-001]
 /// Konformitätssuite für den `GraphIndex`-Port.
 pub mod graph;
 
-// ANCHOR[acta-testkit:CONF-MOD-MACROS-001]
 /// Hilfsmakros für Konformitätsprüfungen (`assert_conformance!`).
 pub mod macros;
 
-// ANCHOR[acta-testkit:CONF-MOD-METRICS-001]
 /// Konformitätssuite für den `MetricsSink`-Port.
 pub mod metrics;
 
-// ANCHOR[acta-testkit:CONF-MOD-RNG-001]
 /// Konformitätssuite für den Zufallszahlen-Port (`Rng`).
 pub mod rng;
 
-// ANCHOR[acta-testkit:CONF-MOD-STORAGE-001]
 /// Konformitätssuite für den `StorageEngine`-Port.
 pub mod storage;
 
-// ANCHOR[acta-testkit:CONF-MOD-TEXT-001]
 /// Konformitätssuite für den `TextIndex`-Port.
 pub mod text;
 
-// ANCHOR[acta-testkit:CONF-MOD-VECTOR-001]
 /// Konformitätssuite für den `VectorIndex`-Port.
 pub mod vector;
 
 /// Konformitätssuite für den `Vfs`-Port.
 pub mod vfs;
 
-// ANCHOR[acta-testkit:CONF-MOD-KV-001]
 /// Konformitaetssuiten fuer KV-Ports.
 pub mod kv_ports;
 
-// ANCHOR[acta-testkit:CONF-MOD-ROUTING-001]
 /// Konformitaetssuiten fuer Routing-Ports.
 pub mod routing_ports;
 

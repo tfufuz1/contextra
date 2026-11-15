@@ -1,4 +1,3 @@
-// ANCHOR[TEST:WAL-POISON-CAUSES] STATUS:DONE (TS:2026-11-08)
 //! Test suite verifying fail-closed WAL durability and PoisonCause discipline.
 
 #![cfg(feature = "fault-injection")]

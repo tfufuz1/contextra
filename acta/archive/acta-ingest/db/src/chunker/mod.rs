@@ -2,14 +2,11 @@
 //!
 //! **Zweck:** Dokument-Segmentierung und Chunker-Subsystem für Fließtexte und Abschnitte.
 //!
-//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// FILE-CONTEXT
-// ZWECK: Hauptmodul des Markdown-Chunkers (.1 / Teil 6.12 Ingestion Chunking Spezifikation).
-// INVARIANTEN: Re-exportiert exakt alle bisherigen öffentlichen Typen und Funktionen.
+// Hauptmodul des Markdown-Chunkers (.1 / Teil 6.12 Ingestion Chunking Spezifikation).
+// Invarianten: Re-exportiert exakt alle bisherigen öffentlichen Typen und Funktionen.
 // NICHT-OFFENSICHTLICH: Zerlegt Dokumente deterministisch; Brotkrumen und Spans als Metadaten angehängt. Indexfrei & Panikfrei.
-// STAND: TS:2026-10-29T00:00:00Z
 
 //! Markdown Semantic Chunker (.1 / Teil 6.12 Ingestion Chunking Spezifikation)
 

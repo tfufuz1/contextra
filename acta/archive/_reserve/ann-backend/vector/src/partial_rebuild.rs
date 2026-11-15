@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen (F-02).
-// INVARIANTEN:: Partial-Rebuild darf globalen HNSW-Graph nicht inkonsistent hinterlassen.
+// Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen (F-02).
+// Invarianten: : Partial-Rebuild darf globalen HNSW-Graph nicht inkonsistent hinterlassen.
 // NICHT-OFFENSICHTLICH: Ergänzt den globalen HNSW_REBUILD_DELETION_RATIO-Trigger hinter Feature-Flag partial-index-rebuild.
-// STAND: TS:2026-11-11T02:00:00Z
 
 //! F-02: Lokaler Partial-Rebuild-Trigger für HNSW-Hot-Path-Regionen.
 //!
@@ -38,13 +36,11 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 // SECTION Konfiguration
 
-// ANCHOR[acta-vec:PARTIAL-REBUILD-CONFIG]
 /// Konfiguration für den Partial-Rebuild-Trigger.
 #[derive(Debug, Clone)]
 pub struct PartialRebuildConfig {
     /// Kritische Übersättigungs-Schwelle θ_c. Default: 3.0 (3× globale Dichte).
     pub critical_ratio: f32,
-    /// Ringpuffer-Größe N für Traversal-Statistik. Default: 1000.
     pub traversal_window: usize,
     /// Mindest-Tombstone-Anteil global, bevor lokale Analyse sinnvoll ist. Default: 0.01.
     pub min_global_ratio: f32,
@@ -63,8 +59,6 @@ impl Default for PartialRebuildConfig {
 
 // SECTION TraversalTracker & Heuristik-Wächter
 
-// ANCHOR[acta-vec:PARTIAL-REBUILD-TRACKER]
-/// Ringpuffer für besuchte HNSW-Knoten-IDs während ef_search-Traversierungen.
 #[derive(Debug)]
 pub struct TraversalTracker {
     config: PartialRebuildConfig,
@@ -81,7 +75,6 @@ impl TraversalTracker {
     }
 
     /// Trägt die in einem ef_search-Lauf besuchten Node-IDs ein.
-    // ANCHOR[acta-vec:PARTIAL-REBUILD-RECORD]
     pub fn record_traversal(&mut self, visited_node_ids: Vec<u64>) {
         if self.config.traversal_window == 0 || visited_node_ids.is_empty() {
             return;
@@ -94,7 +87,6 @@ impl TraversalTracker {
 
     /// Berechnet S_local für alle Hot-Path-Regionen.
     /// Gibt Knoten-IDs zurück, für die S_local > θ_c gilt.
-    // ANCHOR[acta-vec:PARTIAL-REBUILD-OVERSATURATED]
     pub fn find_oversaturated_regions(
         &self,
         tombstone_map: &BTreeMap<u64, bool>, // node_id → is_tombstoned
@@ -155,7 +147,6 @@ impl TraversalTracker {
 ///
 /// Returns `Some(hot_node_ids)` wenn Partial-Rebuild ausgelöst werden soll,
 /// `None` wenn kein Rebuild nötig.
-// ANCHOR[acta-vec:PARTIAL-REBUILD-TRIGGER]
 #[cfg(feature = "partial-index-rebuild")]
 pub fn should_trigger_partial_rebuild(
     tracker: &TraversalTracker,

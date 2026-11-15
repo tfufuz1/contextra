@@ -1,11 +1,9 @@
-// FILE-CONTEXT
-// ZWECK: Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch.
-// INVARIANTEN: Safe Public API, zero panic, bytemuck/slice alignments.
+// Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch.
+// Invarianten: Safe Public API, zero panic, bytemuck/slice alignments.
 // HOTSPOTS: lib.rs, kernels/, dispatch.rs
 
 //! # Crate `acta-sys`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Kern, unsafe-Insel).
 //!
 //! **Zweck:**
 //! Diese Crate stellt hochoptimierte Vektor-Distanzberechnungen bereit.
@@ -15,10 +13,8 @@
 //!
 //! **Verbindung im System:**
 //! - **Abhängigkeiten (normal):** `bytemuck`, `thiserror`. Optional: `acta-base` (nur transitional via Feature `types-compat`), `serde`, `tracing`.
-//! - **Wird eingebunden von:** `acta-vec` (Ring 1) zur Beschleunigung von Ähnlichkeitssuchen in Vektorindizes
 //!   (z. B. HNSW = Hierarchical Navigable Small World).
 //!
-//! **Architektur:**
 //! 1. `kernels/`: Enthält isolierte Implementierungen für Skalar (Referenz), AVX2, AVX-512 und ARM NEON.
 //! 2. `dispatch.rs`: Ermittelt beim Start dynamisch die CPU-Fähigkeiten und wählt den schnellsten sicheren Pfad.
 //! 3. `lib.rs`: Bietet die sichere öffentliche Schnittstelle mit Vorab-Validierung gegen ungültige Werte (NaN/Unendlich).
@@ -30,12 +26,10 @@
 #![allow(unused_unsafe)]
 
 // SECTION MODULE-DECLARATIONS
-// ANCHOR[acta-sys:CORE-MOD-DISPATCH]
 pub mod contract;
 // Dynamische CPU-Erkennung und Funktionszeiger-Auswahl.
 pub mod dispatch;
 pub mod error;
-// ANCHOR[acta-sys:CORE-MOD-KERNELS]
 // Hardwarespezifische Rechenkerne (Scalar, AVX2, AVX-512, NEON).
 pub mod kernels;
 pub mod metric;
@@ -45,7 +39,6 @@ pub mod compat;
 // !SECTION MODULE-DECLARATIONS
 
 // SECTION RE-EXPORTS
-// ANCHOR[acta-sys:RE-EXPORTS]
 pub use contract::{DistanceFn, MetricDistanceFn};
 pub use dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
@@ -66,7 +59,6 @@ pub use metric::DistanceMetric;
 // !SECTION RE-EXPORTS
 
 // SECTION PUBLIC-API-FACADE
-// ANCHOR[acta-sys:CORE-VALIDATE-VEC]
 /// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
 ///
 /// NaN (Not a Number) und Unendlich führen in SIMD-Registern und Metriken zu undefinierten
@@ -105,7 +97,6 @@ pub fn validate_vector(vec: &[f32]) -> Result<()> {
     Ok(())
 }
 
-// ANCHOR[acta-sys:CORE-COMPUTE-DIST]
 /// Berechnet die Distanz zwischen zwei Vektoren unter Verwendung der angegebenen Metrik inklusive Validierung.
 ///
 /// Diese Funktion ist der primäre Einstiegspunkt für sichere Berechnungen von ungesicherten Eingaben.
@@ -142,7 +133,6 @@ pub fn compute_distance(a: &[f32], b: &[f32], metric: DistanceMetric) -> Result<
     compute_distance_trusted(a, b, metric)
 }
 
-// ANCHOR[acta-sys:CORE-COMPUTE-DIST-TRUSTED]
 /// Berechnet die Distanz zwischen zwei bereits validierten `f32`-Vektoren ohne erneute NaN-Prüfung.
 ///
 /// Wird intern verwendet, wenn Vektoren bereits bei der Aufnahme in den Speicher validiert wurden,
@@ -168,7 +158,6 @@ pub fn compute_distance_trusted(a: &[f32], b: &[f32], metric: DistanceMetric) ->
     }
 }
 
-// ANCHOR[acta-sys:CORE-COMPUTE-DIST-BYTES-TRUSTED]
 /// Berechnet die Distanz zwischen einem `f32`-Vektor und einem rohen Byte-Puffer (`&[u8]`), der `f32`-Werte darstellt.
 ///
 /// Dies ist besonders nützlich, wenn Vektoren aus dem Speicher oder Disk-Cache (z. B. LSM-Tree oder Memory-Mapped Files)

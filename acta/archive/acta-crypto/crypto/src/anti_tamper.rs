@@ -23,7 +23,6 @@ use zeroize::{Zeroize, Zeroizing};
 // !SECTION
 
 // SECTION [epic=crypto-tamper,seq=2] Volatiler Schlüssel & Notfall-Wipe
-// ANCHOR[acta-crypto:TAMPER-001] VolatileEncryptionKey mit Emergency Trigger
 // NOTE: Schützt vor Cold-Boot Angriffen durch sofortiges Nullen des Speichers (TS:2026-11-11)
 #[derive(Zeroize)]
 #[zeroize(drop)]
@@ -79,7 +78,6 @@ impl Eq for VolatileEncryptionKey {}
 // !SECTION
 
 // SECTION [epic=crypto-tamper,seq=3] Konstantzeit-Operationen
-// ANCHOR[acta-crypto:TAMPER-002] Konstantzeit-Vergleich zweier Slices
 /// Konstantzeit-Verifikation zweier Byte-Slices.
 ///
 /// Verhindert Timing-Orakel bei MAC-, Tag- und Prüfsummen-Validierungen.
@@ -93,7 +91,6 @@ pub fn constant_time_compare(a: &[u8], b: &[u8]) -> bool {
 
 /// Verifiziert ein Authentifizierungs-Tag in konstanter Zeit und liefert `Result<()>`.
 #[inline]
-// ANCHOR[acta-crypto:TAMPER-003] Tag-Validierung ohne Timing-Lecks
 pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()> {
     if constant_time_compare(expected, actual) {
         Ok(())
@@ -107,7 +104,6 @@ pub fn verify_tag_constant_time(expected: &[u8], actual: &[u8]) -> Result<()> {
 // !SECTION
 
 // SECTION [epic=crypto-tamper,seq=4] BLAKE3 Integritätskette
-// ANCHOR[acta-crypto:TAMPER-004] Blake3Chain Zustandsmaschine
 pub struct Blake3Chain {
     current_hash: [u8; 32],
     step_count: u64,

@@ -1,14 +1,11 @@
-// FILE-CONTEXT: Deutsche Morphologie & Komposita-Zerlegung.
-// ZWECK: Umlaut-Normalisierung (ä->ae, ö->oe, ü->ue, ß->ss) und Zerlegung deutscher Zusammensetzungen.
-// INVARIANTEN: Decompose arbeitet ausschließlich auf Kleinbuchstaben und prüft Mindestkomponentenlänge.
+// Umlaut-Normalisierung (ä->ae, ö->oe, ü->ue, ß->ss) und Zerlegung deutscher Zusammensetzungen.
+// Invarianten: Decompose arbeitet ausschließlich auf Kleinbuchstaben und prüft Mindestkomponentenlänge.
 // NICHT-OFFENSICHTLICH: KMU-Wörterbuch aus data/german_words.txt via include_str! geladen.
 // HOTSPOTS: GermanCompoundSplitter::decompose, normalize_umlauts
-// STAND: TS:2026-09-10T19:21:35Z (SESSION: 4dd1c98c)
 
 //! # Morphologische Analyse & Komposita-Zerlegung (`morphology`)
 //!
 //! # Einordnung im Ring-Modell
-//! Gehört zu **Ring 0 (Kern)**.
 //!
 //! # Zweck
 //! Bereitstellung von Algorithmen zur linguistischen Vorverarbeitung deutscher Texte:

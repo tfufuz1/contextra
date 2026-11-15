@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Laden des DiskANN-Indexes aus Speicherabbildung.
-// INVARIANTEN: Zero-Panic bei korruptem Header/Footer; Bounds-Prüfungen vor Slice-Zugriff.
-// STAND: 2026-11-11
+// Laden des DiskANN-Indexes aus Speicherabbildung.
+// Invarianten: Zero-Panic bei korruptem Header/Footer; Bounds-Prüfungen vor Slice-Zugriff.
 
 use std::sync::Arc;
 use subtle::ConstantTimeEq;

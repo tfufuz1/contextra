@@ -6,7 +6,6 @@
 use thiserror::Error;
 
 // SECTION ERROR-ENUM
-// ANCHOR[acta-sys:SIMD-ERROR-ENUM]
 /// Aufzählungs-Typ für alle im Crate auftretenden Fehlerzustände.
 ///
 /// Alle Varianten sind Fail-Closed konstruiert.
@@ -33,7 +32,6 @@ pub enum SimdError {
 // !SECTION ERROR-ENUM
 
 // SECTION RESULT-ALIAS
-// ANCHOR[acta-sys:SIMD-RESULT-ALIAS]
 /// Crate-lokales Result-Alias mit `SimdError` als Standard-Fehlertyp.
 pub type Result<T> = core::result::Result<T, SimdError>;
 

@@ -1,10 +1,8 @@
-// FILE-CONTEXT
-// ZWECK: Basis-Recall-Prüfung für HNSW f32 vs. SQ8 Quantisierung.
-// INVARIANTEN: Recall@10 >= 0.95 für HNSW f32 und SQ8 unter Cosine-Metrik.
+// Basis-Recall-Prüfung für HNSW f32 vs. SQ8 Quantisierung.
+// Invarianten: Recall@10 >= 0.95 für HNSW f32 und SQ8 unter Cosine-Metrik.
 // DATENSATZ: 1000 Vektoren, Dim: 128, 100 Queries, TestRng Seed: 0xABCD_EF01_2345_6789.
 // HERLEITUNG: Gemessener Recall 0.985, Schwelle 0.95 mit 0.035 Sicherheitsabstand.
 // HOTSPOTS: 25-85
-// STAND: 2026-11-12
 
 #[path = "common_q/mod.rs"]
 mod common_q;

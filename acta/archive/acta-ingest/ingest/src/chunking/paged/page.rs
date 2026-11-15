@@ -1,14 +1,11 @@
 //! Verarbeitung einzelner Seiten und Folienabschnitte.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: Seiten- und Folien-Verarbeitung für PagedChunker.
-// INVARIANTEN: Zero-Panic, Zitierbarkeit über page/slide locators, monotone Spans.
-// STAND: TS:2026-10-31T00:00:00Z
+// Seiten- und Folien-Verarbeitung für PagedChunker.
+// Invarianten: Zero-Panic, Zitierbarkeit über page/slide locators, monotone Spans.
 
 use crate::canonical::CanonicalText;
 use crate::chunking::common::{token_count, window_split};
@@ -34,7 +31,6 @@ struct PageGroup {
 }
 
 /// Verarbeitet das Dokument seiten- bzw. folienbasiert.
-// ANCHOR[acta-ingest:CHK-0220]
 // fn `process_paged_document` fuer Verarbeitung einzelner Seiten und Folienabschnitte.
 pub fn process_paged_document(
     ir: &DocumentIr,

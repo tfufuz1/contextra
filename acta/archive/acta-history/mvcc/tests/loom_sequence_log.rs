@@ -1,4 +1,3 @@
-// ANCHOR[acta-history:TEST-LOOM-SEQ-LOG]
 //! # Loom-Modell für `SequenceLog`
 #![allow(unexpected_cfgs)]
 

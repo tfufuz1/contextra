@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Parsing von word/numbering.xml zur Listenauflösung (aufzählend vs. nummeriert).
-// INVARIANTEN: Zero-Panic, deterministische Zuordnung, kein unsafe.
-// STAND: TS:2026-10-31T00:00:00Z
+// Parsing von word/numbering.xml zur Listenauflösung (aufzählend vs. nummeriert).
+// Invarianten: Zero-Panic, deterministische Zuordnung, kein unsafe.
 
 use crate::error::IngestError;
 use crate::extractor::ResourceBudget;

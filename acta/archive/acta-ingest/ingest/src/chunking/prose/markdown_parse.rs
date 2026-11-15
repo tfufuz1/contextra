@@ -1,21 +1,17 @@
 //! Markdown-Parser fuer Fliesstext-Segmentierung.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: Eigenständiger Markdown-Blockparser mit exakten Byte-Offsets ohne Fremdabhängigkeiten.
-// INVARIANTEN: Zero-Panic, UTF-8-sicher, exakte Byte-Spans relativ zur Eingabe, Deterministisch.
-// STAND: TS:2026-10-31T00:00:00Z
+// Eigenständiger Markdown-Blockparser mit exakten Byte-Offsets ohne Fremdabhängigkeiten.
+// Invarianten: Zero-Panic, UTF-8-sicher, exakte Byte-Spans relativ zur Eingabe, Deterministisch.
 
 use crate::ir::Locator;
 use std::ops::Range;
 
 /// Klassifikation von geparsten Markdown-Blöcken.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[acta-ingest:CHK-0221]
 // enum `ParsedBlockKind` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub enum ParsedBlockKind {
     YamlFrontMatter,
@@ -56,7 +52,6 @@ pub enum ParsedBlockKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[acta-ingest:CHK-0222]
 // struct `ParsedListItem` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub struct ParsedListItem {
     pub depth: u8,
@@ -66,7 +61,6 @@ pub struct ParsedListItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[acta-ingest:CHK-0223]
 // struct `ParsedMarkdownBlock` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub struct ParsedMarkdownBlock {
     pub kind: ParsedBlockKind,
@@ -83,7 +77,6 @@ struct LineInfo<'a> {
 }
 
 /// Zerlegt einen Markdown-Text in Blöcke mit exakten Byte-Spans.
-// ANCHOR[acta-ingest:CHK-0224]
 // fn `parse_markdown_blocks` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub fn parse_markdown_blocks(full_text: &str, base_offset: usize) -> Vec<ParsedMarkdownBlock> {
     if full_text.is_empty() {

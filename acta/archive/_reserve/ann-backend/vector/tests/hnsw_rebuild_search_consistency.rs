@@ -1,6 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-// FILE-CONTEXT: Integration test verifying HNSW snapshot search consistency before, during, and after index rebuilds. (TS: 2026-09-11)
 
 use acta_base::VectorIndex; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_base::{Rng, SeededRng}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen

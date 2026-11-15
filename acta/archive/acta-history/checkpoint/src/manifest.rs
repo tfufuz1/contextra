@@ -3,7 +3,6 @@
 //! Dieses Modul implementiert das kryptografisch verifizierte Manifest eines Checkpoints.
 //!
 //! ## Ring & Rolle
-//! Gehört zu **Ring 1 (Persistenz)**. Schützt Checkpoint-Metadaten und Komponentenlisten vor
 //! versehentlicher Beschädigung oder unbemerkter Manipulation (Tampering).
 //!
 //! ## Hauptkomponenten
@@ -24,11 +23,9 @@ struct LegacyMetaPayload<'a> {
 use crate::error::{CheckpointError, Result};
 use serde::{Deserialize, Serialize};
 
-/// AI-TAG\[PANIC-SAFETY\]\[CRITICAL\] RESOLVED: AGT-CKPT-f3a1b2c4 (TS:2026-08-29T08:06:29Z) (SESSION:14348074)
 /// Fault-Injection-Tests in
 /// tests/manifest_fault_injection.rs beweisen atomare Schreib-Semantik
 /// und Tamper-Erkennung via Blake3-Checksum.
-// ANCHOR[acta-history:MAN-001]
 /// Kryptografisch gesichertes Manifest eines gespeicherten Checkpoints.
 ///
 /// # Zweck
@@ -50,7 +47,6 @@ pub struct CheckpointManifest {
 }
 
 impl CheckpointManifest {
-    // ANCHOR[acta-history:MAN-002]
     /// Erzeugt ein neues [`CheckpointManifest`] und berechnet die BLAKE3-Prüfsumme.
     ///
     /// # Vorbedingungen
@@ -88,7 +84,6 @@ impl CheckpointManifest {
         })
     }
 
-    // ANCHOR[acta-history:MAN-003]
     /// Verifiziert die Integrität des Manifests anhand der gespeicherten Prüfsumme.
     ///
     /// # Ablauf von `verify`:

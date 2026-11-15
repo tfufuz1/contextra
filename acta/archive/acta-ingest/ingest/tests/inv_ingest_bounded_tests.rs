@@ -33,7 +33,6 @@ impl Read for InfiniteByteReader {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0451]
 #[test]
 fn test_inv_ingest_bounded_stream_never_reads_more_than_64k() {
     let mut reader = InfiniteByteReader::new(b'A');
@@ -48,7 +47,6 @@ fn test_inv_ingest_bounded_stream_never_reads_more_than_64k() {
     assert_eq!(reader.bytes_read, MAX_DETECT_BYTES);
 }
 
-// ANCHOR[acta-ingest:TST-0452]
 #[test]
 fn test_inv_ingest_bounded_large_slice() {
     let large_data = vec![b'%'; 10 * 1024 * 1024]; // 10 MiB
@@ -59,7 +57,6 @@ fn test_inv_ingest_bounded_large_slice() {
     assert!(res.is_err() || res.is_ok());
 }
 
-// ANCHOR[acta-ingest:TST-0453]
 proptest! {
     #[test]
     fn prop_detect_bounded_invariant(data in proptest::collection::vec(any::<u8>(), 0..128 * 1024)) {

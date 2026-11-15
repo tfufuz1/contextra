@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Persistenz-Subsystem für DiskANN.
-// INVARIANTEN: Modulare Aufteilung in Teildomänen; re-exportiert alle bisherigen Pfade.
-// STAND: 2026-11-11
+// Persistenz-Subsystem für DiskANN.
+// Invarianten: Modulare Aufteilung in Teildomänen; re-exportiert alle bisherigen Pfade.
 
 pub(crate) mod delta;
 pub(crate) mod fallback;

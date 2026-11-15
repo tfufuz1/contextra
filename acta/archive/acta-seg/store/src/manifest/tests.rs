@@ -1,4 +1,3 @@
-//! # Manifest-Tests (Ring 1)
 //!
 //! Validiert Rollover, Recovery und atomare Manifest-Commits.
 

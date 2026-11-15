@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Differenzieller Test zwischen SIMD- und Skalar-Kernen für AVX2/NEON/Fallback.
-// INVARIANTEN: Bit-Identität bzw. Differenz <= 1e-5 für alle Metriken.
+// Differenzieller Test zwischen SIMD- und Skalar-Kernen für AVX2/NEON/Fallback.
+// Invarianten: Bit-Identität bzw. Differenz <= 1e-5 für alle Metriken.
 // HOTSPOTS: 15-55
-// STAND: 2026-11-12
 use acta_vec::distance::{compute_distance, ScalarKernel, DistanceKernel};
 use acta_base::DistanceMetric; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 

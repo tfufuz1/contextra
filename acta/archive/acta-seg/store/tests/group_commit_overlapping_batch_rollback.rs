@@ -1,5 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Testet, dass ein Fehlschlag eines nachfolgenden Batches B (Tx 3) nicht die bereits dauerhaften WAL-Einträge von Batch A (Tx 2) abschneidet.
+// Testet, dass ein Fehlschlag eines nachfolgenden Batches B (Tx 3) nicht die bereits dauerhaften WAL-Einträge von Batch A (Tx 2) abschneidet.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg(feature = "fault-injection")]

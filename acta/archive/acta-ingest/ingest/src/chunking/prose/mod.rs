@@ -1,14 +1,11 @@
 //! Prosa- und Markdown-Chunking-Modul fuer Fliesstext.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: ProseChunker Hauptmodul für IR-basiertes span-genaues Chunking.
-// INVARIANTEN: Zero-Panic, deterministisch, span-genau im kanonischen Text, Parität zu Engine-Chunker.
-// STAND: TS:2026-10-31T00:00:00Z
+// ProseChunker Hauptmodul für IR-basiertes span-genaues Chunking.
+// Invarianten: Zero-Panic, deterministisch, span-genau im kanonischen Text, Parität zu Engine-Chunker.
 
 pub mod markdown_parse;
 pub mod merge;
@@ -32,7 +29,6 @@ use serde_json::{Map, Value};
 use std::ops::Range;
 
 #[derive(Debug, Default, Clone)]
-// ANCHOR[acta-ingest:CHK-0226]
 // struct `ProseChunker` fuer Prosa- und Markdown-Chunking-Modul fuer Fliesstext.
 pub struct ProseChunker;
 
@@ -86,7 +82,6 @@ enum InterKind {
     Other,
 }
 
-// ANCHOR[acta-ingest:CHK-0227]
 // fn `draft_prose` fuer Prosa- und Markdown-Chunking-Modul fuer Fliesstext.
 pub fn draft_prose(
     ir: &DocumentIr,

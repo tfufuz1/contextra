@@ -3,9 +3,8 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kdf_argon2id`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
-// FILE-CONTEXT
-// ZWECK: Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration.
-// INVARIANTEN: Zero Panics bei Fuzzing/ungültigen Header-Bytes. Determinismus bei gleichen Eingaben. Unveränderte HKDF-Referenzwerte.
+// Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration.
+// Invarianten: Zero Panics bei Fuzzing/ungültigen Header-Bytes. Determinismus bei gleichen Eingaben. Unveränderte HKDF-Referenzwerte.
 
 use acta_crypto::crypto::KeyManager;
 use acta_crypto::kdf::{

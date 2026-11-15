@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 // =========================================================================
 // SECTION: IdGen Port Trait
-// ANCHOR[id=idgen-root,epic=id-gen,seq=1]
 // NOTE: Primäre Abstraktion zur Erzeugung prozessweiter oder lokaler eindeutiger IDs.
 // =========================================================================
 
@@ -27,7 +26,6 @@ pub trait IdGen: Send + Sync + 'static {
 
 // =========================================================================
 // SECTION: SequentialIdGen Implementation
-// ANCHOR[id=idgen-seq,epic=id-gen,seq=2]
 // NOTE: Threadsichere atomare Implementierung basierend auf `AtomicU64`.
 // =========================================================================
 
@@ -71,7 +69,6 @@ impl IdGen for SequentialIdGen {
 
 // =========================================================================
 // SECTION: Blanket Implementation for Arc<T>
-// ANCHOR[id=idgen-arc,epic=id-gen,seq=3]
 // NOTE: Erlaubt direkte Nutzung von `Arc<dyn IdGen>` ohne zusätzliche Allokationen.
 // =========================================================================
 
@@ -86,7 +83,6 @@ impl<T: IdGen + ?Sized> IdGen for Arc<T> {
 
 // =========================================================================
 // SECTION: Unit Tests
-// ANCHOR[id=idgen-tests,epic=id-gen,seq=4]
 // =========================================================================
 
 #[cfg(test)]

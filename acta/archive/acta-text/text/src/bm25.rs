@@ -1,14 +1,11 @@
-// FILE-CONTEXT: BM25 Scoring & Parameter Struct.
-// ZWECK: Berechnet mathematisch BM25 Term-Scores und validiert Hyperparameter (k1, b).
-// INVARIANTEN: k1 >= 0.0 (non-NaN, finite), 0.0 <= b <= 1.0 (non-NaN, finite).
+// Berechnet mathematisch BM25 Term-Scores und validiert Hyperparameter (k1, b).
+// Invarianten: k1 >= 0.0 (non-NaN, finite), 0.0 <= b <= 1.0 (non-NaN, finite).
 // NICHT-OFFENSICHTLICH: Log-IDF ist mit Robertson-Spärck-Jones Glättung implementiert (ln(1 + (N - df + 0.5) / (df + 0.5))).
 // HOTSPOTS: score_term, score_term_with_params
-// STAND: TS:2026-08-30T22:01:55Z (SESSION: cf1f75c6)
 
 //! Mathematische BM25- und BM25F-Scoring-Funktionen sowie Parametrisierung.
 //!
 //! # Ring-Zuordnung
-//! Ring 0 (Kern).
 //!
 //! # Mathematische Grundlagen
 //! Implementiert das Okapi-BM25-Modell zur Bewertung der Dokumentrelevanz bzgl. Suchtermen.
@@ -19,15 +16,12 @@
 
 use crate::error::{Result, TextError};
 
-// ANCHOR[acta-text:BM25-001]
 /// Standard-k1-Parameter für die Termfrequenz-Sättigung in BM25 (1.5).
 pub const BM25_K1: f32 = 1.5;
 
-// ANCHOR[acta-text:BM25-002]
 /// Standard-b-Parameter für die Dokumentlängen-Normalisierung in BM25 (0.75).
 pub const BM25_B: f32 = 0.75;
 
-// ANCHOR[acta-text:BM25-003]
 /// Konfigurationsparameter für das BM25-Scoring-Modell.
 ///
 /// - `k1`: Steuert die Sättigung der Termhäufigkeit (TF). Standardwert: 1.5.
@@ -41,7 +35,6 @@ pub struct BM25 {
 }
 
 impl BM25 {
-    // ANCHOR[acta-text:BM25-004]
     /// Erzeugt eine neue `BM25`-Instanz mit validierten Hyperparametern.
     ///
     /// # Fehler
@@ -57,7 +50,6 @@ impl BM25 {
         Ok(Self { k1, b })
     }
 
-    // ANCHOR[acta-text:BM25-005]
     /// Berechnet den BM25-Score für einen Begriff mit den Parametern dieser Instanz.
     pub fn score_term(&self, tf: u32, doc_len: u32, avg_doc_len: f32, df: u32, n: u32) -> f32 {
         score_term_with_params(tf, doc_len, avg_doc_len, df, n, self.k1, self.b)
@@ -74,7 +66,6 @@ impl Default for BM25 {
     }
 }
 
-// ANCHOR[acta-text:BM25-006]
 /// Berechnet den BM25-Score für einen Begriff mit den Standardparametern (`k1 = 1.5`, `b = 0.75`).
 ///
 /// # Parameter
@@ -87,7 +78,6 @@ pub fn score_term(tf: u32, doc_len: u32, avg_doc_len: f32, df: u32, n: u32) -> f
     score_term_with_params(tf, doc_len, avg_doc_len, df, n, BM25_K1, BM25_B)
 }
 
-// ANCHOR[acta-text:BM25-007]
 /// Berechnet den BM25-Score mit frei konfigurierbaren Parametern `k1` und `b`.
 ///
 /// # Ablauf
@@ -130,11 +120,9 @@ pub fn score_term_with_params(
     idf * (tf_numerator / tf_denominator)
 }
 
-// ANCHOR[acta-text:BM25-008]
 /// Eindeutige Kennung für Dokumentenfelder im feldgewichteten BM25F-Scoring.
 pub type FieldId = u32;
 
-// ANCHOR[acta-text:BM25-009]
 /// Feldgewichtungskonfiguration für ein bestimmtes Feld in BM25F.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FieldWeight {
@@ -147,7 +135,6 @@ pub struct FieldWeight {
 }
 
 impl FieldWeight {
-    // ANCHOR[acta-text:BM25-010]
     /// Erzeugt eine neue `FieldWeight`-Konfiguration nach Validierung von `weight` und `b`.
     pub fn new(field_id: FieldId, weight: f32, b: f32) -> Result<Self> {
         if weight < 0.0 || weight.is_nan() {
@@ -166,7 +153,6 @@ impl FieldWeight {
     }
 }
 
-// ANCHOR[acta-text:BM25-011]
 /// Konfiguration für feldgewichtetes BM25F-Scoring (§11.3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct BM25F {
@@ -178,7 +164,6 @@ pub struct BM25F {
 }
 
 impl BM25F {
-    // ANCHOR[acta-text:BM25-012]
     /// Erzeugt ein neues BM25F-Modell mit Feldgewichtungen.
     pub fn new(k1: f32, field_weights: Vec<FieldWeight>) -> Result<Self> {
         if k1 < 0.0 || k1.is_nan() {
@@ -195,7 +180,6 @@ impl BM25F {
         })
     }
 
-    // ANCHOR[acta-text:BM25-013]
     /// Berechnet den BM25F-Score über mehrere Felder hinweg.
     pub fn score_term(
         &self,
@@ -207,7 +191,6 @@ impl BM25F {
     }
 }
 
-// ANCHOR[acta-text:BM25-014]
 /// Berechnet den feldgewichteten BM25F-Score nach Robertson & Zaragoza (2004).
 ///
 /// Berechnet zunächst die gewichtete Pseudo-Termfrequenz über alle Felder und wendet
@@ -308,7 +291,6 @@ pub fn score_term_bm25f(
 mod tests {
     use super::*;
 
-    // ANCHOR[acta-text:TEST-BM25-001]
     // Prüft, dass BM25 bei allen Grenzfällen niemals NaN oder Unendlich liefert.
     #[test]
     fn test_bm25_no_nan_or_infinity() {

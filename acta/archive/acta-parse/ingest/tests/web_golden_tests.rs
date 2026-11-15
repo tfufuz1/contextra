@@ -5,10 +5,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Golden Integrationstests, EPUB-Zip-Tests, Stack-Overflow-Schutz und Proptests für WebExtractor (WP M4).
-// INVARIANTEN: All-targets / All-features Lints einhalten, Fail-Closed, Zero-Panic.
-// STAND: TS:2026-10-31T00:00:00Z
+// Golden Integrationstests, EPUB-Zip-Tests, Stack-Overflow-Schutz und Proptests für WebExtractor (WP M4).
+// Invarianten: All-targets / All-features Lints einhalten, Fail-Closed, Zero-Panic.
 
 #![allow(
     clippy::unwrap_used,
@@ -44,7 +42,6 @@ fn make_test_context<'a>(
     }
 }
 
-// ANCHOR[acta-ingest:TST-0440]
 // Testet die Funktionsfaehigkeit von `test_golden_1_article_page_main_and_nav_discarding`.
 #[test]
 fn test_golden_1_article_page_main_and_nav_discarding() {
@@ -102,7 +99,6 @@ fn test_golden_1_article_page_main_and_nav_discarding() {
     assert!(!full_text.contains("Fußzeile Copyright"));
 }
 
-// ANCHOR[acta-ingest:TST-0441]
 // Testet die Funktionsfaehigkeit von `test_golden_2_table_flattening_colspan_rowspan`.
 #[test]
 fn test_golden_2_table_flattening_colspan_rowspan() {
@@ -161,7 +157,6 @@ fn test_golden_2_table_flattening_colspan_rowspan() {
     );
 }
 
-// ANCHOR[acta-ingest:TST-0442]
 // Testet die Funktionsfaehigkeit von `test_golden_3_code_block_language_extraction`.
 #[test]
 fn test_golden_3_code_block_language_extraction() {
@@ -197,7 +192,6 @@ fn test_golden_3_code_block_language_extraction() {
     assert!(code_block.1.contains("fn hello()"));
 }
 
-// ANCHOR[acta-ingest:TST-0443]
 // Testet die Funktionsfaehigkeit von `test_golden_4_nested_lists`.
 #[test]
 fn test_golden_4_nested_lists() {
@@ -242,7 +236,6 @@ fn test_golden_4_nested_lists() {
     assert_eq!(list_items[2], (1, true, "Ebene 1 Nummer 1".to_string()));
 }
 
-// ANCHOR[acta-ingest:TST-0444]
 // Testet die Funktionsfaehigkeit von `test_golden_5_entities_and_german_umlauts`.
 #[test]
 fn test_golden_5_entities_and_german_umlauts() {
@@ -268,7 +261,6 @@ fn test_golden_5_entities_and_german_umlauts() {
     assert_eq!(text, "Mülheim, Köln, Straße & Bäume");
 }
 
-// ANCHOR[acta-ingest:TST-0445]
 // Testet die Funktionsfaehigkeit von `test_golden_6_7_hidden_element_and_prompt_injection_suppression`.
 #[test]
 fn test_golden_6_7_hidden_element_and_prompt_injection_suppression() {
@@ -304,7 +296,6 @@ fn test_golden_6_7_hidden_element_and_prompt_injection_suppression() {
         .any(|w| w.code == WarningCode::HiddenContentSkipped));
 }
 
-// ANCHOR[acta-ingest:TST-0446]
 // Testet die Funktionsfaehigkeit von `test_epub_extraction_two_chapters_ncx_titles`.
 #[test]
 fn test_epub_extraction_two_chapters_ncx_titles() {
@@ -358,7 +349,6 @@ fn test_epub_extraction_two_chapters_ncx_titles() {
     assert!(full_text.contains("Zweites Kapitel Text."));
 }
 
-// ANCHOR[acta-ingest:TST-0447]
 // Testet die Funktionsfaehigkeit von `test_epub_drm_encrypted_error`.
 #[test]
 fn test_epub_drm_encrypted_error() {
@@ -399,7 +389,6 @@ fn test_epub_drm_encrypted_error() {
     );
 }
 
-// ANCHOR[acta-ingest:TST-0448]
 // Testet die Funktionsfaehigkeit von `test_epub_zip_bomb_entries_limit`.
 #[test]
 fn test_epub_zip_bomb_entries_limit() {
@@ -442,7 +431,6 @@ fn test_epub_zip_bomb_entries_limit() {
     ));
 }
 
-// ANCHOR[acta-ingest:TST-0449]
 // Testet die Funktionsfaehigkeit von `test_deep_divs_100k_depth_limit_or_clean_handling`.
 #[test]
 fn test_deep_divs_100k_depth_limit_or_clean_handling() {
@@ -478,7 +466,6 @@ fn test_deep_divs_100k_depth_limit_or_clean_handling() {
 }
 
 proptest! {
-// ANCHOR[acta-ingest:TST-0450]
 // Testet die Funktionsfaehigkeit von `test_proptest_arbitrary_bytes_no_panic`.
     #[test]
     fn test_proptest_arbitrary_bytes_no_panic(bytes in proptest::collection::vec(any::<u8>(), 0..2048)) {

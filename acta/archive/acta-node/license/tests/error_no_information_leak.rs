@@ -5,7 +5,6 @@
 
 use acta_node::{FeatureRing, LicenseError, LicenseGate, SignedLicenseGate};
 
-// ANCHOR[acta-node:TEST-ERROR-NO-INFO-LEAK]
 // Prüft, dass LicenseError::NotActivated keinerlei interne Hash-Werte oder Pfade im Display-String ausgibt.
 #[test]
 fn test_not_activated_error_formatting_contains_no_hashes_or_local_ids() {

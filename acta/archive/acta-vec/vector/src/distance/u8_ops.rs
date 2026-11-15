@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Integer-Kernel für quantisierte Operationen (u8 Distanzen und Skalarprodukte).
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Keine Panics bei ungleichen Längen.
+// Integer-Kernel für quantisierte Operationen (u8 Distanzen und Skalarprodukte).
+// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); Keine Panics bei ungleichen Längen.
 // HOTSPOTS: euclidean_distance_sq_u8, dot_product_u8, cosine_similarity_parts_u8
-// STAND: 2026-11-12
 
 //! # Quantized Integer Ops Module
 //!

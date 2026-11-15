@@ -1,7 +1,5 @@
-//! # Lifecycle, Validation & Context Preparation Ports (Ring 0 / Class B)
 //!
 //!
-//! // ANCHOR[acta-base:LIFECYCLE-001]
 //! // SECTION lifecycle-validation-contracts
 //! // NOTE: Definiert Validierungs- und Budgetverträge für RAG-Pipelines.
 //! // Invarianten:
@@ -13,7 +11,6 @@ use crate::types::{ContextChunk, ContextWindow, TokenBudget};
 use crate::Result;
 use serde::{Deserialize, Serialize};
 
-// ANCHOR[acta-base:GROUNDING-ASSESS-001]
 /// Result of a post-hoc grounding / attribution validation check.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GroundingAssessment {
@@ -25,7 +22,6 @@ pub struct GroundingAssessment {
     pub reason: Option<String>,
 }
 
-// ANCHOR[acta-base:GROUNDING-VAL-001]
 /// Abstract contract for post-hoc hallucination / grounding validation.
 pub trait GroundingValidator: Send + Sync {
     /// Validates an LLM-generated response against retrieval context chunks.
@@ -40,7 +36,6 @@ pub trait GroundingValidator: Send + Sync {
     ) -> BoxFuture<'a, Result<GroundingAssessment>>;
 }
 
-// ANCHOR[acta-base:RESP-GROUNDING-VAL-001]
 /// Abstract contract for grounding validation of LLM-generated responses against raw source strings.
 pub trait ResponseGroundingValidator: Send + Sync {
     /// Evaluates the grounding score for an LLM-generated response against source text slices.
@@ -53,7 +48,6 @@ pub trait ResponseGroundingValidator: Send + Sync {
     fn score_grounding(&self, response: &str, sources: &[&str]) -> Result<f32>;
 }
 
-// ANCHOR[acta-base:CTX-PREPARER-001]
 /// Contract for trimming and preparing context windows tailored to token budgets.
 pub trait ContextPreparer: Send + Sync {
     /// Prepares and trims context chunks according to the provided token budget and relevance threshold.

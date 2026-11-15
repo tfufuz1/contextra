@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Exaktes Nachranking und Score-Berechnung für SQ8 und unquantisierte Kandidaten.
-// INVARIANTEN: Deterministische Sortierung (Score absteigend, DocId aufsteigend).
+// Exaktes Nachranking und Score-Berechnung für SQ8 und unquantisierte Kandidaten.
+// Invarianten: Deterministische Sortierung (Score absteigend, DocId aufsteigend).
 // HOTSPOTS: compute_distance_score, sort_and_truncate_results
-// STAND: 2026-11-12
 
 //! Exaktes Nachranking und Metrik-Konvertierung für Suchkandidaten.
 

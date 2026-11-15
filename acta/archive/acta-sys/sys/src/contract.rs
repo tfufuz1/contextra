@@ -1,4 +1,3 @@
-//! Minimaler Umwelt-Vertrag (`contract`) für `acta-sys` (Ring 0 / E0).
 //!
 //! Definiert die minimalen Abstraktions-Traits für speicherbezogene und haltbare
 //! Systemoperationen, damit Konsumenten und Test-Harnesses ohne physische E/A oder

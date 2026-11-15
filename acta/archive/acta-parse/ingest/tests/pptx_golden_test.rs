@@ -5,10 +5,8 @@
 //! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
 //! von `acta-ingest` fuer dieses Modul/Format gemaess Spezifikation.
 //!
-// FILE-CONTEXT
-// ZWECK: Golden-Tests für PPTX-Extraktion (PresentationML, Folienreihenfolge, Formen, Notizen, Limits).
-// INVARIANTEN: Zero-Panic, Test-First, dynamische Zip-Generierung im Code.
-// STAND: TS:2026-10-31T00:00:00Z
+// Golden-Tests für PPTX-Extraktion (PresentationML, Folienreihenfolge, Formen, Notizen, Limits).
+// Invarianten: Zero-Panic, Test-First, dynamische Zip-Generierung im Code.
 
 #![allow(
     clippy::unwrap_used,
@@ -248,7 +246,6 @@ fn build_golden_pptx() -> Vec<u8> {
     res.into_inner()
 }
 
-// ANCHOR[acta-ingest:TST-0401]
 // Testet die Funktionsfaehigkeit von `test_pptx_golden_extraction_order_shapes_table_notes_and_hidden`.
 #[test]
 fn test_pptx_golden_extraction_order_shapes_table_notes_and_hidden() {
@@ -346,7 +343,6 @@ fn test_pptx_golden_extraction_order_shapes_table_notes_and_hidden() {
         .any(|w| w.code == WarningCode::HiddenContentSkipped));
 }
 
-// ANCHOR[acta-ingest:TST-0402]
 // Testet die Funktionsfaehigkeit von `test_pptx_hidden_slide_included_when_policy_enabled`.
 #[test]
 fn test_pptx_hidden_slide_included_when_policy_enabled() {
@@ -383,7 +379,6 @@ fn test_pptx_hidden_slide_included_when_policy_enabled() {
     );
 }
 
-// ANCHOR[acta-ingest:TST-0403]
 // Testet die Funktionsfaehigkeit von `test_pptx_corrupt_xml_and_zip_bomb_limits`.
 #[test]
 fn test_pptx_corrupt_xml_and_zip_bomb_limits() {
@@ -433,7 +428,6 @@ fn test_pptx_corrupt_xml_and_zip_bomb_limits() {
     ));
 }
 
-// ANCHOR[acta-ingest:TST-0404]
 // Testet die Funktionsfaehigkeit von `test_fuzz_seeds_generation`.
 #[test]
 fn test_fuzz_seeds_generation() {

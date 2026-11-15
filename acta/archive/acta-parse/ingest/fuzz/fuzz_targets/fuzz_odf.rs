@@ -12,5 +12,4 @@ fuzz_target!(|data: &[u8]| {
     acta_ingest::fuzz_support::run(acta_ingest::format::FormatId::Odp, data);
 });
 
-// ANCHOR[acta-ingest:FUZZ-0454]
 // Fuzzing-Target-Definition fuer fuzz_odf.rs.

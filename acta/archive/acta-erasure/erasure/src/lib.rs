@@ -1,6 +1,5 @@
 //! Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.
 //!
-//! Ring 3. Abhängigkeitsregel AR-3: Erlaubte Abhängigkeiten
 //! sind ausschließlich `acta-base`, `acta-base` und `acta-crypto`.
 
 #![forbid(unsafe_code)]

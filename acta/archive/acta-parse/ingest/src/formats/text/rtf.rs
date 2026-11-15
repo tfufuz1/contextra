@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: RTF (Rich Text Format) Extractor ohne externe Abhängigkeiten (WP M4).
-// INVARIANTEN: Zero-Panic, Stack-Tiefe aus max_xml_depth, \u/\'hh/\v/Tabellen/\info Handling.
-// STAND: TS:2026-10-31T00:00:00Z
+// RTF (Rich Text Format) Extractor ohne externe Abhängigkeiten (WP M4).
+// Invarianten: Zero-Panic, Stack-Tiefe aus max_xml_depth, \u/\'hh/\v/Tabellen/\info Handling.
 
 use crate::canonical::sanitize_text;
 use crate::error::{IngestError, LimitKind};

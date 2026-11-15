@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// STAND: 2026-09-19T20:22:00Z (SESSION: 01c5be8b)
-// ZWECK: Unsafe Islands inventory verification (GESAMTSPEZIFIKATION §0.2, §0.4).
-// INVARIANTEN: Exactly 3 Unsafe Islands (acta-sys, acta-sys, acta-parse-worker).
+// Unsafe Islands inventory verification (GESAMTSPEZIFIKATION §0.2, §0.4).
+// Invarianten: Exactly 3 Unsafe Islands (acta-sys, acta-sys, acta-parse-worker).
 // Temporary transition allowance until Phase 1c for legacy store, index, db, and crypto test.
 
 use std::collections::HashSet;

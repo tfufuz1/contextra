@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Lokaler partieller Rebuild von Knotenregionen und Bereinigung von Tombstones in der Nachbarschaft.
-// INVARIANTEN: Lock-Hierarchie: write_mutex -> arena write lock.
+// Lokaler partieller Rebuild von Knotenregionen und Bereinigung von Tombstones in der Nachbarschaft.
+// Invarianten: Lock-Hierarchie: write_mutex -> arena write lock.
 // HOTSPOTS: rebuild_region_sync
-// STAND: TS:2026-11-11T02:00:00Z
 
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;

@@ -1,5 +1,4 @@
 // =========================================================================
-// ANCHOR[id=sys-error-main,epic=sys-error,seq=0] Crate-level structured error types
 // =========================================================================
 // NOTE: Crate-level structured error types for acta-sys.
 // Invariante: Zero panic; structured error propagation; no string-parsed errnos; thiserror integration.
@@ -15,7 +14,6 @@
 use thiserror::Error;
 
 // SECTION Error Enum
-// ANCHOR[id=sys-error-enum,epic=sys-error,seq=1] Error Definition
 
 /// Typisierter Systemfehler für Low-Level-OS-Operationen.
 #[derive(Debug, Error)]
@@ -58,7 +56,6 @@ pub enum Error {
 // !SECTION Error Enum
 
 // SECTION Type Aliases & Standard Conversions
-// ANCHOR[id=sys-error-aliases,epic=sys-error,seq=2] Typ-Aliase und Konvertierungen
 
 /// Typ-Alias für das Crate-Fehlermodell gemäß Baukasten-Spezifikation.
 pub type SysError = Error;
@@ -66,7 +63,6 @@ pub type SysError = Error;
 /// Spezifischer Result-Typ für `acta-sys`.
 pub type Result<T> = std::result::Result<T, Error>;
 
-// ANCHOR[id=sys-error-from-io,epic=sys-error,seq=3] Konvertierung in std::io::Error
 // NOTE: Ermöglicht nahtlose Interoperabilität mit der Rust-Standardbibliothek (std::io).
 impl From<Error> for std::io::Error {
     fn from(err: Error) -> Self {

@@ -1,14 +1,11 @@
 //! Fallback-Chunker fuer unstrukturierte oder unbekannte Dokumentarten.
 //!
 //! # Zweck & Architektur
-//! Gehoert zur Segmentierungsschicht (Ring 4) in `acta-ingest`.
 //! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
 //! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
 //!
-// FILE-CONTEXT
-// ZWECK: FallbackChunker autonom delegierend an ProseChunker (WP M3).
-// INVARIANTEN: Monotone Suche im kanonischen Text, bei Nichtfund approximativ span_approximate=true.
-// STAND: TS:2026-10-31T00:00:00Z
+// FallbackChunker autonom delegierend an ProseChunker (WP M3).
+// Invarianten: Monotone Suche im kanonischen Text, bei Nichtfund approximativ span_approximate=true.
 
 use crate::canonical::CanonicalText;
 use crate::chunking::config::ChunkingConfig;
@@ -20,7 +17,6 @@ use crate::ir::DocumentIr;
 
 /// Fallback-Chunker, der unstrukturierte Dokumente oder unbekannte Formate über ProseChunker verarbeitet.
 #[derive(Debug, Default)]
-// ANCHOR[acta-ingest:CHK-0212]
 // struct `FallbackChunker` fuer Fallback-Chunker fuer unstrukturierte oder unbekannte Dokumentarten.
 pub struct FallbackChunker;
 

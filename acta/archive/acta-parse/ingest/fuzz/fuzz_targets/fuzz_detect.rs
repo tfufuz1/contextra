@@ -15,5 +15,4 @@ fuzz_target!(|data: &[u8]| {
     let _ = acta_ingest::detect::detect(data, &hints);
 });
 
-// ANCHOR[acta-ingest:FUZZ-0451]
 // Fuzzing-Target-Definition fuer fuzz_detect.rs.

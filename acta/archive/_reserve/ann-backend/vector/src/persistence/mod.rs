@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Persistenzschicht fuer HNSW (Header, MmapIndex, NodeRecord, write_atomic).
-// INVARIANTEN: Persistenzdateien muessen atomar geschrieben und ueber BLAKE3 validiert werden.
+// Persistenzschicht fuer HNSW (Header, MmapIndex, NodeRecord, write_atomic).
+// Invarianten: Persistenzdateien muessen atomar geschrieben und ueber BLAKE3 validiert werden.
 // HOTSPOTS: persistence/header.rs, persistence/mmap.rs, persistence/atomic.rs
-// STAND: TS:2026-11-12T00:00:00Z
 
 pub mod atomic;
 mod header;

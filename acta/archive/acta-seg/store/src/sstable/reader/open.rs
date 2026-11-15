@@ -1,5 +1,4 @@
 //! SSTable Reader: Open- und Initialisierungspfade (VFS, Mmap, Index- & Bloom-Laden).
-// ANCHOR[acta-seg:SST-RDR-100]
 
 use super::SstableReader;
 use crate::error::{StoreError as ActaError, StoreResult as Result};

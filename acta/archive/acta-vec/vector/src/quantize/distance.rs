@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Asymmetrische und symmetrische Distanzberechnung für quantisierte Vektoren.
-// INVARIANTEN: Zero unsafe code (#![forbid(unsafe_code)]); Zero allocations via Inline-Dequantisierung.
+// Asymmetrische und symmetrische Distanzberechnung für quantisierte Vektoren.
+// Invarianten: Zero unsafe code (#![forbid(unsafe_code)]); Zero allocations via Inline-Dequantisierung.
 // HOTSPOTS: asymmetric_dist, symmetric_dist
-// STAND: 2026-11-12
 
 //! # Scalar Quantizer Distance Module
 //!
@@ -15,7 +13,6 @@ use crate::types::DistanceMetric;
 
 impl ScalarQuantizer {
     /// Berechnet die asymmetrische Distanz zwischen einer exakten f32-Query und einem quantisierten u8-Vektor.
-    // ANCHOR[acta-vec:SQ8-ASYMMETRIC-DIST]
     pub fn asymmetric_dist(
         &self,
         query: &[f32],
@@ -66,7 +63,6 @@ impl ScalarQuantizer {
     }
 
     /// Berechnet die symmetrische Distanz zwischen zwei quantisierten u8-Vektoren.
-    // ANCHOR[acta-vec:SQ8-SYMMETRIC-DIST]
     pub fn symmetric_dist(&self, q1: &[u8], q2: &[u8], metric: DistanceMetric) -> Result<f32> {
         if q1.len() != q2.len() {
             return Err(VectorError::invalid_input("Vector dimensions must match"));

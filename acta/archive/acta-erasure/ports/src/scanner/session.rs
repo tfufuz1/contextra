@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: ScanSession für den gesperrten Mint-Pfad von LayerWitness.
-// INVARIANTEN: ScanSession::finish verweigert scanned == 0, control_matches == 0 und NotMeasured ohne Grund.
+// ScanSession für den gesperrten Mint-Pfad von LayerWitness.
+// Invarianten: ScanSession::finish verweigert scanned == 0, control_matches == 0 und NotMeasured ohne Grund.
 // HOTSPOTS: [1-90]
 
 #![forbid(unsafe_code)]

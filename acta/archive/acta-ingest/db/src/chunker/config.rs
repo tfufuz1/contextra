@@ -2,14 +2,11 @@
 //!
 //! **Zweck:** Konfigurationsparameter für Chunk-Größen, Overlap und Grenzzeichen.
 //!
-//! **Architektur:** Gehört zur Crate `acta-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
 
-// FILE-CONTEXT
-// ZWECK: Konfiguration des Markdown-Chunkers (.1 / Teil 6.12 Spezifikation).
-// INVARIANTEN: Standardwerte entsprechen Ingestion-Vorgaben; max_tokens > 0.
+// Konfiguration des Markdown-Chunkers (.1 / Teil 6.12 Spezifikation).
+// Invarianten: Standardwerte entsprechen Ingestion-Vorgaben; max_tokens > 0.
 // NICHT-OFFENSICHTLICH: split_levels steuert, bei welchen Überschriftsebenen gesplittet wird.
-// STAND: TS:2026-10-29T00:00:00Z
 
 /// Configuration for the Markdown chunker.
 #[derive(Debug, Clone)]

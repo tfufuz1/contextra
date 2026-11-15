@@ -1,12 +1,9 @@
-//! # Mandantentrennung & Key-Codec (Ring 1)
 //!
 //! Definiert [`TenantKeyCodec`] und [`TenantScopedStorage`], um Daten strikt
 //! mandantenfaehig zu praefigieren und logisch zu isolieren.
 
-// FILE-CONTEXT
-// STAND: 2026-09-28T00:00:00Z
-// ZWECK: Multi-Tenant Key Isolation & Encoding für LSM Storage Engine
-// INVARIANTEN:: scan_prefix(codec.scan_prefix) liefert ausschließlich Keys des gewählten Tenants
+// Multi-Tenant Key Isolation & Encoding für LSM Storage Engine
+// Invarianten: : scan_prefix(codec.scan_prefix) liefert ausschließlich Keys des gewählten Tenants
 // NICHT-OFFENSICHTLICH: Festes `t:` Präfix verhindert Kollisionen mit Legacy non-tenanted Keys
 // SIEHE AUCH: lsm.rs, rules/tag_taxonomy.md
 

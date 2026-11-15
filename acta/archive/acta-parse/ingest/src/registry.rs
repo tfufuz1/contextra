@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: ExtractorRegistry zur Registrierung und Panik-Isolierung von Format-Extraktoren (WP M3).
-// INVARIANTEN: Zero-Panic, catch_unwind Isolierung, kein HashMap/HashSet (BTreeMap), feature-basierte Defaults.
-// STAND: TS:2026-10-31T00:00:00Z
+// ExtractorRegistry zur Registrierung und Panik-Isolierung von Format-Extraktoren (WP M3).
+// Invarianten: Zero-Panic, catch_unwind Isolierung, kein HashMap/HashSet (BTreeMap), feature-basierte Defaults.
 
 use crate::error::IngestError;
 use crate::extractor::{DocumentExtractor, ExtractContext};

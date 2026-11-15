@@ -1,7 +1,5 @@
-// FILE-CONTEXT
-// STAND: 2026-11-08
-// ZWECK: LLM-gestütztes Multi-Signal Query-Rewriting für Ollama (Text, Semantik, Graph-Anker)
-// INVARIANTEN: Prompt-Injection-Isolation via xml_escape; Resiliente JSON/Fallback-Antwortdekodierung; Zero Panic
+// LLM-gestütztes Multi-Signal Query-Rewriting für Ollama (Text, Semantik, Graph-Anker)
+// Invarianten: Prompt-Injection-Isolation via xml_escape; Resiliente JSON/Fallback-Antwortdekodierung; Zero Panic
 
 //! Ollama-gestützter QueryRewriter für Multi-Step Retrieval.
 //!

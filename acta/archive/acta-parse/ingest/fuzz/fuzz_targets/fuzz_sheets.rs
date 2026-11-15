@@ -22,5 +22,4 @@ fuzz_target!(|data: &[u8]| {
     acta_ingest::fuzz_support::run(format, &data[1..]);
 });
 
-// ANCHOR[acta-ingest:FUZZ-0461]
 // Fuzzing-Target-Definition fuer fuzz_sheets.rs.

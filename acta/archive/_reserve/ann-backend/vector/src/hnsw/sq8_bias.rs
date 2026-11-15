@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: Quantisierungs-Bias-Kalibrierung (Sq8Bias) für SQ8-Quantisierung im HNSW Index Header.
-// INVARIANTEN: Zero-Panic Doctrine; Gemessener Quantisierungs-Bias im Index-Header.
+// Quantisierungs-Bias-Kalibrierung (Sq8Bias) für SQ8-Quantisierung im HNSW Index Header.
+// Invarianten: Zero-Panic Doctrine; Gemessener Quantisierungs-Bias im Index-Header.
 
 //! SQ8 quantization bias calibration module.
 

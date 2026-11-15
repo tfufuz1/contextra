@@ -17,7 +17,6 @@ use std::io::Cursor;
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
-// ANCHOR[acta-ingest:TST-0454]
 #[test]
 fn test_inv_ingest_no_archive_bomb_zip_slip_rejected() {
     let malicious_paths = [
@@ -37,7 +36,6 @@ fn test_inv_ingest_no_archive_bomb_zip_slip_rejected() {
     }
 }
 
-// ANCHOR[acta-ingest:TST-0455]
 #[test]
 fn test_inv_ingest_no_archive_bomb_path_length_limit() {
     let long_path = "a".repeat(1025);
@@ -51,7 +49,6 @@ fn test_inv_ingest_no_archive_bomb_path_length_limit() {
     ));
 }
 
-// ANCHOR[acta-ingest:TST-0456]
 #[test]
 fn test_inv_ingest_no_archive_bomb_compression_ratio() {
     let mut buf = Vec::new();
@@ -78,7 +75,6 @@ fn test_inv_ingest_no_archive_bomb_compression_ratio() {
     ));
 }
 
-// ANCHOR[acta-ingest:TST-0457]
 #[test]
 fn test_inv_ingest_no_archive_bomb_total_decompressed_bytes() {
     let mut buf = Vec::new();
@@ -105,7 +101,6 @@ fn test_inv_ingest_no_archive_bomb_total_decompressed_bytes() {
     ));
 }
 
-// ANCHOR[acta-ingest:TST-0458]
 #[test]
 fn test_inv_ingest_billion_laughs_and_xxe_rejected() {
     let xxe_payload = b"<?xml version=\"1.0\"?>\n<!DOCTYPE foo [\n<!ENTITY xxe SYSTEM \"file:///etc/passwd\">\n]>\n<foo>&xxe;</foo>";

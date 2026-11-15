@@ -4,10 +4,8 @@
 //! Dieses Modul definiert Standard-Typen für `DocId` und `ContextChunk`,
 //! sodass `acta-ingest` vollkommen autark ohne Kopplung an `acta-base` agiert.
 
-// FILE-CONTEXT
-// ZWECK: Autarke Typen DocId, ContextChunk und Link für acta-ingest.
-// INVARIANTEN: Zero-Panic, deterministische Serialisierung.
-// STAND: TS:2026-11-08T00:00:00Z
+// Autarke Typen DocId, ContextChunk und Link für acta-ingest.
+// Invarianten: Zero-Panic, deterministische Serialisierung.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

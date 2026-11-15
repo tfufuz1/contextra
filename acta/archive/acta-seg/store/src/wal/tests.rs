@@ -1,4 +1,3 @@
-//! # WAL Modultests (Ring 1)
 //!
 //! Sammelmodul fuer interne WAL-Tests.
 

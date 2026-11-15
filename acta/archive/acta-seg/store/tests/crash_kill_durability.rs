@@ -1,5 +1,4 @@
 #![cfg(feature = "workspace")]
-// ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-30T00:00:00Z)
 //! Crash kill durability verification test.
 //!
 //! Evaluates SIGKILL process termination recovery and durability invariants.

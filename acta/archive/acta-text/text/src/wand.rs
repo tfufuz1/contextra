@@ -1,6 +1,5 @@
-// FILE-CONTEXT: Block-Max WAND (Weak-AND) BM25 Query Execution Engine (IP-10).
-// ZWECK: Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding.
-// INVARIANTEN: Zero-Panic Doctrine, Safe Optimization (Ergebnisse identisch zu Full-Scan), MVCC & Tombstone Isolation.
+// Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding.
+// Invarianten: Zero-Panic Doctrine, Safe Optimization (Ergebnisse identisch zu Full-Scan), MVCC & Tombstone Isolation.
 
 //! Block-Max WAND (Weak AND) Algorithmus für performante Multi-Term BM25-Suchen.
 
@@ -13,7 +12,6 @@ use acta_base::DocId;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
 
-// ANCHOR[acta-text:WAND-001]
 /// Interner BM25-Kandidat für die Top-K-Min-Heap-Verwaltung.
 struct Bm25Candidate {
     doc_id: DocId,
@@ -45,7 +43,6 @@ impl PartialOrd for Bm25Candidate {
     }
 }
 
-// ANCHOR[acta-text:WAND-002]
 /// Begrenzter Min-Heap zur effizienten Verwaltung der K besten Treffer.
 pub struct BoundedTopK {
     heap: BinaryHeap<Bm25Candidate>,
@@ -53,7 +50,6 @@ pub struct BoundedTopK {
 }
 
 impl BoundedTopK {
-    // ANCHOR[acta-text:WAND-003]
     /// Erzeugt einen neuen `BoundedTopK`-Puffer mit maximaler Kapazität (`MAX_SEARCH_K`).
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.min(MAX_SEARCH_K);
@@ -63,7 +59,6 @@ impl BoundedTopK {
         }
     }
 
-    // ANCHOR[acta-text:WAND-004]
     /// Fügt einen neuen Kandidaten ein, wenn er besser als der schlechteste bisherige Treffer ist.
     pub fn push(&mut self, doc_id: DocId, score: f32) {
         if self.capacity == 0 {
@@ -80,7 +75,6 @@ impl BoundedTopK {
         }
     }
 
-    // ANCHOR[acta-text:WAND-005]
     /// Liefert den aktuellen Minimal-Score (Schwelle), den ein Kandidat übertreffen muss.
     pub fn min_threshold(&self) -> f32 {
         if self.heap.len() < self.capacity {
@@ -90,7 +84,6 @@ impl BoundedTopK {
         }
     }
 
-    // ANCHOR[acta-text:WAND-006]
     /// Konvertiert den Heap in einen nach Relevanz absteigend sortierten Ergebnisvektor.
     pub fn into_sorted_vec(self) -> Vec<(DocId, f32)> {
         self.heap
@@ -222,7 +215,6 @@ impl TermCursor {
     }
 }
 
-// ANCHOR[acta-text:WAND-007]
 /// Ergebnis einer Block-Max-WAND-Suche inklusive Top-K-Treffern und Metadaten über evaluierte Dokumente.
 #[derive(Debug)]
 pub struct WandSearchResult {
@@ -232,7 +224,6 @@ pub struct WandSearchResult {
     pub evaluated_docs_count: usize,
 }
 
-// ANCHOR[acta-text:WAND-008]
 #[allow(clippy::too_many_arguments)]
 /// Führt eine dynamisch geprunte Block-Max WAND Volltextsuche über den gegebenen Termen.
 pub async fn block_max_wand_search<S: PostingStore>(
@@ -751,7 +742,6 @@ mod tests {
         }
     }
 
-    // ANCHOR[acta-text:TEST-WAND-001]
     #[tokio::test]
     async fn test_block_max_wand_equivalence_and_pruning_performance() -> Result<()> {
         let storage = Arc::new(MockStorage::new());

@@ -1,9 +1,7 @@
-// FILE-CONTEXT
-// ZWECK: HNSW Vector Index mit Layer Descent, Soft-Deletes und transaktionalem Staging (TxBuffer).
-// INVARIANTEN: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes (HotState/ColdState).
+// HNSW Vector Index mit Layer Descent, Soft-Deletes und transaktionalem Staging (TxBuffer).
+// Invarianten: Lock-Hierarchie: write_mutex (exklusive Mutation/Rebuild) -> entry_point -> nodes / doc_to_node / deleted_nodes (HotState/ColdState).
 // NICHT-OFFENSICHTLICH: Multi-threaded Reads sperren nie write_mutex; background rebuild tauscht Core atomar via Swap.
 // HOTSPOTS: mod.rs (HnswIndex::insert, search, delete, rebuild, save)
-// STAND: 2026-11-12
 
 //! HNSW (Hierarchical Navigable Small World) vector index module.
 //!
@@ -18,19 +16,14 @@
 
 // SECTION Öffentliche HNSW-Submodule
 
-// ANCHOR[acta-vec:HNSW-MOD-ADAPTIVE-EF]
 // Dynamische Anpassung des ef-Search-Parameters basierend auf Selektivität und Latenz.
 pub mod adaptive_ef;
-// ANCHOR[acta-vec:HNSW-MOD-ARENA]
 // Lock-freie und cache-effiziente Kanten-Arena für Graph-Nachbarschaften.
 pub mod arena;
-// ANCHOR[acta-vec:HNSW-MOD-CLOCK]
 // Monotoner Zähler-Takt für deterministische Tests und Benchmarks.
 pub mod clock;
-// ANCHOR[acta-vec:HNSW-MOD-DELETION]
 // Tombstone-Verwaltung, Slot-Nullung und GhostFreeVectorIndex.
 pub mod deletion;
-// ANCHOR[acta-vec:HNSW-MOD-SQ8-BIAS]
 // Asymmetrische Distanzkorrektur für quantisierte Vektoren.
 pub mod sq8_bias;
 // !SECTION

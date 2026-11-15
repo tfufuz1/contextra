@@ -1,4 +1,3 @@
-//! # Manifest-Wiederherstellung (Ring 1)
 //!
 //! Liest vorhandene Manifest-Dateien beim Start und baut das aktive VersionSet auf.
 

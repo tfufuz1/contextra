@@ -1,14 +1,12 @@
 #![allow(deprecated)]
-// FILE-CONTEXT: TextIndex Storage & Memory Layer Scanner.
-// ZWECK: Stellt den LayerScanner für WitnessLayer::TextIndex bereit.
-// INVARIANTEN: Scan-Messungen laufen unabhängig vom Löschcode; Positivkontrolle vorab zwingend.
+// Stellt den LayerScanner für WitnessLayer::TextIndex bereit.
+// Invarianten: Scan-Messungen laufen unabhängig vom Löschcode; Positivkontrolle vorab zwingend.
 // NICHT-OFFENSICHTLICH: Scans read both LSM storage keys and in-memory ResidentPostingIndex entries directly.
 // HOTSPOTS: scan_units, run_positive_control
 
 //! Speicher- und RAM-Scanner für den Textindex zur Verifikation physischer Bereinigungen.
 //!
 //! # Ring-Zuordnung
-//! Ring 0 (Kern).
 //!
 //! # Funktionsweise & Positivkontrolle
 //! Implementiert den [`LayerScanner`]-Port für `WitnessLayer::TextIndex`.
@@ -23,7 +21,6 @@ use acta_base::StorageEngine; // TODO(acta-hr3): Hub-Import (ex types/ports) nac
 use acta_base::{ActaError, DocId, RequestContext, Result, TxId}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use std::sync::Arc;
 
-// ANCHOR[acta-text:SCAN-001]
 /// Geparstes Zielobjekt (Dokument-ID oder Kollektion) für den Scanner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[deprecated(
@@ -87,7 +84,6 @@ where
     futures::executor::block_on(f)
 }
 
-// ANCHOR[acta-text:SCAN-002]
 /// Scanner zur Feststellung verbleibender Restdaten im Textindex.
 #[deprecated(
     since = "0.1.0",
@@ -99,7 +95,6 @@ pub struct TextScanner<S: StorageEngine + 'static> {
 }
 
 impl<S: StorageEngine + 'static> TextScanner<S> {
-    // ANCHOR[acta-text:SCAN-003]
     /// Erzeugt einen neuen `TextScanner` für den übergebenen invertierten Index.
     pub fn new(index: Arc<InvertedIndex<S>>) -> Self {
         Self {
@@ -108,7 +103,6 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         }
     }
 
-    // ANCHOR[acta-text:SCAN-004]
     /// Erzeugt einen neuen `TextScanner` mit vorab konfiguriertem Scan-Ziel.
     pub fn new_with_target(index: Arc<InvertedIndex<S>>, target: ScanTarget) -> Self {
         Self {
@@ -117,20 +111,17 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         }
     }
 
-    // ANCHOR[acta-text:SCAN-005]
     /// Konfiguriert das Scan-Ziel im Builder-Muster.
     pub fn with_target(self, target: ScanTarget) -> Self {
         *self.target.lock() = Some(target);
         self
     }
 
-    // ANCHOR[acta-text:SCAN-006]
     /// Weist dem Scanner ein neues Zielobjekt zu.
     pub fn set_target(&self, target: ScanTarget) {
         *self.target.lock() = Some(target);
     }
 
-    // ANCHOR[acta-text:SCAN-007]
     // Positivkontrolle: Schreibt temporär ein Kanarienvogel-Dokument, prüft dessen Erkennung im Scan und löscht es wieder.
     fn run_positive_control(&self, session: &mut ScanSession) -> Result<()> {
         let canary_ns = "scratch_canary_pctl";
@@ -296,7 +287,6 @@ impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
     }
 }
 
-// ANCHOR[acta-text:SCAN-008]
 /// Erzeugt eine instanziierte Implementierung des [`LayerScanner`]-Ports für den Textindex.
 #[deprecated(
     since = "0.1.0",

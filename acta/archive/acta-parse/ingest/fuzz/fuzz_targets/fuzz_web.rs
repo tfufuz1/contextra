@@ -11,5 +11,4 @@ fuzz_target!(|data: &[u8]| {
     acta_ingest::fuzz_support::run(acta_ingest::format::FormatId::Html, data);
 });
 
-// ANCHOR[acta-ingest:FUZZ-0464]
 // Fuzzing-Target-Definition fuer fuzz_web.rs.

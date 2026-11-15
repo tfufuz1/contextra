@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Index-Validierung für ungültige Vektorkomponenten (NaN, Inf, -Inf).
-// INVARIANTEN: Konsistente Ablehnung mit Err(InvalidInput) vor Index-Mutation.
+// Index-Validierung für ungültige Vektorkomponenten (NaN, Inf, -Inf).
+// Invarianten: Konsistente Ablehnung mit Err(InvalidInput) vor Index-Mutation.
 // HOTSPOTS: 20-90
-// STAND: 2026-11-12
 use acta_base::VectorIndex; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_base::{ActaError, DistanceMetric, DocId, TxId}; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
 use acta_vec::distance::{compute_distance_trusted, validate_vector};

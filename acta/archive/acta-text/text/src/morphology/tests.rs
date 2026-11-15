@@ -7,7 +7,6 @@ use super::stopwords::{is_german_stopword, normalize_umlauts};
 use super::trie::Trie;
 use std::collections::HashSet;
 
-// ANCHOR[acta-text:TEST-MORPH-001]
 // Prüft die Zerlegung deutscher Komposita durch den GermanMorphTokenizer.
 #[test]
 fn test_german_tokenizer_splits_compounds() {
@@ -17,7 +16,6 @@ fn test_german_tokenizer_splits_compounds() {
     assert!(tokens.iter().any(|t| t == "Datenbank" || t == "datenbank"));
 }
 
-// ANCHOR[acta-text:TEST-MORPH-002]
 // Prüft die Normalisierung deutscher Umlaute während der Tokenisierung.
 #[test]
 fn test_german_tokenizer_normalizes_umlauts() {
@@ -30,7 +28,6 @@ fn test_german_tokenizer_normalizes_umlauts() {
         .any(|t: &String| t.contains("ue") || t.contains("buch")));
 }
 
-// ANCHOR[acta-text:TEST-MORPH-003]
 // Stellt sicher, dass Wörter mit Großbuchstaben sicher unzerlegt bleiben.
 #[test]
 fn test_decompose_handles_uppercase_safely() {
@@ -39,7 +36,6 @@ fn test_decompose_handles_uppercase_safely() {
     assert_eq!(parts, vec!["Bundesverfassungsgericht"]);
 }
 
-// ANCHOR[acta-text:TEST-MORPH-004]
 // Prüft die Zerlegung kleingeschriebener Wörter.
 #[test]
 fn test_decompose_accepts_lowercase() {
@@ -48,7 +44,6 @@ fn test_decompose_accepts_lowercase() {
     assert!(!parts.is_empty());
 }
 
-// ANCHOR[acta-text:TEST-MORPH-005]
 // Stellt sicher, dass umlaut-normalisierte Wörter gültige Eingaben für den Splitter darstellen.
 #[test]
 fn test_normalize_umlauts_produces_valid_input_for_splitter() {
@@ -65,7 +60,6 @@ fn test_normalize_umlauts_produces_valid_input_for_splitter() {
     }
 }
 
-// ANCHOR[acta-text:TEST-MORPH-006]
 // Prüft Basisfunktionen und Fallbacks des deutschen Zerlegers.
 #[test]
 fn test_german_splitter_scaffold() {
@@ -78,7 +72,6 @@ fn test_german_splitter_scaffold() {
     assert_eq!(splitter.language(), "de");
 }
 
-// ANCHOR[acta-text:TEST-MORPH-007]
 // Prüft die Zerlegung bekannter Wörter in ihre Einzelstämme.
 #[test]
 fn test_compound_splitting_known_words() {
@@ -91,7 +84,6 @@ fn test_compound_splitting_known_words() {
     assert!(result.iter().any(|t| t.eq_ignore_ascii_case("server")));
 }
 
-// ANCHOR[acta-text:TEST-MORPH-008]
 // Prüft die Konsistenz und Idempotenz der Umlaut-Normalisierung.
 #[test]
 fn test_umlaut_normalization_is_consistent() {
@@ -107,7 +99,6 @@ fn test_umlaut_normalization_is_consistent() {
     );
 }
 
-// ANCHOR[acta-text:TEST-MORPH-009]
 // Prüft das Ranking-Verhalten von BM25 bei Mehrfachtreffern deutscher Begriffe.
 #[test]
 fn test_bm25_german_ranks_more_matches_higher() {
@@ -245,30 +236,20 @@ struct KmuTestCase {
     interfix_type: &'static str,
 }
 
-// ANCHOR[TEST:TXT-001] STATUS:DONE — Recall-Evaluation für deutsche Zusammensetzungen (TS:2026-08-30T22:01:55Z) (SESSION:cf1f75c6)
-// REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-01T23:15:00Z) (SESSION: de8fd9f5)
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-02T08:30:00Z) (SESSION: 98e60e97)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Recall evaluation suite for German compounds verified (55 KMU compounds test suite passes with >90% recall).
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-02T08:18:07Z) (SESSION: b952fab8)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified test_kmu_55_compounds_suite (100% recall across 55 test cases) and entire acta-text test suite.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-02T23:17:17Z) (SESSION: adced73f)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified acta-text gate-stack, zero unsafe, APM-7 slicing safety, and 77/77 tests passed.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-03T19:36:00Z) (SESSION: 87124619)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified acta-text gate-stack, zero unsafe, APM-7 slicing safety, Tier-2 concurrency test suite, and chaos engineering scenarios.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-06T11:17:24Z) (SESSION: 9fd3f17f)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified gate-stack, zero unsafe, APM-7 slicing safety, KMU suite 54/55 (98.2% > 90.0%), and Tier-2 concurrency suite.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-09T12:39:30Z) (SESSION: 6ccc1466)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified gate-stack, zero unsafe, APM-7 slicing safety, KMU suite 55/55 (100% recall), Tier-2 concurrency suite (10/10 runs pass), and 94.13% line coverage.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-09T13:22:45Z) (SESSION: dc71d70)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified gate-stack, zero unsafe, APM-7 slicing safety, KMU suite 55/55 (100% recall), inventory sync, and full workspace check.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:TXT-001) (TS: 2026-09-10T19:21:35Z) (SESSION: 4dd1c98c)
 // PRÜFER-KONTEXT: FRESH
 // BEFUND: Re-verified gate-stack, zero unsafe, APM-7 slicing safety, KMU suite 54/55 (98.2% recall > 90% required), inventory sync, and full workspace check.
 #[test]
@@ -657,7 +638,6 @@ fn test_normalize_umlauts_case_edge_inputs() {
     assert_eq!(normalize_umlauts("Grüße aus Köln!"), "gruesse aus koeln!");
 }
 
-// ANCHOR[acta-text:TEST-MORPH-010]
 // Fuzz-Test mit 10.000 Iterationen zur Verifikation von Panik-Freiheit bei beliebigem UTF-8.
 #[test]
 fn test_fuzz_german_compound_splitter_utf8_panic_free_10k() {

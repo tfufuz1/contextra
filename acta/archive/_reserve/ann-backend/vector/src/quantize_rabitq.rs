@@ -1,6 +1,5 @@
-// FILE-CONTEXT
-// ZWECK: RaBitQ-Quantisierer (Binär-Quantisierung mit orthogonaler Rotation und Fehlerkorrektur).
-// INVARIANTEN: Zero-Panic (keine .unwrap()/.expect() in Produktionscode), NaN-Scan beim Input.
+// RaBitQ-Quantisierer (Binär-Quantisierung mit orthogonaler Rotation und Fehlerkorrektur).
+// Invarianten: Zero-Panic (keine .unwrap()/.expect() in Produktionscode), NaN-Scan beim Input.
 // NICHT-OFFENSICHTLICH: Orthogonale Rotation R R^T = I per Gram-Schmidt erlaubt isometry-erhaltende Binarisierung.
 // HOTSPOTS: quantize_rabitq.rs (RaBitQQuantizer::try_train, quantize, asymmetric_distance)
 

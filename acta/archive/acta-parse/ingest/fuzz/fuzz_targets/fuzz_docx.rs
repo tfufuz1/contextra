@@ -11,5 +11,4 @@ fuzz_target!(|data: &[u8]| {
     acta_ingest::fuzz_support::run(acta_ingest::format::FormatId::Docx, data);
 });
 
-// ANCHOR[acta-ingest:FUZZ-0452]
 // Fuzzing-Target-Definition fuer fuzz_docx.rs.

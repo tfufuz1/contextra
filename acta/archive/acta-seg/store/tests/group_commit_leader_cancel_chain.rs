@@ -1,6 +1,5 @@
 #![cfg(feature = "workspace")]
-// FILE-CONTEXT
-// ZWECK: Testet, dass der Abbruch (Cancellation) der Leader-Future das Queue-Integritäts-Verhalten nicht korrumpiert und wartende Follower geordnet fehlschlagen.
+// Testet, dass der Abbruch (Cancellation) der Leader-Future das Queue-Integritäts-Verhalten nicht korrumpiert und wartende Follower geordnet fehlschlagen.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

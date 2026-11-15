@@ -1,6 +1,4 @@
-// FILE-CONTEXT
-// ZWECK: Moduldeklaration der DiskANN-Testsuiten.
-// STAND: 2026-11-11
+// Moduldeklaration der DiskANN-Testsuiten.
 
 mod build_search_tests;
 mod config_tests;

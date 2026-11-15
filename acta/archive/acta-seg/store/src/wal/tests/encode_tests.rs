@@ -1,4 +1,3 @@
-//! # Tests fuer WAL-Frame-Kodierung (Ring 1)
 //!
 //! Validiert Roundtrips, Framing-Grenzfaelle und Bitflips.
 

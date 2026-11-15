@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,10 +8,8 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: PowerPoint PresentationML Extractor (PPTX, PPSX, POTX, PPTM).
-// INVARIANTEN: FILE-CONTEXT Kopf, Zero-Panic, ResourceBudget-Absicherung, BTreeMap.
-// STAND: TS:2026-10-31T00:00:00Z
+// PowerPoint PresentationML Extractor (PPTX, PPSX, POTX, PPTM).
+// Invarianten: Zero-Panic, ResourceBudget-Absicherung, BTreeMap.
 
 pub mod presentation;
 pub mod slide;

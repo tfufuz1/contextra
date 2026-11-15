@@ -4,7 +4,6 @@ use acta_base::*;
 
 // =========================================================================
 // SECTION: Conformance Test Suite
-// ANCHOR[id=conformance-tests,epic=env-core,seq=5]
 // NOTE: Verifiziert alle Grundverträge der vier Environment-Kernports.
 // =========================================================================
 

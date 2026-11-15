@@ -10,12 +10,10 @@
 //! und organisatorische Hilfestellungen leisten und eingehende Direktanträge unverzüglich weiterleiten.
 //!
 //! # Ring-Zugehörigkeit
-//! Teil von Ring 4 (Erweiterung).
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
-// ANCHOR[acta-reports:DSR-001]
 /// Rendert Abschnitt 9: „Unterstützung bei Betroffenenrechten“.
 ///
 /// Schreibt die Unterstützungszusagen für Rechte betroffener Personen nach Kapitel III DSGVO in den Puffer.

@@ -19,5 +19,4 @@ fuzz_target!(|data: &[u8]| {
     }
 });
 
-// ANCHOR[acta-ingest:FUZZ-0459]
 // Fuzzing-Target-Definition fuer fuzz_safe_archive.rs.

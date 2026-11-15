@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: Verzeichnismodul fuer HNSW-Zustandstypen, Re-Exports aller Typen am bisherigen Pfad.
-// INVARIANTEN: Keine Pfadaenderungen gegenueber src/hnsw/types.rs. Alle Typen sind 1:1 re-exportiert.
+// Verzeichnismodul fuer HNSW-Zustandstypen, Re-Exports aller Typen am bisherigen Pfad.
+// Invarianten: Keine Pfadaenderungen gegenueber src/hnsw/types.rs. Alle Typen sind 1:1 re-exportiert.
 // HOTSPOTS: HnswIndex, HnswNode, VectorData, HnswIndexCore
-// STAND: TS:2026-11-12T00:00:00Z
 
 mod builder;
 mod core;

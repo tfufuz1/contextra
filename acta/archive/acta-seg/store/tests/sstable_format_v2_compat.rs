@@ -1,4 +1,4 @@
-// ZWECK: Interne und V2/V3 Compatibility Integrationstests für SSTable Format v3.
+// Interne und V2/V3 Compatibility Integrationstests für SSTable Format v3.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bytes::{BufMut, Bytes, BytesMut};

@@ -1,8 +1,6 @@
-// FILE-CONTEXT
-// ZWECK: SequenceLog-Kompaktierung und Snapshot-Verwaltung fuer GenericHnswIndex.
-// INVARIANTEN: Aufrufe delegieren thread-sicher ueber RwLock an acta_history::SequenceLog.
+// SequenceLog-Kompaktierung und Snapshot-Verwaltung fuer GenericHnswIndex.
+// Invarianten: Aufrufe delegieren thread-sicher ueber RwLock an acta_history::SequenceLog.
 // HOTSPOTS: GenericHnswIndex::pin_snapshot, GenericHnswIndex::compact_seq_log
-// STAND: TS:2026-11-12T00:00:00Z
 
 use super::index::GenericHnswIndex;
 use crate::distance::DistanceKernel;

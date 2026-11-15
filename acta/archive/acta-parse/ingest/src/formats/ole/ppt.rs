@@ -1,7 +1,6 @@
 //! Modul
 //!
 //! # Zweck & Architektur
-//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
 //! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
 //!
 //! # Invarianten
@@ -9,12 +8,10 @@
 //! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
 //! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
 
-// FILE-CONTEXT
-// ZWECK: Extractor für MS-PPT (Binary PowerPoint Presentation Format) (WP M4).
-// INVARIANTEN: Zero-Panic, RecordHeader-Parsen mit Längenprüfung, CryptSession10Container => Encrypted,
+// Extractor für MS-PPT (Binary PowerPoint Presentation Format) (WP M4).
+// Invarianten: Zero-Panic, RecordHeader-Parsen mit Längenprüfung, CryptSession10Container => Encrypted,
 //              SlideListWithText, TextCharsAtom (UTF-16LE), TextBytesAtom (Latin-1),
 //              Titel über TextHeaderAtom, SpeakerNotes aus NotesContainer.
-// STAND: TS:2026-10-31T00:00:00Z
 
 use crate::error::IngestError;
 use crate::extractor::ExtractContext;

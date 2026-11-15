@@ -1,13 +1,11 @@
-// FILE-CONTEXT
-// ZWECK: Versionierter Key Derivation Function (KDF) Header und Argon2id Schlüsselableitung für Passphrasen.
-// INVARIANTEN: OWASP Argon2id Parameter-Standards (m_cost >= 19456, t_cost >= 2, p_cost >= 1). Binär-Format KdfHeader total geparst (keine Panics).
+// Versionierter Key Derivation Function (KDF) Header und Argon2id Schlüsselableitung für Passphrasen.
+// Invarianten: OWASP Argon2id Parameter-Standards (m_cost >= 19456, t_cost >= 2, p_cost >= 1). Binär-Format KdfHeader total geparst (keine Panics).
 // NICHT-OFFENSICHTLICH: Zeroizing für abgeleitete Schlüssel. KdfHeader binary layout: magic (4B "AKDF") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (>=16B).
 // HOTSPOTS: [KdfHeader::from_bytes, derive_key_argon2id]
 
 //! Versionierter KDF-Header und Argon2id-Schlüsselableitung für `acta-crypto`.
 //!
 //! # Geplante Migration
-//! AI-NOTE\[KDF-MIGRATION\]\[OPEN\] AGT-CRYPTO-002: Geplante Migration für Aufrufer in `acta-seg` (`recovery.rs` / LSM-Recovery):
 //! 1. Beim Erstellen eines neuen verschlüsselten Datenverzeichnisses wird ein `KdfHeader` generiert und als
 //!    `kdf_header.bin` im Metadaten-Verzeichnis abgelegt.
 //! 2. Beim Öffnen / Recovery wird geprüft, ob `kdf_header.bin` existiert.
@@ -102,7 +100,6 @@ impl KdfParams {
 
 /// Versionierter KDF-Header, der alle Parameter und den Salt für die Argon2id-Ableitung speichert.
 #[derive(Debug, Clone, PartialEq, Eq)]
-// ANCHOR[acta-crypto:KDF-001]
 /// Versionierter KDF-Metadaten-Header zur deterministischen Reproduktion von Schlüsseln.
 ///
 /// Speichert die Argon2id-Kostenparameter (m_cost, t_cost, p_cost) und den Salt,
@@ -274,7 +271,6 @@ impl KdfHeader {
 pub struct DerivedKey(pub [u8; 32]);
 
 /// Leitet einen 256-Bit (32 Byte) Schlüssel aus einer Passphrase und einem `KdfHeader` via Argon2id ab.
-// ANCHOR[acta-crypto:KDF-002]
 /// Leitet einen kryptographisch starken Schlüssel mittels Argon2id aus einer Passphrase ab.
 ///
 /// # Ablauf der Argon2id-Schlüsselableitung:

@@ -1,6 +1,5 @@
 //! # Kalibrierungssubsystem (`calibration`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Dieses Modul bündelt Algorithmen zur Wahrscheinlichkeitskalibrierung von Roh-Scores
 //! sowie zur konformen Vorhersage (Conformal Prediction).

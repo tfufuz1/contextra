@@ -1,5 +1,4 @@
 // =========================================================================
-// ANCHOR[id=sys-posix-main,epic=sys-posix,seq=0] POSIX Systemaufrufe & Limits
 // =========================================================================
 // NOTE: Low-level POSIX syscall wrappers.
 // Invariante: Zero panic; typed error propagation; bounds checked descriptors; safe wrappers over libc syscalls.
@@ -11,7 +10,6 @@
 //! und Prozess-Ressourcenlimits.
 //!
 //! ## Ring-Zugehörigkeit und Zweck
-//! - **Ring 0 / Ebene E0 (Kern / Unsafe-Insel):** Direkte FFI-Aufrufe an `libc` (`open`, `dup2`, `close`, `getrlimit`, `setrlimit`).
 //! - **Verwendung im System:**
 //!   - `ensure_fd_limit` / `set_fd_limit`: Datenbank- und Suchsysteme (wie LSM-Trees und Vektorindizes) halten
 //!     oft hunderte bis tausende SSTable- und WAL-Dateien gleichzeitig geöffnet. Diese Funktionen stellen
@@ -21,7 +19,6 @@
 use std::path::Path;
 
 // SECTION Descriptor Redirection
-// ANCHOR[id=sys-posix-dup2,epic=sys-posix,seq=1] reopen_and_dup2
 
 /// Öffnet den Pfad `path` mit den angegebenen POSIX-Flags (z. B. `O_RDONLY`) und ersetzt atomar `target_fd` via `dup2`.
 ///
@@ -74,7 +71,6 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
 // !SECTION Descriptor Redirection
 
 // SECTION Resource Limits
-// ANCHOR[id=sys-posix-rlimit,epic=sys-posix,seq=2] ensure_fd_limit und set_fd_limit
 
 /// Stellt sicher, dass das weiche Limit für offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` beträgt.
 ///
@@ -135,7 +131,6 @@ pub fn set_fd_limit(limit: u64) -> bool {
 // !SECTION Resource Limits
 
 // SECTION Unit Tests
-// ANCHOR[id=sys-posix-tests,epic=sys-posix,seq=3] POSIX-Modultests
 #[cfg(test)]
 mod tests {
     use super::*;
