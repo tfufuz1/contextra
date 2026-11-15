@@ -225,7 +225,7 @@ mod standard_tests {
 
         assert_eq!(
             total_fenced_violations, 0,
-            "INV-ERA-5 VIOLATION: A writer was permitted to write into a fenced range!"
+            "T-ERA-5 VIOLATION: A writer was permitted to write into a fenced range!"
         );
         assert!(
             total_unfenced_success > 0,

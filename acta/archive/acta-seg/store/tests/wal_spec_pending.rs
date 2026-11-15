@@ -25,7 +25,7 @@ use tokio::fs;
 /// any uncommitted or committed truncation of the active WAL tail before the HWM
 /// MUST fail LsmStorage startup with `ActaError::WalTruncationDetected`.
 #[tokio::test]
-#[ignore = "Pending production implementation of ADR-N12 (HWM anchoring). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
+#[ignore = "Pending production implementation of SPEC 5.1 (HWM anchoring). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n12_wal_tail_truncation_detection_after_sstable_flush() {
     let dir = tempdir().expect("tempdir");
     let config = LsmConfig {
@@ -109,7 +109,7 @@ async fn spec_n12_wal_tail_truncation_detection_after_sstable_flush() {
 /// Deleting or swapping intermediate segment N MUST cause replay of Segment N+1 to fail
 /// with `ActaError::WalTruncationDetected` or `ActaError::WalCorruption`.
 #[tokio::test]
-#[ignore = "Pending production implementation of ADR-N12 (Cross-segment HMAC). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
+#[ignore = "Pending production implementation of SPEC 5.1 (Cross-segment HMAC). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n12_cross_segment_hmac_chain_continuity() {
     let dir = tempdir().expect("tempdir");
 
@@ -157,7 +157,7 @@ async fn spec_n12_cross_segment_hmac_chain_continuity() {
 /// Periodically written `WalCheckpoint` entries in MANIFEST provide a monotonically
 /// advancing high-water-mark anchor that is verified upon startup.
 #[tokio::test]
-#[ignore = "Pending production implementation of ADR-N12 (Periodic HWM checkpoint). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
+#[ignore = "Pending production implementation of SPEC 5.1 (Periodic HWM checkpoint). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n12_manifest_periodic_hwm_checkpoint_verification() {
     let dir = tempdir().expect("tempdir");
     let manifest_path = dir.path().join("MANIFEST");
@@ -193,7 +193,7 @@ async fn spec_n12_manifest_periodic_hwm_checkpoint_verification() {
 /// the reader MUST return `ActaError::WalCorruption` rather than silently breaking
 /// and losing subsequent valid commits.
 #[tokio::test]
-#[ignore = "Pending production implementation of ADR-N13 (Frame V4 header integrity). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
+#[ignore = "Pending production implementation of SPEC 5.1 (Frame V4 header integrity). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n13_v4_frame_header_crc_bitflip_fails_hard_middle_entry() {
     let dir = tempdir().expect("tempdir");
     let wal_path = dir.path().join("v4_corrupt_middle.wal");
@@ -243,7 +243,7 @@ async fn spec_n13_v4_frame_header_crc_bitflip_fails_hard_middle_entry() {
 /// An incomplete write or zero-fill padding at the exact EOF (file tail) is accepted as a
 /// clean torn write during crash recovery. A corrupted header before EOF MUST trigger `WalCorruption`.
 #[tokio::test]
-#[ignore = "Pending production implementation of ADR-N13 (Frame V4 clean torn tail policy). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
+#[ignore = "Pending production implementation of SPEC 5.1 (Frame V4 clean torn tail policy). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n13_v4_clean_torn_tail_distinguished_from_middle_corrupted_header() {
     let dir = tempdir().expect("tempdir");
     let wal_path = dir.path().join("v4_torn_tail.wal");
@@ -290,7 +290,7 @@ async fn spec_n13_v4_clean_torn_tail_distinguished_from_middle_corrupted_header(
 /// V2 and V3 format WALs remain readable by the WAL parser. When rewritten or consolidated
 /// via `.bak` / `recover_from_bak_if_present`, old formats are transparently converted to V4 (`AWL4`).
 #[tokio::test]
-#[ignore = "Pending production implementation of ADR-N13 (Frame V4 backward compat rewrite). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
+#[ignore = "Pending production implementation of SPEC 5.1 (Frame V4 backward compat rewrite). Execute with: cargo test -p acta-seg --test wal_spec_pending -- --ignored"]
 async fn spec_n13_v2_v3_to_v4_transparent_migration_and_compatibility() {
     let dir = tempdir().expect("tempdir");
     let wal_path = dir.path().join("legacy_v3.wal");

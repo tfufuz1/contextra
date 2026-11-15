@@ -95,7 +95,7 @@ impl SignedReport {
 
         if report.witnesses.is_empty() {
             return Err(ErasureError::Internal(
-                "INV-CLASS-MEASURED-1 violation: report contains no witnesses".to_string(),
+                "T-CLASS-MEASURED-1 violation: report contains no witnesses".to_string(),
             ));
         }
 
@@ -110,7 +110,7 @@ impl SignedReport {
         for (idx, w) in report.witnesses.iter().enumerate() {
             if !w.control_ok {
                 return Err(ErasureError::Internal(format!(
-                    "INV-CLASS-MEASURED-1 violation: witness at index {idx} failed positive control"
+                    "T-CLASS-MEASURED-1 violation: witness at index {idx} failed positive control"
                 )));
             }
             if w.matches != 0 {

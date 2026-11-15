@@ -580,7 +580,7 @@ impl Wal {
 
         if cause != PoisonCause::TornWrite {
             return Err(StoreError::Storage(format!(
-                "Irreversible WAL poison state ({cause:?}); handle cannot be recovered into service (SPEC §12.1, INV-FSYNC-1)"
+                "Irreversible WAL poison state ({cause:?}); handle cannot be recovered into service (SPEC §12.1, fsync-poison)"
             )));
         }
 

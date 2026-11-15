@@ -3,7 +3,7 @@
 //! Ermoeglicht wahlfreien und sequentiellen Lesezugriff auf unveraenderliche SSTables
 //! mit Block-Caching und Bloom-Filter-Abfragen.
 
-use super::block_cache::{BlockCache, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_MFSX};
+use super::block_cache::{BlockCache, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_ASGX};
 use super::block_search::{
     binary_search_entry_in_block, binary_search_first_index_in_block, get_entry_at_index,
 };

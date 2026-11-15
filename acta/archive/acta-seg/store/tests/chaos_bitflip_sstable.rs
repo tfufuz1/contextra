@@ -19,7 +19,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 
 /// Magic bytes for SSTable file trailer ("ASGX")
-const SSTABLE_MAGIC_MFSX: u32 = 0x5847_5341;
+const SSTABLE_MAGIC_ASGX: u32 = 0x5847_5341;
 
 /// SSTable Layout Metadata with block boundaries
 #[derive(Debug, Clone)]
@@ -63,7 +63,7 @@ fn parse_sstable_layout(path: &Path) -> std::io::Result<SstableLayout> {
     file.read_exact(&mut trailer)?;
 
     let magic = u32::from_le_bytes(trailer[50..54].try_into().unwrap());
-    if magic != SSTABLE_MAGIC_MFSX {
+    if magic != SSTABLE_MAGIC_ASGX {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Invalid SSTable magic: 0x{:08X}", magic),

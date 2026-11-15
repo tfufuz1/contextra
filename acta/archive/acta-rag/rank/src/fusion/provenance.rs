@@ -272,7 +272,7 @@ pub(super) fn build_provenance(builder: &ProvenanceBuilder) -> ProvenanceRecord 
             .sum();
         debug_assert!(
             (expected_rrf - expected).abs() < 1e-6,
-            "INV-PROV-1 violation in build_provenance: expected_rrf={expected_rrf}, expected={expected}"
+            "T-PROV-1 violation in build_provenance: expected_rrf={expected_rrf}, expected={expected}"
         );
     }
 

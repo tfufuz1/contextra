@@ -68,7 +68,7 @@ fn test_inv_era_3_single_flight_per_scope() {
 
     // Zweiter Versuch scheitert
     let f2 = coord.try_acquire(scope.clone());
-    assert!(f2.is_err(), "Second concurrent flight must fail under INV-ERA-3");
+    assert!(f2.is_err(), "Second concurrent flight must fail under T-ERA-3");
 
     drop(f1);
     assert!(!coord.is_active(&scope));

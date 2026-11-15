@@ -36,7 +36,7 @@ pub fn validate_witness(witness: &LayerWitness) -> Result<(), crate::error::Eras
     }
     if *witness.hash() == [0u8; 32] {
         return Err(crate::error::ErasureError::Internal(
-            "INV-CLASS-MEASURED-1 violation: witness has empty zero scan hash".to_string(),
+            "T-CLASS-MEASURED-1 violation: witness has empty zero scan hash".to_string(),
         ));
     }
     Ok(())

@@ -43,7 +43,7 @@ async fn test_inv_vec_connectivity_1_reachable_after_compact() {
     let connected = index.verify_full_connectivity();
     assert!(
         connected,
-        "INV-VEC-CONNECTIVITY-1: Every alive node MUST be reachable from entry point after compact"
+        "vec-connectivity: Every alive node MUST be reachable from entry point after compact"
     );
 
     // 5. Verifiziere Geisterzeigerfreiheit: Kein lebender Knoten darf eine Kante zu den gelöschten Knoten haben

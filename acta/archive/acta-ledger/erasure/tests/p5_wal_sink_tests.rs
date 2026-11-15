@@ -74,7 +74,7 @@ fn inv_era_6_wal_read_after_scope_purge_has_no_plaintext() {
     let after_entries = sink.read_entries_for_scope(&scope_a);
     assert!(
         after_entries.is_empty(),
-        "INV-ERA-6 verletzt: Klartext nach Purge noch im WAL lesbar!"
+        "T-ERA-6 verletzt: Klartext nach Purge noch im WAL lesbar!"
     );
 
     // Krypto-Schlüssel für Scope A muss verworfen sein

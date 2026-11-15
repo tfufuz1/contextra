@@ -22,3 +22,7 @@ Orakel-Material, das bislang im Archiv fehlte: Absturz-, Loom-, Eigenschafts- un
 Fuzz-Targets fuer Parser, Segmentformat und Loeschnachweis, Fusion/Zeitachse/Kalibrierung im Ranking, Checkpoint-Quellen
 und -Tests, Port-Vorlagen (`Vfs`, Text-/Vektorindex, Richtlinie, Beobachter), Tombstone-/Filter-/Budget-Typen,
 Zeitreise-Filter, Lizenzbindungs-Tests, Modellinfo des Inferenz-Clients. Neu angelegt: `acta-access/` (Referenz fuer den ABAC-Neubau).
+
+## Bereinigung (Pruefskript `scripts/check-no-legacy.sh`)
+
+Ergaenzend entfernt bzw. umbenannt: Alt-Magic-Bezeichner (`SSTABLE_MAGIC_MFSX` zu `SSTABLE_MAGIC_ASGX`, `MFRLBK` zu `AROLLB`), Alt-Kennungen (`INV-*` zu `T-*`, `ADR-N*` und `ADR-024` zu SPEC-Verweisen) in Kommentaren und Meldungen, Binaer-Goldens (`*.bin`) und die beiden `.wal_integrity_key`-Dateien. Das Skript meldet jede neue Altspur (Projektname, Alt-Magics, Alt-IDs, Schluesseldateien ohne `TODO(acta-altlast)`-Marker, `*.bin`); Exit-Code 1 bei Treffern.

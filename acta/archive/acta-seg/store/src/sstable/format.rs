@@ -4,7 +4,7 @@
 //! und Versionsprüfung für SSTables (Format V4 ASGX und Legacy V3 ASGT).
 //!
 //! Invarianten:
-//! - Magic `SSTABLE_MAGIC_MFSX` = `0x5847_5341` (b"ASGX" little-endian)
+//! - Magic `SSTABLE_MAGIC_ASGX` = `0x5847_5341` (b"ASGX" little-endian)
 //! - Magic `SSTABLE_MAGIC_LEGACY` = `0x4153_4754` (b"ASGT" little-endian)
 //! - Bit 63 (`TOMBSTONE_BIT`) wird vor `max_seq`-Vergleichen maskiert.
 //! - Byte-Identität persistierter Formate bleibt strikt gewahrt.
@@ -12,7 +12,7 @@
 use crate::error::{StoreError, StoreResult};
 
 /// Magic-Bytes für V4 SSTable: `ASGX` in Hex (0x5847_5341).
-pub const SSTABLE_MAGIC_MFSX: u32 = 0x5847_5341;
+pub const SSTABLE_MAGIC_ASGX: u32 = 0x5847_5341;
 
 /// Magic-Bytes für Legacy SSTable: `ASGT` in Hex (0x4153_4754).
 pub const SSTABLE_MAGIC_LEGACY: u32 = 0x4153_4754;
@@ -24,10 +24,10 @@ pub const BLOCK_SIZE: usize = 4096;
 pub const CURRENT_SSTABLE_FORMAT_VERSION: u16 = 4;
 
 /// Trailer-Länge für ASGX Format Version >= 1 (54 Bytes).
-pub const MFSX_TRAILER_LEN_V1: usize = 54;
+pub const ASGX_TRAILER_LEN_V1: usize = 54;
 
 /// Trailer-Länge für ASGX Format Version 0 (52 Bytes).
-pub const MFSX_TRAILER_LEN_V0: usize = 52;
+pub const ASGX_TRAILER_LEN_V0: usize = 52;
 
 /// Trailer-Länge für Legacy ASGT (54 Bytes).
 pub const LEGACY_TRAILER_LEN: usize = 54;
@@ -66,14 +66,14 @@ impl SstableFooter {
         let mut format_version = 0u16;
         let mut is_mfsx = false;
 
-        if trailer_len >= MFSX_TRAILER_LEN_V1 {
+        if trailer_len >= ASGX_TRAILER_LEN_V1 {
             if let Some(slice) = trailer_data.get(50..54) {
                 let magic_v1 = u32::from_le_bytes(
                     slice
                         .try_into()
                         .map_err(|_| StoreError::Storage("Invalid trailer".into()))?,
                 );
-                if magic_v1 == SSTABLE_MAGIC_MFSX {
+                if magic_v1 == SSTABLE_MAGIC_ASGX {
                     if let Some(ver_slice) = trailer_data.get(48..50) {
                         format_version = u16::from_le_bytes(
                             ver_slice
@@ -86,14 +86,14 @@ impl SstableFooter {
             }
         }
 
-        if !is_mfsx && trailer_len >= MFSX_TRAILER_LEN_V0 {
+        if !is_mfsx && trailer_len >= ASGX_TRAILER_LEN_V0 {
             if let Some(slice) = trailer_data.get(48..52) {
                 let magic_v0 = u32::from_le_bytes(
                     slice
                         .try_into()
                         .map_err(|_| StoreError::Storage("Invalid trailer".into()))?,
                 );
-                if magic_v0 == SSTABLE_MAGIC_MFSX {
+                if magic_v0 == SSTABLE_MAGIC_ASGX {
                     is_mfsx = true;
                     format_version = 0;
                 }
@@ -181,9 +181,9 @@ impl SstableFooter {
 
         let trailer_actual_len = if is_mfsx {
             if format_version >= 1 {
-                MFSX_TRAILER_LEN_V1
+                ASGX_TRAILER_LEN_V1
             } else {
-                MFSX_TRAILER_LEN_V0
+                ASGX_TRAILER_LEN_V0
             }
         } else {
             LEGACY_TRAILER_LEN

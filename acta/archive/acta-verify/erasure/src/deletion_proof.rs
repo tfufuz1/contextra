@@ -251,7 +251,7 @@ impl LayerCleanupProof {
     ) -> Result<Self> {
         if remaining_live_entries != 0 {
             return Err(ErasureError::Internal(format!(
-                "INV-DELETION-1 violation: attempted to construct LayerCleanupProof for \
+                "T-DELETION-1 violation: attempted to construct LayerCleanupProof for \
                  layer {layer:?} but verification found {remaining_live_entries} \
                  remaining live entries — physical cleanup is incomplete or was not \
                  performed before proof construction"
@@ -284,7 +284,7 @@ impl LayerCleanupProof {
             })
         } else {
             Err(ErasureError::Internal(format!(
-                "INV-DELETION-1 violation: physical cleanup verification \
+                "T-DELETION-1 violation: physical cleanup verification \
                  failed for layer {layer:?} — refusing to create \
                  LayerCleanupProof"
             )))
@@ -514,7 +514,7 @@ impl DeletionProof {
         for w in witnesses {
             if w.remaining() > 0 {
                 return Err(ErasureError::Internal(format!(
-                    "INV-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
+                    "T-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
                     w.layer(),
                     w.remaining()
                 )));
@@ -524,7 +524,7 @@ impl DeletionProof {
                 | crate::types_local::ScanMethod::FeatureDisabled => {}
                 crate::types_local::ScanMethod::NotMeasured(reason) => {
                     return Err(ErasureError::Internal(format!(
-                        "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
+                        "T-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
                         w.layer(),
                         reason
                     )));
@@ -557,7 +557,7 @@ impl DeletionProof {
             // Check for remaining > 0 -> Err
             if w.remaining() > 0 {
                 return Err(ErasureError::Internal(format!(
-                    "INV-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
+                    "T-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
                     w.layer(),
                     w.remaining()
                 )));
@@ -569,7 +569,7 @@ impl DeletionProof {
                 | crate::types_local::ScanMethod::FeatureDisabled => {}
                 crate::types_local::ScanMethod::NotMeasured(reason) => {
                     return Err(ErasureError::Internal(format!(
-                        "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
+                        "T-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
                         w.layer(),
                         reason
                     )));
@@ -579,7 +579,7 @@ impl DeletionProof {
             // Check technique == ScanTechnique::NotMeasured / LogicalView for physical storage layers -> Err
             if let ScanTechnique::NotMeasured(reason) = w.technique() {
                 return Err(ErasureError::Internal(format!(
-                    "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
+                    "T-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
                     w.layer(),
                     reason
                 )));
@@ -590,7 +590,7 @@ impl DeletionProof {
             // Check for duplicate layers using WitnessLayer -> Err
             if !seen_layers.insert(witness_layer.clone()) {
                 return Err(ErasureError::Internal(format!(
-                    "INV-WITNESS-MINT-1 violation: duplicate witness layer '{:?}' in witnesses list",
+                    "T-WITNESS-MINT-1 violation: duplicate witness layer '{:?}' in witnesses list",
                     witness_layer
                 )));
             }
@@ -622,19 +622,19 @@ impl DeletionProof {
 
         if !has_memtable {
             return Err(ErasureError::Internal(
-                "INV-WITNESS-MINT-1 violation: mandatory layer LsmMemtable missing from witnesses"
+                "T-WITNESS-MINT-1 violation: mandatory layer LsmMemtable missing from witnesses"
                     .to_string(),
             ));
         }
         if !has_sstable {
             return Err(ErasureError::Internal(
-                "INV-WITNESS-MINT-1 violation: mandatory layer SsTableAllLevels missing from witnesses"
+                "T-WITNESS-MINT-1 violation: mandatory layer SsTableAllLevels missing from witnesses"
                     .to_string(),
             ));
         }
         if !has_wal {
             return Err(ErasureError::Internal(
-                "INV-WITNESS-MINT-1 violation: mandatory layer WalAllSegments missing from witnesses"
+                "T-WITNESS-MINT-1 violation: mandatory layer WalAllSegments missing from witnesses"
                     .to_string(),
             ));
         }
@@ -1809,7 +1809,7 @@ mod tests {
         assert!(res.is_err());
         match res {
             Err(ErasureError::Internal(msg)) => {
-                assert!(msg.contains("INV-DELETION-1 violation"));
+                assert!(msg.contains("T-DELETION-1 violation"));
                 assert!(msg.contains("found 3 remaining live entries"));
             }
             _ => panic!("Expected ErasureError::Internal"),

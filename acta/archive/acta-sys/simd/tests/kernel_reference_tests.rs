@@ -3,7 +3,7 @@
 
 //! # Kernel-Referenztests: `kernel_reference_tests`
 //!
-//! **Zweck (WP-90a):**
+//! **Zwecka):**
 //! Vollstaendige Verifikation aller Distanz-Kernel (L2 / Euclidean, Cosine, Dot Product)
 //! und ISA-Pfade (Skalar, AVX2, AVX-512, NEON) gegen die skalare Referenz (`kernels/scalar.rs`).
 //!

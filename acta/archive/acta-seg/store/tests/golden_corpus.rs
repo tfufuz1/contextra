@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Test gegen die Alt-Schluesseldatei des Journals (siehe archive/ALTLASTEN.md); durch Journal-Tests mit Schluessel als Parameter ersetzen (5.1, Z10).
 #![cfg(feature = "workspace")]
 //! Golden Corpus Generator & Regression Tests (ST6.1)
 //!
@@ -5,7 +6,7 @@
 //! 1. Manifest (`AMNF` v1)
 //! 2. SSTable (`ASGX` v4 default, `ASGT` legacy v3, multiblock with Bloom)
 //! 3. WAL including HMAC hash chain, WAL without HMAC, WAL with corrupt tail
-//! 4. Rollback Intent (`MFRLBK\0\0`)
+//! 4. Rollback Intent (`AROLLB\0\0`)
 //! 5. Tenant Codec Test Vectors
 
 use acta_seg::manifest::{Manifest, ManifestEntry, CURRENT_MANIFEST_VERSION};
@@ -57,7 +58,7 @@ async fn test_golden_backward_compatibility_read() {
     // 1. Read Rollback Intent
     let rollback_path = dir.join("rollback_tx_42.intent");
     let intent_bytes = fs::read(&rollback_path).expect("read rollback intent");
-    assert_eq!(&intent_bytes[..8], b"MFRLBK\0\0");
+    assert_eq!(&intent_bytes[..8], b"AROLLB\0\0");
     let tx_num = u64::from_le_bytes(intent_bytes[8..16].try_into().unwrap());
     assert_eq!(tx_num, 42);
 
@@ -176,7 +177,7 @@ async fn generate_golden_corpus() {
     // 1. Rollback Intent
     let rollback_path = dir.join("rollback_tx_42.intent");
     let mut intent_bytes = Vec::with_capacity(16);
-    intent_bytes.extend_from_slice(b"MFRLBK\0\0");
+    intent_bytes.extend_from_slice(b"AROLLB\0\0");
     intent_bytes.extend_from_slice(&42u64.to_le_bytes());
     fs::write(&rollback_path, &intent_bytes).expect("write intent");
 

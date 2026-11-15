@@ -67,7 +67,7 @@ impl SingleFlightCoordinator {
         let mut set = self.inner.active_scopes.lock();
         if set.contains(&key) {
             return Err(ErasureError::LimitExceeded(
-                "INV-ERA-3 violation: concurrent purge for scope already active (single-flight enforced)".to_string(),
+                "T-ERA-3 violation: concurrent purge for scope already active (single-flight enforced)".to_string(),
             ));
         }
         set.insert(key);

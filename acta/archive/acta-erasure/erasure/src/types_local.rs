@@ -1917,19 +1917,19 @@ impl ScanSession {
             ScanTechnique::NotMeasured(reason) => {
                 if reason.trim().is_empty() {
                     return Err(crate::error::ErasureError::Internal(
-                        "INV-WITNESS-MINT-1 violation: NotMeasured technique requires non-empty reason".to_string(),
+                        "T-WITNESS-MINT-1 violation: NotMeasured technique requires non-empty reason".to_string(),
                     ));
                 }
             }
             _ => {
                 if self.scanned == 0 {
                     return Err(crate::error::ErasureError::Internal(
-                        "INV-WITNESS-MINT-1 violation: scanned count cannot be 0 for active scan technique".to_string(),
+                        "T-WITNESS-MINT-1 violation: scanned count cannot be 0 for active scan technique".to_string(),
                     ));
                 }
                 if self.control_matches == 0 {
                     return Err(crate::error::ErasureError::Internal(
-                        "INV-WITNESS-MINT-1 violation: positive control check failed (control_matches == 0)".to_string(),
+                        "T-WITNESS-MINT-1 violation: positive control check failed (control_matches == 0)".to_string(),
                     ));
                 }
             }

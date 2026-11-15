@@ -592,7 +592,7 @@ pub fn try_build_report_with_options(
 ) -> Result<ErasureReport, ErasureError> {
     if witnesses.is_empty() {
         return Err(ErasureError::Internal(
-            "INV-CLASS-MEASURED-1 violation: report cannot be created without verified scanner witnesses"
+            "T-CLASS-MEASURED-1 violation: report cannot be created without verified scanner witnesses"
                 .to_string(),
         ));
     }

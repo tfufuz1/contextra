@@ -102,7 +102,7 @@ pub trait VectorIndex: Send + Sync + 'static {
             let _ = (query, k, seq_no);
             Err(crate::error::ActaError::capability_unsupported(
                 "snapshot_read_at",
-                "Vector search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
+                "Vector search snapshot isolation (search_at) is not supported by default — tracked in SPEC 6.5",
             ))
         }
     }
@@ -373,9 +373,9 @@ mod tests {
         match res2 {
             Err(crate::error::ActaError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "snapshot_read_at");
-                assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
+                assert!(reason.contains("SPEC 6.5"), "Unexpected reason: {reason}");
             }
-            _ => panic!("Expected CapabilityUnsupported with ADR-024 for search_at"),
+            _ => panic!("Expected CapabilityUnsupported with SPEC 6.5 for search_at"),
         }
     }
 }

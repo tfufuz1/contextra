@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Test gegen die Alt-Schluesseldatei des Journals (siehe archive/ALTLASTEN.md); durch Journal-Tests mit Schluessel als Parameter ersetzen (5.1, Z10).
 use acta_seg::wal::Wal;
 use tempfile::tempdir;
 

@@ -8,7 +8,7 @@ use super::block::BlockBuilder;
 use super::meta::SstableMetadata;
 use crate::error::{StoreError as ActaError, StoreResult as Result};
 use crate::io_seam::{RealFs, Vfs, VfsFile, VfsOpenOptions};
-use crate::sstable::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
+use crate::sstable::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_ASGX};
 use crate::sstable::bloom::BloomFilter;
 use crate::wal::KeyManager;
 use bytes::{BufMut, Bytes, BytesMut};
@@ -359,7 +359,7 @@ impl SstableBuilder {
         trailer.put_u64_le(bloom_offset);
         trailer.put_u64_le(index_offset);
         trailer.put_u16_le(self.format_version);
-        trailer.put_u32_le(SSTABLE_MAGIC_MFSX);
+        trailer.put_u32_le(SSTABLE_MAGIC_ASGX);
 
         if let Err(e) = self.write_to_file(&trailer, self.offset) {
             self.poisoned = true;

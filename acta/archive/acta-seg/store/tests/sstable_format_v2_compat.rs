@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bytes::{BufMut, Bytes, BytesMut};
-use acta_seg::sstable::{BlockCache, SstableBuilder, SstableReader, SSTABLE_MAGIC_MFSX};
+use acta_seg::sstable::{BlockCache, SstableBuilder, SstableReader, SSTABLE_MAGIC_ASGX};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::fs::File;
@@ -229,7 +229,7 @@ async fn test_sstable_v2_legacy_fixture_reading() {
     file.write_u64_le(bloom_offset).await.unwrap();
     file.write_u64_le(index_offset).await.unwrap();
     file.write_u16_le(2).await.unwrap(); // version = 2
-    file.write_u32_le(SSTABLE_MAGIC_MFSX).await.unwrap(); // magic = SSTABLE_MAGIC_MFSX
+    file.write_u32_le(SSTABLE_MAGIC_ASGX).await.unwrap(); // magic = SSTABLE_MAGIC_ASGX
     file.sync_all().await.unwrap();
 
     let reader = SstableReader::open(&sst_path, bc)

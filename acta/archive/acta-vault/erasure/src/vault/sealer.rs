@@ -5,7 +5,7 @@
 //! Bei Dokumenten ohne Betroffenen: `salt_S = 0³²`.
 //! Fehlt einer der Ahnen-Slots T/C/S/D im Tresor, ist der DEK nicht ableitbar (`Erased`).
 //! `make_slots_durable`: synchronisiert alle berührten Shards über VFS vor WAL-Schreibvorgängen (I-9).
-//! WP-5a: Sicherer Speicher-Swap, Fail-Closed Handle-Vergiftung und Zeroize-Garantie.
+//!a: Sicherer Speicher-Swap, Fail-Closed Handle-Vergiftung und Zeroize-Garantie.
 //!: Blob-Rewrite mit Journal, Manifest und RAM-Swap.
 
 use crate::crypto_local::{derive_dek, AncestorSalts, UnitKey};
@@ -25,7 +25,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-/// Fehlerarten für Sealer- und Swap-Operationen mit Phasenbezug (WP-5a).
+/// Fehlerarten für Sealer- und Swap-Operationen mit Phasenbezuga).
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum SealerError {
     /// Handle ist vergiftet.

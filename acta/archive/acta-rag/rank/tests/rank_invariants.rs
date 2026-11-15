@@ -46,7 +46,7 @@ fn test_inv_rank_determinism_1() {
         let run = rrf_fuse(&inputs, 60).unwrap();
         assert_eq!(
             baseline, run,
-            "INV-RANK-DETERMINISM-1 violated: Non-deterministic output"
+            "T-RANK-DETERMINISM-1 violated: Non-deterministic output"
         );
     }
 }
@@ -128,7 +128,7 @@ fn test_inv_rank_monotonic_1() {
         let prob = calibrate_score(raw, &calibrator).unwrap();
         assert!(
             prob >= last_calibrated,
-            "INV-RANK-MONOTONIC-1 violated: raw={raw} yielded {prob} < {last_calibrated}"
+            "T-RANK-MONOTONIC-1 violated: raw={raw} yielded {prob} < {last_calibrated}"
         );
         last_calibrated = prob;
     }

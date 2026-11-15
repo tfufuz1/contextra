@@ -2,7 +2,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-const INTENT_MAGIC: &[u8] = b"MFRLBK\0\0";
+const INTENT_MAGIC: &[u8] = b"AROLLB\0\0";
 
 fuzz_target!(|data: &[u8]| {
     // 1. Validierung des 16-Byte Intent-Formats (8B Magic + 8B TxId little-endian)

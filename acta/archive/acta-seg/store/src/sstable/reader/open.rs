@@ -4,7 +4,7 @@
 use super::SstableReader;
 use crate::error::{StoreError as ActaError, StoreResult as Result};
 use crate::io_seam::{RealFs, Vfs, VfsFile, VfsOpenOptions};
-use crate::sstable::block_cache::{BlockCache, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_MFSX};
+use crate::sstable::block_cache::{BlockCache, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_ASGX};
 use crate::sstable::bloom::BloomFilter;
 use crate::sstable::builder::SstableMetadata;
 use crate::sstable::io::pread_exact;
@@ -90,7 +90,7 @@ impl SstableReader {
                         .try_into()
                         .map_err(|_| ActaError::Storage("Invalid trailer".into()))?,
                 );
-                if magic_v1 == SSTABLE_MAGIC_MFSX {
+                if magic_v1 == SSTABLE_MAGIC_ASGX {
                     if let Some(ver_slice) = trailer_data.get(48..50) {
                         format_version = u16::from_le_bytes(
                             ver_slice
@@ -110,7 +110,7 @@ impl SstableReader {
                         .try_into()
                         .map_err(|_| ActaError::Storage("Invalid trailer".into()))?,
                 );
-                if magic_v0 == SSTABLE_MAGIC_MFSX {
+                if magic_v0 == SSTABLE_MAGIC_ASGX {
                     is_mfsx = true;
                     format_version = 0;
                 }

@@ -51,7 +51,7 @@ impl Manifest {
         if let Err(e) = file.sync_all().await {
             self.is_poisoned.store(true, Ordering::SeqCst);
             return Err(StoreError::Storage(format!(
-                "MANIFEST fsync failed for {}: {} (handle poisoned, INV-FSYNC-1)",
+                "MANIFEST fsync failed for {}: {} (handle poisoned, fsync-poison)",
                 self.path.display(),
                 e
             )));

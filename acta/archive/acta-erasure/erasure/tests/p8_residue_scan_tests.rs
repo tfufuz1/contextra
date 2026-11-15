@@ -149,7 +149,7 @@ fn inv_class_measured_1_no_witness_without_positive_control_and_zero_residue() {
     // Positivkontrolle funktioniert, aber Spuren sind vorhanden
     let err = coordinator
         .measure_after_erasure(&query, &canary, 2)
-        .expect_err("INV-CLASS-MEASURED-1: Residuen müssen Fehler erzeugen");
+        .expect_err("T-CLASS-MEASURED-1: Residuen müssen Fehler erzeugen");
 
     match err {
         ResidueMeasurementError::ResidueDetected { phase, matches } => {
@@ -203,7 +203,7 @@ fn inv_vault_failclosed_1_scanner_error_fails_closed() {
 
     let err = coordinator
         .measure_after_erasure(&query, &canary, 1)
-        .expect_err("INV-VAULT-FAILCLOSED-1: Korruption muss fail-closed abbrechen");
+        .expect_err("T-VAULT-FAILCLOSED-1: Korruption muss fail-closed abbrechen");
 
     match err {
         ResidueMeasurementError::CorruptIndexState { reason, .. } => {

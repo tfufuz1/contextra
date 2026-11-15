@@ -438,7 +438,7 @@ async fn test_manifest_poisoning_on_fsync_failure() {
     );
     let err_msg = err.unwrap_err().to_string();
     assert!(
-        err_msg.contains("poisoned") && err_msg.contains("INV-FSYNC-1"),
-        "Error message should mention poisoned and INV-FSYNC-1"
+        err_msg.contains("poisoned") && err_msg.contains("fsync-poison"),
+        "Error message should mention poisoned and fsync-poison"
     );
 }

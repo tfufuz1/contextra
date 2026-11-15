@@ -1,4 +1,4 @@
-//! P2 Test-Suite: Swap-Sofortfix (WP-5a) und Rewrite mit Journal und Manifest.
+//! P2 Test-Suite: Swap-Sofortfixa) und Rewrite mit Journal und Manifest.
 //!
 //! Pflicht-Tests:
 //! - `swap_error_leaves_no_plaintext`: Fault-Injection an Swap-Stellen verifiziert Zeroize und Poisoning.
@@ -10,7 +10,7 @@
 
 use acta_erasure::vault::sealer::{SealerError, VaultSealer};
 
-/// WP-5a: Test `swap_error_leaves_no_plaintext`
+///a: Test `swap_error_leaves_no_plaintext`
 ///
 /// Injiziert Fehler an allen möglichen Stellen des Speicher-Swaps (vorher, mittendrin, danach)
 /// und prüft, dass:
@@ -242,7 +242,7 @@ mod async_rewrite_tests {
         ));
         assert!(
             rewriter.is_poisoned(),
-            "INV-VAULT-FAILCLOSED-1: Handle must be permanently poisoned on overwrite IO error"
+            "T-VAULT-FAILCLOSED-1: Handle must be permanently poisoned on overwrite IO error"
         );
 
         // Weitere Aufrufe müssen sofort mit Poisoned abgewiesen werden
@@ -269,7 +269,7 @@ mod async_rewrite_tests {
         ));
         assert!(
             sync_rewriter.is_poisoned(),
-            "INV-VAULT-FAILCLOSED-1: Handle must be permanently poisoned on sync failure"
+            "T-VAULT-FAILCLOSED-1: Handle must be permanently poisoned on sync failure"
         );
     }
 

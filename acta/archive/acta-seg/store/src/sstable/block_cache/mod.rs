@@ -14,7 +14,7 @@ pub use quick::QuickCacheBlockCacheBackend;
 pub use sieve::SieveCacheBackend;
 pub use traits::BlockCacheBackend;
 
-pub use super::format::{BLOCK_SIZE, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_MFSX};
+pub use super::format::{BLOCK_SIZE, SSTABLE_MAGIC_LEGACY, SSTABLE_MAGIC_ASGX};
 
 use bytes::Bytes;
 use std::sync::Arc;

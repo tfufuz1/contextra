@@ -72,12 +72,12 @@ impl MockSagaDriver {
         }
         if self.anchored_proof.is_none() {
             return Err(
-                "INV-ERA-4 VIOLATION: Cannot end saga without anchoring key destruction in ledger",
+                "T-ERA-4 VIOLATION: Cannot end saga without anchoring key destruction in ledger",
             );
         }
         // Verifikation der Ledger-Kette
         if !self.ledger.verify_chain() {
-            return Err("INV-ERA-4 VIOLATION: Ledger chain verification failed");
+            return Err("T-ERA-4 VIOLATION: Ledger chain verification failed");
         }
         self.saga_ended = true;
         Ok(())
@@ -98,7 +98,7 @@ fn inv_era_4_key_destruction_is_anchored_before_saga_end() {
     let early_end = saga.step_end_saga();
     assert!(
         early_end.is_err(),
-        "INV-ERA-4: Saga must refuse to end if key destruction is not anchored in ledger"
+        "T-ERA-4: Saga must refuse to end if key destruction is not anchored in ledger"
     );
 
     // Jetzt im Ledger verankern

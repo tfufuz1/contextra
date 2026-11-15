@@ -1,3 +1,4 @@
+// TODO(acta-altlast): Test gegen die Alt-Schluesseldatei des Journals (siehe archive/ALTLASTEN.md); durch Journal-Tests mit Schluessel als Parameter ersetzen (5.1, Z10).
 #![cfg(feature = "workspace")]
 use acta_seg::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
 use acta_base::TxId; // TODO(acta-hr3): Hub-Import (ex types/ports) nach HR-2/HR-3 aufloesen
