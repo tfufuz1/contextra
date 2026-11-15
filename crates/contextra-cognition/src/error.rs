@@ -75,9 +75,10 @@ impl From<CognitionError> for contextra_types::ContextraError {
             CognitionError::BudgetExceeded {
                 peak_bytes,
                 max_bytes,
-            } => contextra_types::ContextraError::MemoryLimitExceeded(format!(
-                "Speicherbudget für Konsolidierung überschritten: {peak_bytes} > {max_bytes} Bytes"
-            )),
+            } => contextra_types::ContextraError::MemoryBudgetExceeded {
+                used_mb: peak_bytes.div_ceil(1024 * 1024) as u64,
+                limit_mb: max_bytes.div_ceil(1024 * 1024) as u64,
+            },
             CognitionError::StaleRead(msg) => contextra_types::ContextraError::StaleRead(msg),
             CognitionError::NotFound(msg) => contextra_types::ContextraError::NotFound(msg),
             CognitionError::Serialization(msg) => {

@@ -24,8 +24,9 @@ impl AgentTool for EchoTool {
     ) -> BoxFuture<'a, Result<StepResult>> {
         Box::pin(async move {
             Ok(StepResult {
+                node_id: "step1".to_string(),
                 output: json!({ "echo": input }),
-                next_node: None,
+                next_edge: None,
                 tokens_consumed: 15,
             })
         })

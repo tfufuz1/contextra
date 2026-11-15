@@ -298,9 +298,26 @@ mod tests {
 
         let lic_err = PerformanceProfileError::LicenseRequired(
             FeatureRing::Sovereign,
-            contextra_ports::license::LicenseError::InsufficientRing,
+            contextra_ports::license::LicenseError::NotActivated(FeatureRing::Sovereign),
         );
         assert!(lic_err.to_string().contains("requires a valid license"));
+    }
+}
+
+impl PartialEq<contextra_db::DurabilityMode> for DurabilityMode {
+    fn eq(&self, other: &contextra_db::DurabilityMode) -> bool {
+        matches!(
+            (self, other),
+            (DurabilityMode::Full, contextra_db::DurabilityMode::Full)
+                | (DurabilityMode::WalNoHmac, contextra_db::DurabilityMode::WalNoHmac)
+                | (DurabilityMode::MemoryOnly, contextra_db::DurabilityMode::MemoryOnly)
+        )
+    }
+}
+
+impl PartialEq<DurabilityMode> for contextra_db::DurabilityMode {
+    fn eq(&self, other: &DurabilityMode) -> bool {
+        other == self
     }
 }
 

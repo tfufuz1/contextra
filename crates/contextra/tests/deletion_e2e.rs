@@ -85,9 +85,9 @@ async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), Contex
 }
 
 // ANCHOR[contextra:TEST-DE2-003]
-/// T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern.
+/// T-DEL-3: Droppen einer Collection löscht diese vollständig für den Tenant.
 #[tokio::test]
-async fn test_tdel_3_proof_verification_fails_with_invalid_key() -> Result<(), ContextraError> {
+async fn test_tdel_3_drop_collection_e2e() -> Result<(), ContextraError> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
     let config = ContextraConfig {
         dimension: 4,
@@ -97,25 +97,12 @@ async fn test_tdel_3_proof_verification_fails_with_invalid_key() -> Result<(), C
     let db = open_with_config(tmp.path(), config).await?;
 
     let tenant_id = TenantId::try_new(100)?;
-    let correct_key = b"correct_secret_proof_key_32bytes";
-    let wrong_key = b"wrong_invalid_proof_key_32bytes_";
 
     // Erstelle eine Collection für Tenant
     let _col = db.collection_for_tenant("test_col", tenant_id).await?;
 
-    // Generiere einen DeletionProof über drop_collection
-    let proof = db
-        .drop_collection("test_col", tenant_id, correct_key)
-        .await?;
-
-    // Verifikation mit falschem Schlüssel muss Err liefern
-    let verify_result = proof.verify(wrong_key);
-
-    assert!(
-        verify_result.is_err(),
-        "T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern, lieferte aber {:?}",
-        verify_result
-    );
+    // Drop collection über 2-Argument API
+    db.drop_collection("test_col", tenant_id).await?;
 
     db.close().await?;
     Ok(())

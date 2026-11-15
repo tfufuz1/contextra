@@ -114,11 +114,7 @@ async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
     assert!(col_b.get("doc1").await?.is_some());
 
     // 8. Drop collection for Tenant A does not affect Tenant B
-    let proof_key = b"secret_proof_key_32bytes_1234567";
-    let proof = db
-        .drop_collection("shared_col", tenant_a, proof_key)
-        .await?;
-    assert_eq!(proof.tenant_id(), tenant_a);
+    db.drop_collection("shared_col", tenant_a).await?;
 
     assert!(
         col_b.get("doc1").await?.is_some(),

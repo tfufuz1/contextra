@@ -326,7 +326,7 @@ impl ContextraBuilder {
         let requested_ring = if let Some(profile) = self.performance_profile {
             let resolved = profile.resolve();
             if self.explicit_user_config {
-                if config_for_open.durability_mode != resolved.durability_mode.into()
+                if config_for_open.durability_mode != contextra_db::DurabilityMode::from(resolved.durability_mode)
                     || config_for_open.deletion_proof_active != resolved.integrity_proof_active
                     || config_for_open.vector_delete_mode != resolved.vector_delete_mode
                 {
