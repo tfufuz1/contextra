@@ -1,2 +1,0 @@
-    Checking contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.06s
