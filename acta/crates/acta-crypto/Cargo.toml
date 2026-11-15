@@ -1,0 +1,88 @@
+[lints.rust]
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)'] }
+deprecated = "allow"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+panic = "allow"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
+dbg_macro = "deny"
+unwrap_used = "allow"
+expect_used = "allow"
+indexing_slicing = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+doc_lazy_continuation = "allow"
+disallowed_methods = "allow"
+disallowed_types = "allow"
+
+[package]
+autobenches = false
+name = "acta-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version = "1.89"
+description = "Encryption at Rest and KV-Cache Security utilities for Acta"
+readme = "README.md"
+repository = "https://github.com/tfufuz1/acta"
+keywords = ["cryptography", "aead", "kdf", "wal", "zeroize"]
+categories = ["cryptography"]
+# Internes Bausteinlager fuer die Acta-Architektur, kein externes Crates.io-Release
+publish = false
+
+[package.metadata.acta]
+ring = "0"
+klasse = "A"
+
+[dependencies]
+thiserror = { workspace = true }
+sha2 = "0.10"
+hmac = "0.12"
+aes-gcm-siv = "0.11"
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+hkdf = "0.12"
+subtle = "2.6"
+blake3 = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+acta-ids = { path = "../acta-ids", version = "0.1.0" }
+acta-env = { path = "../acta-env", version = "0.1.0" }
+acta-types = { path = "../acta-types", version = "0.1.0", optional = true }
+acta-ports = { path = "../acta-ports", version = "0.1.0", optional = true }
+rand = { workspace = true }
+tracing = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+parking_lot = { workspace = true }
+ahash = { workspace = true }
+lru = "0.16.4"
+regex = { workspace = true }
+
+[features]
+default = ["kv-encryption", "workspace"]
+workspace = ["dep:acta-types", "dep:acta-ports"]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
+test-utils = []
+kv-encryption = []
+cloud-egress-guard = []
+
+[dev-dependencies]
+acta-crypto = { path = ".", features = ["test-utils"] }
+acta-types = { path = "../acta-types" }
+acta-ports = { path = "../acta-ports" }
+acta-env = { path = "../acta-env", features = ["test-utils"] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util"] }
+proptest = "1.4"
+criterion = { workspace = true }
+loom = "0.7"
+
+[[bench]]
+name = "crypto_benchmarks"
+harness = false

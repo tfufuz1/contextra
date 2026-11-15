@@ -1,0 +1,20 @@
+[package]
+name = "acta-env"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.89"
+description = "Injectable environment (clock, rng, id generation, metrics) for Acta"
+
+[dependencies]
+
+[dev-dependencies]
+
+[features]
+default = ["std"]
+std = []
+test-utils = []
+
+[[test]]
+name = "legacy_reference_unix_ms"
+required-features = ["test-utils"]
