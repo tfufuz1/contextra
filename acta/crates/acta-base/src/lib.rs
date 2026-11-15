@@ -5,12 +5,14 @@
 //! Extraktionsarchiv: `archive/acta-base/MANIFEST.md`.
 #![forbid(unsafe_code)]
 
+pub mod canon;
 pub mod class;
 pub mod error;
 pub mod fx;
 pub mod ids;
+pub mod limits;
 pub mod ports;
 
 pub use class::DataClass;
-pub use error::{ClassifiedError, ErrorClass};
+pub use error::{BaseError, ClassifiedError, ErrorClass};
 pub use ports::{Clock, CryptoRng, EntropyError};
