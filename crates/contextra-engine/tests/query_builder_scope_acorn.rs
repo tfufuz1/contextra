@@ -31,7 +31,7 @@ impl MockFilteredIndex {
     fn new(dimension: usize) -> Self {
         let config = HnswConfig {
             dimension,
-            distance_metric: DistanceMetric::Cosine,
+            distance_metric: DistanceMetric::Cosine.into(),
             ..Default::default()
         };
         Self {
@@ -151,7 +151,7 @@ async fn create_standard_collection(name: &str) -> (Collection<LsmStorage, HnswI
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
     let hnsw_config = HnswConfig {
         dimension: 4,
-        distance_metric: DistanceMetric::Cosine,
+        distance_metric: DistanceMetric::Cosine.into(),
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());

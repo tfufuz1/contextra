@@ -20,7 +20,7 @@ pub enum SearchStrategy {
         max_hops: usize,
     },
     /// Personalized PageRank power iteration graph traversal strategy.
-    PersonalizedPageRank(contextra_types::PprConfig),
+    PersonalizedPageRank(contextra_graph::PprConfig),
     /// PathRAG bidirectional Dijkstra graph traversal strategy.
     PathRag {
         /// Maximum traversal hop depth.

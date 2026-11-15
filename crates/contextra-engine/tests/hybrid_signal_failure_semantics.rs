@@ -26,7 +26,7 @@ async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
     let hnsw_config = HnswConfig {
         dimension: 4,
-        distance_metric: DistanceMetric::Cosine,
+        distance_metric: DistanceMetric::Cosine.into(),
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());

@@ -1237,7 +1237,7 @@ async fn test_hybrid_search_snapshot_unsupported_strategies() -> contextra_types
     .await?;
 
     let ppr_strat = contextra_types::GraphTraversalStrategy::PersonalizedPageRank(
-        contextra_types::PprConfig::default(),
+        contextra_graph::PprConfig::default(),
     );
     let ppr_res = col
         .hybrid_search_with_strategy(

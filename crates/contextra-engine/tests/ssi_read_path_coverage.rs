@@ -177,7 +177,7 @@ async fn test_non_ssi_storage_engine_startup_behavior() -> Result<()> {
     let index = Arc::new(
         contextra_vector::HnswIndex::try_new(contextra_vector::HnswConfig {
             dimension: 4,
-            distance_metric: contextra_types::DistanceMetric::Cosine,
+            distance_metric: contextra_types::DistanceMetric::Cosine.into(),
             ..Default::default()
         })
         .expect("Failed to create HnswIndex"),

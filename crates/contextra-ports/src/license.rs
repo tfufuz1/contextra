@@ -14,6 +14,10 @@
 /// Vector deletion mode for vector index maintenance (§15).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+)]
 pub enum VectorDeleteMode {
     /// Synchronous graph repair during vector deletion.
     SynchronousRepair,
@@ -30,6 +34,10 @@ impl Default for VectorDeleteMode {
 /// Feature-Ring gemäß Spec §15.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+)]
 pub enum FeatureRing {
     /// Fast ring (open source core).
     Fast,
@@ -45,6 +53,10 @@ pub enum FeatureRing {
 /// `AuthorizedRing` cannot be directly instantiated outside of the `contextra-ports` crate or
 /// without passing through a [`LicenseGate`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+)]
 pub struct AuthorizedRing {
     ring: FeatureRing,
 }
@@ -64,6 +76,10 @@ impl AuthorizedRing {
 /// Fehlerklasse für Lizenz-/Aktivierungsprüfung — crate-lokal, an der Grenze in
 /// `ContextraError` konvertierbar (P6-konform, siehe Spec §17).
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+)]
 pub enum LicenseError {
     /// No valid activation found for the requested feature ring.
     #[error("no valid activation found for feature ring {0:?}")]
@@ -80,6 +96,10 @@ pub enum LicenseError {
 /// Dyn-kompatibler Port (P27) für Lizenzprüfung — Implementierung (Lizenzserver-Anbindung,
 /// Ed25519-Signaturprüfung analog zum Signaturprüfpfad §14.1) ist NICHT Teil dieses Tickets
 /// und folgt in einem eigenen, separat zu beauftragenden Schritt.
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+)]
 pub trait LicenseGate: Send + Sync {
     /// Checks if the requested feature ring is activated and accessible.
     ///
@@ -104,6 +124,10 @@ pub trait LicenseGate: Send + Sync {
 
 /// Default open activation gate allowing `Fast` ring features without restriction.
 #[derive(Debug, Default, Clone, Copy)]
+#[deprecated(
+    since = "0.2.0",
+    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+)]
 pub struct OpenFastGate;
 
 impl LicenseGate for OpenFastGate {

@@ -13,11 +13,11 @@
 )]
 
 use contextra_kvcache::{KvReusePolicy, KvSegment, PrefixRadixTree, TenantIsolatedKvStore};
-use contextra_types::TenantId;
+use contextra_kvcache::TenantId;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_radix_tree_lookup_and_insert(c: &mut Criterion) {
-    let tenant = TenantId::try_new(1).unwrap();
+    let tenant = TenantId::from(1u64);
     let mut tree = PrefixRadixTree::new(tenant);
 
     for i in 0..100 {
@@ -36,7 +36,7 @@ fn bench_radix_tree_lookup_and_insert(c: &mut Criterion) {
 
 fn bench_store_insert_and_get(c: &mut Criterion) {
     let store = TenantIsolatedKvStore::new();
-    let tenant = TenantId::try_new(42).unwrap();
+    let tenant = TenantId::from(42u64);
 
     for i in 0..50 {
         let segment = KvSegment::new(tenant, i as u64, vec![0xAA; 1024]);
