@@ -1,0 +1,171 @@
+//! `types` — Lokale Typ- und Traitabstraktionen für Zeit, Mandantenisolation und Egress-Policy (Klasse A).
+//!
+//! # Zweck
+//! Stellt sicher, dass `acta-pii` als autarker Baustein ohne interne Abhängigkeiten
+//! zu `acta-base` oder `acta-base` funktioniert.
+
+use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Trait für monotone und reale Zeitabfragen ohne Abhängigkeit von externen Ports.
+pub trait Clock: Send + Sync {
+    /// Liefert die aktuelle Zeit in Unix-Nanosekunden.
+    fn now_unix_nanos(&self) -> u64;
+    /// Liefert einen monotonen Nanosekunden-Zähler.
+    fn monotonic_nanos(&self) -> u64;
+}
+
+/// Standardmäßige Implementierung von [`Clock`] auf Basis von `std::time::SystemTime`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SystemClock;
+
+impl SystemClock {
+    /// Erstellt eine neue [`SystemClock`].
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Clock for SystemClock {
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
+    fn now_unix_nanos(&self) -> u64 {
+        SystemTime::now() // ALLOW-DETERMINISM: Wall clock baseline in standalone SystemClock
+            .duration_since(UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
+            .unwrap_or(0)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.now_unix_nanos()
+    }
+}
+
+/// Numerischer Mandanten-Identifikator (64-Bit).
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[repr(transparent)]
+pub struct TenantId(pub u64);
+
+impl TenantId {
+    /// Systemmandant (0).
+    pub const SYSTEM: Self = Self(0);
+
+    /// Erstellt einen neuen `TenantId`.
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Versucht, einen Mandanten zu erzeugen (0 ist reserviert/Fehler für Benutzerdaten).
+    pub fn try_new(id: u64) -> Result<Self, TenantScopeViolation> {
+        if id == 0 {
+            Err(TenantScopeViolation::InvalidZero)
+        } else {
+            Ok(Self(id))
+        }
+    }
+
+    /// Liefert den numerischen Wert.
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
+}
+
+impl fmt::Display for TenantId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TenantId({})", self.0)
+    }
+}
+
+impl From<u64> for TenantId {
+    fn from(val: u64) -> Self {
+        Self(val)
+    }
+}
+
+/// Fehler bei Mandanten-Scope-Verletzungen.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum TenantScopeViolation {
+    /// Mandanten-Scope-Ungleichheit.
+    #[error("tenant scope mismatch: expected {expected:?}, got {actual:?}")]
+    Mismatch {
+        /// Erwarteter Mandant.
+        expected: TenantId,
+        /// Tatsächlicher Mandant.
+        actual: TenantId,
+    },
+    /// Ungültiger Null-Mandant oder unzulässige Operation.
+    #[error("tenant ID cannot be 0")]
+    InvalidZero,
+}
+
+/// An einen Mandanten gebundener Datenbehälter zur Durchsetzung von Isolation.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TenantScoped<T> {
+    tenant_id: TenantId,
+    data: T,
+}
+
+impl<T> TenantScoped<T> {
+    /// Erstellt einen neuen `TenantScoped`-Container.
+    pub const fn new(tenant_id: TenantId, data: T) -> Self {
+        Self { tenant_id, data }
+    }
+
+    /// Liefert die gebundene Mandanten-ID.
+    pub const fn tenant_id(&self) -> &TenantId {
+        &self.tenant_id
+    }
+
+    /// Gibt eine Referenz auf die inneren Daten zurück.
+    pub const fn inner(&self) -> &T {
+        &self.data
+    }
+
+    /// Prüft den Mandanten und entpackt die inneren Daten.
+    pub fn into_inner_checked(self, expected: &TenantId) -> Result<T, TenantScopeViolation> {
+        if self.tenant_id == *expected {
+            Ok(self.data)
+        } else {
+            Err(TenantScopeViolation::Mismatch {
+                expected: *expected,
+                actual: self.tenant_id,
+            })
+        }
+    }
+}
+
+/// Entscheidung einer Egress-Richtlinienauswertung.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EgressDecision {
+    /// Anfrage ohne Modifikation gestattet.
+    Allow,
+    /// Anfrage gestattet, aber Payload muss bereinigt / maskiert werden.
+    Redact(String),
+    /// Anfrage verweigert.
+    Deny(String),
+}
+
+/// Crate-eigener dynamischer Trait für Egress-Richtlinien.
+pub trait EgressPolicy: Send + Sync {
+    /// Bewertet, ob der ausgehende Payload die Richtlinie erfüllt.
+    fn evaluate(&self, payload: &str) -> EgressDecision;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct AllowAllPolicy;
+    impl EgressPolicy for AllowAllPolicy {
+        fn evaluate(&self, _payload: &str) -> EgressDecision {
+            EgressDecision::Allow
+        }
+    }
+
+    #[test]
+    fn test_egress_policy_trait_contract() {
+        let policy: Box<dyn EgressPolicy> = Box::new(AllowAllPolicy);
+        assert_eq!(policy.evaluate("test-payload"), EgressDecision::Allow);
+    }
+}

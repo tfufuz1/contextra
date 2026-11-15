@@ -2241,4 +2241,3 @@ Es ist keine Entscheidung bekannt, die Crypto-Shredding billigt oder ein Löschv
 |ADR-33|Segmentierung nach Partition (K, P, DK, DP) und Lineage je Quellart|Löschlogik nur für DP|vier Segmentarten|–|
 
 **Entscheidungen, die nicht in dieser Spezifikation liegen:** Archiv- und Aufbewahrungsrecht des Mandanten, Wahl der Aufbewahrungsklassen und Fristen, Einstufung nach KI-VO, Zulässigkeit und Dauer pseudonymer Commitments im konkreten Fall, Haltung der zuständigen Aufsicht zur Schlüsselvernichtung, Freigabe externer Dienste. Sie sind Pflichtparameter oder Freigabepflichten (20.4), nicht offene Fragen der Architektur.
-s

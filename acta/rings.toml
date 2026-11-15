@@ -1,0 +1,71 @@
+# Level-Modell (Spec 3.2). Abhaengigkeit A -> B nur wenn level(A) > level(B).
+# Dev-Abhaengigkeiten zaehlen nicht. Gate G1 liest diese Datei.
+[levels]
+acta-base = 0
+acta-crypto = 1
+acta-fs = 1
+acta-sys = 1
+acta-gate = 1
+acta-access = 1
+acta-infer = 1
+acta-pii = 1
+acta-ingest = 1
+acta-parse = 1
+acta-ledger = 2
+acta-vault = 2
+acta-seg = 2
+acta-pstore = 3
+acta-history = 3
+acta-text = 3
+acta-vec = 3
+acta-erasure = 4
+acta-decision = 4
+acta-rag = 4
+acta-reports = 5
+acta-engine = 6
+acta-node = 7
+acta-infer-http = 8
+acta-sink-net = 8
+acta-api = 8
+acta-server = 9
+acta-cli = 9
+acta-parse-worker = 9
+acta-verify = 9
+acta-testkit = 2
+
+[isolated]
+# keine interne Abhaengigkeit erlaubt (Spec 17.1)
+acta-verify = 1
+
+[budgets]
+# harte Obergrenzen fuer Produktionscode in LOC (Spec 3.3, G-HUB)
+acta-base = 2500
+acta-crypto = 4200
+acta-fs = 2500
+acta-sys = 1600
+acta-gate = 1200
+acta-access = 3000
+acta-infer = 700
+acta-pii = 4000
+acta-ingest = 3000
+acta-parse = 5000
+acta-ledger = 2800
+acta-vault = 5500
+acta-seg = 6500
+acta-pstore = 5000
+acta-history = 6500
+acta-text = 5000
+acta-vec = 4000
+acta-erasure = 9000
+acta-decision = 4500
+acta-rag = 7000
+acta-reports = 3500
+acta-engine = 12000
+acta-node = 3000
+acta-infer-http = 3000
+acta-sink-net = 600
+acta-api = 6000
+acta-server = 700
+acta-cli = 3000
+acta-parse-worker = 600
+acta-verify = 1200

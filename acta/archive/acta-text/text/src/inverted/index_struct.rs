@@ -1,0 +1,670 @@
+use super::types::{Language, StagedStatsChange, TextIndexMetadata};
+use crate::posting_list::{Posting, ResidentPostingIndex};
+use crate::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+use crate::error::{Result, TextError};
+use crate::storage::PostingStore;
+use crate::types::MAX_SEARCH_K;
+use acta_base::{DocId, TxId};
+// ANCHOR[acta-text:INV-008]
+/// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
+///
+/// # Nebenläufigkeit & Sperrhierarchie:
+/// 1. `commit_lock` (`parking_lot::Mutex`): Serialisiert Transaktions-Commits auf den Statistiken (Single-Writer).
+/// 2. `staged_stats` (`parking_lot::Mutex`): Kurzlebiger Spinlock für ungecommittete Transaktionsänderungen im RAM.
+///
+/// **Regel**: `commit_lock` muss IMMER vor `staged_stats` akquiriert werden. Niemals synchrone Sperren über `.await`-Punkte halten!
+pub struct InvertedIndex<S: PostingStore> {
+    storage: Arc<S>,
+    prefix: Vec<u8>,
+    tokenizer: Arc<dyn Tokenizer>,
+    pub(crate) total_docs: Arc<AtomicU64>,
+    pub(crate) total_tokens: Arc<AtomicU64>,
+    pub(crate) avg_doc_len_x1000: Arc<AtomicU64>, // Cached fixed-point (FIND-TXT-004)
+    pub(crate) staged_stats: Arc<parking_lot::Mutex<HashMap<TxId, StagedStatsChange>>>,
+    pub(crate) staged_terms: Arc<parking_lot::Mutex<HashMap<TxId, Vec<String>>>>,
+    commit_lock: Arc<parking_lot::Mutex<()>>,
+    pub(crate) resident_index: Arc<ResidentPostingIndex>,
+}
+
+impl<S: PostingStore> Clone for InvertedIndex<S> {
+    fn clone(&self) -> Self {
+        Self {
+            storage: self.storage.clone(),
+            prefix: self.prefix.clone(),
+            tokenizer: self.tokenizer.clone(),
+            total_docs: self.total_docs.clone(),
+            total_tokens: self.total_tokens.clone(),
+            avg_doc_len_x1000: self.avg_doc_len_x1000.clone(),
+            staged_stats: self.staged_stats.clone(),
+            staged_terms: self.staged_terms.clone(),
+            commit_lock: self.commit_lock.clone(),
+            resident_index: self.resident_index.clone(),
+        }
+    }
+}
+
+impl<S: PostingStore> InvertedIndex<S> {
+    // ANCHOR[acta-text:INV-009]
+    /// Maximale Textgröße pro Dokument (10 MiB) zur Begrenzung von Speicherverbrauch und DoS-Schutz.
+    pub const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
+
+    // ANCHOR[acta-text:INV-010]
+    /// Maximale Anzahl gleichzeitig ungecommitteter Transaktionen (10.000).
+    pub const MAX_STAGED_TRANSACTIONS: usize = 10_000;
+
+    // ANCHOR[acta-text:INV-011]
+    /// Erzeugt einen neuen invertierten Index mit expliziter Sprachkonfiguration.
+    ///
+    /// # Language Selection
+    /// Use `Language::from_iso("de")` for German,
+    /// `Language::English` (default) for all other languages.
+    ///
+    /// **NOT** namespace-based — namespace names do NOT determine language.
+    pub fn new_with_language(storage: Arc<S>, namespace: &str, language: Language) -> Self {
+        let prefix = if namespace == "default" {
+            b"__txt:default:".to_vec()
+        } else {
+            format!("__txt:{}:", namespace).into_bytes()
+        };
+
+        let tokenizer: Arc<dyn Tokenizer> = match language {
+            Language::German => Arc::new(GermanMorphTokenizer::try_new().unwrap_or_default()),
+            Language::English | Language::Custom => Arc::new(DefaultTokenizer),
+        };
+
+        Self {
+            storage,
+            prefix,
+            tokenizer,
+            total_docs: Arc::new(AtomicU64::new(0)),
+            total_tokens: Arc::new(AtomicU64::new(0)),
+            avg_doc_len_x1000: Arc::new(AtomicU64::new(0)),
+            staged_stats: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+            staged_terms: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+            commit_lock: Arc::new(parking_lot::Mutex::new(())),
+            resident_index: Arc::new(ResidentPostingIndex::new()),
+        }
+    }
+
+    // ANCHOR[acta-text:INV-012]
+    /// Erzeugt einen neuen invertierten Index mit englischem Standard-Tokenizer.
+    pub fn new(storage: Arc<S>, namespace: &str) -> Self {
+        Self::new_with_language(storage, namespace, Language::English)
+    }
+
+    // ANCHOR[acta-text:INV-013]
+    /// Konfiguriert einen benutzerdefinierten Tokenizer.
+    pub fn with_tokenizer(mut self, tokenizer: Arc<dyn Tokenizer>) -> Self {
+        self.tokenizer = tokenizer;
+        self
+    }
+
+    /// Accessor for underlying storage engine.
+    pub fn storage(&self) -> &Arc<S> {
+        &self.storage
+    }
+
+    /// Accessor for index storage prefix bytes.
+    pub fn prefix(&self) -> &[u8] {
+        &self.prefix
+    }
+
+    /// Accessor for single-writer commit lock.
+    pub fn commit_lock(&self) -> &parking_lot::Mutex<()> {
+        &self.commit_lock
+    }
+
+    // ANCHOR[acta-text:INV-014]
+    /// Lädt die persistenten Statistiken (`meta:stats`) aus dem Storage in die atomaren In-Memory-Felder.
+    pub async fn load_stats(&self) -> Result<()> {
+        let meta_key = self.key("meta:stats");
+        if let Some(bytes) = self.storage.get(&meta_key).await? {
+            let meta: TextIndexMetadata = bincode::deserialize(&bytes)
+                .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
+            self.total_docs.store(meta.total_docs, Ordering::SeqCst);
+            self.total_tokens.store(meta.total_tokens, Ordering::SeqCst);
+            self.avg_doc_len_x1000
+                .store(meta.avg_doc_len_x1000, Ordering::SeqCst);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn key(&self, suffix: &str) -> Vec<u8> {
+        let mut k = Vec::with_capacity(self.prefix.len() + suffix.len());
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(suffix.as_bytes());
+        k
+    }
+
+    pub(crate) fn key_with_id(&self, type_prefix: &str, id: impl Into<u128>) -> Vec<u8> {
+        let mut itoa_buf = itoa::Buffer::new();
+        let id_str = itoa_buf.format(id.into());
+        let mut k = Vec::with_capacity(self.prefix.len() + type_prefix.len() + id_str.len());
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(type_prefix.as_bytes());
+        k.extend_from_slice(id_str.as_bytes());
+        k
+    }
+
+    pub(crate) fn key_with_term_doc(&self, term: &str, doc_id: DocId) -> Vec<u8> {
+        let mut itoa_buf = itoa::Buffer::new();
+        let id_str = itoa_buf.format(doc_id.inner());
+        let mut k = Vec::with_capacity(self.prefix.len() + 3 + term.len() + 1 + id_str.len());
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(b"pl:");
+        k.extend_from_slice(term.as_bytes());
+        k.push(b':');
+        k.extend_from_slice(id_str.as_bytes());
+        k
+    }
+
+    pub(crate) fn key_term_prefix(&self, term: &str) -> Vec<u8> {
+        let mut k = Vec::with_capacity(self.prefix.len() + 3 + term.len() + 1);
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(b"pl:");
+        k.extend_from_slice(term.as_bytes());
+        k.push(b':');
+        k
+    }
+
+    pub(crate) fn key_batch_posting_list(&self, term: &str) -> Vec<u8> {
+        let mut k = Vec::with_capacity(self.prefix.len() + 4 + term.len());
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(b"plb:");
+        k.extend_from_slice(term.as_bytes());
+        k
+    }
+
+    /// Ensures that the posting list for a term is loaded into the resident index from storage.
+    pub(crate) async fn ensure_term_loaded(
+        &self,
+        term: &str,
+    ) -> Result<Arc<crate::posting_list::PostingList>> {
+        if let Some(list) = self.resident_index.get(term) {
+            return Ok(list);
+        }
+
+        let plb_key = self.key_batch_posting_list(term);
+        if let Some(bytes) = self.storage.get(&plb_key).await? {
+            if let Ok(plist) = crate::posting_list::PostingList::decode_compact(&bytes) {
+                self.resident_index.insert_list(term.to_string(), plist);
+                if let Some(l) = self.resident_index.get(term) {
+                    return Ok(l);
+                }
+            }
+        }
+
+        // Fallback to legacy single-key prefix scan
+        let prefix = self.key_term_prefix(term);
+        let raw_entries = self.storage.scan_prefix(&prefix).await?;
+        let mut postings = Vec::with_capacity(raw_entries.len());
+        for (key, val_bytes) in raw_entries {
+            let suffix_bytes = &key[prefix.len()..];
+            if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
+                #[cfg(not(feature = "docid-128"))]
+                let parsed_doc_id = suffix.parse::<u64>().ok();
+                #[cfg(feature = "docid-128")]
+                let parsed_doc_id = suffix.parse::<u128>().ok();
+
+                if let Some(doc_id_raw) = parsed_doc_id {
+                    if val_bytes.len() == 4 {
+                        let doc_id = DocId::new(doc_id_raw as _);
+                        let tf =
+                            u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
+                                TextError::Storage("Invalid posting tf length".into())
+                            })?);
+                        let dl_key = self.key_with_id("dl:", doc_id.inner());
+                        let doc_len = match self.storage.get(&dl_key).await? {
+                            Some(dl_bytes) if dl_bytes.len() == 4 => {
+                                u32::from_le_bytes((&dl_bytes[..]).try_into().map_err(|_| {
+                                    TextError::Storage("Invalid doc_len length".into())
+                                })?)
+                            }
+                            _ => 0,
+                        };
+                        postings.push(Posting::new(doc_id, tf, doc_len));
+                    }
+                }
+            }
+        }
+        let plist = crate::posting_list::PostingList::new(postings);
+        self.resident_index
+            .insert_list(term.to_string(), plist.clone());
+        Ok(Arc::new(plist))
+    }
+
+    /// Generates a tombstone storage key for document updating or deletion.
+    pub(crate) fn key_tombstone(&self, doc_id: DocId, term: &str) -> Vec<u8> {
+        let mut itoa_buf = itoa::Buffer::new();
+        let id_str = itoa_buf.format(doc_id.inner());
+        let mut k = Vec::with_capacity(self.prefix.len() + 4 + id_str.len() + 1 + term.len());
+        k.extend_from_slice(&self.prefix);
+        k.extend_from_slice(b"tbs:");
+        k.extend_from_slice(id_str.as_bytes());
+        k.push(b':');
+        k.extend_from_slice(term.as_bytes());
+        k
+    }
+
+    // ANCHOR[acta-text:INV-015]
+    /// Fügt ein Dokument in den Index ein oder aktualisiert ein bestehendes.
+    #[tracing::instrument(skip(self, text))]
+    pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {
+        if text.len() > Self::MAX_TEXT_BYTES {
+            return Err(TextError::InvalidInput(format!(
+                "Text length {} exceeds maximum allowed size {}",
+                text.len(),
+                Self::MAX_TEXT_BYTES
+            )));
+        }
+
+        let tokens = self.tokenizer.tokenize(text);
+        let new_len = tokens.len() as u32;
+
+        let mut tfs = HashMap::with_capacity(tokens.len());
+        for t in tokens {
+            *tfs.entry(t).or_insert(0u32) += 1;
+        }
+
+        let dl_key = self.key_with_id("dl:", doc_id.inner());
+        let fw_key = self.key_with_id("fw:", doc_id.inner());
+        let mut old_len = 0u32;
+        let mut is_update = false;
+
+        if let Some(bytes) = self.storage.get(&dl_key).await? {
+            if bytes.len() == 4 {
+                old_len = u32::from_le_bytes(
+                    (&bytes[..])
+                        .try_into()
+                        .map_err(|_| TextError::Storage("Invalid doc_len length".into()))?,
+                );
+                is_update = true;
+
+                if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
+                    let old_terms: Vec<String> = bincode::deserialize(&fw_bytes)
+                        .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
+                    for term in old_terms {
+                        if !tfs.contains_key(&term) {
+                            let tbs_key = self.key_tombstone(doc_id, &term);
+                            self.storage.put(tx, &tbs_key, &[]).await?;
+                        }
+                    }
+                }
+            }
+        }
+
+        self.storage
+            .put(tx, &dl_key, &new_len.to_le_bytes())
+            .await?;
+
+        let mut tfs_vec: Vec<(String, u32)> = tfs.into_iter().collect();
+        tfs_vec.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let unique_terms: Vec<&str> = tfs_vec.iter().map(|(k, _)| k.as_str()).collect();
+        let fw_bytes = bincode::serialize(&unique_terms)
+            .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?;
+        self.storage.put(tx, &fw_key, &fw_bytes).await?;
+
+        // Stage stats changes
+        let mut change = StagedStatsChange::default();
+        if is_update {
+            change.tokens_delta = (new_len as i64) - (old_len as i64);
+        } else {
+            change.docs_delta = 1;
+            change.tokens_delta = new_len as i64;
+        }
+        self.stage_stats_change(tx, change)?;
+
+        for (term, tf) in &tfs_vec {
+            self.ensure_term_loaded(term).await?;
+            let pl_doc_key = self.key_with_term_doc(term, doc_id);
+            self.storage.put(tx, &pl_doc_key, &tf.to_le_bytes()).await?;
+            self.resident_index
+                .upsert_posting(term, Posting::new(doc_id, *tf, new_len));
+
+            if let Some(plist) = self.resident_index.get(term) {
+                let batch_bytes = plist.encode_compact()?;
+                let plb_key = self.key_batch_posting_list(term);
+                self.storage.put(tx, &plb_key, &batch_bytes).await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    // ANCHOR[acta-text:INV-025]
+    /// Schreibt Postinglisten für gegebene Terme neu (Maintenance / Rewrite API).
+    pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize> {
+        let mut rewritten = 0;
+        for &term in terms {
+            self.ensure_term_loaded(term).await?;
+            let plb_key = self.key_batch_posting_list(term);
+            if let Some(plist) = self.resident_index.get(term) {
+                if !plist.is_empty() {
+                    let batch_bytes = plist.encode_compact()?;
+                    self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                    rewritten += 1;
+                } else {
+                    self.storage.delete(tx, &plb_key).await?;
+                    rewritten += 1;
+                }
+            }
+        }
+        Ok(rewritten)
+    }
+
+    // ANCHOR[acta-text:INV-026]
+    /// Kompaktiert Terme und bereinigt verwaiste Metadaten im Inverted Index (Maintenance / Compaction API).
+    pub async fn compact_terms(&self, tx: TxId) -> Result<u64> {
+        self.resolve_tombstones(tx).await
+    }
+
+    /// Bereinigt Tombstones im Inverted Index für gegebene Transaktion.
+    pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {
+        let tbs_prefix = {
+            let mut k = Vec::with_capacity(self.prefix.len() + 4);
+            k.extend_from_slice(&self.prefix);
+            k.extend_from_slice(b"tbs:");
+            k
+        };
+
+        let tombstones = self.storage.scan_prefix(&tbs_prefix).await?;
+        let mut resolved = 0u64;
+
+        for (tbs_key, _) in tombstones {
+            let suffix = &tbs_key[tbs_prefix.len()..];
+            let parts: Vec<&[u8]> = suffix.split(|&b| b == b':').collect();
+            if parts.len() < 2 {
+                continue;
+            }
+
+            #[cfg(not(feature = "docid-128"))]
+            let doc_id_raw_opt = std::str::from_utf8(parts[0])
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(DocId::new);
+            #[cfg(feature = "docid-128")]
+            let doc_id_raw_opt = std::str::from_utf8(parts[0])
+                .ok()
+                .and_then(|s| s.parse::<u128>().ok())
+                .map(|v| DocId::new(v as _));
+            let doc_id = match doc_id_raw_opt {
+                Some(v) => v,
+                None => continue,
+            };
+            let term = String::from_utf8_lossy(parts[1]).to_string();
+
+            let fw_key = self.key_with_id("fw:", doc_id.inner());
+            let is_live = if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
+                let live_terms: Vec<String> = bincode::deserialize::<Vec<String>>(&fw_bytes)
+                    .map_err(|e| {
+                        TextError::Storage(format!(
+                            "forward-index corrupt for doc {}: {}",
+                            doc_id.inner(),
+                            e
+                        ))
+                    })?;
+                live_terms.contains(&term)
+            } else {
+                false
+            };
+
+            if !is_live {
+                self.ensure_term_loaded(&term).await?;
+                let pl_key = self.key_with_term_doc(&term, doc_id);
+                self.storage.delete(tx, &pl_key).await?;
+                self.resident_index
+                    .remove_posting_from_terms(std::slice::from_ref(&term), doc_id);
+
+                let plb_key = self.key_batch_posting_list(&term);
+                if let Some(plist) = self.resident_index.get(&term) {
+                    let batch_bytes = plist.encode_compact()?;
+                    self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                } else {
+                    self.storage.delete(tx, &plb_key).await?;
+                }
+            }
+            self.storage.delete(tx, &tbs_key).await?;
+            resolved += 1;
+        }
+
+        Ok(resolved)
+    }
+
+    // ANCHOR[acta-text:INV-017]
+    /// Löscht ein Dokument logisch aus dem Index und markiert alle Terme mit Tombstones.
+    pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()> {
+        let dl_key = self.key_with_id("dl:", doc_id.inner());
+        let fw_key = self.key_with_id("fw:", doc_id.inner());
+
+        let mut doc_len = 0u32;
+        if let Some(bytes) = self.storage.get(&dl_key).await? {
+            if bytes.len() == 4 {
+                doc_len = u32::from_le_bytes(
+                    (&bytes[..])
+                        .try_into()
+                        .map_err(|_| TextError::Storage("Invalid doc_len length".into()))?,
+                );
+            }
+        } else {
+            return Ok(());
+        }
+
+        self.storage.delete(tx, &dl_key).await?;
+
+        if let Some(fw_bytes) = self.storage.get(&fw_key).await? {
+            if let Ok(old_terms) = bincode::deserialize::<Vec<String>>(&fw_bytes) {
+                for term in &old_terms {
+                    self.ensure_term_loaded(term).await?;
+                    let pl_doc_key = self.key_with_term_doc(term, doc_id);
+                    self.storage.delete(tx, &pl_doc_key).await?;
+                    let tbs_key = self.key_tombstone(doc_id, term);
+                    self.storage.put(tx, &tbs_key, &[]).await?;
+
+                    self.resident_index
+                        .remove_posting_from_terms(std::slice::from_ref(term), doc_id);
+
+                    let plb_key = self.key_batch_posting_list(term);
+                    if let Some(plist) = self.resident_index.get(term) {
+                        let batch_bytes = plist.encode_compact()?;
+                        self.storage.put(tx, &plb_key, &batch_bytes).await?;
+                    } else {
+                        self.storage.delete(tx, &plb_key).await?;
+                    }
+                }
+            }
+        }
+        self.storage.delete(tx, &fw_key).await?;
+
+        // Stage stats changes
+        let change = StagedStatsChange {
+            docs_delta: -1,
+            tokens_delta: -(doc_len as i64),
+        };
+        self.stage_stats_change(tx, change)?;
+
+        Ok(())
+    }
+
+    fn stage_stats_change(&self, tx: TxId, change: StagedStatsChange) -> Result<()> {
+        let mut guard = self.staged_stats.lock();
+        if guard.len() >= Self::MAX_STAGED_TRANSACTIONS && !guard.contains_key(&tx) {
+            return Err(TextError::InvalidInput(format!(
+                "Staged stats limit ({}) exceeded for uncommitted transactions",
+                Self::MAX_STAGED_TRANSACTIONS
+            )));
+        }
+        let entry = guard.entry(tx).or_default();
+        entry.docs_delta += change.docs_delta;
+        entry.tokens_delta += change.tokens_delta;
+        Ok(())
+    }
+
+    // ANCHOR[acta-text:INV-018]
+    /// Überträgt die gepufferten statistischen Änderungen einer Transaktion dauerhaft.
+    pub async fn commit_stats(&self, tx: TxId) -> Result<()> {
+        let change = {
+            let mut guard = self.staged_stats.lock();
+            guard.remove(&tx).unwrap_or_default()
+        };
+
+        if change.docs_delta != 0 || change.tokens_delta != 0 {
+            if change.docs_delta > 0 {
+                self.total_docs
+                    .fetch_add(change.docs_delta as u64, Ordering::SeqCst);
+            } else if change.docs_delta < 0 {
+                self.total_docs
+                    .fetch_sub(change.docs_delta.unsigned_abs(), Ordering::SeqCst);
+            }
+
+            if change.tokens_delta > 0 {
+                self.total_tokens
+                    .fetch_add(change.tokens_delta as u64, Ordering::SeqCst);
+            } else if change.tokens_delta < 0 {
+                self.total_tokens
+                    .fetch_sub(change.tokens_delta.unsigned_abs(), Ordering::SeqCst);
+            }
+
+            let docs = self.total_docs.load(Ordering::SeqCst);
+            let tokens = self.total_tokens.load(Ordering::SeqCst);
+            let avg_len = if docs > 0 {
+                let ratio = (tokens as f64) / (docs as f64);
+                if ratio.is_finite() && ratio >= 0.0 {
+                    (ratio * 1000.0).round().clamp(0.0, u64::MAX as f64) as u64
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            self.avg_doc_len_x1000.store(avg_len, Ordering::SeqCst);
+        }
+
+        let meta_bytes = {
+            let _guard = self.commit_lock.lock();
+            let docs = self.total_docs.load(Ordering::SeqCst);
+            let tokens = self.total_tokens.load(Ordering::SeqCst);
+            let avg_len = self.avg_doc_len_x1000.load(Ordering::SeqCst);
+
+            let meta = TextIndexMetadata {
+                total_docs: docs,
+                total_tokens: tokens,
+                avg_doc_len_x1000: avg_len,
+            };
+            bincode::serialize(&meta)
+                .map_err(|e| TextError::Storage(format!("bincode: {}", e)))?
+        };
+        let meta_key = self.key("meta:stats");
+
+        self.storage
+            .put(tx, &meta_key, &meta_bytes)
+            .await
+            .map_err(Into::into)
+    }
+
+    // ANCHOR[acta-text:INV-019]
+    /// Verwirft die gepufferten statistischen Änderungen einer Transaktion bei Rollback.
+    pub async fn rollback_stats(&self, tx: TxId) -> Result<()> {
+        let mut guard = self.staged_stats.lock();
+        guard.remove(&tx);
+        self.resident_index.clear();
+        Ok(())
+    }
+
+    // ANCHOR[acta-text:INV-020]
+    /// Führt eine Volltextsuche mit BM25 aus.
+    #[tracing::instrument(skip(self, query))]
+    pub async fn search_bm25(
+        &self,
+        query: &str,
+        k: usize,
+        max_seq: Option<u64>,
+    ) -> Result<Vec<(DocId, f32)>> {
+        self.search_bm25_at(query, k, max_seq).await
+    }
+
+    // ANCHOR[acta-text:INV-021]
+    /// Führt eine Volltextsuche mit BM25 zu einer bestimmten MVCC-Snapshot-Sequenznummer aus.
+    #[tracing::instrument(skip(self, query))]
+    pub async fn search_bm25_at(
+        &self,
+        query: &str,
+        k: usize,
+        max_seq: Option<u64>,
+    ) -> Result<Vec<(DocId, f32)>> {
+        if query.is_empty() || k == 0 {
+            return Ok(Vec::new());
+        }
+
+        let k = k.min(MAX_SEARCH_K);
+
+        if query.len() > Self::MAX_TEXT_BYTES {
+            return Err(TextError::InvalidInput(format!(
+                "Query length {} exceeds maximum allowed size {}",
+                query.len(),
+                Self::MAX_TEXT_BYTES
+            )));
+        }
+
+        let tokens = self.tokenizer.tokenize(query);
+        if tokens.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let n = self.total_docs.load(Ordering::Acquire);
+        let cached_avg_len_x1000 = self.avg_doc_len_x1000.load(Ordering::Acquire);
+
+        let avg_doc_len = if n > 0 {
+            cached_avg_len_x1000 as f32 / 1000.0
+        } else {
+            0.0
+        };
+
+        let wand_res = crate::wand::block_max_wand_search(
+            self.storage.as_ref(),
+            &tokens,
+            &self.resident_index,
+            |term| self.key_term_prefix(term),
+            |doc_id, term| self.key_tombstone(doc_id, term),
+            |doc_id_inner| self.key_with_id("dl:", doc_id_inner),
+            k,
+            max_seq,
+            n,
+            avg_doc_len,
+        )
+        .await?;
+
+        Ok(wand_res.results)
+    }
+
+    /// Liefert die Anzahl aktiver Dokumente im Index.
+    pub fn len_sync(&self) -> usize {
+        self.total_docs.load(Ordering::Acquire) as usize
+    }
+
+    /// Delegiert das Commit auf der Storage-Engine nach `commit_stats`.
+    pub async fn commit(&self, tx: TxId) -> Result<()> {
+        self.commit_stats(tx).await?;
+        self.storage.commit(tx).await
+    }
+
+    /// Delegiert das Rollback auf der Storage-Engine nach `rollback_stats`.
+    pub async fn rollback(&self, tx: TxId) -> Result<()> {
+        self.rollback_stats(tx).await?;
+        self.storage.rollback(tx).await
+    }
+
+    /// Delegiert `rollback_to_tx` auf der Storage-Engine.
+    pub async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
+        self.storage.rollback_to_tx(tx_id).await
+    }
+
+    /// Delegiert `last_tx_id` auf der Storage-Engine.
+    pub async fn last_tx_id(&self) -> Result<TxId> {
+        self.storage.last_tx_id().await
+    }
+}

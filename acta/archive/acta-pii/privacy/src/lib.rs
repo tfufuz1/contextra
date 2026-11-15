@@ -1,0 +1,80 @@
+#![deny(missing_docs)]
+#![forbid(unsafe_code)]
+//! `acta-pii` — Cloud Egress Security, DLP & Exfiltration Protection
+//!
+//! # Zweck und Architektur
+//! Dieses Crate implementiert die Sicherheits- und Datenschutzschicht für ausgehende Datenströme
+//! (Cloud Egress) in Acta. Ziel ist es, Data Loss Prevention (DLP, Schutz vor Datenverlust),
+//! Erkennung von Exfiltrationsversuchen, automatisierte Pseudonymisierung über Surrogat-Token
+//! sowie unveränderbare Audit-Protokolle bereitzustellen.
+//!
+//! # Ebene und Rolle
+//! Ebene E0 (Autarker Baustein). Das Crate ist vollständig eigenständig kompilier- und testbar.
+//!
+//! # Einbindung und Abhängigkeiten
+//! - **Eingehend:** Wird eingebunden von `acta-api`.
+//! - **Ausgehend:** Vollkommen autark (keine internen Pflichtabhängigkeiten).
+//!
+//! # Wichtigste Module
+//! - [`contract`]: Minimale Umwelt- und Port-Traits (`Clock`, `EgressPolicy`, `TextSearchEngine`, `EntityRecognizer`).
+//! - [`egress_vault`]: DLP-Prüfung, Regex-Klassifikation und `SurrogateVault`-Pseudonymisierung.
+//! - [`entity_recognizer`]: Erkennung personenbezogener Daten (PII) wie IBAN, E-Mail, Kreditkarten.
+//! - [`egress_guard`]: Semantische k-NN Vektorähnlichkeitsprüfung gegen Datenabfluss.
+//! - [`egress_gateway`]: Zentrales Schutzgateway (Egress Shield) vor Weiterleitung in externe Cloud-Dienste.
+//! - [`bulk_exfiltration_detector`]: Sitzungsbasiertes Rate-Limiting gegen Massenabflüsse.
+//! - [`context_edit_audit`]: Kryptografisch verkettete Audit-Aufzeichnungen von Kontextbearbeitungen.
+//! - [`processing_registry`]: Verzeichnis von Verarbeitungstätigkeiten (VVT).
+//! - [`guarded_payload`]: Type-State-Muster zur Verhinderung ungesäuberter Datenabflüsse zur Compile-Zeit.
+
+pub mod audit_trace;
+pub mod bulk_exfiltration_detector;
+pub mod context_edit_audit;
+pub mod contract;
+pub mod egress_gateway;
+pub mod egress_guard;
+pub mod egress_vault;
+pub mod entity_recognizer;
+pub mod error;
+pub mod guarded_payload;
+pub mod processing_registry;
+pub mod types;
+
+// ANCHOR[acta-pii:LIB-001]
+// Re-Exports für bequemen Zugriff auf die Kernfunktionalitäten
+pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+pub use bulk_exfiltration_detector::{
+    BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
+};
+pub use context_edit_audit::{
+    build_context_edit_audit_record, compute_record_hash, render_audit_line, verify_audit_chain,
+    ContextEditAuditError, ContextEditAuditRecord, ContextEditKind,
+};
+pub use contract::{Clock, EgressDecision, EgressPolicy};
+#[allow(deprecated)]
+pub use egress_gateway::{
+    handle_cloud_query, handle_cloud_query_with_bulk_detector, handle_cloud_query_with_guard,
+    pii_vault_forces_crypto_shred, pii_vault_requires_isolated_retention, process_cloud_response,
+    resolve_effective_kv_delete_mode, resolve_effective_retention_mode, CloudQueryRequest,
+    CloudQueryResponse, CloudResponseRehydrator, DefaultEgressClassifier, EgressGateway,
+    EgressGatewayBuilder, EgressGuardCheck, InjectionDetector, MAX_SEARCH_QUERY_BYTES,
+};
+pub use egress_guard::{
+    EgressGuard, TextSearchEngine, TextSearchResult, DEFAULT_EGRESS_GUARD_MIN_BYTES,
+    DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_TIMEOUT,
+};
+#[allow(deprecated)]
+pub use egress_vault::NoOpRecognizer;
+pub use egress_vault::{
+    BlockReason, BoxFuture, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
+    EgressVaultError, EntityRecognizer, PolicyCategory, SurrogateVault, MAX_CLASSIFY_PAYLOAD_BYTES,
+};
+pub use entity_recognizer::{
+    EntityMatch, Gazetteer, PatternRecognizer, RuleBasedEntityRecognizer, DEFAULT_MAX_INPUT_LENGTH,
+};
+pub use error::{EgressError, Error, PrivacyError, Result};
+pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
+pub use processing_registry::{
+    generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistry,
+    ProcessingRegistryExport, ProcessorRole,
+};
+pub use types::{SystemClock, TenantId, TenantScopeViolation, TenantScoped};

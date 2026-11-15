@@ -1,0 +1,33 @@
+#![forbid(unsafe_code)]
+//! Acta WASM Execution Boundary (§4.18).
+//!
+//! Stellt eine eng begrenzte WASM-Ausführungsgrenze für die `CodeExecution`-Permission bereit.
+//! Kein WASM-Compiler — nur Ausführung vorab kompilierter `.wasm`-Binaries.
+//!
+//! # Sicherheitsgrundsätze
+//! - `#![forbid(unsafe_code)]`: Alle Interaktionen via wasmtime's sichere Rust-API
+//! - Fuel + Wall-Clock-Timeout: beide aktiv (§4.18)
+//! - `WasmOutput.stdout` ist `ZeroizeOnDrop` (P9)
+//! - Kein Dateisystem-/Netzwerkzugriff per Default
+
+pub mod approval;
+pub mod capabilities;
+pub mod error;
+#[cfg(feature = "wasm")]
+pub mod executor;
+#[cfg(feature = "wasm")]
+pub mod merge;
+pub mod output;
+#[cfg(feature = "wasm")]
+pub mod wasi;
+
+pub use approval::{
+    classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
+};
+pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
+pub use error::SandboxError;
+#[cfg(feature = "wasm")]
+pub use executor::WasmExecutor;
+#[cfg(feature = "wasm")]
+pub use merge::WasmMergeFunction;
+pub use output::WasmOutput;

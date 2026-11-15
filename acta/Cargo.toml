@@ -1,0 +1,152 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/acta-base",
+    "crates/acta-crypto",
+    "crates/acta-fs",
+    "crates/acta-sys",
+    "crates/acta-gate",
+    "crates/acta-access",
+    "crates/acta-infer",
+    "crates/acta-pii",
+    "crates/acta-ingest",
+    "crates/acta-parse",
+    "crates/acta-ledger",
+    "crates/acta-vault",
+    "crates/acta-seg",
+    "crates/acta-pstore",
+    "crates/acta-history",
+    "crates/acta-text",
+    "crates/acta-vec",
+    "crates/acta-erasure",
+    "crates/acta-decision",
+    "crates/acta-rag",
+    "crates/acta-reports",
+    "crates/acta-engine",
+    "crates/acta-node",
+    "crates/acta-infer-http",
+    "crates/acta-sink-net",
+    "crates/acta-api",
+    "crates/acta-server",
+    "crates/acta-cli",
+    "crates/acta-parse-worker",
+    "crates/acta-verify",
+    "crates/acta-testkit",
+    "xtask",
+]
+default-members = [
+    "crates/acta-base",
+    "crates/acta-crypto",
+    "crates/acta-fs",
+    "crates/acta-sys",
+    "crates/acta-gate",
+    "crates/acta-access",
+    "crates/acta-infer",
+    "crates/acta-pii",
+    "crates/acta-ingest",
+    "crates/acta-parse",
+    "crates/acta-ledger",
+    "crates/acta-vault",
+    "crates/acta-seg",
+    "crates/acta-pstore",
+    "crates/acta-history",
+    "crates/acta-text",
+    "crates/acta-vec",
+    "crates/acta-erasure",
+    "crates/acta-decision",
+    "crates/acta-rag",
+    "crates/acta-reports",
+    "crates/acta-engine",
+    "crates/acta-node",
+    "crates/acta-infer-http",
+    "crates/acta-sink-net",
+    "crates/acta-api",
+    "crates/acta-server",
+    "crates/acta-cli",
+    "crates/acta-parse-worker",
+    "crates/acta-verify",
+    "crates/acta-testkit",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+license = "LicenseRef-Proprietary"
+publish = false
+
+[workspace.dependencies]
+thiserror = "2"
+zeroize = "1"
+subtle = "2"
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+ed25519-dalek = "2"
+argon2 = "0.5"
+roaring = "0.10"
+crc32c = "0.6"
+unicode-normalization = "0.1"
+unicode-segmentation = "1"
+regex = "1"
+rustix = { version = "1", features = ["mm", "process", "rand"] }
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+landlock = "0.4"
+seccompiler = "0.5"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "signal"] }
+proptest = "1"
+loom = "0.7"
+trybuild = "1"
+
+# Interne Crates (nur Pfad, keine Versionen)
+acta-base = { path = "crates/acta-base" }
+acta-crypto = { path = "crates/acta-crypto" }
+acta-fs = { path = "crates/acta-fs" }
+acta-sys = { path = "crates/acta-sys" }
+acta-gate = { path = "crates/acta-gate" }
+acta-access = { path = "crates/acta-access" }
+acta-infer = { path = "crates/acta-infer" }
+acta-pii = { path = "crates/acta-pii" }
+acta-ingest = { path = "crates/acta-ingest" }
+acta-parse = { path = "crates/acta-parse" }
+acta-ledger = { path = "crates/acta-ledger" }
+acta-vault = { path = "crates/acta-vault" }
+acta-seg = { path = "crates/acta-seg" }
+acta-pstore = { path = "crates/acta-pstore" }
+acta-history = { path = "crates/acta-history" }
+acta-text = { path = "crates/acta-text" }
+acta-vec = { path = "crates/acta-vec" }
+acta-erasure = { path = "crates/acta-erasure" }
+acta-decision = { path = "crates/acta-decision" }
+acta-rag = { path = "crates/acta-rag" }
+acta-reports = { path = "crates/acta-reports" }
+acta-engine = { path = "crates/acta-engine" }
+acta-node = { path = "crates/acta-node" }
+acta-infer-http = { path = "crates/acta-infer-http" }
+acta-sink-net = { path = "crates/acta-sink-net" }
+acta-api = { path = "crates/acta-api" }
+acta-server = { path = "crates/acta-server" }
+acta-cli = { path = "crates/acta-cli" }
+acta-parse-worker = { path = "crates/acta-parse-worker" }
+acta-testkit = { path = "crates/acta-testkit" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+let_underscore_must_use = "deny"
+
+[profile.release]
+panic = "abort"
+overflow-checks = true
+lto = "thin"
+codegen-units = 1

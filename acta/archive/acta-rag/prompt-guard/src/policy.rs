@@ -1,0 +1,71 @@
+//! Quarantäne-Policies und Konfiguration für die Prompt-Injection-Behandlung.
+
+use serde::{Deserialize, Serialize};
+
+/// Neutraler Standard-Platzhalter für als verdächtig erkannten Text im Strict/Escalate-Modus.
+pub const DEFAULT_REDACTION_PLACEHOLDER: &str =
+    "[REDACTED: potenzielle Prompt-Injection erkannt, Originaltext zur Sicherheitsprüfung zurückgehalten]";
+
+/// Konfigurierbare Quarantäne-Policy für die Prompt-Injection-Behandlung.
+///
+/// **SICHERHEITSHINWEIS & HEURISTIK-LIMITATION**:
+/// Pattern-Matching und Normalisierung stellen ein Defense-in-Depth Heuristik-System dar.
+/// Es bietet **keine absolute Garantie** gegen neuartige oder komplexe Prompt-Injection-Angriffe.
+/// Clients müssen abgerufene Dokumenteninhalte weiterhin in isolierten Prompt-Kontexten
+/// (z.B. `<untrusted_context>`) verarbeiten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum QuarantinePolicy {
+    /// Verdächtige Texte werden durch einen neutralen Platzhalter ersetzt (Default).
+    #[default]
+    Strict,
+
+    /// **WARNUNG (UNSICHER)**: Text wird unverändert durchgereicht, lediglich das Flag
+    /// `suspicious_injection_detected: true` wird gesetzt.
+    ///
+    /// Nutze diesen Modus ausschließlich in vertrauenswürdigen, kontrollierten Umgebungen,
+    /// in denen nachgelagerte Komponenten das Flag deterministisch auswerten.
+    FlagOnly,
+
+    /// Text wird zurückgehalten/redigiert UND der Vorfall wird in ein separates Sicherheits-Audit-Log geschrieben.
+    Escalate,
+}
+
+impl QuarantinePolicy {
+    /// Liest die Policy aus der Umgebungsvariablen `ACTA_MCP_QUARANTINE_POLICY`.
+    #[cfg(any(feature = "std", feature = "file-audit"))]
+    #[allow(clippy::disallowed_methods)]
+    pub fn from_env() -> Self {
+        if let Ok(val) = std::env::var("ACTA_MCP_QUARANTINE_POLICY") {
+            match val.trim().to_lowercase().as_str() {
+                "flag_only" | "flagonly" | "flag" => QuarantinePolicy::FlagOnly,
+                "escalate" => QuarantinePolicy::Escalate,
+                _ => QuarantinePolicy::Strict,
+            }
+        } else {
+            QuarantinePolicy::Strict
+        }
+    }
+}
+
+/// Konfiguration zur Initialisierung aus einer externen Konfigurationsdatei.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptInjectionConfig {
+    /// Ausgewählte Quarantäne-Policy.
+    #[serde(default)]
+    pub policy: QuarantinePolicy,
+    /// Platzhaltertext für redigierte Inhalte.
+    #[serde(default = "default_redaction_placeholder")]
+    pub redaction_placeholder: String,
+    /// Optionaler Dateipfad für das Audit-Log.
+    #[serde(default)]
+    pub audit_log_path: Option<String>,
+    /// Zusätzliche benutzerdefinierte Erkennungsmuster.
+    #[serde(default)]
+    pub custom_patterns: Vec<String>,
+}
+
+/// Gibt den Standard-Redaktionsplatzhalter zurück.
+pub fn default_redaction_placeholder() -> String {
+    DEFAULT_REDACTION_PLACEHOLDER.to_string()
+}

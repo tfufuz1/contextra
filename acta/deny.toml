@@ -1,0 +1,21 @@
+# G-SUPPLY: Whitelist nach Spec 3.8. Aufnahme neuer Crates nur mit ADR-Eintrag.
+[advisories]
+yanked = "deny"
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "ISC", "Unicode-3.0", "Unicode-DFS-2016", "Zlib", "CC0-1.0"]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+# Whitelist (informativ; Durchsetzung ueber xtask g-supply):
+# chacha20poly1305 hkdf hmac sha2 ed25519-dalek argon2 zeroize subtle roaring crc32c thiserror
+# unicode-normalization unicode-segmentation regex rustix getrandom serde serde_json
+# Rand (L8+): rustls hyper axum tokio · Sandbox: landlock seccompiler · Tests: proptest loom cargo-fuzz trybuild cargo-mutants

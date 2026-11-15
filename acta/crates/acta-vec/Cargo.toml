@@ -1,0 +1,27 @@
+[package]
+name = "acta-vec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Acta Level 3"
+
+[features]
+default = []
+
+[dependencies]
+acta-base.workspace = true
+acta-crypto.workspace = true
+acta-gate.workspace = true
+acta-vault.workspace = true
+acta-seg.workspace = true
+thiserror.workspace = true
+roaring.workspace = true
+
+[dev-dependencies]
+acta-testkit.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true
