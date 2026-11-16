@@ -1,10 +1,10 @@
-# Contextra als Baukasten — Spezifikation v5 (normativ)
+# Contextra als Baukasten — Spezifikation v6 (normativ)
 
-Nov 11, 2026 · @kiki · Revision „Restarbeit“
+16. Nov 2026 · @kiki · Revision v6 „Personendaten, Löschkette, Zeitreise“ · Vorgänger v5 (11.11.2026)
 
 ## 1 Status, Geltung, Änderungsprotokoll
 
-Diese Spezifikation v5 ersetzt v4 und ist die einzige normative Quelle für Crate-Grenzen, Abhängigkeitsrichtung, Brücken, Features, Persistenzformate, Gates und die Reihenfolge der Entkopplung. Sie ändert die Zielarchitektur von v4 nicht. Sie gleicht den Plan mit dem Repository ab, führt in §9 nur noch offene Arbeit, schließt die in v4 fehlenden Anhänge A und B und korrigiert Aussagen, die der Code widerlegt hat.
+Diese Spezifikation v6 ersetzt v5 als Quelle für Crate-Grenzen (§2 bis §10). Sie ergänzt Kapitel 11 bis 15: Trennung personenbezogener und unternehmensbezogener Daten, Löschkette, Zeitreise und Versionierung von Regeln, Simulation sowie Prüfung. Alle Kapitel sind normativ und gleichrangig. Die Festlegungen zu Abhängigkeitsrichtung, Brücken, Features, Persistenzformaten, Gates und Reihenfolge der Entkopplung aus v5 gelten unverändert weiter. Sie ändert die Zielarchitektur von v4 nicht. Sie gleicht den Plan mit dem Repository ab, führt in §9 nur noch offene Arbeit, schließt die in v4 fehlenden Anhänge A und B und korrigiert Aussagen, die der Code widerlegt hat.
 
 ### 1.1 Grundlage und Grenzen
 
@@ -52,6 +52,16 @@ MUSS, DARF NICHT und SOLL gelten nach RFC 2119. **Jede MUSS-Aussage hat ein Prü
 - **Offen im Kern:** ungegatete Brückenreferenzen in `graph` (140), `store` (28), `vector` (14), `infer-candle` (7) \[V\]; verbotene Defaults in 13 Crates; verbotene dev-Kanten in 8 Crates; `rank` ohne `ids`/`env`; `ports` und `types` haben nichts abgegeben (S-50, S-51); `env` unverändert (S-11); `cognition` hängt noch an `engine` und `graph`.
 - **Offen in der Durchsetzung:** 38 Gates in `not_run_baseline`, `golden`-Wurzelkorpus fehlt, `commit-msg`-Hook fehlt, CI blockiert INV-4 und G-L1 nicht (§7.3).
 
+### 1.6 Änderungsprotokoll v5 → v6
+
+| ID | Änderung in v6 | Wirkung |
+| --- | --- | --- |
+| N1 | Kapitel 11 (Personendaten, Löschkette), 12 (Zeitreise und Regelversionierung), 13 (Simulation), 14 (Prüfung) und 15 (Umsetzung) sind neu und normativ. | Ergänzt §2 bis §10, ersetzt nichts. |
+| N2 | Invarianten INV-13 bis INV-16 (§3), Entscheidungen D-24 bis D-33 (§10), Befunde F-17 bis F-20 (Anhang A), Schritte S-100 bis S-111 (§15). | Neue Prüfpunkte; Gates G-ER1 bis G-ER3, G-TT1, G-SIM1, G-PII1 (§14.4). |
+| N3 | Neuer Baustein `contextra-rules` (E1a) in §4.1; §2.2 führt ihn in E1a. | Die Zielarchitektur wächst um einen Baustein; Budget und Closure nach D-03 und R11. |
+| N4 | Die Befunde F-17 bis F-20 wurden per `grep`, Dateilisten und Lesen einzelner Dateien am Stand `fcd387021` geprüft. Nichts wurde gebaut oder getestet, auch nicht mit der Toolchain 1.89.0. | Nachweise bleiben offen, bis S-111 abgeschlossen ist. |
+| N5 | Rangfolge (§1.2): Entscheidungsregister und Kapitel 11 bis 15 stehen im Rang der Spezifikation selbst. | Crate-lokale Dokumente bleiben nachrangig. |
+
 ## 2 Begriffe, Ebenen, Entnehmbarkeit
 
 Ein Baustein ist nur dann einsetzbar, wenn seine Abhängigkeiten berechenbar sind. Deshalb definiert dieser Abschnitt jede Größe so, dass ein Werkzeug sie ohne Auslegung ausgeben kann.
@@ -75,7 +85,7 @@ Die Ebene eines Crates folgt aus seiner Kern-Closure. Die Spalte „Kern“ in �
 | Ebene | Definition | Crates (Ziel) |
 | --- | --- | --- |
 | **E0** | Kern-Closure leer. | `ids`, `env`, `sys`, `durable-fs`, `simd`, `wire`, `adapt`, `ingest`, `privacy`, `sandbox`, `prompt-guard`, `infer-onnx`, `erasure`, `license`, `audit-export`, `avv-generator` |
-| **E1a** | Kern-Closure ⊆ E0, höchstens 4 Mitglieder. | `mvcc`, `crypto`, `text`, `graph`, `rank`, `checkpoint`, `kvcache`, `vault`, `infer-ollama`, `infer-candle` |
+| **E1a** | Kern-Closure ⊆ E0, höchstens 4 Mitglieder. | `mvcc`, `crypto`, `text`, `graph`, `rank`, `checkpoint`, `kvcache`, `vault`, `infer-ollama`, `infer-candle`, `rules` |
 | **E1b** | Kern-Closure ⊆ E0 ∪ E1a, mindestens ein E1a-Mitglied, höchstens 4 Mitglieder. Ausnahme `store` mit 5 (D-03). | `store`, `vector` |
 | **E2** | Integration. Darf E0, E1 und E2 nutzen, nie E3. | `types`, `ports`, `router`, `agent`, `cognition`, `engine`, `db`, `contextra` |
 | **E3** | Anwendungen und Testwerkzeuge. | `mcp`, `py`, `testkit`, `bench` |
@@ -100,6 +110,10 @@ Die zwölf Invarianten gelten für jeden Umbauschritt. Ein Schritt, der eine ver
 | INV-10 | **Keine stille Gate-Abschwächung.** Änderungen an `governance/gates.toml`, `ratchet.toml` und `protected-paths.toml` nur mit ADR und Label `protected-path`. Ratchet-Werte dürfen nur sinken; `not_run_baseline` darf nur schrumpfen (D-04). | `gate-weakening`, `ratchet` |
 | INV-11 | **Unsafe-Inseln.** `unsafe` nur in `simd`, `sys`, `wire`, jeweils mit lückenlosem `// SAFETY:`-Nachweis. Alle anderen Crates führen `#![forbid(unsafe_code)]`. Am HEAD stehen außerhalb der Inseln `unsafe`-Blöcke nur in zwei Test-Binaries (`text/tests/alloc_profiler.rs`, `graph/tests/ppr_alloc_test.rs`, je ein `GlobalAlloc`-Zähler) \[V\]; sie sind bis zur Entscheidung D-21 die einzigen benannten Ausnahmen. | `tests/unsafe_islands.rs`, `unsafe-inventory` |
 | INV-12 | **Keine Panics in neuem Nicht-Test-Code, in allen Crates.** Kein `unwrap()`, `expect()`, `panic!()`, `todo!()`. Das erweitert R8 aus v3, das nur `ids` und `env` erfasste und damit hinter `AGENTS.md` zurückblieb. | `unwrap-gate` (`.github/workflows/unwrap-gate.yml` \[V\]) |
+| INV-13 | **Klassentrennung.** K-Crates und Wissenspfade enthalten keine personenbezogenen Typen oder Klartexte. Verweise auf P nur als `PersonalRef` (§11.2). | G-ER1, G-PII1 |
+| INV-14 | **Löschung berührt den Versionsgraphen nicht.** Eine Löschung in P ändert keine Objekt-IDs, Commit-Hashes oder K-Ledger-Einträge (Z-E6). | Test Z-E6 |
+| INV-15 | **Zeitreise-Determinismus.** Gleicher Commit, gleiche Gültigkeitszeit und gleiche Parameter ergeben byte-identische Ausgaben (Z-T1). | G-TT1 |
+| INV-16 | **Simulationsisolation.** Ein Szenario verändert weder `main`, P noch Zugriffsrechte (Z-S1). | G-SIM1 |
 
 ## 4 Zielarchitektur
 
@@ -135,6 +149,7 @@ Jeder Baustein hat genau eine Ebene, einen eigenen Fehlertyp, einen geschlossene
 | `checkpoint` | E1a | ids, env → 2 | `workspace` | — | `CheckpointError` |
 | `kvcache` | E1a | ids, env → 2 | `kv-encryption`→crypto; `kv-shredding`; `exp-kivi`; `workspace` | `std` | `KvCacheError` |
 | `vault` | E1a | sys → 1 | `workspace` | — | `VaultError` |
+| `rules` | E1a | ids, env, privacy → 3 | `workspace`→types, ports | `std` | `RulesError` |
 | `infer-ollama` | E1a | env → 1 | `workspace` | — | `OllamaError` |
 | `infer-candle` | E1a | env → 1 | `candle`; `kv-bridge`→kvcache; `workspace` | — | `CandleError` |
 | `store` | E1b | ids, env, sys, mvcc, crypto → 5 | `workspace` | — | `StoreError` |
@@ -594,6 +609,287 @@ Jede Festlegung, auf die diese Spezifikation oder `AGENTS.md` verweist, steht hi
 | D-21 | INV-11 gilt für Bibliotheks-Targets (`src/`). Test-Binaries mit `GlobalAlloc`-Zähler (`text/tests/alloc_profiler.rs`, `graph/tests/ppr_alloc_test.rs`) bleiben mit lückenlosem `// SAFETY:`-Nachweis als einzige Ausnahme, oder sie werden durch eine Messung ohne `unsafe` ersetzt. | Die Aussage „nur Kommentare“ ist falsch (F-08); ohne Entscheidung ist `tests/unsafe_islands.rs` entweder rot oder zu locker. | Vorschlag, Entscheidung der Eigentümer |
 | D-22 | `graph` führt `session-dag`, `entity-extraction` und `hyperedge-suggest` im Default; sie stehen nicht in der geschlossenen Liste von R10. Vorschlag: `default` leer (so verlangt es §9.4 und S-34), Verbraucher (`engine`, `cognition`) aktivieren sie explizit. Alternative: die Liste in R10 erweitern. | R10 ist geschlossen; §9.4 sagt „`default` leer“. Die Verbraucher der drei Features sind noch nicht ermittelt \[E\]. | Vorschlag, in S-34 zu ermitteln |
 | D-23 | Gate-Schritte in CI enthalten weder `\|\| true` noch `continue-on-error`. Ein nicht-blockierender Lauf zählt als nicht vorhanden (D-04 sinngemäß). | §7.1 definiert Exit-Codes; mit `\|\| true` sind sie wirkungslos (F-01). | festgelegt (v5) |
+| D-24 | Vier Datenklassen K, P, D, E. Jeder Schreibvorgang deklariert seine Klasse (R-CLS, §11.2). | Die Trennung von Unternehmens- und Personendaten ist Voraussetzung für atomare Löschung. | festgelegt (v6) |
+| D-25 | K verweist auf P nur über `PersonalRef`, einen neuen ID-Typ in `ids`. | Der Versionsgraph bleibt frei von Personenbezug. | festgelegt (v6), Umsetzung S-100 |
+| D-26 | Erfüllungsstufen Gesperrt, Bereinigt, Schlüssel vernichtet, Vollständig gemessen. Jede Stufe nur mit bestandener Positivkontrolle. | Keine Stufe darf allein aus Schlüsselvernichtung folgen. | festgelegt (v6) |
+| D-27 | Neuer Baustein `contextra-rules` (E1a) für versionierte Regeln, Fristen und Kalender. | `mvcc` hat keine Gültigkeitsachse; Regeln brauchen Git-Semantik ohne Personenbezug. | festgelegt (v6), Umsetzung S-104 |
+| D-28 | Zwei Zeitachsen: Transaktionszeit (`tx_seq`) und Gültigkeitszeit als Kalendertag-Intervall `[valid_from, valid_until)`. | Gesetzeslage und Systemstand sind getrennt abfragbar. | festgelegt (v6) |
+| D-29 | Bei Mehrbetroffenen ist ein Trockenlauf Pflicht. Konfliktversionen werden sofort gesperrt. Es gibt kein automatisches `DeleteAll` nach Timeout. | Keine Löschung zulasten Dritter. | festgelegt (v6) |
+| D-30 | Simulationen laufen nur auf Branches `sim/<id>` und haben keinen Schreibzugriff auf `main`, P oder Rechte. | Z-S1, INV-16. | festgelegt (v6) |
+| D-31 | Logs, Ledger und Metriken enthalten keine stabilen Pseudonyme. Commitments sind epochengebunden und werden nach Ablauf anonymisiert. | Z-E7. Die Dauer ist offen [⚠]. | festgelegt (v6), Dauer offen |
+| D-32 | Restore-Schutz gilt nur bedingt: mit unabhängiger Senke oder Ankerstand. Sonst startet der Knoten in `Quarantine`. | Ohne unabhängigen Registerbeleg kann niemand Löschungen nachweisen. | festgelegt (v6) |
+| D-33 | Takedown in K ist eine eigene Operation mit `Redacted`-Blob und erhaltener Objekt-ID, nicht Teil der P-Löschkette. | Trennt Versionsgraph und Personenlöschung (§12.6). | festgelegt (v6) |
+
+## 11 Personendaten, Unternehmensdaten und Löschkette
+
+Dieses Kapitel ist neu in v6 und normativ. Es legt fest, wie Contextra personenbezogene Daten von unternehmensbezogenen Daten trennt und wie eine Löschung abläuft. Es ist keine Rechtsberatung; §11.6 benennt die offenen Rechtsfragen.
+
+### 11.1 Ziel und Abgrenzung
+
+Personenbezogene Daten sind so von Unternehmenswissen getrennt, dass sie je Betroffenem und je Dokumentversion isoliert und atomar gelöscht werden können. Versionsgeschichte, Regelwerk und Indizes bleiben dabei intakt. **Nicht-Ziele:** kein Dokumentenmanagement für Originale; keine automatische Entscheidung über natürliche Personen; keine Aussage „gelöscht“ ohne gemessene Stufe (§11.4).
+
+### 11.2 Datenklassen und Ebenen [D]
+
+| Ebene | Inhalt | Ort (Crate) | Löschweg |
+| --- | --- | --- | --- |
+| **K** | Unternehmensdaten und Regeln ohne Personenbezug: Richtlinien, Fristen, Gesetzestexte, Schwellenwerte, Prompts, Konfiguration | `rules` (Versionsgraph), Inhalte in `store`, `text`, `vector` | nur Takedown (§12.6), mit Vermerk |
+| **P** | Personenbezogene Daten je Betroffenem und Dokumentversion | `erasure` (Gate, Saga, Journal), Schlüssel in `erasure::vault` bzw. `contextra-vault` (§11.3) | Löschkette §11.4 |
+| **D** | Ableitungen: Indizes, Embeddings, Caches, Sitzungen; jede trägt ihre Herkunft (Lineage) | `text`, `vector`, `kvcache`, `erasure::kv_shredding` | Bereinigung über Lineage, danach Neuaufbau |
+| **E** | Nachweise: Gate-Journal, Ledger, Löschberichte | `erasure` (`journal`, `ledger`, `report`) | enthalten keine Roh-Kennungen (Z-E7) |
+
+**Regel R-CLS [D]:** Jeder Schreibvorgang deklariert seine Klasse. Fehlt sie, bricht die Operation mit `Invalid` ab; es wird nichts geschrieben. Ein Schreibvorgang der Klasse K, in dem Personenbezug erkannt wird, scheitert (fail-closed). Die Prüfung nutzt `contextra-privacy::entity_recognizer` (Baustein E0) und ist typerzwungen: der K-Schreiber nimmt nur `Validated<T>` entgegen.
+
+**Regel R-HANDLE [D]:** K enthält Verweise auf P ausschließlich als `PersonalRef`. Das ist ein neuer 128-Bit-ID-Typ im Baustein `ids` (S-100), zufällig, ohne Ableitung aus Inhalt oder Kennung. Die Auflösung erfolgt nur über das Betroffenenverzeichnis in P.
+
+### 11.3 Schlüsselhierarchie [D]
+
+```
+Tenant-Wurzelschlüssel (Generation g, Tresor)
+  └─ SubjectKey(s)        je Betroffenem; Vernichtung löscht die Person
+       └─ DocumentKey(v)  je Dokumentversion; Vernichtung löscht genau diese Version
+  └─ DEK(v) = HKDF(IKM = DocumentKey(v) ‖ SubjectKey(s1) ‖ … ‖ SubjectKey(sn),
+                   salt = VersionRef(v), info = "contextra/dek/v1" ‖ n)
+```
+
+- Inhalte einer Version werden mit AEAD unter DEK(v) verschlüsselt, mit neuem Nonce je Umschlag. Die Liste der Betroffenen einer Version steht verschlüsselt im Dokumentkopf.
+- Zwei Versionen teilen nie einen DEK. Berichtigung, Hinzufügen oder Schwärzung eines Betroffenen erzeugt eine neue Version mit neuem `DocumentKey`.
+- Schlüsselerzeugung läuft über einen fallibeln Zufallsport. Ein Fehler erzeugt weder Umschlag noch Ersatzschlüssel.
+- Bestehende Bausteine: `erasure_domain.rs` (`SubjectRef`, `DocRef`, `EraseTarget`), `erasure::kv_shredding` (Crypto-Shredding), `erasure::vault` und `crates/contextra-vault` (Tresor). Dass es zwei Tresor-Implementierungen gibt, ist Befund F-19.
+
+**Vernichtung eines Schlüssels [D].** Ein Schlüssel gilt erst dann als vernichtet, wenn (1) sein Tresoreintrag durch einen Grabstein ersetzt und synchronisiert ist, (2) die Tresordatei der Generation mit dem Eintrag rotiert ist, (3) der Wurzelschlüssel dieser Generation vernichtet ist und (4) alle Sicherungsexporte, die den Schlüssel enthielten, abgelaufen sind. Erst dann erreicht eine Löschung die Stufe „Schlüssel vernichtet“.
+
+**Sicherungen [D].** Sicherungsexporte sind unter einem Epochenschlüssel mit begrenzter Lebensdauer `T_backup` verschlüsselt. Danach sind sie unlesbar, auch wenn sie kopiert wurden. Der Restore-Schutz steht in §11.4.5.
+
+### 11.4 Löschkette
+
+Die Löschung ist ein dauerhafter, idempotenter Ablauf (Saga) mit Durabilitätspunkten. Die Stufen bilden die vorhandenen Module `erasure::saga`, `gate`, `purge`, `vault`, `measure` und `report` ab.
+
+| Schritt | Inhalt | Durabilitätspunkt | Modul |
+| --- | --- | --- | --- |
+| L0 Anfrage | `ErasureId`, Ziel (Betroffener, Dokument, Version), Auslöser; Eintrag im Ledger | Ledger-`fsync` | `saga::core`, `ledger` |
+| L1 Sperre | Trockenlauf über alle Versionen einschließlich Vorgängerversionen; Gate-Eintrag; Lesesperre sofort wirksam | Gate-Journal-`fsync` | `gate::{read_gate, log}`, `journal` |
+| L2 Bereinigung | Entfernen aller Klartextspuren und Ableitungen des Ziels: Indexsegmente, Caches, Sitzungen, Chunk-Cache, Tempdateien, Journal | `fsync` je Segment-/Manifest-Batch | `purge::*`, `ErasureLayer` |
+| L3 Schlüsselvernichtung | Grabstein je Schlüssel, Synchronisation, Direktlesen zur Verifikation; ersetzte Segmente mit alten `SegmentKey`s | Tresor-`fsync` | `vault::*`, `kv_shredding` |
+| L4 Rotation und Sicherungsfenster | Tresorrotation, Vernichtung des Wurzelschlüssels der Generation, Ablauf der Sicherungsepochen | Ledger-`fsync` nach Ankernachweis | `vault::rehash`, `vault::keyring` |
+| L5 Messung | Scanner über alle Schichten; Positivkontrolle an einem synthetischen Betroffenen (Canary) vor der Sperre; Restbestand | Messprotokoll | `measure::*` |
+| L6 Bericht | Signierter Bericht in kanonischer Form, Ledger-Eintrag, Spiegelung in die Registersenke | Ledger-`fsync` | `report::*`, `ledger` |
+
+**Erfüllungsstufen [D].** Das Ergebnis einer Löschung wird in vier Stufen ausgewiesen. Keine Stufe lässt sich aus dem Wort „gelöscht“ ableiten.
+
+- **Gesperrt:** L1 abgeschlossen, Lesesperre wirksam.
+- **Bereinigt:** L2 abgeschlossen und gemessen, Positivkontrolle bestanden.
+- **Schlüssel vernichtet:** L3 und L4 abgeschlossen, Sicherungsfenster abgelaufen.
+- **Vollständig gemessen:** L5 und L6 mit bestandener Positivkontrolle, Senke bestätigt.
+
+Eine Stufe gilt nur, wenn das zugehörige Messverfahren seine Funktionsfähigkeit an einem synthetischen Treffer bewiesen hat. Ein nicht implementiertes Verfahren liefert `NotImplemented`, nie „erreicht“. Der Bericht weist jede Stufe als `reached` oder `not_reached` aus.
+
+**Reihenfolge [D].** Standardpfad ist L0 bis L6. Im vorgezogenen Pfad (Betroffener mit besonderer Datenklasse oder knappe Frist) wird der Schlüssel vor der Bereinigung vernichtet. Die Schlüssel gemischter Segmente bleiben bis zu deren Ersatz erhalten, damit Daten Dritter nicht verloren gehen. **Bindungsregel:** Ein Schlüssel wird nie vernichtet, solange eine Version, die er bindet und die lesbar bleiben muss, noch existiert. Eine Version, die wegen eines Konflikts erhalten bleibt, wird vorher als neue Version ohne Bindung an den Betroffenen abgelegt.
+
+#### 11.4.1 Mehrbetroffene Dokumente [D]
+
+Ein Trockenlauf prüft innerhalb `erase_return_timeout` alle Mitbetroffenen einer Version auf Aufbewahrungspflicht, Hold, Widerspruch und offenen Vorgang. Konfliktfreie Versionen laufen direkt durch L1 bis L6. Konfliktversionen werden sofort gesperrt (`Restricted(MultiSubjectReview)`). Modi:
+
+- `DeleteAll` (Standard): nur ohne Konflikt.
+- `RedactSplit`: neue Version ohne den Betroffenen, geschwärzte Spannen; Pflicht bei Sammelakten.
+- `RestrictShared`: Version bleibt gesperrt, solange der Konflikt besteht.
+
+Ein Review entscheidet. Es gibt **kein** automatisches `DeleteAll` nach Fristablauf. Je Version sind höchstens 64 Betroffene gebunden; darüber gilt die Version als Sammelakte mit Pflicht zu `RedactSplit`.
+
+#### 11.4.2 Gate und Lesesperre [D]
+
+Nach Rückkehr von L1 liefert kein Lesepfad Klartext des Ziels: nicht Suche, Antwort, Zeitreise, Simulation, Cache, Export, Vorschau oder Sitzung, auch nicht ältere Versionen. Die Prüfung erfolgt vor der Entschlüsselung und vor jeder Ausgabe, in O(1) ohne I/O. Berechtigte erhalten `Erased`; Unberechtigte erhalten dasselbe Fehlerbild wie bei einem nicht vorhandenen Ziel.
+
+#### 11.4.3 Crash-Invarianz [D]
+
+Ein Absturz an jedem Durabilitätspunkt führt nach Neustart zur Vollendung der Löschung oder zu `Pending` bei aktiver Sperre. Eine durable Sperre geht nie verloren. Physische Tatsachen (Schlüssel vernichtet, Segment ersetzt) haben Vorrang vor dem Journalstand. Die Prüfung erfolgt über die Crash-Matrix (§14.2).
+
+#### 11.4.4 Fehlerpfade [D]
+
+- `FsyncFailed`: Dieselbe Datei wird nicht erneut als stabil angenommen. Der Inhalt wird aus Journal oder Speicher in eine neue Datei geschrieben. Scheitert auch das, wird der betroffene Bereich vergiftet.
+- Ein fehlender Schlüssel ohne Gate-Eintrag oder Registerbeleg ist ein Integritätsfehler, kein `Erased` (Z-E9).
+- Es gibt keinen Standardschlüssel und keinen Fallback-Schlüssel.
+
+#### 11.4.5 Restore-Schutz [D, bedingt]
+
+Das Einspielen einer alten Sicherung darf gelöschte Daten nicht wiederbeleben. Das gilt nur, wenn (a) das Löschregister unabhängig verfügbar ist (Registersenke oder Ankerstand) und (b) der Sicherungshorizont die Schlüsselaufbewahrung abdeckt. Andernfalls startet der Knoten in `Quarantine` und liefert keine Daten. Bei einer Wiederherstellung werden alle Sperren und Grabsteine erneut angewendet.
+
+### 11.5 Zusagen zur Löschung
+
+Jede Zusage ist normativ und hat mindestens einen automatisierten Test. Ohne Test gilt sie als nicht erfüllt (Gate G-ER3).
+
+| ID | Zusage | Nachweis |
+| --- | --- | --- |
+| **Z-E1** | Nach Rückkehr von L1 liefert kein Standard-Lesepfad Klartext des Ziels, auch nicht `Superseded`-Versionen. Schreibzugriffe werden verweigert. | Test je Lesepfad; Linearisierungstest (`loom`) |
+| **Z-E2** | Jeder persistierte Klartext von P und jede daraus abgeleitete Struktur liegt vor dem Schreiben unter AEAD mit Schlüsseln, die nach Vernichtung nicht mehr existieren. Metadaten tragen keine dauerhaften deterministischen Personenpseudonyme und keine exakten Längen. | Bytes-Suche über alle Dateien mit Canary-Kennungen; Metadatentest |
+| **Z-E3** | Bei Konflikt kein `DeleteAll`; kein automatisches `DeleteAll` nach Timeout. | Trockenlauf-Tests je Modus |
+| **Z-E4** | Crash-Invarianz über alle Durabilitätspunkte L0 bis L6 und alle Gate- und Tresorschreibstellen. | Crash-Matrix (§14.2) |
+| **Z-E5** | K enthält keine Personendaten. Schreibversuche mit erkanntem Personenbezug scheitern. | Compile-Fail-Tests; Mustertests (G-PII1) |
+| **Z-E6** | Eine Löschung in P ändert keine Objekt-IDs, Commit-Hashes oder K-Ledger-Einträge. | Vorher-Nachher-Vergleich |
+| **Z-E7** | Logs, Ledger, Metriken und Fehlertexte enthalten keine Roh-Kennungen und keine stabilen Pseudonyme. Zulässig sind epochengebundene Commitments, die nach Ablauf anonymisiert werden (D-31). | Canary-Suche in allen Ausgaben |
+| **Z-E8** | Zugriffskontrolle wirkt vor Suche und Statistik: Rangfolge, Zählwerte und Fehlerbilder ändern sich nicht durch unzugängliche Dokumente. | Rangtest mit unzugänglichem Dokument |
+| **Z-E9** | Fail-closed: kein Fehler im Schlüssel-, Zufalls- oder Siegelpfad erzeugt Ersatzwerte. | Fehlerinjektion |
+| **Z-E10** | Nachweise entstehen nur mit Positivkontrolle. Nicht implementierte Messungen liefern `NotImplemented`. | Test mit absichtlich verstümmeltem Scanner, der scheitern muss |
+| **Z-E11** | Restore-Schutz gilt nur unter den Bedingungen aus §11.4.5. | Restore-Tests mit und ohne Senke, außerhalb des Horizonts |
+| **Z-E12** | Anbieterneutralität: keine Telemetrie, kein Fernzugriff, keine Schlüsselhinterlegung, kein Wiederherstellungsweg über den Hersteller. Supportpakete werden lokal erzeugt und enthalten nachweislich keine Inhalte. | Test `T-VENDOR-BUNDLE` |
+
+### 11.6 Rechtliche Einordnung [R][⚠]
+
+- Die DSGVO definiert „Löschen“ nicht technisch. Nach Kenntnis dieser Spezifikation hat weder eine Aufsichtsbehörde noch ein Gericht abschließend entschieden, ob Schlüsselvernichtung als Löschung gilt [V]. Contextra stützt sich deshalb nie allein auf Schlüsselvernichtung; die Stufen in §11.4 bilden die Grundlage.
+- Anonymisierung ist keine Löschmethode dieser Spezifikation. `RedactSplit` setzt eine bestandene Prüfung voraus.
+- Aufbewahrungspflichten führen zu Einschränkung (Sperre), nicht zu Löschung (Art. 17 Abs. 3, Art. 18 DSGVO) [V]. Fristen sind Konfiguration des Verantwortlichen, keine Vorgabe der Software.
+- Pseudonyme Commitments im Ledger sind personenbezogen, solange der Epochenschlüssel existiert. Grundlage und Dauer sind im Löschkonzept des Betreibers zu begründen [⚠].
+- Produktaussagen unterliegen INV-7 und dem Wortfilter (G-DOC1). Verboten sind insbesondere „DSGVO-konform“, „garantiert gelöscht“ und „100 % gelöscht“. Zulässig sind Stufenbezeichnungen mit Messergebnis.
+- Verantwortlicher ist der Betreiber. Der Hersteller hat keinen Zugriff auf Inhalte, Schlüssel oder Telemetrie (Z-E12).
+
+## 12 Zeitreise und Richtlinien-Versionierung („Git für Regeln“)
+
+Dieses Kapitel ist neu in v6 und normativ.
+
+### 12.1 Ziel
+
+Fristen, Gesetzestexte, Regelungen, Schwellenwerte, Prompts und Konfigurationen werden wie Quellcode versioniert, verzweigt und zu jedem früheren Stand abgefragt. Sie enthalten keine personenbezogenen Daten und gehören zur Klasse K (§11.2).
+
+### 12.2 Zwei Zeitachsen [D]
+
+- **Transaktionszeit `tx`:** Wann Contextra einen Stand erfasst hat. Sie ist je Mandant monoton (`tx_seq`, dicht) und trägt `tx_time` in Millisekunden (u64). Ein Rücksprung der Systemuhr wird geklemmt und markiert (`clamped`); ein Rücksprung über `clock_skew_max` (5 min) ist ein Fehler.
+- **Gültigkeitszeit `valid`:** Fachliche Geltung eines Inhalts als Intervall `[valid_from, valid_until)` in Kalendertagen (`i32`, Tage seit 1970-01-01). Ein fehlendes Ende bedeutet „offen“. Ein fehlender Wert ist ein expliziter Zustand, nie `0`.
+- **Abfrage:** `as_of` (Transaktionszeit) und `valid_at` (Gültigkeitszeit) sind unabhängig kombinierbar. Beispiel: Welche Fassung eines Gesetzes galt am 1. März, und was wusste das System am 15. März?
+
+**Ist-Stand [V]:** `contextra-mvcc` führt nur die Sequenzachse (`SnapshotRegistry`, `SeqBitTombstone`). Die bitemporale Prüfung mit Intervall-Semantik `[valid_from, valid_until)` liegt in `contextra-db/src/temporal_filter.rs`. Beide Begriffe sind nicht gemeinsam typisiert (F-20). Die Überführung in `rules` ist S-105.
+
+### 12.3 Objektmodell [D]
+
+- **Blob:** Inhalt eines Regeldokuments (Text, Tabelle, Feiertagskalender, Schwellenwert). Adressierung: `blake3` über kanonische Bytes mit Domänenpräfix `contextra/blob/v1`.
+- **Tree:** sortierte Einträge `{name, kind, id}`; `kind` ∈ {Blob, Tree, Redacted}.
+- **Commit:** `{tree, parents, tx_seq, tx_time, author, kind, Gültigkeitsmetadaten}`; `kind` ∈ {Ingest, Edit, Merge, Config, Takedown, Release}.
+- **Ref:** Branch (`main`, `sim/<id>`, `draft/<id>`) oder unveränderlicher Tag.
+- Commits sind verkettet (Hash über Vorgänger). Freitext in Commits ist verboten; Notizen liegen als validierte Blobs vor.
+- **Pfadkonvention:** `rules/<domäne>/…` (Gesetze, Fristen), `calendar/<land>/…` (Feiertage), `thresholds/…`, `prompts/…`, `config/…`. Die Zugriffsrichtlinie liegt auf `policy` und wirkt **immer im aktuellen Stand**; ein früherer Stand erweitert nie Rechte (Z-T5).
+
+### 12.4 Operationen [D]
+
+- `commit`, `branch`, `tag`; `checkout(as_of, valid_at)` als Sicht, ohne Kopie; `diff(a, b)` auf Blob-, Eintrags- und Gültigkeitsebene.
+- `merge(src, dst)` als Drei-Wege-Merge pro Pfad. Ein Merge nach `main` verlangt eine signierte Vier-Augen-Freigabe. Eine Regressionsprüfung gegen ein Fragenset ist optional aktivierbar.
+- `retire(branch)` entfernt einen Branch; nicht erreichbare Objekte werden nach einer Aufbewahrungsfrist bereinigt.
+- **Schreibreihenfolge:** Blobs, Trees, Commit, dann Ref-Bewegung. Ein Absturz davor hinterlässt nur unerreichbare Objekte, die die Bereinigung entfernt.
+
+### 12.5 Fristen und Kalender [D]
+
+- Fristenrechnung ist deterministisch und enthält kein Sprachmodell. Eingaben: Ereignisdatum, Fristart und ein Kalenderstand (Commit-Referenz auf `calendar/…`). Ausgaben: Fristbeginn, Fristende und die Herleitung mit Verweis auf den Regeltext.
+- Regeltexte (etwa Fristberechnungsregeln) sind Blobs mit Quellenangabe. Die Primärquelle ist Pflichtfeld. Nicht am Primärtext geprüfte Quellen werden als `[V]` geführt.
+- Das Ergebnis trägt den Commit, mit dem es berechnet wurde. Gleiche Eingabe und gleicher Commit ergeben gleiche Ausgabe (Z-T1).
+
+### 12.6 Takedown in K [D]
+
+Stellt sich heraus, dass ein Blob Personenbezug enthält, wird er nicht still überschrieben. Ein `Takedown`-Commit ersetzt den Blob durch `Redacted`: Objekt-ID und Kette bleiben erhalten, Inhalt und Salzableitung werden entfernt. Das Ereignis wird im Ledger vermerkt und in die Registersenke gespiegelt. Takedown ist eine eigene Operation, nicht Teil der P-Löschkette. Die Freigabe ist eine Vier-Augen-Freigabe mit Rollen `DataProtection` und `Legal` oder `TenantAdmin`.
+
+### 12.7 Zusagen Zeitreise
+
+| ID | Zusage | Nachweis |
+| --- | --- | --- |
+| **Z-T1** | Determinismus: gleicher Commit, gleiche Gültigkeitszeit und gleiche Parameter ergeben byte-identische Ausgaben auf x86_64 und aarch64. Rangfolgen ohne Gleitkommaarithmetik; Gleichstand nach ID aufsteigend (INV-5). | Golden-Korpus (G-TT1) |
+| **Z-T2** | Vollständige Historie: `as_of` liefert den Stand, der zum Zeitpunkt galt. Spätere Commits verändern frühere Antworten nicht. | Eigenschaftstest über Commit-Folgen |
+| **Z-T3** | Takedown lässt Objekt-IDs und Kette prüfbar; der Inhalt ist danach nicht mehr lesbar. | Takedown-Test; Prüfer (§14.3) |
+| **Z-T4** | K enthält keine Personendaten (Z-E5 gilt auch hier). | G-PII1 |
+| **Z-T5** | Die Zugriffsrichtlinie wirkt nur im aktuellen Stand. | Test mit älterem Stand und erweiterter Richtlinie |
+
+## 13 Simulation („Wenn-Dann“)
+
+Dieses Kapitel ist neu in v6 und normativ.
+
+### 13.1 Szenario [D]
+
+Ein Szenario besteht aus Basis-Commit, einem Szenario-Branch `sim/<id>` mit Änderungen (geänderte Frist, Gesetzesfassung, Schwellenwert, Prompt oder Konfiguration), einem Fragenset (validierter Blob) und einem Lauf. Der Lauf erzeugt ein Ereignisprotokoll `SimRun` mit Basis-Commit, Szenario-Commit, Parametern und Ergebnissen.
+
+### 13.2 Ablauf [D]
+
+1. Branch aus dem Basis-Commit.
+2. Änderungen als Commits.
+3. Fragenset gegen Basis und Szenario ausführen.
+4. Vergleich: Unterschiede bei Fristen, Ergebnissen und Enthaltungen.
+5. `merge` mit Freigabe oder `retire`.
+
+Ändert das Szenario Chunking oder Embedder, entsteht ein temporärer Index unter dem Szenario, der mit `retire` entfällt.
+
+### 13.3 Isolation [D]
+
+Ein Szenario schreibt nie in `main`, nie in P, verändert keine Zugriffsrechte und löst keine Löschwirkung aus. Personenbezogene Daten darf es nur lesen, und nur mit Zugriffsrecht und Vorgangsbindung. Ergebnisse mit Personenbezug werden verschlüsselt und tragen eine Ablauffrist.
+
+### 13.4 Zusagen Simulation
+
+| ID | Zusage | Nachweis |
+| --- | --- | --- |
+| **Z-S1** | Isolation: `main`, P und Zugriffsrechte sind vor und nach einem Szenario identisch. | G-SIM1 (proptest über Operationsfolgen) |
+| **Z-S2** | Ein Szenarioergebnis ist reproduzierbar wie in Z-T1. | Golden-Korpus |
+| **Z-S3** | Eine Simulation ist keine Entscheidung. Ausgaben tragen den Hinweis „Entscheidungshilfe“ und werden von einem Menschen freigegeben. | Vorlagentest |
+
+## 14 Prüfung, Messung und Freigabe
+
+Dieses Kapitel ist neu in v6 und normativ.
+
+### 14.1 Berichte [D]
+
+Löschberichte sind kanonisch serialisiert (Modul `report::canonical`) und mit Ed25519 signiert (Feature `signing`, Domänenpräfix `contextra/report/v1`). Sie enthalten Zählwerte statt Kennungen, die erreichten Stufen mit Zeitpunkten und Messverfahren, die Positivkontrolle, die Zahl der Mitbetroffenen, Annahmen und Restrisiken. Ein Bericht gilt erst mit seinem Ledger-Eintrag.
+
+### 14.2 Crash-Matrix [D]
+
+Für jeden Durabilitätspunkt L0 bis L6 und jede Gate- und Tresorschreibstelle läuft ein Szenario: Zustand aufbauen, an der Stelle abbrechen (`FaultVfs`), neu starten, Invarianten prüfen.
+
+- **I1** Eine durable Sperre geht nie verloren.
+- **I2** Kein Lesepfad liefert Klartext eines gesperrten Ziels.
+- **I3** Ein Schlüssel geht nie ohne Absicht verloren.
+- **I4** Jede Saga ist vollendet oder `Pending` bei aktiver Sperre.
+- **I5** Ledger, Manifest und Gate-Log sind konsistent.
+- **I6** Ordinale werden nie wiederverwendet.
+
+Jedes Messverfahren hat zusätzlich einen Positivkontrolltest: Wird das Verfahren deaktiviert oder verstümmelt, muss der Test scheitern.
+
+### 14.3 Unabhängiger Prüfer [D]
+
+Ein eigenständiges Binary ohne interne Abhängigkeit (Ziel: `contextra-verify`; Abhängigkeiten nur `blake3`, `ed25519-dalek`, `serde_json`) prüft Berichte und Ledger-Ketten, Signaturen und Konsistenz der Stufen. Es prüft Struktur und Echtheit, nicht die Wahrheit einer Messung. Ausgabe: `verified` oder `failed` mit stabilen Codes, ohne Inhalte und ohne Kennungen (S-110).
+
+### 14.4 Neue Gates [D]
+
+| Gate | Prüfung |
+| --- | --- |
+| **G-ER1** | Klassentrennung: K-Crates und Wissenspfade kompilieren ohne P-Typen (Compile-Fail-Test). |
+| **G-ER2** | Löschkette vollständig: jeder Schritt L0 bis L6 und jede Zeile aus §11.4 hat einen grünen Lebenszyklustest. Eine fehlende Zeile ist rot. |
+| **G-ER3** | Jede Zusage Z-E1 bis Z-E12 hat mindestens einen grünen Test. |
+| **G-TT1** | Golden-Korpus für `rules` (Festkomma, Kalender) auf x86_64 und aarch64. |
+| **G-SIM1** | Isolationstest für Szenarien (proptest). |
+| **G-PII1** | Mustertest des K-Validators mit synthetischen Canaries (Namen, Anschriften, Kennungen, E-Mail, Telefon). |
+
+Neue Gates werden **nicht** in `ratchet.toml › not_run_baseline` aufgenommen (D-04, D-23).
+
+### 14.5 Leistungsziele [Q]
+
+Startwerte, bestätigt erst durch den Messbericht (S-111):
+
+- Rückkehr einer Sperre (L1) bei einer Person mit 1 000 Versionen: p99 unter 50 ms; harte Grenze `erase_return_timeout` (2 s).
+- Stufe „Bereinigt“ für eine Person mit 1 000 Dokumenten: erwartbar Minuten, Obergrenze 24 h.
+- Zeitreiseabfrage (`as_of` und `valid_at`) auf 1 Mio. Blobs: p95 unter 200 ms.
+
+## 15 Umsetzung der Kapitel 11 bis 14
+
+Die Schritte aus §9 bleiben unverändert gültig. Diese Schritte kommen hinzu. Stand ist HEAD `fcd387021` plus die Befunde F-17 bis F-20. Nichts davon ist gebaut oder getestet.
+
+| ID | Ziel | Rest | Abnahme | Abhängig von |
+| --- | --- | --- | --- | --- |
+| **S-100** | `ids`: Typ `PersonalRef` (128 Bit, zufällig, serde, Golden-Vektoren) | alles | Golden-Test, Differenztest | — |
+| **S-101** | `erasure`: doppelte Traits `FenceGate` (`types_local.rs` und `gate/fence.rs`) und `WalSink` (`types_local.rs` und `journal/wal_sink.rs`) zu je einem Besitzer zusammenführen (F-17) | alles | Build grün, Crash-Suite | S-24 |
+| **S-102** | `erasure` in `default-members` aufnehmen, sobald der Check grün ist; die im Fix-Report genannten Check-Fehler beheben (F-18) | Check-Fehler, Branch `fix/test-targets` offen | G-L3 (INV-4) | S-101 |
+| **S-103** | Lebenszyklustabelle §11.4 gegen den Code abgleichen; je Schritt einen Test; G-ER2 einführen | alles | G-ER2 | S-102 |
+| **S-104** | Neuer Baustein `contextra-rules` (E1a, Kern `ids`, `env`, `privacy`; Feature `workspace`; Fehler `RulesError`); Eintrag in §4.1, Budget, `capabilities.fragment.toml` | Crate fehlt | G-L1 bis G-L4, G-H1 | S-100, D-14 (F-19) |
+| **S-105** | `db/temporal_filter.rs` auf `rules::ValidityWindow` umstellen; Golden für Intervallgrenzen (F-20) | alles | Golden-Tests | S-104 |
+| **S-106** | K-Validator: `privacy::entity_recognizer` als Pflichtprüfung für `rules`-Commits | alles | G-PII1 | S-104 |
+| **S-107** | Simulation: Branch `sim/<id>`, `SimRun`, Vergleich | alles | G-SIM1 | S-104, S-106 |
+| **S-108** | Takedown in `rules`: `Redacted`-Blob, Vier-Augen | alles | Z-T3 | S-104 |
+| **S-109** | Gates G-ER1, G-ER3, G-TT1, G-SIM1, G-PII1 in `governance/gates.toml` (laufend, nicht baseline) | alles | Gate-Lauf grün | S-103, S-106 |
+| **S-110** | `contextra-verify` als unabhängiger Prüfer | alles | Negativtests mit verfälschten Berichten | S-100 |
+| **S-111** | Messbericht Löschung und Zeitreise (Werte aus §14.5) | alles | Messbericht unter §8.3 | S-103, S-105 |
+
+**Reihenfolge-Zwang:** S-101 und S-102 stehen vor S-103. Ohne grünen Build der Löschkette ist keine Zusage aus §11.5 prüfbar. S-104 steht nach der Entscheidung zu D-14 (`contextra-vault` aus `exclude` holen).
+
 
 ## Anhang A Befundregister
 
@@ -617,6 +913,10 @@ Jeder Befund nennt Beleg und Schritt. IDs sind stabil; ein behobener Befund blei
 | F-14 | `crypto/kv_segment` und `kvcache` führen parallele KV-Implementierungen. | `crypto/src/{kv_cipher.rs,kv_segment/*}`; `kvcache/src/{cipher,segment,store,eviction_worker}.rs` | S-38 | offen |
 | F-15 | In `store` und `vector` liegen Altdateien mit Brückenreferenzen neben `compat/`-Fassungen. | `store/src/scanner/*`, `store/src/engine/memory_only.rs` neben `store/src/compat/{scanner,engine}`; `vector/src/hnsw/*` neben `vector/src/compat/*` | S-36, S-37 | offen \[Dubletten nicht geprüft\] |
 | F-16 | `gate_dependencies.py` und `gate_g1_layering.py` (Alias) existieren neben `gate_layering.py`; die Spezifikation kennt nur zwei der drei. | `tools/` | S-01 | offen |
+| F-17 | Doppelte Trait-Definitionen in `erasure`: `FenceGate` in `types_local.rs` und `gate/fence.rs`, `WalSink` in `types_local.rs` und `journal/wal_sink.rs`. | `grep -rn 'pub trait FenceGate\|pub trait WalSink' crates/contextra-erasure/src` | S-101 | offen |
+| F-18 | `erasure` ist nicht in `default-members`. Der Fix-Report zählt im Crate 78 Fehler im Check. Die Löschkette ist deshalb nicht verifiziert. | `Cargo.toml` (`default-members`); `reports/FIX_REPORT_2026-11-16.md`, Abschnitt 2 | S-102 | offen |
+| F-19 | Zwei Tresor-Implementierungen: `crates/contextra-erasure/src/vault/` (Feature `aead`) und `crates/contextra-vault` (in `exclude`, D-14). | `Cargo.toml` (`exclude`); Verzeichnisse | S-102, S-104 | offen |
+| F-20 | Die Zeitachsen sind nicht gemeinsam typisiert: `mvcc` führt nur die Sequenzachse, die bitemporale Prüfung liegt in `db/src/temporal_filter.rs`. | `mvcc/src/snapshot.rs`; `db/src/temporal_filter.rs` (Zeilen 24 bis 32) | S-104, S-105 | offen |
 
 ## Anhang B Werkzeugliste und Reproduktion
 
