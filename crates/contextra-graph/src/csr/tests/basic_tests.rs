@@ -15,7 +15,8 @@ use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
 use contextra_ports::GraphIndex;
-use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
+use crate::error::GraphError;
+use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 
@@ -128,32 +129,32 @@ async fn test_invalid_edge_weights_rejected() {
         .insert_edge_direct(id1, id2, f32::NAN)
         .await
         .unwrap_err();
-    assert!(matches!(err_nan, ContextraError::InvalidInput(_)));
+    assert!(matches!(err_nan, GraphError::InvalidInput(_)));
 
     // Infinity weight
     let err_inf = graph
         .insert_edge_direct(id1, id2, f32::INFINITY)
         .await
         .unwrap_err();
-    assert!(matches!(err_inf, ContextraError::InvalidInput(_)));
+    assert!(matches!(err_inf, GraphError::InvalidInput(_)));
 
     // Neg Infinity weight
     let err_neginf = graph
         .insert_edge_direct(id1, id2, f32::NEG_INFINITY)
         .await
         .unwrap_err();
-    assert!(matches!(err_neginf, ContextraError::InvalidInput(_)));
+    assert!(matches!(err_neginf, GraphError::InvalidInput(_)));
 
     // Negative weight
     let err_neg = graph.insert_edge_direct(id1, id2, -1.0).await.unwrap_err();
-    assert!(matches!(err_neg, ContextraError::InvalidInput(_)));
+    assert!(matches!(err_neg, GraphError::InvalidInput(_)));
 
     // add_edge with NaN
     let edge_nan = Edge::new(id1, id2, "rel").with_weight(f32::NAN);
     let err_add = GraphIndex::add_edge(graph.as_ref(), tx, edge_nan)
         .await
         .unwrap_err();
-    assert!(matches!(err_add, ContextraError::InvalidInput(_)));
+    assert!(matches!(err_add, GraphError::InvalidInput(_)));
 }
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-BASIC-TESTS-003]

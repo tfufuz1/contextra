@@ -671,7 +671,7 @@ mod tests {
         assert_eq!(checkpoint.task_id, "task-reset");
         assert_eq!(checkpoint.completed_subgoal_index, 0);
         assert_eq!(checkpoint.chunk_count_at_checkpoint, 2);
-        assert_eq!(checkpoint.purge_receipt.chunks_purged, 2);
+        assert_eq!(checkpoint.reset_receipt.chunks_purged, 2);
 
         // total_bytes ist nun 0, current_subgoal_index inkrementiert
         assert_eq!(pad.total_bytes(), 0);

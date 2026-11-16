@@ -44,6 +44,8 @@ tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
 contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
+contextra-ports = { version = "0.1.0", path = "../contextra-ports" }
+contextra-types = { version = "0.1.0", path = "../contextra-types" }
 
 [[bench]]
 name = "checkpoint_bench"
