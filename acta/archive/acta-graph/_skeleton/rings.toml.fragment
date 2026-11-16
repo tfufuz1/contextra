@@ -1,6 +1,0 @@
-# Nach Annahme des ADR in rings.toml uebernehmen (und SPEC 3.3 anpassen: 31 Produktions-Crates):
-[levels]
-acta-graph = 3
-[budgets]
-acta-graph = 4000
-# Workspace-Cargo.toml: members += "crates/acta-graph"; [workspace.dependencies] acta-graph = { path = "crates/acta-graph" }
