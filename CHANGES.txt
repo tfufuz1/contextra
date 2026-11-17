@@ -1,0 +1,17 @@
+Entfernt: contextra-license, contextra-audit-export, contextra-avv-generator (96 Dateien unter crates/)
+
+Geänderte/wiederhergestellte Dateien:
+Cargo.lock
+Cargo.toml
+capabilities.toml
+crates/contextra-db/src/license_seam.rs
+crates/contextra-ports/src/license.rs
+deny.toml
+tools/doc_lint.py
+tools/erasure_leak_prober.py
+tools/generate_interface_spec.py
+tools/modularity_score.py
+
+Wiederhergestellt aus 24487fa^ (im HEAD gelöscht): Cargo.toml, capabilities.toml, deny.toml
+Nicht angefasst: LicenseGate in crates/contextra-ports/src/license.rs (von contextra, ports, plugin genutzt); Erwähnungen in PLAN.md/SPEC.md/docs/.
+Nicht kompiliert: Rust ist in der VM nicht installiert.

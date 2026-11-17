@@ -42,9 +42,6 @@ TARGET_CORE_DEPS = {
     "contextra-prompt-guard": set(),
     "contextra-infer-onnx": set(),
     "contextra-erasure": set(),
-    "contextra-license": set(),
-    "contextra-audit-export": set(),
-    "contextra-avv-generator": set(),
     "contextra-mvcc": {"contextra-ids", "contextra-env"},
     "contextra-crypto": {"contextra-ids", "contextra-env"},
     "contextra-text": {"contextra-ids", "contextra-env"},
@@ -171,7 +168,7 @@ def calculate_modularity_score(repo_root: Path, target_crate: str | None = None)
                             break
                     except Exception:
                         pass
-            if not has_error_type and cname not in ("contextra-env", "contextra-durable-fs", "contextra-wire", "contextra-privacy", "contextra-sandbox", "contextra-avv-generator"):
+            if not has_error_type and cname not in ("contextra-env", "contextra-durable-fs", "contextra-wire", "contextra-privacy", "contextra-sandbox"):
                 score -= 5
                 deductions.append("Missing local Error type: -5")
 

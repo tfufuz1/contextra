@@ -1,0 +1,86 @@
+[graph]
+targets = []
+
+[output]
+feature-depth = 1
+
+[advisories]
+ignore = [
+    "RUSTSEC-2024-0384", # number_prefix
+    "RUSTSEC-2024-0436", # paste
+    "RUSTSEC-2026-0176", # pyo3
+    "RUSTSEC-2026-0177", # pyo3
+    "RUSTSEC-2026-0285", # rustls
+    "RUSTSEC-2026-0205", # scc
+]
+
+[licenses]
+private = { ignore = true }
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "MPL-2.0",
+    "CC0-1.0",
+    "Zlib",
+]
+clarify = [
+    { name = "contextra-mcp", expression = "MIT OR Apache-2.0", license-files = [] },
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+deny = [
+    { crate = "tokio", wrappers = [
+        "criterion",
+        "hyper",
+        "hyper-rustls",
+        "hyper-util",
+        "contextra",
+        "contextra-agent",
+        "contextra-bench",
+        "contextra-checkpoint", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-cognition",
+        "contextra-crypto", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-db",
+        "contextra-engine",
+        "contextra-graph", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-infer-candle",
+        "contextra-infer-ollama",
+        "contextra-infer-onnx",
+        "contextra-kvcache", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-mcp",
+        "contextra-mvcc", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-ports", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-privacy",
+        "contextra-py",
+        "contextra-rank", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-router",
+        "contextra-sandbox",
+        "contextra-store", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-testkit",
+        "contextra-text", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-vector", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "reqwest",
+        "tokio-rustls",
+        "tokio-util",
+        "tower",
+    ] },
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle"] },
+    { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
+    { crate = "reqwest", wrappers = ["contextra-infer-ollama"] },
+    { crate = "wasmtime", wrappers = ["contextra-sandbox"] },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

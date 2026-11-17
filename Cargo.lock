@@ -747,27 +747,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-audit-export"
-version = "0.1.0"
-dependencies = [
- "contextra-types",
- "criterion",
- "proptest",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "contextra-avv-generator"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "serde",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
@@ -1143,22 +1122,6 @@ dependencies = [
  "tokio",
  "tracing",
  "zeroize",
-]
-
-[[package]]
-name = "contextra-license"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "blake3",
- "contextra-ports",
- "contextra-types",
- "criterion",
- "ed25519-dalek",
- "rand 0.8.8",
- "serde",
- "thiserror 2.0.20",
- "tracing",
 ]
 
 [[package]]

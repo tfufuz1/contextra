@@ -1,4 +1,0 @@
-[crates.contextra-license]
-klasse = "A"
-may_depend_on = []
-transitional = ["ports-compat"]

@@ -29,7 +29,7 @@ from agent_tooling_common import (
 )
 
 # Crates allowed to contain erasure domain logic
-ALLOWED_ERASURE_CRATES = {"contextra-erasure", "contextra-ports", "contextra-types", "contextra-avv-generator"}
+ALLOWED_ERASURE_CRATES = {"contextra-erasure", "contextra-ports", "contextra-types"}
 
 LEAK_PATTERNS = [
     (r"\bDeletionProof\b", "LEAK_DELETION_PROOF", "Usage of DeletionProof in data kernel"),

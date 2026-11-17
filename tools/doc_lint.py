@@ -34,9 +34,6 @@ FORBIDDEN_COMPLIANCE_PATTERNS = [
 # Erlaubte Ausnahmen in Compliance-Spezifikationen bzw. Tests und Audit-Dokumentationen
 ALLOWED_PATHS = {
     "crates/contextra-erasure",
-    "crates/contextra-license",
-    "crates/contextra-audit-export",
-    "crates/contextra-avv-generator",
     "docs/spec/COMPLIANCE",
     "docs/compliance",
     "docs/archive",

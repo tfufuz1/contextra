@@ -16,7 +16,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[deprecated(
     since = "0.2.0",
-    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
 )]
 pub enum VectorDeleteMode {
     /// Synchronous graph repair during vector deletion.
@@ -36,7 +36,7 @@ impl Default for VectorDeleteMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[deprecated(
     since = "0.2.0",
-    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
 )]
 pub enum FeatureRing {
     /// Fast ring (open source core).
@@ -55,7 +55,7 @@ pub enum FeatureRing {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[deprecated(
     since = "0.2.0",
-    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
 )]
 pub struct AuthorizedRing {
     ring: FeatureRing,
@@ -78,7 +78,7 @@ impl AuthorizedRing {
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 #[deprecated(
     since = "0.2.0",
-    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
 )]
 pub enum LicenseError {
     /// No valid activation found for the requested feature ring.
@@ -98,7 +98,7 @@ pub enum LicenseError {
 /// und folgt in einem eigenen, separat zu beauftragenden Schritt.
 #[deprecated(
     since = "0.2.0",
-    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
 )]
 pub trait LicenseGate: Send + Sync {
     /// Checks if the requested feature ring is activated and accessible.
@@ -126,7 +126,7 @@ pub trait LicenseGate: Send + Sync {
 #[derive(Debug, Default, Clone, Copy)]
 #[deprecated(
     since = "0.2.0",
-    note = "Canonical owner is `contextra_license` per S-50. This re-export will be removed in S-70."
+    note = "Das Crate `contextra-license` wurde entfernt; `LicenseGate` bleibt vorerst hier, bis die Lizenz-Seams (S-50/S-64) entschieden sind."
 )]
 pub struct OpenFastGate;
 
