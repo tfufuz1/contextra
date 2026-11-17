@@ -1,0 +1,135 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-infer-candle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Native Candle GGUF ML inference backend for Contextra"
+
+[package.metadata.contextra]
+ring = "2"
+
+[dependencies]
+candle-core = { version = "0.11", optional = true }
+candle-nn = { version = "0.11", optional = true }
+candle-transformers = { version = "0.11", optional = true }
+tokenizers = { version = "0.21", optional = true }
+bytes = { workspace = true }
+sha2 = "0.10"
+tokio = { workspace = true }
+futures-util = "0.3"
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+bincode = { workspace = true, optional = true }
+half = { version = "2.4", optional = true }
+parking_lot = { workspace = true }
+
+# Erlaubte Kern-AbhÃ¤ngigkeiten
+contextra-env = { path = "../contextra-env", version = "0.1.0" }
+
+# Optionale BrÃ¼cken-AbhÃ¤ngigkeiten (hinter workspace)
+contextra-types = { path = "../contextra-types", version = "0.1.0", default-features = false, optional = true }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0", default-features = false, optional = true }
+contextra-rank = { path = "../contextra-rank", version = "0.1.0", default-features = false, optional = true }
+contextra-crypto = { path = "../contextra-crypto", version = "0.1.0", optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+criterion = { workspace = true }
+contextra-types = { path = "../contextra-types", version = "0.1.0" }
+contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
+contextra-rank = { path = "../contextra-rank", version = "0.1.0" }
+contextra-crypto = { workspace = true, features = ["kv-encryption"] }
+
+[[bench]]
+name = "kv_bridge_bench"
+harness = false
+required-features = ["kv-bridge"]
+
+[features]
+default = ["candle"]
+workspace = [
+    "dep:contextra-types",
+    "dep:contextra-ports",
+    "dep:contextra-rank",
+]
+types-compat = ["workspace"]
+ports-compat = ["workspace"]
+candle = [
+    "dep:candle-core",
+    "dep:candle-nn",
+    "dep:candle-transformers",
+    "dep:tokenizers",
+    "dep:half"
+]
+kv-bridge = ["workspace", "dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
+kv-stage-b = ["dep:bincode"]
+exp-kv-stage-b = ["kv-stage-b"]
+exp-gasp = []
+cuda = ["candle-core?/cuda", "candle-nn?/cuda", "candle-transformers?/cuda"]
+test-utils = []
+
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "0.11", features = ["metal"] }
+candle-nn = { version = "0.11", features = ["metal"] }
+candle-transformers = { version = "0.11", features = ["metal"] }
+
+# Golden-Test nutzt Fakes aus `fake.rs`, die nur mit Feature `test-utils` existieren.
+[[test]]
+name = "golden_test"
+path = "tests/golden_test.rs"
+required-features = ["test-utils", "workspace"]
+
+[[test]]
+name = "attention_exporter_bounded_memory"
+required-features = ["workspace"]
+
+[[test]]
+name = "embedding_normalization_proptest"
+required-features = ["workspace"]
+
+[[test]]
+name = "embedding_provider_conformance"
+required-features = ["workspace"]
+
+[[test]]
+name = "gasp_mutant_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "kv_bridge_and_stress_test"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_bridge_roundtrip"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_bridge_tenant_key_separation"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_bridge_version_mismatch"
+required-features = ["kv-bridge"]
+
+[[test]]
+name = "kv_prefix_reuse_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "kv_stage_b_test"
+required-features = ["workspace"]
+
+[[test]]
+name = "proptest_candle"
+required-features = ["workspace"]
+
+[[test]]
+name = "real_inference_test"
+required-features = ["workspace"]
+

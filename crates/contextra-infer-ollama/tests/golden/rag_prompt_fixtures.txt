@@ -1,0 +1,12 @@
+=== ESCAPED ===
+&lt;tag&gt;&amp;special &quot;quotes&quot; &amp; &apos;apostrophes&apos;&lt;/tag&gt;
+=== RAG PROMPT ===
+<system>Du bist ein hilfsbereiter Assistent.</system>
+<instructions>
+Beantworte die folgende Anfrage ausschließlich auf Basis der in &lt;context&gt; bereitgestellten Dokumentauszüge.
+Verwende kein Wissen außerhalb dieses Kontexts. Wenn die Antwort nicht eindeutig aus dem Kontext hervorgeht, antworte wörtlich: "Diese Information ist in den importierten Dokumenten nicht enthalten."
+Belege jede sachliche Aussage am Satzende mit einem Verweis auf die Quelle in eckigen Klammern im Format [Quelle: &lt;Dateiname oder Chunk-Kennung&gt;], sofern diese Information in den Metadaten des Kontexts vorhanden ist.
+</instructions>
+<context>Dokument 1: &lt;Inhalt mit XML-Tags&gt;
+Dokument 2: Normaler Text &amp; Sonderzeichen</context>
+<user_query>Finde alle relevanten Verträge.</user_query>

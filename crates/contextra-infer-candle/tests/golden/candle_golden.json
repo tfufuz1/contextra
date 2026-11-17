@@ -1,0 +1,19 @@
+{
+  "errors": [
+    "I/O error: entity not found",
+    "Model load error: invalid GGUF magic 0x12345678",
+    "Tokenizer error: missing vocabulary item",
+    "Inference execution error: out of memory on device Cpu",
+    "Invalid parameter: batch size 0 exceeds allowable range",
+    "Resource limit exceeded: tracked requests ceiling reached",
+    "Grounding policy violation: LowConfidenceGrounding",
+    "Backend unavailable: candle feature not enabled"
+  ],
+  "fake_embed": [],
+  "fingerprint": {
+    "model_id": "test"
+  },
+  "gasp_raw_score_fixture": {
+    "score": 1.0
+  }
+}
