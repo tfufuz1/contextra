@@ -47,41 +47,34 @@ from collections import Counter
 # --------------------------------------------------------------------------- #
 
 RING_META: dict[str, tuple[int, str, str]] = {
+    # Ebene E0 — Autarke Bausteine & Fundamente
     "contextra-ids": (0, "Fertig", "Kanonische Identitätstypen, DocId, TenantId und ID_WIDTH_BITS."),
     "contextra-env": (0, "Fertig", "System-Umwelt, deterministische Clock, SeededRng und MetricsSink."),
     "contextra-sys": (0, "Fertig", "System-Abstraktionen für mmap, mlock und Win32-ACLs (Unsafe-Insel)."),
     "contextra-durable-fs": (0, "Fertig", "Durable I/O, atomare Dateiverschiebungen und fsync-Garantien."),
     "contextra-simd": (0, "Fertig", "AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne mit Laufzeit-Dispatch (Unsafe-Insel)."),
-    
-    "contextra-adapt": (0, "Fertig", "LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler."),
-    "contextra-ingest": (0, "Fertig", "Multi-Format Dokumenten-Ingestion mit Chunking und Formaterkennung."),
     "contextra-privacy": (0, "Fertig", "Cloud-Egress Privacy Gateway, PII-Vault, Surrogat-Tokenisierung und DLP."),
-    "contextra-sandbox": (0, "Fertig", "WASM-Ausführungs-Isolation mit Fuel- und Wall-Clock-Limits via Wasmtime."),
-    "contextra-prompt-guard": (0, "Fertig", "Heuristische und ML-basierte Prompt-Injection- und Jailbreak-Erkennung."),
-    "contextra-infer-onnx": (0, "Fertig", "ONNX-Embeddings und Reranking via ort."),
     "contextra-erasure": (0, "Fertig", "Löschungsprüfung, kryptografische Nachweise und Audit-Ledger."),
-    "contextra-mvcc": (1, "Fertig", "SeqLog, SnapshotRegistry und transaktionaler TxBuffer (MVCC-Isolation)."),
-    "contextra-crypto": (1, "Fertig", "AES-256-GCM-SIV, WAL-HMAC-Integritätsketten, Zeroize und KeyManager."),
+
+    # Ebene E1 — Speicherschicht, Indizes & Domänenbausteine
+    "contextra-store": (1, "Fertig", "LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung."),
+    "contextra-vector": (1, "Fertig", "HNSW- und DiskANN-Vektorindex-Implementierungen."),
     "contextra-text": (1, "Fertig", "BM25/BM25F-Volltextindexierung und deutsche Kompositazerlegung."),
     "contextra-graph": (1, "Fertig", "Compressed Sparse Row (CSR) Graph, Forward-Push PPR, Leiden und Hyperkanten."),
     "contextra-rank": (1, "Fertig", "4-Signal-Retrieval-Fusion, Score-Kalibrierung und Drift-Messung."),
+    "contextra-mvcc": (1, "Fertig", "SeqLog, SnapshotRegistry und transaktionaler TxBuffer (MVCC-Isolation)."),
+    "contextra-crypto": (1, "Fertig", "AES-256-GCM-SIV, WAL-HMAC-Integritätsketten, Zeroize und KeyManager."),
     "contextra-checkpoint": (1, "Fertig", "Time-Travel-Registry und Checkpoint-Verwaltung ohne globalen Zustand."),
-    "contextra-kvcache": (1, "Fertig", "Verschlüsselter Prefix-Radix-Baum und KV-Cache-Segment-Verwaltung."),
-    "contextra-vault": (1, "Fertig", "Schlüsselverwaltung mit Hardware-Sicherheitsmodul / Keyring-Anbindung."),
-    "contextra-infer-ollama": (1, "Fertig", "HTTP-Inferenz-Client für Ollama mit Contextual-Chunk-Prefixing."),
-    "contextra-infer-candle": (1, "Fertig", "Native GGUF-Modell-Inferenz via Candle."),
-    "contextra-store": (1, "Fertig", "LSM-Tree Storage Engine mit WAL-Group-Commit und HMAC-Integritätsprüfung."),
-    "contextra-vector": (1, "Fertig", "HNSW- und DiskANN-Vektorindex-Implementierungen."),
+
+    # Ebene E2 — Integration, Domäne & Orchestrierung
     "contextra-types": (2, "Fertig", "Kanonische Domänenmodelle, Budgets, Filter-AST und Fehlertypen."),
     "contextra-ports": (2, "Fertig", "dyn-kompatible Trait-Definitionen (Ports) für Storage, Indizes und Embedder."),
-    "contextra-router": (2, "Fertig", "SLM-Profil-Routing und MCP-Dispatch."),
-    "contextra-agent": (2, "Fertig", "Agenten-Workflow-Engine mit auditierbarer State-Machine und DLQ."),
-    
-    "contextra-engine": (2, "Fertig", "Collection-LSM-Anbindung, Multi-Index-Pläne und Schreibtransaktionen."),
     "contextra-db": (2, "Fertig", "Monolithische Übergangsfassade für Speicher-, Such- und Indexzugriffe."),
+    "contextra-engine": (2, "Fertig", "Deprecated Re-Export von contextra-db."),
     "contextra": (2, "Fertig", "Öffentliche Haupt-Fassade und Composition Root für Rust-Anwendungen."),
+
+    # Ebene E3 — Endpunkte & Werkzeuge
     "contextra-mcp": (3, "Fertig", "Stdio-JSON-RPC MCP-Server-Protokoll-Adapter."),
-    
     "contextra-testkit": (3, "Fertig", "Deterministische Test-Utilities (ManualClock, InMemoryStorageEngine, FaultVfs)."),
     "contextra-bench": (3, "Fertig", "End-to-End-Benchmarks für Ingestion, Vektorsuche und Transaktionsdurchsatz."),
 }
@@ -95,16 +88,16 @@ RING_NAMES = {
 
 # Reihenfolge der Darstellung im Dokument (Ring-für-Ring, dependency-nah sortiert)
 ORDER = [
-    "contextra-types", "contextra-ports", "contextra-mvcc",  "contextra-sys",
-    "contextra-simd", "contextra-crypto", "contextra-vector", "contextra-text", "contextra-graph",
-    "contextra-rank", "contextra-adapt", "contextra-core", 
-
-    "contextra-store", "contextra-kvcache", "contextra-checkpoint",
-    "contextra-infer-candle", "contextra-infer-ollama", "contextra-infer-onnx", "contextra-sandbox",
-    "contextra-engine",  "contextra-privacy", 
-    "contextra-agent", "contextra-db",
-    "contextra", "contextra-mcp", 
-    "contextra-testkit",
+    # E0
+    "contextra-ids", "contextra-env", "contextra-sys", "contextra-durable-fs",
+    "contextra-simd", "contextra-privacy", "contextra-erasure",
+    # E1
+    "contextra-store", "contextra-vector", "contextra-text", "contextra-graph",
+    "contextra-rank", "contextra-mvcc", "contextra-crypto", "contextra-checkpoint",
+    # E2
+    "contextra-types", "contextra-ports", "contextra-db", "contextra-engine", "contextra",
+    # E3
+    "contextra-mcp", "contextra-testkit", "contextra-bench",
 ]
 
 UNSAFE_ISLANDS = {"contextra-simd", "contextra-sys"}
@@ -523,7 +516,7 @@ def render_closing(f) -> None:
 * **Zero-Panic-Doktrin:** `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable` sind workspace-weit als Clippy-Lint verboten.
 * **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd` heben dies explizit auf.
 * **Sync-Kern, Async-Schale (P26):** Ring-0-Crates verwenden kein `tokio`.
-* **DAG-Integrität (P5):** Aufwärtskanten sind verboten; einzige dokumentierte Restausnahme: `contextra-router → contextra-db` (Migrationsartefakt).
+* **DAG-Integrität (P5):** Aufwärtskanten sind strikt verboten (E3 → E2 → E1 → E0).
 * **`#[non_exhaustive]`-Disziplin** bei zentralen Fehler-Enums (u. a. `ContextraError`).
 * **Deletion-Proof-Kette:** kryptographisch extern verifizierbare Löschbeweise (`contextra-crypto`).
 * **Feature-Ring-Trennung:** `fast` / `sovereign` / `compliance` (Crate `contextra`) trennen Lizenzstufen auf Kompilierungsebene.

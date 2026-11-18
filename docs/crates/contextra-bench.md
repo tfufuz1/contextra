@@ -1,79 +1,102 @@
-# contextra-bench — Crate-Spezifikation (Benchmark-Harness & Regressions-Gates)
+# contextra-bench — Implementierungsspezifikation (Soll-Zustand)
 
 **Ebene:** E3 (Endpunkte / Benchmarks)  
-**Status:** Normativ  
-**Version:** 1.0  
+**Kern-Closure:** `db`, `store`, `vector`, `text`, `rank`, `types`  
+**Status:** Normativ (Soll-Zustand für Entwickler)  
+**Version:** 2.0  
 **Geltungsbereich:** `benchmarks/contextra-bench`  
-**Referenz:** `docs/SPEC.md` §2, §12
+**Referenzdokumente:** `docs/SPEC.md` §2, §12; `ALTLASTEN-AUDIT.md` (AP-14)  
 
 ---
 
-## 1. Zweck & Systemrolle
+## 1. Zweck & Architekturgarantien
 
-`contextra-bench` ist die offizielle, automatisierte Benchmark- und Regressionsprüf-Harness für Contextra:
-- **Genauigkeits-Evaluation:** Reproduzierbare Messung von Retrieval-Genauigkeit (Recall@K, MRR@K, NDCG@K, MAP@K) über standardisierte Datensätze (BEIR-Benchmark, synthetische Korpora).
-- **Latenz- & Durchsatz-Profiling:** Messung von Latenz-Perzentilen (p50, p95, p99, p99.9) für Vektor-, Volltext- und Hybrid-Suchanfragen unter variierender nebenläufiger Last.
-- **Regressions-Gates:** Automatischer CI-Abbruch bei Performance-Einbußen oder Qualitätsverlusten gegenüber festgelegten Baselines (`baseline_metrics.json`).
-- **Vergleich mit Referenz-Systemen:** Standardisierte Vergleichsadapter gegen externe Engines (z.B. LanceDB, Qdrant, Tantivy, SQLite/Redb).
+`contextra-bench` ist die offizielle Benchmark-, Evaluations- und Regressions-Harness für Contextra:
+- **Retrieval Accuracy:** Wissenschaftlich fundierte Messung von Recall@K, MRR@K, NDCG@K über standardisierte Testkorpora (BEIR-Standard).
+- **Latenz- & Durchsatz-Profiling:** Mikrosekunden-genaue Aufzeichnung von Latenz-Perzentilen (p50, p95, p99, p99.9) via `hdrhistogram`.
+- **Regressions-Gates (Ratchet Guard):** CI-Überwachung zur Verhinderung von Performance- oder Genauigkeitsrückschritten gegenüber der gespeicherten Baseline (`baseline_metrics.json`).
+- **Wettbewerbsvergleiche:** Standardisierte Benchmarks gegen externe Speicher-Engines (z. B. Redb, Sled).
 
----
+### Beseitigung von Altlasten (AP-14)
+1. **AP-14a (`src/main.rs`):** Entfernen der unkompilierbaren ONNX-Importe (`#[cfg(feature = "onnx-bench")] use contextra_infer_onnx::...`).
+2. **AP-14b (`src/main.rs`):** Entfernen der Candle-Embedding-Instantiierung (`contextra_infer_candle::CandleEmbedClient`).
+3. **Leere Default-Features (R3):** `default = []`.
 
-## 2. Architektur & Module
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       contextra-bench                       │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                    BenchmarkRunner                  │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ AnnBenchmarks      │    │ BeirEvaluator     │   │   │
-│   │   │ (HNSW vs Flat)     │    │ (BEIR Datasets)   │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ PathRagSweep       │    │ CompetitiveKv     │   │   │
-│   │   │ (Graph Traversal)  │    │ (Store vs Redb)   │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ LatencyProfiler    │    │ RegressionGate    │   │   │
-│   │   │ (HdrHistogram)     │    │ (Ratchet Guard)   │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+### Architekturgarantien (R1–R6, INV-3, INV-4, INV-7)
+1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
+2. **Reine Auswertungsebene:** Keine Rückwirkung auf Kern-Bibliotheken (E0 bis E2).
+3. **Keine ungeprüften Behauptungen (INV-7):** Jedes Benchmark-Ergebnis erfasst Git-Commit, CPU-Architektur, RAM, SSD und Datensatz-Prüfsumme.
 
 ---
 
-## 3. Bewertungsmetriken
+## 2. Bewertungsmetriken & Formeln
 
-### 3.1 Retrieval Accuracy
-- **Recall@K:** Anteil der relevanten Dokumente in den Top-$K$ Ergebnissen:
+### 2.1 Retrieval-Genauigkeit
+- **Recall@K:**
   $$\text{Recall}@K = \frac{|\text{Top}_K \cap \text{Relevant}|}{|\text{Relevant}|}$$
-- **Mean Reciprocal Rank (MRR@K):** Reziproker Rang des ersten relevanten Treffers:
+- **Mean Reciprocal Rank (MRR@K):**
   $$\text{MRR} = \frac{1}{|Q|} \sum_{i=1}^{|Q|} \frac{1}{\text{rank}_i}$$
-- **NDCG@K:** Normalized Discounted Cumulative Gain zur Bewertung abgestufter Relevanzen.
+- **NDCG@K:** Normalized Discounted Cumulative Gain zur Bewertung differenzierter Relevanzstufen.
 
-### 3.2 Latenzmessung
-Messung über `hdrhistogram` mit Mikrosekunden-Präzision. Kaltstart- und Warmup-Phasen werden strikt getrennt protokolliert.
-
----
-
-## 4. Richtlinien für Benchmark-Ergebnisse (INV-CLAIMS-1)
-
-Jede publizierte oder im CI erfasste Benchmark-Zahl MUSS zwingend folgende Kontextdaten enthalten:
-1. Exakter Git-Commit-Hash.
-2. Hardware-Konfiguration: CPU-Architektur (x86_64 / aarch64), Core-Count, RAM, SSD-Modell.
-3. Betriebssystem und Kernel-Version.
-4. Datensatz-Name und SHA256-Prüfsumme des Korpus.
-5. Konfigurationsprofil (z.B. `EnterpriseRegulated`, Thread-Pool-Größe, SIMD-Modus).
+### 2.2 Latenz- und Durchsatz-Metriken
+- Durchsatz: Operationen pro Sekunde (QPS).
+- Latenz-Perzentile: $p50$, $p90$, $p99$, $p99.9$ unter konstanter und variierender Thread-Last.
 
 ---
 
-## 5. Invarianten
+## 3. `Cargo.toml` Spezifikation
 
-1. **`#![forbid(unsafe_code)]`:** Vollständig sicher.
-2. **Keine Rückwirkung auf den Kern:** Benchmarks dienen ausschließlich der externen Messung; kein Kern-Crate importiert `contextra-bench`.
-3. **Ratchet-Prinzip:** Baselines dürfen nur nachweislich verbessert oder bei dokumentierten Architektur-Upgrades aktualisiert werden.
+```toml
+[package]
+name = "contextra-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+default-run = "contextra-bench"
+description = "Reproducible benchmark harness and regression gates for Contextra"
+
+[lints]
+workspace = true
+
+[package.metadata.contextra]
+ring = "tooling"
+level = 3
+
+[dependencies]
+contextra-types = { workspace = true }
+contextra-db = { workspace = true }
+contextra-store = { workspace = true }
+contextra-vector = { workspace = true }
+contextra-text = { workspace = true }
+contextra-rank = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+hdrhistogram = "7"
+rand = { workspace = true }
+anyhow = "1"
+
+[dev-dependencies]
+criterion = { workspace = true }
+redb = "2"
+
+[features]
+default = []
+datasets = []
+external-benchmarks = []
+```
+
+---
+
+## 4. Implementierungs-Arbeitspakete für Entwickler
+
+1. **AP-14a & AP-14b (`src/main.rs`):**
+   - Veraltete Bezüge auf `contextra_infer_onnx` und `contextra_infer_candle` bereinigen.
+2. **Baselines auditieren:**
+   - Sicherstellen, dass Regression-Gate-Schwellenwerte mit den konsolidierten 23 Crates harmonieren.
+3. **Verifikation:**
+   - `cargo check -p contextra-bench`

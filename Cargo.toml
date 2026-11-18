@@ -89,6 +89,7 @@ crc32fast = "1.3"
 
 # Concurrency
 rand = "0.8"
+zeroize = { version = "1.8", features = ["derive"] }
 
 # Observability
 tracing = "0.1"

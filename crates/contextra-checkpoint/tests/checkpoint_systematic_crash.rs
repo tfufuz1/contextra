@@ -130,13 +130,12 @@ impl<S: SnapshotSource> SnapshotSource for FaultInjectingStorage<S> {
         self.inner.scan_prefix(prefix)
     }
 }
-}
 
 // Testet: systematic crash at every checkpoint io point via fault-injected storage.
 #[tokio::test]
 async fn systematic_crash_at_every_checkpoint_io_point() {
     for crash_mode in 0..4 {
-        let mem = Arc::new(InMemoryStorageEngine::new());
+        let mem = Arc::new(InMemorySnapshotSource::new());
         let fault_storage = Arc::new(FaultInjectingStorage::new(mem.clone()));
 
         // Put initial test data in storage

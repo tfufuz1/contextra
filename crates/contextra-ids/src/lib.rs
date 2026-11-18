@@ -10,6 +10,7 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::mem::{align_of, size_of};
 use thiserror::Error;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Bit width of `DocId` and associated identifiers in the current build.
 pub const ID_WIDTH_BITS: u32 = if cfg!(feature = "docid-128") { 128 } else { 64 };
@@ -66,6 +67,9 @@ pub enum IdError {
     /// Internal TxId allocation overflow.
     #[error("Internal TxId allocation offset {0} overflows u64::MAX")]
     TxIdAllocationOverflow(u64),
+    /// Entropy source failure when generating secure random identifiers.
+    #[error("Entropy exhaustion during secure random generation: {0}")]
+    EntropyExhaustion(String),
 }
 
 /// Result alias for identifier operations.
@@ -640,12 +644,183 @@ macro_rules! define_ref_newtype {
 
 define_ref_newtype!(TenantRef, "Mandanten-Referenz (SPEC 7.3).");
 define_ref_newtype!(CollectionRef, "Collection-Referenz (SPEC 7.3).");
-define_ref_newtype!(SubjectRef, "Betroffenen-Referenz (SPEC 7.2, 7.3).");
 define_ref_newtype!(OperatorRef, "Opake Betreiberkennung (SPEC 7.3).");
 define_ref_newtype!(DocKey, "Dokumentenschlüssel (SPEC 7.2).");
 
+/// 128-Bit kryptographische Betroffenen-Referenz (Art. 4 Nr. 1 DSGVO, SPEC §3.2, D-06).
+///
+/// Invarianten:
+/// - Kein `Clone`: Verhindert unkontrollierte Duplizierung im RAM.
+/// - `ZeroizeOnDrop`: Speicherabbild wird beim Drop genullt (HKDF-Schlüsselmaterial-Schutz).
+/// - Fehlbare Erzeugung: Ausschließlich über `OsRng::try_fill_bytes`.
+/// - Geschwärztes Display & Debug: Verhindert PII-Tracking in Traces/Logs (INV-12).
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Zeroize, ZeroizeOnDrop, Serialize, Deserialize)]
+pub struct SubjectRef(pub [u8; 16]);
+
+impl SubjectRef {
+    /// Erzeugt ein neues kryptographisch zufälliges `SubjectRef` über den OS-CSPRNG.
+    pub fn generate() -> Result<Self> {
+        use rand::RngCore;
+        let mut bytes = [0u8; 16];
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut bytes)
+            .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
+        Ok(Self(bytes))
+    }
+
+    /// Konstruiert `SubjectRef` aus rohen 16 Bytes (nur für autorisierte Deserialisierer/Layer).
+    #[inline]
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Liefert die 16 Bytes als geschützte Referenz.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SubjectRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SubjectRef([REDACTED])")
+    }
+}
+
+impl fmt::Display for SubjectRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SubjectRef([REDACTED])")
+    }
+}
+
+/// 128-Bit Zufalls-Referenz auf P-Daten innerhalb von Klasse-K-Dokumenten (SPEC §3.2, D-06).
+///
+/// Wird bei Löschung des Betroffenen zum toten Zeiger (Dangling Reference),
+/// ohne dass das umgebende K-Dokument umgeschrieben werden muss.
+/// Kein `Clone`.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct PersonalRef(pub [u8; 16]);
+
+impl PersonalRef {
+    /// Erzeugt ein neues zufälliges `PersonalRef`.
+    pub fn generate() -> Result<Self> {
+        use rand::RngCore;
+        let mut bytes = [0u8; 16];
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut bytes)
+            .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
+        Ok(Self(bytes))
+    }
+
+    /// Konstruiert aus 16 Bytes.
+    #[inline]
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Liefert die 16 Bytes als Slice.
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for PersonalRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PersonalRef([REDACTED])")
+    }
+}
+
+impl fmt::Display for PersonalRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PersonalRef([REDACTED])")
+    }
+}
+
+/// 128-Bit eindeutige Saga-Löschauftragskennung (SPEC §5.3, §7.4, D-01).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ErasureId(pub [u8; 16]);
+
+impl ErasureId {
+    /// Erzeugt eine neue zufällige `ErasureId`.
+    pub fn generate() -> Result<Self> {
+        use rand::RngCore;
+        let mut bytes = [0u8; 16];
+        rand::rngs::OsRng
+            .try_fill_bytes(&mut bytes)
+            .map_err(|e| IdError::EntropyExhaustion(e.to_string()))?;
+        Ok(Self(bytes))
+    }
+
+    /// Konstruiert aus 16 Bytes.
+    pub const fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Liefert die 16 Bytes als Slice.
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for ErasureId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ErasureId({:02x}{:02x}{:02x}{:02x}..)",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
+    }
+}
+
+impl fmt::Display for ErasureId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
+
+/// 128-Bit Kennung für ReadGate-Sperreinträge (SPEC §6, D-01).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct GateId(pub [u8; 16]);
+
+impl GateId {
+    /// Konstruiert aus 16 Bytes.
+    pub const fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Liefert die 16 Bytes als Slice.
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for GateId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "GateId({:02x}{:02x}{:02x}{:02x}..)",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
+    }
+}
+
+impl fmt::Display for GateId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for b in &self.0 {
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
+
 /// Eindeutige Dokumentenadresse: Betroffener ist unveränderlicher Teil der Identität (SPEC 7.2, D-70).
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
 pub struct DocRef {
     /// Optionaler Betroffener (Subject).
     pub subject: Option<SubjectRef>,

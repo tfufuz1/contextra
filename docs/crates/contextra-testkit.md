@@ -1,20 +1,30 @@
-# contextra-testkit — Crate-Spezifikation (Test-Infrastruktur & Simulatoren)
+# contextra-testkit — Implementierungsspezifikation (Soll-Zustand)
 
 **Ebene:** E3 (Endpunkte / Testwerkzeuge)  
-**Status:** Normativ  
-**Version:** 1.0  
+**Kern-Closure:** `ports`, `types`, `ids`, `env`, `erasure`  
+**Status:** Normativ (Soll-Zustand für Entwickler)  
+**Version:** 2.0  
 **Geltungsbereich:** `crates/contextra-testkit`  
-**Referenz:** `docs/SPEC.md` §2, §12
+**Referenzdokumente:** `docs/SPEC.md` §2, §12 (Testkatalog); `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
 
 ---
 
-## 1. Zweck & Systemrolle
+## 1. Zweck & Architekturgarantien
 
-`contextra-testkit` stellt die gemeinsame Testinfrastruktur, Mock-Objekte, Invarianten-Prüfer und Fehlersimulatoren für den gesamten Contextra-Workspace bereit:
-- **Fehlersimulatoren (Fault Injection):** Gezielte Simulation von I/O-Fehlern, Dateisystem-Voll-Zuständen (`DiskReserve`), Systemabstürzen mitten im Two-Phase-Commit (2PC) und asynchronen Task-Cancellations (Cancel-Safety).
-- **Löschketten-Orakel & Positivkontrollen:** Bereitstellung von Canary-Generatoren und deterministischen Scannern zur Validierung der DSGVO-Löschkette (T-DEL-1 bis T-DEL-13).
-- **Synthetische Korpus-Generatoren:** Erzeugung von reproduzierbaren Dokumenten, Vektoren und Wissensgraphen mit annotierter Ground-Truth für deterministische Differenztests.
-- **Loom- & Concurrency-Harness:** Unterstützung für Concurrency- und Race-Condition-Tests.
+`contextra-testkit` stellt die gemeinsame Testinfrastruktur, In-Memory-Testdoppel, Fehlersimulatoren und Konformitätssuiten für das Contextra-System bereit:
+- **In-Memory Port-Testdoppel:** Schnelle RAM-Implementierungen aller Port-Traits (`InMemoryStore`, `InMemoryVector`, `InMemoryText`, `InMemoryGraph`).
+- **Fehlersimulatoren (Fault Injection):** Gezielte Injektion von I/O-Fehlern, Disk-Voll-Zuständen (`DiskReserveLow`) und Handle-Poisoning zur Verifikation von Crash-Konsistenz.
+- **Canary-Orakel & Positivkontrolle (T-DEL-7):** Erzeugung kryptographisch eindeutiger Canaries zur Kalibrierung des `Scanner<Armed>` im DSGVO-Testkatalog (T-DEL-1 bis T-DEL-13).
+- **Deterministische Korpora:** Reproduzierbare synthetische Dokumente und Vektoren für Regressions- und Differenzialtests.
+
+### Beseitigung von Altlasten & Richtlinien (R2, R3, AP-21)
+1. **R2-Abhängigkeitsregel:** `contextra-testkit` ist eine reine E3-Komponente. Kern-Crates der Ebenen E0 und E1 dürfen `contextra-testkit` **weder in dependencies noch in dev-dependencies** einbinden.
+2. **Leere Default-Features (R3):** `default = []` (Entfernung von `default = ["testkit", "erasure-conformance"]`).
+3. **Altlasten-Bereinigung (`AP-21`):** In `src/lib.rs` (Z. 27–28) und `src/conformance/routing_ports.rs` werden alle Referenzen auf `contextra-agent`, `contextra-cognition` und `contextra-router` gelöscht.
+
+### Architekturgarantien (R1–R6, INV-3, INV-4)
+1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
+2. **Zero-Panic-Policy:** Test-Frameworks und Mocks schlagen kontrolliert mit Fehlern fehl; keine unkontrollierten Panics in Helfern.
 
 ---
 
@@ -26,58 +36,117 @@
 │                                                             │
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │                 FaultInjectionEngine                │   │
-│   │   ├── CorruptingVfs (simuliert Dateikorruption)     │   │
-│   │   ├── FailingFsync (simuliert Stromausfall)         │   │
-│   │   └── Interrupted2PC (bricht nach Phase 1 ab)       │   │
+│   │   ├── FaultVfs (simuliert Dateisystem-Fehler)       │   │
+│   │   └── PoisonSimulator (triggert INV-FSYNC-1)        │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │                 InMemoryTestDoubles                 │   │
+│   │   ├── InMemoryStorageEngine                         │   │
+│   │   ├── InMemoryVectorIndex                           │   │
+│   │   ├── InMemoryTextIndex                             │   │
+│   │   └── InMemoryGraph                                 │   │
 │   └─────────────────────────────────────────────────────┘   │
 │                                                             │
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │                ErasureTestingHarness                │   │
-│   │   ├── CanaryOracle (injiziert Byte-Muster)          │   │
-│   │   ├── PositivControlCalibrator                      │   │
-│   │   └── ResidueScanner (prüft Festplatte auf 0 Reste) │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                 SyntheticCorpusKit                  │   │
-│   │   ├── DeterministicVectorGenerator (Fixed Seed)     │   │
-│   │   ├── GermanCorpusSynthesizer (Morphology-Test)     │   │
-│   │   └── GroundTruthGraphBuilder                       │   │
+│   │   ├── CanaryGenerator (T-DEL-1 bis T-DEL-13)        │   │
+│   │   └── PositiveControlArming (Scanner<Armed>)        │   │
 │   └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Test-Utilities für die DSGVO-Löschkette
+## 3. Test-Harness für die Löschkette (T-DEL-1 bis T-DEL-13)
 
-`contextra-testkit` liefert die standardisierten Test fixtures zur Verifikation der Klassen K, P, D und E:
-
-### 3.1 `CanaryOracle`
-Injiziert ein kryptographisch eindeutiges Byte-Muster über die reguläre Schreib-API:
 ```rust
-pub struct CanaryOracle {
-    pattern: [u8; 32],
+use std::path::Path;
+
+pub struct CanaryPattern {
+    pub bytes: [u8; 32],
 }
 
-impl CanaryOracle {
-    pub fn new_random() -> Self;
-    pub fn as_bytes(&self) -> &[u8];
-    /// Prüft alle Dateien eines Verzeichnisses rekursiv auf Vorkommen des Musters.
-    pub fn scan_directory(&self, dir: &Path) -> Result<ScanReport, std::io::Error>;
+impl CanaryPattern {
+    pub fn generate() -> Self {
+        use rand::RngCore;
+        let mut b = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut b);
+        Self { bytes: b }
+    }
+}
+
+pub struct CanaryScanner;
+
+impl CanaryScanner {
+    /// Scannt ein Dateisystem-Verzeichnis rekursiv nach dem Canary-Muster.
+    /// Liefert die Anzahl gefundener Vorkommen im Klartext.
+    pub fn scan_dir(dir: &Path, canary: &CanaryPattern) -> Result<u64, std::io::Error> {
+        let mut count = 0;
+        for entry in walkdir::WalkDir::new(dir) {
+            let entry = entry?;
+            if entry.file_type().is_file() {
+                let data = std::fs::read(entry.path())?;
+                if data.windows(32).any(|w| w == canary.bytes) {
+                    count += 1;
+                }
+            }
+        }
+        Ok(count)
+    }
 }
 ```
 
-### 3.2 Positivkontrolle (T-DEL-7)
-Ein Negativtest (keine Funde im Speicher) ist nur gültig, wenn der Scanner nachweislich funktioniert:
-1. Der `PositivControlCalibrator` erzeugt eine synthetische Testdatei mit eingebettetem Canary.
-2. Der Scanner scannt die Datei und **muss** das Muster finden.
-3. Erst wenn die Positivkontrolle bestanden ist, wird der `Scanner<Armed>`-Typ freigeschaltet, der als Beweis in `ErasureLayer::witness` übergeben werden darf.
+---
+
+## 4. `Cargo.toml` Spezifikation
+
+```toml
+[package]
+name = "contextra-testkit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Deterministic test utilities, in-memory port doubles, and fault injection for Contextra"
+
+[lints]
+workspace = true
+
+[package.metadata.contextra]
+ring = "tooling"
+level = 3
+
+[dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+walkdir = "2.4"
+rand = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+tempfile = { workspace = true }
+
+[features]
+default = []
+testkit = []
+erasure-conformance = []
+```
 
 ---
 
-## 4. Richtlinien für Abhängigkeiten (R1 / R2)
+## 5. Implementierungs-Arbeitspakete für Entwickler
 
-1. **Reine Test-Bibliothek:** `contextra-testkit` darf NIEMALS in der `[dependencies]`-Sektion eines Kern-Crates (E0 bis E2) stehen.
-2. **Dev-Dependencies:** Ausschließlich unter `[dev-dependencies]` für Integrationstests in `tests/` erlaubt.
-3. **`#![forbid(unsafe_code)]`:** Alle Simulatoren und Testwerkzeuge sind speichersicher implementiert.
+1. **`Cargo.toml` Bereinigung:**
+   - Default-Features leeren (`default = []`, R3).
+2. **Altlasten-Bereinigung (`AP-21`):**
+   - In `src/lib.rs` (Z. 27–28) Referenzen auf `contextra-agent` und `contextra-cognition` entfernen.
+   - In `src/conformance/routing_ports.rs` Bezüge zu `contextra-router` bereinigen.
+3. **Verifikation:**
+   - `cargo test -p contextra-testkit`

@@ -7,7 +7,7 @@ Detailed diagnostic of unsafe boundaries across the Rust workspace:
 - Checks whether an explicit `// SAFETY:` explanation accompanies each `unsafe` usage.
 - Traces raw pointer operations (`*const`, `*mut`, `as_ptr`, `from_raw_parts`).
 - Traces foreign function interface (FFI) bindings (`extern "C"`, libc calls).
-- Enforces Unsafe Island governance (only `contextra-simd`, `contextra-sys`, `contextra-wire`
+- Enforces Unsafe Island governance (only `contextra-simd`, `contextra-sys`
   may contain unsafe; all other crates must enforce `#![forbid(unsafe_code)]`).
 """
 

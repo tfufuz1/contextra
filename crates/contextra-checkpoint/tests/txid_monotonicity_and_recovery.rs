@@ -101,7 +101,6 @@ impl SnapshotSource for MockPersistentStorage {
         })
     }
 }
-}
 
 /// Test 1: Monotonicity across simulated process restarts.
 /// Store is populated with several `allocate_tx()` calls and checkpoints.

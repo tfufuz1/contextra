@@ -101,7 +101,6 @@ impl SnapshotSource for MockStorage {
         })
     }
 }
-}
 
 // Testet: test concurrent checkpoint creation same name.
 #[tokio::test]

@@ -1,20 +1,21 @@
-//! Eigenständiges Beispiel für `contextra-checkpoint` auf `InMemoryStorageEngine`.
+//! Eigenständiges Beispiel für `contextra-checkpoint` auf `InMemorySnapshotSource`.
 //!
 //! Demonstriert die Erstellung, Abfrage und Wiederherstellung eines Checkpoints
 //! ohne Abhängigkeit zu `contextra-store`.
 
+use contextra_checkpoint::contract::InMemorySnapshotSource;
 use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_testkit::InMemoryStorageEngine;
+use contextra_ids::TxId;
 use serde_json::json;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let storage = Arc::new(InMemorySnapshotSource::new());
     let store = PersistentCheckpointStore::open(storage, "demo_namespace").await?;
 
     // Checkpoint mit Ziel-Tx erzeugen
-    let tx = contextra_types::TxId::new(contextra_types::TxId::INTERNAL_BASE + 100);
+    let tx = TxId::new(TxId::INTERNAL_BASE + 100);
     let cp_meta = store
         .create_checkpoint(
             "demo_cp",

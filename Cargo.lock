@@ -558,9 +558,11 @@ dependencies = [
  "bincode",
  "blake3",
  "hex",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
