@@ -146,7 +146,7 @@ fn test_t_class_1_unrecorded_layer_marked_not_recorded() {
         contextra_erasure::types_local::MeasureClass::Mk1,
         1,
     )
-    .arm(contextra_erasure::types_local::ControlEvidence::observed())
+    .arm(contextra_erasure::measure::prove_positive_control(b"CANARY", &[b"xxCANARYxx"]).expect("positive control"))
     .finish(0, std::time::Duration::from_millis(5), [0u8; 32])
     .expect("witness");
 

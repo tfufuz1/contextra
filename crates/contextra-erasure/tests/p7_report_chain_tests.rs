@@ -18,7 +18,7 @@ use std::time::Duration;
 
 fn make_valid_witness(layer_byte: u8, method_id: u16, hash_byte: u8) -> LayerWitness {
     Scanner::new(LayerId::new([layer_byte; 16]), MeasureClass::Mk1, method_id)
-        .arm(ControlEvidence::observed())
+        .arm(contextra_erasure::measure::prove_positive_control(b"CANARY", &[b"xxCANARYxx"]).expect("positive control"))
         .finish(0, Duration::from_micros(10_000), [hash_byte; 32])
         .expect("witness must be created successfully")
 }
@@ -119,11 +119,11 @@ fn tamper_removed_reordered_modified_witness_rejected() {
 fn canonical_form_is_deterministic() {
     let erasure_id = ErasureId::new([0x42; 16]);
     let w1 = Scanner::new(LayerId::new([1; 16]), MeasureClass::Mk1, 1)
-        .arm(ControlEvidence::observed())
+        .arm(contextra_erasure::measure::prove_positive_control(b"CANARY", &[b"xxCANARYxx"]).expect("positive control"))
         .finish(0, Duration::from_micros(10_000), [0xaa; 32])
         .expect("witness 1");
     let w2 = Scanner::new(LayerId::new([2; 16]), MeasureClass::Mk2, 2)
-        .arm(ControlEvidence::observed())
+        .arm(contextra_erasure::measure::prove_positive_control(b"CANARY", &[b"xxCANARYxx"]).expect("positive control"))
         .finish(0, Duration::from_micros(20_000), [0xbb; 32])
         .expect("witness 2");
 

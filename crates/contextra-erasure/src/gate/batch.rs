@@ -193,25 +193,16 @@ impl GateBatchCoordinator {
     }
 }
 
-// Globaler In-Memory Default-Zustand für freistehenden Aufruf von `add_batch` (Rückwärtskompatibilität / Tests)
-static GLOBAL_GATE_SET: parking_lot::RwLock<Option<Arc<RwLock<ErasedSet>>>> =
-    parking_lot::RwLock::new(None);
-
-/// Initialisiert oder bindet das globale ErasedSet für freistehende `add_batch`-Aufrufe.
-pub fn bind_global_erased_set(set: Arc<RwLock<ErasedSet>>) {
-    let mut guard = GLOBAL_GATE_SET.write();
-    *guard = Some(set);
-}
-
 /// Freistehende `add_batch`-Funktion (SPEC §11.3, D-57, D-78).
 ///
 /// Fügt Gate-Anfragen im Batch mit atomarer Inkrementierung von `gate_epoch` und
 /// Aktualisierung des gebundenen `ErasedSet` hinzu.
 pub fn add_batch(
+    set_arc: &RwLock<ErasedSet>,
     requests: Vec<BatchGateRequest>,
     current_seq: Seq,
 ) -> Result<BatchGateOutcome, ErasureError> {
-    if let Some(set_arc) = GLOBAL_GATE_SET.read().as_ref() {
+    {
         let mut set = set_arc.write();
         set.increment_epoch();
         for req in &requests {

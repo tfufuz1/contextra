@@ -139,3 +139,23 @@ impl MeasurementCoordinator {
         Self { _private: () }
     }
 }
+
+/// Einziger öffentlicher Weg zu `ControlEvidence` (E-7, INV-WITNESS-MINT-1).
+///
+/// Gelingt nur, wenn das Kontrollmuster (`canary`) in mindestens einem der
+/// Positivkontroll-Fundorte (`found_in`) tatsächlich gefunden wurde.
+/// Ohne Fund wird die Messung als ungültig abgelehnt.
+pub fn prove_positive_control(
+    canary: &[u8],
+    found_in: &[&[u8]],
+) -> Result<crate::types_local::ControlEvidence, crate::error::ErasureError> {
+    if canary.is_empty() {
+        return Err(crate::error::ErasureError::IntegrityViolation);
+    }
+    let found = found_in.iter().any(|hay| hay.windows(canary.len()).any(|w| w == canary));
+    if found {
+        Ok(crate::types_local::ControlEvidence::observed())
+    } else {
+        Err(crate::error::ErasureError::IntegrityViolation)
+    }
+}

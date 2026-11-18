@@ -464,7 +464,7 @@ pub struct ControlEvidence(());
 impl ControlEvidence {
     /// Bezeugt das Auffinden des Kontrollmusters (nur in autorisierten Modulen aufgerufen).
     #[inline]
-    pub const fn observed() -> Self {
+    pub(crate) const fn observed() -> Self {
         Self(())
     }
 }

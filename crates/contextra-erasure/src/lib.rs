@@ -42,3 +42,5 @@ pub mod kv_shredding;
 pub mod orchestrator;
 #[cfg(feature = "signing")]
 pub mod revocation_log;
+
+pub use gate::saga_gate::{GateDecision, RangeGate, ReadGate, SagaGate};

@@ -19,21 +19,7 @@ use std::time::Duration;
 // Identifikatoren & Sequenzen
 // =========================================================================
 
-/// 16-Byte Lösch-Identifikator (SPEC §7.4, TY-09).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct ErasureId(pub [u8; 16]);
 
-impl ErasureId {
-    /// Erzeugt eine `ErasureId` aus rohen 16 Bytes.
-    pub const fn new(bytes: [u8; 16]) -> Self {
-        Self(bytes)
-    }
-
-    /// Liefert die 16 Bytes als Slice.
-    pub const fn as_bytes(&self) -> &[u8; 16] {
-        &self.0
-    }
-}
 
 impl AsRef<[u8]> for KeyBuf {
     fn as_ref(&self) -> &[u8] {
@@ -41,66 +27,11 @@ impl AsRef<[u8]> for KeyBuf {
     }
 }
 
-impl fmt::Debug for ErasureId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "ErasureId({:02x}{:02x}{:02x}{:02x}..)",
-            self.0[0], self.0[1], self.0[2], self.0[3]
-        )
-    }
-}
 
-impl fmt::Display for ErasureId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for b in &self.0 {
-            write!(f, "{:02x}", b)?;
-        }
-        Ok(())
-    }
-}
 
-/// Streng monoton steigende Sequenznummer (SPEC §8.7, I-12).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Seq(pub u64);
 
-impl Seq {
-    /// Erzeugt eine neue Sequenznummer.
-    pub const fn new(val: u64) -> Self {
-        Self(val)
-    }
 
-    /// Liefert den numerischen Wert als u64.
-    pub const fn as_u64(&self) -> u64 {
-        self.0
-    }
-}
 
-/// Diskreter Zeitstempel in Mikrosekunden oder Millisekunden seit Epoche.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Timestamp(pub u64);
-
-impl Timestamp {
-    /// Erzeugt einen neuen Zeitstempel.
-    pub const fn new(val: u64) -> Self {
-        Self(val)
-    }
-
-    /// Erzeugt Zeitstempel aus Mikrosekunden.
-    pub const fn from_micros(micros: u64) -> Self {
-        Self(micros)
-    }
-
-    /// Liefert den numerischen Wert.
-    pub const fn as_u64(&self) -> u64 {
-        self.0
-    }
-
-    /// Liefert Mikrosekunden.
-    pub const fn as_micros(&self) -> u64 {
-        self.0
-    }
-}
 
 /// Opake Betreiberkennung für Attestierungen (SPEC §7.3).
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -618,7 +549,7 @@ impl LedgerEntry {
         hasher.update(&prev_hash);
         hasher.update(&commitment);
         hasher.update(&gated_seq.as_u64().to_le_bytes());
-        hasher.update(&completed_at.as_u64().to_le_bytes());
+        hasher.update(&completed_at.as_micros().to_le_bytes());
         for (start, end) in range_set.ranges() {
             hasher.update(start.as_bytes());
             hasher.update(end.as_bytes());
@@ -641,7 +572,7 @@ impl LedgerEntry {
         hasher.update(prev_hash);
         hasher.update(&self.commitment);
         hasher.update(&self.gated_seq.as_u64().to_le_bytes());
-        hasher.update(&self.completed_at.as_u64().to_le_bytes());
+        hasher.update(&self.completed_at.as_micros().to_le_bytes());
         for (start, end) in self.range_set.ranges() {
             hasher.update(start.as_bytes());
             hasher.update(end.as_bytes());
@@ -736,12 +667,13 @@ pub struct Armed(pub ());
 
 /// Beleg für eine beobachtete Positivkontrolle (D-72).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct ControlEvidence(pub ());
+pub struct ControlEvidence(());
 
 impl ControlEvidence {
     /// Bezeugt das Auffinden des Kontrollmusters.
+    /// Nur crate-intern; externe Aufrufer nutzen `measure::prove_positive_control` (E-7, INV-WITNESS-MINT-1).
     #[inline]
-    pub const fn observed() -> Self {
+    pub(crate) const fn observed() -> Self {
         Self(())
     }
 }
@@ -1585,89 +1517,16 @@ pub fn open_vfs_file(
 // =========================================================================
 
 /// Mandanten-Identifikator.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
-pub struct TenantId(pub u64);
 
-impl TenantId {
-    /// Erzeugt eine neue `TenantId`.
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
 
-    /// Liefert den internen `u64`-Wert.
-    pub const fn inner(self) -> u64 {
-        self.0
-    }
-}
-
-impl fmt::Display for TenantId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TenantId({})", self.0)
-    }
-}
 
 /// Collection-Identifikator.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
-pub struct CollectionId(pub u64);
 
-impl CollectionId {
-    /// Erzeugt eine neue `CollectionId`.
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
 
-    /// Liefert den internen `u64`-Wert.
-    pub const fn inner(self) -> u64 {
-        self.0
-    }
-}
-
-impl fmt::Display for CollectionId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CollectionId({})", self.0)
-    }
-}
 
 /// Dokument-Identifikator.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
-pub struct DocId(pub u64);
 
-impl DocId {
-    /// Erzeugt eine neue `DocId`.
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
 
-    /// Liefert den internen `u64`-Wert.
-    pub const fn inner(self) -> u64 {
-        self.0
-    }
-
-    /// Erzeugt eine `DocId` aus einem Schlüssel mittels BLAKE3.
-    pub fn from_key(key: &str) -> Result<Self, crate::error::ErasureError> {
-        if key.is_empty() {
-            return Err(crate::error::ErasureError::Internal(
-                "Key cannot be empty".to_string(),
-            ));
-        }
-        let hash = blake3::hash(key.as_bytes());
-        let mut buf = [0u8; 8];
-        buf.copy_from_slice(&hash.as_bytes()[..8]);
-        Ok(Self(u64::from_le_bytes(buf)))
-    }
-}
-
-impl fmt::Display for DocId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DocId({})", self.0)
-    }
-}
 
 /// Transaktions-Identifikator.
 #[derive(
@@ -2437,3 +2296,7 @@ impl<T: ResidueScanner + ?Sized> ResidueScanner for Arc<T> {
         (**self).scan_residues(ctx, scope, target)
     }
 }
+
+
+// Identifikatoren & Sequenzen: kanonisch aus contextra-ids / contextra-env (WP-E1, E-2).
+pub use contextra_ids::{CollectionId, DocId, ErasureId, Seq, Timestamp, TenantId};

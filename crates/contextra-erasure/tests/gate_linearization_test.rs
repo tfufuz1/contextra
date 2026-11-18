@@ -12,7 +12,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_erasure::gate::batch::{
-    add_batch, bind_global_erased_set, BatchGateRequest, GateBatchCoordinator,
+    add_batch, BatchGateRequest, GateBatchCoordinator,
 };
 use contextra_erasure::gate::erased_set::ErasedSet;
 use contextra_erasure::gate::log::GateLog;
@@ -65,7 +65,6 @@ fn make_78_byte_key(prefix_byte: u8, commit_seq: u64) -> [u8; 78] {
 #[tokio::test]
 async fn t_gate_1_immediate_rejection_after_persist() {
     let set = Arc::new(RwLock::new(ErasedSet::new()));
-    bind_global_erased_set(Arc::clone(&set));
     let guard = GateGuard::new(Arc::clone(&set));
 
     let key_buf = KeyBuf::new([0x11; 16]);
@@ -80,7 +79,7 @@ async fn t_gate_1_immediate_rejection_after_persist() {
         [0xbb; 16],
     );
 
-    let outcome = add_batch(vec![req], Seq::new(42)).expect("add_batch failed");
+    let outcome = add_batch(&set, vec![req], Seq::new(42)).expect("add_batch failed");
     assert_eq!(outcome.gated_seq, Seq::new(42));
     assert!(outcome.applied_to_set, "must be applied to ErasedSet");
 

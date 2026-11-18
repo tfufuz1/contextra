@@ -5,6 +5,7 @@ pub mod erased_set;
 pub mod fence;
 pub mod log;
 pub mod read_gate;
+pub mod saga_gate;
 
 pub use erased_set::ErasedSet;
 pub use fence::{

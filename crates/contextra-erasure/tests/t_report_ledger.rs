@@ -33,7 +33,7 @@ fn t_restore_1_ledger_and_guard() {
         [0x11; 32],
         RangeSet::new(vec![(KeyBuf::new([1; 16]), KeyBuf::new([2; 16]))]),
         Seq::new(50),
-        Timestamp::new(1000),
+        Timestamp::from_micros(1000),
         [0u8; 32],
         [0x22; 32],
     );

@@ -157,7 +157,7 @@ pub fn finalize_erasure(
             params.commitment,
             range_set,
             Seq::new(params.gated_seq),
-            Timestamp::new(params.completed_at),
+            Timestamp::from_micros(params.completed_at),
             [0u8; 32],
             [0u8; 32],
         );
