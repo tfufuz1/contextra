@@ -1,4 +1,4 @@
-//! Prompt-Injection-Erkennung (Stub — contextra-prompt-guard wurde entfernt).
+//! Prompt-Injection-Erkennung (Stub).
 //!
 //! Die externen Typen werden als leere Stubs beibehalten, um die öffentliche API
 //! von `contextra-mcp` nicht zu brechen. Funktionalität ist deaktiviert.

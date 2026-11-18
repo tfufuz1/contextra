@@ -1,4 +1,4 @@
-//! Sandbox-Merge-Operator-Adapter (Stub — contextra-sandbox wurde entfernt).
+//! Merge-Operator-Adapter (Stub).
 //!
 //! Das Feature `sandbox` ist deaktiviert. Dieser Stub verhindert Kompilier-Fehler
 //! bei versehentlicher Aktivierung.

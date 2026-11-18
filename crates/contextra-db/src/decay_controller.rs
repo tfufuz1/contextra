@@ -11,7 +11,7 @@
 
 //! Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) (F-01).
 //!
-//! Adaptive Decay Controller (lokal implementiert, ehemals contextra-adapt).
+//! Adaptive Decay Controller (lokal implementiert).
 //! ADR-016: TxId-Differenz statt SystemTime (deterministisch, replay-safe).
 
 use contextra_ports::Clock;

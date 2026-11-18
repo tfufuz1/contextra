@@ -408,7 +408,7 @@ pub fn create_llm_text_generator(
     }
 }
 
-/// Router configuration settings (Stub — contextra-router wurde entfernt).
+/// Router configuration settings.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RouterConfig {
     pub profiles_path: Option<PathBuf>,

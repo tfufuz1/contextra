@@ -1,9 +1,0 @@
-[crates.contextra-vector]
-klasse = "A"
-group = "retrieval"
-level = "E1b"
-tier = "core"
-allowed_internal = ["contextra-ids", "contextra-env", "contextra-mvcc"]
-feature_closure_allowed = { mmap = ["contextra-sys"], simd = ["contextra-simd"], workspace = ["contextra-types", "contextra-ports", "contextra-sys"] }
-dev_allowed = []
-transitional = ["ports-compat"]

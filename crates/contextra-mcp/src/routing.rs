@@ -8,7 +8,6 @@ use contextra_types::ContextraError;
 use std::sync::Arc;
 
 /// Holds strong Arc references to routing and calibration components.
-/// NOTE: Router-Funktionalität wurde entfernt (contextra-router Crate nicht mehr vorhanden).
 pub struct RoutingHandle {
     pub calibrator: Arc<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
 }

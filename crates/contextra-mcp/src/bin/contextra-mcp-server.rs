@@ -59,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         contextra_mcp::is_write_allowed_by_env()
     };
 
-    // Router-Profiles-Laden entfernt (contextra-router nicht mehr vorhanden).
+    // Router-Profiles-Konfiguration laden.
     let router_config = RouterConfig::from_env();
 
     let db = Arc::new(Contextra::open(&db_path).await?);

@@ -137,8 +137,6 @@ yaml-rust2 = "0.9"
 toml = "0.8"
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
-# contextra-cluster, contextra-saos-agent wurden in Phase 0 ausgelagert, contextra-sandbox wurde entfernt. <!-- crate-ref-ignore -->
-# contextra-embed    → ONNX-Embeddings <!-- crate-ref-ignore -->
 
 # 🧊 Frozen Zone — external deps for future reactivation
 # openraft = { version = "0.9", features = ["storage-v2", "serde"] }

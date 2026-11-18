@@ -1,7 +1,0 @@
-# Schema v3 capabilities fragment for contextra-vault
-group = "safety"
-level = 1
-tier = "beta"
-allowed_internal = ["contextra-sys"]
-feature_closure_allowed = ["contextra-sys", "contextra-types"]
-dev_allowed = []

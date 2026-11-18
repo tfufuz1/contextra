@@ -44,7 +44,7 @@ pub struct EncryptedSegmentPayload {
 /// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherbereinigung.
 #[deprecated(
     since = "0.1.0",
-    note = "KV-Segment Logik wurde entfernt (contextra-kvcache nicht mehr im Workspace, ADR-PROPOSAL-crypto-kv-segment, E-04)."
+    note = "KV-Segment Logik ist veraltet und wird nicht mehr verwendet."
 )]
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
