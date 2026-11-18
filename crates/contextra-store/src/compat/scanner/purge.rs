@@ -67,7 +67,13 @@ impl Purger for LsmPurger {
             let mut sst_files_to_purge = Vec::new();
 
             for reader in &readers {
-                let entries = reader.iter().await.unwrap_or_default();
+                let entries = reader.iter().await.map_err(|e| {
+                    ContextraError::Storage(format!(
+                        "Purge: SSTable {} nicht lesbar: {e}",
+                        reader.file_path().display()
+                    ))
+                })?;
+                let total_entries = entries.len();
                 let mut retained = Vec::new();
 
                 for (k, v, seq) in entries {
@@ -78,7 +84,7 @@ impl Purger for LsmPurger {
                     }
                 }
 
-                if retained.len() == reader.iter().await.unwrap_or_default().len() {
+                if retained.len() == total_entries {
                     // Keine Target-Einträge in dieser SSTable -> behalten
                     new_readers.push(Arc::clone(reader));
                 } else if retained.is_empty() {
@@ -88,26 +94,43 @@ impl Purger for LsmPurger {
                     // Datei filtern und neu schreiben
                     let old_path = reader.file_path();
                     let new_path = old_path.with_extension("purged.sst");
-                    if let Ok(mut builder) =
-                        SstableBuilder::create_with_vfs(&new_path, None, self.storage.vfs().clone())
-                            .await
-                    {
-                        for (rk, rv, rseq) in retained {
-                            let _ = builder.add(&rk, &rv, rseq, 1).await;
-                        }
-                        if builder.finish().await.is_ok() {
-                            if let Ok(new_reader) = SstableReader::open_with_key_manager(
-                                &new_path,
-                                block_cache.clone(),
-                                None,
-                            )
-                            .await
-                            {
-                                new_readers.push(Arc::new(new_reader));
-                                sst_files_to_purge.push(old_path.to_path_buf());
-                            }
-                        }
+                    let mut builder = SstableBuilder::create_with_vfs(
+                        &new_path,
+                        storage.key_manager(),
+                        storage.vfs().clone(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        ContextraError::Storage(format!(
+                            "Purge: Builder {} nicht erstellbar: {e}",
+                            new_path.display()
+                        ))
+                    })?;
+                    for (rk, rv, rseq) in retained {
+                        builder.add(&rk, &rv, rseq, 1).await.map_err(|e| {
+                            ContextraError::Storage(format!("Purge: Schreibfehler: {e}"))
+                        })?;
                     }
+                    builder.finish().await.map_err(|e| {
+                        ContextraError::Storage(format!(
+                            "Purge: Finalisierung {} fehlgeschlagen: {e}",
+                            new_path.display()
+                        ))
+                    })?;
+                    let new_reader = SstableReader::open_with_key_manager(
+                        &new_path,
+                        block_cache.clone(),
+                        storage.key_manager(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        ContextraError::Storage(format!(
+                            "Purge: Oeffnen {} fehlgeschlagen: {e}",
+                            new_path.display()
+                        ))
+                    })?;
+                    new_readers.push(Arc::new(new_reader));
+                    sst_files_to_purge.push(old_path.to_path_buf());
                 }
             }
 
@@ -138,15 +161,17 @@ impl Purger for LsmPurger {
             }
 
             for old_path in sst_files_to_purge {
-                if let Ok(metadata) = tokio::fs::metadata(&old_path).await {
-                    let len = metadata.len();
-                    let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
-                    let _ = tokio::fs::write(&old_path, zeros).await;
-                    if tokio::fs::remove_file(&old_path).await.is_ok() {
-                        bytes_freed += len;
-                    }
-                }
+                let len = match tokio::fs::metadata(&old_path).await {
+                    Ok(m) => m.len(),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(e) => return Err(ContextraError::Io(e)),
+                };
+                zero_and_unlink(&old_path, len).await?;
+                bytes_freed += len;
             }
+            vfs.sync_dir(data_dir).map_err(|e| {
+                ContextraError::Storage(format!("Purge: Dir-Fsync nach SST-Unlink: {e}"))
+            })?;
 
             // 4. WAL-Segmente filtern / bereinigen
             let mut wal_files = Vec::new();
@@ -215,13 +240,7 @@ impl Purger for LsmPurger {
                             .await
                             .map_err(ContextraError::Io)?;
                         let len = metadata.len();
-                        let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
-                        tokio::fs::write(&wal_path, &zeros)
-                            .await
-                            .map_err(ContextraError::Io)?;
-                        tokio::fs::remove_file(&wal_path)
-                            .await
-                            .map_err(ContextraError::Io)?;
+                        zero_and_unlink(&wal_path, len).await?;
                         bytes_freed += len;
                     } else {
                         // WAL neu schreiben ohne Target-Records
@@ -268,16 +287,18 @@ impl Purger for LsmPurger {
                             .await
                             .map_err(ContextraError::Io)?;
 
-                        if let Ok(metadata) = tokio::fs::metadata(&trash_wal_path).await {
-                            let len = metadata.len();
-                            let zeros = vec![0u8; usize::try_from(len).unwrap_or(0)];
-                            let _ = tokio::fs::write(&trash_wal_path, &zeros).await;
-                            let _ = tokio::fs::remove_file(&trash_wal_path).await;
-                            bytes_freed += len.saturating_sub(file_bytes.len() as u64);
-                        }
+                        let metadata = tokio::fs::metadata(&trash_wal_path)
+                            .await
+                            .map_err(ContextraError::Io)?;
+                        let len = metadata.len();
+                        zero_and_unlink(&trash_wal_path, len).await?;
+                        bytes_freed += len.saturating_sub(file_bytes.len() as u64);
                     }
                 }
             }
+            vfs.sync_dir(data_dir).map_err(|e| {
+                ContextraError::Storage(format!("Purge: Dir-Fsync nach WAL-Bereinigung: {e}"))
+            })?;
 
             Ok::<(), ContextraError>(())
         })?;
@@ -287,4 +308,27 @@ impl Purger for LsmPurger {
             bytes_freed,
         })
     }
+}
+
+/// Ueberschreibt `path` in Chunks mit Nullen, fsynct und entfernt die Datei.
+///
+/// Kein Fehler wird unterdrueckt; der Aufrufer fsynct das Verzeichnis.
+async fn zero_and_unlink(path: &std::path::Path, len: u64) -> Result<()> {
+    use tokio::io::AsyncWriteExt;
+    const CHUNK: usize = 1 << 20;
+    let zeros = vec![0u8; CHUNK];
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .await
+        .map_err(ContextraError::Io)?;
+    let mut remaining = len;
+    while remaining > 0 {
+        let n = usize::try_from(remaining).map_or(CHUNK, |r| r.min(CHUNK));
+        file.write_all(&zeros[..n]).await.map_err(ContextraError::Io)?;
+        remaining -= n as u64;
+    }
+    file.sync_all().await.map_err(ContextraError::Io)?;
+    drop(file);
+    tokio::fs::remove_file(path).await.map_err(ContextraError::Io)
 }

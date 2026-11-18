@@ -349,7 +349,7 @@ Mindestens 1 GB Plattenreserve muss vorhanden sein (`check_disk_reserve`).
 | a | Snapshot-Widerruf | `contextra-mvcc` | Snapshots bis `gated_seq` invalidieren |
 | b | Text-Rewrite | `contextra-text` | Inverted-Index-Segmente ohne gelöschte DocIds neuschreiben |
 | c | WAL-Drain | `contextra-store` | WAL flushen, aktiven MemTable immutable machen |
-| d | SSTable-Rewrite | `contextra-store` | Kompaktions-Rewrite ohne gelöschte Keys; alte Dateien via `scrub_file` nullen |
+| d | SSTable-Rewrite | `contextra-store` | Kompaktions-Rewrite ohne gelöschte Keys; alte Dateien via `scrub_if_safe` nullen |
 | e | Vektor-Reparatur | `contextra-vector` | HNSW-Knoten entfernen, Nachbarknoten neu vernetzen, Slots nullen |
 | f | Graph-Bereinigung | `contextra-graph` | Entitäten und Kanten des Ziels entfernen |
 | g | Slot-Bereinigung | `contextra-crypto` | Residuale Datei-Schlüssel nullen |

@@ -86,7 +86,7 @@ Unter exklusivem Halt der `PurgeBarrier`:
 2. **Kompaktions-Filter:** Beim Zusammenführen der SSTables filtert der `CompactionFilter` alle Einträge aus, deren Schlüssel im `ReadGate` als `Erased` gemeldet sind.
 3. **Schreiben neuer SSTables:** Neue SSTables enthalten weder Daten noch Tombstones der gelöschten Entitäten.
 4. **Manifest-Update:** Atomare Aktualisierung des Manifests via `write_atomic` und Directory-Sync.
-5. **Scrubbing (`contextra-durable-fs`):** Alte, ersetzte SSTable-Dateien werden vor dem Unlink physisch mit Nullen überschrieben (`scrub_file`).
+5. **Scrubbing (`contextra-durable-fs`):** Alte, ersetzte SSTable-Dateien werden vor dem Unlink physisch mit Nullen überschrieben (`scrub_if_safe`).
 
 ---
 
@@ -199,6 +199,6 @@ cache = []
 2. **Altlasten-Bereinigung (`AP-21`):**
    - In `src/lib.rs` (Z. 26) und `src/compaction/merge_operator.rs` (Z. 11) alle Referenzen auf `contextra-agent` und `contextra-sandbox` entfernen.
 3. **Schritte 4c & 4d Härtung:**
-   - WAL-Drain und SSTable-Rewrite fest an `contextra-durable-fs::scrub_file` koppeln.
+   - WAL-Drain und SSTable-Rewrite fest an `contextra-durable-fs::scrub_if_safe` koppeln.
 4. **Verifikation:**
    - `cargo test -p contextra-store`

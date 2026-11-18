@@ -402,6 +402,11 @@ impl LsmStorage {
         self.sstables.read().await.clone()
     }
 
+    /// Liefert den Key-Manager (Purge muss Neuschreibungen mit demselben Schluessel ablegen, T-DEL-1).
+    pub(crate) fn key_manager(&self) -> Option<Arc<KeyManager>> {
+        self.key_manager.clone()
+    }
+
     /// Returns the data directory path.
     pub fn data_path(&self) -> &std::path::Path {
         &self.config.path
