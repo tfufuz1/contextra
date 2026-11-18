@@ -325,7 +325,12 @@ async fn zero_and_unlink(path: &std::path::Path, len: u64) -> Result<()> {
     let mut remaining = len;
     while remaining > 0 {
         let n = usize::try_from(remaining).map_or(CHUNK, |r| r.min(CHUNK));
-        file.write_all(&zeros[..n]).await.map_err(ContextraError::Io)?;
+        let Some(chunk) = zeros.get(..n) else {
+            return Err(ContextraError::Storage(
+                "Purge: interner Chunk-Fehler beim Nullen".to_string(),
+            ));
+        };
+        file.write_all(chunk).await.map_err(ContextraError::Io)?;
         remaining -= n as u64;
     }
     file.sync_all().await.map_err(ContextraError::Io)?;

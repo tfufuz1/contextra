@@ -19,13 +19,43 @@ pub const DEFAULT_REGION: u16 = 0;
 /// Standardcluster falls kein expliziter Cluster angegeben wird.
 pub const DEFAULT_CLUSTER: u32 = 0;
 
-/// Typ-Tag für Keys
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Typ-Tag für Keys.
+///
+/// Gleichheit, Ordnung und Hash folgen ausschließlich dem kodierten Byte (`to_u8`).
+/// Damit gilt `Custom(1) == Chunk` und `a < b <=> bytes(a) < bytes(b)`
+/// (Ordnungserhaltung, Roundtrip-Injektivität).
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum KeyTag {
     Chunk = 1,
     Graph = 2,
     Custom(u8) = 255,
+}
+
+impl PartialEq for KeyTag {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_u8() == other.to_u8()
+    }
+}
+
+impl Eq for KeyTag {}
+
+impl PartialOrd for KeyTag {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for KeyTag {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_u8().cmp(&other.to_u8())
+    }
+}
+
+impl std::hash::Hash for KeyTag {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.to_u8().hash(state);
+    }
 }
 
 impl From<u8> for KeyTag {
