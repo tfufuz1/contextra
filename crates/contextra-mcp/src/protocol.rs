@@ -98,8 +98,8 @@ pub struct JsonRpcError {
 pub struct JsonRpcRequest {
     pub jsonrpc: String,
     pub method: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub params: Option<serde_json::Value>,
+    #[serde(default)]
+    pub params: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<serde_json::Value>,
 }

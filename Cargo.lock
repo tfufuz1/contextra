@@ -439,7 +439,6 @@ dependencies = [
  "contextra-testkit",
  "contextra-text",
  "contextra-types",
- "contextra-vault",
  "contextra-vector",
  "criterion",
  "parking_lot 0.12.5",
@@ -785,16 +784,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "contextra-vault"
-version = "0.1.0"
-dependencies = [
- "contextra-sys",
- "thiserror",
- "tracing",
- "zeroize",
 ]
 
 [[package]]

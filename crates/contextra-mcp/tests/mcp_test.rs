@@ -980,32 +980,19 @@ async fn test_mcp_boot_with_routing_config() {
     let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
     let embedder = Arc::new(MockEmbedder { dimension: 768 });
 
-    let profile = contextra_router::SlmProfile::new(
-        "test-profile",
-        "http://localhost:11434",
-        vec![1],
-        contextra_types::TokenBudget::new(1000, 100),
-        0.5,
-    );
-
-    let router_config = contextra_mcp::RouterConfig {
-        profiles: vec![profile],
-        profiles_path: None,
-        calibration_store_path: None,
-    };
+    let router_config = contextra_mcp::RouterConfig::default();
 
     let routing = contextra_mcp::setup_routing(&db, &router_config)
         .await
         .expect("setup routing");
-    assert!(routing.is_some());
+    assert!(routing.is_none());
 
     let server = McpServer::with_write_permission(db.clone(), embedder, true)
         .expect("server new")
         .with_routing(routing);
 
     let stats = server.db.stats().await.expect("db stats");
-    assert_ne!(stats.drift_status, "nicht verfügbar");
-    assert_eq!(stats.drift_status, "unbekannt");
+    assert_eq!(stats.drift_status, "nicht verfügbar");
 }
 
 #[tokio::test]

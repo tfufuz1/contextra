@@ -18,11 +18,7 @@ allowed_internal = [
 ]
 
 [crates.contextra-engine.feature_closure_allowed]
-adaptive-candidate-pool-sizing = ["contextra-adapt"]
-onnx = ["contextra-infer-onnx"]
-sandbox = ["contextra-sandbox"]
 
 [crates.contextra-engine.dev_allowed]
-ingest = ["contextra-ingest"]
 testkit = ["contextra-testkit"]
 test = "cargo test -p contextra-engine --locked"

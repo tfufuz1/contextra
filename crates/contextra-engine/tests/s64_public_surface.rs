@@ -1,7 +1,7 @@
 //! # Konsumenten-Anker (S-64A)
 //!
 //! Reiner Compile-Time-Pin-Test, der sicherstellt, dass alle öffentlichen Re-Exporte
-//! von `contextra-engine` sowie alle Schnittstellen, die von `contextra-db` und `contextra-cognition`
+//! von `contextra-engine` sowie alle Schnittstellen, die von `contextra-db`
 //! konsumiert werden, vorhanden, unverändert typisiert und quellkompatibel bleiben.
 
 #![allow(dead_code, unused_imports)]
@@ -27,12 +27,11 @@ fn _pin_db_consumer_surface() {
         ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
     };
 
-    #[cfg(feature = "sandbox")]
     use contextra_engine::SandboxBridge;
 }
 
-// 2. Konsumenten-Pfade von contextra-cognition
-fn _pin_cognition_consumer_surface() {
+// 2. Konsumenten-Pfade für Sprachverarbeitung
+fn _pin_language_consumer_surface() {
     use contextra_engine::collection::Collection;
     use contextra_engine::Language;
     let _lang = Language::English;

@@ -16,6 +16,9 @@ pub enum GuardError {
 /// Stub-Clock.
 pub trait Clock: Send + Sync {
     fn now_iso8601(&self) -> String;
+    fn now_unix_nanos(&self) -> u64 {
+        0
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -34,8 +37,13 @@ pub struct PromptInjectionConfig {
 }
 
 /// Stub-Quarantäne-Policy.
-#[derive(Debug, Clone, Default)]
-pub struct QuarantinePolicy;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum QuarantinePolicy {
+    #[default]
+    Strict,
+    FlagOnly,
+    Escalate,
+}
 
 /// Stub-Guard (No-Op).
 #[derive(Debug, Clone, Default)]
@@ -44,6 +52,23 @@ pub struct PromptInjectionGuard;
 impl PromptInjectionGuard {
     pub fn new() -> Self {
         Self
+    }
+
+    pub fn from_env() -> Self {
+        Self
+    }
+
+    pub fn detect(&self, _text: &str) -> Option<String> {
+        None
+    }
+
+    pub fn process_result(
+        &self,
+        _doc_id: &str,
+        _collection: &str,
+        _obj: &mut serde_json::Map<String, serde_json::Value>,
+    ) -> bool {
+        false
     }
 }
 

@@ -8,13 +8,10 @@ allowed_internal = [
     "contextra",
     "contextra-types",
     "contextra-ports",
-    "contextra-wire",
     "contextra-rank",
     "contextra-crypto",
     "contextra-privacy",
-    "contextra-router",
-    "contextra-prompt-guard",
 ]
-feature_closure_allowed = { candle = ["contextra-infer-candle"], ollama = ["contextra-infer-ollama"], onnx = ["contextra-infer-onnx"] }
+feature_closure_allowed = {}
 dev_allowed = []
 test = "cargo test -p contextra-mcp --locked"

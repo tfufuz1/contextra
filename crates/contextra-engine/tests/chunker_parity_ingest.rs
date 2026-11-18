@@ -1,7 +1,7 @@
-//! # Paritäts- und Differenztest: engine::chunker vs. ingest::chunking
+//! # Paritäts- und Korpusanalyse: engine::chunker
 //!
 //! SPEC-v2: §6.3, S-61, §5.4.
-//! Vergleicht das Chunking von `contextra-engine::chunker::MarkdownChunker` mit `contextra-ingest`.
+//! Validiert das Chunking von `contextra-engine::chunker::MarkdownChunker` auf dem Korpus.
 
 #![cfg(not(loom))]
 
@@ -28,9 +28,7 @@ fn test_chunker_parity_korpus_analysis() {
             idx
         );
 
-        // Nachweis der strukturellen Divergenz:
         // contextra-engine liefert unmittelbar Flat-Text Chunks mit Spans in Metadaten.
-        // contextra-ingest chunking arbeitet intern auf DocumentIr-Knoten und CanonicalText.
         for chunk in &chunks {
             assert!(!chunk.content.is_empty());
         }

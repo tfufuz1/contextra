@@ -62,17 +62,6 @@ workspace = ["contextra-types"]
 [crates.contextra-simd.dev_allowed]
 test = "cargo test -p contextra-simd --locked"
 
-[crates.contextra-wire]
-group = "foundation"
-level = 0
-tier = "archived"
-path = "crates/contextra-wire"
-unsafe_island = true
-allowed_internal = []
-[crates.contextra-wire.feature_closure_allowed]
-[crates.contextra-wire.dev_allowed]
-test = "cargo test -p contextra-wire --locked"
-
 [crates.contextra-mvcc]
 group = "foundation"
 level = 1
@@ -199,91 +188,6 @@ workspace = ["contextra-types", "contextra-ports"]
 testkit = ["contextra-testkit"]
 test = "cargo test -p contextra-checkpoint --locked"
 
-[crates.contextra-kvcache]
-group = "llm"
-level = 1
-tier = "archived"
-path = "crates/contextra-kvcache"
-unsafe_island = false
-allowed_internal = ["contextra-env", "contextra-crypto"]
-[crates.contextra-kvcache.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-kvcache.dev_allowed]
-test = "cargo test -p contextra-kvcache --locked"
-
-[crates.contextra-router]
-group = "llm"
-level = 2
-tier = "archived"
-path = "crates/contextra-router"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports", "contextra-adapt"]
-[crates.contextra-router.feature_closure_allowed]
-subprocess-dispatch = ["contextra-wire"]
-[crates.contextra-router.dev_allowed]
-test = "cargo test -p contextra-router --locked"
-
-[crates.contextra-adapt]
-group = "llm"
-level = 0
-tier = "archived"
-path = "crates/contextra-adapt"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-adapt.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-adapt.dev_allowed]
-test = "cargo test -p contextra-adapt --locked"
-
-[crates.contextra-infer-ollama]
-group = "llm"
-level = 1
-tier = "archived"
-path = "crates/contextra-infer-ollama"
-unsafe_island = false
-allowed_internal = ["contextra-env"]
-[crates.contextra-infer-ollama.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-ollama.dev_allowed]
-test = "cargo test -p contextra-infer-ollama --locked"
-
-[crates.contextra-infer-candle]
-group = "llm"
-level = 1
-tier = "archived"
-path = "crates/contextra-infer-candle"
-unsafe_island = false
-allowed_internal = ["contextra-env"]
-[crates.contextra-infer-candle.feature_closure_allowed]
-kv-bridge = ["contextra-kvcache"]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-candle.dev_allowed]
-test = "cargo test -p contextra-infer-candle --locked"
-
-[crates.contextra-infer-onnx]
-group = "llm"
-level = 0
-tier = "archived"
-path = "crates/contextra-infer-onnx"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-infer-onnx.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ports"]
-[crates.contextra-infer-onnx.dev_allowed]
-test = "cargo test -p contextra-infer-onnx --locked"
-
-[crates.contextra-ingest]
-group = "data"
-level = 0
-tier = "archived"
-path = "crates/contextra-ingest"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-ingest.feature_closure_allowed]
-workspace = ["contextra-types", "contextra-ids"]
-[crates.contextra-ingest.dev_allowed]
-test = "cargo test -p contextra-ingest --locked"
-
 [crates.contextra-privacy]
 group = "safety"
 level = 0
@@ -295,64 +199,6 @@ allowed_internal = []
 workspace = ["contextra-types", "contextra-ports"]
 [crates.contextra-privacy.dev_allowed]
 test = "cargo test -p contextra-privacy --locked"
-
-[crates.contextra-sandbox]
-group = "safety"
-level = 0
-tier = "archived"
-path = "crates/contextra-sandbox"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-sandbox.feature_closure_allowed]
-[crates.contextra-sandbox.dev_allowed]
-test = "cargo test -p contextra-sandbox --locked"
-
-[crates.contextra-prompt-guard]
-group = "safety"
-level = 0
-tier = "archived"
-path = "crates/contextra-prompt-guard"
-unsafe_island = false
-allowed_internal = []
-[crates.contextra-prompt-guard.feature_closure_allowed]
-[crates.contextra-prompt-guard.dev_allowed]
-test = "cargo test -p contextra-prompt-guard --locked"
-
-[crates.contextra-vault]
-group = "safety"
-level = 1
-tier = "experimental"
-path = "crates/contextra-vault"
-unsafe_island = false
-allowed_internal = ["contextra-sys"]
-[crates.contextra-vault.feature_closure_allowed]
-workspace = ["contextra-types"]
-[crates.contextra-vault.dev_allowed]
-test = "cargo test -p contextra-vault --locked"
-
-[crates.contextra-agent]
-group = "agentic"
-level = 2
-tier = "archived"
-path = "crates/contextra-agent"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports"]
-[crates.contextra-agent.feature_closure_allowed]
-storage-bindings = ["contextra-db", "contextra-graph", "contextra-checkpoint", "contextra-router"]
-[crates.contextra-agent.dev_allowed]
-test = "cargo test -p contextra-agent --locked"
-
-[crates.contextra-cognition]
-group = "agentic"
-level = 2
-tier = "archived"
-path = "crates/contextra-cognition"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports"]
-[crates.contextra-cognition.feature_closure_allowed]
-exp-hyperedge = ["contextra-graph"]
-[crates.contextra-cognition.dev_allowed]
-test = "cargo test -p contextra-cognition --locked"
 
 [crates.contextra-erasure]
 group = "compliance"
@@ -383,7 +229,7 @@ level = 2
 tier = "stable"
 path = "crates/contextra-db"
 unsafe_island = false
-allowed_internal = ["contextra-types", "contextra-ports", "contextra-mvcc", "contextra-store", "contextra-vector", "contextra-text", "contextra-checkpoint", "contextra-rank", "contextra-graph", "contextra-vault"]
+allowed_internal = ["contextra-types", "contextra-ports", "contextra-mvcc", "contextra-store", "contextra-vector", "contextra-text", "contextra-checkpoint", "contextra-rank", "contextra-graph"]
 [crates.contextra-db.feature_closure_allowed]
 [crates.contextra-db.dev_allowed]
 test = "cargo test -p contextra-db --locked"
@@ -409,17 +255,6 @@ allowed_internal = ["contextra", "contextra-types", "contextra-ports", "contextr
 [crates.contextra-mcp.feature_closure_allowed]
 [crates.contextra-mcp.dev_allowed]
 test = "cargo test -p contextra-mcp --locked"
-
-[crates.contextra-py]
-group = "apps"
-level = 3
-tier = "archived"
-path = "crates/contextra-py"
-unsafe_island = false
-allowed_internal = ["contextra-types", "contextra", "contextra-wire"]
-[crates.contextra-py.feature_closure_allowed]
-[crates.contextra-py.dev_allowed]
-test = "cargo test -p contextra-py --locked"
 
 [crates.contextra-testkit]
 group = "testing"

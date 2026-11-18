@@ -33,7 +33,6 @@ pub mod homeostat;
 #[cfg(not(loom))]
 pub mod import;
 pub(crate) mod license_seam;
-#[cfg(feature = "sandbox")]
 pub mod merge_operator_adapter;
 #[cfg(not(loom))]
 pub mod metrics_names;
@@ -45,14 +44,12 @@ pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
 
-#[cfg(feature = "cognition")]
 pub mod cognition;
 
 #[cfg(feature = "volatile-vault")]
 pub mod volatile_vault;
 
 use license_seam::LicenseGate;
-#[cfg(feature = "sandbox")]
 use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
@@ -68,7 +65,6 @@ use serde_json::Value;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-#[cfg(feature = "sandbox")]
 pub use merge_operator_adapter::WasmMergeOperator;
 
 #[cfg(not(loom))]
@@ -374,7 +370,6 @@ impl Contextra {
     }
 }
 
-#[cfg(feature = "sandbox")]
 pub trait SandboxBridge: Send + Sync {
     fn db_search<'a>(
         &'a self,
@@ -392,7 +387,6 @@ pub trait SandboxBridge: Send + Sync {
     ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
 }
 
-#[cfg(feature = "sandbox")]
 impl SandboxBridge for Contextra {
     fn db_search<'a>(
         &'a self,
@@ -491,7 +485,6 @@ pub mod advanced {
         ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
     };
 
-    #[cfg(feature = "sandbox")]
     pub use crate::SandboxBridge;
 }
 

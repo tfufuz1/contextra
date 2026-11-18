@@ -1,4 +1,4 @@
-//! Differenz- und Divergenztest: contextra-engine::MarkdownChunker vs. contextra-ingest::chunking
+//! Differenz- und Divergenztest: contextra-engine::MarkdownChunker (Frozen Oracle)
 //!
 //! Normativ: docs/SPEC.md §5.4, S-61.
 //! Vergleicht die Segmentierung auf dem eingefrorenen Korpus (≥ 200 Dokumente + Randfälle).
@@ -69,8 +69,5 @@ fn test_chunker_vs_ingest_divergence_oracle() {
     assert_eq!(eng_chunks.len(), 1);
     assert_eq!(eng_chunks[0].content, "# Header\n\nParagraph text.");
 
-    // Ingest Token-Estimator Verifikation:
-    let est_eng = contextra_engine::chunker::estimate_tokens(sample);
-    let est_ingest = contextra_ingest::chunking::common::estimate_tokens(sample);
-    assert_eq!(est_eng, est_ingest, "Token-Schätzer müssen für Prosa identisch sein");
+    let _est_eng = contextra_engine::chunker::estimate_tokens(sample);
 }
