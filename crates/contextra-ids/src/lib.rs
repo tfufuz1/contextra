@@ -265,6 +265,30 @@ impl DocId {
     pub const fn as_u64(self) -> u64 {
         self.0
     }
+
+    /// Returns little-endian byte representation.
+    #[inline]
+    pub const fn to_le_bytes(self) -> [u8; 8] {
+        self.0.to_le_bytes()
+    }
+
+    /// Constructs from little-endian bytes.
+    #[inline]
+    pub const fn from_le_bytes(bytes: [u8; 8]) -> Self {
+        Self(u64::from_le_bytes(bytes))
+    }
+
+    /// Returns big-endian byte representation.
+    #[inline]
+    pub const fn to_be_bytes(self) -> [u8; 8] {
+        self.0.to_be_bytes()
+    }
+
+    /// Constructs from big-endian bytes.
+    #[inline]
+    pub const fn from_be_bytes(bytes: [u8; 8]) -> Self {
+        Self(u64::from_be_bytes(bytes))
+    }
 }
 
 #[cfg(feature = "docid-128")]
@@ -298,6 +322,30 @@ impl DocId {
     #[inline]
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
+    }
+
+    /// Returns little-endian byte representation.
+    #[inline]
+    pub const fn to_le_bytes(self) -> [u8; 16] {
+        self.0.to_le_bytes()
+    }
+
+    /// Constructs from little-endian bytes.
+    #[inline]
+    pub const fn from_le_bytes(bytes: [u8; 16]) -> Self {
+        Self(u128::from_le_bytes(bytes))
+    }
+
+    /// Returns big-endian byte representation.
+    #[inline]
+    pub const fn to_be_bytes(self) -> [u8; 16] {
+        self.0.to_be_bytes()
+    }
+
+    /// Constructs from big-endian bytes.
+    #[inline]
+    pub const fn from_be_bytes(bytes: [u8; 16]) -> Self {
+        Self(u128::from_be_bytes(bytes))
     }
 }
 
@@ -671,6 +719,12 @@ impl SubjectRef {
     /// Konstruiert `SubjectRef` aus rohen 16 Bytes (nur für autorisierte Deserialisierer/Layer).
     #[inline]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
+    /// Konstruiert `SubjectRef` aus rohen 16 Bytes (Alias für `from_bytes`).
+    #[inline]
+    pub const fn new(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 
