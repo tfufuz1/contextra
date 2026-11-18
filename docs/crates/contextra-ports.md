@@ -1,36 +1,28 @@
 # contextra-ports — Implementierungsspezifikation (Soll-Zustand)
 
-**Ebene:** E2 (Integration & Schnittstellenverträge)  
-**Kern-Closure:** `ids`, `env`, `erasure`, `types`  
+**Ebene:** E0 (Fundament & Schnittstellenverträge / Ring 0)  
+**Kern-Closure:** `ids`, `env`, `types`  
 **Status:** Normativ (Soll-Zustand)  
-**Version:** 2.1  
+**Version:** 2.2  
 **Geltungsbereich:** `crates/contextra-ports`  
-**Referenzdokumente:** `docs/SPEC.md` §2.4, §5, §6, §7, §10
+**Referenzdokumente:** `docs/SPEC.md` §2.1, §2.4, §5, §6, §7, §10
 
 ---
 
 ## 1. Zweck & Architekturgarantien
 
-`contextra-ports` definiert systemweite `dyn`-kompatible Wrapper-Traits für die Orchestrierungsschicht:
-- **Synchronisationsverträge:** `CommitBarrier` und `PurgeBarrier` — schützen Gate-Commit und Purge gegen parallele Writer und Kompaktionen.
-- **EmbeddingEngine-Port:** Abstrahiert eine optionale Embedding-Implementierung ohne konkrete Abhängigkeit.
-
-### Kritische Ebenenregel (R1) — Befund 1.1
-
-`ErasureLayer`, `ReadGate`, `Scanner<Armed>`, `LayerWitness`, `GateDecision` und `RangeGate` sind **nicht** in `contextra-ports` definiert. Sie sind kanonisch in `contextra-erasure` (E0) definiert. `contextra-ports` importiert sie von dort.
-
-**E1-Crates implementieren `ErasureLayer` aus `contextra-erasure`, nicht aus `contextra-ports`.** Sie dürfen `contextra-ports` nicht importieren (das wäre E1 → E2, verboten durch R1).
-
-`contextra-ports` enthält **ausschließlich**:
-1. `CommitBarrier` + Permits
-2. `PurgeBarrier` + Permits
-3. `EmbeddingEngine`
+`contextra-ports` definiert systemweite, trait-basierte Schnittstellenverträge (Ports) nach dem Prinzip der hexagonalen Architektur (Ports & Adapters):
+- **Schichtentrennung (E0):** Als Fundamentbaustein auf Ebene E0 hängt `contextra-ports` ausschließlich von `contextra-env`, `contextra-types` und `contextra-ids` ab.
+- **Entkopplung der Schichten:** Ermöglicht den E1-Domänenbausteinen (`store`, `vector`, `text`, `graph`), standardisierte Schnittstellen zu implementieren, und dem E2-Orchestrator (`contextra-db`), diese homogen zu steuern.
+- **Synchronisationsverträge:** Definition von Barrieren (`CommitBarrier`, `PurgeBarrier`).
+- **EmbeddingEngine-Port:** Abstrahiert Text- und Vektoreinbettungen.
 
 ### Architekturgarantien (R1–R6)
 1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Object Safety:** Alle Traits sind `dyn`-kompatibel.
+2. **Object Safety (Dyn-Kompatibilität):** Alle Port-Traits sind objekt-sicher (`Box<dyn Port>`).
 3. **Keine konkreten Speicherschichten:** Importiert niemals `store`, `vector`, `text`, `graph`, `db`.
 4. **Leere Default-Features (R3):** `default = []`.
+5. **R1-Konformität:** Keine Aufwärtsabhängigkeiten (E0 hängt von keinem E1/E2/E3 ab).
 
 ---
 

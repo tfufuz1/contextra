@@ -1,9 +1,9 @@
 # contextra-types — Implementierungsspezifikation (Soll-Zustand)
 
-**Ebene:** E2 (Integration)  
-**Kern-Closure:** `ids`, `env`, `privacy`, `erasure`  
+**Ebene:** E0 (Fundament / Ring 0)  
+**Kern-Closure:** `ids` (0 weitere Workspace-Abhängigkeiten)  
 **Status:** Normativ (Soll-Zustand)  
-**Version:** 2.1  
+**Version:** 2.2  
 **Geltungsbereich:** `crates/contextra-types`  
 **Referenzdokumente:** `docs/SPEC.md` §2, §3, §5, §11, §13, §14  
 

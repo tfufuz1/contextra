@@ -58,9 +58,9 @@ Der aktive Workspace umfasst **23 Crates** in 4 Ebenen:
 
 | Ebene | Crates |
 |-------|--------|
-| **E0 — Fundament** | `ids`, `env`, `sys`, `durable-fs`, `simd`, `privacy`, `erasure` |
+| **E0 — Fundament & Ports** | `ids`, `env`, `sys`, `durable-fs`, `simd`, `types`, `ports`, `privacy`, `erasure` |
 | **E1 — Domänenbausteine** | `store`, `vector`, `text`, `graph`, `rank`, `mvcc`, `crypto`, `checkpoint` |
-| **E2 — Integration** | `types`, `ports`, `db`, `engine` (deprecated Re-Export), `contextra` |
+| **E2 — Integration** | `db`, `engine` (deprecated Re-Export), `contextra` |
 | **E3 — Endpunkte** | `mcp`, `testkit`, `bench` |
 
 **Excluded:** `vault` (dormant, Funktionalität in `erasure` aufgegangen — darf nicht reaktiviert werden ohne G-REACTIVATE)
@@ -92,28 +92,29 @@ contextra-kv-cache
 ┌──────────────────────── E3: Endpunkte ──────────────────────┐
 │  mcp          testkit          bench                        │
 └──────────────────────────┬──────────────────────────────────┘
-                           │ darf E0,E1,E2 nutzen
+                           │ darf E0, E1, E2 nutzen
 ┌──────────────────────── E2: Integration ────────────────────┐
-│  contextra ──► db       types        ports                  │
-│  engine (deprecated = pub use db::*)                        │
+│  contextra ──► db ──► engine (deprecated = pub use db::*)   │
 └──────────────────────────┬──────────────────────────────────┘
-                           │ darf E0,E1 nutzen
+                           │ darf E0, E1 nutzen
 ┌──────────────────────── E1: Domäne ─────────────────────────┐
 │  store    vector    text    graph    rank                    │
 │  mvcc     crypto    checkpoint                              │
 └──────────────────────────┬──────────────────────────────────┘
                            │ darf nur E0 nutzen
-┌──────────────────────── E0: Fundament ──────────────────────┐
-│  ids   env   sys   durable-fs   simd   privacy   erasure    │
+┌──────────────────────── E0: Fundament & Ports ──────────────┐
+│  ids   env   sys   durable-fs   simd   types   ports        │
+│  privacy   erasure                                          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Kritische Klarstellung zu `ports` und `erasure` (Befund 1.1):**
+**Klarstellung zur Schichtentrennung (Auflösung von Befund 1.1):**
 
-- `contextra-erasure` ist **E0**. Es definiert `ReadGate`, `ErasureLayer`, `Scanner<Armed>`, `LayerWitness`, `SagaState`, `EraseTarget`, `GateDecision`. Diese Typen werden von E1-Crates **implementiert**.
-- `contextra-ports` ist **E2**. Es enthält nur die `dyn`-kompatiblen Wrapper-Traits `CommitBarrier` und `PurgeBarrier` sowie den `EmbeddingEngine`-Port. Es importiert konkrete Typen aus `contextra-erasure` (E0) — dies ist regelkonform (E2 → E0 ✓). Es importiert **nicht** aus E1-Crates.
-- E1-Crates implementieren `ErasureLayer` aus `contextra-erasure` (E0). Sie DÜRFEN NICHT `contextra-ports` importieren (das wäre E1→E2, verboten durch R1).
-- `contextra-db` (E2) nimmt `Box<dyn ErasureLayer>` via `contextra-erasure` und registriert Instanzen der E1-Crates. Die Kopplung E2→E1 ist erlaubt.
+- `contextra-types` und `contextra-ports` liegen normativ auf **Ebene E0 (Fundament & Ports)**.
+- `types` enthält kanonische Typen, IDs und Datenstrukturen (`DocId`, `ScoredDocument`, `ContextraError`) ohne interne I/O- oder Laufzeitabhängigkeiten.
+- `ports` enthält die standardisierten Trait-Verträge (`StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`, `CommitBarrier`, `PurgeBarrier`) und hängt ausschließlich von `env` und `types` ab (E0 → E0 ✓).
+- E1-Crates (`store`, `vector`, etc.) implementieren die Traits aus `ports` und nutzen Typen aus `types`. Da `ports` und `types` auf E0 liegen, zeigt die Abhängigkeitskante **strikt abwärts** (E1 → E0 ✓, R1 erfüllt).
+- Es bedarf **keiner Ausnahmeregelung** (`feature_closure_allowed`) und **keiner Versteckspiele** hinter `features = ["workspace"]`. Alle E1→E0 Kanten sind explizit, sauber und architektonisch normativ.
 
 ### 2.5 Kanonische Typbesitzer (R4)
 

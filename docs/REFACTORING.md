@@ -147,20 +147,16 @@ Globale Suche-und-Ersetze: `KeyDestroyed` → `KeyRevoked` in allen Quelldateien
 
 ## Phase 3 — Ebenenbereinigung (Abhängigkeiten, R1–R3)
 
-### 3.1 E0-Crates: Keine E1/E2-Abhängigkeiten
+### 3.1 Bereinigung der E1-Abhängigkeiten (R1)
 
-Betroffen: `erasure`, `privacy`, `simd`
+Mit der Korrektur der Ebenenordnung liegen `contextra-types` und `contextra-ports` normativ auf **E0 (Fundament & Ports)**.
+Damit ist die Kante E1 → E0 (`store` → `types`/`ports`) architektonisch sauber und erlaubt.
 
-**Für `contextra-erasure`:**
-- `aes-gcm-siv`, `sha2`, `hmac` aus `[dependencies]` entfernen
-- Alle Krypto-Operationen aus `erasure` nach `contextra-crypto` verschieben
-- `erasure` ruft `crypto` nicht direkt auf — Vault-Slot-Management nutzt nur `zeroize`
-
-**Für alle E1-Crates (`store`, `vector`, `text`, `graph`, `crypto`, `mvcc`, `rank`, `checkpoint`):**
-- `contextra-types` aus `[dependencies]` entfernen (E1 → E2 verboten)
-- `contextra-ports` aus `[dependencies]` entfernen (E1 → E2 verboten)
-- Features `workspace`, `types-compat`, `ports-compat` entfernen
-- `contextra-testkit` aus `[dev-dependencies]` entfernen (R2: dev-dep auf höhere Ebene verboten)
+**Aufgaben:**
+- In allen E1-Crates (`store`, `vector`, `text`, `graph`, `crypto`, `mvcc`, `rank`, `checkpoint`) die Abhängigkeiten auf `contextra-types` und `contextra-ports` als reguläre Abhängigkeiten deklarieren (`workspace = true`, kein `optional = true`).
+- Die Hilfs-Features `workspace`, `types-compat` und `ports-compat` in allen E1-Crates **vollständig entfernen**.
+- `contextra-testkit` (E3) aus `[dev-dependencies]` aller E1- und E2-Crates entfernen (R2-Verletzung: dev-dep auf höhere Ebene verboten).
+- In `contextra-db`: `features = ["workspace"]` bei `contextra-store`, `contextra-vector`, `contextra-text`, `contextra-rank`, `contextra-graph` entfernen.
 
 ### 3.2 `default = []` für alle Crates (R3)
 
