@@ -35,7 +35,7 @@ impl Manifest {
                         .unwrap_or_else(|| path.clone());
                     valid_map.remove(&key);
                 }
-                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
+                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } | ManifestEntry::WalFloor { .. } => {}
                 ManifestEntry::Replace { removed, added, .. } => {
                     for p in removed {
                         let key = p
@@ -90,7 +90,7 @@ impl Manifest {
                 }
                 ManifestEntry::Add { .. }
                 | ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. } => {}
+                | ManifestEntry::WalCheckpoint { .. } | ManifestEntry::WalFloor { .. } => {}
             }
         }
 
@@ -105,5 +105,18 @@ impl Manifest {
             }
         }
         None
+    }
+
+    /// Extracts the highest recorded WAL floor sequence number.
+    pub fn extract_wal_floor(entries: &[ManifestEntry]) -> u64 {
+        let mut floor = 0u64;
+        for entry in entries {
+            if let ManifestEntry::WalFloor { seq } = entry {
+                if *seq > floor {
+                    floor = *seq;
+                }
+            }
+        }
+        floor
     }
 }

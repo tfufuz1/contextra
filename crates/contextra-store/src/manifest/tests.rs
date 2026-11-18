@@ -442,3 +442,35 @@ async fn test_manifest_poisoning_on_fsync_failure() {
         "Error message should mention poisoned and INV-FSYNC-1"
     );
 }
+
+#[tokio::test]
+async fn test_wal_floor_manifest_entry_roundtrip() {
+    let entry = ManifestEntry::WalFloor { seq: 42_000 };
+    let bytes = entry.to_bytes().expect("serialize WalFloor");
+    let decoded = ManifestEntry::from_bytes(&bytes).expect("deserialize WalFloor");
+    assert_eq!(decoded, entry);
+
+    let entries = vec![
+        ManifestEntry::WalFloor { seq: 100 },
+        ManifestEntry::WalFloor { seq: 500 },
+        ManifestEntry::WalFloor { seq: 250 },
+    ];
+    let floor = Manifest::extract_wal_floor(&entries);
+    assert_eq!(floor, 500);
+}
+
+#[test]
+fn test_version_immutable_updates() {
+    let v0 = super::version::Version::empty();
+    assert_eq!(v0.generation_id, 0);
+    assert_eq!(v0.wal_floor, 0);
+    assert!(v0.sstables.is_empty());
+
+    let v1 = v0.update(Vec::new(), &[], Some(100));
+    assert_eq!(v1.generation_id, 1);
+    assert_eq!(v1.wal_floor, 100);
+
+    let v2 = v1.update(Vec::new(), &[], Some(50)); // darfnicht fallen
+    assert_eq!(v2.generation_id, 2);
+    assert_eq!(v2.wal_floor, 100);
+}

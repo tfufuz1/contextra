@@ -25,3 +25,6 @@ pub const MAX_MANIFEST_ENTRY_SIZE: u32 = 1024 * 1024;
 pub const DEFAULT_ROLLOVER_THRESHOLD_BYTES: u64 = 64 * 1024;
 
 pub use core::{CURRENT_MANIFEST_VERSION, MANIFEST_HEADER_MAGIC};
+
+pub mod version;
+pub use version::Version;

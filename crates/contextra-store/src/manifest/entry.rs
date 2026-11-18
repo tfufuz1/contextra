@@ -42,6 +42,8 @@ pub enum ManifestEntry {
     },
     /// A WAL high-water-mark entry recording the valid WAL-tail HMAC at flush/checkpoint time.
     WalCheckpoint { hmac: [u8; 32] },
+    /// Minimum required sequence number for WAL retention (WalFloor).
+    WalFloor { seq: u64 },
 }
 
 impl ManifestEntry {
@@ -92,6 +94,10 @@ impl ManifestEntry {
             ManifestEntry::WalCheckpoint { hmac } => {
                 payload.push(4u8); // op_tag = 4
                 payload.extend_from_slice(hmac);
+            }
+            ManifestEntry::WalFloor { seq } => {
+                payload.push(5u8); // op_tag = 5
+                payload.extend_from_slice(&seq.to_le_bytes());
             }
         }
 
@@ -360,6 +366,22 @@ impl ManifestEntry {
                     .try_into()
                     .map_err(|_| StoreError::Serialization("Invalid hmac format".into()))?;
                 Ok(ManifestEntry::WalCheckpoint { hmac })
+            }
+            5 => {
+                // WalFloor
+                if remaining.len() != 8 {
+                    return Err(StoreError::Serialization(format!(
+                        "WalFloor payload length mismatch: expected 8, got {}",
+                        remaining.len()
+                    )));
+                }
+                let seq_bytes = remaining.get(0..8).ok_or_else(|| {
+                    StoreError::Serialization("WalFloor seq bytes missing".into())
+                })?;
+                let seq = u64::from_le_bytes(
+                    seq_bytes.try_into().map_err(|_| StoreError::Serialization("Invalid seq format".into()))?
+                );
+                Ok(ManifestEntry::WalFloor { seq })
             }
             _ => Err(StoreError::Serialization(format!(
                 "Unknown Manifest op tag: {}",
