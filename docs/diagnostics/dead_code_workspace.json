@@ -1,0 +1,4037 @@
+{
+  "tool_name": "dead_code_microprobe.py",
+  "title": "Dead Code & Unused Item Microprobe Diagnostic",
+  "description": "Identifies unreferenced private functions, types, constants, #[allow(dead_code)] suppressions, and deprecated items across crates.",
+  "timestamp": "2026-11-18T18:01:33.875379+00:00",
+  "metrics": {
+    "dead_code_candidates": 421,
+    "allow_dead_code_attributes": 47,
+    "deprecated_attributes": 34,
+    "total_findings": 502
+  },
+  "findings_count": 502,
+  "findings": [
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/builder.rs",
+      "line": 247,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"license gating was removed; no-op\")]"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/collection_profile.rs",
+      "line": 125,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"license gating was removed; no-op\")]"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 133,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"license gating was removed; unused\")]"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 176,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"license gating was removed; no-op\")]"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/src/performance_profile.rs",
+      "line": 209,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'check_ring' appears unused in crate (freq=1)",
+      "snippet": "function check_ring"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/tenant_isolation_facade.rs",
+      "line": 17,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'tenant_a_cannot_read_tenant_b' appears unused in crate (freq=1)",
+      "snippet": "function tenant_a_cannot_read_tenant_b"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/tenant_isolation_facade.rs",
+      "line": 131,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'startup_ssi_tracking_check' appears unused in crate (freq=1)",
+      "snippet": "function startup_ssi_tracking_check"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/type_identity_test.rs",
+      "line": 48,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'check_err' appears unused in crate (freq=1)",
+      "snippet": "function check_err"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/type_identity_test.rs",
+      "line": 51,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'check_metric' appears unused in crate (freq=1)",
+      "snippet": "function check_metric"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/type_identity_test.rs",
+      "line": 54,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'check_doc_id' appears unused in crate (freq=1)",
+      "snippet": "function check_doc_id"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/vertical_path_ssi_under_write_load.rs",
+      "line": 50,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'vertical_path_test_3_ssi_under_write_load_b16' appears unused in crate (freq=1)",
+      "snippet": "function vertical_path_test_3_ssi_under_write_load_b16"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/wiring_matrix.rs",
+      "line": 22,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'flush_preserves_pinned_snapshot' appears unused in crate (freq=1)",
+      "snippet": "function flush_preserves_pinned_snapshot"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/wiring_matrix.rs",
+      "line": 60,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'second_open_same_directory_rejected' appears unused in crate (freq=1)",
+      "snippet": "function second_open_same_directory_rejected"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/wiring_matrix.rs",
+      "line": 77,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'open_compliance_profile_succeeds_without_license' appears unused in crate (freq=1)",
+      "snippet": "function open_compliance_profile_succeeds_without_license"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/wiring_matrix.rs",
+      "line": 96,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'profile_durability_reaches_lsm_config' appears unused in crate (freq=1)",
+      "snippet": "function profile_durability_reaches_lsm_config"
+    },
+    {
+      "crate": "contextra",
+      "file": "crates/contextra/tests/wiring_matrix.rs",
+      "line": 119,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'confirmed_commit_survives_drop_reopen' appears unused in crate (freq=1)",
+      "snippet": "function confirmed_commit_survives_drop_reopen"
+    },
+    {
+      "crate": "contextra-bench",
+      "file": "benchmarks/contextra-bench/src/main.rs",
+      "line": 890,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'update_current_metrics_locomo' appears unused in crate (freq=1)",
+      "snippet": "function update_current_metrics_locomo"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/meta.rs",
+      "line": 95,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_id_width_bits' appears unused in crate (freq=1)",
+      "snippet": "function default_id_width_bits"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/compat/ports_impl.rs",
+      "line": 16,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'create_named_checkpoint' appears unused in crate (freq=1)",
+      "snippet": "function create_named_checkpoint"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/compat/ports_impl.rs",
+      "line": 29,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'restore_named_checkpoint' appears unused in crate (freq=1)",
+      "snippet": "function restore_named_checkpoint"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/compat/ports_impl.rs",
+      "line": 33,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'drop_named_checkpoint' appears unused in crate (freq=1)",
+      "snippet": "function drop_named_checkpoint"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/compat/ports_impl.rs",
+      "line": 37,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'list_named_checkpoints' appears unused in crate (freq=1)",
+      "snippet": "function list_named_checkpoints"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/compat/ports_impl.rs",
+      "line": 45,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'take_snapshot' appears unused in crate (freq=1)",
+      "snippet": "function take_snapshot"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/src/compat/ports_impl.rs",
+      "line": 55,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'restore' appears unused in crate (freq=1)",
+      "snippet": "function restore"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+      "line": 137,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'systematic_crash_at_every_checkpoint_io_point' appears unused in crate (freq=1)",
+      "snippet": "function systematic_crash_at_every_checkpoint_io_point"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/tests/checkpoint_systematic_crash.rs",
+      "line": 200,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'crash_during_checkpoint_deletion_leaves_clean_state' appears unused in crate (freq=1)",
+      "snippet": "function crash_during_checkpoint_deletion_leaves_clean_state"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/tests/golden_corpus_test.rs",
+      "line": 146,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'regen_golden_corpus' appears unused in crate (freq=1)",
+      "snippet": "function regen_golden_corpus"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/tests/golden_generator.rs",
+      "line": 7,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_files' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_files"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/tests/guard_proptest.rs",
+      "line": 137,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_guard_random_lifecycle_sequences' appears unused in crate (freq=1)",
+      "snippet": "function prop_guard_random_lifecycle_sequences"
+    },
+    {
+      "crate": "contextra-checkpoint",
+      "file": "crates/contextra-checkpoint/tests/guard_proptest.rs",
+      "line": 177,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_manifest_checksum_integrity' appears unused in crate (freq=1)",
+      "snippet": "function prop_manifest_checksum_integrity"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/campaign_mut_j17.rs",
+      "line": 12,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'killer_test_kdf_params_new_for_test' appears unused in crate (freq=1)",
+      "snippet": "function killer_test_kdf_params_new_for_test"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/campaign_mut_j17.rs",
+      "line": 22,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'killer_test_kdf_header_to_bytes_exact_length_and_magic' appears unused in crate (freq=1)",
+      "snippet": "function killer_test_kdf_header_to_bytes_exact_length_and_magic"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/campaign_mut_j17.rs",
+      "line": 46,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'killer_test_kdf_header_from_bytes_boundary_validations' appears unused in crate (freq=1)",
+      "snippet": "function killer_test_kdf_header_from_bytes_boundary_validations"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/campaign_mut_j17.rs",
+      "line": 85,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'killer_test_key_manager_kv_cipher_seal_open_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function killer_test_key_manager_kv_cipher_seal_open_roundtrip"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/campaign_mut_j17.rs",
+      "line": 112,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'killer_test_kv_segment_cipher_kv_cipher_seal_open' appears unused in crate (freq=1)",
+      "snippet": "function killer_test_kv_segment_cipher_kv_cipher_seal_open"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/crypto_property_and_invariants.rs",
+      "line": 20,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_aead_seal_open_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_aead_seal_open_roundtrip"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/crypto_property_and_invariants.rs",
+      "line": 37,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_bit_mutation_rejects' appears unused in crate (freq=1)",
+      "snippet": "function prop_bit_mutation_rejects"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/eviction_worker_tokio_runtime_nonblocking_regression.rs",
+      "line": 16,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'eviction_worker_drop_does_not_starve_other_tasks_indefinitely' appears unused in crate (freq=1)",
+      "snippet": "function eviction_worker_drop_does_not_starve_other_tasks_indefinitely"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/golden_corpus.rs",
+      "line": 242,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_files' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_files"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/kv_segment_proptests.rs",
+      "line": 22,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_kv_segment_creation' appears unused in crate (freq=1)",
+      "snippet": "function prop_kv_segment_creation"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/kv_segment_proptests.rs",
+      "line": 38,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tenant_isolation_strictness' appears unused in crate (freq=1)",
+      "snippet": "function prop_tenant_isolation_strictness"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/kv_segment_proptests.rs",
+      "line": 79,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_segment_zeroize_wipes_all_bytes' appears unused in crate (freq=1)",
+      "snippet": "function prop_segment_zeroize_wipes_all_bytes"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptest_wal_hmac_v2_collision.rs",
+      "line": 86,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'v2_hmac_is_not_length_prefixed_documented_gap' appears unused in crate (freq=1)",
+      "snippet": "function v2_hmac_is_not_length_prefixed_documented_gap"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptest_wal_hmac_v2_collision.rs",
+      "line": 141,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'v3_hmac_is_length_prefixed_no_collision' appears unused in crate (freq=1)",
+      "snippet": "function v3_hmac_is_length_prefixed_no_collision"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptest_wal_hmac_v2_collision.rs",
+      "line": 214,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_v2_arbitrary_boundary_shift_collides' appears unused in crate (freq=1)",
+      "snippet": "function prop_v2_arbitrary_boundary_shift_collides"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 18,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_encrypt_decrypt_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_encrypt_decrypt_roundtrip"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 26,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_ciphertext_bit_flip_authenticity_failure' appears unused in crate (freq=1)",
+      "snippet": "function prop_ciphertext_bit_flip_authenticity_failure"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 44,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_kv_segment_cipher_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_kv_segment_cipher_roundtrip"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 65,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_kv_segment_cipher_mismatch_fails_decrypt' appears unused in crate (freq=1)",
+      "snippet": "function prop_kv_segment_cipher_mismatch_fails_decrypt"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 85,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_kv_segment_cipher_freshness_nonce_and_ciphertext' appears unused in crate (freq=1)",
+      "snippet": "function prop_kv_segment_cipher_freshness_nonce_and_ciphertext"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 103,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_encrypted_wal_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_encrypted_wal_roundtrip"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/proptests.rs",
+      "line": 115,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_integrity_verifier_v3_valid_and_tampered' appears unused in crate (freq=1)",
+      "snippet": "function prop_integrity_verifier_v3_valid_and_tampered"
+    },
+    {
+      "crate": "contextra-crypto",
+      "file": "crates/contextra-crypto/tests/wal_completeness_tests.rs",
+      "line": 40,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_wal_chain_completeness_equivalence' appears unused in crate (freq=1)",
+      "snippet": "function prop_wal_chain_completeness_equivalence"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/homeostat.rs",
+      "line": 31,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"use PidLatencyController instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/background_workers/expiry_workers.rs",
+      "line": 74,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"use start_expiry_cleanup_worker instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/background_workers/expiry_workers.rs",
+      "line": 113,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"use start_decay_cleanup_worker instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/background_workers/orphan_workers.rs",
+      "line": 188,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"use start_orphan_cleanup_worker instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/transaction/compensating_actions.rs",
+      "line": 205,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/transaction/db_transaction_rollback.rs",
+      "line": 14,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/mod.rs",
+      "line": 103,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Parsing LLM responses should happen outside contextra-db\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/crud/auto_extraction.rs",
+      "line": 85,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/basic.rs",
+      "line": 20,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/basic.rs",
+      "line": 38,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/basic.rs",
+      "line": 55,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/basic.rs",
+      "line": 101,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/filtered.rs",
+      "line": 178,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/filtered.rs",
+      "line": 197,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/hybrid/mod.rs",
+      "line": 20,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/hybrid/mod.rs",
+      "line": 42,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/hybrid/mod.rs",
+      "line": 65,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/hybrid/mod.rs",
+      "line": 90,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/src/collection/search/hybrid/query.rs",
+      "line": 42,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"use Collection::query() instead\")]"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/search_result_bound.rs",
+      "line": 54,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)] // Candidate search.rs path locator utility for db test suite"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/cross_domain_chaos_matrix_test.rs",
+      "line": 91,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'provider_name' appears unused in crate (freq=1)",
+      "snippet": "function provider_name"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/cross_domain_chaos_matrix_test.rs",
+      "line": 97,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'embedding_dim' appears unused in crate (freq=1)",
+      "snippet": "function embedding_dim"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/cross_domain_chaos_matrix_test.rs",
+      "line": 134,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'embed_batch' appears unused in crate (freq=1)",
+      "snippet": "function embed_batch"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/cross_domain_chaos_matrix_test.rs",
+      "line": 200,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'chaos_gpu_busy_disk_full_no_orphaned_embedding' appears unused in crate (freq=1)",
+      "snippet": "function chaos_gpu_busy_disk_full_no_orphaned_embedding"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/fusion_edge_cases_test.rs",
+      "line": 603,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_replicator_weight_sum_invariant_preserved_through_fusion' appears unused in crate (freq=1)",
+      "snippet": "function prop_replicator_weight_sum_invariant_preserved_through_fusion"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/proptest_search_invariants.rs",
+      "line": 51,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_bounded_by_k' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_bounded_by_k"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/proptest_search_invariants.rs",
+      "line": 68,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_e2e_search_bounded_by_k' appears unused in crate (freq=1)",
+      "snippet": "function prop_e2e_search_bounded_by_k"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/proptest_search_invariants.rs",
+      "line": 141,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_bm25_score_monotonic_in_tf' appears unused in crate (freq=1)",
+      "snippet": "function prop_bm25_score_monotonic_in_tf"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/proptest_search_invariants.rs",
+      "line": 175,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_scores_sorted_descending' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_scores_sorted_descending"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/proptest_search_invariants.rs",
+      "line": 202,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_empty_inputs_never_panic' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_empty_inputs_never_panic"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/search_result_bound.rs",
+      "line": 55,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'read_search_rs' appears unused in crate (freq=1)",
+      "snippet": "function read_search_rs"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/search_result_bound.rs",
+      "line": 75,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_search_never_exceeds_k' appears unused in crate (freq=1)",
+      "snippet": "function proof_search_never_exceeds_k"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/search_result_bound.rs",
+      "line": 144,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_search_returns_nonzero_results_for_matching_query' appears unused in crate (freq=1)",
+      "snippet": "function proof_search_returns_nonzero_results_for_matching_query"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/search_result_bound.rs",
+      "line": 180,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_search_with_k_zero_returns_empty' appears unused in crate (freq=1)",
+      "snippet": "function proof_search_with_k_zero_returns_empty"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/search_result_bound.rs",
+      "line": 211,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_usize_max_removed_from_search_path' appears unused in crate (freq=1)",
+      "snippet": "function proof_usize_max_removed_from_search_path"
+    },
+    {
+      "crate": "contextra-db",
+      "file": "crates/contextra-db/tests/split_brain_vector_orphan_test.rs",
+      "line": 364,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_no_dangling_search_result_under_random_insert_delete_sequence' appears unused in crate (freq=1)",
+      "snippet": "function prop_no_dangling_search_result_under_random_insert_delete_sequence"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/src/lib.rs",
+      "line": 6,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "// INVARIANTE: INV-2: Name bleibt als #[deprecated]-Fassade erhalten."
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/chunker_hardening_tests.rs",
+      "line": 136,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_source_span_matches_unsynthesized_content' appears unused in crate (freq=1)",
+      "snippet": "function prop_source_span_matches_unsynthesized_content"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/decay_and_expiry.rs",
+      "line": 128,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'monotonic_nanos' appears unused in crate (freq=1)",
+      "snippet": "function monotonic_nanos"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/metrics_instrumentation.rs",
+      "line": 19,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'record_counter' appears unused in crate (freq=1)",
+      "snippet": "function record_counter"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/metrics_instrumentation.rs",
+      "line": 23,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'record_gauge' appears unused in crate (freq=1)",
+      "snippet": "function record_gauge"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/metrics_instrumentation.rs",
+      "line": 27,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'record_histogram' appears unused in crate (freq=1)",
+      "snippet": "function record_histogram"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/proof_chunker_properties.rs",
+      "line": 71,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_chunker_arbitrary_utf8_safety' appears unused in crate (freq=1)",
+      "snippet": "function prop_chunker_arbitrary_utf8_safety"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/proof_temporal_filter_vs_rank.rs",
+      "line": 160,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_temporal_filter_differential_proptest' appears unused in crate (freq=1)",
+      "snippet": "function prop_temporal_filter_differential_proptest"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/query_builder_scope_acorn.rs",
+      "line": 93,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'search_knn_acorn' appears unused in crate (freq=1)",
+      "snippet": "function search_knn_acorn"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/s64_public_surface.rs",
+      "line": 12,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_pin_db_consumer_surface' appears unused in crate (freq=1)",
+      "snippet": "function _pin_db_consumer_surface"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/s64_public_surface.rs",
+      "line": 34,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_pin_language_consumer_surface' appears unused in crate (freq=1)",
+      "snippet": "function _pin_language_consumer_surface"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/s64_public_surface.rs",
+      "line": 42,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_pin_engine_public_surface' appears unused in crate (freq=1)",
+      "snippet": "function _pin_engine_public_surface"
+    },
+    {
+      "crate": "contextra-engine",
+      "file": "crates/contextra-engine/tests/write_skew_via_engine_api.rs",
+      "line": 125,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_concurrent_engine_transactions_serializable' appears unused in crate (freq=1)",
+      "snippet": "function prop_concurrent_engine_transactions_serializable"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/deletion_proof.rs",
+      "line": 247,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Umstellung auf DeletionProof::issue, siehe P-19\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/deletion_proof.rs",
+      "line": 275,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Umstellung auf DeletionProof::issue, siehe P-19\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/kv_shredding.rs",
+      "line": 227,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/measure.rs",
+      "line": 36,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Verwende crate::types_local::ControlEvidence \u00fcber die Positivkontrolle\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/measure.rs",
+      "line": 45,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Verwende crate::types_local::ControlEvidence \u00fcber die Positivkontrolle\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/measure.rs",
+      "line": 62,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Verwende crate::types_local::Scanner<Unarmed>\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/measure.rs",
+      "line": 96,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Verwende crate::types_local::Scanner<Armed>\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/measure.rs",
+      "line": 116,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Verwende crate::types_local::LayerWitness\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/src/measure/scanner_flow.rs",
+      "line": 186,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Verwende scan_with_control(vfs, plan) f\u00fcr echte Scans\")]"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/crash_matrix_recovery.rs",
+      "line": 211,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_1_fm_matrix_recovery_step_progression' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_1_fm_matrix_recovery_step_progression"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/crash_matrix_recovery.rs",
+      "line": 272,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_3_fm_3_disk_reserve_pending' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_3_fm_3_disk_reserve_pending"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs",
+      "line": 16,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'verify_external_accepts_valid_proof' appears unused in crate (freq=1)",
+      "snippet": "function verify_external_accepts_valid_proof"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs",
+      "line": 46,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'verify_external_rejects_tampered_timestamp' appears unused in crate (freq=1)",
+      "snippet": "function verify_external_rejects_tampered_timestamp"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs",
+      "line": 80,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'verify_external_rejects_tampered_deleted_keys_hash' appears unused in crate (freq=1)",
+      "snippet": "function verify_external_rejects_tampered_deleted_keys_hash"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs",
+      "line": 114,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'verify_external_rejects_wrong_public_key' appears unused in crate (freq=1)",
+      "snippet": "function verify_external_rejects_wrong_public_key"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/deletion_proof_external_verify_rejects_tamper.rs",
+      "line": 142,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'verify_external_rejects_legacy_hmac_proof' appears unused in crate (freq=1)",
+      "snippet": "function verify_external_rejects_legacy_hmac_proof"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/deletion_proof_prefix_collision_proptest.rs",
+      "line": 39,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'no_prefix_collision' appears unused in crate (freq=1)",
+      "snippet": "function no_prefix_collision"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/gate_linearization_test.rs",
+      "line": 66,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_gate_1_immediate_rejection_after_persist' appears unused in crate (freq=1)",
+      "snippet": "function t_gate_1_immediate_rejection_after_persist"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/gate_linearization_test.rs",
+      "line": 93,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_gate_2_linearized_read_and_gate_epoch' appears unused in crate (freq=1)",
+      "snippet": "function t_gate_2_linearized_read_and_gate_epoch"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/gate_linearization_test.rs",
+      "line": 131,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_gate_3_state_table_per_read_path' appears unused in crate (freq=1)",
+      "snippet": "function t_gate_3_state_table_per_read_path"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/gate_linearization_test.rs",
+      "line": 160,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_gategroup_1_concurrent_erases_share_barrier_phase' appears unused in crate (freq=1)",
+      "snippet": "function t_gategroup_1_concurrent_erases_share_barrier_phase"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/gate_linearization_test.rs",
+      "line": 214,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_ver_1_replay_filter_and_78_byte_matcher' appears unused in crate (freq=1)",
+      "snippet": "function t_ver_1_replay_filter_and_78_byte_matcher"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/golden_erasure_test.rs",
+      "line": 119,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_files' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_files"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/journal_durable_spec_tests.rs",
+      "line": 179,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_1_durable_journal_roundtrip_and_fsync' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_1_durable_journal_roundtrip_and_fsync"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/journal_durable_spec_tests.rs",
+      "line": 225,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_2_torn_tail_recovery' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_2_torn_tail_recovery"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/journal_durable_spec_tests.rs",
+      "line": 264,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_4_recover_open_sagas_conservative_gate' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_4_recover_open_sagas_conservative_gate"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/journal_durable_spec_tests.rs",
+      "line": 297,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_jrn_3_reduction_after_completed_r13' appears unused in crate (freq=1)",
+      "snippet": "function t_jrn_3_reduction_after_completed_r13"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/journal_durable_spec_tests.rs",
+      "line": 366,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_erid_1_p13_no_plaintext_keys_or_ids_in_journal' appears unused in crate (freq=1)",
+      "snippet": "function t_erid_1_p13_no_plaintext_keys_or_ids_in_journal"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/loom_erasure_models.rs",
+      "line": 48,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'loom_verify_fence_writer_mutual_exclusion' appears unused in crate (freq=1)",
+      "snippet": "function loom_verify_fence_writer_mutual_exclusion"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/loom_erasure_models.rs",
+      "line": 73,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'loom_tests_disabled_without_cfg' appears unused in crate (freq=1)",
+      "snippet": "function loom_tests_disabled_without_cfg"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/loom_gate.rs",
+      "line": 70,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_conc_1_loom_gate_linearized_reader' appears unused in crate (freq=1)",
+      "snippet": "function t_conc_1_loom_gate_linearized_reader"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/loom_gate.rs",
+      "line": 106,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_conc_1_stress_concurrent_reads_and_gate_linearization' appears unused in crate (freq=1)",
+      "snippet": "function t_conc_1_stress_concurrent_reads_and_gate_linearization"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/measure_real_scan_tests.rs",
+      "line": 207,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_raw_2_missing_positive_control_fails_closed' appears unused in crate (freq=1)",
+      "snippet": "function t_raw_2_missing_positive_control_fails_closed"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/measure_real_scan_tests.rs",
+      "line": 234,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_raw_1_and_4_scan_finds_needle_in_tmp_and_old_segments' appears unused in crate (freq=1)",
+      "snippet": "function t_raw_1_and_4_scan_finds_needle_in_tmp_and_old_segments"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/measure_real_scan_tests.rs",
+      "line": 290,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_mut_1_and_t_keycov_1_mk3_broken_slot_detected' appears unused in crate (freq=1)",
+      "snippet": "function t_mut_1_and_t_keycov_1_mk3_broken_slot_detected"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/measure_real_scan_tests.rs",
+      "line": 342,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_raw_1_and_5_structure_decoder_injection' appears unused in crate (freq=1)",
+      "snippet": "function t_raw_1_and_5_structure_decoder_injection"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p1_key_hierarchy_and_purge.rs",
+      "line": 26,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'kek_destruction_makes_all_deks_undecryptable' appears unused in crate (freq=1)",
+      "snippet": "function kek_destruction_makes_all_deks_undecryptable"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p1_key_hierarchy_and_purge.rs",
+      "line": 77,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'dek_never_plaintext_outside_zeroized_memory' appears unused in crate (freq=1)",
+      "snippet": "function dek_never_plaintext_outside_zeroized_memory"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p1_key_hierarchy_and_purge.rs",
+      "line": 94,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'epoch_isolation' appears unused in crate (freq=1)",
+      "snippet": "function epoch_isolation"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p1_key_hierarchy_and_purge.rs",
+      "line": 134,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'purge_keys_idempotent' appears unused in crate (freq=1)",
+      "snippet": "function purge_keys_idempotent"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p1_key_hierarchy_and_purge.rs",
+      "line": 160,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_no_resurrection_1_purge_keys_survives_double_call_without_resurrection' appears unused in crate (freq=1)",
+      "snippet": "function inv_no_resurrection_1_purge_keys_survives_double_call_without_resurrection"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p2_vault_rewrite_tests.rs",
+      "line": 21,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'swap_error_leaves_no_plaintext' appears unused in crate (freq=1)",
+      "snippet": "function swap_error_leaves_no_plaintext"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p2_vault_rewrite_tests.rs",
+      "line": 141,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'rewrite_crash_at_every_step_never_exposes_plaintext' appears unused in crate (freq=1)",
+      "snippet": "function rewrite_crash_at_every_step_never_exposes_plaintext"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p2_vault_rewrite_tests.rs",
+      "line": 219,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'rewrite_io_error_poisons_handle_permanently' appears unused in crate (freq=1)",
+      "snippet": "function rewrite_io_error_poisons_handle_permanently"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p2_vault_rewrite_tests.rs",
+      "line": 281,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'manifest_matches_journal_after_recovery' appears unused in crate (freq=1)",
+      "snippet": "function manifest_matches_journal_after_recovery"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p3_purge_and_scope_tests.rs",
+      "line": 158,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'purge_phase_transition_matrix_is_exhaustive' appears unused in crate (freq=1)",
+      "snippet": "function purge_phase_transition_matrix_is_exhaustive"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p3_purge_and_scope_tests.rs",
+      "line": 221,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_era_3_single_flight_after_simulated_crash_between_two_starts' appears unused in crate (freq=1)",
+      "snippet": "function inv_era_3_single_flight_after_simulated_crash_between_two_starts"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p3_purge_and_scope_tests.rs",
+      "line": 383,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'stale_lock_is_recovered_without_double_purge' appears unused in crate (freq=1)",
+      "snippet": "function stale_lock_is_recovered_without_double_purge"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p5_wal_sink_tests.rs",
+      "line": 45,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_era_6_wal_read_after_scope_purge_has_no_plaintext' appears unused in crate (freq=1)",
+      "snippet": "function inv_era_6_wal_read_after_scope_purge_has_no_plaintext"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p5_wal_sink_tests.rs",
+      "line": 91,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'dispose_is_idempotent_and_resumable' appears unused in crate (freq=1)",
+      "snippet": "function dispose_is_idempotent_and_resumable"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p5_wal_sink_tests.rs",
+      "line": 124,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'other_scopes_wal_untouched' appears unused in crate (freq=1)",
+      "snippet": "function other_scopes_wal_untouched"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p5_wal_sink_tests.rs",
+      "line": 159,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'sink_error_is_fail_closed' appears unused in crate (freq=1)",
+      "snippet": "function sink_error_is_fail_closed"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p5_wal_sink_tests.rs",
+      "line": 209,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'wal_sink_error_variants_and_display' appears unused in crate (freq=1)",
+      "snippet": "function wal_sink_error_variants_and_display"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p6_ledger_durability.rs",
+      "line": 89,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_era_4_key_destruction_is_anchored_before_saga_end' appears unused in crate (freq=1)",
+      "snippet": "function inv_era_4_key_destruction_is_anchored_before_saga_end"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p6_ledger_durability.rs",
+      "line": 118,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'open_missing_ledger_fails_closed' appears unused in crate (freq=1)",
+      "snippet": "function open_missing_ledger_fails_closed"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p6_ledger_durability.rs",
+      "line": 142,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'open_corrupted_ledger_fails_closed' appears unused in crate (freq=1)",
+      "snippet": "function open_corrupted_ledger_fails_closed"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p6_ledger_durability.rs",
+      "line": 204,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'broken_hash_chain_detected' appears unused in crate (freq=1)",
+      "snippet": "function broken_hash_chain_detected"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p6_ledger_durability.rs",
+      "line": 330,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'atomic_batch_append_crash_leaves_no_partial_batch' appears unused in crate (freq=1)",
+      "snippet": "function atomic_batch_append_crash_leaves_no_partial_batch"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p7_report_chain_tests.rs",
+      "line": 28,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_era_7_report_binds_witness_chain' appears unused in crate (freq=1)",
+      "snippet": "function inv_era_7_report_binds_witness_chain"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p7_report_chain_tests.rs",
+      "line": 56,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'tamper_removed_reordered_modified_witness_rejected' appears unused in crate (freq=1)",
+      "snippet": "function tamper_removed_reordered_modified_witness_rejected"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p7_report_chain_tests.rs",
+      "line": 119,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'canonical_form_is_deterministic' appears unused in crate (freq=1)",
+      "snippet": "function canonical_form_is_deterministic"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p7_report_chain_tests.rs",
+      "line": 172,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'report_without_verified_witness_refused' appears unused in crate (freq=1)",
+      "snippet": "function report_without_verified_witness_refused"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p7_report_chain_tests.rs",
+      "line": 214,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'report_text_contains_no_binding_guarantee_phrases' appears unused in crate (freq=1)",
+      "snippet": "function report_text_contains_no_binding_guarantee_phrases"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p7_report_chain_tests.rs",
+      "line": 251,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'existing_external_verify_test_still_green' appears unused in crate (freq=1)",
+      "snippet": "function existing_external_verify_test_still_green"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 27,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'positive_control_finds_known_residue' appears unused in crate (freq=1)",
+      "snippet": "function positive_control_finds_known_residue"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 41,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'negative_control_after_erasure_finds_nothing' appears unused in crate (freq=1)",
+      "snippet": "function negative_control_after_erasure_finds_nothing"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 73,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scan_without_working_positive_control_is_invalid' appears unused in crate (freq=1)",
+      "snippet": "function scan_without_working_positive_control_is_invalid"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 100,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scanner_error_never_reported_as_clean' appears unused in crate (freq=1)",
+      "snippet": "function scanner_error_never_reported_as_clean"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 136,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_class_measured_1_no_witness_without_positive_control_and_zero_residue' appears unused in crate (freq=1)",
+      "snippet": "function inv_class_measured_1_no_witness_without_positive_control_and_zero_residue"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 164,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_no_resurrection_1_erased_entry_cannot_reappear' appears unused in crate (freq=1)",
+      "snippet": "function inv_no_resurrection_1_erased_entry_cannot_reappear"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 191,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_vault_failclosed_1_scanner_error_fails_closed' appears unused in crate (freq=1)",
+      "snippet": "function inv_vault_failclosed_1_scanner_error_fails_closed"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/p8_residue_scan_tests.rs",
+      "line": 217,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inv_claim_bind_1_no_legal_warranty_wording' appears unused in crate (freq=1)",
+      "snippet": "function inv_claim_bind_1_no_legal_warranty_wording"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/proof_fail_closed_and_consistency.rs",
+      "line": 97,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_wal_sink_monotonicity_and_durability' appears unused in crate (freq=1)",
+      "snippet": "function prop_wal_sink_monotonicity_and_durability"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/saga_core_orchestration.rs",
+      "line": 403,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_1_orchestration_full_flow_steps_1_to_6' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_1_orchestration_full_flow_steps_1_to_6"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/saga_core_orchestration.rs",
+      "line": 429,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_sla_1_orchestration_batched_returns_gated' appears unused in crate (freq=1)",
+      "snippet": "function t_sla_1_orchestration_batched_returns_gated"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/saga_core_orchestration.rs",
+      "line": 453,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_status_1_retention_matrix_refusal' appears unused in crate (freq=1)",
+      "snippet": "function t_status_1_retention_matrix_refusal"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/saga_core_orchestration.rs",
+      "line": 475,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_restr_1_retention_matrix_restricted_mode' appears unused in crate (freq=1)",
+      "snippet": "function t_restr_1_retention_matrix_restricted_mode"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/saga_core_orchestration.rs",
+      "line": 500,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_cancel_1_caller_abort' appears unused in crate (freq=1)",
+      "snippet": "function t_cancel_1_caller_abort"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/saga_core_orchestration.rs",
+      "line": 525,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_1_witness_missing_residue_pending' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_1_witness_missing_residue_pending"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/scope_codec_spec_tests.rs",
+      "line": 149,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_1_scope_binary_codec_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_1_scope_binary_codec_roundtrip"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/scope_codec_spec_tests.rs",
+      "line": 168,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_erid_1_scope_file_persistence_threshold' appears unused in crate (freq=1)",
+      "snippet": "function t_erid_1_scope_file_persistence_threshold"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_gate.rs",
+      "line": 9,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_gate_1_erased_set_checks_and_compaction_policy' appears unused in crate (freq=1)",
+      "snippet": "function t_gate_1_erased_set_checks_and_compaction_policy"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_gate.rs",
+      "line": 64,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_restr_1_lift_restriction' appears unused in crate (freq=1)",
+      "snippet": "function t_restr_1_lift_restriction"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_measure.rs",
+      "line": 17,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_raw_2_positive_control_and_witness_generation' appears unused in crate (freq=1)",
+      "snippet": "function t_raw_2_positive_control_and_witness_generation"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_measure.rs",
+      "line": 50,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_raw_2_positive_control_genuine_scan_and_mutants' appears unused in crate (freq=1)",
+      "snippet": "function t_raw_2_positive_control_genuine_scan_and_mutants"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_measure.rs",
+      "line": 72,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_raw_2_typed_scanner_flow' appears unused in crate (freq=1)",
+      "snippet": "function t_raw_2_typed_scanner_flow"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_observer.rs",
+      "line": 27,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_obs_1_2_3_observer_lifecycle' appears unused in crate (freq=1)",
+      "snippet": "function t_obs_1_2_3_observer_lifecycle"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_observer.rs",
+      "line": 50,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_3_disk_reserve_check' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_3_disk_reserve_check"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_report_ledger.rs",
+      "line": 15,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_report_1_canonical_json_and_signature' appears unused in crate (freq=1)",
+      "snippet": "function t_report_1_canonical_json_and_signature"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_report_ledger.rs",
+      "line": 30,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_restore_1_ledger_and_guard' appears unused in crate (freq=1)",
+      "snippet": "function t_restore_1_ledger_and_guard"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_report_ledger.rs",
+      "line": 57,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_report_residual_risks_and_appendix_d' appears unused in crate (freq=1)",
+      "snippet": "function t_report_residual_risks_and_appendix_d"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_saga_journal.rs",
+      "line": 18,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_1_and_idempotence' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_1_and_idempotence"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_saga_journal.rs",
+      "line": 48,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_driver_linearization_and_advance' appears unused in crate (freq=1)",
+      "snippet": "function t_driver_linearization_and_advance"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_saga_journal.rs",
+      "line": 84,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_cancel_1_and_journal_persistence' appears unused in crate (freq=1)",
+      "snippet": "function t_cancel_1_and_journal_persistence"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_saga_journal.rs",
+      "line": 104,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_crash_matrix_recovery_table' appears unused in crate (freq=1)",
+      "snippet": "function t_crash_matrix_recovery_table"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_sealer_keyring.rs",
+      "line": 13,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_fk_1_keyring_create_open_destroy' appears unused in crate (freq=1)",
+      "snippet": "function t_fk_1_keyring_create_open_destroy"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_sealer_keyring.rs",
+      "line": 40,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_vault_2_and_4_sealer_seal_open_evict' appears unused in crate (freq=1)",
+      "snippet": "function t_vault_2_and_4_sealer_seal_open_evict"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_vault_core.rs",
+      "line": 17,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_vault_1_slot_destruction_and_verification' appears unused in crate (freq=1)",
+      "snippet": "function t_vault_1_slot_destruction_and_verification"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_vault_core.rs",
+      "line": 47,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_vault_3_constants_and_layout' appears unused in crate (freq=1)",
+      "snippet": "function t_vault_3_constants_and_layout"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_vault_core.rs",
+      "line": 55,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_vault_5_probing_and_load_factor' appears unused in crate (freq=1)",
+      "snippet": "function t_vault_5_probing_and_load_factor"
+    },
+    {
+      "crate": "contextra-erasure",
+      "file": "crates/contextra-erasure/tests/t_vault_core.rs",
+      "line": 94,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 't_vault_1_and_t_crash_5_slot_tombstone_verification' appears unused in crate (freq=1)",
+      "snippet": "function t_vault_1_and_t_crash_5_slot_tombstone_verification"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/ppr/tests/algo_tests.rs",
+      "line": 838,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)] // Test utility for tracing log capture assertions"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/ppr/tests/algo_tests.rs",
+      "line": 853,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)] // Test utility visitor for tracing log capture assertions"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/types.rs",
+      "line": 18,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/types.rs",
+      "line": 20,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/types.rs",
+      "line": 22,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/types.rs",
+      "line": 24,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 247,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_sigma' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_sigma"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 248,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_delta' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_delta"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 249,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_gamma' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_gamma"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 250,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_iterations' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_iterations"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 251,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_top_k_expansion' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_top_k_expansion"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 252,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_hyperedge_sort_size' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_hyperedge_sort_size"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/types.rs",
+      "line": 291,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_warn_on_non_convergence' appears unused in crate (freq=1)",
+      "snippet": "function default_warn_on_non_convergence"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/path_rag/k_path.rs",
+      "line": 75,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'eq' appears unused in crate (freq=1)",
+      "snippet": "function eq"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/src/csr/inner/mod.rs",
+      "line": 174,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'deref_mut' appears unused in crate (freq=1)",
+      "snippet": "function deref_mut"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/csr_complexity_bench.rs",
+      "line": 14,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'bench_single_compaction_scaling' appears unused in crate (freq=1)",
+      "snippet": "function bench_single_compaction_scaling"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/csr_complexity_bench.rs",
+      "line": 83,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'bench_amortized_1m_edge_inserts' appears unused in crate (freq=1)",
+      "snippet": "function bench_amortized_1m_edge_inserts"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/golden_generator.rs",
+      "line": 11,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_files' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_files"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/hyperedge_suggest_tests.rs",
+      "line": 313,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_candidates_participants_bounds' appears unused in crate (freq=1)",
+      "snippet": "function prop_candidates_participants_bounds"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/hyperedge_suggest_tests.rs",
+      "line": 349,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_output_candidates_are_canonically_sorted' appears unused in crate (freq=1)",
+      "snippet": "function prop_output_candidates_are_canonically_sorted"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/hyperedge_suggest_tests.rs",
+      "line": 368,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_idempotency_of_candidate_computation' appears unused in crate (freq=1)",
+      "snippet": "function prop_idempotency_of_candidate_computation"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/leiden_reference_validation.rs",
+      "line": 125,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'leiden_on_karate_club_matches_reference' appears unused in crate (freq=1)",
+      "snippet": "function leiden_on_karate_club_matches_reference"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/leiden_reference_validation.rs",
+      "line": 158,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'leiden_is_deterministic_with_fixed_seed' appears unused in crate (freq=1)",
+      "snippet": "function leiden_is_deterministic_with_fixed_seed"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/persistence_test.rs",
+      "line": 123,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'edges_survive_restart' appears unused in crate (freq=1)",
+      "snippet": "function edges_survive_restart"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_csr_invariants.rs",
+      "line": 21,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_1_adjacency_after_compact_has_no_tombstones' appears unused in crate (freq=1)",
+      "snippet": "function prop_1_adjacency_after_compact_has_no_tombstones"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_csr_invariants.rs",
+      "line": 129,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_2_edge_weights_non_negative' appears unused in crate (freq=1)",
+      "snippet": "function prop_2_edge_weights_non_negative"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_csr_invariants.rs",
+      "line": 192,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_3_source_doc_ids_not_none_after_compact' appears unused in crate (freq=1)",
+      "snippet": "function prop_3_source_doc_ids_not_none_after_compact"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_csr_invariants.rs",
+      "line": 262,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_4_compact_is_idempotent' appears unused in crate (freq=1)",
+      "snippet": "function prop_4_compact_is_idempotent"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_csr_invariants.rs",
+      "line": 336,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_5_node_count_monotonically_non_decreasing' appears unused in crate (freq=1)",
+      "snippet": "function prop_5_node_count_monotonically_non_decreasing"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_diffusion.rs",
+      "line": 128,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tl_hfd_diffusion_objective_is_monotonically_non_increasing' appears unused in crate (freq=1)",
+      "snippet": "function prop_tl_hfd_diffusion_objective_is_monotonically_non_increasing"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_diffusion.rs",
+      "line": 194,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tl_hfd_diffusion_matches_bruteforce_reference_small_graph' appears unused in crate (freq=1)",
+      "snippet": "function prop_tl_hfd_diffusion_matches_bruteforce_reference_small_graph"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_lovasz.rs",
+      "line": 77,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_lovasz_extension_is_nonnegative' appears unused in crate (freq=1)",
+      "snippet": "function prop_lovasz_extension_is_nonnegative"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_lovasz.rs",
+      "line": 90,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_lovasz_extension_matches_bruteforce_reference' appears unused in crate (freq=1)",
+      "snippet": "function prop_lovasz_extension_matches_bruteforce_reference"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_lovasz.rs",
+      "line": 111,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_lovasz_extension_max_min_are_distinct_or_none' appears unused in crate (freq=1)",
+      "snippet": "function prop_lovasz_extension_max_min_are_distinct_or_none"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_lovasz.rs",
+      "line": 149,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_truncate_participants_preserves_min_and_top_k' appears unused in crate (freq=1)",
+      "snippet": "function prop_truncate_participants_preserves_min_and_top_k"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/proptest_tl_hfd_lovasz.rs",
+      "line": 209,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_truncate_participants_result_length_bounded' appears unused in crate (freq=1)",
+      "snippet": "function prop_truncate_participants_result_length_bounded"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/source_doc_ids_populated.rs",
+      "line": 13,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_source_doc_ids_set_after_compact' appears unused in crate (freq=1)",
+      "snippet": "function proof_source_doc_ids_set_after_compact"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/source_doc_ids_populated.rs",
+      "line": 64,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_source_doc_ids_empty_before_first_compact' appears unused in crate (freq=1)",
+      "snippet": "function proof_source_doc_ids_empty_before_first_compact"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/source_doc_ids_populated.rs",
+      "line": 101,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_source_doc_ids_consistent_after_multiple_compacts' appears unused in crate (freq=1)",
+      "snippet": "function proof_source_doc_ids_consistent_after_multiple_compacts"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/stress_dag.rs",
+      "line": 20,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'stress_session_dag_deadlock_freedom' appears unused in crate (freq=1)",
+      "snippet": "function stress_session_dag_deadlock_freedom"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/type_parity.rs",
+      "line": 103,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_entity_id_bincode_parity' appears unused in crate (freq=1)",
+      "snippet": "function prop_entity_id_bincode_parity"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/type_parity.rs",
+      "line": 111,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_doc_id_bincode_parity' appears unused in crate (freq=1)",
+      "snippet": "function prop_doc_id_bincode_parity"
+    },
+    {
+      "crate": "contextra-graph",
+      "file": "crates/contextra-graph/tests/type_parity.rs",
+      "line": 119,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_from_key_parity' appears unused in crate (freq=1)",
+      "snippet": "function prop_from_key_parity"
+    },
+    {
+      "crate": "contextra-ids",
+      "file": "crates/contextra-ids/src/lib.rs",
+      "line": 89,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Identisch zu TenantId::SYSTEM \u2014 nutze SYSTEM f\u00fcr Klarheit.\")]"
+    },
+    {
+      "crate": "contextra-ids",
+      "file": "crates/contextra-ids/src/lib.rs",
+      "line": 436,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Nutze inner()\")]"
+    },
+    {
+      "crate": "contextra-ids",
+      "file": "crates/contextra-ids/src/lib.rs",
+      "line": 138,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'try_from' appears unused in crate (freq=1)",
+      "snippet": "function try_from"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/explain.rs",
+      "line": 22,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_collection' appears unused in crate (freq=1)",
+      "snippet": "function default_collection"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/src/prompt_injection.rs",
+      "line": 19,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'now_unix_nanos' appears unused in crate (freq=1)",
+      "snippet": "function now_unix_nanos"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/tests/mcp_test.rs",
+      "line": 703,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'mcp_parse_error_returns_rpc_32700' appears unused in crate (freq=1)",
+      "snippet": "function mcp_parse_error_returns_rpc_32700"
+    },
+    {
+      "crate": "contextra-mcp",
+      "file": "crates/contextra-mcp/tests/mcp_test.rs",
+      "line": 723,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'mcp_method_not_found_returns_32601' appears unused in crate (freq=1)",
+      "snippet": "function mcp_method_not_found_returns_32601"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/golden_corpus.rs",
+      "line": 204,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_mvcc' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_mvcc"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_coarsening_proptest.rs",
+      "line": 18,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_ssi_coarsening_zero_false_negatives' appears unused in crate (freq=1)",
+      "snippet": "function prop_ssi_coarsening_zero_false_negatives"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_determinism_proptest.rs",
+      "line": 79,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_ssi_validation_is_100_percent_deterministic' appears unused in crate (freq=1)",
+      "snippet": "function prop_ssi_validation_is_100_percent_deterministic"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_forget_and_bounds.rs",
+      "line": 15,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'forget_from_removes_keys_of_failed_batch' appears unused in crate (freq=1)",
+      "snippet": "function forget_from_removes_keys_of_failed_batch"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_forget_and_bounds.rs",
+      "line": 43,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'committed_writes_bounded' appears unused in crate (freq=1)",
+      "snippet": "function committed_writes_bounded"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_forget_and_bounds.rs",
+      "line": 72,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'phantom_prefix_conflict' appears unused in crate (freq=1)",
+      "snippet": "function phantom_prefix_conflict"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_hardening.rs",
+      "line": 157,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_prune_equivalence_above_watermark' appears unused in crate (freq=1)",
+      "snippet": "function prop_prune_equivalence_above_watermark"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_metrics_observability.rs",
+      "line": 52,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'record_counter' appears unused in crate (freq=1)",
+      "snippet": "function record_counter"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/ssi_metrics_observability.rs",
+      "line": 76,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'record_histogram' appears unused in crate (freq=1)",
+      "snippet": "function record_histogram"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/tx_buffer_byte_budget.rs",
+      "line": 15,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'tx_buffer_byte_budget_exceeded' appears unused in crate (freq=1)",
+      "snippet": "function tx_buffer_byte_budget_exceeded"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/tx_buffer_byte_budget.rs",
+      "line": 52,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'tx_buffer_byte_budget_freed_on_drain_discard_reap' appears unused in crate (freq=1)",
+      "snippet": "function tx_buffer_byte_budget_freed_on_drain_discard_reap"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/visibility_proptest.rs",
+      "line": 23,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_mvcc_visibility_matches_reference_10k' appears unused in crate (freq=1)",
+      "snippet": "function prop_mvcc_visibility_matches_reference_10k"
+    },
+    {
+      "crate": "contextra-mvcc",
+      "file": "crates/contextra-mvcc/tests/visibility_proptest.rs",
+      "line": 74,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_mvcc_visibility_explicit_boundary_cases' appears unused in crate (freq=1)",
+      "snippet": "function prop_mvcc_visibility_explicit_boundary_cases"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/conformance.rs",
+      "line": 7,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/key_material.rs",
+      "line": 37,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'fill_key_bytes' appears unused in crate (freq=1)",
+      "snippet": "function fill_key_bytes"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/license.rs",
+      "line": 158,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_doctest_authorized_ring_private_fields' appears unused in crate (freq=1)",
+      "snippet": "function _doctest_authorized_ring_private_fields"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/src/storage.rs",
+      "line": 185,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'flush' appears unused in crate (freq=1)",
+      "snippet": "function flush"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/tests/generate_golden_env.rs",
+      "line": 9,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_env_data' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_env_data"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/tests/plugin_registry_dependency_cycle.rs",
+      "line": 78,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_dependency_cycle_detected_and_no_plugins_activated' appears unused in crate (freq=1)",
+      "snippet": "function prop_dependency_cycle_detected_and_no_plugins_activated"
+    },
+    {
+      "crate": "contextra-ports",
+      "file": "crates/contextra-ports/tests/plugin_registry_dependency_cycle.rs",
+      "line": 143,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_dag_dependencies_activated_successfully' appears unused in crate (freq=1)",
+      "snippet": "function prop_dag_dependencies_activated_successfully"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 397,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Neutralisierte API: verwende pii_vault_requires_isolated_retention\")]"
+    },
+    {
+      "crate": "contextra-privacy",
+      "file": "crates/contextra-privacy/src/egress_gateway.rs",
+      "line": 429,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(note = \"Neutralisierte API: verwende resolve_effective_retention_mode\")]"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/src/fusion/types.rs",
+      "line": 20,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/src/calibration/isotonic.rs",
+      "line": 65,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/src/calibration/isotonic.rs",
+      "line": 67,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/src/calibration/isotonic.rs",
+      "line": 90,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_default_clock' appears unused in crate (freq=1)",
+      "snippet": "function _default_clock"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/calibration_deep_tests.rs",
+      "line": 284,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_platt_scaler_bounded_output' appears unused in crate (freq=1)",
+      "snippet": "function prop_platt_scaler_bounded_output"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/calibration_drift_property_tests.rs",
+      "line": 11,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_isotonic_pava_monotonicity' appears unused in crate (freq=1)",
+      "snippet": "function prop_isotonic_pava_monotonicity"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/calibration_drift_property_tests.rs",
+      "line": 42,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_platt_scaling_range_bounded' appears unused in crate (freq=1)",
+      "snippet": "function prop_platt_scaling_range_bounded"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/calibration_drift_property_tests.rs",
+      "line": 54,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_drift_detector_stationary_no_false_alarms' appears unused in crate (freq=1)",
+      "snippet": "function prop_drift_detector_stationary_no_false_alarms"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/calibration_stress_and_fault_tests.rs",
+      "line": 71,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_isotonic_ece_non_negative_and_bounded' appears unused in crate (freq=1)",
+      "snippet": "function prop_isotonic_ece_non_negative_and_bounded"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/fusion_deep_property_tests.rs",
+      "line": 30,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_mrrf_weights_renormalized' appears unused in crate (freq=1)",
+      "snippet": "function prop_mrrf_weights_renormalized"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/fusion_deep_property_tests.rs",
+      "line": 97,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_score_normalized_minmax_clamping' appears unused in crate (freq=1)",
+      "snippet": "function prop_score_normalized_minmax_clamping"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/fusion_deep_property_tests.rs",
+      "line": 135,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_global_fusion_strategy_community_cap' appears unused in crate (freq=1)",
+      "snippet": "function prop_global_fusion_strategy_community_cap"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/fusion_tie_break_proof.rs",
+      "line": 122,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_fusion_tie_break_alphabetical' appears unused in crate (freq=1)",
+      "snippet": "function prop_fusion_tie_break_alphabetical"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/golden_tests.rs",
+      "line": 184,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'regen_fixtures' appears unused in crate (freq=1)",
+      "snippet": "function regen_fixtures"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/isotonic_mutation_hardening_test.rs",
+      "line": 162,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_pava_monotonicity_holds_for_arbitrary_unordered_input' appears unused in crate (freq=1)",
+      "snippet": "function prop_pava_monotonicity_holds_for_arbitrary_unordered_input"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rank_invariants.rs",
+      "line": 332,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_inv_rank_monotonic_1' appears unused in crate (freq=1)",
+      "snippet": "function prop_inv_rank_monotonic_1"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rank_invariants.rs",
+      "line": 358,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_commutativity' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_commutativity"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 28,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_empty_lists_return_empty' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_empty_lists_return_empty"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 36,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_monotonicity_single_list' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_monotonicity_single_list"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 57,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_permutation_invariance' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_permutation_invariance"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 102,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_k_boundary_values' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_k_boundary_values"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 128,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_rrf_duplicate_ids_in_single_list' appears unused in crate (freq=1)",
+      "snippet": "function prop_rrf_duplicate_ids_in_single_list"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 144,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_weighted_rrf_permutation_invariance_arbitrary_docs' appears unused in crate (freq=1)",
+      "snippet": "function prop_weighted_rrf_permutation_invariance_arbitrary_docs"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_property_tests.rs",
+      "line": 195,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_weighted_rrf_tie_break_ascending_id' appears unused in crate (freq=1)",
+      "snippet": "function prop_weighted_rrf_tie_break_ascending_id"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_reference.rs",
+      "line": 46,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'rrf_known_values' appears unused in crate (freq=1)",
+      "snippet": "function rrf_known_values"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_reference.rs",
+      "line": 65,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'rrf_with_disjoint_lists' appears unused in crate (freq=1)",
+      "snippet": "function rrf_with_disjoint_lists"
+    },
+    {
+      "crate": "contextra-rank",
+      "file": "crates/contextra-rank/tests/rrf_reference.rs",
+      "line": 90,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'rrf_with_three_lists' appears unused in crate (freq=1)",
+      "snippet": "function rrf_with_three_lists"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 36,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_cosine_f32' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_cosine_f32"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 59,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_euclidean_f32' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_euclidean_f32"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 82,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_dot_product_f32' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_dot_product_f32"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 105,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_cosine_f32_bytes' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_cosine_f32_bytes"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 128,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_euclidean_f32_bytes' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_euclidean_f32_bytes"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 151,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_dot_product_f32_bytes' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_dot_product_f32_bytes"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 174,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_dot_product_u8' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_dot_product_u8"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 195,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_euclidean_sq_u8' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_euclidean_sq_u8"
+    },
+    {
+      "crate": "contextra-simd",
+      "file": "crates/contextra-simd/tests/simd_cross_validation.rs",
+      "line": 216,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'simd_vs_scalar_cosine_similarity_parts_u8' appears unused in crate (freq=1)",
+      "snippet": "function simd_vs_scalar_cosine_similarity_parts_u8"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 119,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 138,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 148,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 159,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 175,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/tenant_codec.rs",
+      "line": 187,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/manifest/core.rs",
+      "line": 16,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/manifest/core.rs",
+      "line": 18,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 9,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/hmac.rs",
+      "line": 447,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/replay.rs",
+      "line": 169,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code, clippy::type_complexity)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compat/scanner/memtable.rs",
+      "line": 32,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 568,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 341,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 346,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 385,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/engine.rs",
+      "line": 400,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/lsm/ops/maintenance.rs",
+      "line": 22,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/support/mod.rs",
+      "line": 6,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/support/mod.rs",
+      "line": 16,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/support/mod.rs",
+      "line": 30,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/support/mod.rs",
+      "line": 47,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/support/mod.rs",
+      "line": 59,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 14,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 200,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'poll_read' appears unused in crate (freq=1)",
+      "snippet": "function poll_read"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 217,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'poll_write' appears unused in crate (freq=1)",
+      "snippet": "function poll_write"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 225,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'poll_flush' appears unused in crate (freq=1)",
+      "snippet": "function poll_flush"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 231,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'poll_shutdown' appears unused in crate (freq=1)",
+      "snippet": "function poll_shutdown"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 240,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'start_seek' appears unused in crate (freq=1)",
+      "snippet": "function start_seek"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/wal/fs.rs",
+      "line": 255,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'poll_complete' appears unused in crate (freq=1)",
+      "snippet": "function poll_complete"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 569,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_check_partial_cmp' appears unused in crate (freq=1)",
+      "snippet": "function _check_partial_cmp"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/src/compaction/engine.rs",
+      "line": 574,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function '_verify_partial_cmp' appears unused in crate (freq=1)",
+      "snippet": "function _verify_partial_cmp"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/amplification_benchmark.rs",
+      "line": 103,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'run_amplification_benchmark' appears unused in crate (freq=1)",
+      "snippet": "function run_amplification_benchmark"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/budget_drift.rs",
+      "line": 38,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_memtable_budget_drift_is_zero' appears unused in crate (freq=1)",
+      "snippet": "function prop_memtable_budget_drift_is_zero"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_fuzzregress_memtable_concurrent.rs",
+      "line": 15,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'campaign_fuzzregress_memtable_concurrent_out_of_order_seq' appears unused in crate (freq=1)",
+      "snippet": "function campaign_fuzzregress_memtable_concurrent_out_of_order_seq"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_prop_lsm_ops.rs",
+      "line": 244,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_campaign_lsm_differential_simulation' appears unused in crate (freq=1)",
+      "snippet": "function prop_campaign_lsm_differential_simulation"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_prop_lsm_ops.rs",
+      "line": 377,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_counter_probe_scan_ordering_inversion' appears unused in crate (freq=1)",
+      "snippet": "function prop_counter_probe_scan_ordering_inversion"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_prop_lsm_ops.rs",
+      "line": 401,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_counter_probe_uncommitted_rollback_leakage' appears unused in crate (freq=1)",
+      "snippet": "function prop_counter_probe_uncommitted_rollback_leakage"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/campaign_prop_lsm_ops.rs",
+      "line": 421,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_counter_probe_prefix_bound_overflow' appears unused in crate (freq=1)",
+      "snippet": "function prop_counter_probe_prefix_bound_overflow"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_bitflip_sstable.rs",
+      "line": 174,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_chaos_sstable_datablock_bitflip' appears unused in crate (freq=1)",
+      "snippet": "function prop_chaos_sstable_datablock_bitflip"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_bitflip_sstable.rs",
+      "line": 257,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_chaos_sstable_bloomfilter_bitflip' appears unused in crate (freq=1)",
+      "snippet": "function prop_chaos_sstable_bloomfilter_bitflip"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_bitflip_sstable.rs",
+      "line": 329,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_chaos_sstable_index_bitflip' appears unused in crate (freq=1)",
+      "snippet": "function prop_chaos_sstable_index_bitflip"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/chaos_bitflip_sstable.rs",
+      "line": 407,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_chaos_sstable_trailer_bitflip' appears unused in crate (freq=1)",
+      "snippet": "function prop_chaos_sstable_trailer_bitflip"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/compaction_overlap_scan_and_tombstone.rs",
+      "line": 115,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_compaction_overlap_scan_and_tombstone' appears unused in crate (freq=1)",
+      "snippet": "function prop_compaction_overlap_scan_and_tombstone"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/crash_kill_durability.rs",
+      "line": 59,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'repro_bug_tx_end_duplicate_seq_no_wal_replay' appears unused in crate (freq=1)",
+      "snippet": "function repro_bug_tx_end_duplicate_seq_no_wal_replay"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/crash_kill_durability.rs",
+      "line": 103,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'child_writer' appears unused in crate (freq=1)",
+      "snippet": "function child_writer"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/golden_corpus.rs",
+      "line": 172,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_corpus' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_corpus"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_group_commit_handoff.rs",
+      "line": 19,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'commit_mutex_handoff_no_lost_write' appears unused in crate (freq=1)",
+      "snippet": "function commit_mutex_handoff_no_lost_write"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_group_commit_handoff.rs",
+      "line": 50,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'commit_mutex_handoff_preserves_commit_order' appears unused in crate (freq=1)",
+      "snippet": "function commit_mutex_handoff_preserves_commit_order"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/loom_guard_rollback.rs",
+      "line": 60,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'loom_guard_drop_against_concurrent_append' appears unused in crate (freq=1)",
+      "snippet": "function loom_guard_drop_against_concurrent_append"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/manifest_corruption.rs",
+      "line": 6,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scenario1_mid_file_corruption_returns_err' appears unused in crate (freq=1)",
+      "snippet": "function scenario1_mid_file_corruption_returns_err"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/manifest_corruption.rs",
+      "line": 55,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scenario2_tail_truncation_is_recoverable' appears unused in crate (freq=1)",
+      "snippet": "function scenario2_tail_truncation_is_recoverable"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/manifest_corruption.rs",
+      "line": 97,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scenario3_prevent_sstable_resurrection' appears unused in crate (freq=1)",
+      "snippet": "function scenario3_prevent_sstable_resurrection"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/manifest_corruption.rs",
+      "line": 141,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scenario4_crc_header_corruption_returns_err' appears unused in crate (freq=1)",
+      "snippet": "function scenario4_crc_header_corruption_returns_err"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/manifest_corruption.rs",
+      "line": 177,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scenario5_replace_mid_file_corruption_returns_err' appears unused in crate (freq=1)",
+      "snippet": "function scenario5_replace_mid_file_corruption_returns_err"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/model_based_mvcc_flush.rs",
+      "line": 56,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_model_based_mvcc_flush_simulation' appears unused in crate (freq=1)",
+      "snippet": "function prop_model_based_mvcc_flush_simulation"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/proptest_model_based.rs",
+      "line": 136,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_model_based_lsm_simulation' appears unused in crate (freq=1)",
+      "snippet": "function prop_model_based_lsm_simulation"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/proptest_sstable_zero_copy_block_decode.rs",
+      "line": 74,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proptest_sstable_zero_copy_block_decode' appears unused in crate (freq=1)",
+      "snippet": "function proptest_sstable_zero_copy_block_decode"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/tenant_codec_properties.rs",
+      "line": 8,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tenant_codec_chunk_key_injective' appears unused in crate (freq=1)",
+      "snippet": "function prop_tenant_codec_chunk_key_injective"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/tenant_scoped_storage.rs",
+      "line": 131,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scan_prefix_never_crosses_tenant_boundary' appears unused in crate (freq=1)",
+      "snippet": "function scan_prefix_never_crosses_tenant_boundary"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/toctou_put_if_absent.rs",
+      "line": 76,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_trait_default_removed' appears unused in crate (freq=1)",
+      "snippet": "function proof_trait_default_removed"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/toctou_put_if_absent.rs",
+      "line": 91,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_put_if_absent_default_trait_removed' appears unused in crate (freq=1)",
+      "snippet": "function proof_put_if_absent_default_trait_removed"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/toctou_put_if_absent.rs",
+      "line": 106,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_put_if_absent_sees_uncommitted_staged_write' appears unused in crate (freq=1)",
+      "snippet": "function proof_put_if_absent_sees_uncommitted_staged_write"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/toctou_put_if_absent.rs",
+      "line": 143,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_put_if_absent_atomicity_under_contention' appears unused in crate (freq=1)",
+      "snippet": "function proof_put_if_absent_atomicity_under_contention"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/toctou_put_if_absent.rs",
+      "line": 204,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_put_if_absent_atomicity' appears unused in crate (freq=1)",
+      "snippet": "function proof_put_if_absent_atomicity"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_legacy_key_tests.rs",
+      "line": 11,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'record_debug' appears unused in crate (freq=1)",
+      "snippet": "function record_debug"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_lifecycle_crash_point_matrix.rs",
+      "line": 212,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'wal_crash_matrix_full_command_coverage' appears unused in crate (freq=1)",
+      "snippet": "function wal_crash_matrix_full_command_coverage"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_poison_causes.rs",
+      "line": 16,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'fsync_fail_poisons_irreversibly' appears unused in crate (freq=1)",
+      "snippet": "function fsync_fail_poisons_irreversibly"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_poison_causes.rs",
+      "line": 64,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'set_len_fail_poisons' appears unused in crate (freq=1)",
+      "snippet": "function set_len_fail_poisons"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_poison_causes.rs",
+      "line": 113,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'rollback_contention_poisons_handle' appears unused in crate (freq=1)",
+      "snippet": "function rollback_contention_poisons_handle"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_poison_causes.rs",
+      "line": 150,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'recover_from_poison_rejects_fsync_cause' appears unused in crate (freq=1)",
+      "snippet": "function recover_from_poison_rejects_fsync_cause"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_poison_causes.rs",
+      "line": 174,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'recover_from_poison_accepts_torn_write' appears unused in crate (freq=1)",
+      "snippet": "function recover_from_poison_accepts_torn_write"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_spec_pending.rs",
+      "line": 29,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'spec_n12_wal_tail_truncation_detection_after_sstable_flush' appears unused in crate (freq=1)",
+      "snippet": "function spec_n12_wal_tail_truncation_detection_after_sstable_flush"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_spec_pending.rs",
+      "line": 113,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'spec_n12_cross_segment_hmac_chain_continuity' appears unused in crate (freq=1)",
+      "snippet": "function spec_n12_cross_segment_hmac_chain_continuity"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_spec_pending.rs",
+      "line": 161,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'spec_n12_manifest_periodic_hwm_checkpoint_verification' appears unused in crate (freq=1)",
+      "snippet": "function spec_n12_manifest_periodic_hwm_checkpoint_verification"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_spec_pending.rs",
+      "line": 197,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'spec_n13_v4_frame_header_crc_bitflip_fails_hard_middle_entry' appears unused in crate (freq=1)",
+      "snippet": "function spec_n13_v4_frame_header_crc_bitflip_fails_hard_middle_entry"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_spec_pending.rs",
+      "line": 247,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'spec_n13_v4_clean_torn_tail_distinguished_from_middle_corrupted_header' appears unused in crate (freq=1)",
+      "snippet": "function spec_n13_v4_clean_torn_tail_distinguished_from_middle_corrupted_header"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_spec_pending.rs",
+      "line": 294,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'spec_n13_v2_v3_to_v4_transparent_migration_and_compatibility' appears unused in crate (freq=1)",
+      "snippet": "function spec_n13_v2_v3_to_v4_transparent_migration_and_compatibility"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_systematic_crash.rs",
+      "line": 21,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'systematic_crash_at_every_wal_io_point' appears unused in crate (freq=1)",
+      "snippet": "function systematic_crash_at_every_wal_io_point"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_systematic_crash.rs",
+      "line": 149,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'crash_exactly_at_fsync_after_commit_marker' appears unused in crate (freq=1)",
+      "snippet": "function crash_exactly_at_fsync_after_commit_marker"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_truncate_ordering.rs",
+      "line": 26,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_hmac_chain_valid_after_truncate_and_rewrite' appears unused in crate (freq=1)",
+      "snippet": "function proof_hmac_chain_valid_after_truncate_and_rewrite"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_truncate_ordering.rs",
+      "line": 85,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_size_counter_consistent_after_truncate' appears unused in crate (freq=1)",
+      "snippet": "function proof_size_counter_consistent_after_truncate"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_truncate_ordering.rs",
+      "line": 123,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_flusher_actor_exclusive_after_single_consumer_refactor' appears unused in crate (freq=1)",
+      "snippet": "function proof_flusher_actor_exclusive_after_single_consumer_refactor"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_truncate_ordering.rs",
+      "line": 138,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_concurrent_flush_and_truncate_no_panic' appears unused in crate (freq=1)",
+      "snippet": "function proof_concurrent_flush_and_truncate_no_panic"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_truncate_ordering.rs",
+      "line": 189,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_wal_size_counter_consistent_after_failed_truncate' appears unused in crate (freq=1)",
+      "snippet": "function proof_wal_size_counter_consistent_after_failed_truncate"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/wal_truncate_ordering.rs",
+      "line": 234,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_wal_truncate_ordering_under_concurrent_flush' appears unused in crate (freq=1)",
+      "snippet": "function proof_wal_truncate_ordering_under_concurrent_flush"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 388,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'run_differential_large' appears unused in crate (freq=1)",
+      "snippet": "function run_differential_large"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 651,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'task_op_strategy' appears unused in crate (freq=1)",
+      "snippet": "function task_op_strategy"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 666,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'run_concurrent_differential' appears unused in crate (freq=1)",
+      "snippet": "function run_concurrent_differential"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 790,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'differential_lsm_vs_redb' appears unused in crate (freq=1)",
+      "snippet": "function differential_lsm_vs_redb"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 803,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'differential_redb_under_memory_pressure_large_values' appears unused in crate (freq=1)",
+      "snippet": "function differential_redb_under_memory_pressure_large_values"
+    },
+    {
+      "crate": "contextra-store",
+      "file": "crates/contextra-store/tests/differential/redb_operation_sequence.rs",
+      "line": 817,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'differential_redb_concurrent_compaction_under_load' appears unused in crate (freq=1)",
+      "snippet": "function differential_redb_concurrent_compaction_under_load"
+    },
+    {
+      "crate": "contextra-sys",
+      "file": "crates/contextra-sys/src/mmap.rs",
+      "line": 179,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'as_ref' appears unused in crate (freq=1)",
+      "snippet": "function as_ref"
+    },
+    {
+      "crate": "contextra-sys",
+      "file": "crates/contextra-sys/src/vault.rs",
+      "line": 201,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'deref_mut' appears unused in crate (freq=1)",
+      "snippet": "function deref_mut"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/wand.rs",
+      "line": 24,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'eq' appears unused in crate (freq=1)",
+      "snippet": "function eq"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/compat/scanner.rs",
+      "line": 196,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'layer' appears unused in crate (freq=1)",
+      "snippet": "function layer"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/src/compat/scanner.rs",
+      "line": 200,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'scan_units' appears unused in crate (freq=1)",
+      "snippet": "function scan_units"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/alloc_profiler.rs",
+      "line": 242,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'run_profile_10k_documents' appears unused in crate (freq=1)",
+      "snippet": "function run_profile_10k_documents"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/alloc_profiler.rs",
+      "line": 510,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'alloc_budget_gate' appears unused in crate (freq=1)",
+      "snippet": "function alloc_budget_gate"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/audit_inspection.rs",
+      "line": 15,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inspect_20_compounds' appears unused in crate (freq=1)",
+      "snippet": "function inspect_20_compounds"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/audit_inspection.rs",
+      "line": 56,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'inspect_umlaut_bimap' appears unused in crate (freq=1)",
+      "snippet": "function inspect_umlaut_bimap"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/core_smoke.rs",
+      "line": 127,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'core_smoke' appears unused in crate (freq=1)",
+      "snippet": "function core_smoke"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/golden_oracle_tests.rs",
+      "line": 25,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_corpus' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_corpus"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/ids_env_diff_test.rs",
+      "line": 15,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'monotonic_nanos' appears unused in crate (freq=1)",
+      "snippet": "function monotonic_nanos"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/index_purge_proptests.rs",
+      "line": 157,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_compound_splitter_umlauts_and_sz_never_panic' appears unused in crate (freq=1)",
+      "snippet": "function prop_compound_splitter_umlauts_and_sz_never_panic"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/index_purge_proptests.rs",
+      "line": 167,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_compound_splitter_hyphenated_never_panic' appears unused in crate (freq=1)",
+      "snippet": "function prop_compound_splitter_hyphenated_never_panic"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/index_purge_proptests.rs",
+      "line": 176,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tokenizer_case_and_normalization_determinism' appears unused in crate (freq=1)",
+      "snippet": "function prop_tokenizer_case_and_normalization_determinism"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/pipeline_analyzer_tests.rs",
+      "line": 131,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_pipeline_arbitrary_utf8_never_panics_and_offsets_valid' appears unused in crate (freq=1)",
+      "snippet": "function prop_pipeline_arbitrary_utf8_never_panics_and_offsets_valid"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/pipeline_analyzer_tests.rs",
+      "line": 153,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_normalization_idempotency_arbitrary_utf8' appears unused in crate (freq=1)",
+      "snippet": "function prop_normalization_idempotency_arbitrary_utf8"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/proptest_bm25_invariants.rs",
+      "line": 211,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_1_bm25_score_strictly_positive_for_present_terms' appears unused in crate (freq=1)",
+      "snippet": "function prop_1_bm25_score_strictly_positive_for_present_terms"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/proptest_bm25_invariants.rs",
+      "line": 230,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_2_bm25_score_monotone_increasing_in_tf' appears unused in crate (freq=1)",
+      "snippet": "function prop_2_bm25_score_monotone_increasing_in_tf"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/proptest_bm25_invariants.rs",
+      "line": 266,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_3_bm25_score_monotone_decreasing_in_doc_len' appears unused in crate (freq=1)",
+      "snippet": "function prop_3_bm25_score_monotone_decreasing_in_doc_len"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/proptest_bm25_invariants.rs",
+      "line": 289,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_4_no_nan_output_for_valid_inputs' appears unused in crate (freq=1)",
+      "snippet": "function prop_4_no_nan_output_for_valid_inputs"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/proptest_bm25_invariants.rs",
+      "line": 316,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_5_tombstone_isolation_snapshot_semantics' appears unused in crate (freq=1)",
+      "snippet": "function prop_5_tombstone_isolation_snapshot_semantics"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/snapshot_oracle_proptest.rs",
+      "line": 73,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_memory_index_matches_oracle' appears unused in crate (freq=1)",
+      "snippet": "function prop_memory_index_matches_oracle"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/tombstone_read_your_writes.rs",
+      "line": 205,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_deleted_doc_not_in_search_results' appears unused in crate (freq=1)",
+      "snippet": "function proof_deleted_doc_not_in_search_results"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/tombstone_read_your_writes.rs",
+      "line": 259,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_tombstone_snapshot_isolation' appears unused in crate (freq=1)",
+      "snippet": "function proof_tombstone_snapshot_isolation"
+    },
+    {
+      "crate": "contextra-text",
+      "file": "crates/contextra-text/tests/wand_differential.rs",
+      "line": 420,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_wand_differential_randomized_corpus' appears unused in crate (freq=1)",
+      "snippet": "function prop_wand_differential_randomized_corpus"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/error.rs",
+      "line": 534,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'contextra_error_display_no_panic' appears unused in crate (freq=1)",
+      "snippet": "function contextra_error_display_no_panic"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/saos.rs",
+      "line": 774,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_fusion_weights_never_panics' appears unused in crate (freq=1)",
+      "snippet": "function prop_fusion_weights_never_panics"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 410,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_sigma' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_sigma"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 413,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_delta' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_delta"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 416,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_gamma' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_gamma"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 419,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_iterations' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_iterations"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 422,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_top_k_expansion' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_top_k_expansion"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 425,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_tl_hfd_max_hyperedge_sort_size' appears unused in crate (freq=1)",
+      "snippet": "function default_tl_hfd_max_hyperedge_sort_size"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/misc.rs",
+      "line": 502,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'default_warn_on_non_convergence' appears unused in crate (freq=1)",
+      "snippet": "function default_warn_on_non_convergence"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 142,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_valid_key_is_ok' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_valid_key_is_ok"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 149,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_from_empty_returns_err' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_from_empty_returns_err"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 162,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'tx_id_ordering_is_consistent' appears unused in crate (freq=1)",
+      "snippet": "function tx_id_ordering_is_consistent"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 418,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tx_id_range_isolation' appears unused in crate (freq=1)",
+      "snippet": "function prop_tx_id_range_isolation"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/ids_tests.rs",
+      "line": 427,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tx_id_overflow_isolation' appears unused in crate (freq=1)",
+      "snippet": "function prop_tx_id_overflow_isolation"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 177,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_docid_serialization' appears unused in crate (freq=1)",
+      "snippet": "function prop_docid_serialization"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 185,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_from_key_deterministic' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_from_key_deterministic"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 192,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_from_key_never_panics' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_from_key_never_panics"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 197,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'doc_id_empty_key_is_err' appears unused in crate (freq=1)",
+      "snippet": "function doc_id_empty_key_is_err"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 202,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_txid_serialization' appears unused in crate (freq=1)",
+      "snippet": "function prop_txid_serialization"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/src/types/domain/tests/misc_tests.rs",
+      "line": 210,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_entityid_serialization' appears unused in crate (freq=1)",
+      "snippet": "function prop_entityid_serialization"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 100,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_distance_metric_symmetry_and_non_negativity' appears unused in crate (freq=1)",
+      "snippet": "function prop_distance_metric_symmetry_and_non_negativity"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/distance_metrics_and_embeddings_suite.rs",
+      "line": 117,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_embedding_normalize_is_idempotent' appears unused in crate (freq=1)",
+      "snippet": "function prop_embedding_normalize_is_idempotent"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 110,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tombstone_bit_invariants' appears unused in crate (freq=1)",
+      "snippet": "function prop_tombstone_bit_invariants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/error_and_witness_suite.rs",
+      "line": 122,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tenant_scoped_isolation' appears unused in crate (freq=1)",
+      "snippet": "function prop_tenant_scoped_isolation"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/generate_golden_ids.rs",
+      "line": 17,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_ids_data' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_ids_data"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 148,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_config_fingerprint_bit_exact_floats' appears unused in crate (freq=1)",
+      "snippet": "function prop_config_fingerprint_bit_exact_floats"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/model_fingerprint_and_schema_suite.rs",
+      "line": 160,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_model_fingerprint_serde_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_model_fingerprint_serde_roundtrip"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 32,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_doc_id_from_key_properties' appears unused in crate (freq=1)",
+      "snippet": "function prop_doc_id_from_key_properties"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 54,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_entity_id_from_key_properties' appears unused in crate (freq=1)",
+      "snippet": "function prop_entity_id_from_key_properties"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 76,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_tx_id_ordering_and_display' appears unused in crate (freq=1)",
+      "snippet": "function prop_tx_id_ordering_and_display"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 98,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_collection_id_invariants' appears unused in crate (freq=1)",
+      "snippet": "function prop_collection_id_invariants"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 113,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_importance_score_clamping' appears unused in crate (freq=1)",
+      "snippet": "function prop_importance_score_clamping"
+    },
+    {
+      "crate": "contextra-types",
+      "file": "crates/contextra-types/tests/newtype_invariants_suite.rs",
+      "line": 125,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_token_budget_consumption' appears unused in crate (freq=1)",
+      "snippet": "function prop_token_budget_consumption"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/diskann/build/tombstone_wal.rs",
+      "line": 44,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/quantize/train.rs",
+      "line": 172,
+      "kind": "DEPRECATED_ITEM",
+      "description": "Deprecated item marked for removal",
+      "snippet": "#[deprecated(since = \"0.1.0\", note = \"Use `calculate_vector_drift` instead\")]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/src/hnsw/staging.rs",
+      "line": 27,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/mmap_toctou_test.rs",
+      "line": 78,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/mmap_toctou_test.rs",
+      "line": 186,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 12,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 15,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 18,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 21,
+      "kind": "ALLOW_DEAD_CODE",
+      "description": "Explicit #[allow(dead_code)] annotation",
+      "snippet": "#[allow(dead_code)]"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/benches/overfetch_selectivity.rs",
+      "line": 56,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'fill_bytes' appears unused in crate (freq=1)",
+      "snippet": "function fill_bytes"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/deleted_nodes_lock_contention.rs",
+      "line": 10,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_no_deadlock_concurrent_delete_search' appears unused in crate (freq=1)",
+      "snippet": "function proof_no_deadlock_concurrent_delete_search"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/deleted_nodes_lock_contention.rs",
+      "line": 83,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_deleted_nodes_lock_hoisted_before_loop' appears unused in crate (freq=1)",
+      "snippet": "function proof_deleted_nodes_lock_hoisted_before_loop"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/deleted_nodes_lock_contention.rs",
+      "line": 123,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_search_throughput_not_degraded_by_deletes' appears unused in crate (freq=1)",
+      "snippet": "function proof_search_throughput_not_degraded_by_deletes"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/deletion_ghost_pointer_proptest.rs",
+      "line": 9,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_ghost_free_deletion_removes_all_pointers' appears unused in crate (freq=1)",
+      "snippet": "function prop_ghost_free_deletion_removes_all_pointers"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/golden_test.rs",
+      "line": 31,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'generate_golden_files' appears unused in crate (freq=1)",
+      "snippet": "function generate_golden_files"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/mmap_toctou_test.rs",
+      "line": 28,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'run_subcommand_target' appears unused in crate (freq=1)",
+      "snippet": "function run_subcommand_target"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/nan_validation_policy.rs",
+      "line": 14,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_nan_rejected_at_insert' appears unused in crate (freq=1)",
+      "snippet": "function proof_nan_rejected_at_insert"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/nan_validation_policy.rs",
+      "line": 47,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_compute_distance_trusted_never_scans_nan' appears unused in crate (freq=1)",
+      "snippet": "function proof_compute_distance_trusted_never_scans_nan"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/nan_validation_policy.rs",
+      "line": 78,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_valid_insert_after_nan_rejection' appears unused in crate (freq=1)",
+      "snippet": "function proof_valid_insert_after_nan_rejection"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/nan_validation_policy.rs",
+      "line": 126,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_validate_vector_covers_all_positions' appears unused in crate (freq=1)",
+      "snippet": "function proof_validate_vector_covers_all_positions"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/nan_validation_policy.rs",
+      "line": 156,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'proof_nan_in_query_rejected_at_search' appears unused in crate (freq=1)",
+      "snippet": "function proof_nan_in_query_rejected_at_search"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/proptest_distance_quantize.rs",
+      "line": 22,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_sq8_quantize_dequantize_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_sq8_quantize_dequantize_roundtrip"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/proptest_distance_quantize.rs",
+      "line": 44,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_cosine_self_distance_is_zero' appears unused in crate (freq=1)",
+      "snippet": "function prop_cosine_self_distance_is_zero"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/proptest_distance_quantize.rs",
+      "line": 58,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_euclidean_non_negative' appears unused in crate (freq=1)",
+      "snippet": "function prop_euclidean_non_negative"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/proptest_distance_quantize.rs",
+      "line": 71,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_dimension_mismatch_returns_err' appears unused in crate (freq=1)",
+      "snippet": "function prop_dimension_mismatch_returns_err"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/recall_vs_brute_force.rs",
+      "line": 189,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'recall_at_10_vs_brute_force_cosine' appears unused in crate (freq=1)",
+      "snippet": "function recall_at_10_vs_brute_force_cosine"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/recall_vs_brute_force.rs",
+      "line": 201,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'recall_at_10_vs_brute_force_euclidean' appears unused in crate (freq=1)",
+      "snippet": "function recall_at_10_vs_brute_force_euclidean"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/recall_vs_brute_force.rs",
+      "line": 213,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'recall_at_10_vs_brute_force_dot_product' appears unused in crate (freq=1)",
+      "snippet": "function recall_at_10_vs_brute_force_dot_product"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/recall_vs_brute_force.rs",
+      "line": 225,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'recall_at_1_vs_brute_force' appears unused in crate (freq=1)",
+      "snippet": "function recall_at_1_vs_brute_force"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/simd_numerical_audit.rs",
+      "line": 170,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_simd_vs_f64_parity_random_vectors' appears unused in crate (freq=1)",
+      "snippet": "function prop_simd_vs_f64_parity_random_vectors"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 13,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'assert_distance_fn_object_safety' appears unused in crate (freq=1)",
+      "snippet": "function assert_distance_fn_object_safety"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 16,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'assert_block_transform_object_safety' appears unused in crate (freq=1)",
+      "snippet": "function assert_block_transform_object_safety"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 19,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'assert_clock_object_safety' appears unused in crate (freq=1)",
+      "snippet": "function assert_clock_object_safety"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_contract_object_safety.rs",
+      "line": 22,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'assert_rng_object_safety' appears unused in crate (freq=1)",
+      "snippet": "function assert_rng_object_safety"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_primitives.rs",
+      "line": 121,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_test_u32_roundtrip' appears unused in crate (freq=1)",
+      "snippet": "function prop_test_u32_roundtrip"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_primitives.rs",
+      "line": 128,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_test_to_u8_valid' appears unused in crate (freq=1)",
+      "snippet": "function prop_test_to_u8_valid"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_primitives.rs",
+      "line": 134,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_test_to_u8_invalid' appears unused in crate (freq=1)",
+      "snippet": "function prop_test_to_u8_invalid"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp02_primitives.rs",
+      "line": 139,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_test_f32_non_negative_finite' appears unused in crate (freq=1)",
+      "snippet": "function prop_test_f32_non_negative_finite"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp06_distance_contract.rs",
+      "line": 104,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_distance_invariants' appears unused in crate (freq=1)",
+      "snippet": "function prop_distance_invariants"
+    },
+    {
+      "crate": "contextra-vector",
+      "file": "crates/contextra-vector/tests/wp06_sq8_bounds.rs",
+      "line": 80,
+      "kind": "UNUSED_PRIVATE_FUNCTION",
+      "description": "Private function 'prop_sq8_error_bound' appears unused in crate (freq=1)",
+      "snippet": "function prop_sq8_error_bound"
+    }
+  ],
+  "sections": [
+    {
+      "header": "Zusammenfassung der technischen Schulden",
+      "content": "| Kategorie | Anzahl | Beschreibung |\n|---|---|---|\n| Unused Private Items | 421 | Private Funktionen, Structs oder Consts ohne Aufrufer im Crate |\n| `#[allow(dead_code)]` | 47 | Unterdr\u00fcckte Dead-Code-Warnungen |\n| `#[deprecated]` | 34 | Veraltete Relikte zur Entfernung |"
+    }
+  ]
+}
