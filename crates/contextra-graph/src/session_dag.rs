@@ -658,6 +658,7 @@ mod tests {
 
     // ANCHOR[contextra-graph:SRC-SESSION-DAG-037]
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     async fn test_session_dag_survives_restart() {
         use crate::test_doubles::InMemoryStorageEngine;
 
@@ -788,6 +789,7 @@ mod tests {
 
     // ANCHOR[contextra-graph:SRC-SESSION-DAG-042]
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     #[allow(non_snake_case)]
     async fn test_load_CASE_non_existent_namespace_returns_not_found() {
         use crate::test_doubles::InMemoryStorageEngine;
@@ -806,6 +808,7 @@ mod tests {
 
     // ANCHOR[contextra-graph:SRC-SESSION-DAG-043]
     #[tokio::test]
+    #[cfg(feature = "ports-compat")]
     #[allow(non_snake_case)]
     async fn test_load_CASE_corrupt_data_returns_serialization_error() {
         use crate::test_doubles::InMemoryStorageEngine;

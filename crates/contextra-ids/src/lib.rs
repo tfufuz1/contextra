@@ -870,6 +870,12 @@ impl<T> TenantScoped<T> {
         &self.value
     }
 
+    /// Referenz auf den inneren Wert (Alias für value).
+    #[inline]
+    pub fn inner(&self) -> &T {
+        &self.value
+    }
+
     /// Gibt den Wert nur zurück, wenn die aufrufende Seite die erwartete `TenantId` nennt.
     pub fn into_inner_checked(
         self,

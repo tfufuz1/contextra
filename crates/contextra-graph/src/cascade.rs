@@ -438,18 +438,18 @@ pub fn verify_doc_hyperedge_deletion_completeness(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "workspace"))]
 mod tests {
     use super::*;
     use crate::csr::EdgeType;
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
     use crate::path_rag::PathRAGEngine;
-    #[cfg(feature = "workspace")]
     use contextra_ports::GraphIndex;
     use crate::types::{Edge, Entity};
 
     // ANCHOR[contextra-graph:SRC-CASCADE-014]
     #[tokio::test]
+    #[cfg(feature = "workspace")]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
         let tx1 = TxId::new(1);

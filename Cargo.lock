@@ -636,6 +636,8 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
+ "contextra-env",
+ "contextra-ids",
  "criterion",
  "parking_lot 0.12.5",
  "rand 0.8.8",

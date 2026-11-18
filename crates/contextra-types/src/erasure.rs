@@ -13,7 +13,7 @@ use crate::ids::{ErasureId, Timestamp};
 use crate::refs::{CollectionRef, DocRef, OperatorRef, SubjectRef, TenantRef};
 
 /// Löschziel (SPEC 7.3).
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
     note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"
@@ -112,7 +112,7 @@ pub struct RetentionAttestation {
 }
 
 /// Löschauftrag (SPEC 7.3).
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 #[deprecated(
     since = "0.1.0",
     note = "Löschtypen gehören in die Erasure-Familie (contextra-erasure-spi per D-E1)"

@@ -30,6 +30,7 @@ pub mod audit_trace;
 pub mod bulk_exfiltration_detector;
 pub mod context_edit_audit;
 pub mod contract;
+pub mod data_class;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod egress_vault;
@@ -50,6 +51,7 @@ pub use context_edit_audit::{
     ContextEditAuditError, ContextEditAuditRecord, ContextEditKind,
 };
 pub use contract::{Clock, EgressDecision, EgressPolicy};
+pub use data_class::{validate_k_payload, DataClass, PersonalDataFound, Validated};
 #[allow(deprecated)]
 pub use egress_gateway::{
     handle_cloud_query, handle_cloud_query_with_bulk_detector, handle_cloud_query_with_guard,

@@ -2,10 +2,10 @@
 
 **Ebene:** E2 (Integration)  
 **Kern-Closure:** `ids`, `env`, `privacy`, `erasure`  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
+**Status:** Normativ (Soll-Zustand)  
+**Version:** 2.1  
 **Geltungsbereich:** `crates/contextra-types`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5, §11, §13; `ANALYSIS-E0-CONTRADICTIONS.md` (§1, §7, D-01, D-07); `ALTLASTEN-AUDIT.md` (AP-21)  
+**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5, §11, §13, §14  
 
 ---
 
@@ -153,12 +153,18 @@ std = [
 
 ## 5. Implementierungs-Arbeitspakete für Entwickler
 
-1. **Veraltetes Modul `src/erasure.rs` löschen:**
-   - Entfernen der Datei und aller deprecated Re-Exports.
-   - Kanonische Löschtypen (`EraseTarget`, `SagaState`, `RetentionAttestation`) stattdessen aus `contextra-erasure` re-exportieren.
-2. **`src/ids.rs` bereinigen:**
-   - Entfernen der doppelten `ErasureId` und `GateId`.
-3. **Altlasten-Bereinigung (`AP-21`):**
-   - Entfernen aller Bezüge auf `contextra-py` und `contextra-router` in `src/error.rs`, `src/error_dto.rs`, `src/retrieval_strategy.rs` und `src/types/domain/misc.rs`.
-4. **Verifikation:**
+> **Kritischer Befund (Befund 2.2):** `contextra-db` verwendet `encryption_passphrase: Option<String>` — kein `SecretString`, nicht zeroisiert. Das ist ein INV-11-Verstoß und muss durch die kanonischen Konfigurationstypen aus dieser Spezifikation ersetzt werden.
+
+1. **`ContextraConfig` und `EncryptionConfig` implementieren:**
+   - `SecretString` als `ZeroizeOnDrop`-Wrapper ohne `Debug`, `Clone`, `Serialize` implementieren.
+   - `EncryptionConfig::Required { passphrase: SecretString }` als einzigen Modus mit Verschlüsselung.
+   - `encryption_passphrase: Option<String>` in `contextra-db` vollständig ersetzen.
+2. **Veraltetes Modul `src/erasure.rs` löschen:**
+   - Kanonische Löschtypen (`EraseTarget`, `SagaState`, `RetentionAttestation`) aus `contextra-erasure` re-exportieren.
+3. **`src/ids.rs` bereinigen:**
+   - Doppelte `ErasureId` und `GateId` entfernen.
+4. **Altlasten-Bereinigung:**
+   - Alle Bezüge auf `contextra-py` und `contextra-router` entfernen.
+5. **Verifikation:**
+   - `cargo clippy -p contextra-types -- -D warnings`
    - `cargo test -p contextra-types`

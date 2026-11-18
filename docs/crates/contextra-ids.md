@@ -2,8 +2,8 @@
 
 **Ebene:** E0 (Autarkes Fundament / Ring 0)  
 **Kern-Closure:** Leer (0 interne Workspace-Abhängigkeiten)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
+**Status:** Normativ (Soll-Zustand)  
+**Version:** 2.1  
 **Geltungsbereich:** `crates/contextra-ids`  
 **Referenzdokumente:** `docs/SPEC.md` §2, §3.2, §4, §13; `ANALYSIS-E0-CONTRADICTIONS.md` (D-01, D-06); `ALTLASTEN-AUDIT.md`  
 
@@ -437,20 +437,26 @@ docid-128 = []
 
 ## 5. Implementierungs-Arbeitspakete für Entwickler
 
+> **Kritischer Befund (Befund 1.4):** Der aktuelle Code implementiert `SubjectRef` als `Vec<u8>`-Wrapper mit `Clone` und ohne `ZeroizeOnDrop`. Das ist ein direkter Verstoß gegen SPEC §3.2 und zerstört die Atomarität der P-Klassen-Löschung. Dieser Befund hat höchste Priorität.
+
 1. **`crates/contextra-ids/Cargo.toml`:**
    - `[lints] workspace = true` ergänzen.
    - `rand` und `zeroize` in Dependencies aufnehmen.
-   - `default = []` setzen (R3-Konformität).
-2. **`SubjectRef` Refactoring:**
+   - `default = []` setzen (R3).
+2. **`SubjectRef` Refactoring (HÖCHSTE PRIORITÄT):**
    - Makro `define_ref_newtype!(SubjectRef)` entfernen.
-   - Echte `[u8; 16]`-Implementierung mit `ZeroizeOnDrop`, `generate()`, ohne `Clone` einbauen.
+   - `Vec<u8>`-Implementierung vollständig ersetzen durch `[u8; 16]`.
+   - `ZeroizeOnDrop` implementieren; `Clone` explizit **nicht** ableiten.
+   - `generate()` via `OsRng::try_fill_bytes` implementieren.
+   - `Debug` und `Display` liefern ausschließlich `"SubjectRef([REDACTED])"`.
 3. **`PersonalRef` Refactoring:**
    - Eigenständiger Typ `[u8; 16]`, ohne `Clone`, mit `generate()`.
 4. **`ErasureId` & `GateId` einbinden:**
-   - Kanonisch in `contextra-ids` definieren.
-5. **Altlasten-Bereinigung:**
-   - Sicherstellen, dass keine Referenzen auf entfernte Crates existieren.
-6. **Tests:**
-   - Unit-Tests für `ZeroizeOnDrop` von `SubjectRef`.
-   - Unit-Tests für `generate()` und deterministische Fehler bei Entropiemangel.
-   - Layout-Checks für 64-Bit und 128-Bit DocId.
+   - Kanonisch in `contextra-ids` definieren; alle Duplikate in anderen Crates löschen.
+5. **Tests:**
+   - Unit-Test: `SubjectRef` dropped → Speicher ist `0x00`.
+   - Unit-Test: `generate()` liefert bei simuliertem RNG-Fehler `Err(IdError::EntropyExhaustion)`.
+   - Layout-Checks für 64-Bit und 128-Bit `DocId`.
+6. **Verifikation:**
+   - `cargo clippy -p contextra-ids -- -D warnings`
+   - `cargo test -p contextra-ids`

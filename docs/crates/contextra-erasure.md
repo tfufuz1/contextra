@@ -1,11 +1,11 @@
 # contextra-erasure — Implementierungsspezifikation (Soll-Zustand)
 
 **Ebene:** E0 (Autarkes Fundament / Ring 0 — Löschkern)  
-**Kern-Closure:** `ids`, `env`, `durable-fs`, `privacy` (autarke Fundamente gemäß SPEC §2.1)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
+**Kern-Closure:** `ids`, `env`, `durable-fs`, `privacy` (E0-Fundamente, keine E1/E2/E3-Abhängigkeiten)  
+**Status:** Normativ (Soll-Zustand)  
+**Version:** 2.1  
 **Geltungsbereich:** `crates/contextra-erasure`  
-**Referenzdokumente:** `docs/SPEC.md` §3, §4, §5, §6, §7, §10, §11, §12, §13; `ANALYSIS-E0-CONTRADICTIONS.md` (D-01, D-05, D-07); `ALTLASTEN-AUDIT.md`  
+**Referenzdokumente:** `docs/SPEC.md` §2.4, §3, §4, §5, §6, §7, §10, §11, §12, §13  
 
 ---
 
@@ -18,11 +18,13 @@
 - **Messung mit Positivkontrolle:** Typestate-gestützter Nachweis (`Scanner<Armed>`), dass keine Datenrückstände verbleiben (`residue_matches == 0`).
 - **Beweisführung & Audit:** Ed25519-signierter Löschbericht und kryptographisch hash-verkettetes Ledger außerhalb des Datenverzeichnisses.
 
-### Beseitigung von Ebenen- und Typkonflikten (D-01, D-05, D-07)
-1. **E0-Fundament-Status:** `contextra-erasure` ist als E0-Fundament definiert (`package.metadata.contextra.ring = "0"`).
-2. **Eliminierung von `types_local.rs`:** Alle Typ-Dubletten werden entfernt. `ErasureId`, `GateId`, `DocId`, `SubjectRef`, `PersonalRef`, `TenantId`, `CollectionId`, `Seq` und `Timestamp` stammen kanonisch aus `contextra-ids`.
-3. **Kanonischer SagaState (D-07):** Vereinheitlichung auf `KeyRevoked` (SPEC-normativ) anstelle des historischen `KeyDestroyed`.
-4. **Keine Krypto-Dubletten:** Die Krypto-Engines für AEAD gehören nach `contextra-crypto` (E1). In `contextra-erasure` verbleiben nur Vault-Slot-Management und optional Ed25519-Signierung.
+### E0-Architekturregeln für dieses Crate
+
+1. **E0-Fundament-Status:** `contextra-erasure` liegt auf Ebene E0. Es darf **keine** Abhängigkeiten auf E1 (`crypto`, `store`, `vector` usw.) oder E2 (`types`, `ports`) haben.
+2. **Kanonische Typbesitzer:** `ErasureId`, `GateId`, `DocId`, `SubjectRef`, `PersonalRef`, `TenantId`, `CollectionId`, `Seq`, `Timestamp` stammen aus `contextra-ids`. Keine lokalen Kopien.
+3. **Kanonischer `SagaState`:** `KeyRevoked` ist der normative Zustandsname. `KeyDestroyed` existiert nicht. Alle Code-Vorkommen von `KeyDestroyed` sind zu ersetzen.
+4. **Keine Krypto-Duplikate:** `aes-gcm-siv`, `sha2`, `hmac` dürfen **nicht** in den `[dependencies]` von `contextra-erasure` stehen. Kryptographische Primitives gehören ausschließlich in `contextra-crypto` (E1). In `contextra-erasure` verbleibt nur: Vault-Slot-Management (Zeroize), optional Ed25519-Signierung (feature `signing`).
+5. **ErasureLayer ist E0:** Das Trait `ErasureLayer` wird in diesem Crate definiert und von E1-Crates **implementiert**. `contextra-erasure` kennt keine konkreten E1-Implementierungen.
 
 ### Architekturgarantien (R1–R6, INV-9, INV-10, INV-11, INV-12)
 1. **`#![forbid(unsafe_code)]`:** Vollständig speichersicher.
@@ -484,18 +486,23 @@ proptest = "1.4"
 ## 9. Implementierungs-Arbeitspakete für Entwickler
 
 1. **`Cargo.toml` Bereinigung:**
-   - `ring = "0"` eintragen (E0-Status herstellen).
-   - `types_local.rs` auflösen: Abhängigkeiten zu `contextra-ids`, `contextra-env`, `contextra-durable-fs`, `contextra-privacy` etablieren.
-   - `aes-gcm-siv`, `sha2`, `hmac` aus Dependencies entfernen (gehören nach `contextra-crypto`).
-   - Default-Features leeren (`default = []`, R3).
-2. **Kanonisierung `SagaState`:**
-   - `KeyDestroyed` in allen Dateien zu `KeyRevoked` umbenennen (D-07).
-   - Invariante INV-9 für terminale Zustände prüfen.
-3. **`SagaGate` In-Memory Lookup:**
-   - Sicherstellen, dass `ReadGate::check()` O(1) ohne Lock-Contention oder I/O ausführt.
+   - `ring = "0"` in `[package.metadata.contextra]` eintragen.
+   - `aes-gcm-siv`, `sha2`, `hmac` **vollständig entfernen** — diese gehören in `contextra-crypto`.
+   - `default = []` setzen (R3).
+   - `[lints] workspace = true` eintragen.
+2. **Typ-Bereinigung:**
+   - `types_local.rs` löschen.
+   - Alle Vorkommen von `KeyDestroyed` → `KeyRevoked` umbenennen.
+   - Sicherstellen: keine E1/E2-Crate in `[dependencies]`.
+3. **SagaGate In-Memory Lookup:**
+   - `ReadGate::check()` MUSS O(1) ohne Lock-Contention und ohne I/O ausführen.
+   - Beim Öffnen der Datenbank: alle nicht-terminalen Sagas aus Journal laden, Gate sofort aktivieren.
 4. **Scanner-Härtung:**
-   - Privater Konstruktor für `ControlEvidence`, sodass `Scanner<Armed>` nur nach nachweislichem Canary-Fund instanziiert werden kann.
-5. **Altlasten-Bereinigung (`ALTLASTEN-AUDIT.md`):**
-   - Entfernen aller Bezüge auf gelöschte Crates in Tests und Modulen.
+   - `ControlEvidence::observed()` ist der einzige Weg zu `Scanner<Armed>`.
+   - Privater Konstruktor sicherstellen.
+5. **Vault-Härtung:**
+   - `verify_key_absent` mit Constant-Time-Vergleich.
+   - Zeroize-Sequenz: Zufallsbytes → Null → fsync → Verifikation.
 6. **Verifikation:**
+   - `cargo clippy -p contextra-erasure -- -D warnings`
    - `cargo test -p contextra-erasure`

@@ -2,30 +2,34 @@
 
 **Ebene:** E2 (Integration & Schnittstellenverträge)  
 **Kern-Closure:** `ids`, `env`, `erasure`, `types`  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
+**Status:** Normativ (Soll-Zustand)  
+**Version:** 2.1  
 **Geltungsbereich:** `crates/contextra-ports`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §5, §6, §7, §10; `ANALYSIS-E0-CONTRADICTIONS.md` (§7.3, D-08); `ALTLASTEN-AUDIT.md` (AP-21)  
+**Referenzdokumente:** `docs/SPEC.md` §2.4, §5, §6, §7, §10
 
 ---
 
 ## 1. Zweck & Architekturgarantien
 
-`contextra-ports` definiert die systemweiten, dynamisch dispatchbaren Trait-Schnittstellen (Ports) nach dem Prinzip der hexagonalen Architektur (Ports & Adapters):
-- **Entkopplung der Schichten:** Ermöglicht dem Orchestrator (`contextra-db`) und dem Löschkern (`contextra-erasure`), Speicherschichten zu steuern, ohne konkrete Implementierungsdetails zu kennen.
-- **Synchronisationsverträge:** Definition von Barrieren (`CommitBarrier`, `PurgeBarrier`) und der synchronen Lesesperre (`ReadGate`).
-- **Lösch-Protokoll (`ErasureLayer`):** Einheitlicher Vertrag für alle speichernden Schichten (Store, Vector, Text, Graph, Crypto).
-- **Messung & Positivkontrolle:** Definition von `LayerWitness`, `MeasureClass` und des Scanner-Protokolls.
+`contextra-ports` definiert systemweite `dyn`-kompatible Wrapper-Traits für die Orchestrierungsschicht:
+- **Synchronisationsverträge:** `CommitBarrier` und `PurgeBarrier` — schützen Gate-Commit und Purge gegen parallele Writer und Kompaktionen.
+- **EmbeddingEngine-Port:** Abstrahiert eine optionale Embedding-Implementierung ohne konkrete Abhängigkeit.
 
-### Beseitigung von Typ- und Altlasten-Inkonsistenzen (R4, AP-21)
-1. **Fehlertypen typisieren:** `ErasureLayer`-Methoden dürfen nicht `Result<T, String>` zurückgeben, sondern typisierte Fehler (`PortError` bzw. `ContextraError`).
-2. **Kanonische `LayerWitness`-Definition:** `LayerWitness` wird kanonisch in `contextra-ports::scanner` definiert (`INV-WITNESS-MINT-1`).
-3. **Altlasten-Bereinigung (`AP-21`):** In `src/embedding.rs` Zeile 7 werden alle Verweise auf `infer-candle` und `infer-ollama` bereinigt.
+### Kritische Ebenenregel (R1) — Befund 1.1
 
-### Architekturgarantien (R1–R6, INV-3, INV-4)
+`ErasureLayer`, `ReadGate`, `Scanner<Armed>`, `LayerWitness`, `GateDecision` und `RangeGate` sind **nicht** in `contextra-ports` definiert. Sie sind kanonisch in `contextra-erasure` (E0) definiert. `contextra-ports` importiert sie von dort.
+
+**E1-Crates implementieren `ErasureLayer` aus `contextra-erasure`, nicht aus `contextra-ports`.** Sie dürfen `contextra-ports` nicht importieren (das wäre E1 → E2, verboten durch R1).
+
+`contextra-ports` enthält **ausschließlich**:
+1. `CommitBarrier` + Permits
+2. `PurgeBarrier` + Permits
+3. `EmbeddingEngine`
+
+### Architekturgarantien (R1–R6)
 1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Object Safety (Dyn-Kompatibilität):** Alle Port-Traits sind objekt-sicher (`Box<dyn Port>`).
-3. **Keine zirkulären Abhängigkeiten:** Importiert niemals konkrete Speicherschichten (`store`, `vector`, `text`, `graph`, `db`).
+2. **Object Safety:** Alle Traits sind `dyn`-kompatibel.
+3. **Keine konkreten Speicherschichten:** Importiert niemals `store`, `vector`, `text`, `graph`, `db`.
 4. **Leere Default-Features (R3):** `default = []`.
 
 ---
@@ -37,28 +41,22 @@
 │                       contextra-ports                       │
 │                                                             │
 │   ┌──────────────────────────┐ ┌──────────────────────────┐ │
-│   │       ErasureLayer       │ │         ReadGate         │ │
-│   │ resolve, on_gate, purge, │ │ check(key), check_range, │ │
-│   │ witness                  │ │ gated_seq                │ │
-│   └──────────────────────────┘ └──────────────────────────┘ │
-│                                                             │
-│   ┌──────────────────────────┐ ┌──────────────────────────┐ │
 │   │      CommitBarrier       │ │       PurgeBarrier       │ │
 │   │ shared() / exclusive()   │ │ compaction() / purge()   │ │
+│   │                          │ │ purge_waiting() -> bool  │ │
 │   └──────────────────────────┘ └──────────────────────────┘ │
 │                                                             │
-│   ┌──────────────────────────┐ ┌──────────────────────────┐ │
-│   │       LayerWitness       │ │     EmbeddingEngine      │ │
-│   │ residue_matches == 0     │ │ embed_query, embed_batch │ │
-│   └──────────────────────────┘ └──────────────────────────┘ │
+│   ┌──────────────────────────┐                             │
+│   │     EmbeddingEngine      │                             │
+│   │ embed_query, embed_batch │                             │
+│   └──────────────────────────┘                             │
+│                                                             │
+│  ⚠ ErasureLayer, ReadGate, LayerWitness, Scanner<Armed>    │
+│    sind in contextra-erasure (E0) definiert, nicht hier.   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
-
-### 2.1 `ErasureLayer` (`erasure.rs`)
-
-Jedes speichernde Subsystem implementiert dieses Trait:
 
 ```rust
 use contextra_erasure::{EraseTarget, LayerWitness, Scanner, Armed};
@@ -110,7 +108,7 @@ pub trait ErasureLayer: Send + Sync {
 
 ---
 
-### 2.2 Synchronisations-Barrieren (`barrier.rs`)
+### 2.1 Synchronisations-Barrieren (`barrier.rs`)
 
 ```rust
 pub trait SharedPermit: Send + Sync {}
@@ -129,13 +127,26 @@ pub trait PurgePermit: Send + Sync {}
 pub trait PurgeBarrier: Send + Sync {
     fn compaction(&self) -> BoxFuture<'_, Box<dyn CompactionPermit>>;
     fn purge(&self) -> BoxFuture<'_, Box<dyn PurgePermit>>;
+    /// Signalisiert wartenden Kompaktionen, dass ein Purge ansteht.
     fn purge_waiting(&self) -> bool;
 }
 ```
 
 ---
 
-## 3. Fehlerbehandlung (`PortError`)
+## 3. EmbeddingEngine (`embedding.rs`)
+
+```rust
+pub trait EmbeddingEngine: Send + Sync {
+    fn embed_query(&self, text: &str) -> BoxFuture<'_, Result<Vec<f32>, PortError>>;
+    fn embed_batch(&self, texts: &[&str]) -> BoxFuture<'_, Result<Vec<Vec<f32>>, PortError>>;
+    fn dimension(&self) -> usize;
+}
+```
+
+---
+
+## 4. Fehlerbehandlung (`PortError`)
 
 ```rust
 #[non_exhaustive]
@@ -160,7 +171,7 @@ pub enum PortError {
 
 ---
 
-## 4. `Cargo.toml` Spezifikation
+## 5. `Cargo.toml` Spezifikation
 
 ```toml
 [package]
@@ -194,11 +205,11 @@ std = ["contextra-ids/std", "contextra-env/std"]
 
 ---
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
+## 6. Implementierungs-Arbeitspakete für Entwickler
 
-1. **Signatur-Härtung:**
-   - In `src/erasure.rs` alle Rückgabetypen von `Result<_, String>` auf `Result<_, PortError>` migrieren.
-2. **Altlasten-Bereinigung (`AP-21`):**
-   - In `src/embedding.rs` Zeile 7 Referenzen auf `infer-candle` und `infer-ollama` bereinigen.
-3. **Verifikation:**
+1. **ErasureLayer entfernen:** `src/erasure.rs` löschen. `ErasureLayer`, `ReadGate`, `Scanner<Armed>`, `LayerWitness` werden aus `contextra-erasure` importiert, nicht in `contextra-ports` definiert.
+2. **Signatur-Härtung:** Alle Rückgabetypen von `Result<_, String>` auf `Result<_, PortError>` migrieren.
+3. **Altlasten-Bereinigung:** In `src/embedding.rs` Referenzen auf `infer-candle` und `infer-ollama` entfernen.
+4. **Verifikation:**
+   - `cargo clippy -p contextra-ports -- -D warnings`
    - `cargo test -p contextra-ports`

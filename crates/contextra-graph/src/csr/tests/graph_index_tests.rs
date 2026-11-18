@@ -16,7 +16,7 @@ use super::basic_tests::setup_test_graph;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
 use contextra_ports::{GraphIndex, StorageEngine};
 use crate::error::GraphError;
-use contextra_types::{Edge, Entity, EntityId, TxId};
+use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-001]
@@ -218,13 +218,13 @@ async fn test_traverse_CASE_exceeds_max_hops_returns_invalid_input() {
     let graph = setup_test_graph().await;
 
     let err = graph.traverse(EntityId::new(1), 101).await.unwrap_err();
-    assert!(matches!(err, GraphError::InvalidInput(_)));
+    assert!(matches!(err, ContextraError::InvalidInput(_)));
 
     let err_time = graph
         .traverse_at_time(EntityId::new(1), 101, TxId::new(100))
         .await
         .unwrap_err();
-    assert!(matches!(err_time, GraphError::InvalidInput(_)));
+    assert!(matches!(err_time, ContextraError::InvalidInput(_)));
 }
 
 // ANCHOR[contextra-graph:SRC-CSR-TESTS-GRAPH-INDEX-TESTS-008]
