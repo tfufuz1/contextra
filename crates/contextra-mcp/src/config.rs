@@ -29,7 +29,7 @@ pub fn available_compiled_providers() -> Vec<&'static str> {
 fn no_provider_error() -> ContextraError {
     let avail = available_compiled_providers();
     let avail_str = if avail.is_empty() {
-        "keine einkompiliert (features: candle, ollama, onnx) / none compiled in".to_string()
+        "keine einkompiliert / none compiled in".to_string()
     } else {
         avail.join(", ")
     };

@@ -61,9 +61,8 @@ fn test_chunker_vs_ingest_divergence_oracle() {
     assert_eq!(total_engine_tokens, 257858, "Eingefrorene Token-Schätzung des Korpus (inkl. 1 MiB Dokument)");
     assert_eq!(chunks_with_breadcrumbs, 628, "Eingefrorene Anzahl an Chunks mit Brotkrumen (alle außer edge_whitespace_only)");
 
-    // Nachweis struktureller Unterschiede zu contextra-ingest:
+    // Nachweis struktureller Eigenschaften des MarkdownChunker:
     // contextra-engine liefert ContextChunk mit Flat-Text und Json-Metadaten.
-    // contextra-ingest arbeitet auf DocumentIr/ChunkDraft und setzt IngestError voraus.
     let sample = "# Header\n\nParagraph text.\n";
     let eng_chunks = engine_chunker.chunk(DocId::new(1), sample);
     assert_eq!(eng_chunks.len(), 1);

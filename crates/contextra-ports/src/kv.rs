@@ -7,7 +7,7 @@
 //!
 //! // ANCHOR[contextra-ports:KV-001]
 //! // SECTION kv-prefix-contracts
-//! // NOTE: Vollständige Trennung von konkreten KV-Caches (`contextra-kvcache`).
+//! // NOTE: Vollständige Trennung von konkreten KV-Cache-Implementierungen.
 
 use crate::model_fingerprint::ModelFingerprint;
 use crate::types::domain::TenantId;

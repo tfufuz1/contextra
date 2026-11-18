@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 #[non_exhaustive]
 #[deprecated(
     since = "0.1.0",
-    note = "KV-Segment Logik migriert nach contextra-kvcache (ADR-PROPOSAL-crypto-kv-segment, E-04). Bitte contextra-kvcache verwenden."
+    note = "KV-Segment Logik wurde entfernt (contextra-kvcache nicht mehr im Workspace, ADR-PROPOSAL-crypto-kv-segment, E-04)."
 )]
 pub enum KvDeleteMode {
     TombstoneOnly,

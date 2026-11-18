@@ -5,7 +5,7 @@
 // STAND: 2026-11-12
 // Testpflicht AK-12 (docs/specs/CONTEXTRA_SPEC_v2.md / Spec §15.2)
 
-use contextra_types::DistanceMetric;
+use contextra_vector::DistanceMetric;
 use contextra_vector::hnsw::Sq8Bias;
 use contextra_vector::quantize::ScalarQuantizer;
 

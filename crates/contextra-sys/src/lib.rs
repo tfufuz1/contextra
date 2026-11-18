@@ -26,7 +26,6 @@
 //! - **Abhängigkeiten (ausgehend):** Keine internen Workspace-Abhängigkeiten. Externe Crates: `libc` (POSIX),
 //!   `windows-sys` (Win32), `memmap2`, `thiserror`, `tracing`.
 //! - **Eingehende Abhängigkeiten (Beispiel-Konsumenten):**
-//!   - `contextra-vault` (RAII-Tresorpuffer aufbauend auf `sys::vault`)
 //!   - `contextra-store` (LSM-Speicher und WAL = Write-Ahead-Log)
 //!   - `contextra-vector` (Vektorindex und DiskANN-Speicherabbildung)
 //!   - Hinweis: `contextra-durable-fs` ist eine eigenständige Dateisystem-Abstraktion (SPEC v3 S-03R / §6.4).
@@ -90,7 +89,7 @@ pub mod map {
 
 // SECTION Public Re-exports
 // ANCHOR[id=sys-reexports,epic=sys-core,seq=3] Ergonomische Direktzugriffe
-// NOTE: Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-vector, contextra-vault).
+// NOTE: Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-vector).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use contract::{MemoryLocker, NoopMemoryLocker, OsMemoryLocker};
 pub use durability::{durable_flush_dir, durable_flush_file, write_all_durable, DurableFile};

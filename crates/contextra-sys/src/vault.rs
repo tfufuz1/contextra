@@ -17,7 +17,7 @@
 //!   Überschreiben (Volatile Memory Zeroization) via `write_volatile` in Kombination mit
 //!   einer sequenziellen Compiler-Fence (`std::sync::atomic::compiler_fence(Ordering::SeqCst)`).
 //! - **Verwendung im System:** Wird von Kryptografie- und Schlüsselverwaltungsmodulen
-//!   (z. B. `contextra-vault`, `contextra-crypto` oder Schlüsselladern in `contextra-store`) eingesetzt.
+//!   (z. B. `contextra-crypto` oder Schlüsselladern in `contextra-store`) eingesetzt.
 //! - **Sicherheitsanforderung (INV-SYS-MEMLOCK-1):**
 //!   Über [`VaultBuffer`] allozierte Puffer werden mit `mlock` im physischen RAM verankert,
 //!   per `madvise(MADV_DONTDUMP)` vom Core-Dump ausgenommen und beim Drop vor der Speicherfreigabe
