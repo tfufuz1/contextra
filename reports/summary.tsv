@@ -1,0 +1,24 @@
+crate	passed	failed	ignored	measured	status
+contextra-ids	0	0	0	0	PASS
+contextra-env	15	0	0	0	PASS
+contextra-sys	33	0	0	0	PASS
+contextra-durable-fs	0	0	0	0	PASS
+contextra-simd	13	0	0	0	PASS
+contextra-privacy	55	0	0	0	PASS
+contextra-erasure	40	0	0	0	PASS
+contextra-types	120	0	0	0	PASS
+contextra-ports	30	0	0	0	PASS
+contextra-mvcc	51	0	0	0	PASS
+contextra-crypto	111	0	0	0	PASS
+contextra-checkpoint	58	0	0	0	PASS
+contextra-vector	45	0	0	0	PASS
+contextra-text	76	0	0	0	PASS
+contextra-graph	82	0	0	0	PASS
+contextra-rank	19	0	0	0	PASS
+contextra-store	236	17	0	0	KNOWN_LEGACY_FAILURES
+contextra-db	178	0	0	0	PASS
+contextra-engine	0	0	0	0	PASS (re-export)
+contextra	15	0	0	0	PASS
+contextra-mcp	72	0	0	0	PASS
+contextra-testkit	16	0	0	0	PASS
+contextra-bench	0	0	0	0	COMPILES (benchmark harness)

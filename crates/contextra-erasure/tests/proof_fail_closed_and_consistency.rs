@@ -132,7 +132,7 @@ fn test_canonical_report_golden_reproducibility() {
     );
 
     let canonical_bytes = canonicalize_report(&report).expect("Canonical serialization must succeed");
-    let golden_path = "crates/contextra-erasure/tests/golden/canonical_report_v1.golden";
+    let golden_path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden/canonical_report_v1.golden");
     
     // Prüfen gegen das Golden Fixture
     let expected_golden = std::fs::read(golden_path).expect("Golden fixture must be readable");
