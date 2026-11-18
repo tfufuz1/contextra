@@ -386,6 +386,7 @@ Die Spalte „Verstoß, wenn“ ist das Sollverhalten. Ob ein vorhandenes Skript
 | **G-C1** Nebenläufigkeit und Mutation | INV-6 | Loom (`loom-gate.yml`), TSan (`tsan.yml`), Miri, Mutation (`mutation-testing.yml`, Baseline `mutants-guarantees.toml`) | ein Lauf fehlschlägt oder der Mutation-Score unter die Baseline fällt |
 | **G-A1** Öffentliche API | INV-2, R9 | `cargo public-api` (`gates.toml › public-api`) | ein öffentlicher Pfad ohne `#[deprecated]`-Re-Export verschwindet oder sich ändert. Der Nightly muss mindestens `rust-version` 1.89 entsprechen; das Pinning regelt ein ADR. |
 | **G-DOC1** Doku | INV-7, §1.3 | `tools/doc_lint.py` | eine Compliance-Aussage steht, ein Verweis auf eine nicht existierende Datei oder §-Überschrift läuft ins Leere, oder ein Docstring `capabilities.toml` widerspricht |
+| **G-REACTIVATE** Reaktivierung | D-34 bis D-42, §8.4 | `cargo check --no-default-features`, `gate_bridge_null.py`, `feature_audit.py`, `isolation_proof.py` | ein archiviertes Crate in den Workspace aufgenommen wird, ohne dass alle fünf Eintrittsbedingungen erfüllt sind |
 
 **Querschnittsgates:** `unwrap-gate` (INV-12), `unsafe-inventory` und `tests/unsafe_islands.rs` (INV-11), `symbol-uniqueness` (R4), `ratchet`, `gate-weakening` und `protected-paths` (INV-10), `error-domain` (= G-E1).
 
@@ -619,6 +620,15 @@ Jede Festlegung, auf die diese Spezifikation oder `AGENTS.md` verweist, steht hi
 | D-31 | Logs, Ledger und Metriken enthalten keine stabilen Pseudonyme. Commitments sind epochengebunden und werden nach Ablauf anonymisiert. | Z-E7. Die Dauer ist offen [⚠]. | festgelegt (v6), Dauer offen |
 | D-32 | Restore-Schutz gilt nur bedingt: mit unabhängiger Senke oder Ankerstand. Sonst startet der Knoten in `Quarantine`. | Ohne unabhängigen Registerbeleg kann niemand Löschungen nachweisen. | festgelegt (v6) |
 | D-33 | Takedown in K ist eine eigene Operation mit `Redacted`-Blob und erhaltener Objekt-ID, nicht Teil der P-Löschkette. | Trennt Versionsgraph und Personenlöschung (§12.6). | festgelegt (v6) |
+| D-34 | `cognition` und `agent` verbleiben außerhalb des Workspace. Reaktivierung erfordert strikte Inversion-of-Control über Traits in `ports` ohne direkte Bindung an Speicher-Engines. | Verhinderung von Architekturschleifen und Zyklen (INV-8); Trennung Klasse P und K. | festgelegt (v6.1) |
+| D-35 | `adapt` und `router` verbleiben außerhalb. Regler (`decay`, `homeostat`, `pid`) verbleiben als interne Hilfsmodule in `db`. Reaktivierung nach Bestehen von S-60 (Differenztests). | Vorläufige Konsolidierung zur Verhinderung redundanter Regler-Dubletten (F-15-analog). | festgelegt (v6.1) |
+| D-36 | `wire` ist eingefroren bis zur Einführung automatisierter Schema-Stabilitäts-Gates (G-F2 mit SHA256-Prüfung). | Schutz vor unbemerkten ABI- und FlatBuffers-Inkompatibilitäten. | festgelegt (v6.1) |
+| D-37 | `py` verbleibt außerhalb bis zum vollständigen API-Freeze der `contextra`-Façade (G-A1) und sauberer Weiterleitung von `docid-128`. | Verhindert Re-Work bei instabiler Public API. | festgelegt (v6.1) |
+| D-38 | `prompt-guard` wird nicht als eigener Crate geführt; Logik ist in `mcp` bzw. `privacy` absorbiert. | Vermeidung von Crate-Proliferation für kleine Regelsätze unter 1.000 Zeilen (Regel X4). | festgelegt (v6.1) |
+| D-39 | `ingest` verbleibt außerhalb bis zum erfolgreichen Abschluss von S-61 (Chunker-Paritätsnachweis gegen `text`). | Sicherstellung von Format- und Chunking-Determinismus (INV-1, INV-5). | festgelegt (v6.1) |
+| D-40 | Inferenz-Crates (`infer-onnx`, `infer-ollama`, `infer-candle`) sind entkoppelt. Contextra operiert autonom; Inferenz wird rein dynamisch über Trait-Objekte in `ports` angebunden. | Reduziert externe C-Dependencies und stellt autarken Betrieb des Kerns sicher. | festgelegt (v6.1) |
+| D-41 | `sandbox` verbleibt außerhalb bis zum formalen Isolationsnachweis via `isolation_proof.py`. | E0-Isolation muss formal belegt sein. | festgelegt (v6.1) |
+| D-42 | `kv-cache` wird erst nach Bereinigung der doppelten KV-Verschlüsselung in `crypto` (S-38) reaktiviert. | Einziger Besitzer je Konzept (Regel R4, Befund F-14). | festgelegt (v6.1) |
 
 ## 11 Personendaten, Unternehmensdaten und Löschkette
 

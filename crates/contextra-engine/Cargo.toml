@@ -17,14 +17,11 @@ contextra-db = { workspace = true }
 
 [features]
 default = []
-onnx = ["contextra-db/onnx"]
-sandbox = ["contextra-db/sandbox"]
 reranking = ["contextra-db/reranking"]
 experimental-diskann = ["contextra-db/experimental-diskann"]
 background-maintenance = ["contextra-db/background-maintenance"]
 graph-connectivity-health = ["contextra-db/graph-connectivity-health"]
 edge-reinforcement-learning = ["contextra-db/edge-reinforcement-learning"]
-adaptive-candidate-pool-sizing = ["contextra-db/adaptive-candidate-pool-sizing"]
 exp-extraction = ["contextra-db/exp-extraction"]
 entity-extraction = ["contextra-db/entity-extraction"]
 auto-extraction-opt-out = ["contextra-db/auto-extraction-opt-out"]
@@ -38,7 +35,6 @@ contextra-text = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-checkpoint = { workspace = true }
-contextra-ingest = { workspace = true }
 contextra-testkit = { workspace = true }
 bytes = { workspace = true }
 serde = { workspace = true }

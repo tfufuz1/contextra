@@ -56,8 +56,6 @@ pub use contextra_types::DistanceMetric;
 pub use performance_profile::{DurabilityConfigError, DurabilityMode, PerformanceProfile};
 pub use query_rewriter::LlmQueryRewriter;
 
-#[cfg(feature = "candle")]
-pub use contextra_infer_candle as candle;
 
 // ANCHOR[contextra:LIB-001]
 /// Erzeugt einen neuen [`ContextraBuilder`] zur Konfiguration und Instanziierung der Datenbank [`Contextra`].

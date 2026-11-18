@@ -84,7 +84,61 @@ impl From<&str> for McpError {
     }
 }
 
-pub use contextra_wire::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
+/// JSON-RPC 2.0 Error Object.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JsonRpcError {
+    pub code: i32,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+}
+
+/// JSON-RPC 2.0 Request Object.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JsonRpcRequest {
+    pub jsonrpc: String,
+    pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<serde_json::Value>,
+}
+
+/// JSON-RPC 2.0 Response Object.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JsonRpcResponse {
+    pub jsonrpc: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<JsonRpcError>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<serde_json::Value>,
+}
+
+impl JsonRpcResponse {
+    pub fn ok(id: Option<serde_json::Value>, result: serde_json::Value) -> Self {
+        Self {
+            jsonrpc: "2.0".to_string(),
+            result: Some(result),
+            error: None,
+            id,
+        }
+    }
+
+    pub fn err(id: Option<serde_json::Value>, code: i32, message: String) -> Self {
+        Self {
+            jsonrpc: "2.0".to_string(),
+            result: None,
+            error: Some(JsonRpcError {
+                code,
+                message,
+                data: None,
+            }),
+            id,
+        }
+    }
+}
 
 /// Ermittelt die Schachtelungstiefe eines JSON-Value.
 pub fn measure_json_depth(val: &Value) -> usize {

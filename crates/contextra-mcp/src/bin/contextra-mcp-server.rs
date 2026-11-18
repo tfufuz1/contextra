@@ -59,20 +59,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         contextra_mcp::is_write_allowed_by_env()
     };
 
-    let mut router_config = RouterConfig::from_env();
-    if let Some(i) = args.iter().position(|a| a == "--router-profiles-path") {
-        if let Some(val) = args.get(i + 1) {
-            let path = std::path::PathBuf::from(val);
-            if let Ok(bytes) = std::fs::read(&path) {
-                if let Ok(loaded) =
-                    serde_json::from_slice::<Vec<contextra_router::SlmProfile>>(&bytes)
-                {
-                    router_config.profiles = loaded;
-                }
-            }
-            router_config.profiles_path = Some(path);
-        }
-    }
+    // Router-Profiles-Laden entfernt (contextra-router nicht mehr vorhanden).
+    let router_config = RouterConfig::from_env();
 
     let db = Arc::new(Contextra::open(&db_path).await?);
     let routing = setup_routing(&db, &router_config).await?;
