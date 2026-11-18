@@ -27,13 +27,14 @@ legacy-wal-key = []
 [dependencies]
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
+contextra-sys = { workspace = true }
+contextra-durable-fs = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-mvcc = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-contextra-sys = { workspace = true }
-contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
-contextra-crypto = { workspace = true }
 bytes = { workspace = true }
 blake3 = { workspace = true }
 crc32fast = { workspace = true }
@@ -43,17 +44,11 @@ tokio = { workspace = true }
 memmap2 = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
-
 rand = { workspace = true }
 lru = "0.16.3"
-
-
-uuid = { version = "1", features = ["v4"] }
 tokio-util = { version = "0.7.18", features = ["rt"] }
 
-
 [dev-dependencies]
-contextra-testkit = { workspace = true }
 contextra-env = { workspace = true, features = ["test-utils"] }
 libc = "0.2"
 serde_json = { workspace = true }

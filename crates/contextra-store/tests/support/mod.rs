@@ -1,4 +1,9 @@
-use contextra_testkit::ReferenceModel;
+pub mod reference_model;
+pub mod fault_vfs;
+
+pub use reference_model::ReferenceModel;
+pub use fault_vfs::{FaultConfig, FaultVfs};
+
 use std::fs;
 use std::path::Path;
 
@@ -83,4 +88,101 @@ pub async fn verify_storage_against_reference_model(
         }
     }
     Ok(())
+}
+
+pub use metrics_mock::{MetricEvent, TestMetricsSink};
+pub mod metrics_mock {
+    use contextra_ports::MetricsSink;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum MetricEvent {
+        Counter {
+            name: String,
+            value: u64,
+            labels: Vec<(String, String)>,
+        },
+        Gauge {
+            name: String,
+            value: f64,
+            labels: Vec<(String, String)>,
+        },
+        Histogram {
+            name: String,
+            value: f64,
+            labels: Vec<(String, String)>,
+        },
+    }
+
+    #[derive(Default)]
+    pub struct TestMetricsSink {
+        events: Arc<Mutex<Vec<MetricEvent>>>,
+    }
+
+    impl TestMetricsSink {
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        pub fn events(&self) -> Vec<MetricEvent> {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone()
+        }
+
+        pub fn clear(&self) {
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clear();
+        }
+    }
+
+    impl MetricsSink for TestMetricsSink {
+        fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
+            let labels_vec = labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(MetricEvent::Counter {
+                    name: name.to_string(),
+                    value,
+                    labels: labels_vec,
+                });
+        }
+
+        fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+            let labels_vec = labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(MetricEvent::Gauge {
+                    name: name.to_string(),
+                    value,
+                    labels: labels_vec,
+                });
+        }
+
+        fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
+            let labels_vec = labels
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(MetricEvent::Histogram {
+                    name: name.to_string(),
+                    value,
+                    labels: labels_vec,
+                });
+        }
+    }
 }

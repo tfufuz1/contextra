@@ -9,7 +9,7 @@
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_testkit::{FaultConfig, FaultVfs};
+use crate::support::{FaultConfig, FaultVfs};
 use contextra_types::TxId;
 use tempfile::TempDir;
 

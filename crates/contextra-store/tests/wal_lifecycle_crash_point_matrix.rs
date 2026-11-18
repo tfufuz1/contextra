@@ -7,7 +7,7 @@
 use contextra_store::wal::{
     Wal, WalConfig, WalOp, WalVersion, FAIL_APPEND_FOR_TX, FAIL_TRUNCATE_ONCE,
 };
-use contextra_testkit::{FaultConfig, FaultVfs};
+use crate::support::{FaultConfig, FaultVfs};
 use contextra_types::{ContextraError, TxId};
 use tempfile::TempDir;
 

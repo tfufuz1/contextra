@@ -4,7 +4,7 @@
 
 use contextra_ports::StorageEngine;
 use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver};
-use contextra_testkit::ManualClock;
+use contextra_env::ManualClock;
 use contextra_types::TxId;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;

@@ -694,12 +694,12 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-crypto",
+ "contextra-durable-fs",
  "contextra-env",
  "contextra-ids",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-sys",
- "contextra-testkit",
  "contextra-types",
  "crc32fast",
  "criterion",
@@ -720,7 +720,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "uuid",
 ]
 
 [[package]]
