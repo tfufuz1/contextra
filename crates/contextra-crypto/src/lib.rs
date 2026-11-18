@@ -19,7 +19,7 @@
 //! - **Ring:** Ring 0 (Kern / Foundation)
 //! - **Abhängigkeiten (ausgehend):** `contextra-ids`, `contextra-env`
 //! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
-//!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
+//!   `contextra-mcp`, `contextra-privacy`,
 //!   `contextra-store`, `contextra-vector`.
 //!
 //! ## Hauptaufgaben

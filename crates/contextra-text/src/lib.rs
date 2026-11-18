@@ -22,7 +22,7 @@
 //! - **Normal**: `contextra-ports`, `contextra-types`, sowie Hilfs-Bibliotheken (`bincode`, `blake3`,
 //!   `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`,
 //!   `unicode-segmentation`).
-//! - **Wird genutzt von**: `contextra-engine`, `contextra-db`, `contextra-router`, `contextra-agent`
+//! - **Wird genutzt von**: `contextra-engine`, `contextra-db`
 //!   sowie Benchmarks (`contextra-bench`).
 //!
 //! # Haupttypen

@@ -552,7 +552,7 @@ impl EgressVault {
 }
 
 // ANCHOR[contextra-privacy:EV-017]
-/// Schnittstelle für Downstream-Crates (`contextra-mcp`, `contextra-router`).
+/// Schnittstelle für Downstream-Crates (`contextra-mcp`).
 pub trait EgressClassifier: Send + Sync {
     /// Klassifiziert einen Text-Payload für den Egress-Export.
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;

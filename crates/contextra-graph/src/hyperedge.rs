@@ -307,11 +307,8 @@ pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
 
 /// Guard zur Erzwingung kanonischer Lock-Reihenfolge über mehrere Entitäten (H2 / §5.1.2).
 ///
-/// # Abgrenzung zu `contextra-cognition`
 /// Dieser Guard im CSR-Graph-Subsystem dient ausschließlich der lock-freien / deadlock-freien
 /// Akquisition von Entitätsmengen bei der Hyperkanten-Konsolidierung (H2 / §5.1.2).
-/// Er unterscheidet sich von `ConsolidationNodesGuard` in `contextra-cognition`, welcher
-/// den kognitiven Sleep-Cycle und Multi-Knoten-Re-Consolidations auf Transaktionsebene steuert.
 ///
 /// Stellt sicher, dass Entitäts-IDs vor dem Erwerb mehrerer Schlösser deterministisch
 /// sortiert und dedupliziert werden (`sort_dedup_entities`), um Deadlocks (Lock Order Inversions)

@@ -1,33 +1,85 @@
-# contextra-crypto — Crate-Spezifikation
+# contextra-crypto — Crate-Spezifikation (Kryptographische Primitive)
 
 **Ebene:** E1a (Kern-Closure: `ids`, `env`)  
-**Bindung:** `docs/SPEC.md` §4, §5, §7
+**Status:** Normativ  
+**Version:** 1.0  
+**Geltungsbereich:** `crates/contextra-crypto`  
+**Referenz:** `docs/SPEC.md` §4, §5, §7
 
 ---
 
-## 1 Zweck & Kryptographische Primitive
+## 1. Zweck & Systemrolle
 
-`contextra-crypto` implementiert die kryptographischen Kernalgorithmen für Verschlüsselung, Hashing, Key-Derivation und Schlüsselzerstörung.
+`contextra-crypto` implementiert die kryptographischen Kernalgorithmen für Contextra:
+- **Authenticated Encryption with Associated Data (AEAD):** Schutz aller vertraulichen Daten der Klassen K und P vor unbefugter Einsichtnahme und Manipulation.
+- **Key Derivation Functions (KDF):** Deterministische und kryptographisch getrennte Schlüsselableitung aus Master-, Mandanten- und Betroffenen-Schlüsseln.
+- **Sichere Speicherverwaltung:** Garantierte Löschung (`ZeroizeOnDrop`) allen Schlüsselmaterials aus dem RAM.
+- **Kryptographische Bereinigung:** Slot-Nullung und Vernichtung von DEKs für das DSGVO-Krypto-Shredding.
 
-## 2 Kryptographischer Standard
+---
 
-| Funktion | Algorithmus | Spezifikation |
-|---|---|---|
-| Authenticated Encryption | AES-256-GCM-SIV | RFC 8452 (Misuse-resistant, schützt vor Nonce-Wiederverwendung) |
-| Key Derivation | HKDF-SHA-256 | RFC 5869 |
-| Master-Key-Derivation | Argon2id | m=256MB, t=4, p=1 |
-| Nonces | 96 Bit | Zufall via `rand::rngs::OsRng::try_fill_bytes` (fehlbar) |
-| Schlüsselzerstörung | Memory Wiping | `zeroize::ZeroizeOnDrop` für alle internen Puffer |
+## 2. Kryptographische Standards & Algorithmen
 
-## 3 Rolle in der Löschkette & PII-Kapselung
+| Funktion | Algorithmus | Standard / RFC | Parameter |
+|---|---|---|---|
+| **AEAD Chiffre** | AES-256-GCM-SIV | RFC 8452 | 256-Bit Key, 96-Bit Nonce, 128-Bit Tag. Misuse-resistant. |
+| **Key Derivation** | HKDF-SHA-256 | RFC 5869 | Expand- und Extract-Routinen mit Domain Separation Strings |
+| **Passphrase KDF** | Argon2id | RFC 9106 | $m=256\text{MB}$, $t=4$, $p=1$, 32-Byte Salt |
+| **Zufall (RNG)** | OS CSPRNG | `getrandom` | Fehlbar (`try_fill_bytes`). Kein deterministischer Fallback |
+| **Memory Sanitization** | Zeroize | Rust `zeroize` | `ZeroizeOnDrop` für alle Schlüsselstrukturen |
 
-- **Kryptographisches Shredding:** `contextra-crypto` liefert die Primitive zum Überschreiben und Nullen von Schlüsselslots im persistenten Tresor (`SagaVault`).
-- **Keine stillen Fallbacks:** Schlägt HKDF, AEAD oder RNG fehl, wird strikt mit `Err(CryptoError)` abgebrochen. Kein Fallback auf Klartext oder unsichere BLAKE3-Masken.
-- **Bindung an Kontext (AAD):** Verschlüsselungen fordern verpflichtend Additional Authenticated Data (AAD): `tenant_id || collection_id || doc_id || version`. Ein Chiffretext kann kryptographisch nicht in eine andere Collection oder Version verschoben werden.
-- **ErasureLayer-Rolle:** Implementiert `ErasureLayer` für verbleibende Slot-Bereinigungen (Phase 4g).
+---
 
-## 4 Invarianten
+## 3. Schlüsselhierarchie & Domänen-Trennung (SPEC §4)
 
-- Schlüsselmaterial besitzt weder `Clone`, `Debug` noch unsichere Kopierroutinen.
-- `#![forbid(unsafe_code)]`.
-- Constant-time Vergleiche für MACs und Tags (`subtle::ConstantTimeEq`).
+```
+MasterKey (256 Bit)
+   │
+   ├── HKDF-Expand(info="contextra/tenant/v1" || tenant_id)
+   │      │
+   │      └── TenantKEK
+   │             │
+   │             ├── HKDF-Expand(info="contextra/collection/v1" || coll_id || epoch)
+   │             │      │
+   │             │      └── CollectionKEK
+   │             │             │
+   │             │             ├── HKDF-Expand(info="contextra/doc/v1" || doc_id || ver)
+   │             │             │      └── DocumentDEK (Klasse K)
+   │             │             │
+   │             │             └── HKDF-Expand(info="contextra/subject/v1" || subject_ref)
+   │             │                    │
+   │             │                    └── SubjectKey (Klasse P)
+   │             │                           │
+   │             │                           └── HKDF-Expand(...)
+   │             │                                  └── SubjectDocDEK
+   │             │
+   │             └── (Neue Epoche bei Collection-Neuanlage nach Drop)
+   │
+   └── HKDF-Expand(info="contextra/erasure/v1")
+          └── ErasureKey (für Audit-Journal und Ledger)
+```
+
+### 3.1 AAD-Bindung (Additional Authenticated Data)
+Jede AEAD-Verschlüsselung bindet zwingend Kontextinformationen ein:
+$$\text{AAD} = \text{TenantId} \,\|\, \text{CollectionId} \,\|\, \text{DocId} \,\|\, \text{Version}$$
+Ein Chiffretext, der in eine andere Collection, einen anderen Mandanten oder eine andere Version kopiert wird, schlägt bei der Entschlüsselung fehl.
+
+---
+
+## 4. Rolle in der DSGVO-Löschkette
+
+- **Schritt 3 (Schlüsselvernichtung):** 
+  - Überschreibt den Schlüsselslot mit kryptographischen Zufallsbytes aus dem OS CSPRNG.
+  - Überschreibt den Slot anschließend mit Nullen (`0x00`).
+  - Führt ein `fsync` auf die Keyring-Datei aus (`contextra-durable-fs`).
+- **Schritt 4g (Slot-Bereinigung):**
+  - Implementiert `ErasureLayer` zur physischen Bereinigung von Slot-Fragmenten und temporären FileKeys im Speicher und auf Platte.
+
+---
+
+## 5. Invarianten
+
+1. **`#![forbid(unsafe_code)]`:** Vollständig speichersicher.
+2. **Keine stillen Fallbacks:** Fehlt ein Schlüssel oder schlägt die Entschlüsselung fehl, MUSS sofort `Err(ContextraError::Crypto(...))` zurückgegeben werden. Es gibt keine Pseudo-Schlüssel oder Klartext-Notfallmodi.
+3. **Schlüsseltypen ohne Debug & Clone:** Schlüsselmaterial implementiert weder `Clone`, `Debug` noch `Serialize`, um versehentliches Logging oder Kopieren im Speicher zu verhindern.
+4. **Constant-Time Vergleiche:** Tags und Hashes werden ausschließlich mit `subtle::ConstantTimeEq` verglichen (Timing-Attack Schutz).

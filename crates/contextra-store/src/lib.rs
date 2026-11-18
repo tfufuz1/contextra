@@ -23,7 +23,7 @@
 //! ## Ring-Hierarchie & Abhängigkeiten
 //! - **Ring 1 / Klasse B:** Kernkomponente des Storage-Bundles (`types`, `ports`, `mvcc`, `crypto`, `sys`, `store`).
 //! - **Eingehende Abhängigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`,
-//!   `contextra-checkpoint`, `contextra-agent` und der übergeordneten Fassade `contextra`.
+//!   `contextra-checkpoint` und der übergeordneten Fassade `contextra`.
 //! - **Ausgehende Abhängigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
 //!   `contextra-sys`, `contextra-mvcc`.
 

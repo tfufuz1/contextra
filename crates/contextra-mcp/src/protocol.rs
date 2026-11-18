@@ -126,13 +126,13 @@ impl JsonRpcResponse {
         }
     }
 
-    pub fn err(id: Option<serde_json::Value>, code: i32, message: String) -> Self {
+    pub fn err(id: Option<serde_json::Value>, code: i32, message: impl Into<String>) -> Self {
         Self {
             jsonrpc: "2.0".to_string(),
             result: None,
             error: Some(JsonRpcError {
                 code,
-                message,
+                message: message.into(),
                 data: None,
             }),
             id,

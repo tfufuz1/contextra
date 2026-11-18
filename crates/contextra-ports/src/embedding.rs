@@ -4,7 +4,7 @@
 //! LINK crates/contextra-ports/src/reranker.rs
 //! LINK crates/contextra-ports/src/query_rewriter.rs
 //!
-//! Abstrakte Verträge für ML-Embeddings und LLM-Textgenerierung (z. B. `contextra-infer-candle`, `contextra-infer-ollama`).
+//! Abstrakte Verträge für ML-Embeddings und LLM-Textgenerierung (für Embedding- und LLM-Backends).
 //!
 //! // ANCHOR[contextra-ports:EMBED-001]
 //! // SECTION embedding-inference-contracts

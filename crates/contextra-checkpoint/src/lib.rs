@@ -31,7 +31,7 @@
 //! ## Einbindung & Abhängigkeiten
 //! - **Abhängigkeiten (normal):** `contextra-types`, `contextra-ports`, `bytes`, `tokio`, `tracing`, `serde`, `serde_json`, `parking_lot`, `blake3`, `thiserror`.
 //! - **Abhängigkeiten (dev):** `contextra-testkit`, `tempfile`, `proptest`, `criterion`.
-//! - **Wird eingebunden von:** `contextra-agent`, `contextra-db`, `contextra-engine`.
+//! - **Wird eingebunden von:** `contextra-db`, `contextra-engine`.
 
 #![forbid(unsafe_code)]
 

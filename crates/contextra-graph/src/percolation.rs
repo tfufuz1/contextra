@@ -16,10 +16,8 @@ use std::collections::HashMap;
 
 /// Konfiguration für den Perkolations-Gesundheitsmonitor.
 ///
-/// # Abgrenzung zu `contextra-cognition`
 /// Diese Konfiguration steuert den lokalen Perkolations-Gesundheitsmonitor (`physio-percolation`)
-/// auf CSR-Graph-Ebene. Sie unterscheidet sich von der kognitiven Wartungskonfiguration in
-/// `contextra-cognition`, welche systemweite Sleep-Cycle-Intervalle und Konsolidierungs-Trigger orchestriert.
+/// auf CSR-Graph-Ebene.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-graph:SRC-PERCOLATION-001]
 

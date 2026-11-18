@@ -3,7 +3,7 @@
 //!
 //! # Zweck & Architektur-Rolle: Typen-Fundament (contracts)
 //!
-//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu Python via `contextra-py` oder
+//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu externen Clients oder
 //! Tauri/Web-Frontends via IPC) gehen bei einfachen String-Repräsentationen die Typinformationen
 //! und strukturierte Felder verloren.
 //!

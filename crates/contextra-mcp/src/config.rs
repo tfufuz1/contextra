@@ -20,15 +20,6 @@ static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 /// Returns the list of currently compiled provider identifiers.
 pub fn available_compiled_providers() -> Vec<&'static str> {
     let mut list = Vec::new();
-    if cfg!(feature = "candle") {
-        list.push("candle");
-    }
-    if cfg!(feature = "ollama") {
-        list.push("ollama");
-    }
-    if cfg!(feature = "onnx") {
-        list.push("onnx");
-    }
     if cfg!(any(test, feature = "test-utils")) {
         list.push("mock");
     }

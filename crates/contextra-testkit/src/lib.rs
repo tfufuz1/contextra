@@ -24,8 +24,8 @@
 //!
 //! ## Abhängigkeiten
 //! - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`.
-//! - **Wird eingebunden von:** `contextra`, `contextra-agent`, `contextra-checkpoint`,
-//!   `contextra-cognition`, `contextra-crypto`, `contextra-db`, `contextra-engine`,
+//! - **Wird eingebunden von:** `contextra`, `contextra-checkpoint`,
+//!   `contextra-crypto`, `contextra-db`, `contextra-engine`,
 //!   `contextra-graph`, `contextra-mvcc`, `contextra-privacy`, `contextra-store`.
 
 // FILE-CONTEXT
