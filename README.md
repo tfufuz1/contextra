@@ -228,8 +228,7 @@ CONTEXTRA kombiniert dafür drei Suchwege, die sich gegenseitig ergänzen: die S
 * **Suchqualität in Zahlen.** Gängige Vergleichstests messen, wie gut relevante Treffer gefunden und gerankt werden, sowohl auf bekannten Datensätzen als auch auf einem eigenen deutschen Korpus mit zusammengesetzten Wörtern.
 * **Geschwindigkeit und Trefferquote im Zusammenspiel.** Durchsatz und Antwortzeiten (vom Medianwert bis zum 99. Perzentil) werden für jede Suchvariante gemessen.
 * **Gedächtnisqualität.** Eigene Tests prüfen das Erinnern über mehrere Sitzungen, die zeitliche Konsistenz und die Güte der Verdichtung.
-* **Keine unbemerkten Rückschritte.** Automatisierte Tests, auch für mehrstufige Wissenssuche und bei 100.000 Dokumenten, stoppen Änderungen, die Qualität oder Geschwindigkeit verschlechtern würden, bevor sie ausgeliefert werden.
-
+* **Keine unbemerkten Rückschritte.** Automatisierte Tests, auch für mehrstufige Wissenssuche mit 100.000 Dokumenten.
 ---
 
 ## Zusammenfassung
