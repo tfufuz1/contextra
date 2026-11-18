@@ -39,9 +39,9 @@ class Definition:
     is_public: bool
 
 
-def find_definitions_and_usages(crate_path: Path, repo_root: Path) -> Tuple[List[Definition], Set[str], List[Dict]]:
+def find_definitions_and_usages(crate_path: Path, repo_root: Path) -> Tuple[List[Definition], Dict[str, int], List[Dict]]:
     definitions: List[Definition] = []
-    all_identifier_usages: Set[str] = set()
+    all_identifier_usages: Dict[str, int] = defaultdict(int)
     debt_findings: List[Dict] = []
 
     re_private_fn = re.compile(r"^\s*(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z0-9_]+)")
@@ -62,8 +62,8 @@ def find_definitions_and_usages(crate_path: Path, repo_root: Path) -> Tuple[List
         clean_content = strip_comments_and_strings(content)
 
         # Usages: extract all identifiers from clean code
-        identifiers = set(re.findall(r"\b([A-Za-z0-9_]+)\b", clean_content))
-        all_identifier_usages.update(identifiers)
+        for word in re.findall(r"\b([A-Za-z0-9_]+)\b", clean_content):
+            all_identifier_usages[word] += 1
 
         # Parse definitions per line
         for idx, (raw_line, clean_line) in enumerate(zip(content.splitlines(), clean_content.splitlines()), start=1):
@@ -121,18 +121,9 @@ def find_definitions_and_usages(crate_path: Path, repo_root: Path) -> Tuple[List
     return definitions, all_identifier_usages, debt_findings
 
 
-def check_definition_frequency(crate_path: Path, item_name: str) -> int:
-    """Count how many times item_name appears across all files in crate_path."""
-    count = 0
-    pattern = re.compile(rf"\b{re.escape(item_name)}\b")
-    for rpath in iter_rust_files(crate_path, include_tests=True):
-        try:
-            content = rpath.read_text(encoding="utf-8")
-            clean = strip_comments_and_strings(content)
-            count += len(pattern.findall(clean))
-        except Exception:
-            pass
-    return count
+# Optimized: identifier counts are collected during Pass 1
+def check_definition_frequency(crate_path: Path, item_name: str, id_counts: Dict[str, int]) -> int:
+    return id_counts.get(item_name, 0)
 
 
 def main():
@@ -181,7 +172,7 @@ def main():
 
         for d in defs:
             # Check occurrences: if count == 1, it's only the definition itself!
-            freq = check_definition_frequency(cmeta.path, d.name)
+            freq = check_definition_frequency(cmeta.path, d.name, usages)
             if freq <= 1:
                 dead_candidates += 1
                 report.add_finding({

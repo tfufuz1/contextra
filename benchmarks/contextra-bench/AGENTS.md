@@ -1,62 +1,28 @@
-# AGENTS.md — `contextra-bench`
+# AGENTS.md — contextra-bench — Benchmark-Harness & Regressions-Gates
 
-> **Werkzeug** · Klasse Werkzeug (`benchmarks/`) · Reifegrad `–` · Unsafe: nein · Rolle: Reproduzierbare Benchmark-Harness: Recall@K, MRR, ANN-, BEIR-, Pfad-RAG-Läufe, Regressions-Gate.
-> Gemeinsame Regeln stehen in der Root-`AGENTS.md` und `docs/SPEC.md`; diese Datei nennt nur Crate-Spezifisches. Stand 2026-11-18.
+**Status:** Normativ  
+**Crate-Spezifikation:** [`docs/crates/contextra-bench.md`](file:///home/freddy/Projekte/contextra/docs/crates/contextra-bench.md)  
+**Gesamtspezifikation:** [`docs/SPEC.md`](file:///home/freddy/Projekte/contextra/docs/SPEC.md) — Bindung: docs/SPEC.md §2 (Architektur), §12 (Testkatalog), §13 (INV-CLAIMS-1)  
+**Workspace-Richtlinie:** [`AGENTS.md`](file:///home/freddy/Projekte/contextra/AGENTS.md) (Wurzel)  
+**Ebene:** E3 (Endpunkte / Benchmarks)  
+**Kern-Closure:** Darf alle Ebenen E0-E2 nutzen  
+**Unsafe-Status:** Verboten (`#![forbid(unsafe_code)]`)  
 
-## 1. Baukasten-Profil
+---
 
-| Aspekt | Wert |
-|---|---|
-| Standalone-Build | `cargo build -p contextra-bench --no-default-features --locked` |
-| Contextra-Abhängigkeiten **Ist** (Cargo) | (Workspace-Mitglied) |
-| Contextra-Abhängigkeiten **Soll** (PLAN §4) | nie Abhängigkeit des Kerns |
-| Features | – |
-| Lints | `#![forbid(unsafe_code)]` |
+## 1. Zweck & Systemrolle
 
-## 2. Abhängigkeiten & Schulden
+Reproduzierbare Benchmark-Harness: Recall@K, MRR, NDCG, Latenz-Profiling (hdrhistogram) und CI-Regressions-Gates.
 
-- Wird von keinem Kern-Crate benötigt; **enthält laut SPEC §4.2 `unsafe`** (Angabe prüfen, Crate setzt `forbid`).
+---
 
-## 3. Modul-Karte (am Code verifiziert)
+## 2. Kern-Richtlinien für Agenten
 
-| Pfad | Verantwortung |
-|---|---|
-| `src/` (`ann_benchmarks`, `beir_eval`, `compare`, `path_rag_sweep`, `regression_gate`) | Läufe und Vergleich |
-| `baseline_metrics.json`, `baseline_recall.json`, `benches/competitive_kv.rs` | Baselines, Wettbewerbsvergleich |
+- **Keine Rückwirkung auf den Kern:** Benchmarks dienen ausschließlich der externen Messung; kein Kern-Crate darf von `contextra-bench` abhängen.
+- **Kontext-Pflicht für Ergebnisse (INV-CLAIMS-1):** Jede Zahl nennt Commit-Hash, CPU/Hardware, OS-Kernel, Korpus-Hash und Konfigurationsprofil.
+- **Ratchet-Prinzip:** Baselines (`baseline_metrics.json`) dürfen nur nachweislich verbessert oder bei dokumentierten Upgrades angepasst werden.
 
-## 4. Verträge & Invarianten
-
-1. Deterministische, synthetische Korpora mit annotierter Ground Truth; Ausgabe JSON und Markdown.
-2. **Jede veröffentlichte Zahl nennt Commit, Modell-Hash, Hardware, Workload, Vergleichsbasis** (EP4, INV-CLAIMS-1). Fremde Baselines (z. B. `redb`) gehören dazu.
-3. Benchmarks bleiben von Kernaussagen getrennt (SPEC §17.10).
-
-## 5. Ports
-
-Keine.
-
-## 6. Nebenläufigkeit & Performance
-
-- Messung mit Konfidenzintervall; Warm-up und Wiederholungen dokumentieren.
-
-## 7. Anti-Patterns
-
-- Einzelläufe als Beleg.
-- Baseline stillschweigend überschreiben (Ratchet: nur besser).
-
-## 8. Tests & Messung
-
-```bash
-cargo test -p contextra-bench --locked
-cargo clippy -p contextra-bench --all-targets -- -D warnings
-```
-
-- `regression_gate.rs` + Workflow `bench-regression.yml`.
-
-## 9. Offene Arbeit
-
-| WP | Inhalt |
-|---|---|
-| 0.4 | `baseline_20261106.json` einchecken |
+---
 
 <!-- BEGIN GENERATED: crate_inventory.py -->
 
@@ -64,7 +30,7 @@ cargo clippy -p contextra-bench --all-targets -- -D warnings
 
 - **Pfad:** `benchmarks/contextra-bench` · **Ring:** tooling · **Version:** 0.1.0
 - **Beschreibung:** Contextra — Reproducible Benchmark Harness for Retrieval Accuracy
-- **src:** 12 Dateien, 3685 LOC · **unsafe:** 0 Vorkommen, Policy `forbid`
+- **src:** 12 Dateien, 3551 LOC · **unsafe:** 0 Vorkommen, Policy `forbid`
 - **Interne Abhängigkeiten (normal, 6):** `contextra-db`, `contextra-rank`, `contextra-store`, `contextra-text`, `contextra-types`, `contextra-vector`
 - **Interne Dev/Build-Abhängigkeiten (1):** `contextra-sys`
 - **Externe Abhängigkeiten (normal, 9):** `anyhow`, `hdrhistogram`, `rand`, `serde`, `serde_json`, `tempfile`, `tokio`, `tracing`, `tracing-subscriber`

@@ -273,7 +273,7 @@ level = 3
 tier = "stable"
 path = "benchmarks/contextra-bench"
 unsafe_island = false
-allowed_internal = ["contextra-store", "contextra-vector", "contextra-text", "contextra-db"]
+allowed_internal = ["contextra-store", "contextra-vector", "contextra-text", "contextra-db", "contextra-rank", "contextra-types"]
 [crates.contextra-bench.feature_closure_allowed]
 [crates.contextra-bench.dev_allowed]
 test = "cargo test -p contextra-bench --locked"

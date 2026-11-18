@@ -361,6 +361,12 @@ def create_standard_cli(description: str) -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "--workspace", "--root",
+        type=str,
+        default=None,
+        help="Workspace root directory (defaults to auto-discovered repo root).",
+    )
+    parser.add_argument(
         "--crate", "-c",
         type=str,
         help="Target a specific crate (e.g., contextra-store). Defaults to workspace-wide scan.",

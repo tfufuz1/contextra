@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 //! Test helpers and in-memory test doubles for `contextra-graph` (Klasse A, B2).
 //!
 //! Replaces internal dev-dependency on `contextra-testkit` with self-contained

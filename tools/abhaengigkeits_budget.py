@@ -22,6 +22,7 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any, Dict, Set
 
@@ -30,6 +31,33 @@ def get_metadata(pfad: str | None = None) -> dict:
     if pfad and os.path.exists(pfad):
         with open(pfad, "r", encoding="utf-8") as fh:
             return json.load(fh)
+    
+    # Pure-Python fallback using Cargo.toml
+    root = Path(__file__).resolve().parent.parent
+    root_toml = root / "Cargo.toml"
+    if root_toml.is_file():
+        with open(root_toml, "rb") as fh:
+            ws_data = tomllib.load(fh).get("workspace", {})
+        members = ws_data.get("members", [])
+        packages = []
+        for m in members:
+            c_toml = root / m / "Cargo.toml"
+            if c_toml.is_file():
+                with open(c_toml, "rb") as cfh:
+                    cdata = tomllib.load(cfh)
+                pkg = cdata.get("package", {})
+                deps = []
+                for dname, dval in cdata.get("dependencies", {}).items():
+                    opt = dval.get("optional", False) if isinstance(dval, dict) else False
+                    deps.append({"name": dname, "optional": opt, "kind": None})
+                packages.append({
+                    "name": pkg.get("name", m),
+                    "manifest_path": str(c_toml),
+                    "dependencies": deps,
+                    "source": None
+                })
+        return {"packages": packages}
+
     cmd = ["cargo", "metadata", "--format-version", "1", "--no-deps"]
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:

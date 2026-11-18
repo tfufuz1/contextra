@@ -1,24 +1,35 @@
-# contextra-vector — Crate-Spezifikation (HNSW-Vektorindex)
+# contextra-vector — Implementierungsspezifikation (Soll-Zustand)
 
-**Ebene:** E1b (Kern-Closure: `ids`, `env`, `simd`, `durable-fs`)  
-**Status:** Normativ  
-**Version:** 1.0  
+**Ebene:** E1 (Domänenbaustein / Ring 1)  
+**Kern-Closure:** `ids`, `env`, `simd`, `durable-fs` (E0-Fundamente, max. 5)  
+**Status:** Normativ (Soll-Zustand für Entwickler)  
+**Version:** 2.0  
 **Geltungsbereich:** `crates/contextra-vector`  
-**Referenz:** `docs/SPEC.md` §2, §3, §5, §6, §7
+**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5.3 (Schritt 4e), §6, §7; `ANALYSIS-E0-CONTRADICTIONS.md`  
 
 ---
 
-## 1. Zweck & Systemrolle
+## 1. Zweck & Architekturgarantien
 
-`contextra-vector` implementiert die hochperformante Vektorindexierung und semantische Ähnlichkeitssuche für Contextra:
-- **Hierarchical Navigable Small World (HNSW):** Mehrschichtiger Graph für sub-lineare Approximate Nearest Neighbor (ANN) Suche.
-- **Hardware-Beschleunigung:** Vektor-Distanzberechnungen (Cosine, L2, Dot-Product) über SIMD-Intrinsics via `contextra-simd` (AVX2, AVX-512, NEON) mit automatischem skalarem Fallback.
-- **Quantisierung:** Optionale Skalare Quantisierung (SQ8, SQ4) zur signifikanten Reduzierung des RAM-Bedarfs.
-- **Physische Graph-Reparatur:** Beseitigung gelöschter Vektoren unter Erhaltung der Konnektivität des Small-World-Graphen im Rahmen der DSGVO-Löschkette.
+`contextra-vector` implementiert die hochskalierbare Vektorindexierung und semantische Approximate Nearest Neighbor (ANN) Suche für Contextra:
+- **Hierarchical Navigable Small World (HNSW):** Mehrschichtiger Graph für sub-lineare Suchzeiten mit hoher Recall-Garantie.
+- **Hardwarebeschleunigung:** Nutzung der SIMD-Kerne aus `contextra-simd` (AVX2, AVX-512, NEON) mit garantiert bitidentischem skalarem IEEE-754 Fallback (INV-5).
+- **Vektor-Quantisierung:** Skalare Quantisierung (SQ8, SQ4) zur Reduktion des RAM-Bedarfs bei minimalem Recall-Verlust.
+- **Graph-Reparatur & Slot-Nullung (DSGVO Phase 4e):** Heuristische Neuvernetzung isolierter Nachbarknoten zur Erhaltung der Small-World-Konnektivität und physisches Nullen von Vektor-Slots im Speicher und auf Disk.
+
+### Beseitigung von Ebenenverstößen (R1)
+Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace` und `ports-compat` werden vollständig entfernt. `contextra-vector` operiert als reiner E1-Baustein ausschließlich auf `contextra-ids`, `contextra-env`, `contextra-simd` und `contextra-durable-fs`.
+
+### Architekturgarantien (R1–R6, INV-3, INV-4, INV-5, INV-11)
+1. **`#![forbid(unsafe_code)]`:** Vollständig speichersicher.
+2. **Zero-Panic-Policy:** Alle Operationen liefern `VectorError`.
+3. **Leere Default-Features (R3):** `default = []`.
+4. **Konnektivitäts-Invariante (INV-VEC-CONNECTIVITY-1):** Das Entfernen gelöschter Vektoren darf den HNSW-Graphen nicht fragmentieren oder den Recall unbeteiligter Dokumente degradieren.
+5. **Slot-Zeroize (INV-VEC-ZEROIZE-1):** Gelöschte Vektor-Slots werden vor ihrer Reallokation physisch mit Nullen überschrieben.
 
 ---
 
-## 2. Architektur & Datenstrukturen
+## 2. Architektur & Komponenten
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -39,7 +50,8 @@
 │   │   └────────────────────┘    └───────────────────┘   │   │
 │   │                                                     │   │
 │   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ SimdDistanceEngine │    │ ErasureLayer Impl │   │   │
+│   │   │ SimdDistanceEngine │    │ VectorPurger      │   │   │
+│   │   │ (contextra-simd)   │    │ (DSGVO Phase 4e)  │   │   │
 │   │   └────────────────────┘    └───────────────────┘   │   │
 │   └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -47,88 +59,148 @@
 
 ---
 
-## 3. Schutz personenbezogener Vektoren (Klasse D)
+## 3. DSGVO-Löschkette: HNSW-Reparatur (Phase 4e)
 
-- **Inversions-Risiko:** Vektoren und Embeddings sind Ableitungen (Klasse D). Sie können durch Embedding-Inversion-Angriffe rekonstruierbar sein und gelten daher bei Personenbezug als schutzwürdig.
-- **Adressierung & Kapselung:**
-  - Vektor-IDs sind numerische Indizes, die intern über eine geschützte Map auf `DocId` oder `PersonalRef` (Klasse P) abgebildet werden.
-  - Vektor-Nutzlasten (Metadata / Payload) werden nicht im Vektorindex im Klartext gehalten, sondern verweisen auf den LSM-Store (`contextra-store`).
-
----
-
-## 4. DSGVO-Löschkette: ErasureLayer-Implementierung
-
-`contextra-vector` implementiert `contextra_ports::erasure::ErasureLayer` (Priorität 4e — Vektor-Reparatur):
+Unter exklusivem Halt der `PurgeBarrier`:
 
 ```rust
-impl ErasureLayer for HnswIndex {
-    fn id(&self) -> LayerId {
-        LayerId(*b"CTX_VEC_HNSW__01")
-    }
+use contextra_ids::DocId;
+use std::path::Path;
 
-    fn key_coverage(&self) -> KeyCoverage {
-        KeyCoverage::Full
-    }
-
-    fn resolve(&self, target: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, String>>;
-    fn on_gate(&self, scope: &LayerScope) -> BoxFuture<'_, Result<(), String>>;
-    fn purge(&self, scope: &LayerScope, cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>>;
-    fn witness(&self, scope: &LayerScope, sc: &Scanner<Armed>) -> BoxFuture<'_, Result<LayerWitness, String>>;
+pub struct VectorPurgeOutcome {
+    pub vectors_purged: u64,
+    pub edges_repaired: u64,
+    pub bytes_reclaimed: u64,
 }
-```
 
-### 4.1 Die 4 Phasen in `contextra-vector`
+pub struct VectorPurger;
 
-#### 1. `resolve(target)`
-- Mappt die betroffenen `DocId`s oder Schlüsselbereiche auf die internen numerischen Vektor-IDs (`InternalId`).
-- Erzeugt einen `LayerScope` mit der Menge der zu entfernenden Knoten.
-
-#### 2. `on_gate(scope)`
-- Setzt die ermittelten Vektor-IDs in einer atomaren `RoaringBitmap` (`excluded_vectors`).
-- Ab diesem Zeitpunkt überspringt jede Ähnlichkeitssuche (`search_knn`) diese Knoten mit $O(1)$ Overhead.
-
-#### 3. `purge(scope, cx)` — Physische Graph-Reparatur
-Wird unter `PurgeBarrier::purge` ausgeführt:
-- **Knoten-Isolation:** Für jeden betroffenen Knoten werden alle eingehenden und ausgehenden Kanten auf allen HNSW-Ebenen abgetrennt.
-- **Graph-Konnektivitäts-Heilung:**
-  - Für alle Nachbarknoten des gelöschten Knotens wird das Heuristik-Linking erneut aufgerufen, um alternative Verbindungen herzustellen.
-  - Dadurch bleibt die Navigierbarkeit des Small-World-Netzwerks mathematisch stabil.
-- **Vektordaten-Nullung:** Die Speicher-Slots in den Vektordateien (`.vec`) werden mit Nullen überschrieben (`zeroize`) und mittels `fsync` synchronisiert (`contextra-durable-fs`).
-- **Index-Kompaktion:** Übersteigt der Anteil gelöschter Knoten 20%, wird im Hintergrund ein sequentielles Re-Packing der Vektordatei durchgeführt.
-
-#### 4. `witness(scope, sc)` — Verifikation & Messung
-- Führt eine gezielte Lookup-Abfrage nach den gelöschten Vektor-IDs im Index durch.
-- Prüft die binären Segmente auf Abwesenheit der Vektoren.
-- Liefert `LayerWitness { residue_matches: 0, ... }`.
-
----
-
-## 5. Synchroner Lesepfad: ReadGate-Integration
-
-Während der Suche konsultiert der HNSW-Graph-Traversal-Algorithmus den synchronen `ReadGate`:
-
-```rust
-pub fn search_knn(&self, query: &[f32], k: usize) -> Result<Vec<VectorHit>, ContextraError> {
-    // 1. Initialisierung PriorityQueue
-    // 2. Traversal Layer L_max bis Layer 0
-    // 3. Auf Layer 0: Für jeden Kandidaten Prüfung gegen In-Memory-Maske und ReadGate
-    for candidate in candidates {
-        if self.excluded_mask.contains(candidate.id) {
-            continue;
-        }
-        if self.read_gate.check_internal(candidate.id) == GateDecision::Erased {
-            continue;
-        }
-        // Score-Berechnung via SIMD
+impl VectorPurger {
+    /// Führt die physische Reparatur des HNSW-Graphen und Vektorspeichers aus (Phase 4e).
+    ///
+    /// 1. Trennt alle Kanten des gelöschten Knotens auf allen HNSW-Schichten.
+    /// 2. Heuristische Wiedervernetzung: Führt k-NN Suchen für Nachbarn des gelöschten Knotens
+    ///    durch, um Konnektivitätsverluste auszugleichen (INV-VEC-CONNECTIVITY-1).
+    /// 3. Überschreibt Vektordaten im Speicher und in der .vec-Datei mit Nullen (INV-VEC-ZEROIZE-1).
+    /// 4. Synchronisiert die Datei via contextra-durable-fs.
+    pub fn purge_vectors(
+        index_dir: &Path,
+        doc_ids: &[DocId],
+    ) -> Result<VectorPurgeOutcome, VectorError> {
+        // HNSW Heuristic Re-Linking und Slot-Zeroize
+        Ok(VectorPurgeOutcome {
+            vectors_purged: doc_ids.len() as u64,
+            edges_repaired: 0,
+            bytes_reclaimed: 0,
+        })
     }
-    // 4. Auffüllen auf k (Z-E8 konform)
 }
 ```
 
 ---
 
-## 6. Invarianten & Qualitätsstandards
+## 4. Ähnlichkeitssuche & Ausschlussfilter
 
-1. **`#![forbid(unsafe_code)]`:** Alle Low-Level SIMD-Befehle sind strikt in `contextra-simd` gekapselt.
-2. **Determinismus (INV-5):** Identische Abfragen auf identischen Indexständen liefern exakt identische Trefferlisten. Bei identischen Distanzen erfolgt der Tie-Break nach `DocId` aufsteigend.
-3. **Keine Panics:** Fehlerhafte Vektordimensionen oder NaNs in Eingabevektoren führen zu `Err(ContextraError::InvalidInput)`, niemals zu Panics.
+```rust
+use contextra_ids::DocId;
+use roaring::RoaringBitmap;
+
+pub struct VectorSearchHit {
+    pub doc_id: DocId,
+    pub distance: f32,
+}
+
+pub trait VectorIndex: Send + Sync {
+    /// Führt k-NN Suche aus. Ausgeschlossene Vektoren (ReadGate / ExclusionFilter)
+    /// werden mit O(1) übersprungen.
+    fn search_knn(
+        &self,
+        query: &[f32],
+        k: usize,
+        exclusion_filter: Option<&RoaringBitmap>,
+    ) -> Result<Vec<VectorSearchHit>, VectorError>;
+}
+```
+
+---
+
+## 5. Fehlerbehandlung (`VectorError`)
+
+```rust
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
+pub enum VectorError {
+    #[error("Vector dimension mismatch: expected {expected}, got {actual}")]
+    DimensionMismatch { expected: usize, actual: usize },
+
+    #[error("Vector contains invalid floating point values (NaN/Inf)")]
+    InvalidFloat,
+
+    #[error("Vector storage corrupted: {0}")]
+    CorruptedStorage(String),
+
+    #[error("Graph index disconnected: connectivity repair failed")]
+    ConnectivityLoss,
+
+    #[error("I/O error during index persistence: {0}")]
+    Io(#[from] std::io::Error),
+}
+```
+
+---
+
+## 6. `Cargo.toml` Spezifikation
+
+```toml
+[package]
+name = "contextra-vector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "HNSW vector index, SIMD distance acceleration, and quantized search for Contextra"
+
+[lints]
+workspace = true
+
+[dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-simd = { workspace = true }
+contextra-durable-fs = { workspace = true }
+contextra-mvcc = { workspace = true }
+ahash = { workspace = true }
+parking_lot = { workspace = true }
+roaring = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+tokio = { workspace = true, features = ["full", "test-util"] }
+criterion = { workspace = true }
+
+[features]
+default = []
+std = ["contextra-ids/std", "contextra-env/std"]
+tracing = ["dep:tracing"]
+quantize = []
+diskann = []
+```
+
+---
+
+## 7. Implementierungs-Arbeitspakete für Entwickler
+
+1. **`Cargo.toml` Bereinigung:**
+   - Entfernen von `contextra-types` und `contextra-ports`.
+   - Features `workspace` und `ports-compat` entfernen.
+   - `default = []` setzen (R3).
+2. **Konnektivitäts-Heilung absichern:**
+   - Heuristische Neuverlinkung von Nachbarknoten bei Vektor-Löschung verifizieren (`INV-VEC-CONNECTIVITY-1`).
+3. **Slot-Zeroize:**
+   - Sicherstellen, dass Vektordaten vor Slot-Freigabe physisch genullt werden (`INV-VEC-ZEROIZE-1`).
+4. **Verifikation:**
+   - `cargo test -p contextra-vector`

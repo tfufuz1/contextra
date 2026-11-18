@@ -166,9 +166,22 @@ def main():
 
     target_crates = []
     if args.crate:
-        target_crates.append(crates_dir / args.crate)
+        c_path = Path(args.crate)
+        if (workspace_root / c_path).is_dir():
+            target_crates.append(workspace_root / c_path)
+        elif (crates_dir / c_path).is_dir():
+            target_crates.append(crates_dir / c_path)
+        elif (workspace_root / "benchmarks" / c_path).is_dir():
+            target_crates.append(workspace_root / "benchmarks" / c_path)
+        else:
+            print(f"Fehler: Crate {args.crate} nicht gefunden.", file=sys.stderr)
+            sys.exit(1)
     else:
-        target_crates = sorted([p for p in crates_dir.iterdir() if p.is_dir() and (p / "Cargo.toml").exists()])
+        for sdir in [crates_dir, workspace_root / "benchmarks"]:
+            if sdir.is_dir():
+                for p in sorted(sdir.iterdir()):
+                    if p.is_dir() and (p / "Cargo.toml").exists():
+                        target_crates.append(p)
 
     all_reports = []
     total_prod_violations = 0

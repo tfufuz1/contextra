@@ -1,0 +1,3164 @@
+# Async Boundary & Concurrency Scanner (M8 / INV-LOCK-ORDER-1)
+
+> Generiert durch `tools/async_boundary_scanner.py`.
+> Regel M8: Ebene E0 und Speicherkerne halten ihre Logik synchron. Async nur an der Port-Grenze.
+
+## Crate Übersicht (Produktivpfade)
+
+| Crate | Sync Mandat (M8) | async fn | .await | tokio:: | block_on | Lock across Await |
+|---|---|---|---|---|---|---|
+| `contextra` | Nein | 14 | 28 | 5 | 0 | 0 |
+| `contextra-checkpoint` | Nein | 51 | 111 | 26 | 5 | 23 |
+| `contextra-crypto` | **MANDAT** | 3 | 3 | 8 | 2 | 1 |
+| `contextra-db` | Nein | 213 | 690 | 98 | 1 | 29 |
+| `contextra-durable-fs` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-engine` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-env` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-erasure` | Nein | 15 | 65 | 2 | 0 | 17 |
+| `contextra-graph` | Nein | 59 | 173 | 30 | 1 | 0 |
+| `contextra-ids` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-mcp` | Nein | 18 | 53 | 18 | 3 | 0 |
+| `contextra-mvcc` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-ports` | **MANDAT** | 50 | 49 | 10 | 0 | 0 |
+| `contextra-privacy` | **MANDAT** | 42 | 51 | 33 | 0 | 0 |
+| `contextra-rank` | **MANDAT** | 1 | 1 | 0 | 0 | 0 |
+| `contextra-simd` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-store` | Nein | 215 | 648 | 233 | 19 | 95 |
+| `contextra-sys` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-testkit` | Nein | 35 | 178 | 6 | 0 | 0 |
+| `contextra-text` | Nein | 50 | 135 | 1 | 2 | 2 |
+| `contextra-types` | **MANDAT** | 0 | 0 | 0 | 0 | 0 |
+| `contextra-vault` | Nein | 0 | 0 | 0 | 0 | 0 |
+| `contextra-vector` | Nein | 43 | 45 | 5 | 2 | 14 |
+
+## Auffälligkeiten & M8-Abweichungen
+
+### `contextra-checkpoint`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:180` [async_fn]: `pub async fn recover_and_clean<S: crate::snapshot_source::SnapshotSource>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:189` [await_expr]: `if let Err(e) = storage.unpin_checkpoint(pin_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:484` [async_fn]: `pub async fn flush_orphan_registry(&self) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:497` [tokio_import]: `let res = if tokio::runtime::Handle::try_current().is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:498` [tokio_import]: `tokio::task::spawn_blocking(move || state.persist_sync())`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:499` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/orphan.rs:647` [async_fn]: `pub async fn await_pending_rollbacks() {}`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:58` [async_fn]: `pub async fn pin(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:64` [await_expr]: `Self::pin_with_clock(storage, seq_no, orphan_registry, clock).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:76` [async_fn]: `pub async fn pin_with_clock(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:83` [await_expr]: `storage.pin_checkpoint(seq_no).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:110` [async_fn]: `pub async fn unpin(mut self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:112` [await_expr]: `self.storage.unpin_checkpoint(seq_no).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:114` [await_expr]: `if let Err(err) = self.orphan_registry.flush_orphan_registry().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:153` [await_expr]: `#[must_use = "CheckpointGuard must be explicitly finalized via .commit() or .rollback().await"]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:272` [async_fn]: `pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:274` [await_expr]: `Self::for_agent_step_with_clock(storage, tx, clock).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:278` [async_fn]: `pub async fn for_agent_step_with_registry(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:298` [async_fn]: `pub async fn for_agent_step_with_clock(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:349` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:351` [await_expr]: `if let Err(err) = reg.flush_orphan_registry().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:373` [async_fn]: `pub async fn rollback(mut self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:387` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:396` [await_expr]: `let res = self.storage.rollback_to_tx(cp.tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:397` [await_expr]: `if let Err(err) = self.orphan_registry.flush_orphan_registry().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:418` [tokio_import]: `if tokio::runtime::Handle::try_current().is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:420` [await_expr]: `"Cannot call rollback_blocking from within an active async Tokio runtime context; use rollback().await instead"`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:443` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:452` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:453` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:461` [await_expr]: `self.storage.rollback_to_tx(cp.tx_id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:611` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:616` [block_on]: `let guard = rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:618` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:656` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:657` [async_fn]: `async fn test_rollback_blocking_in_async_context_returns_error() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:667` [tokio_import]: `let res = tokio::time::timeout(std::time::Duration::from_secs(2), async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:670` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:679` [await_expr]: `assert!(msg.contains("rollback().await"));`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:682` [await_expr]: `"Expected CheckpointError::Internal error message instructing to use rollback().await"`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:688` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:689` [async_fn]: `async fn test_checkpoint_guard_for_agent_step() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:692` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:705` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:706` [async_fn]: `async fn checkpoint_guard_CASE_uncommitted_guard_holds_state() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:724` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:725` [async_fn]: `async fn checkpoint_guard_CASE_commit_moves_ownership() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:746` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:747` [async_fn]: `async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:790` [await_expr]: `let res = consumed_guard3.rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:795` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:796` [async_fn]: `async fn test_checkpoint_metrics_commit_duration() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:826` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/guard.rs:827` [async_fn]: `async fn test_checkpoint_metrics_drop_rollback_duration() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:146` [async_fn]: `async fn determine_tx_counter_bounds<S: SnapshotSource>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:151` [await_expr]: `let entries = storage.scan_prefix(prefix.as_bytes()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:172` [await_expr]: `if let Ok(last_tx) = storage.last_tx_id().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:180` [await_expr]: `let persisted_val: Option<u64> = match storage.get(counter_key.as_bytes()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:206` [async_fn]: `async fn persist_hwm_internal<S: SnapshotSource>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:218` [await_expr]: `storage.put(tx, key.as_bytes(), &bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:219` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:220` [await_expr]: `storage.flush().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:242` [tokio_import]: `write_lock: tokio::sync::Mutex<()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:248` [tokio_import]: `hwm_lock: tokio::sync::Mutex<()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:271` [async_fn]: `pub async fn open_and_recover(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:278` [await_expr]: `Self::open_and_recover_with_orphan_registry(storage, ns, orphan_registry).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:282` [async_fn]: `pub async fn open_and_recover_with_orphan_registry(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:287` [await_expr]: `let store = Self::open_with_orphan_registry(storage, namespace, orphan_registry).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:288` [await_expr]: `let recovered_pins = store.recover_orphaned_pins().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:289` [await_expr]: `let recovered_checkpoints = store.recover_orphaned_checkpoints().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:298` [async_fn]: `pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:302` [await_expr]: `Self::open_with_orphan_registry(storage, ns, orphan_registry).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:306` [async_fn]: `pub async fn open_with_orphan_registry(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:312` [await_expr]: `let (start_raw, initial_hwm) = determine_tx_counter_bounds(&storage, &namespace).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:322` [tokio_import]: `write_lock: tokio::sync::Mutex::new(()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:325` [tokio_import]: `hwm_lock: tokio::sync::Mutex::new(()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:353` [tokio_import]: `let res = if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:354` [tokio_import]: `if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:355` [tokio_import]: `tokio::task::block_in_place(|| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:356` [block_on]: `handle.block_on(Self::open_with_orphan_registry(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:364` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:368` [block_on]: `rt.block_on(Self::open_with_orphan_registry(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:383` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:389` [block_on]: `rt.block_on(Self::open_with_orphan_registry(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:414` [async_fn]: `pub async fn allocate_tx(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:424` [await_expr]: `let _guard = self.hwm_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:424` [lock_held_across_await_warning]: `Lock acquired at line 424 near await at line 424`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:428` [await_expr]: `persist_hwm_internal(&self.storage, &self.namespace, new_hwm).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:428` [lock_held_across_await_warning]: `Lock acquired at line 424 near await at line 428`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:518` [async_fn]: `pub async fn create_checkpoint(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:540` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:540` [lock_held_across_await_warning]: `Lock acquired at line 540 near await at line 540`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:542` [await_expr]: `let old_checkpoint = self.get_checkpoint_internal(name).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:542` [lock_held_across_await_warning]: `Lock acquired at line 540 near await at line 542`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:545` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:545` [lock_held_across_await_warning]: `Lock acquired at line 540 near await at line 545`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:549` [await_expr]: `if let Err(e) = self.storage.unpin_checkpoint(old.seq_no).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:549` [lock_held_across_await_warning]: `Lock acquired at line 540 near await at line 549`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:577` [async_fn]: `async fn save_checkpoint_with_pin_guard(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:588` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:590` [await_expr]: `if let Err(e) = self.save_checkpoint_internal(meta.clone()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:591` [await_expr]: `if let Err(unpin_err) = pin_guard.unpin().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:615` [async_fn]: `pub async fn drop_checkpoint(&self, name: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:617` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:617` [lock_held_across_await_warning]: `Lock acquired at line 617 near await at line 617`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:619` [await_expr]: `if let Some(checkpoint) = self.get_checkpoint_internal(name).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:619` [lock_held_across_await_warning]: `Lock acquired at line 617 near await at line 619`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:624` [await_expr]: `let unique_tx = self.allocate_tx().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:624` [lock_held_across_await_warning]: `Lock acquired at line 617 near await at line 624`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:626` [await_expr]: `if let Err(e) = self.storage.delete(unique_tx, key.as_bytes()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:626` [lock_held_across_await_warning]: `Lock acquired at line 617 near await at line 626`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:627` [await_expr]: `if let Err(rb_err) = self.storage.rollback(unique_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:627` [lock_held_across_await_warning]: `Lock acquired at line 617 near await at line 627`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:632` [await_expr]: `if let Err(e) = self.storage.commit(unique_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:633` [await_expr]: `if let Err(rb_err) = self.storage.rollback(unique_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:640` [await_expr]: `if let Err(e) = self.storage.unpin_checkpoint(checkpoint.seq_no).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:654` [async_fn]: `async fn save_checkpoint_internal(&self, meta: CheckpointMeta) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:660` [await_expr]: `let tx = self.allocate_tx().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:661` [await_expr]: `if let Err(e) = self.storage.put(tx, key.as_bytes(), &value).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:662` [await_expr]: `if let Err(rb_err) = self.storage.rollback(tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:667` [await_expr]: `if let Err(e) = self.storage.commit(tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:668` [await_expr]: `if let Err(rb_err) = self.storage.rollback(tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:680` [async_fn]: `async fn get_checkpoint_internal(&self, name: &str) -> Result<Option<CheckpointMeta>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:688` [await_expr]: `match self.storage.get(key.as_bytes()).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:688` [lock_held_across_await_warning]: `Lock acquired at line 682 near await at line 688`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:714` [async_fn]: `pub async fn list_checkpoints(&self) -> Result<Vec<CheckpointMeta>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:716` [await_expr]: `let entries: Vec<(Vec<u8>, Vec<u8>)> = self.storage.scan_prefix(prefix.as_bytes()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:748` [async_fn]: `pub async fn get_checkpoint(&self, name: &str) -> Result<Option<CheckpointMeta>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:750` [await_expr]: `self.get_checkpoint_internal(name).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:750` [lock_held_across_await_warning]: `Lock acquired at line 736 near await at line 750`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:760` [async_fn]: `pub async fn restore_checkpoint(&self, name: &str) -> Result<CheckpointMeta> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:762` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:762` [lock_held_across_await_warning]: `Lock acquired at line 762 near await at line 762`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:766` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:766` [lock_held_across_await_warning]: `Lock acquired at line 762 near await at line 766`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:769` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:769` [lock_held_across_await_warning]: `Lock acquired at line 762 near await at line 769`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:780` [await_expr]: `self.storage.rollback_to_tx(meta.tx_id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:783` [await_expr]: `self.list_checkpoints().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:800` [async_fn]: `pub async fn flush_orphan_registry(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:803` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:808` [async_fn]: `pub async fn shutdown(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:809` [await_expr]: `self.flush_orphan_registry().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:813` [async_fn]: `pub async fn close(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:814` [await_expr]: `self.shutdown().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:850` [async_fn]: `pub async fn recover_orphaned_pins(&self) -> Result<Vec<PinId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:854` [await_expr]: `if let Err(e) = self.storage.unpin_checkpoint(orphan.seq_no).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:874` [async_fn]: `pub async fn recover_orphaned_checkpoints(&self) -> Result<Vec<TxId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:875` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:875` [lock_held_across_await_warning]: `Lock acquired at line 875 near await at line 875`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:879` [await_expr]: `let last_tx = self.storage.last_tx_id().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:879` [lock_held_across_await_warning]: `Lock acquired at line 875 near await at line 879`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:883` [await_expr]: `if let Err(e) = self.storage.rollback_to_tx(cp.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:883` [lock_held_across_await_warning]: `Lock acquired at line 875 near await at line 883`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:905` [async_fn]: `pub async fn create_hardlink_clone(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:915` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:922` [await_expr]: `let _guard = self.write_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:922` [lock_held_across_await_warning]: `Lock acquired at line 922 near await at line 922`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:923` [await_expr]: `self.save_checkpoint_internal(meta).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:923` [lock_held_across_await_warning]: `Lock acquired at line 922 near await at line 923`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:933` [await_expr]: `let all = self.list_checkpoints().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:933` [lock_held_across_await_warning]: `Lock acquired at line 929 near await at line 933`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:939` [await_expr]: `Box::pin(async move { self.list_checkpoints().await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:939` [lock_held_across_await_warning]: `Lock acquired at line 929 near await at line 939`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:947` [await_expr]: `Box::pin(async move { self.recover_orphaned_pins().await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:951` [await_expr]: `Box::pin(async move { self.recover_orphaned_checkpoints().await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/store.rs:955` [await_expr]: `Box::pin(async move { self.flush_orphan_registry().await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:63` [tokio_import]: `use tokio::fs;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:69` [async_fn]: `pub async fn create_dir_all<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:73` [async_fn]: `pub async fn read_dir<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomReadDir> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:77` [async_fn]: `pub async fn metadata<P: AsRef<Path>>(_path: P) -> std::io::Result<LoomMetadata> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:84` [async_fn]: `pub async fn remove_file<P: AsRef<Path>>(_path: P) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:88` [async_fn]: `pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:95` [async_fn]: `pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(_from: P, _to: Q) -> std::io::Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:101` [async_fn]: `pub async fn next_entry(&mut self) -> std::io::Result<Option<LoomDirEntry>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:211` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:216` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:221` [await_expr]: `while let Some(entry) = read_dir.next_entry().await.map_err(CheckpointError::Io)? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:238` [await_expr]: `if fs::metadata(&target_path).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:239` [await_expr]: `let _ = fs::remove_file(&target_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:243` [await_expr]: `if let Err(io_err) = fs::hard_link(&path, &target_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/hardlink_cloner.rs:250` [await_expr]: `if let Err(copy_err) = fs::copy(&path, &target_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:11` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:12` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:14` [await_expr]: `let store = PersistentCheckpointStore::open(storage, "demo_namespace").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:26` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:30` [await_expr]: `let listed = store.list_checkpoints().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/checkpoint_memvfs.rs:34` [await_expr]: `if let Some(cp) = store.get_checkpoint("demo_cp").await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/standalone.rs:7` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/standalone.rs:8` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/standalone.rs:10` [await_expr]: `let store = PersistentCheckpointStore::open(source, "standalone_demo").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/standalone.rs:13` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/examples/standalone.rs:15` [await_expr]: `let restored = store.restore_checkpoint("cp1").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:30` [await_expr]: `Box::pin(async move { StorageEngine::get(self, key).await.map_err(map_err) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:41` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:49` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:55` [await_expr]: `Box::pin(async move { StorageEngine::commit(self, tx_id).await.map_err(map_err) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:59` [await_expr]: `Box::pin(async move { StorageEngine::rollback(self, tx_id).await.map_err(map_err) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:65` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:71` [await_expr]: `Box::pin(async move { StorageEngine::flush(self).await.map_err(map_err) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:75` [await_expr]: `Box::pin(async move { StorageEngine::last_seq_no(self).await.map_err(map_err) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:79` [await_expr]: `Box::pin(async move { StorageEngine::last_tx_id(self).await.map_err(map_err) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:85` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:93` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/snapshot_bridge.rs:104` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:16` [async_fn]: `async fn create_named_checkpoint(`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:25` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:29` [async_fn]: `async fn restore_named_checkpoint(&self, name: &str) -> Result<Self::Meta> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:30` [await_expr]: `self.restore_checkpoint(name).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:33` [async_fn]: `async fn drop_named_checkpoint(&self, name: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:34` [await_expr]: `self.drop_checkpoint(name).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:37` [async_fn]: `async fn list_named_checkpoints(&self) -> Result<Vec<Self::Meta>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:38` [await_expr]: `self.list_checkpoints().await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:47` [await_expr]: `let seq_no = self.storage().last_seq_no().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:57` [await_expr]: `self.storage().rollback_to_tx(state.tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-checkpoint/src/compat/ports_impl.rs:58` [await_expr]: `self.list_checkpoints().await?;`
+### `contextra-crypto`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/wal_crypto.rs:621` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/wal_crypto.rs:622` [async_fn]: `async fn test_encrypted_wal_roundtrip() -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/wal_crypto.rs:635` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/wal_crypto.rs:636` [async_fn]: `async fn test_encrypted_wal_1mb_roundtrip() -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/crypto.rs:914` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/crypto.rs:915` [async_fn]: `async fn test_parallel_nonce_uniqueness() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/crypto.rs:928` [tokio_import]: `handles.push(tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/crypto.rs:942` [await_expr]: `handle.await.expect("task handle joined"); // expect`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/crypto.rs:942` [lock_held_across_await_warning]: `Lock acquired at line 932 near await at line 942`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:653` [tokio_import]: `let notify_batch_released = Arc::new(tokio::sync::Notify::new());`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:654` [tokio_import]: `let notify_read_complete = Arc::new(tokio::sync::Notify::new());`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:662` [tokio_import]: `let rt = tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:667` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:669` [await_expr]: `notify_batch_released_clone.notified().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:687` [tokio_import]: `tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:690` [block_on]: `.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-crypto/src/kv_segment/store.rs:691` [await_expr]: `notify_read_complete_evict.notified().await;`
+### `contextra-db`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:143` [async_fn]: `pub async fn search(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:151` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:174` [async_fn]: `pub async fn search_with_embedder(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:210` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:282` [tokio_import]: `let rewrite_outputs_res = tokio::time::timeout(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:286` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:332` [await_expr]: `match emb.embed(sem_q).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/multistep.rs:374` [await_expr]: `match builder.execute().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:35` [async_fn]: `pub async fn import_memories(&self, col_export: ExportCollectionV1) -> Result<ImportSummary> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:70` [await_expr]: `self.upsert(&mem.id, emb, Some(meta)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:72` [await_expr]: `self.upsert_text_only(&mem.id, text, Some(meta)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:82` [await_expr]: `self.upsert_text_only(&mem.id, text, Some(meta)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:84` [await_expr]: `self.put_kv(&mem.id, &meta).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:97` [await_expr]: `match self.relate(&rel.from, &rel.to, &rel.label).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:115` [async_fn]: `pub async fn import_memories(&self, doc: ExportDocumentV1) -> Result<ImportSummary> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:134` [await_expr]: `let col = self.collection(&col_export.name).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/import.rs:135` [await_expr]: `let col_summary = col.import_memories(col_export).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:89` [async_fn]: `pub async fn export_memories(&self) -> Result<ExportCollectionV1> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:108` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:197` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:232` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:233` [async_fn]: `async fn test_export_import_roundtrip() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:241` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:244` [await_expr]: `let col_default = db1.collection("default").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:255` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:267` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:276` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:279` [await_expr]: `db1.relate("mem-1", "mem-2", "related_to").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:281` [await_expr]: `let custom_col = db1.collection("work").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:291` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:295` [await_expr]: `let export_doc = db1.export_memories().await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:302` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:305` [await_expr]: `let summary = db2.import_memories(export_doc.clone()).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:311` [await_expr]: `let col2_default = db2.collection("default").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:312` [await_expr]: `assert_eq!(col2_default.len().await, 2);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:314` [await_expr]: `let doc1 = col2_default.get("mem-1").await.unwrap().unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:319` [await_expr]: `let doc2 = col2_default.get("mem-2").await.unwrap().unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:325` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:334` [await_expr]: `let col2_work = db2.collection("work").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:335` [await_expr]: `assert_eq!(col2_work.len().await, 1);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:336` [await_expr]: `let work_doc = col2_work.get("work-1").await.unwrap().unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:340` [await_expr]: `let export_doc2 = db2.export_memories().await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:344` [await_expr]: `let summary_reimport = db2.import_memories(export_doc.clone()).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:346` [await_expr]: `assert_eq!(col2_default.len().await, 2);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:349` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:350` [async_fn]: `async fn test_import_schema_version_mismatch_fails() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:359` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:368` [await_expr]: `let err = db.import_memories(invalid_doc).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:379` [async_fn]: `pub async fn export_memories(&self) -> Result<ExportDocumentV1> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:380` [await_expr]: `let collection_names = self.list_collections().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:384` [await_expr]: `let col = self.collection(&name).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/export.rs:385` [await_expr]: `let export_col = col.export_memories().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:115` [tokio_import]: `) -> tokio::task::JoinHandle<()>`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:131` [tokio_import]: `) -> tokio::task::JoinHandle<()>`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:341` [tokio_import]: `collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:342` [tokio_import]: `tenant_collections: tokio::sync::RwLock<TenantCollectionMap>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:415` [await_expr]: `let results: Vec<SearchResult> = self.search(&vector, k).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:431` [await_expr]: `self.insert(&id, &[], Some(val_json)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:441` [await_expr]: `let doc = self.get(&id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:514` [async_fn]: `async fn test_db(dim: usize) -> (Contextra, TempDir) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:523` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:528` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:529` [async_fn]: `async fn test_insert_search_roundtrip() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:530` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:537` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:545` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:549` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:552` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 2).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:557` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:558` [async_fn]: `async fn test_insert_search_returns_metadata() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:559` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:566` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:569` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:577` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:578` [async_fn]: `async fn test_get_by_key() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:579` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:586` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:589` [await_expr]: `let doc = db.get("doc-1").await.expect("get").expect("should exist");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:593` [await_expr]: `let none = db.get("nonexistent").await.expect("get");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:597` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:598` [async_fn]: `async fn test_update() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:599` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:602` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:606` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:609` [await_expr]: `let doc = db.get("doc-1").await.expect("get").expect("exists");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:612` [await_expr]: `let results = db.search(&[0.0, 1.0, 0.0, 0.0], 1).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:617` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:618` [async_fn]: `async fn test_delete() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:619` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:622` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:624` [await_expr]: `assert_eq!(db.len().await.expect("len"), 1);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:626` [await_expr]: `db.delete("doc-1").await.expect("delete");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:627` [await_expr]: `assert_eq!(db.len().await.expect("len"), 0);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:629` [await_expr]: `let doc = db.get("doc-1").await.expect("get");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:633` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:634` [async_fn]: `async fn test_relate() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:635` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:638` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:641` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:645` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:649` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:650` [async_fn]: `async fn test_dimension_mismatch() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:651` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:652` [await_expr]: `let result = db.insert("doc-1", &[1.0, 0.0], None).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:656` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:657` [async_fn]: `async fn test_empty_search() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:658` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:659` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:663` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:664` [async_fn]: `async fn test_relate_and_scan_prefix() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:665` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:668` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:671` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:674` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:678` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:681` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:686` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:699` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:705` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:706` [async_fn]: `async fn test_stats_aggregation() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:707` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:710` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:713` [await_expr]: `let stats = db.stats().await.expect("stats");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:720` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:721` [async_fn]: `async fn test_stats_live_data_and_weak_reference_lifecycle() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:722` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:724` [await_expr]: `let stats_unattached = db.stats().await.expect("stats");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:754` [await_expr]: `let stats_attached = db.stats().await.expect("stats");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:754` [lock_held_across_await_warning]: `Lock acquired at line 744 near await at line 754`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:762` [await_expr]: `let stats_dropped = db.stats().await.expect("stats after drop");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:769` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:770` [async_fn]: `async fn test_integration_end_to_end() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:771` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:778` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:785` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:792` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:796` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:799` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:802` [await_expr]: `let results = db.search(&[1.0, 0.5, 0.0, 0.0], 2).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:811` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:816` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:820` [await_expr]: `db.delete("agent-1").await.expect("delete");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:822` [await_expr]: `let get_agent = db.get("agent-1").await.expect("get");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:824` [await_expr]: `assert_eq!(db.len().await.expect("len"), 2);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:827` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:828` [async_fn]: `async fn test_concurrent_collection_idempotency() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:829` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:835` [tokio_import]: `handles.push(tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:836` [await_expr]: `db_clone.collection("c").await.expect("collection c")`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:842` [await_expr]: `cols.push(handle.await.expect("join handle"));`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:854` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:855` [async_fn]: `async fn test_collections_are_isolated() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:856` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:857` [await_expr]: `let col_a = db.collection("a").await.expect("col a");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:858` [await_expr]: `let col_b = db.collection("b").await.expect("col b");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:862` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:866` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:869` [await_expr]: `let res_a = col_a.get("k1").await.expect("get a").expect("exists");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:870` [await_expr]: `let res_b = col_b.get("k1").await.expect("get b").expect("exists");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:877` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:884` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:885` [async_fn]: `async fn test_close_and_reopen_100_docs() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:895` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:901` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:904` [await_expr]: `db.close().await.expect("close");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:909` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:911` [await_expr]: `assert_eq!(db.len().await.expect("len"), 100);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:914` [await_expr]: `let doc = db.get(&id).await.expect("get").expect("exists");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:918` [await_expr]: `let results = db.search(&[0.5, 0.5, 0.0, 0.0], 10).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:923` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:924` [async_fn]: `async fn test_close_and_reopen() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:934` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:937` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:939` [await_expr]: `db.close().await.expect("close");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:944` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:946` [await_expr]: `let doc = db.get("doc-1").await.expect("get").expect("exists");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:952` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:953` [async_fn]: `async fn test_drop_removes_all_data() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:954` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:958` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:961` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:965` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:970` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:972` [await_expr]: `assert_eq!(col2.len().await, 0);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:973` [await_expr]: `assert!(col2.get("k1").await.expect("get").is_none());`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:976` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:977` [async_fn]: `async fn test_default_collection_compat() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:978` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:980` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:983` [await_expr]: `let doc = db.get("k").await.expect("get").expect("exists");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:986` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 1).await.expect("search");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:990` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:991` [async_fn]: `async fn test_list_collections() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:992` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:993` [await_expr]: `db.collection("c1").await.expect("c1");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:994` [await_expr]: `db.collection("c2").await.expect("c2");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:995` [await_expr]: `db.collection("c3").await.expect("c3");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:997` [await_expr]: `let list = db.list_collections().await.expect("list");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1025` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1026` [async_fn]: `async fn test_open_dimension_mismatch_fails() -> contextra_types::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1033` [await_expr]: `let db = Contextra::open_with_config(dir.path(), config_768).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1034` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1040` [await_expr]: `let result = Contextra::open_with_config(dir.path(), config_1536).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1109` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1110` [async_fn]: `async fn test_provenance_rrf_sum_invariant() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1111` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1112` [await_expr]: `let col = db.collection("prov_test").await.expect("collection");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1122` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1133` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1157` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1158` [async_fn]: `async fn test_search_results_have_provenance_is_some() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1159` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1160` [await_expr]: `let col = db.collection("search_prov_test").await.expect("collection");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1167` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1172` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/lib.rs:1190` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:20` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:21` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:26` [await_expr]: `let db = Contextra::open_with_config("./collections_data", config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:29` [await_expr]: `let agents = db.collection("agents").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:30` [await_expr]: `let tools = db.collection("tools").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:39` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:47` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:56` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:64` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:69` [await_expr]: `let agent_results = agents.query().embedding(query).k(2).execute().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:75` [await_expr]: `let tool_results = tools.query().embedding(query).k(2).execute().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:82` [await_expr]: `let all = db.list_collections().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:89` [await_expr]: `let snapshot = db.create_snapshot().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:99` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:102` [await_expr]: `let at_snapshot = agents.get_at_snapshot("reviewer", snapshot).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:113` [await_expr]: `let current = agents.get("reviewer").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:121` [await_expr]: `db.drop_collection("tools", tenant_id, &[0u8; 32]).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:122` [await_expr]: `let remaining = db.list_collections().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:128` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:129` [await_expr]: `let _ = tokio::fs::remove_dir_all("./collections_data").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/collections.rs:129` [tokio_import]: `let _ = tokio::fs::remove_dir_all("./collections_data").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:22` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:23` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:28` [await_expr]: `let db = Contextra::open_with_config("./hybrid_data", config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:68` [await_expr]: `db.insert_many(&docs).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:78` [await_expr]: `let results = db.hybrid_search(text_query, &vector_query, 3, None).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:96` [await_expr]: `let vector_only = db.search(&vector_query, 3).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:103` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:104` [await_expr]: `let _ = tokio::fs::remove_dir_all("./hybrid_data").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/hybrid_search.rs:104` [tokio_import]: `let _ = tokio::fs::remove_dir_all("./hybrid_data").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/db_standalone.rs:10` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/db_standalone.rs:11` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/db_standalone.rs:20` [await_expr]: `let db = Contextra::open_with_config(tmp_dir.path(), config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/db_standalone.rs:31` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/db_standalone.rs:33` [await_expr]: `let results = db.search(&[1.0, 0.0, 0.0, 0.0], 5).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/db_standalone.rs:39` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:19` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:20` [async_fn]: `async fn main() -> contextra_types::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:26` [await_expr]: `let db = Contextra::open_with_config("./example_data", config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:34` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:41` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:48` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:52` [await_expr]: `let results = db.search(&query, 2).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:63` [await_expr]: `if let Some(doc) = db.get("rust-lang").await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:69` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:72` [await_expr]: `let _ = tokio::fs::remove_dir_all("./example_data").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/examples/quickstart.rs:72` [tokio_import]: `let _ = tokio::fs::remove_dir_all("./example_data").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/open_ie.rs:80` [async_fn]: `pub async fn extract_triples(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/open_ie.rs:112` [await_expr]: `let response = generator.generate(&prompt).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/mod.rs:58` [await_expr]: `open_ie::extract_triples(text, gen, config).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/mod.rs:83` [async_fn]: `pub async fn extract_triples_for_mode(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/mod.rs:90` [await_expr]: `extractor.extract_triples(text, generator, config).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/mod.rs:94` [async_fn]: `pub async fn extract_triples_for_config(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/extraction/mod.rs:99` [await_expr]: `extract_triples_for_mode(ExtractorMode::OpenIe, text, generator, config).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:29` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:30` [tokio_import]: `tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:31` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:32` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:33` [await_expr]: `ticker.tick().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:41` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:43` [await_expr]: `match collection.reap_expired_documents(MAX_EXPIRED_PER_TICK).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:79` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:91` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:93` [tokio_import]: `tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:94` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:95` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:97` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:99` [await_expr]: `match collection.evict_decayed_chunks(&decay_controller, 100).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/expiry_workers.rs:119` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:18` [tokio_import]: `use tokio::sync::Mutex;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:39` [async_fn]: `pub async fn enqueue(&self, ids: impl IntoIterator<Item = HyperEdgeId>) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:40` [await_expr]: `let mut guard = self.inner.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:40` [lock_held_across_await_warning]: `Lock acquired at line 40 near await at line 40`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:45` [async_fn]: `pub async fn drain_up_to(&self, max: usize) -> Vec<HyperEdgeId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:46` [await_expr]: `let mut guard = self.inner.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:46` [lock_held_across_await_warning]: `Lock acquired at line 46 near await at line 46`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:58` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:59` [tokio_import]: `tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:60` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:61` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:70` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/hyperedge_worker.rs:72` [await_expr]: `let batch = queue.drain_up_to(MAX_DEFERRED_HYPEREDGES_PER_TICK).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:41` [tokio_import]: `) -> (tokio::task::JoinHandle<()>, Arc<AtomicU32>) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:45` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:46` [tokio_import]: `let mut ticker = tokio::time::interval(interval);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:47` [tokio_import]: `ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:59` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:62` [tokio_import]: `let expired = tokio::task::spawn_blocking(move || {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:65` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:110` [tokio_import]: `let rebuild_res = tokio::time::timeout(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:114` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:176` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/background_workers/orphan_workers.rs:194` [tokio_import]: `) -> tokio::task::JoinHandle<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:18` [async_fn]: `pub async fn collection_for_tenant(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:25` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:31` [async_fn]: `pub async fn collection_with_language_and_tenant(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:54` [await_expr]: `let read_guard = self.tenant_collections.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:54` [lock_held_across_await_warning]: `Lock acquired at line 54 near await at line 54`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:72` [await_expr]: `contextra_graph::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:95` [await_expr]: `tenant_storage.put(tx, &col_idx_key, b"{}").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:95` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 95`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:96` [await_expr]: `tenant_storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:96` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 96`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:99` [await_expr]: `col.load_index().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:99` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 99`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:100` [await_expr]: `col.load_text_stats().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:100` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 100`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:101` [await_expr]: `col.migrate_doc_keys_v1().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:101` [lock_held_across_await_warning]: `Lock acquired at line 88 near await at line 101`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:105` [await_expr]: `let mut write_guard = self.tenant_collections.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:105` [lock_held_across_await_warning]: `Lock acquired at line 105 near await at line 105`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:117` [await_expr]: `if let Err(e) = worker_handle.await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:117` [lock_held_across_await_warning]: `Lock acquired at line 105 near await at line 117`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:130` [async_fn]: `pub async fn collection(&self, name: &str) -> Result<Arc<Collection<LsmStorage>>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:131` [await_expr]: `self.collection_with_language(name, Language::English).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:140` [async_fn]: `pub async fn collection_with_language(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:165` [await_expr]: `let read_guard = self.collections.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:165` [lock_held_across_await_warning]: `Lock acquired at line 165 near await at line 165`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:171` [await_expr]: `let mut write_guard = self.collections.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:171` [lock_held_across_await_warning]: `Lock acquired at line 171 near await at line 171`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:182` [await_expr]: `let mut graph = contextra_graph::CsrGraph::load_from_storage(self.storage.as_ref()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:182` [lock_held_across_await_warning]: `Lock acquired at line 171 near await at line 182`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:205` [await_expr]: `self.storage.put(tx, &col_idx_key, b"{}").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:205` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 205`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:206` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:206` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 206`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:209` [await_expr]: `col.load_index().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:209` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 209`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:210` [await_expr]: `col.load_text_stats().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:210` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 210`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:211` [await_expr]: `col.migrate_doc_keys_v1().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:211` [lock_held_across_await_warning]: `Lock acquired at line 198 near await at line 211`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:222` [await_expr]: `if let Err(e) = worker_handle.await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:245` [async_fn]: `pub async fn list_collections(&self) -> Result<Vec<String>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:247` [await_expr]: `let entries = self.storage.scan_prefix(col_idx_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:259` [await_expr]: `let guard = self.collections.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:259` [lock_held_across_await_warning]: `Lock acquired at line 259 near await at line 259`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:272` [async_fn]: `pub async fn list_collections_for_tenant(&self, tenant_id: TenantId) -> Result<Vec<String>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:278` [await_expr]: `let entries = tenant_storage.scan_prefix(col_idx_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:299` [async_fn]: `pub async fn drop_collection(&self, name: &str, tenant_id: TenantId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:304` [await_expr]: `let mut write_guard = self.tenant_collections.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:304` [lock_held_across_await_warning]: `Lock acquired at line 304 near await at line 304`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:310` [await_expr]: `None => self.collection_for_tenant(name, tenant_id).await?,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:310` [lock_held_across_await_warning]: `Lock acquired at line 304 near await at line 310`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:314` [await_expr]: `col.drop_collection().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:314` [lock_held_across_await_warning]: `Lock acquired at line 304 near await at line 314`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:324` [await_expr]: `tenant_storage.delete(tx, &col_idx_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/collections.rs:325` [await_expr]: `tenant_storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:18` [async_fn]: `pub(crate) async fn default_col(&self) -> Result<Arc<Collection<LsmStorage>>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:19` [await_expr]: `self.collection("default").await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:25` [async_fn]: `pub async fn put_kv(&self, id: &str, value: &Value) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:26` [await_expr]: `self.default_col().await?.put_kv(id, value).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:32` [async_fn]: `pub async fn get_kv(&self, id: &str) -> Result<Option<Value>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:33` [await_expr]: `self.default_col().await?.get_kv(id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:39` [async_fn]: `pub async fn insert(&self, id: &str, embedding: &[f32], metadata: Option<Value>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:41` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:43` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:49` [async_fn]: `pub async fn insert_typed(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:58` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:60` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:66` [async_fn]: `pub async fn upsert(&self, id: &str, embedding: &[f32], metadata: Option<Value>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:68` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:70` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:76` [async_fn]: `pub async fn insert_many(&self, docs: &[(String, Vec<f32>, Option<Value>)]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:77` [await_expr]: `self.default_col().await?.insert_many(docs).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:83` [async_fn]: `pub async fn upsert_many(&self, docs: &[(String, Vec<f32>, Option<Value>)]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:84` [await_expr]: `self.default_col().await?.upsert_many(docs).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:90` [async_fn]: `pub async fn get(&self, id: &str) -> Result<Option<Document>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:91` [await_expr]: `self.default_col().await?.get(id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:97` [async_fn]: `pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<Document>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:98` [await_expr]: `self.default_col().await?.get_at_snapshot(id, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:104` [async_fn]: `pub async fn last_committed_seq(&self) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:105` [await_expr]: `StorageEngine::last_seq_no(&*self.storage).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:111` [async_fn]: `pub async fn create_snapshot(&self) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:112` [await_expr]: `StorageEngine::last_seq_no(&*self.storage).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:118` [async_fn]: `pub async fn update(&self, id: &str, embedding: &[f32], metadata: Option<Value>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:120` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:122` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:129` [async_fn]: `pub async fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:131` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:136` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:147` [async_fn]: `pub async fn search_with_filter(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:153` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:158` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:165` [async_fn]: `pub async fn search_with_filter_expr(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:171` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:176` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:182` [async_fn]: `pub async fn insert_text_only(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:189` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:191` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:197` [async_fn]: `pub async fn upsert_text_only(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:204` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:206` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:213` [async_fn]: `pub async fn search_text(&self, text: &str, k: usize) -> Result<Vec<SearchResult>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:215` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:220` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:227` [async_fn]: `pub async fn search_filtered(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:235` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:237` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:244` [async_fn]: `pub async fn hybrid_search(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:251` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:256` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:263` [async_fn]: `pub async fn hybrid_search_reranked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:271` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:279` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:286` [async_fn]: `pub async fn hybrid_search_with_weights(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:294` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:302` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:309` [async_fn]: `pub async fn hybrid_search_with_strategy(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:318` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:329` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:336` [async_fn]: `pub async fn hybrid_search_with_query(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:341` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:345` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:350` [async_fn]: `pub async fn delete(&self, id: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:351` [await_expr]: `self.default_col().await?.delete(id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:357` [async_fn]: `pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:358` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:359` [await_expr]: `col.relate(from, to, label).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:365` [async_fn]: `pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:366` [await_expr]: `let col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:367` [await_expr]: `col.relate_bidirectional(from, to, label).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:373` [async_fn]: `pub async fn scan_prefix(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:378` [await_expr]: `self.default_col().await?.scan_prefix(prefix, limit).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:384` [async_fn]: `pub async fn len(&self) -> Result<usize> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:385` [await_expr]: `Ok(self.default_col().await?.len().await)`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:391` [async_fn]: `pub async fn is_empty(&self) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:392` [await_expr]: `Ok(self.default_col().await?.is_empty().await)`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:398` [async_fn]: `pub async fn scan(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/crud.rs:404` [await_expr]: `self.default_col().await?.scan(start, end, limit).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:24` [async_fn]: `pub async fn open(path: impl AsRef<Path>) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:33` [await_expr]: `Self::open_authorized(path, config, &token, fast_gate).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:38` [async_fn]: `pub async fn open_with_config(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:47` [await_expr]: `Self::open_authorized(path, config, &token, fast_gate).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:53` [async_fn]: `pub async fn open_authorized(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:84` [await_expr]: `let storage = Arc::new(LsmStorage::new(lsm_config).await?);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:90` [await_expr]: `let last_tx = storage.last_tx_id().await?.inner();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:95` [await_expr]: `if let Some(stored_dim_bytes) = storage.get(dim_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:112` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:113` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:140` [tokio_import]: `collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:141` [tokio_import]: `tenant_collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:151` [await_expr]: `db.initialize_collections().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:155` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:159` [await_expr]: `transaction::recover_pending_intents(db.storage.as_ref(), &db.next_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:162` [await_expr]: `db.repair_on_open().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:164` [await_expr]: `db.init_embedding_backend(&config.embedding_backend).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:167` [await_expr]: `let default_col = db.collection("default").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:178` [await_expr]: `if let Err(e) = handle.await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:190` [async_fn]: `async fn init_embedding_backend(&self, backend: &EmbeddingBackend) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:207` [async_fn]: `async fn initialize_collections(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:213` [await_expr]: `let entries = self.storage.scan_prefix(col_idx_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:217` [await_expr]: `let _ = self.collection(&name).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:226` [async_fn]: `pub async fn repair_on_open(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:228` [await_expr]: `match tokio::time::timeout(timeout_duration, self.repair_on_open_internal()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:228` [tokio_import]: `match tokio::time::timeout(timeout_duration, self.repair_on_open_internal()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:239` [async_fn]: `async fn repair_on_open_internal(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:258` [await_expr]: `let pending_intents = self.scan_pending_intents().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:276` [await_expr]: `let value_opt = self.storage.get(&intent_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:290` [await_expr]: `let col = match self.collection(&col_name).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:302` [await_expr]: `let _ = self.storage.put(tx, &intent_key, &failed_bytes).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:303` [await_expr]: `let _ = self.storage.commit(tx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:310` [await_expr]: `if let Err(e) = col.repair().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:323` [await_expr]: `let _ = self.storage.put(tx, &intent_key, &failed_bytes).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:324` [await_expr]: `let _ = self.storage.commit(tx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:343` [await_expr]: `if col.storage.get(&doc_key).await.unwrap_or(None).is_some() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:362` [await_expr]: `if let Err(e) = self.storage.put(tx, &intent_key, &final_bytes).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:367` [await_expr]: `} else if let Err(e) = self.storage.commit(tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:399` [async_fn]: `async fn scan_pending_intents(&self) -> Result<Vec<Vec<u8>>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:420` [await_expr]: `let entries = self.storage.scan_prefix(default_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:426` [await_expr]: `let col_entries = self.storage.scan_prefix(col_idx_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:433` [await_expr]: `let ns_entries = self.storage.scan_prefix(&ns_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:452` [async_fn]: `pub async fn wait_shutdown(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:455` [await_expr]: `self.task_tracker.wait().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:456` [await_expr]: `self.collections.write().await.clear();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:457` [await_expr]: `self.tenant_collections.write().await.clear();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:471` [async_fn]: `pub async fn close(self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:472` [await_expr]: `self.wait_shutdown().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:473` [await_expr]: `self.flush().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:474` [await_expr]: `self.storage.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:481` [async_fn]: `pub async fn with_embedder(self, embedder: Arc<dyn TextEmbeddingEngine>) -> Self {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:486` [await_expr]: `let cols = self.collections.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:486` [lock_held_across_await_warning]: `Lock acquired at line 486 near await at line 486`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:498` [async_fn]: `pub async fn set_embedder(&self, embedder: Arc<dyn TextEmbeddingEngine>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:503` [await_expr]: `let collections_read = self.collections.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:503` [lock_held_across_await_warning]: `Lock acquired at line 503 near await at line 503`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:519` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:520` [async_fn]: `async fn test_instance_bound_consolidation_launchers_isolation() -> contextra_types::Result<()>`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:532` [tokio_import]: `tokio::spawn(async {})`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:539` [tokio_import]: `tokio::spawn(async {})`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:545` [await_expr]: `let db1 = Contextra::open_with_config(dir1.path(), config1).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:546` [await_expr]: `let db2 = Contextra::open_with_config(dir2.path(), config2).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:551` [await_expr]: `db1.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:552` [await_expr]: `db2.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:557` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:558` [async_fn]: `async fn test_without_consolidation_launcher_initializes_cleanly() -> contextra_types::Result<()>`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:563` [await_expr]: `let db = Contextra::open_with_config(dir.path(), config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:564` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:569` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:570` [async_fn]: `async fn test_custom_lsm_configuration_passthrough() -> contextra_types::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:580` [await_expr]: `let db = Contextra::open_with_config(dir.path(), config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/lifecycle.rs:581` [await_expr]: `db.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:17` [async_fn]: `pub async fn stats(&self) -> Result<ContextraStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:18` [await_expr]: `let default_col = self.default_col().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:19` [await_expr]: `let active_memory_count = default_col.len().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:20` [await_expr]: `let index_stats = default_col.stats().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:21` [await_expr]: `let storage_stats = StorageEngine::stats(&*self.storage).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:58` [async_fn]: `pub async fn flush(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/contextra_impl/diagnostics.rs:59` [await_expr]: `self.storage.flush().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction.rs:172` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction.rs:174` [await_expr]: `if let Err(e) = collection.graph_index.rollback(tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction.rs:180` [await_expr]: `if let Err(e) = collection.text_index.rollback(tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction.rs:186` [await_expr]: `if let Err(e) = collection.index.rollback(tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction.rs:192` [await_expr]: `if let Err(e) = collection.storage.rollback(tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:23` [async_fn]: `pub(super) async fn commit_text_staged(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:43` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:43` [lock_held_across_await_warning]: `Lock acquired at line 32 near await at line 43`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:50` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:58` [async_fn]: `pub(super) async fn commit_graph_staged(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:78` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:78` [lock_held_across_await_warning]: `Lock acquired at line 67 near await at line 78`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:82` [await_expr]: `GraphIndex::add_edge(&*self.collection.graph_index, self.tx_id, edge).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:109` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:109` [lock_held_across_await_warning]: `Lock acquired at line 98 near await at line 109`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:124` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:124` [lock_held_across_await_warning]: `Lock acquired at line 113 near await at line 124`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:131` [async_fn]: `pub async fn commit(self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:133` [await_expr]: `let res = self.commit_internal().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:149` [async_fn]: `async fn commit_internal(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:244` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:246` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:253` [await_expr]: `if let Err(e) = self.collection.storage.commit(intent_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:254` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:262` [await_expr]: `if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:263` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:295` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:297` [await_expr]: `let _ = self.collection.storage.commit(stage1_tx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:302` [await_expr]: `if let Err(e) = self.commit_text_staged().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:303` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:307` [await_expr]: `if let Err(e) = self.commit_graph_staged().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:308` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:312` [await_expr]: `if let Err(index_err) = self.collection.index.commit(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:313` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:326` [await_expr]: `if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:327` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:338` [await_expr]: `if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:339` [await_expr]: `ledger.execute_rollback().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:371` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:373` [await_expr]: `if let Ok(()) = self.collection.storage.commit(cleanup_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:379` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(50 * attempt as u64)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_commit.rs:379` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(50 * attempt as u64)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:14` [async_fn]: `pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:22` [await_expr]: `let orphaned_keys = storage.scan_prefix(prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:32` [await_expr]: `storage.delete(tx, &key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:33` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:52` [async_fn]: `pub async fn recover_pending_intents<S: StorageEngine>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:56` [await_expr]: `let mut intent_entries = storage.scan_prefix(b"__tx_intent:").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:58` [await_expr]: `if let Ok(col_entries) = storage.scan_prefix(col_idx_prefix).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:64` [await_expr]: `if let Ok(ns_entries) = storage.scan_prefix(&ns_prefix).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:100` [await_expr]: `if storage.get(&doc_key).await?.is_some() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:110` [await_expr]: `storage.put(tx, &intent_key, &committed_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:111` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:115` [await_expr]: `storage.put(tx, &intent_key, &aborted_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/cleanup.rs:116` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:18` [async_fn]: `pub(super) async fn compensate_hnsw(&self, doc_ids: &[DocId]) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:25` [await_expr]: `if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:33` [await_expr]: `if let Err(e) = self.collection.index.commit(comp_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:40` [async_fn]: `pub(super) async fn compensate_text(&self, doc_ids: &[DocId]) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:51` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:60` [await_expr]: `if let Err(e) = self.collection.text_index.commit(comp_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:67` [async_fn]: `pub(super) async fn compensate_lsm(&self, intent_key: &[u8], doc_ids: &[DocId]) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:103` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:105` [await_expr]: `None => self.collection.storage.delete(rollback_tx, f_key).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:125` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:127` [await_expr]: `None => self.collection.storage.delete(rollback_tx, r_key).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:143` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:149` [await_expr]: `if let Err(e) = self.collection.storage.commit(rollback_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:165` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:165` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:183` [async_fn]: `pub(super) async fn rollback_internal(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:184` [await_expr]: `if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:187` [await_expr]: `if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:190` [await_expr]: `if let Err(e) = self.collection.index.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:193` [await_expr]: `if let Err(e) = self.collection.storage.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:199` [async_fn]: `pub async fn rollback(self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:202` [await_expr]: `let graph_res = self.collection.graph_index.rollback(self.tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:203` [await_expr]: `let text_res = self.collection.text_index.rollback(self.tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:204` [await_expr]: `let index_res = self.collection.index.rollback(self.tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/db_transaction_rollback.rs:205` [await_expr]: `let storage_res = self.collection.storage.rollback(self.tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:42` [async_fn]: `pub async fn execute_rollback(&mut self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:44` [await_expr]: `if let Err(e) = action.execute().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:104` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:106` [await_expr]: `None => self.collection.storage.delete(rollback_tx, f_key).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:126` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:128` [await_expr]: `None => self.collection.storage.delete(rollback_tx, r_key).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:150` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:156` [await_expr]: `if let Err(e) = self.collection.storage.commit(rollback_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:172` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:172` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(100)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:228` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:230` [await_expr]: `if let Err(e) = self.collection.graph_index.commit(comp_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:278` [await_expr]: `if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:287` [await_expr]: `if let Err(e) = self.collection.index.commit(comp_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:351` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:360` [await_expr]: `if let Err(e) = self.collection.text_index.commit(comp_tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:387` [await_expr]: `if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:390` [await_expr]: `if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:393` [await_expr]: `if let Err(e) = self.collection.index.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/transaction/compensating_actions.rs:396` [await_expr]: `if let Err(e) = self.collection.storage.rollback(self.tx_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:163` [async_fn]: `pub async fn execute_all(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:167` [await_expr]: `if let Err(e) = step.run(&mut self.context).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:266` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:267` [async_fn]: `async fn test_typestate_workflow_success() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:286` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:295` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:296` [async_fn]: `async fn test_typestate_workflow_failure() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:305` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:314` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/orchestration/mod.rs:315` [async_fn]: `async fn test_engine_service_container_wiring() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:16` [async_fn]: `pub async fn relate_with_provenance(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:28` [await_expr]: `let _guards = self.lock_keys_sorted([from, to]).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:39` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:49` [await_expr]: `if let Err(e) = self.storage.put(db_tx.tx_id, &key, &bytes).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:51` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:76` [await_expr]: `match db_tx.commit().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:87` [async_fn]: `pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:88` [await_expr]: `self.relate_with_provenance(from, to, label, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:93` [async_fn]: `pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:94` [await_expr]: `self.relate(from, to, label).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:95` [await_expr]: `self.relate(to, from, label).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:107` [async_fn]: `pub async fn relate_n_ary(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:144` [await_expr]: `let _guards = self.lock_keys_sorted(lock_keys).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:182` [await_expr]: `if let Err(e) = self.storage.put(db_tx.tx_id, &key, &bytes).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:184` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:201` [await_expr]: `match db_tx.commit().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:215` [async_fn]: `async fn test_db(dim: usize) -> (crate::Contextra, TempDir) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:224` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:229` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:230` [async_fn]: `async fn test_relate_n_ary_basic() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:231` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:232` [await_expr]: `let col = db.collection("default").await.expect("collection");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:235` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:238` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:241` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:252` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:271` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:272` [async_fn]: `async fn test_relate_n_ary_insufficient_participants() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:273` [await_expr]: `let (db, _tmp) = test_db(4).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:274` [await_expr]: `let col = db.collection("default").await.expect("collection");`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:277` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/relate.rs:281` [await_expr]: `let res = col.relate_n_ary("solo", &single_participant, None).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:30` [async_fn]: `pub async fn evict_decayed_chunks(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:38` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:57` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:120` [await_expr]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:120` [tokio_import]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:133` [await_expr]: `if let Err(e) = self.delete(id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:151` [async_fn]: `pub async fn repair(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:153` [await_expr]: `let res = self.repair_internal().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:169` [async_fn]: `async fn repair_internal(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:170` [await_expr]: `let _guard = self.consolidation_guard.clone().lock_owned().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:171` [await_expr]: `let docs = self.storage.scan_prefix(&self.prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:173` [await_expr]: `self.index.all_doc_ids().await?.into_iter().collect();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:180` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:183` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:207` [async_fn]: `async fn recover_pending_transaction_intents(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:212` [await_expr]: `let intents = self.storage.scan_prefix(&intent_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:236` [await_expr]: `if self.storage.get(&target_doc_key).await?.is_some() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:239` [await_expr]: `if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:258` [await_expr]: `if self.storage.get(&doc_key).await?.is_some() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:267` [await_expr]: `if let Some(val) = self.storage.get(&doc_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:275` [await_expr]: `if let Some(user_val) = self.storage.get(&user_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:294` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:304` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:312` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:324` [await_expr]: `self.graph_index.add_entity(recovery_tx, entity).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:341` [await_expr]: `if let Err(e) = self.index.delete(recovery_tx, doc_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:349` [await_expr]: `self.text_index.delete_document(recovery_tx, doc_id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:359` [await_expr]: `if let Err(e) = self.graph_index.remove_entity(recovery_tx, eid).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:368` [await_expr]: `if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:374` [await_expr]: `self.index.commit(recovery_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:377` [await_expr]: `self.text_index.commit(recovery_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:380` [await_expr]: `self.graph_index.commit(recovery_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:383` [await_expr]: `self.storage.commit(recovery_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:390` [async_fn]: `async fn fallback_scan_missing_text_index_documents(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:422` [await_expr]: `if let Ok(bm25_res) = self.text_index.search_bm25(&text, 1, None).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:426` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:434` [await_expr]: `self.index.commit(fallback_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:437` [await_expr]: `self.text_index.commit(fallback_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:445` [async_fn]: `pub async fn stats(&self) -> Result<contextra_ports::VectorIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:446` [await_expr]: `self.index.stats().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:452` [async_fn]: `pub async fn reap_expired_documents(&self, max_expired: usize) -> Result<usize> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:453` [await_expr]: `let current_seq = self.snapshot_seq().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:464` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:511` [await_expr]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:511` [tokio_import]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:520` [await_expr]: `if let Err(e) = self.delete(id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:555` [async_fn]: `pub async fn trigger_expiry_cleanup(&self) -> Result<usize> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:568` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:642` [await_expr]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:642` [tokio_import]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:650` [await_expr]: `match self.delete(&id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:685` [async_fn]: `pub async fn update_document_importance(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:693` [await_expr]: `let Some(data) = self.storage.get_tracked(tx, &user_key).await? else {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:748` [await_expr]: `let _guard = self.kv_locks.lock_for(doc_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:750` [await_expr]: `self.storage.put(tx, &user_key, &user_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:751` [await_expr]: `self.storage.put(tx, &doc_key, &doc_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:752` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:760` [async_fn]: `pub async fn run_community_detection(&self) -> Result<Vec<CommunityAssignment>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:762` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:768` [async_fn]: `pub async fn run_community_detection_with_config(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:772` [await_expr]: `let assignments = detect_communities(&self.graph_index, config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:785` [await_expr]: `self.storage.put(tx, &key, &val).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:788` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:795` [async_fn]: `pub async fn get_community(&self, entity_id: EntityId) -> Result<Option<u64>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:801` [await_expr]: `if let Some(bytes) = self.storage.get(&key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:813` [async_fn]: `pub async fn get_communities_batch(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:822` [await_expr]: `let graph_map = self.graph_index.get_communities_batch(entity_ids).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:829` [await_expr]: `let entries = self.storage.scan_prefix(&prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:852` [async_fn]: `pub async fn drop_collection(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:853` [await_expr]: `let _guard = self.consolidation_guard.clone().lock_owned().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:865` [await_expr]: `self.storage.delete_prefix(tx, &prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:869` [await_expr]: `self.storage.delete_prefix(tx, &txt_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:871` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:894` [async_fn]: `pub async fn run_percolation_check(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:898` [await_expr]: `let stats = self.graph_index.stats().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:923` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:940` [await_expr]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:940` [tokio_import]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:951` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/maintenance.rs:957` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:8` [tokio_import]: `use tokio::sync::{Mutex, MutexGuard};`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:50` [async_fn]: `pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:52` [await_expr]: `_guard: self.shards[idx].lock().await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:58` [async_fn]: `pub async fn lock_for<'a>(&'a self, key: &str) -> KeyGuard<'a> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:60` [await_expr]: `self.lock_shard(idx).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:83` [async_fn]: `pub async fn lock_many_sorted<'a>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:91` [await_expr]: `guards.push(self.lock_shard(idx).await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:255` [tokio_import]: `let rt = tokio::runtime::Builder::new_multi_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:261` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:265` [tokio_import]: `let t1 = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:266` [await_expr]: `let _guards = locks_t1.lock_many_sorted(["key_alpha", "key_beta"]).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:270` [tokio_import]: `let t2 = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:271` [await_expr]: `let _guards = locks_t2.lock_many_sorted(["key_beta", "key_alpha"]).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:274` [await_expr]: `t1.await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/kv_lock.rs:275` [await_expr]: `t2.await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:288` [tokio_import]: `pub consolidation_guard: Arc<tokio::sync::Mutex<()>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:300` [tokio_import]: `parking_lot::RwLock<Option<tokio::sync::watch::Receiver<contextra_store::SystemPressure>>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:400` [tokio_import]: `consolidation_guard: Arc::new(tokio::sync::Mutex::new(())),`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:463` [tokio_import]: `pressure_rx: tokio::sync::watch::Receiver<contextra_store::SystemPressure>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:472` [tokio_import]: `pressure_rx: tokio::sync::watch::Receiver<contextra_store::SystemPressure>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:509` [async_fn]: `pub async fn set_embedder(&self, embedder: Arc<dyn TextEmbeddingEngine>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:577` [async_fn]: `pub async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:578` [await_expr]: `self.index.len().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:589` [async_fn]: `pub async fn is_empty(&self) -> bool {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:590` [await_expr]: `self.index.is_empty().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:595` [async_fn]: `pub async fn load_index(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:606` [await_expr]: `let entries = self.storage.scan_prefix(&scan_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:618` [await_expr]: `if let Err(e) = self.index.insert(tx, doc_id, &stored.embedding).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:622` [await_expr]: `self.index.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:629` [async_fn]: `pub async fn migrate_doc_keys_v1(&self) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:638` [await_expr]: `let entries = self.storage.scan_prefix(&prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:647` [await_expr]: `self.storage.put(tx, &k, &meta_data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:654` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:666` [async_fn]: `pub async fn load_text_stats(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:667` [await_expr]: `self.text_index.load_stats().await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:711` [tokio_import]: `tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/mod.rs:712` [await_expr]: `match collection_clone.run_community_detection().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:17` [async_fn]: `pub async fn execute(self) -> Result<Vec<crate::SearchResult>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:19` [await_expr]: `let (results, report) = self.execute_with_report().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:39` [async_fn]: `pub async fn execute_with_report(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:52` [await_expr]: `self.collection.snapshot_seq().await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:71` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:76` [await_expr]: `let reranked = self.apply_reranker_stage(reranker, results, k).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:182` [async_fn]: `async fn apply_reranker_stage(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:231` [await_expr]: `tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:231` [tokio_import]: `tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:322` [async_fn]: `pub async fn execute_with_scope(self) -> Result<Vec<crate::SearchResult>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:353` [await_expr]: `self.collection.snapshot_seq().await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:358` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:362` [await_expr]: `return self.apply_reranker_stage(reranker, results, k).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:371` [async_fn]: `async fn hydrate_acorn_search_results(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/query_builder/builder_exec.rs:385` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:16` [async_fn]: `pub async fn put_kv(&self, id: &str, value: &serde_json::Value) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:18` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:23` [await_expr]: `self.storage.put(tx, &user_key, &data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:24` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:31` [async_fn]: `pub async fn put_kv_if_absent(&self, id: &str, value: &serde_json::Value) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:33` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:38` [await_expr]: `let written = self.storage.put_if_absent(tx, &user_key, &data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:40` [await_expr]: `if let Err(rollback_err) = self.storage.rollback(tx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:53` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:59` [async_fn]: `pub async fn get_kv(&self, id: &str) -> Result<Option<serde_json::Value>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/kv.rs:63` [await_expr]: `if let Some(data) = self.storage.get(&key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/internal.rs:56` [async_fn]: `pub(crate) async fn apply_insert_backpressure(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/internal.rs:90` [await_expr]: `tokio::time::sleep(backpressure_delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/internal.rs:90` [tokio_import]: `tokio::time::sleep(backpressure_delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/internal.rs:98` [async_fn]: `pub(crate) async fn lock_keys_sorted<'a>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/internal.rs:102` [await_expr]: `self.kv_locks.lock_many_sorted(keys).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:30` [async_fn]: `pub async fn snapshot_seq(&self) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:31` [await_expr]: `self.storage.last_seq_no().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:36` [async_fn]: `pub async fn get(&self, id: &str) -> Result<Option<crate::Document>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:37` [await_expr]: `self.get_at_snapshot(id, u64::MAX).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:42` [async_fn]: `pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:45` [await_expr]: `if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:62` [async_fn]: `pub async fn get_doc_tx(&self, doc_id: DocId) -> Result<Option<TxId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:64` [await_expr]: `if let Some(bytes) = self.storage.get(&doc_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:88` [async_fn]: `pub async fn scan_prefix(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:120` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:174` [async_fn]: `pub async fn scan(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:211` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:291` [async_fn]: `pub async fn get_tracked(&self, tx: TxId, id: &str) -> Result<Option<StoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:293` [await_expr]: `if let Some(bytes) = self.storage.get_tracked(tx, &key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:302` [async_fn]: `pub async fn get_at_seq_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/read.rs:309` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq_tracked(tx, &key, max_seq).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/auto_extraction.rs:240` [async_fn]: `pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/auto_extraction.rs:264` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/auto_extraction.rs:289` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/auto_extraction.rs:321` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/auto_extraction.rs:322` [async_fn]: `async fn test_noop_llm_generator_behavior_defined_skip() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/auto_extraction.rs:326` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:18` [async_fn]: `pub async fn update(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:32` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:35` [await_expr]: `match self.update_op(&db_tx, id, embedding, metadata).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:37` [await_expr]: `db_tx.commit().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:43` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:54` [async_fn]: `pub async fn update_op(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:66` [await_expr]: `self.check_doc_id_collision_tracked(tx, doc_id, id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:74` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:78` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:100` [await_expr]: `self.storage.put(tx, &user_key, &data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:101` [await_expr]: `self.storage.put(tx, &doc_key, &meta_data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:119` [await_expr]: `if let Err(e) = self.index.delete(tx, doc_id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/update.rs:126` [await_expr]: `self.index.insert(tx, doc_id, embedding).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:20` [async_fn]: `pub async fn insert_text_only(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:32` [await_expr]: `embedder.embed(text).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:45` [await_expr]: `let res = self.insert(id, &embedding, metadata).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:50` [await_expr]: `auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:62` [async_fn]: `pub async fn upsert_text_only(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:74` [await_expr]: `embedder.embed(text).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:87` [await_expr]: `let res = self.upsert(id, &embedding, metadata).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:92` [await_expr]: `auto_extract_and_relate(self, id, text, generator.as_ref(), &cfg).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:104` [async_fn]: `pub async fn insert_with_ttl(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:118` [await_expr]: `let current_seq = self.snapshot_seq().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:131` [await_expr]: `self.insert(id, embedding, Some(meta)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:135` [async_fn]: `pub async fn insert_typed(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:167` [await_expr]: `self.insert(id, embedding, Some(meta)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:172` [async_fn]: `pub async fn insert(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:185` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:186` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:187` [await_expr]: `self.insert_inner_unlocked(id, embedding, metadata).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:191` [async_fn]: `pub(crate) async fn insert_inner_unlocked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:219` [await_expr]: `match self.insert_op(&db_tx, id, embedding, metadata).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:221` [await_expr]: `db_tx.commit().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:242` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:251` [async_fn]: `pub(crate) async fn check_doc_id_collision(&self, doc_id: DocId, id: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:254` [await_expr]: `if let Some(val) = self.storage.get(&doc_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:276` [async_fn]: `pub(crate) async fn check_doc_id_collision_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:283` [await_expr]: `if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:305` [async_fn]: `pub async fn insert_op(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:317` [await_expr]: `self.check_doc_id_collision_tracked(tx, doc_id, id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:339` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:343` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:346` [await_expr]: `self.storage.put(tx, &user_key, &data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:349` [await_expr]: `let written = self.storage.put_if_absent(tx, &doc_key, &meta_data).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:351` [await_expr]: `self.check_doc_id_collision(doc_id, id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:356` [await_expr]: `self.index.insert(tx, doc_id, embedding).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:372` [async_fn]: `pub async fn insert_many(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:398` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:401` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:406` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:419` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:430` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:432` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:441` [await_expr]: `db_tx.commit().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:448` [async_fn]: `pub async fn upsert(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:472` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:473` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:475` [await_expr]: `let result = self.update_op(&db_tx, id, embedding, metadata).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:479` [await_expr]: `db_tx.commit().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:484` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:494` [async_fn]: `pub async fn upsert_many(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:520` [await_expr]: `self.apply_insert_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:523` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:527` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:540` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:550` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:552` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/insert.rs:561` [await_expr]: `db_tx.commit().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:15` [async_fn]: `pub async fn delete(&self, id: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:16` [await_expr]: `let _guard = self.kv_locks.lock_for(id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:19` [await_expr]: `match self.delete_op(&mut db_tx, id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:21` [await_expr]: `db_tx.commit().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:27` [await_expr]: `if let Err(rollback_err) = db_tx.rollback().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:38` [async_fn]: `pub async fn delete_op(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:53` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:57` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:65` [await_expr]: `self.storage.delete(tx, &user_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:66` [await_expr]: `self.storage.delete(tx, &doc_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/delete.rs:70` [await_expr]: `self.index.delete(tx, doc_id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:15` [async_fn]: `pub async fn link_memories(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:31` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:33` [await_expr]: `self.check_link_cycle(from, to, relation).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:41` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:45` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:53` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:82` [await_expr]: `self.storage.put(tx, &user_key, &new_user_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:95` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:98` [await_expr]: `self.storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:106` [async_fn]: `async fn check_link_cycle(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:130` [await_expr]: `let links = self.get_links(curr).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:141` [async_fn]: `async fn update_metadata_links(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:177` [await_expr]: `self.storage.put(tx, doc_key, &updated_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:206` [await_expr]: `self.storage.put(tx, doc_key, &updated_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:216` [async_fn]: `pub async fn get_links(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/crud/links.rs:222` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq(&doc_key, u64::MAX).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hydrate.rs:18` [async_fn]: `pub(super) async fn hydrate_from_scored_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hydrate.rs:32` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hydrate.rs:67` [async_fn]: `pub(super) async fn hydrate_from_tuples_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hydrate.rs:81` [await_expr]: `if let Some(bytes) = self.storage.get_at_seq(&doc_key, seq).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:30` [async_fn]: `pub async fn new(storage: &'a S, seq: u64) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:31` [await_expr]: `storage.pin_checkpoint(seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:41` [async_fn]: `pub async fn new_at_latest(storage: &'a S) -> Result<(Self, u64)> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:42` [await_expr]: `let seq = storage.last_seq_no().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:43` [await_expr]: `storage.pin_checkpoint(seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:55` [async_fn]: `pub async fn release(mut self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:57` [await_expr]: `self.storage.unpin_checkpoint(self.seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:76` [async_fn]: `pub async fn with_pinned_checkpoint<S, F, Fut, T>(storage: &S, seq: u64, f: F) -> Result<T>`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:82` [await_expr]: `let pin_guard = CheckpointPinGuard::new(storage, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:83` [await_expr]: `let result = f().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:84` [await_expr]: `if let Err(e) = pin_guard.release().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:94` [async_fn]: `pub async fn with_pinned_checkpoint_at_latest<S, F, Fut, T>(storage: &S, f: F) -> Result<T>`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:100` [await_expr]: `let (pin_guard, seq) = CheckpointPinGuard::new_at_latest(storage).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:101` [await_expr]: `let result = f(seq).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/checkpoint.rs:102` [await_expr]: `if let Err(e) = pin_guard.release().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:23` [async_fn]: `pub async fn search(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:34` [await_expr]: `self.search_with_filter_expr(query_embedding, k, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:41` [async_fn]: `pub async fn search_with_filter(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:51` [await_expr]: `self.search_with_filter_expr(query, k, expr).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:58` [async_fn]: `pub async fn search_with_filter_expr(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:83` [await_expr]: `None => return self.search_filtered_at(query, k, None, seq).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:86` [await_expr]: `let matched_ids = self.get_matching_doc_ids_at(&filter, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:95` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:97` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:104` [async_fn]: `pub async fn search_text(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:116` [await_expr]: `embedder.embed(query_text).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/basic.rs:118` [await_expr]: `self.search(&embedding, k).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:27` [async_fn]: `pub(super) async fn estimate_filter_selectivity(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:37` [await_expr]: `let matched = self.get_matching_doc_ids_at(filter, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:50` [await_expr]: `let entries = self.storage.scan_prefix_at(&prefix, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:87` [async_fn]: `pub(super) async fn get_matching_doc_ids_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:100` [await_expr]: `let entries = self.storage.scan_prefix_at(&prefix, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:123` [async_fn]: `pub(super) async fn get_matching_doc_ids_for_query_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:140` [await_expr]: `let entries = self.storage.scan_prefix_at(&prefix, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:181` [async_fn]: `pub async fn search_filtered(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:191` [await_expr]: `self.search_filtered_at(query, k, filter, seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:193` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:198` [async_fn]: `pub async fn search_filtered_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:221` [await_expr]: `let scored_docs = self.index.search_filtered(query, fetch_k, filter).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/filtered.rs:224` [await_expr]: `let (results, skipped) = self.hydrate_from_scored_at(scored_docs, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:45` [async_fn]: `pub async fn hybrid_search_with_query(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:52` [await_expr]: `self.hybrid_search_with_query_at(query, seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:54` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:59` [async_fn]: `pub async fn hybrid_search_with_query_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:66` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:72` [async_fn]: `pub async fn hybrid_search_with_query_and_report_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:103` [await_expr]: `let total_docs = self.len().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:143` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:158` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:171` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:186` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:190` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:195` [async_fn]: `async fn evaluate_vector_signal_for_query(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:213` [await_expr]: `let matched_ids_opt = self.get_matching_doc_ids_for_query_at(query, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:229` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:257` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:279` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:305` [async_fn]: `async fn evaluate_text_signal_for_query(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:324` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:337` [await_expr]: `let bm25_results = self.text_index.search_at(text, oversample, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:347` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:366` [await_expr]: `let bm25_results = self.text_index.search_at(text, candidate_k, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:374` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:400` [async_fn]: `async fn evaluate_graph_signal_for_query(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:449` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:454` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:457` [await_expr]: `GraphIndex::path_rag_at(&*self.graph_index, anchors, max_hops, seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:469` [await_expr]: `let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:513` [async_fn]: `async fn fuse_and_filter_superseded_results(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:526` [await_expr]: `self.get_community(same_comm_entity).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:562` [await_expr]: `let links = self.get_links(doc_id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/query.rs:588` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:23` [async_fn]: `pub async fn hybrid_search(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:31` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:45` [async_fn]: `pub async fn hybrid_search_reranked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:60` [await_expr]: `builder.execute().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:68` [async_fn]: `pub async fn hybrid_search_with_weights(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:86` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:94` [async_fn]: `pub async fn hybrid_search_with_strategy(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:136` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:146` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:154` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:180` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:199` [await_expr]: `self.get_community(same_comm_entity).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:233` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:236` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:240` [async_fn]: `async fn evaluate_graph_signal_tuples_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:252` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:261` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:270` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:280` [await_expr]: `self.hydrate_from_tuples_at(doc_tuples, seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:294` [async_fn]: `pub(super) async fn apply_community_boost_post_fusion(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:320` [await_expr]: `let community_map = self.get_communities_batch(&candidate_eids).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:346` [async_fn]: `pub async fn traverse_links(`
+- `/home/freddy/Projekte/contextra/crates/contextra-db/src/collection/search/hybrid/mod.rs:363` [await_expr]: `let links = self.get_links(current_id).await?;`
+### `contextra-erasure`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/scope/file.rs:36` [async_fn]: `pub async fn store_scope_file(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/scope/file.rs:48` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/scope/file.rs:125` [async_fn]: `pub async fn load_scope_file(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/scope/file.rs:150` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/vault/sealer.rs:706` [async_fn]: `pub async fn execute_rewrite(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/vault/sealer.rs:734` [await_expr]: `let purge_res = self.backend.purge(&cx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/vault/sealer.rs:794` [async_fn]: `pub async fn recover_and_reconcile(&self) -> Result<usize, RewriteError> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/vault/sealer.rs:816` [await_expr]: `let _ = self.backend.purge(&cx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/seams.rs:64` [async_fn]: `pub async fn query_target_gate(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/seams.rs:68` [await_expr]: `gate.decision_for_target(target).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:45` [tokio_import]: `use tokio::sync::{oneshot, RwLock};`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:224` [async_fn]: `async fn notify_observer(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:242` [await_expr]: `let res = obs.on_erased(event).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:283` [async_fn]: `pub async fn erase(&self, req: EraseExecutionRequest) -> Result<EraseReceipt, ErasureError> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:292` [await_expr]: `let existing_id_opt = { self.open_keys.read().await.get(&open_key).copied() };`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:292` [lock_held_across_await_warning]: `Lock acquired at line 292 near await at line 292`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:294` [await_expr]: `let entry_opt = { self.active_sagas.read().await.get(&existing_id).cloned() };`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:294` [lock_held_across_await_warning]: `Lock acquired at line 294 near await at line 294`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:332` [tokio_import]: `tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:334` [await_expr]: `Self::execute_erase_flow(req, deps, cfg, active_sagas, open_keys, open_key).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:340` [await_expr]: `match rx.await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:349` [async_fn]: `async fn execute_erase_flow(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:365` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:365` [lock_held_across_await_warning]: `Lock acquired at line 365 near await at line 365`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:388` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:389` [await_expr]: `let gated_seq = deps.gate.add_gate(erasure_id, &req.target).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:392` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:395` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:398` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:398` [lock_held_across_await_warning]: `Lock acquired at line 398 near await at line 398`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:411` [await_expr]: `let mut keys = open_keys.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:411` [lock_held_across_await_warning]: `Lock acquired at line 411 near await at line 411`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:430` [await_expr]: `let scope = match layer.resolve(&req.target).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:437` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:438` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:438` [lock_held_across_await_warning]: `Lock acquired at line 438 near await at line 438`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:464` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:467` [await_expr]: `let _permit = deps.commit_barrier.exclusive().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:468` [await_expr]: `let gated_seq = deps.gate.add_gate(erasure_id, &req.target).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:472` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:478` [await_expr]: `if let Err(_err) = layer.on_gate(scope).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:483` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:484` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:484` [lock_held_across_await_warning]: `Lock acquired at line 484 near await at line 484`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:508` [await_expr]: `deps.vault.destroy_highest_key(&req.target).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:511` [await_expr]: `let absent = deps.vault.verify_key_absent(&req.target).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:517` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:518` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:518` [lock_held_across_await_warning]: `Lock acquired at line 518 near await at line 518`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:543` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:545` [await_expr]: `Self::notify_observer(&deps, erasure_id, &req.target, ObservedPhase::Gated).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:551` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:551` [lock_held_across_await_warning]: `Lock acquired at line 551 near await at line 551`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:564` [await_expr]: `let mut keys = open_keys.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:564` [lock_held_across_await_warning]: `Lock acquired at line 564 near await at line 564`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:582` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:602` [async_fn]: `async fn execute_purge_and_verify(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:621` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:629` [await_expr]: `let _purge_permit = deps.purge_barrier.purge().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:638` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:639` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:639` [lock_held_across_await_warning]: `Lock acquired at line 639 near await at line 639`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:659` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:662` [await_expr]: `deps.snapshots.revoke_covering(target, gated_seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:677` [await_expr]: `if let Err(_err) = layer.purge(scope, &purge_cx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:682` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:683` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:683` [lock_held_across_await_warning]: `Lock acquired at line 683 near await at line 683`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:706` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:710` [await_expr]: `match deps.measure.witness_layer(layer.id(), target).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:717` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:718` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:718` [lock_held_across_await_warning]: `Lock acquired at line 718 near await at line 718`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:742` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:748` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:754` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:757` [await_expr]: `deps.gate.compact_gate(erasure_id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:760` [await_expr]: `Self::notify_observer(&deps, erasure_id, target, ObservedPhase::Completed).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:763` [await_expr]: `let mut map = active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:763` [lock_held_across_await_warning]: `Lock acquired at line 763 near await at line 763`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:776` [await_expr]: `let mut keys = open_keys.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:776` [lock_held_across_await_warning]: `Lock acquired at line 776 near await at line 776`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:786` [async_fn]: `pub async fn run_purge_window(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:794` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:829` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:846` [async_fn]: `pub async fn recover_and_resume(&self) -> Result<Vec<ErasureId>, ErasureError> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:847` [await_expr]: `let open_sagas = self.deps.journal.recover_open_sagas().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:863` [await_expr]: `self.deps.journal.append_state(id, next_step, None).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:865` [await_expr]: `let mut active = self.active_sagas.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:865` [lock_held_across_await_warning]: `Lock acquired at line 865 near await at line 865`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:888` [async_fn]: `pub async fn status(&self, id: ErasureId) -> Result<ErasureCoreStatus, ErasureError> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:889` [await_expr]: `let entry_opt = { self.active_sagas.read().await.get(&id).cloned() };`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/core.rs:889` [lock_held_across_await_warning]: `Lock acquired at line 889 near await at line 889`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/driver.rs:102` [async_fn]: `pub async fn step_async(&self, saga: &mut EraseSaga) -> Result<StepOutcome, ErasureError> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/saga/driver.rs:105` [await_expr]: `if let Ok(st) = core.status(id).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/purge/window.rs:73` [async_fn]: `pub async fn run_core_window(core: &ErasureCore) -> Result<WindowOutcome, ErasureError> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/purge/window.rs:74` [await_expr]: `core.run_purge_window().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/gate/batch.rs:123` [async_fn]: `pub async fn execute_batch(`
+- `/home/freddy/Projekte/contextra/crates/contextra-erasure/src/gate/batch.rs:137` [await_expr]: `let _exclusive_permit = self.barrier.exclusive().await;`
+### `contextra-ports`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:75` [await_expr]: `self.insert(tx, *id, embedding).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:136` [await_expr]: `self.search(query, k).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:195` [await_expr]: `async { self.len().await == 0 }`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:257` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:258` [async_fn]: `async fn test_hnsw_search_at_capability() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:261` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &[f32]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:264` [async_fn]: `async fn search(&self, _: &[f32], _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:267` [async_fn]: `async fn search_at(&self, _: &[f32], _: usize, _: u64) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:270` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:273` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:276` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:279` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:282` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:285` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:288` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:299` [await_expr]: `let res = index.search_at(&[1.0, 0.0], 5, 1).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:311` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:312` [async_fn]: `async fn test_vector_index_defaults() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:315` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &[f32]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:319` [async_fn]: `async fn search(&self, _: &[f32], _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:322` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:325` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:328` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:331` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:334` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:337` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:340` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:352` [await_expr]: `assert!(index.is_empty().await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:358` [await_expr]: `index.insert_batch(TxId(1), &vectors).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:359` [await_expr]: `assert_eq!(index.len().await, 2);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:360` [await_expr]: `assert!(!index.is_empty().await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:363` [await_expr]: `let res = index.search_filtered(&[1.0], 1, Some(&|_| true)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/vector_index.rs:372` [await_expr]: `let res2 = index.search_at(&[1.0], 1, 42).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:150` [await_expr]: `async { self.len().await == 0 }`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:179` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:180` [async_fn]: `async fn test_text_index_search_at_capability() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:183` [async_fn]: `async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:186` [async_fn]: `async fn search_at(&self, _: &str, _: usize, _: u64) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:189` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:192` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:195` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:198` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:201` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:204` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:207` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:210` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:219` [await_expr]: `let res = text_index.search_at("test", 5, 1).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:229` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:230` [async_fn]: `async fn test_text_index_defaults() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:233` [async_fn]: `async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:236` [async_fn]: `async fn insert(&self, _: TxId, _: DocId, _: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:239` [async_fn]: `async fn delete(&self, _: TxId, _: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:242` [async_fn]: `async fn commit(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:245` [async_fn]: `async fn rollback(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:248` [async_fn]: `async fn rollback_to_tx(&self, _: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:251` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:254` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:257` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/text_index.rs:267` [await_expr]: `let res = index.search_at("query", 10, 42).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:69` [await_expr]: `results.push(self.embed(text).await?);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:126` [await_expr]: `results.push(self.embed(text).await?);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:163` [await_expr]: `self.generate(&concatenated).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:183` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:194` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:204` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:205` [async_fn]: `async fn test_embedding_error_display() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:224` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:225` [async_fn]: `async fn test_context_segment_and_generate_with_context_default(`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:246` [await_expr]: `let res = llm.generate_with_context(tenant, &[seg1, seg2]).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:251` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:252` [async_fn]: `async fn test_generate_with_context_default_matches_concatenation(`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:258` [await_expr]: `let with_ctx = llm.generate_with_context(tenant, &[seg1, seg2]).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:259` [await_expr]: `let direct = llm.generate("Hello\n\nWorld").await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:264` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:265` [async_fn]: `async fn test_generate_with_context_empty_segments() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/embedding.rs:268` [await_expr]: `let res = llm.generate_with_context(tenant, &[]).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/query_rewriter.rs:19` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/query_rewriter.rs:38` [await_expr]: `let queries = self.rewrite(original_query, current_results).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:46` [async_fn]: `pub async fn assert_checkpoint_coordinator_contract<T: CheckpointCoordinator>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:53` [await_expr]: `.await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:55` [await_expr]: `drop(t.restore_named_checkpoint("name").await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:56` [await_expr]: `drop(t.drop_named_checkpoint("name").await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:57` [await_expr]: `drop(t.list_named_checkpoints().await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:61` [async_fn]: `pub async fn assert_vector_index_contract<T: VectorIndex + HybridSearchProvider>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:67` [await_expr]: `drop(t.search_at(&[0.0; 4], 10, 0).await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/conformance.rs:68` [await_expr]: `drop(t.insert(TxId(1), doc, &[0.0; 4]).await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:70` [await_expr]: `let results = self.traverse(start_node, 1).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:97` [await_expr]: `self.add_edge(tx, Edge::new(from, to, label)).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:98` [await_expr]: `self.add_edge(tx, Edge::new(to, from, label)).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:113` [await_expr]: `let results = self.traverse(start, max_hops).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:138` [await_expr]: `let results = self.traverse_at(start, max_hops, seq_no).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:304` [await_expr]: `Box::pin(async move { self.len().await == 0 })`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:335` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:336` [async_fn]: `async fn test_csr_graph_capability() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:403` [await_expr]: `let res_traverse_at = graph.traverse_at(EntityId::new(1), 2, 1).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:414` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:425` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:435` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:436` [async_fn]: `async fn test_graph_index_defaults() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:479` [await_expr]: `let res = index.traverse_at(EntityId::new(1), 2, 42).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:490` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:500` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:510` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/graph_index.rs:519` [await_expr]: `let res_path_rag_at = index.path_rag_at(&[EntityId::new(1)], 2, 42).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/storage.rs:139` [await_expr]: `self.put(tx_id, key, value).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/storage.rs:153` [await_expr]: `self.delete(tx_id, &key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/storage.rs:166` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/storage.rs:170` [await_expr]: `self.delete_many(tx_id, matching_keys).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-ports/src/storage.rs:220` [await_expr]: `let all = self.scan_prefix(prefix).await?;`
+### `contextra-privacy`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:210` [async_fn]: `pub async fn process(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:222` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:231` [async_fn]: `pub async fn process_with_components(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:255` [await_expr]: `let l1_classification = classifier.classify(&req.query).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:260` [await_expr]: `let l4_classification = guard.check(&req.query).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:478` [async_fn]: `pub async fn handle_cloud_query(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:485` [await_expr]: `handle_cloud_query_scoped(scoped, &dummy_tenant, classifier).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:491` [async_fn]: `pub async fn handle_cloud_query_scoped(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:505` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:514` [async_fn]: `pub async fn handle_cloud_query_scoped_with_guard(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:529` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:538` [async_fn]: `pub async fn handle_cloud_query_scoped_with_bulk_detector(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:560` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:568` [async_fn]: `pub async fn handle_cloud_query_with_guard(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:577` [await_expr]: `handle_cloud_query_scoped_with_guard(scoped, &dummy_tenant, classifier, egress_guard).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:605` [async_fn]: `pub async fn handle_cloud_query_with_bulk_detector(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:622` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:629` [async_fn]: `pub async fn process_cloud_response(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:706` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:707` [async_fn]: `async fn test_layer4_block() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:720` [await_expr]: `let result = handle_cloud_query_with_guard(request, &vault, Some(&mock_guard)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:729` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:730` [async_fn]: `async fn test_layer4_allow_through_to_cloud() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:743` [await_expr]: `let resp = handle_cloud_query_with_guard(request, &vault, Some(&mock_guard)).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:749` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:750` [async_fn]: `async fn test_rehydration_roundtrip() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:804` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:805` [async_fn]: `async fn test_bulk_detector_integration_blocked_and_allowed(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:823` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:838` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:850` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:851` [async_fn]: `async fn test_process_cloud_response_prompt_injection_blocked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_gateway.rs:860` [await_expr]: `let res = process_cloud_response(malicious_resp, &guard, &rehydrator).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/bulk_exfiltration_detector.rs:397` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/bulk_exfiltration_detector.rs:398` [async_fn]: `async fn test_concurrent_requests_prevent_limit_bypass_race() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/bulk_exfiltration_detector.rs:406` [tokio_import]: `handles.push(tokio::spawn(async move { det.record_and_check(sess, 150) }));`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/bulk_exfiltration_detector.rs:413` [await_expr]: `let res = h.await.expect("task join failed");`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:297` [async_fn]: `pub async fn classify_layer1(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:312` [await_expr]: `classify_layer1_arc(payload, patterns_arc, regex_set_arc, timeout).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:316` [async_fn]: `pub async fn classify_layer1_arc(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:334` [tokio_import]: `let eval_task = tokio::task::spawn_blocking(move || {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:361` [await_expr]: `match tokio::time::timeout(timeout, eval_task).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:361` [tokio_import]: `match tokio::time::timeout(timeout, eval_task).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:458` [async_fn]: `pub async fn classify_scoped(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:464` [await_expr]: `Ok(unpacked) => self.classify(unpacked).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:604` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:605` [async_fn]: `async fn test_allow_happy_path() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:612` [await_expr]: `let res = vault.classify("Hello world, this is public text.").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:616` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:617` [async_fn]: `async fn test_payload_with_abstract_and_sensitive_pattern_is_blocked() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:623` [await_expr]: `let res = vault.classify(payload).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:630` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:631` [async_fn]: `async fn test_block_sensitive_pattern() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:639` [await_expr]: `let res = vault.classify(payload).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:646` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:647` [async_fn]: `async fn test_opaque_rule_ids_do_not_leak_raw_regex() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:653` [await_expr]: `let res = vault.classify(payload).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:671` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:672` [async_fn]: `async fn test_oversized_payload_blocked_before_task_spawn() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:676` [await_expr]: `let res = classify_layer1(&huge_payload, &patterns, Duration::from_millis(100)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:702` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:703` [async_fn]: `async fn test_redos_and_timeout_fail_closed() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:718` [await_expr]: `let res = classify_layer1(&huge_payload, &patterns, Duration::ZERO).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:732` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:733` [async_fn]: `async fn test_trait_implementation_e2e() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:739` [await_expr]: `classifier.classify("Normal text").await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:743` [await_expr]: `classifier.classify("Contains PRIVATE_KEY inside").await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:748` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:749` [async_fn]: `async fn test_egress_vault_default_implementation() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:754` [await_expr]: `let res = vault.classify("hello user alice@example.com").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:761` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:762` [async_fn]: `async fn test_egress_vault_accessors_and_with_timeout() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:773` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:774` [async_fn]: `async fn test_exact_payload_boundary_allowed() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:779` [await_expr]: `let res = classify_layer1(&exact_payload, &patterns, Duration::from_millis(200)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:870` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:871` [async_fn]: `async fn test_classify_scoped_and_sanitize_scoped_tenant_isolation() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:882` [await_expr]: `let res_ok = vault.classify_scoped(scoped_a.clone(), &tenant_a).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_vault.rs:886` [await_expr]: `let res_mismatch = vault.classify_scoped(scoped_a.clone(), &tenant_b).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/processing_registry.rs:394` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/processing_registry.rs:395` [async_fn]: `async fn test_text_search_engine_and_tenant_filter_art15() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/processing_registry.rs:404` [await_expr]: `let results = export.search_text("Bankverbindung", 10).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/processing_registry.rs:418` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:111` [async_fn]: `pub async fn check_scoped(`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:117` [await_expr]: `Ok(unpacked) => self.check(unpacked).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:136` [async_fn]: `pub async fn check(&self, payload: &str) -> EgressClassification {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:142` [await_expr]: `match tokio::time::timeout(self.timeout, search_fut).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:142` [tokio_import]: `match tokio::time::timeout(self.timeout, search_fut).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:216` [await_expr]: `tokio::time::sleep(d).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:216` [tokio_import]: `tokio::time::sleep(d).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:223` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:224` [async_fn]: `async fn test_check_scoped_tenant_isolation() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:239` [await_expr]: `let res_ok = guard.check_scoped(scoped_payload.clone(), &tenant_a).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:243` [await_expr]: `let res_mismatch = guard.check_scoped(scoped_payload, &tenant_b).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:254` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:255` [async_fn]: `async fn test_payload_shorter_than_min_bytes_allows() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:261` [await_expr]: `let res = guard.check("short text").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:265` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:266` [async_fn]: `async fn test_empty_results_blocks_fail_closed() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:274` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:283` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:284` [async_fn]: `async fn test_similarity_above_threshold_blocks() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:295` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:304` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:305` [async_fn]: `async fn test_similarity_below_threshold_allows() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:316` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:320` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:321` [async_fn]: `async fn test_timeout_blocks_fail_closed() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:329` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:366` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:367` [async_fn]: `async fn test_index_failure_and_timeout_fail_closed_audit_trace() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:381` [await_expr]: `let (class_fail, trace_fail) = guard_fail.classify_with_trace(payload, &clock).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:407` [await_expr]: `guard_timeout.classify_with_trace(payload, &clock).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:420` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:421` [async_fn]: `async fn test_uninitialized_or_failing_vector_index_fails_closed_with_audit_trace() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:443` [await_expr]: `let classification = guard.check(&payload).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:452` [await_expr]: `let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:459` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:460` [async_fn]: `async fn test_vector_index_timeout_fails_closed_with_audit_trace() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:484` [await_expr]: `let classification = guard.check(&payload).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:491` [await_expr]: `let (traced_class, trace) = guard.classify_with_trace(&payload, &clock).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:498` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:499` [async_fn]: `async fn test_normal_operation_when_vector_index_available() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:520` [await_expr]: `guard_allow.check(&payload).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/egress_guard.rs:538` [await_expr]: `guard_block.check(&payload).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-privacy/src/audit_trace.rs:117` [await_expr]: `let classification = self.classify(payload).await;`
+### `contextra-rank`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-rank/src/dibud/driver.rs:50` [async_fn]: `pub async fn fuse_exact_prefix_async<P, Fut>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-rank/src/dibud/driver.rs:64` [await_expr]: `let item = poll(ch).await?;`
+### `contextra-store`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:14` [async_fn]: `pub async fn sync_file(path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:17` [await_expr]: `let file = crate::wal::fs::File::open(path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:23` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:46` [async_fn]: `pub async fn sync_parent_dir(path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:56` [await_expr]: `let dir = crate::wal::fs::File::open(dir_path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:63` [await_expr]: `dir.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:83` [async_fn]: `pub async fn fsync_parent_dir(path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:84` [await_expr]: `sync_parent_dir(path).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:92` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:94` [async_fn]: `async fn test_sync_file_and_parent_dir_unix() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:97` [tokio_import]: `tokio::fs::write(&file_path, b"test payload")`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:98` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:101` [await_expr]: `sync_file(&file_path).await.expect("sync_file failed");`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:103` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:106` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:110` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:112` [async_fn]: `async fn test_sync_file_and_parent_dir_windows() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:114` [await_expr]: `let err = sync_parent_dir(path).await.unwrap_err();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/fsync.rs:121` [await_expr]: `let err_file = sync_file(path).await.unwrap_err();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:284` [async_fn]: `pub async fn read(&self, path: &Path) -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:287` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.read(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:288` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:293` [async_fn]: `pub async fn read_at(&self, path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:296` [tokio_import]: `tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:321` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:326` [async_fn]: `pub async fn write_atomic(&self, path: &Path, data: Vec<u8>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:329` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.write_atomic(&p, &data))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:330` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:335` [async_fn]: `pub async fn create_dir_all(&self, path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:338` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.create_dir_all(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:339` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:344` [async_fn]: `pub async fn remove_file(&self, path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:347` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.remove_file(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:348` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:353` [async_fn]: `pub async fn rename(&self, from: &Path, to: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:357` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.rename(&f, &t))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:358` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:363` [async_fn]: `pub async fn exists(&self, path: &Path) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:366` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.exists(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:367` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:372` [async_fn]: `pub async fn len(&self, path: &Path) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:375` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.len(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:376` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:381` [async_fn]: `pub async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:384` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.read_dir(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:385` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:390` [async_fn]: `pub async fn sync_dir(&self, path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:393` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.sync_dir(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam.rs:394` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:55` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:56` [async_fn]: `async fn test_monitor_run_cancellation() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:61` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:62` [await_expr]: `monitor.run(cancel_token, || 0, || 10, 10).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:65` [await_expr]: `tokio::time::sleep(Duration::from_millis(20)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:65` [tokio_import]: `tokio::time::sleep(Duration::from_millis(20)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:68` [await_expr]: `let res = tokio::time::timeout(Duration::from_secs(1), handle).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:68` [tokio_import]: `let res = tokio::time::timeout(Duration::from_secs(1), handle).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:75` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:76` [async_fn]: `async fn test_watch_receiver_updates() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:85` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:93` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:103` [await_expr]: `rx.changed().await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:109` [await_expr]: `let _ = handle.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:112` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:113` [async_fn]: `async fn test_blocking_pool_load_triggers_pressure() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:120` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:121` [await_expr]: `monitor.run(cancel_token, || 0, || 10, 10).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:127` [tokio_import]: `handles.push(tokio::task::spawn_blocking(|| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:136` [await_expr]: `if rx.changed().await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:153` [await_expr]: `let _ = handle.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure.rs:155` [await_expr]: `let _ = h.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:9` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:10` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:21` [await_expr]: `let storage = LsmStorage::new(config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:28` [await_expr]: `storage.put(tx, key, val).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:29` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:32` [await_expr]: `let read_val = storage.get(key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/store_standalone.rs:39` [await_expr]: `storage.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:15` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:16` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:34` [await_expr]: `let storage = LsmStorage::new(config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:54` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:55` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:63` [await_expr]: `tokio::time::sleep(Duration::from_millis(10)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/chaos_writer.rs:63` [tokio_import]: `tokio::time::sleep(Duration::from_millis(10)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/standalone.rs:8` [tokio_import]: `#[tokio::main]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/standalone.rs:9` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/standalone.rs:20` [await_expr]: `let storage = LsmStorage::new(config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/examples/standalone.rs:25` [await_expr]: `storage.close().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:16` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:23` [await_expr]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:23` [tokio_import]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:31` [await_expr]: `if let Ok(wal) = Wal::open_with_config(&wal_path, config).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:32` [await_expr]: `let _ = wal.replay().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:33` [tokio_import]: `let file_size = tokio::fs::metadata(&wal_path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:34` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs:37` [await_expr]: `let _ = wal.scan_entries_mmap(file_size, |_, _, _| true).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:16` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:23` [await_expr]: `if tokio::fs::write(&manifest_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:23` [tokio_import]: `if tokio::fs::write(&manifest_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs:27` [await_expr]: `let _ = Manifest::load(&manifest_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_hmac_chain.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_hmac_chain.rs:16` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_hmac_chain.rs:22` [await_expr]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_hmac_chain.rs:22` [tokio_import]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_hmac_chain.rs:27` [await_expr]: `if let Ok(wal) = Wal::open(&wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_hmac_chain.rs:28` [await_expr]: `let _ = wal.replay().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:34` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:42` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:54` [await_expr]: `let storage = match LsmStorage::new(config).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:73` [await_expr]: `if storage.put(tx_id, &key, &val).await.is_ok()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:74` [await_expr]: `&& storage.commit(tx_id).await.is_ok()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:84` [await_expr]: `if storage.delete(tx_id, &key).await.is_ok()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:85` [await_expr]: `&& storage.commit(tx_id).await.is_ok()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:91` [await_expr]: `if let Err(_e) = storage.flush().await {}`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:94` [await_expr]: `let _ = storage.maybe_compact().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs:99` [await_expr]: `let actual = storage.get(key).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:9` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:17` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:32` [await_expr]: `if tokio::fs::write(path.join("MANIFEST"), manifest_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:32` [tokio_import]: `if tokio::fs::write(path.join("MANIFEST"), manifest_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:38` [await_expr]: `if tokio::fs::write(path.join("wal-0.log"), wal_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:38` [tokio_import]: `if tokio::fs::write(path.join("wal-0.log"), wal_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:44` [await_expr]: `if tokio::fs::write(path.join("000001.sst"), sstable_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:44` [tokio_import]: `if tokio::fs::write(path.join("000001.sst"), sstable_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:54` [await_expr]: `if let Ok(storage) = LsmStorage::new(config).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:55` [await_expr]: `let _ = storage.get(b"test_key").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:56` [await_expr]: `let _ = storage.scan_prefix(b"").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:57` [await_expr]: `let _ = storage.last_seq_no().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:58` [await_expr]: `let _ = storage.last_tx_id().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs:59` [await_expr]: `let _ = storage.stats().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:153` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:161` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:179` [await_expr]: `let wal = match Wal::open_with_config(&wal_path, config.clone()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:199` [await_expr]: `let (batch, _) = match wal.prepare_batch(vec![(op, seq)]).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:204` [await_expr]: `if wal.append_batch(batch).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:211` [await_expr]: `if let Ok(replayed) = wal.replay().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:233` [await_expr]: `let mut file_bytes = match tokio::fs::read(&wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:233` [tokio_import]: `let mut file_bytes = match tokio::fs::read(&wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:275` [await_expr]: `if tokio::fs::write(&wal_path, &file_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:275` [tokio_import]: `if tokio::fs::write(&wal_path, &file_bytes).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:280` [await_expr]: `let wal_reopen = match Wal::open_with_config(&wal_path, config).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs:286` [await_expr]: `if let Ok(replayed_entries) = wal_reopen.replay().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:8` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:16` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:23` [await_expr]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:23` [tokio_import]: `if tokio::fs::write(&wal_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:31` [await_expr]: `match Wal::open_with_config(&wal_path, config).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs:33` [await_expr]: `let _ = wal.replay().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_legacy_footer.rs:9` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_legacy_footer.rs:17` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_legacy_footer.rs:23` [await_expr]: `if tokio::fs::write(&sst_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_legacy_footer.rs:23` [tokio_import]: `if tokio::fs::write(&sst_path, data).await.is_err() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_legacy_footer.rs:28` [await_expr]: `if let Ok(reader) = SstableReader::open(&sst_path, cache).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_legacy_footer.rs:29` [await_expr]: `let _ = reader.get(b"test_key").await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader_ext.rs:12` [async_fn]: `pub async fn scan_prefix(&self, prefix: &[u8]) -> Result<Vec<(Bytes, Bytes, u64, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader_ext.rs:46` [await_expr]: `let block_data = self.get_block(offset, next_offset).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader_ext.rs:158` [async_fn]: `pub async fn scan_range(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader_ext.rs:185` [await_expr]: `let block_data = self.get_block(offset, next_offset).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/stream.rs:21` [async_fn]: `pub async fn next(&mut self) -> Result<Option<(Bytes, Bytes, u64, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/stream.rs:40` [await_expr]: `let block_data = self.reader.get_block(offset, next_offset).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/stream.rs:135` [async_fn]: `pub async fn next_entry(&mut self) -> Result<Option<(Bytes, Bytes, u64, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/stream.rs:136` [await_expr]: `self.next().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:7` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:15` [async_fn]: `pub async fn append(&self, entry: &ManifestEntry) -> StoreResult<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:16` [await_expr]: `self.append_batch(std::slice::from_ref(entry)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:20` [async_fn]: `pub async fn append_batch(&self, entries: &[ManifestEntry]) -> StoreResult<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:36` [await_expr]: `let mut file = self.file.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:36` [lock_held_across_await_warning]: `Lock acquired at line 36 near await at line 36`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:37` [await_expr]: `if let Err(e) = file.write_all(&batch_bytes).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:37` [lock_held_across_await_warning]: `Lock acquired at line 36 near await at line 37`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:44` [await_expr]: `if let Err(e) = file.flush().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:44` [lock_held_across_await_warning]: `Lock acquired at line 36 near await at line 44`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/apply.rs:51` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:6` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:28` [async_fn]: `pub async fn rollover(&self, live_entries: &[ManifestEntry]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:29` [await_expr]: `let _ = self.maybe_rollover(live_entries, 0).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:45` [async_fn]: `pub async fn maybe_rollover(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:50` [await_expr]: `let mut file = self.file.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:50` [lock_held_across_await_warning]: `Lock acquired at line 50 near await at line 50`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:51` [await_expr]: `let metadata = file.metadata().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:51` [lock_held_across_await_warning]: `Lock acquired at line 50 near await at line 51`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:80` [tokio_import]: `match tokio::fs::OpenOptions::new()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:84` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:109` [await_expr]: `new_file.write_all(&header).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:118` [await_expr]: `new_file.write_all(&bytes).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:126` [await_expr]: `new_file.flush().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:132` [await_expr]: `new_file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:141` [tokio_import]: `tokio::fs::rename(&tmp_path, &self.path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:142` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:150` [await_expr]: `crate::util::fsync_parent_dir(&self.path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:152` [tokio_import]: `let reopened_file = tokio::fs::OpenOptions::new()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:157` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:168` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:177` [await_expr]: `if let Err(clean_err) = tokio::fs::remove_file(&tmp_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/rollover.rs:177` [tokio_import]: `if let Err(clean_err) = tokio::fs::remove_file(&tmp_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:8` [tokio_import]: `use tokio::io::{AsyncReadExt, AsyncSeekExt};`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:27` [async_fn]: `pub async fn load(path: &Path) -> StoreResult<Vec<ManifestEntry>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:28` [await_expr]: `if !tokio::fs::try_exists(path).await.unwrap_or(false) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:28` [tokio_import]: `if !tokio::fs::try_exists(path).await.unwrap_or(false) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:32` [await_expr]: `let mut file = match tokio::fs::File::open(path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:32` [tokio_import]: `let mut file = match tokio::fs::File::open(path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:45` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:49` [tokio_import]: `let mut reader = tokio::io::BufReader::new(&mut file);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:55` [await_expr]: `if reader.read_exact(&mut header).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:68` [tokio_import]: `.seek(tokio::io::SeekFrom::Start(0))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:69` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:83` [await_expr]: `match reader.read_exact(&mut len_bytes).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:113` [await_expr]: `if let Err(e) = reader.read_exact(&mut entry_raw).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/core.rs:132` [await_expr]: `if let Err(e) = reader.read_exact(&mut partial_raw).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:8` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:17` [tokio_import]: `pub(super) file: tokio::sync::Mutex<tokio::fs::File>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:32` [async_fn]: `pub async fn open(path: impl AsRef<Path>) -> StoreResult<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:33` [await_expr]: `Self::open_with_dir_lock(path, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:37` [async_fn]: `pub(crate) async fn open_with_dir_lock(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:42` [tokio_import]: `let (mut file, is_new) = match tokio::fs::OpenOptions::new()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:47` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:51` [tokio_import]: `let file = tokio::fs::OpenOptions::new()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:56` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:72` [await_expr]: `file.write_all(&header).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:75` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:83` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/manifest/handle.rs:89` [tokio_import]: `file: tokio::sync::Mutex::new(file),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:8` [tokio_import]: `use tokio::io::{AsyncSeekExt, AsyncWriteExt};`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:115` [tokio_import]: `let (tx, mut rx) = tokio::sync::mpsc::channel::<WalCommand>(config.queue_capacity);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:127` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:129` [await_expr]: `let mut flusher_last_hmac = *last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:129` [lock_held_across_await_warning]: `Lock acquired at line 129 near await at line 129`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:134` [await_expr]: `None => match rx.recv().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:134` [lock_held_across_await_warning]: `Lock acquired at line 129 near await at line 134`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:184` [tokio_import]: `let deadline = tokio::time::Instant::now()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:185` [tokio_import]: `+ tokio::time::Duration::from_micros(config.batch_window_micros);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:187` [await_expr]: `match tokio::time::timeout_at(deadline, rx.recv()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:187` [tokio_import]: `match tokio::time::timeout_at(deadline, rx.recv()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:240` [await_expr]: `file.write_all(&WAL_V3_HEADER).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:263` [await_expr]: `if let Err(err) = file.write_all(&batch_payload[..cut]).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:269` [await_expr]: `if let Err(err) = file.flush().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:285` [await_expr]: `file.write_all(&batch_payload).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:292` [await_expr]: `file.flush().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:302` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:341` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:349` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:375` [await_expr]: `let mut last_hmac_guard = last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:375` [lock_held_across_await_warning]: `Lock acquired at line 375 near await at line 375`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:422` [await_expr]: `if let Err(e) = file.set_len(offset).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:436` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:450` [await_expr]: `if let Err(e) = file.seek(std::io::SeekFrom::Start(offset)).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:470` [await_expr]: `let mut last_hmac_guard = last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:470` [lock_held_across_await_warning]: `Lock acquired at line 470 near await at line 470`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:475` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:475` [lock_held_across_await_warning]: `Lock acquired at line 470 near await at line 475`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:503` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:525` [await_expr]: `match crate::wal::fs::try_exists(&candidate_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:541` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:551` [await_expr]: `if let Err(e) = crate::util::fsync_parent_dir(&sealed_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:562` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:572` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:582` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:627` [await_expr]: `file.seek(std::io::SeekFrom::Start(0)).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:640` [await_expr]: `file.set_len(0).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:654` [await_expr]: `file.write_all(&total_bytes).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:667` [await_expr]: `file.flush().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:702` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:718` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:729` [await_expr]: `let mut last_hmac_guard = last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:729` [lock_held_across_await_warning]: `Lock acquired at line 729 near await at line 729`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:734` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:734` [lock_held_across_await_warning]: `Lock acquired at line 729 near await at line 734`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:755` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher.rs:757` [await_expr]: `let _ = file.seek(std::io::SeekFrom::End(0)).await; // INTENTIONAL-DROP`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:54` [tokio_import]: `pub(crate) last_hmac: Arc<tokio::sync::Mutex<[u8; 32]>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:55` [tokio_import]: `pub(crate) flusher_tx: std::sync::RwLock<Option<tokio::sync::mpsc::Sender<WalCommand>>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:56` [tokio_import]: `pub(crate) flusher_task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:58` [tokio_import]: `pub truncate_lock: Arc<tokio::sync::Mutex<()>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:78` [async_fn]: `pub async fn open(path: impl AsRef<Path>) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:79` [await_expr]: `Self::open_with_config(path, WalConfig::default()).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:95` [async_fn]: `pub async fn migrate_legacy_wal(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:100` [await_expr]: `if Self::has_migration_marker(path_ref).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:114` [await_expr]: `let wal = Self::open_with_config(path_ref, config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:115` [await_expr]: `let was_rekeyed = wal.rekey_from_legacy().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:139` [async_fn]: `pub async fn open_for_legacy_migration(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:144` [await_expr]: `if Self::has_migration_marker(path_ref).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:149` [await_expr]: `return Self::open_with_key_manager(path_ref, key_manager).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:158` [await_expr]: `let wal = Self::open_with_config(path_ref, config).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:159` [await_expr]: `let was_rekeyed = wal.rekey_from_legacy().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:167` [async_fn]: `pub(crate) async fn rekey_from_legacy(&self) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:168` [await_expr]: `if Self::has_migration_marker(&self.path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:180` [await_expr]: `Self::write_migration_marker_atomically(&self.path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:187` [await_expr]: `let entries = self.replay().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:190` [await_expr]: `let _secure_key = Self::load_or_create_integrity_key(&self.path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:193` [await_expr]: `self.rewrite_as_v3(&entries).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:196` [await_expr]: `Self::write_migration_marker_atomically(&self.path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:214` [async_fn]: `pub async fn open_read_only(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:225` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:229` [async_fn]: `pub async fn open_read_only_with_config(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:234` [await_expr]: `let has_marker = Self::has_migration_marker(&path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:243` [await_expr]: `Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:246` [await_expr]: `let key = Self::load_or_create_integrity_key(&path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:251` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:266` [tokio_import]: `last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:270` [tokio_import]: `truncate_lock: Arc::new(tokio::sync::Mutex::new(())),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:276` [async_fn]: `pub async fn open_with_key_manager(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:287` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:291` [async_fn]: `pub async fn open_with_config(path: impl AsRef<Path>, config: WalConfig) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:296` [await_expr]: `let _ = recover_from_bak_if_present(&path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:304` [await_expr]: `Self::load_or_create_wal_uuid_with_gen(&path, config.id_gen.as_deref()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:307` [await_expr]: `let key = Self::load_or_create_integrity_key(&path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:316` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:325` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:339` [await_expr]: `file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:346` [await_expr]: `crate::fsync::sync_parent_dir(&path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:351` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:354` [await_expr]: `let has_marker = Self::has_migration_marker(&path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:372` [tokio_import]: `last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:376` [tokio_import]: `truncate_lock: Arc::new(tokio::sync::Mutex::new(())),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:384` [await_expr]: `let (entries, version) = wal.replay_with_size_and_version(metadata.len()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:397` [await_expr]: `let copy_res = fs::copy(&wal.path, &bak_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:403` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:409` [await_expr]: `bak_file.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:414` [await_expr]: `crate::fsync::sync_parent_dir(&bak_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:416` [await_expr]: `let rewrite_res = wal.rewrite_as_v3(&entries).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:456` [await_expr]: `wal.truncate(verified_end, last_hmac).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:458` [await_expr]: `let mut guard = wal.last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:458` [lock_held_across_await_warning]: `Lock acquired at line 458 near await at line 458`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:532` [async_fn]: `pub async fn truncate_uncommitted_tail(&self) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:533` [await_expr]: `let entries = self.replay().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:546` [await_expr]: `self.truncate(last_pos, last_entry.checksum).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:574` [async_fn]: `pub async fn recover_from_poison(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:587` [await_expr]: `let entries = self.replay().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:589` [await_expr]: `let metadata = fs::metadata(&self.path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:618` [await_expr]: `if let Err(e) = self.truncate(verified_offset, verified_hmac).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:628` [await_expr]: `let mut hmac_guard = self.last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:628` [lock_held_across_await_warning]: `Lock acquired at line 628 near await at line 628`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:649` [tokio_import]: `last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/core.rs:653` [tokio_import]: `truncate_lock: Arc::new(tokio::sync::Mutex::new(())),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:67` [async_fn]: `pub async fn replay(&self) -> Result<Vec<(u64, WalEntry, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:68` [await_expr]: `self.replay_with_sink(&NoopReplayProgressSink).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:72` [async_fn]: `pub async fn replay_with_sink<S: ReplayProgressSink>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:76` [await_expr]: `let (entries, _) = self.replay_mmap_with_sink(sink).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:81` [async_fn]: `pub async fn replay_stream(&self) -> Result<Vec<(u64, WalEntry, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:83` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:91` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:97` [async_fn]: `pub async fn replay_from(&self, since_seq_no: u64) -> Result<Vec<WalEntry>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:98` [await_expr]: `let all = self.replay().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:107` [async_fn]: `pub(crate) async fn replay_with_size_and_version(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:111` [await_expr]: `self.replay_mmap_with_size_and_version(file_size).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:115` [async_fn]: `async fn replay_mmap_with_size_and_version(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:119` [await_expr]: `match self.replay_mmap().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:133` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:142` [async_fn]: `pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:143` [await_expr]: `self.replay_mmap_with_sink(&NoopReplayProgressSink).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:148` [async_fn]: `pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:202` [async_fn]: `pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:248` [await_expr]: `self.scan_entries_with_callback(file_size, callback).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:686` [async_fn]: `pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:689` [await_expr]: `if !crate::wal::fs::try_exists(&bak_path).await.unwrap_or(false) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:693` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:696` [await_expr]: `let bak_len = match crate::wal::fs::metadata(&bak_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:704` [await_expr]: `match crate::wal::fs::rename(&bak_path, wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:709` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:713` [await_expr]: `let _ = crate::wal::fs::remove_file(&bak_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:719` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/replay.rs:721` [await_expr]: `f.sync_all().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:152` [async_fn]: `pub async fn prepare_batch(&self, ops: Vec<(WalOp, u64)>) -> Result<(PreparedBatch, [u8; 32])> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:153` [await_expr]: `let mut last_hmac = self.last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:153` [lock_held_across_await_warning]: `Lock acquired at line 153 near await at line 153`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:178` [async_fn]: `pub async fn rollback_hmac(&self, prev_hmac: [u8; 32]) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:179` [await_expr]: `let mut last_hmac = self.last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:179` [lock_held_across_await_warning]: `Lock acquired at line 179 near await at line 179`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:215` [tokio_import]: `pub fn last_hmac_lock_for_test(&self) -> std::sync::Arc<tokio::sync::Mutex<[u8; 32]>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:231` [async_fn]: `pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:233` [await_expr]: `Self::load_or_create_integrity_key_with_source(wal_path, &default_source).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:236` [async_fn]: `pub(crate) async fn load_or_create_integrity_key_with_source(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:252` [async_fn]: `async fn read_key_file(path: &Path) -> Result<[u8; 32]> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:253` [await_expr]: `let bytes = super::fs::read(path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:273` [await_expr]: `read_key_file(&key_path).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:275` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:295` [await_expr]: `let file_res = options.open(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:307` [await_expr]: `if let Err(e) = file.write_all(&key).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:308` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:314` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:315` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:325` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:329` [await_expr]: `let link_res = super::fs::hard_link(&tmp_path, &key_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:330` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:334` [await_expr]: `crate::fsync::sync_parent_dir(&key_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:337` [await_expr]: `Err(_) => read_key_file(&key_path).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:346` [async_fn]: `pub(crate) async fn has_migration_marker(wal_path: &Path) -> bool {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:348` [await_expr]: `super::fs::try_exists(&marker).await.unwrap_or(false)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:372` [async_fn]: `pub(crate) async fn write_migration_marker_atomically(wal_path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:373` [await_expr]: `let new_key = Self::load_or_create_integrity_key(wal_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:374` [await_expr]: `Self::write_migration_marker_with_key_atomically(wal_path, &new_key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:377` [async_fn]: `pub(crate) async fn write_migration_marker_with_key_atomically(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:389` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:404` [await_expr]: `let mut file = match options.open(&tmp_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:416` [await_expr]: `if let Err(e) = file.write_all(marker_content.as_bytes()).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:417` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:424` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:425` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:433` [await_expr]: `if let Err(e) = super::fs::rename(&tmp_path, &marker_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:434` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:443` [await_expr]: `crate::fsync::sync_parent_dir(&marker_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:448` [async_fn]: `pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:449` [await_expr]: `Self::load_or_create_wal_uuid_with_gen(wal_path, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:452` [async_fn]: `pub(crate) async fn load_or_create_wal_uuid_with_gen(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:462` [async_fn]: `async fn read_uuid_file(path: &Path) -> Result<[u8; 16]> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:463` [await_expr]: `let bytes = super::fs::read(path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:478` [await_expr]: `read_uuid_file(&uuid_path).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:480` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:527` [await_expr]: `let mut file = match options.open(&tmp_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:531` [await_expr]: `return read_uuid_file(&uuid_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:541` [await_expr]: `if let Err(e) = file.write_all(&bytes).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:542` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:549` [await_expr]: `if let Err(e) = file.sync_all().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:550` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:558` [await_expr]: `let link_res = super::fs::hard_link(&tmp_path, &uuid_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:559` [await_expr]: `let _ = super::fs::remove_file(&tmp_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:563` [await_expr]: `crate::fsync::sync_parent_dir(&uuid_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/hmac.rs:566` [await_expr]: `Err(_) => read_uuid_file(&uuid_path).await,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:6` [tokio_import]: `pub use tokio::fs::*;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:13` [async_fn]: `pub async fn create_dir_all<P: AsRef<Path>>(path: P) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:17` [async_fn]: `pub async fn read<P: AsRef<Path>>(path: P) -> std::io::Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:20` [async_fn]: `pub async fn write<P: AsRef<Path>, C: AsRef<[u8]>>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:26` [async_fn]: `pub async fn remove_file<P: AsRef<Path>>(path: P) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:30` [async_fn]: `pub async fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:34` [async_fn]: `pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> std::io::Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:38` [async_fn]: `pub async fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:42` [async_fn]: `pub async fn try_exists<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:46` [async_fn]: `pub async fn set_permissions<P: AsRef<Path>>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:53` [async_fn]: `pub async fn metadata<P: AsRef<Path>>(path: P) -> std::io::Result<LoomMetadata> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:147` [async_fn]: `pub async fn open<P: AsRef<Path>>(&self, _path: P) -> std::io::Result<LoomFile> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:165` [async_fn]: `pub async fn open<P: AsRef<Path>>(_path: P) -> std::io::Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:168` [async_fn]: `pub async fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:172` [async_fn]: `pub async fn flush(&self) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:175` [async_fn]: `pub async fn sync_all(&self) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:178` [async_fn]: `pub async fn set_len(&mut self, len: u64) -> std::io::Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:182` [async_fn]: `pub async fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:194` [async_fn]: `pub async fn metadata(&self) -> std::io::Result<LoomMetadata> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:199` [tokio_import]: `impl tokio::io::AsyncRead for LoomFile {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:203` [tokio_import]: `buf: &mut tokio::io::ReadBuf<'_>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:216` [tokio_import]: `impl tokio::io::AsyncWrite for LoomFile {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/fs.rs:239` [tokio_import]: `impl tokio::io::AsyncSeek for LoomFile {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:25` [tokio_import]: `use tokio::sync::RwLock;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:38` [tokio_import]: `pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:105` [tokio_import]: `rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:134` [async_fn]: `pub async fn maybe_compact(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:140` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:144` [async_fn]: `pub async fn maybe_compact_with_cancel(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:154` [await_expr]: `let ssts = sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:154` [lock_held_across_await_warning]: `Lock acquired at line 154 near await at line 154`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:219` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:226` [async_fn]: `pub async fn compact_all(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:232` [await_expr]: `let ssts = sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:232` [lock_held_across_await_warning]: `Lock acquired at line 232 near await at line 232`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:242` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:242` [lock_held_across_await_warning]: `Lock acquired at line 232 near await at line 242`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:248` [async_fn]: `pub async fn compact_range(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:256` [await_expr]: `let ssts = sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:256` [lock_held_across_await_warning]: `Lock acquired at line 256 near await at line 256`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:284` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:288` [async_fn]: `async fn execute_compaction_for_candidates(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:326` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:341` [await_expr]: `.await?,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:346` [await_expr]: `let mut ssts = sstables.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:346` [lock_held_across_await_warning]: `Lock acquired at line 346 near await at line 346`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:393` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:441` [await_expr]: `let ssts = sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:441` [lock_held_across_await_warning]: `Lock acquired at line 441 near await at line 441`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:454` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:454` [lock_held_across_await_warning]: `Lock acquired at line 441 near await at line 454`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:491` [async_fn]: `pub async fn merge_sstables(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:505` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:509` [async_fn]: `pub async fn merge_sstables_with_cancel(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:525` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:542` [async_fn]: `async fn merge_sstables_inner(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:603` [await_expr]: `streams.push(sst.stream().await?);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:608` [await_expr]: `if let Some((key, value, seq, tx)) = stream.next_entry().await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:624` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:648` [await_expr]: `tokio::time::sleep(delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:648` [tokio_import]: `tokio::time::sleep(delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:684` [await_expr]: `tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:684` [tokio_import]: `tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:687` [await_expr]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:687` [tokio_import]: `tokio::task::yield_now().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:748` [await_expr]: `streams[popped_next.source_idx].next_entry().await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:765` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:782` [await_expr]: `tokio::time::sleep(delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:782` [tokio_import]: `tokio::time::sleep(delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:849` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:868` [await_expr]: `tokio::time::sleep(delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:868` [tokio_import]: `tokio::time::sleep(delay).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:888` [await_expr]: `if let Some((key, value, seq, tx)) = streams[item.source_idx].next_entry().await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:898` [await_expr]: `builder.finish().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:911` [async_fn]: `pub async fn run_loop(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:925` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:926` [tokio_import]: `_ = tokio::time::sleep(self.config.check_interval) => {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:927` [await_expr]: `match self.maybe_compact_with_cancel(&sstables, &data_path, Some(&shutdown)).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:935` [await_expr]: `let ssts = sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:935` [lock_held_across_await_warning]: `Lock acquired at line 935 near await at line 935`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:948` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine.rs:948` [lock_held_across_await_warning]: `Lock acquired at line 935 near await at line 948`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:51` [async_fn]: `pub async fn point_lookup_metrics(&self, key: &[u8]) -> (usize, usize, usize, usize, bool) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:53` [await_expr]: `let sstables = self.sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:53` [lock_held_across_await_warning]: `Lock acquired at line 53 near await at line 53`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:62` [await_expr]: `let (b_pass, r_pass, blk_read, k_found) = sst.lookup_metrics(key).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:62` [lock_held_across_await_warning]: `Lock acquired at line 53 near await at line 62`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:89` [async_fn]: `pub(super) async fn collect_visible_entries<F>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:103` [await_expr]: `let state = self.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:103` [lock_held_across_await_warning]: `Lock acquired at line 103 near await at line 103`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:104` [await_expr]: `let sstables = self.sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:104` [lock_held_across_await_warning]: `Lock acquired at line 104 near await at line 104`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:130` [await_expr]: `sst.scan_prefix(prefix).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/scan.rs:133` [await_expr]: `sst.scan_range(start.map(|s| s), end.map(|e| e)).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/commit.rs:61` [async_fn]: `pub(super) async fn apply_backpressure(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/commit.rs:65` [await_expr]: `tokio::time::sleep(std::time::Duration::from_millis(5)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/commit.rs:65` [tokio_import]: `tokio::time::sleep(std::time::Duration::from_millis(5)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/guard.rs:11` [tokio_import]: `pub(super) _lock: &'a tokio::sync::MutexGuard<'a, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:25` [tokio_import]: `use tokio::sync::RwLock;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:55` [tokio_import]: `pub(super) flush_notify: Arc<tokio::sync::Notify>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:58` [tokio_import]: `pub(super) commit_mutex: tokio::sync::Mutex<()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:60` [tokio_import]: `pub(super) flush_mutex: tokio::sync::Mutex<()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:64` [tokio_import]: `pub(super) pending_sealed_wals: tokio::sync::Mutex<Vec<(std::path::PathBuf, [u8; 32])>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:70` [tokio_import]: `pub(super) pending_commit_queue: tokio::sync::Mutex<Option<PendingCommitQueue>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:72` [tokio_import]: `pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:103` [async_fn]: `pub async fn open(config: LsmConfig) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:104` [await_expr]: `Self::new_with_merge_operator(config, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:117` [async_fn]: `pub async fn open_with_merge_operator(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:121` [await_expr]: `Self::new_with_merge_operator(config, Some(merge_operator)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:127` [tokio_import]: `) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:137` [async_fn]: `pub async fn wait_shutdown(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:139` [await_expr]: `self.task_tracker.wait().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:152` [async_fn]: `pub async fn close(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:153` [await_expr]: `self.wait_shutdown().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:154` [await_expr]: `self.flush().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:168` [async_fn]: `pub async fn simulate_wal_append_failure_for_test(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:175` [async_fn]: `pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:182` [async_fn]: `pub async fn restore_wal_file_handle_for_test(&self) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:279` [async_fn]: `pub async fn get_tracked(&self, tx_id: TxId, key: &[u8]) -> Result<Option<Bytes>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:280` [await_expr]: `read::get_tracked(self, tx_id, key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:292` [async_fn]: `pub async fn get_at_seq_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:298` [await_expr]: `read::get_at_seq_tracked(self, tx_id, key, snapshot_seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:305` [async_fn]: `pub async fn scan_prefix_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:310` [await_expr]: `read::scan_prefix_tracked(self, tx_id, prefix).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:377` [async_fn]: `pub async fn maybe_compact_for_test(&self) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:380` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:386` [async_fn]: `pub(crate) async fn memtables_for_scanner(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:392` [await_expr]: `let state = self.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:392` [lock_held_across_await_warning]: `Lock acquired at line 392 near await at line 392`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:401` [async_fn]: `pub(crate) async fn sstables_for_scanner(&self) -> Vec<Arc<crate::sstable::SstableReader>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:402` [await_expr]: `self.sstables.read().await.clone()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:402` [lock_held_across_await_warning]: `Lock acquired at line 392 near await at line 402`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:420` [async_fn]: `pub async fn scan_view(self: &Arc<Self>) -> crate::compat::scanner::StoreScanView {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine.rs:421` [await_expr]: `let (active_memtable, immutable_memtables) = self.memtables_for_scanner().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:15` [async_fn]: `pub(super) async fn execute_group_commit_append(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:19` [tokio_import]: `truncate_guard: tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:25` [await_expr]: `let start_hmac = wal.last_hmac_snapshot().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:28` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:31` [await_expr]: `if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:37` [await_expr]: `match wal.recover_from_poison().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:61` [tokio_import]: `pub(super) sender: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/group_commit.rs:81` [tokio_import]: `pub(super) notify_full: Arc<tokio::sync::Notify>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/flush.rs:9` [async_fn]: `pub async fn force_flush(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/flush.rs:10` [await_expr]: `self.flush().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/flush.rs:17` [async_fn]: `pub async fn maybe_compact(&self) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/flush.rs:20` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:40` [async_fn]: `pub async fn read(&self, path: &Path) -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:43` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.read(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:44` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:49` [async_fn]: `pub async fn read_at(&self, path: &Path, offset: u64, len: usize) -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:52` [tokio_import]: `tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:77` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:82` [async_fn]: `pub async fn write_atomic(&self, path: &Path, data: Vec<u8>) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:85` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.write_atomic(&p, &data))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:86` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:91` [async_fn]: `pub async fn create_dir_all(&self, path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:94` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.create_dir_all(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:95` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:100` [async_fn]: `pub async fn remove_file(&self, path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:103` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.remove_file(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:104` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:109` [async_fn]: `pub async fn rename(&self, from: &Path, to: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:113` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.rename(&f, &t))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:114` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:119` [async_fn]: `pub async fn exists(&self, path: &Path) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:122` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.exists(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:123` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:128` [async_fn]: `pub async fn len(&self, path: &Path) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:131` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.len(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:132` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:137` [async_fn]: `pub async fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:140` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.read_dir(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:141` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:146` [async_fn]: `pub async fn sync_dir(&self, path: &Path) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:149` [tokio_import]: `tokio::task::spawn_blocking(move || vfs.sync_dir(&p))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/io_seam/store_io.rs:150` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:13` [tokio_import]: `pressure_tx: tokio::sync::watch::Sender<SystemPressure>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:15` [tokio_import]: `pub pressure_rx: tokio::sync::watch::Receiver<SystemPressure>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:41` [tokio_import]: `let (pressure_tx, pressure_rx) = tokio::sync::watch::channel(default_pressure);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:75` [async_fn]: `pub async fn run(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:89` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:93` [async_fn]: `pub async fn run_with_metrics_sink(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:111` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:113` [tokio_import]: `_ = tokio::time::sleep(self.sampling_interval) => {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:114` [tokio_import]: `let metrics = tokio::runtime::Handle::current().metrics();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:126` [tokio_import]: `let blocking_probe = tokio::task::spawn_blocking(|| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:129` [await_expr]: `let blocking_util = match tokio::time::timeout(Duration::from_millis(100), blocking_probe).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/system_pressure/monitor.rs:129` [tokio_import]: `let blocking_util = match tokio::time::timeout(Duration::from_millis(100), blocking_probe).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:12` [async_fn]: `pub async fn get<'a>(&'a self, key: &'a [u8]) -> Result<Option<bytes::Bytes>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:13` [await_expr]: `crate::lsm::ops::read::get(self, key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:17` [async_fn]: `pub async fn get_at_seq<'a>(&'a self, key: &'a [u8], seq_no: u64) -> Result<Option<bytes::Bytes>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:18` [await_expr]: `crate::lsm::ops::read::get_at_seq(self, key, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:22` [async_fn]: `pub async fn scan_prefix<'a>(&'a self, prefix: &'a [u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:23` [await_expr]: `crate::lsm::ops::read::scan_prefix(self, prefix).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:27` [async_fn]: `pub async fn scan_prefix_bounded<'a>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:33` [await_expr]: `crate::lsm::ops::read::scan_prefix_bounded(self, prefix, limit, cursor).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:37` [async_fn]: `pub async fn scan_prefix_at<'a>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:42` [await_expr]: `crate::lsm::ops::read::scan_prefix_at(self, prefix, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:46` [async_fn]: `pub async fn scan_bounded<'a>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:53` [await_expr]: `crate::lsm::ops::read::scan_bounded(self, start, end, limit, cursor).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:57` [async_fn]: `pub async fn scan<'a>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:63` [await_expr]: `crate::lsm::ops::read::scan(self, start, end, limit).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:67` [async_fn]: `pub async fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:68` [await_expr]: `crate::lsm::ops::write::put(self, tx_id, key, value).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:72` [async_fn]: `pub async fn put_if_absent<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:73` [await_expr]: `crate::lsm::ops::write::put_if_absent(self, tx_id, key, value).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:77` [async_fn]: `pub async fn delete_many<'a>(&'a self, tx_id: TxId, keys: Vec<Vec<u8>>) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:78` [await_expr]: `crate::lsm::ops::write::delete_many(self, tx_id, keys).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:82` [async_fn]: `pub async fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:83` [await_expr]: `crate::lsm::ops::write::delete_prefix(self, tx_id, prefix).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:87` [async_fn]: `pub async fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:88` [await_expr]: `crate::lsm::ops::write::delete(self, tx_id, key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:92` [async_fn]: `pub async fn commit<'a>(&'a self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:93` [await_expr]: `crate::lsm::ops::write::commit(self, tx_id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:97` [async_fn]: `pub async fn rollback<'a>(&'a self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:98` [await_expr]: `crate::lsm::ops::maintenance::rollback(self, tx_id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:102` [async_fn]: `pub async fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:103` [await_expr]: `crate::lsm::ops::maintenance::pin_checkpoint(self, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:107` [async_fn]: `pub async fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:108` [await_expr]: `crate::lsm::ops::maintenance::unpin_checkpoint(self, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:112` [async_fn]: `pub async fn flush<'a>(&'a self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:113` [await_expr]: `crate::lsm::ops::compaction::flush(self).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:117` [async_fn]: `pub async fn stats<'a>(&'a self) -> Result<crate::stats::StorageStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:118` [await_expr]: `crate::lsm::ops::maintenance::stats(self).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:122` [async_fn]: `pub async fn last_seq_no<'a>(&'a self) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:123` [await_expr]: `crate::lsm::ops::maintenance::last_seq_no(self).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:127` [async_fn]: `pub async fn last_tx_id<'a>(&'a self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/facade.rs:128` [await_expr]: `crate::lsm::ops::maintenance::last_tx_id(self).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:14` [async_fn]: `pub async fn has_pending_legacy_wal_migration_path(path: &std::path::Path) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:15` [await_expr]: `let mut entries = match tokio::fs::read_dir(path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:15` [tokio_import]: `let mut entries = match tokio::fs::read_dir(path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:25` [await_expr]: `while let Some(entry) = entries.next_entry().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:38` [await_expr]: `if !Wal::has_migration_marker(&file_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:47` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:49` [await_expr]: `let _ = test_wal.replay().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:61` [async_fn]: `pub async fn has_pending_legacy_wal_migration(&self) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:62` [await_expr]: `Self::has_pending_legacy_wal_migration_path(&self.config.path).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:66` [async_fn]: `pub async fn migrate_legacy_wal_keys(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:70` [await_expr]: `let mut entries = match tokio::fs::read_dir(&config.path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:70` [tokio_import]: `let mut entries = match tokio::fs::read_dir(&config.path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:83` [await_expr]: `crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:86` [await_expr]: `let salt = tokio::fs::read(&salt_path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:86` [tokio_import]: `let salt = tokio::fs::read(&salt_path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:102` [await_expr]: `while let Some(entry) = entries.next_entry().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:115` [await_expr]: `if !Wal::has_migration_marker(&file_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/engine/migration.rs:117` [await_expr]: `Wal::open_for_legacy_migration(&file_path, key_manager.clone()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/adapter.rs:15` [tokio_import]: `sender: tokio::sync::mpsc::Sender<(u64, TxId, WriteOrigin)>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/adapter.rs:22` [tokio_import]: `) -> (Self, tokio::task::JoinHandle<()>) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/adapter.rs:23` [tokio_import]: `let (tx, mut rx) = tokio::sync::mpsc::channel::<(u64, TxId, WriteOrigin)>(capacity);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/adapter.rs:26` [tokio_import]: `let handle = tokio::spawn(async move {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/adapter.rs:27` [await_expr]: `while let Some((seq_no, tx_id, origin)) = rx.recv().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/registry.rs:245` [tokio_import]: `if let Ok(handle) = tokio::runtime::Handle::try_current() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/registry.rs:246` [tokio_import]: `if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/observer/registry.rs:247` [tokio_import]: `tokio::task::block_in_place(run_notify);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:15` [async_fn]: `pub(crate) async fn rollback(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:23` [async_fn]: `pub(crate) async fn rollback_to_tx(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:24` [await_expr]: `LsmStorage::rollback_to_tx(storage, tx_id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:28` [async_fn]: `pub(crate) async fn pin_checkpoint(storage: &LsmStorage, seq_no: u64) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:34` [async_fn]: `pub(crate) async fn unpin_checkpoint(storage: &LsmStorage, seq_no: u64) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:40` [async_fn]: `pub(crate) async fn stats(storage: &LsmStorage) -> Result<StorageStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:41` [await_expr]: `let state = storage.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:41` [lock_held_across_await_warning]: `Lock acquired at line 41 near await at line 41`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:42` [await_expr]: `let sstables = storage.sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:42` [lock_held_across_await_warning]: `Lock acquired at line 42 near await at line 42`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:62` [async_fn]: `pub(crate) async fn last_seq_no(storage: &LsmStorage) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/maintenance.rs:67` [async_fn]: `pub(crate) async fn last_tx_id(storage: &LsmStorage) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:18` [async_fn]: `pub(crate) async fn get_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:25` [await_expr]: `get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:42` [async_fn]: `pub(crate) async fn get_at_seq_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:54` [await_expr]: `storage.get_at_seq(key, snapshot_seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:57` [async_fn]: `pub(crate) async fn scan_prefix_tracked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:63` [await_expr]: `let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:72` [async_fn]: `pub(crate) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:75` [await_expr]: `let res = storage.get_at_seq(key, snapshot_seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:85` [async_fn]: `pub(crate) async fn get_at_seq(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:95` [await_expr]: `let state = storage.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:95` [lock_held_across_await_warning]: `Lock acquired at line 95 near await at line 95`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:127` [await_expr]: `let sstables = storage.sstables.read().await.clone();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:127` [lock_held_across_await_warning]: `Lock acquired at line 127 near await at line 127`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:135` [await_expr]: `if let Some((val, seq, tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:135` [lock_held_across_await_warning]: `Lock acquired at line 127 near await at line 135`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:155` [async_fn]: `pub(crate) async fn scan_prefix(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:159` [await_expr]: `storage.scan_prefix_at(prefix, u64::MAX).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:162` [async_fn]: `pub(crate) async fn scan_prefix_bounded(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:185` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:225` [async_fn]: `pub(crate) async fn scan_prefix_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:238` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:250` [async_fn]: `pub(crate) async fn scan_bounded(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:272` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:307` [async_fn]: `pub(crate) async fn scan(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/read.rs:321` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:24` [async_fn]: `pub(crate) async fn flush(storage: &LsmStorage) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:25` [await_expr]: `let _flush_lock = storage.flush_mutex.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:25` [lock_held_across_await_warning]: `Lock acquired at line 25 near await at line 25`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:42` [await_expr]: `let state = storage.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:42` [lock_held_across_await_warning]: `Lock acquired at line 42 near await at line 42`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:56` [await_expr]: `let new_wal = Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:56` [lock_held_across_await_warning]: `Lock acquired at line 42 near await at line 56`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:64` [await_expr]: `let _commit_lock = storage.commit_mutex.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:64` [lock_held_across_await_warning]: `Lock acquired at line 64 near await at line 64`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:66` [await_expr]: `let mut state = storage.state.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:66` [lock_held_across_await_warning]: `Lock acquired at line 66 near await at line 66`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:80` [await_expr]: `Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:80` [lock_held_across_await_warning]: `Lock acquired at line 66 near await at line 80`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:86` [await_expr]: `let mut wal_guard = storage.wal.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:86` [lock_held_across_await_warning]: `Lock acquired at line 86 near await at line 86`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:90` [await_expr]: `let hmac = *old_wal.last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:90` [lock_held_across_await_warning]: `Lock acquired at line 90 near await at line 90`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:94` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:94` [lock_held_across_await_warning]: `Lock acquired at line 90 near await at line 94`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:131` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:137` [await_expr]: `builder.add(&k, &v, seq, tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:143` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:152` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:157` [await_expr]: `let pending = storage.pending_sealed_wals.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:157` [lock_held_across_await_warning]: `Lock acquired at line 157 near await at line 157`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:174` [await_expr]: `storage.manifest.append_batch(&manifest_entries).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:178` [await_expr]: `let mut state = storage.state.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:178` [lock_held_across_await_warning]: `Lock acquired at line 178 near await at line 178`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:179` [await_expr]: `let mut sstables = storage.sstables.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:179` [lock_held_across_await_warning]: `Lock acquired at line 179 near await at line 179`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:205` [await_expr]: `let mut pending_guard = storage.pending_sealed_wals.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:205` [lock_held_across_await_warning]: `Lock acquired at line 205 near await at line 205`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:207` [await_expr]: `let wal_read = storage.wal.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:207` [lock_held_across_await_warning]: `Lock acquired at line 207 near await at line 207`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:216` [await_expr]: `trunc_guard_opt = Some(old_wal.truncate_lock.lock().await);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:216` [lock_held_across_await_warning]: `Lock acquired at line 207 near await at line 216`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/compaction.rs:263` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:35` [async_fn]: `pub(crate) async fn write_salt_atomically(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:53` [tokio_import]: `match tokio::fs::OpenOptions::new()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:57` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:80` [await_expr]: `let mut std_file = file.into_std().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:82` [tokio_import]: `tokio::task::spawn_blocking(move || -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:92` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:95` [await_expr]: `tokio::fs::rename(&tmp_path, salt_path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:95` [tokio_import]: `tokio::fs::rename(&tmp_path, salt_path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:99` [await_expr]: `crate::util::fsync_parent_dir(salt_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:102` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:105` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&tmp_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:105` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&tmp_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:116` [async_fn]: `pub(crate) async fn directory_is_pristine(path: &std::path::Path) -> Result<bool> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:117` [await_expr]: `let mut entries = tokio::fs::read_dir(path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:117` [tokio_import]: `let mut entries = tokio::fs::read_dir(path).await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/salt.rs:121` [await_expr]: `while let Some(entry) = entries.next_entry().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:30` [tokio_import]: `use tokio::sync::RwLock;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:39` [async_fn]: `pub async fn new(config: LsmConfig) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:40` [await_expr]: `Self::new_with_merge_operator(config, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:44` [async_fn]: `pub async fn new_with_merge_operator(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:80` [await_expr]: `if !directory_is_pristine(&config.path).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:86` [await_expr]: `write_salt_atomically(&salt_path, &buf).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:102` [tokio_import]: `let mut entries = tokio::fs::read_dir(&config.path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:103` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:108` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:147` [await_expr]: `let entries = crate::manifest::Manifest::load(&manifest_path).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:171` [await_expr]: `let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:172` [await_expr]: `let wal_entries = wal.replay().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:272` [await_expr]: `let wal = Wal::open_with_key_manager(&active_wal_path, key_manager.clone()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:291` [tokio_import]: `let mut entries = tokio::fs::read_dir(&config.path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:292` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:296` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:318` [tokio_import]: `let mut entries = tokio::fs::read_dir(&config.path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:319` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:323` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:334` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:334` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:347` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:347` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:373` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:392` [await_expr]: `crate::manifest::Manifest::open_with_dir_lock(&manifest_path, Some(dir_lock)).await?,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:395` [await_expr]: `let ssts_read = sstables.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:395` [lock_held_across_await_warning]: `Lock acquired at line 395 near await at line 395`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:403` [await_expr]: `let initial_wal_hmac = *wal.last_hmac.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:403` [lock_held_across_await_warning]: `Lock acquired at line 403 near await at line 403`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:407` [await_expr]: `manifest.append_batch(&add_entries).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:407` [lock_held_across_await_warning]: `Lock acquired at line 403 near await at line 407`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:439` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:467` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:471` [tokio_import]: `let flush_notify = Arc::new(tokio::sync::Notify::new());`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:502` [tokio_import]: `commit_mutex: tokio::sync::Mutex::new(()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:503` [tokio_import]: `flush_mutex: tokio::sync::Mutex::new(()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:505` [tokio_import]: `pending_sealed_wals: tokio::sync::Mutex::new(Vec::new()),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:511` [tokio_import]: `pending_commit_queue: tokio::sync::Mutex::new(None),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:528` [await_expr]: `storage.flush().await.map_err(|e| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:535` [await_expr]: `let wal = storage.wal.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:535` [lock_held_across_await_warning]: `Lock acquired at line 535 near await at line 535`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:540` [await_expr]: `if let Err(e) = tokio::fs::remove_file(old_wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:540` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(old_wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:540` [lock_held_across_await_warning]: `Lock acquired at line 535 near await at line 540`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:546` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:546` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:546` [lock_held_across_await_warning]: `Lock acquired at line 535 near await at line 546`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/startup.rs:566` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:23` [async_fn]: `pub async fn rollback_to_tx(&self, target_tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:24` [await_expr]: `let _commit_lock = self.commit_mutex.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:24` [lock_held_across_await_warning]: `Lock acquired at line 24 near await at line 24`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:28` [await_expr]: `self.rollback_to_tx_locked(target_tx, &commit_guard).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:28` [lock_held_across_await_warning]: `Lock acquired at line 24 near await at line 28`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:32` [async_fn]: `pub(crate) async fn rollback_to_tx_locked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:47` [tokio_import]: `tokio::fs::write(&intent_path, &intent_bytes)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:48` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:53` [tokio_import]: `tokio::task::spawn_blocking(move || {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:63` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:67` [await_expr]: `let state = self.state.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:67` [lock_held_across_await_warning]: `Lock acquired at line 67 near await at line 67`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:68` [await_expr]: `let wal = self.wal.read().await.clone();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:68` [lock_held_across_await_warning]: `Lock acquired at line 68 near await at line 68`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:70` [await_expr]: `let (target_offset, target_hmac) = wal.find_tx_offset(target_tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:70` [lock_held_across_await_warning]: `Lock acquired at line 68 near await at line 70`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:71` [await_expr]: `wal.truncate(target_offset, target_hmac).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:71` [lock_held_across_await_warning]: `Lock acquired at line 68 near await at line 71`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:90` [await_expr]: `let mut sstables_lock = self.sstables.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:90` [lock_held_across_await_warning]: `Lock acquired at line 90 near await at line 90`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:109` [await_expr]: `let mut stream = spanning.stream().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:110` [await_expr]: `while let Some((k, v, seq, tx)) = stream.next_entry().await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:128` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:131` [await_expr]: `builder.add(&k, &v, seq, tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:133` [await_expr]: `builder.finish().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:140` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:147` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:181` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:181` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:195` [await_expr]: `if let Err(e) = self.manifest.append_batch(&manifest_batch).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:199` [await_expr]: `if let Err(e) = tokio::fs::remove_file(&intent_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/recovery/rollback.rs:199` [tokio_import]: `if let Err(e) = tokio::fs::remove_file(&intent_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:20` [async_fn]: `pub(crate) async fn commit(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:23` [await_expr]: `let res = commit_internal(storage, tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:39` [async_fn]: `async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:40` [await_expr]: `storage.apply_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:50` [await_expr]: `let commit_lock = storage.commit_mutex.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:50` [lock_held_across_await_warning]: `Lock acquired at line 50 near await at line 50`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:74` [await_expr]: `let wal = storage.wal.read().await.clone();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:74` [lock_held_across_await_warning]: `Lock acquired at line 74 near await at line 74`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:77` [await_expr]: `return single_commit_path(storage, tx_id, wal, wal_ops, mem_updates, first_seq).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:77` [lock_held_across_await_warning]: `Lock acquired at line 74 near await at line 77`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:80` [await_expr]: `let queue_guard = storage.pending_commit_queue.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:80` [lock_held_across_await_warning]: `Lock acquired at line 80 near await at line 80`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:90` [await_expr]: `follower_commit_path(storage, params, queue_guard, commit_lock).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:90` [lock_held_across_await_warning]: `Lock acquired at line 80 near await at line 90`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:92` [await_expr]: `leader_commit_path(storage, wal, params, queue_guard, commit_lock).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/commit_pipeline.rs:92` [lock_held_across_await_warning]: `Lock acquired at line 80 near await at line 92`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/batch.rs:16` [async_fn]: `pub(crate) async fn delete_many(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/batch.rs:31` [await_expr]: `storage.apply_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:18` [async_fn]: `pub(crate) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:21` [await_expr]: `storage.apply_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:40` [async_fn]: `pub(crate) async fn put_if_absent(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:48` [await_expr]: `storage.apply_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:79` [await_expr]: `let is_present = match storage.get_at_seq(key, current_max_seq).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:128` [async_fn]: `pub(crate) async fn delete(storage: &LsmStorage, tx_id: TxId, key: &[u8]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:130` [await_expr]: `storage.apply_backpressure().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:149` [async_fn]: `pub(crate) async fn delete_prefix(storage: &LsmStorage, tx_id: TxId, prefix: &[u8]) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:152` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/put_delete.rs:156` [await_expr]: `storage.delete_many(tx_id, matching_keys).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:29` [async_fn]: `pub(super) async fn follower_commit_path(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:32` [tokio_import]: `mut queue_guard: tokio::sync::MutexGuard<'_, Option<PendingCommitQueue>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:33` [tokio_import]: `commit_lock: tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:46` [tokio_import]: `let (tx, mut rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:68` [await_expr]: `let res = match tokio::time::timeout(storage.config.tx_timeout, &mut rx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:68` [tokio_import]: `let res = match tokio::time::timeout(storage.config.tx_timeout, &mut rx).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:86` [await_expr]: `let mut queue_guard = storage.pending_commit_queue.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:86` [lock_held_across_await_warning]: `Lock acquired at line 86 near await at line 86`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:119` [await_expr]: `match rx.await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:131` [async_fn]: `pub(super) async fn leader_commit_path(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:135` [tokio_import]: `mut queue_guard: tokio::sync::MutexGuard<'_, Option<PendingCommitQueue>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:136` [tokio_import]: `commit_lock: tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:143` [tokio_import]: `let notify_full = Arc::new(tokio::sync::Notify::new());`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:164` [tokio_import]: `tokio::select! {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:165` [tokio_import]: `_ = tokio::time::sleep(Duration::from_micros(storage.config.group_commit_window_micros)) => {},`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:169` [await_expr]: `let commit_lock = storage.commit_mutex.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:169` [lock_held_across_await_warning]: `Lock acquired at line 169 near await at line 169`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:171` [await_expr]: `let mut queue_guard = storage.pending_commit_queue.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:171` [lock_held_across_await_warning]: `Lock acquired at line 171 near await at line 171`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:192` [await_expr]: `let (all_wal_entries, prev_hmac) = match wal.prepare_batch(all_wal_ops).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:213` [await_expr]: `let truncate_guard = wal.truncate_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:213` [lock_held_across_await_warning]: `Lock acquired at line 213 near await at line 213`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:221` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:221` [lock_held_across_await_warning]: `Lock acquired at line 213 near await at line 221`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:224` [await_expr]: `let _ = wal.rollback_hmac(prev_hmac).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:224` [lock_held_across_await_warning]: `Lock acquired at line 213 near await at line 224`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:294` [await_expr]: `let state = storage.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/group.rs:294` [lock_held_across_await_warning]: `Lock acquired at line 294 near await at line 294`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:18` [async_fn]: `pub(super) async fn single_commit_path(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:26` [await_expr]: `let (wal_entries, prev_hmac) = wal.prepare_batch(wal_ops).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:45` [await_expr]: `let truncate_guard = wal.truncate_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:45` [lock_held_across_await_warning]: `Lock acquired at line 45 near await at line 45`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:47` [await_expr]: `let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:47` [lock_held_across_await_warning]: `Lock acquired at line 45 near await at line 47`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:50` [await_expr]: `if let Err(trunc_err) = wal.truncate(start_offset, prev_hmac).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:50` [lock_held_across_await_warning]: `Lock acquired at line 45 near await at line 50`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:56` [await_expr]: `match wal.recover_from_poison().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:56` [lock_held_across_await_warning]: `Lock acquired at line 45 near await at line 56`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:69` [await_expr]: `let _ = wal.rollback_hmac(prev_hmac).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:90` [await_expr]: `let state = storage.state.read().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/ops/write/single.rs:90` [lock_held_across_await_warning]: `Lock acquired at line 90 near await at line 90`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compaction/engine/throttle.rs:7` [tokio_import]: `use tokio::sync::watch::Receiver;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:103` [await_expr]: `self.inner.get_handle(&physical_key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:110` [await_expr]: `self.inner.get_at_seq_handle(&physical_key, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:117` [await_expr]: `self.inner.get_tracked_handle(tx_id, &physical_key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:124` [await_expr]: `self.inner.get_at_seq_tracked_handle(tx_id, &physical_key, seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:131` [await_expr]: `let raw_res = self.inner.scan_prefix_tracked_handle(tx_id, &physical_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:143` [await_expr]: `self.inner.put_handle(tx_id, &physical_key, value).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:150` [await_expr]: `self.inner.put_if_absent_handle(tx_id, &physical_key, value).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:157` [await_expr]: `self.inner.put_batch_handle(tx_id, &physical_entries).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:164` [await_expr]: `self.inner.delete_handle(tx_id, &physical_key).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:171` [await_expr]: `self.inner.delete_many_handle(tx_id, physical_keys).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:178` [await_expr]: `self.inner.delete_prefix_handle(tx_id, &physical_prefix).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:195` [await_expr]: `let raw_res = self.inner.scan_prefix_handle(&physical_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:204` [await_expr]: `let (raw_batch, next_cursor) = self.inner.scan_prefix_bounded_handle(&physical_prefix, limit, physical_cursor.as_deref()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:214` [await_expr]: `let raw_res = self.inner.scan_prefix_at_handle(&physical_prefix, seq_no).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:236` [await_expr]: `let raw_res = self.inner.scan_handle(bound_as_ref(&physical_start), bound_as_ref(&physical_end), limit).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/tenant_storage.rs:259` [await_expr]: `let (raw_batch, next_cursor) = self.inner.scan_bounded_handle(bound_as_ref(&physical_start), bound_as_ref(&physical_end)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:273` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:274` [async_fn]: `async fn test_in_memory_store_put_get_commit_contract() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:278` [await_expr]: `assert!(store.get(b"key1").await.unwrap().is_none());`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:280` [await_expr]: `store.put(tx, b"key1", b"value1").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:282` [await_expr]: `assert!(store.get(b"key1").await.unwrap().is_none());`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:284` [await_expr]: `store.commit(tx).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:285` [await_expr]: `let val = store.get(b"key1").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:289` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:290` [async_fn]: `async fn test_in_memory_store_transaction_isolation() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:294` [await_expr]: `store.put(tx, b"uncommitted_key", b"val").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:296` [await_expr]: `let res = store.get(b"uncommitted_key").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:300` [await_expr]: `store.rollback(tx).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:301` [await_expr]: `store.commit(tx).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:302` [await_expr]: `let res_after = store.get(b"uncommitted_key").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:306` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:307` [async_fn]: `async fn test_in_memory_store_mvcc_get_at_seq() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:312` [await_expr]: `store.put(tx1, b"key_mvcc", b"v1").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:313` [await_expr]: `store.commit(tx1).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:315` [await_expr]: `store.put(tx2, b"key_mvcc", b"v2").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:316` [await_expr]: `store.commit(tx2).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:319` [await_expr]: `let val_at_1 = store.get_at_seq(b"key_mvcc", 1).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:322` [await_expr]: `let val_at_2 = store.get_at_seq(b"key_mvcc", 2).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:326` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:327` [async_fn]: `async fn test_in_memory_store_rollback_to_tx() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:332` [await_expr]: `store.put(tx1, b"key_t1", b"v1").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:333` [await_expr]: `store.commit(tx1).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:335` [await_expr]: `store.put(tx2, b"key_t2", b"v2").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:336` [await_expr]: `store.commit(tx2).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:339` [await_expr]: `store.rollback_to_tx(tx1).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:342` [await_expr]: `store.get(b"key_t1").await.unwrap(),`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:345` [await_expr]: `assert!(store.get(b"key_t2").await.unwrap().is_none());`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:348` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:349` [async_fn]: `async fn test_in_memory_store_zero_disk_io() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:356` [await_expr]: `store.put(tx, b"key_disk", b"val_disk").await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:357` [await_expr]: `store.commit(tx).await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/memory_only.rs:358` [await_expr]: `store.flush().await.unwrap();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:11` [await_expr]: `self.get(key).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:21` [await_expr]: `self.get_at_seq(key, seq_no).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:31` [await_expr]: `crate::lsm::ops::read::get_tracked(self, tx_id, key).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:42` [await_expr]: `crate::lsm::ops::read::get_at_seq_tracked(self, tx_id, key, seq).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:51` [await_expr]: `self.scan_prefix(prefix).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:61` [await_expr]: `crate::lsm::ops::read::scan_prefix_tracked(self, tx_id, prefix).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:76` [await_expr]: `self.scan_prefix_bounded(prefix, limit, cursor).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:86` [await_expr]: `self.scan_prefix_at(prefix, seq_no).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:98` [await_expr]: `self.scan_bounded(start, end, limit, cursor).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:109` [await_expr]: `self.scan(start, end, limit).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:115` [await_expr]: `self.put(tx_id, key, value).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:126` [await_expr]: `self.put_if_absent(tx_id, key, value).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:132` [await_expr]: `self.delete_many(tx_id, keys).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:138` [await_expr]: `self.delete_prefix(tx_id, prefix).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:144` [await_expr]: `self.delete(tx_id, key).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:150` [await_expr]: `self.commit(tx_id).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:156` [await_expr]: `self.rollback(tx_id).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:162` [await_expr]: `crate::lsm::ops::maintenance::rollback_to_tx(self, tx_id).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:168` [await_expr]: `self.pin_checkpoint(seq_no).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:174` [await_expr]: `self.unpin_checkpoint(seq_no).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:180` [await_expr]: `self.flush().await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:186` [await_expr]: `let s = self.stats().await.map_err(|e| contextra_types::ContextraError::from(e))?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:193` [await_expr]: `self.last_seq_no().await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/engine/lsm.rs:199` [await_expr]: `self.last_tx_id().await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/memtable.rs:52` [await_expr]: `let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/memtable.rs:52` [block_on]: `let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/store_scan_view.rs:32` [tokio_import]: `use tokio::sync::RwLock;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:41` [await_expr]: `let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:41` [block_on]: `let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:53` [block_on]: `self.runtime.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:59` [await_expr]: `if let Ok(mut builder) = SstableBuilder::create(&canary_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:60` [await_expr]: `if builder.add(canary_key, canary_val, 1, 1).await.is_ok()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:61` [await_expr]: `&& builder.finish().await.is_ok()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:64` [await_expr]: `SstableReader::open_with_key_manager(&canary_path, block_cache, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:66` [await_expr]: `if let Ok(entries) = reader.iter().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:82` [await_expr]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:82` [tokio_import]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:110` [block_on]: `let discovered_units = self.runtime.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:114` [await_expr]: `let readers = view.sstables.read().await.clone();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:114` [lock_held_across_await_warning]: `Lock acquired at line 114 near await at line 114`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:130` [await_expr]: `if let Ok(entries) = reader.iter().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:150` [await_expr]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:150` [tokio_import]: `if let Ok(mut dir) = tokio::fs::read_dir(data_dir).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:151` [await_expr]: `while let Ok(Some(entry)) = dir.next_entry().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:159` [await_expr]: `SstableReader::open_with_key_manager(&path, block_cache, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/sstable.rs:161` [await_expr]: `if let Ok(entries) = orphan_reader.iter().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:58` [block_on]: `self.runtime.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:60` [await_expr]: `storage.flush().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:63` [await_expr]: `let readers = storage.sstables_for_scanner().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:70` [await_expr]: `let entries = reader.iter().await.unwrap_or_default();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:81` [await_expr]: `if retained.len() == reader.iter().await.unwrap_or_default().len() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:93` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:96` [await_expr]: `let _ = builder.add(&rk, &rv, rseq, 1).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:98` [await_expr]: `if builder.finish().await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:104` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:117` [await_expr]: `let mut sst_guard = sst_arc.write().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:117` [lock_held_across_await_warning]: `Lock acquired at line 117 near await at line 117`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:124` [await_expr]: `for r in &storage.sstables_for_scanner().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:124` [lock_held_across_await_warning]: `Lock acquired at line 117 near await at line 124`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:141` [await_expr]: `if let Ok(metadata) = tokio::fs::metadata(&old_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:141` [tokio_import]: `if let Ok(metadata) = tokio::fs::metadata(&old_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:144` [await_expr]: `let _ = tokio::fs::write(&old_path, zeros).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:144` [tokio_import]: `let _ = tokio::fs::write(&old_path, zeros).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:145` [await_expr]: `if tokio::fs::remove_file(&old_path).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:145` [tokio_import]: `if tokio::fs::remove_file(&old_path).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:166` [await_expr]: `let wal = Wal::open_read_only(&wal_path, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:168` [await_expr]: `let entries = wal.replay().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:214` [tokio_import]: `let metadata = tokio::fs::metadata(&wal_path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:215` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:219` [tokio_import]: `tokio::fs::write(&wal_path, &zeros)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:220` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:222` [tokio_import]: `tokio::fs::remove_file(&wal_path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:223` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:230` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:246` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:247` [tokio_import]: `let mut tmp_file = tokio::fs::OpenOptions::new()`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:252` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:255` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:258` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:264` [tokio_import]: `tokio::fs::rename(&wal_path, &trash_wal_path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:265` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:267` [tokio_import]: `tokio::fs::rename(&tmp_wal_path, &wal_path)`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:268` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:271` [await_expr]: `if let Ok(metadata) = tokio::fs::metadata(&trash_wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:271` [tokio_import]: `if let Ok(metadata) = tokio::fs::metadata(&trash_wal_path).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:274` [await_expr]: `let _ = tokio::fs::write(&trash_wal_path, &zeros).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:274` [tokio_import]: `let _ = tokio::fs::write(&trash_wal_path, &zeros).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:275` [await_expr]: `let _ = tokio::fs::remove_file(&trash_wal_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/purge.rs:275` [tokio_import]: `let _ = tokio::fs::remove_file(&trash_wal_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:40` [await_expr]: `let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:40` [block_on]: `let view = runtime.block_on(async { Ok(storage.scan_view().await) })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:51` [block_on]: `self.runtime.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:58` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:74` [await_expr]: `if tokio::fs::write(&canary_path, file_bytes).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:74` [tokio_import]: `if tokio::fs::write(&canary_path, file_bytes).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:75` [await_expr]: `if let Ok(reader_wal) = Wal::open_read_only(&canary_path, None).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:76` [await_expr]: `if let Ok(entries) = reader_wal.replay().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:95` [await_expr]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:95` [tokio_import]: `let _ = tokio::fs::remove_file(&canary_path).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:123` [block_on]: `let units = self.runtime.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:142` [await_expr]: `if let Ok(wal) = Wal::open_read_only(&wal_path, None).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/wal.rs:143` [await_expr]: `if let Ok(entries) = wal.replay().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/runtime.rs:3` [tokio_import]: `use tokio::runtime::{Handle, RuntimeFlavor};`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/runtime.rs:74` [tokio_import]: `tokio::task::block_in_place(|| handle.block_on(future))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/runtime.rs:74` [block_on]: `tokio::task::block_in_place(|| handle.block_on(future))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/runtime.rs:90` [block_on]: `std::panic::catch_unwind(AssertUnwindSafe(|| handle.block_on(future)))`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/factory.rs:23` [tokio_import]: `handle: tokio::runtime::Handle,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/factory.rs:34` [await_expr]: `let view = match runtime.block_on(async { Ok(storage.scan_view().await) }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/factory.rs:34` [block_on]: `let view = match runtime.block_on(async { Ok(storage.scan_view().await) }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/compat/scanner/factory.rs:60` [tokio_import]: `handle: tokio::runtime::Handle,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:8` [tokio_import]: `use tokio::io::{AsyncReadExt, AsyncSeekExt};`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:21` [async_fn]: `pub(crate) async fn do_scan_entries_with_callback<F>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:35` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:38` [tokio_import]: `let mut reader = tokio::io::BufReader::new(file);`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:69` [await_expr]: `if reader.read_exact(&mut header_buf).await.is_ok() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:80` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:84` [tokio_import]: `reader = tokio::io::BufReader::new(reader.into_inner());`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:92` [await_expr]: `if let Err(e) = reader.read_exact(&mut len_buf).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/scan.rs:140` [await_expr]: `if let Err(e) = reader.read_exact(&mut entry_data_raw).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:8` [tokio_import]: `use tokio::io::{AsyncReadExt, AsyncSeekExt};`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:25` [async_fn]: `pub async fn scan_entries_with_callback<F>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:41` [tokio_import]: `let (item_tx, mut item_rx) = tokio::sync::mpsc::unbounded_channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:42` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:49` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:53` [await_expr]: `while let Some((seq, entry, pos)) = item_rx.recv().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:60` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:67` [async_fn]: `pub(crate) async fn rewrite_as_v3(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:81` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:87` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:87` [lock_held_across_await_warning]: `Lock acquired at line 74 near await at line 87`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:91` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:97` [async_fn]: `pub async fn truncate(&self, offset: u64, new_last_hmac: [u8; 32]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:98` [await_expr]: `let _truncate_guard = self.truncate_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:98` [lock_held_across_await_warning]: `Lock acquired at line 98 near await at line 98`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:114` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:120` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:120` [lock_held_across_await_warning]: `Lock acquired at line 108 near await at line 120`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:123` [await_expr]: `ack_rx.await.map_err(|_| {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:130` [async_fn]: `pub async fn rotate_and_seal(&self) -> Result<PathBuf> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:144` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:146` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:150` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:156` [async_fn]: `pub async fn find_tx_offset(&self, target_tx_id: TxId) -> Result<(u64, [u8; 32])> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:158` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:182` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:189` [async_fn]: `pub async fn last_hmac_snapshot(&self) -> [u8; 32] {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/truncate.rs:190` [await_expr]: `*self.last_hmac.lock().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:17` [tokio_import]: `use tokio::io::AsyncWriteExt;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:19` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:20` [async_fn]: `async fn test_do_scan_entries_with_callback_v3_without_key_manager() {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:26` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:29` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:31` [await_expr]: `file.flush().await.expect("flush failed");`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:37` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/acl.rs:57` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:8` [tokio_import]: `use tokio::io::{AsyncReadExt, AsyncSeekExt};`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:20` [async_fn]: `pub(crate) async fn prepare_append_payload(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:55` [await_expr]: `tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:55` [tokio_import]: `tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:85` [tokio_import]: `let frames_payload = tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:166` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:184` [async_fn]: `pub async fn append_batch(&self, batch: PreparedBatch) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:186` [await_expr]: `let truncate_guard = self.truncate_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:186` [lock_held_across_await_warning]: `Lock acquired at line 186 near await at line 186`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:188` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:188` [lock_held_across_await_warning]: `Lock acquired at line 186 near await at line 188`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:191` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:191` [lock_held_across_await_warning]: `Lock acquired at line 186 near await at line 191`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:196` [async_fn]: `pub async fn enqueue_append_batch_locked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:199` [tokio_import]: `_guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:200` [tokio_import]: `) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:208` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:213` [await_expr]: `let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:223` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:229` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:229` [lock_held_across_await_warning]: `Lock acquired at line 216 near await at line 229`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:235` [async_fn]: `pub async fn append_batch_locked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:238` [tokio_import]: `guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:240` [await_expr]: `let ack_rx = self.enqueue_append_batch_locked(batch, guard).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:242` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:249` [async_fn]: `pub async fn try_append_batch(&self, batch: PreparedBatch) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:251` [await_expr]: `let truncate_guard = self.truncate_lock.lock().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:251` [lock_held_across_await_warning]: `Lock acquired at line 251 near await at line 251`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:253` [await_expr]: `.await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:253` [lock_held_across_await_warning]: `Lock acquired at line 251 near await at line 253`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:256` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:256` [lock_held_across_await_warning]: `Lock acquired at line 251 near await at line 256`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:261` [async_fn]: `pub async fn try_enqueue_append_batch_locked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:264` [tokio_import]: `_guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:265` [tokio_import]: `) -> Result<tokio::sync::oneshot::Receiver<Result<()>>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:273` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:278` [await_expr]: `let (payload_bytes, last_hmac_val) = self.prepare_append_payload(&batch).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:288` [tokio_import]: `let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:295` [tokio_import]: `tokio::sync::mpsc::error::TrySendError::Full(_) => {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:298` [tokio_import]: `tokio::sync::mpsc::error::TrySendError::Closed(_) => {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:306` [async_fn]: `pub async fn try_append_batch_locked(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:309` [tokio_import]: `guard: &tokio::sync::MutexGuard<'_, ()>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:311` [await_expr]: `let ack_rx = self.try_enqueue_append_batch_locked(batch, guard).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/io/append.rs:313` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher/command.rs:9` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher/command.rs:14` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher/command.rs:17` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<PathBuf>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher/command.rs:22` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<()>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher/command.rs:26` [tokio_import]: `item_tx: tokio::sync::mpsc::UnboundedSender<(u64, WalEntry, u64)>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/wal/flusher/command.rs:27` [tokio_import]: `ack: tokio::sync::oneshot::Sender<Result<WalVersion>>,`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:46` [async_fn]: `pub async fn create(path: impl AsRef<Path>) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:47` [await_expr]: `Self::create_with_key_manager(path, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:50` [async_fn]: `pub async fn create_with_key_manager(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:54` [await_expr]: `Self::create_with_vfs(path, key_manager, Arc::new(RealFs)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:57` [async_fn]: `pub async fn create_with_vfs(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:177` [async_fn]: `pub async fn add(&mut self, key: &[u8], value: &[u8], seq_no: u64, tx_id: u64) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:222` [await_expr]: `self.flush_block().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:243` [async_fn]: `async fn flush_block(&mut self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:288` [async_fn]: `pub async fn finish(mut self) -> Result<SstableMetadata> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/builder/writer.rs:296` [await_expr]: `if let Err(e) = self.flush_block().await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/iter.rs:19` [async_fn]: `pub async fn stream(self: &Arc<Self>) -> Result<SstableStream> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/iter.rs:31` [async_fn]: `pub async fn iter(&self) -> Result<Vec<(Bytes, Bytes, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/iter.rs:54` [await_expr]: `let block_data = self.get_block(offset, next_offset).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/block.rs:14` [async_fn]: `pub(crate) async fn read_block_at_file(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/block.rs:38` [tokio_import]: `let data = tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/block.rs:43` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/block.rs:83` [async_fn]: `pub(crate) async fn get_block(&self, offset: u64, next_offset: u64) -> Result<Bytes> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/block.rs:95` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/lookup.rs:16` [async_fn]: `pub async fn get_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/lookup.rs:54` [await_expr]: `let block_data = self.get_block(*offset, next_offset).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/lookup.rs:160` [async_fn]: `pub async fn get(&self, key: &[u8]) -> Result<Option<(Bytes, u64, u64)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/lookup.rs:161` [await_expr]: `self.get_at(key, u64::MAX, u64::MAX).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/lookup.rs:165` [async_fn]: `pub async fn lookup_metrics(&self, key: &[u8]) -> (bool, bool, bool, bool) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/lookup.rs:197` [await_expr]: `let block_data = match self.get_block(offset, next_offset).await {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:17` [async_fn]: `pub async fn open(path: impl AsRef<Path>, block_cache: Arc<BlockCache>) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:18` [await_expr]: `Self::open_with_vfs(path, block_cache, None, Arc::new(RealFs)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:21` [async_fn]: `pub async fn open_with_key_manager(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:26` [await_expr]: `Self::open_with_vfs(path, block_cache, key_manager, Arc::new(RealFs)).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:29` [async_fn]: `pub async fn open_with_vfs(`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:49` [tokio_import]: `tokio::task::spawn_blocking(move || -> Result<(Arc<dyn VfsFile>, u64)> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:55` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:67` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:73` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:237` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:242` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:297` [tokio_import]: `tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:302` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-store/src/sstable/reader/open.rs:402` [await_expr]: `.await?;`
+### `contextra-text`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:238` [async_fn]: `pub async fn block_max_wand_search<S: PostingStore>(`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:260` [await_expr]: `storage.last_seq_no().await?`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:273` [await_expr]: `let active_tbs_entries = storage.scan_prefix_at(&tbs_global_prefix, seq).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:303` [await_expr]: `let loaded_list = if let Some(bytes) = storage.get_at_seq(&batch_key, seq).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:312` [await_expr]: `let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:338` [await_expr]: `let doc_len = match storage.get(&dl_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:492` [await_expr]: `None => match storage.get_at_seq(&dl_key, seq).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:527` [await_expr]: `let ex = storage.get_at_seq(&tbs_key, seq).await?.is_some();`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:539` [await_expr]: `storage.get_at_seq(&key, seq).await?.is_some()`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:612` [await_expr]: `Box::pin(async move { self.get_at_seq(key, u64::MAX).await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:726` [await_expr]: `Box::pin(async move { self.scan_prefix_at(prefix, u64::MAX).await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:755` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:756` [async_fn]: `async fn test_block_max_wand_equivalence_and_pruning_performance() -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:768` [await_expr]: `index.upsert_document(tx, doc_id, &text).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:770` [await_expr]: `index.commit_stats(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:771` [await_expr]: `storage.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:774` [await_expr]: `let query_results = index.search_bm25("common rare", k, None).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/wand.rs:806` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/stream.rs:73` [async_fn]: `pub async fn next_batch(&mut self) -> Result<Vec<(DocId, f32)>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/stream.rs:75` [await_expr]: `self.refill().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/stream.rs:91` [async_fn]: `pub async fn next_doc(&mut self) -> Result<Option<DocId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/stream.rs:93` [await_expr]: `self.refill().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/stream.rs:123` [async_fn]: `async fn refill(&mut self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/stream.rs:136` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:123` [async_fn]: `pub async fn load_stats(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:125` [await_expr]: `if let Some(bytes) = self.storage.get(&meta_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:183` [async_fn]: `pub(crate) async fn ensure_term_loaded(`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:192` [await_expr]: `if let Some(bytes) = self.storage.get(&plb_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:203` [await_expr]: `let raw_entries = self.storage.scan_prefix(&prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:221` [await_expr]: `let doc_len = match self.storage.get(&dl_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:256` [async_fn]: `pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:278` [await_expr]: `if let Some(bytes) = self.storage.get(&dl_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:287` [await_expr]: `if let Some(fw_bytes) = self.storage.get(&fw_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:293` [await_expr]: `self.storage.put(tx, &tbs_key, &[]).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:302` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:310` [await_expr]: `self.storage.put(tx, &fw_key, &fw_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:323` [await_expr]: `self.ensure_term_loaded(term).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:325` [await_expr]: `self.storage.put(tx, &pl_doc_key, &tf.to_le_bytes()).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:332` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:341` [async_fn]: `pub async fn rewrite_posting_lists(&self, tx: TxId, terms: &[&str]) -> Result<usize> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:344` [await_expr]: `self.ensure_term_loaded(term).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:349` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:352` [await_expr]: `self.storage.delete(tx, &plb_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:362` [async_fn]: `pub async fn compact_terms(&self, tx: TxId) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:363` [await_expr]: `self.resolve_tombstones(tx).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:367` [async_fn]: `pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:375` [await_expr]: `let tombstones = self.storage.scan_prefix(&tbs_prefix).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:402` [await_expr]: `let is_live = if let Some(fw_bytes) = self.storage.get(&fw_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:417` [await_expr]: `self.ensure_term_loaded(&term).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:419` [await_expr]: `self.storage.delete(tx, &pl_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:426` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:428` [await_expr]: `self.storage.delete(tx, &plb_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:431` [await_expr]: `self.storage.delete(tx, &tbs_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:440` [async_fn]: `pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:445` [await_expr]: `if let Some(bytes) = self.storage.get(&dl_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:457` [await_expr]: `self.storage.delete(tx, &dl_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:459` [await_expr]: `if let Some(fw_bytes) = self.storage.get(&fw_key).await? {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:462` [await_expr]: `self.ensure_term_loaded(term).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:464` [await_expr]: `self.storage.delete(tx, &pl_doc_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:466` [await_expr]: `self.storage.put(tx, &tbs_key, &[]).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:474` [await_expr]: `self.storage.put(tx, &plb_key, &batch_bytes).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:476` [await_expr]: `self.storage.delete(tx, &plb_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:481` [await_expr]: `self.storage.delete(tx, &fw_key).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:509` [async_fn]: `pub async fn commit_stats(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:565` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:571` [async_fn]: `pub async fn rollback_stats(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:581` [async_fn]: `pub async fn search_bm25(`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:587` [await_expr]: `self.search_bm25_at(query, k, max_seq).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:593` [async_fn]: `pub async fn search_bm25_at(`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:639` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:650` [async_fn]: `pub async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:651` [await_expr]: `self.commit_stats(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:652` [await_expr]: `self.storage.commit(tx).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:656` [async_fn]: `pub async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:657` [await_expr]: `self.rollback_stats(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:658` [await_expr]: `self.storage.rollback(tx).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:662` [async_fn]: `pub async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:663` [await_expr]: `self.storage.rollback_to_tx(tx_id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:667` [async_fn]: `pub async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/inverted/index_struct.rs:668` [await_expr]: `self.storage.last_tx_id().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:87` [block_on]: `futures::executor::block_on(f)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:146` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:147` [await_expr]: `scratch_c.commit(tx).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:153` [await_expr]: `let raw_entries = block_on_async(async move { storage.scan_prefix(&prefix).await })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:178` [await_expr]: `let _ = scratch_c.storage().delete(tx_del, &k).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:180` [await_expr]: `scratch_c.commit(tx_del).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:223` [await_expr]: `let raw_entries = block_on_async(async move { storage.scan_prefix(&index_prefix).await })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:223` [lock_held_across_await_warning]: `Lock acquired at line 212 near await at line 223`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scanner.rs:283` [await_expr]: `block_on_async(async move { storage.scan_prefix(&col_prefix).await })?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:44` [async_fn]: `async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:49` [await_expr]: `self.inner.search(query, k).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:55` [async_fn]: `async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:56` [await_expr]: `self.inner.search_at(query, k, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:59` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:60` [await_expr]: `self.inner.insert(tx, id, text).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:63` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:64` [await_expr]: `self.inner.delete(tx, id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:67` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:68` [await_expr]: `self.inner.commit(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:71` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:72` [await_expr]: `self.inner.rollback(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:75` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:76` [await_expr]: `self.inner.rollback_to_tx(contextra_ids::TxId::new(tx_id.inner())).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:79` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:80` [await_expr]: `self.inner.last_tx_id().await.map(|t| TxId::new(t.inner())).map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:83` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:84` [await_expr]: `self.inner.len().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:87` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/morph_index.rs:88` [await_expr]: `self.inner.stats().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:11` [async_fn]: `async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:14` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:25` [async_fn]: `async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:28` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:39` [async_fn]: `async fn insert(&self, tx: contextra_types::TxId, id: contextra_types::DocId, text: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:41` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:45` [async_fn]: `async fn delete(&self, tx: contextra_types::TxId, id: contextra_types::DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:47` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:51` [async_fn]: `async fn commit(&self, tx: contextra_types::TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:54` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:57` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:61` [async_fn]: `async fn rollback(&self, tx: contextra_types::TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:64` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:67` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:71` [async_fn]: `async fn rollback_to_tx(&self, tx_id: contextra_types::TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:73` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:77` [async_fn]: `async fn last_tx_id(&self) -> Result<contextra_types::TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:79` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:84` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:88` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/inverted_ports.rs:93` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:34` [block_on]: `futures::executor::block_on(f)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:134` [await_expr]: `let dl_bytes_res = block_on_async(async move { storage.get(&dl_key_c).await });`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:166` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &dl_key_c).await }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:180` [await_expr]: `let fw_bytes_res = block_on_async(async move { storage.get(&fw_key_c).await });`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:210` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &fw_key_c).await }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:224` [await_expr]: `let raw_prefix_res = block_on_async(async move { storage.scan_prefix(&prefix).await });`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:254` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &k_c).await }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:269` [await_expr]: `let plb_bytes_res = block_on_async(async move { storage.get(&plb_key_c).await });`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:311` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &plb_key_c).await })`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:332` [await_expr]: `async move { storage.put(tx, &plb_key_c, &encoded).await },`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:359` [await_expr]: `let _ = storage.delete(tx, &pl_doc_key).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:360` [await_expr]: `let _ = storage.delete(tx, &tbs_key).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:403` [await_expr]: `block_on_async(async move { storage.put(tx, &meta_key, &meta_bytes).await });`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:409` [await_expr]: `if let Err(e) = block_on_async(async move { storage.commit(tx).await }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:435` [await_expr]: `let raw_entries_res = block_on_async(async move { storage.scan_prefix(&prefix_c).await });`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:435` [lock_held_across_await_warning]: `Lock acquired at line 421 near await at line 435`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:454` [await_expr]: `if let Err(e) = block_on_async(async move { storage.delete(tx, &k).await }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/purge.rs:471` [await_expr]: `if let Err(e) = block_on_async(async move { storage.commit(tx).await }) {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:53` [async_fn]: `async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:54` [await_expr]: `self.index.search(query, k).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:62` [async_fn]: `async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:63` [await_expr]: `self.index.search_at(query, k, seq_no).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:72` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:73` [await_expr]: `self.index.insert(tx, id, text).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:78` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:79` [await_expr]: `self.index.delete(tx, id).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:84` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:85` [await_expr]: `self.index.commit(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:90` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:91` [await_expr]: `self.index.rollback(contextra_ids::TxId::new(tx.inner())).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:96` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:97` [await_expr]: `self.index.rollback_to_tx(contextra_ids::TxId::new(tx_id.inner())).await.map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:102` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:103` [await_expr]: `self.index.last_tx_id().await.map(|t| TxId::new(t.inner())).map_err(Into::into)`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:108` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:109` [await_expr]: `self.index.len().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:114` [async_fn]: `async fn stats(&self) -> Result<TextIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/scorer.rs:115` [await_expr]: `self.index.stats().await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:14` [await_expr]: `Box::pin(async move { self.0.get(key).await.map_err(crate::error::TextError::from) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:25` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:39` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:48` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:57` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:66` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:75` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:84` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:94` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:106` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:119` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:128` [await_expr]: `Box::pin(async move { self.get(key).await.map_err(crate::error::TextError::from) })`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:138` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:151` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:159` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:167` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:175` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:183` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:191` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:200` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:211` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-text/src/compat/storage.rs:223` [await_expr]: `.await`
+### `contextra-vector`
+
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:19` [tokio_import]: `#[tokio::main(flavor = "current_thread")]`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:20` [async_fn]: `async fn main() -> Result<(), Box<dyn std::error::Error>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:36` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:39` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:42` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:45` [await_expr]: `index.commit(tx).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/examples/standalone_vector.rs:49` [await_expr]: `let results = index.search(&query, 2).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:47` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:55` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:86` [await_expr]: `.await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:89` [await_expr]: `let _ = index.search(&query, k).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs:92` [await_expr]: `let _ = index.delete(TxId::new(tx_id), DocId::new(doc_id)).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:32` [tokio_import]: `let rt = match tokio::runtime::Builder::new_current_thread()`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:40` [block_on]: `rt.block_on(async {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:104` [await_expr]: `let _ = index.insert(tx, DocId::new((i + 1) as u64), vec).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:106` [await_expr]: `let _ = index.commit(tx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs:145` [await_expr]: `let _ = reloaded.search(&query, 5).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/hnsw_bridge.rs:31` [async_fn]: `pub(crate) async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/hnsw_bridge.rs:34` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/search.rs:226` [async_fn]: `pub async fn search_internal(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/search.rs:243` [await_expr]: `return hnsw.search(query, k).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/search.rs:243` [lock_held_across_await_warning]: `Lock acquired at line 241 near await at line 243`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/search.rs:256` [await_expr]: `return hnsw.search(query, k).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/search.rs:256` [lock_held_across_await_warning]: `Lock acquired at line 246 near await at line 256`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/search.rs:281` [await_expr]: `hnsw.search(query, k).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:26` [async_fn]: `pub async fn search_predicate_augmented(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:195` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:196` [async_fn]: `async fn test_gamma_zero_regression_reduction() -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:215` [await_expr]: `index.build(&vecs, &ids).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:220` [await_expr]: `let filtered_res = index.search_filtered(&query, 5, Some(&filter)).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:223` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:235` [tokio_import]: `#[tokio::test]`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:236` [async_fn]: `async fn test_low_selectivity_augmented_improves_recall() -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:255` [await_expr]: `index.build(&vecs, &ids).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:261` [await_expr]: `let filtered_res = index.search_filtered(&query, 5, Some(&filter)).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/predicate_augmented.rs:264` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/filtered.rs:22` [async_fn]: `pub(crate) async fn search_filtered_internal(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/filtered.rs:36` [await_expr]: `return self.search_internal(query, k).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/filtered.rs:43` [await_expr]: `let raw = self.search_internal(query, fetch_k).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:16` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:42` [async_fn]: `async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:221` [async_fn]: `async fn search_filtered(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:227` [await_expr]: `self.search_filtered_internal(query, k, filter, None).await.map(|v| v.into_iter().map(Into::into).collect()).map_err(Int`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:230` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:240` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:369` [async_fn]: `async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:377` [await_expr]: `.await`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:377` [lock_held_across_await_warning]: `Lock acquired at line 372 near await at line 377`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:382` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:393` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:461` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:465` [async_fn]: `async fn all_doc_ids(&self) -> Result<Vec<DocId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:498` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/hnsw_vector_index.rs:523` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:89` [async_fn]: `pub async fn next_batch(&mut self) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:91` [await_expr]: `self.refill().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:108` [async_fn]: `pub async fn next_doc(&mut self) -> Result<Option<DocId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:110` [await_expr]: `self.refill().await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:142` [async_fn]: `async fn refill(&mut self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:153` [await_expr]: `Some(seq) => self.index.search_at(&self.query, target_k, seq).await?,`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/candidate_stream.rs:154` [await_expr]: `None => self.index.search(&self.query, target_k).await?,`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:15` [async_fn]: `async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:18` [await_expr]: `return hnsw.insert(tx, id, embedding).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:18` [lock_held_across_await_warning]: `Lock acquired at line 16 near await at line 18`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:25` [await_expr]: `Self::append_to_pending_wal(&pending_wal, id, embedding).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:25` [lock_held_across_await_warning]: `Lock acquired at line 16 near await at line 25`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:36` [await_expr]: `let n_persisted = self.len().await as u64;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:36` [lock_held_across_await_warning]: `Lock acquired at line 28 near await at line 36`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:49` [async_fn]: `async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:50` [await_expr]: `self.search_internal(query, k).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:53` [async_fn]: `async fn search_filtered(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:59` [await_expr]: `self.search_filtered_internal(query, k, filter).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:63` [async_fn]: `async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:66` [await_expr]: `return hnsw.delete(tx, id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:66` [lock_held_across_await_warning]: `Lock acquired at line 64 near await at line 66`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:96` [await_expr]: `Self::append_to_tombstone_wal(&tombstone_wal, id).await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:101` [async_fn]: `async fn commit(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:104` [await_expr]: `return hnsw.commit(tx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:104` [lock_held_across_await_warning]: `Lock acquired at line 102 near await at line 104`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:109` [async_fn]: `async fn rollback(&self, tx: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:112` [await_expr]: `return hnsw.rollback(tx).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:112` [lock_held_across_await_warning]: `Lock acquired at line 110 near await at line 112`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:117` [async_fn]: `async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:120` [await_expr]: `return hnsw.rollback_to_tx(tx_id).await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:120` [lock_held_across_await_warning]: `Lock acquired at line 118 near await at line 120`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:126` [async_fn]: `async fn all_doc_ids(&self) -> Result<Vec<DocId>> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:129` [await_expr]: `return hnsw.all_doc_ids().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:129` [lock_held_across_await_warning]: `Lock acquired at line 127 near await at line 129`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:147` [async_fn]: `async fn last_tx_id(&self) -> Result<TxId> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:151` [async_fn]: `async fn len(&self) -> usize {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:154` [await_expr]: `return hnsw.len().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:154` [lock_held_across_await_warning]: `Lock acquired at line 152 near await at line 154`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:156` [await_expr]: `self.all_doc_ids().await.map(|ids| ids.len()).unwrap_or(0)`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:156` [lock_held_across_await_warning]: `Lock acquired at line 152 near await at line 156`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:159` [async_fn]: `async fn stats(&self) -> Result<VectorIndexStats> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:161` [await_expr]: `let count = self.len().await;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/compat/diskann_vector_index.rs:161` [lock_held_across_await_warning]: `Lock acquired at line 152 near await at line 161`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/persistence/mmap.rs:134` [async_fn]: `pub async fn open_async(path: impl AsRef<std::path::Path> + Send) -> Result<Self> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search/adaptive.rs:23` [async_fn]: `pub async fn search_adaptive(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search/adaptive.rs:29` [await_expr]: `self.search_adaptive_filtered(query, k, policy, None).await`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search/adaptive.rs:33` [async_fn]: `pub async fn search_adaptive_filtered(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search/adaptive.rs:42` [await_expr]: `.await?;`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search/adaptive.rs:48` [async_fn]: `pub async fn search_adaptive_with_stats(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search/filtered.rs:22` [async_fn]: `pub(crate) async fn search_filtered_internal(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/build/tombstone_wal.rs:84` [async_fn]: `pub(crate) async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/build/pending_wal.rs:59` [async_fn]: `pub(crate) async fn append_to_pending_wal(`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/build/mod.rs:102` [async_fn]: `pub async fn build(&self, vectors: &[Vec<f32>], ids: &[DocId]) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/persistence/loader.rs:51` [async_fn]: `pub async fn load(&self) -> Result<()> {`
+- `/home/freddy/Projekte/contextra/crates/contextra-vector/src/diskann/persistence/delta.rs:28` [async_fn]: `pub async fn persist_delta(&self) -> Result<()> {`

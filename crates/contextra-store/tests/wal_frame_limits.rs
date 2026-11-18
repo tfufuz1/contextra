@@ -1,6 +1,7 @@
 #![cfg(feature = "workspace")]
+use contextra_store::error::StoreError;
 use contextra_store::wal::{KeyManager, Wal, WalEntry, WalOp, MAX_WAL_ENTRY_SIZE};
-use contextra_types::{ContextraError, TxId};
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -207,7 +208,7 @@ async fn test_authenticated_data_parse_error_is_corruption_not_tail() {
     };
 
     assert!(
-        matches!(err, ContextraError::WalCorruption { .. }),
+        matches!(err, StoreError::WalCorruption { .. }),
         "Authenticated data parse error MUST return WalCorruption, got: {:?}",
         err
     );

@@ -103,8 +103,4 @@ pub mod policy {
     pub use super::{PromptInjectionConfig, QuarantinePolicy, DEFAULT_REDACTION_PLACEHOLDER};
 }
 
-pub use audit::*;
-pub use clock::*;
-pub use error::*;
-pub use guard::*;
-pub use policy::*;
+pub use guard::NormalizedPattern;

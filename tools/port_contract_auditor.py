@@ -21,7 +21,7 @@ DATA_HOLDER_CRATES = {
     "contextra-vector",
     "contextra-text",
     "contextra-graph",
-    "contextra-kvcache",
+    
     "contextra-checkpoint",
 }
 
@@ -34,6 +34,7 @@ FORBIDDEN_DOMAIN_IN_HOLDERS = [
 ]
 
 PORT_TRAITS = [
+    "ErasureLayer", "ReadGate", "CommitBarrier", "PurgeBarrier", "SnapshotRevoker",
     "Vfs", "Clock", "Rng", "IdGen", "MetricsSink",
     "StorageEngine", "TextIndex", "VectorIndex",
     "Purger", "LayerScanner", "DynSafePurger", "DynSafeLayerScanner"

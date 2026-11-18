@@ -14,13 +14,12 @@
 //!
 //! Verifiziert die strikte Trennung von Checkpoints über verschiedene Mandanten-Namespaces hinweg.
 
-use contextra_checkpoint::SnapshotPinner;
 use contextra_checkpoint::{
-    CheckpointHardlinkCloner, DefaultHardlinkCloner, PersistentCheckpointStore, PinnedSeqNoOrphan,
-    StateCheckpoint,
+    CheckpointError, CheckpointHardlinkCloner, CheckpointResult as Result, DefaultHardlinkCloner,
+    LocalBoxFuture as BoxFuture, PersistentCheckpointStore, PinnedSeqNoOrphan, SnapshotPinner,
+    SnapshotSource, StateCheckpoint,
 };
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_ids::TxId;
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -63,7 +62,7 @@ impl FaultMockStorage {
     }
 }
 
-impl StorageEngine for FaultMockStorage {
+impl SnapshotSource for FaultMockStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
     }
@@ -71,7 +70,7 @@ impl StorageEngine for FaultMockStorage {
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if *self.fail_put.lock() {
-                return Err(ContextraError::Internal("Simulated Put Failure".into()));
+                return Err(CheckpointError::Internal("Simulated Put Failure".into()));
             }
             self.data.lock().insert(key.to_vec(), value.to_vec());
             let mut last = self.last_tx.lock();
@@ -96,7 +95,7 @@ impl StorageEngine for FaultMockStorage {
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if *self.fail_commit.lock() {
-                return Err(ContextraError::Internal("Simulated Commit Failure".into()));
+                return Err(CheckpointError::Internal("Simulated Commit Failure".into()));
             }
             let mut last = self.last_tx.lock();
             if tx_id > *last {
@@ -121,20 +120,10 @@ impl StorageEngine for FaultMockStorage {
         Box::pin(async move { Ok(()) })
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        Box::pin(async move {
-            Ok(StorageStats {
-                num_segments: 0,
-                total_size_bytes: 0,
-                memtable_size_bytes: 0,
-            })
-        })
-    }
-
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if *self.fail_pin.lock() {
-                return Err(ContextraError::Internal("Simulated Pin Failure".into()));
+                return Err(CheckpointError::Internal("Simulated Pin Failure".into()));
             }
             self.pinned.lock().insert(seq_no);
             Ok(())
@@ -148,29 +137,12 @@ impl StorageEngine for FaultMockStorage {
         })
     }
 
-    fn get_at_seq<'a>(
-        &'a self,
-        key: &'a [u8],
-        _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { self.get(key).await })
-    }
-
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { Ok(0) })
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { Ok(*self.last_tx.lock()) })
-    }
-
-    fn scan<'a>(
-        &'a self,
-        _s: std::ops::Bound<&'a [u8]>,
-        _e: std::ops::Bound<&'a [u8]>,
-        _: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { Ok(Vec::new()) })
     }
 
     fn scan_prefix<'a>(
@@ -186,6 +158,7 @@ impl StorageEngine for FaultMockStorage {
                 .collect())
         })
     }
+}
 }
 
 // ============================================================================

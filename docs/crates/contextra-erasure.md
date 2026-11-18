@@ -1,157 +1,501 @@
-# contextra-erasure — Crate-Spezifikation (DSGVO-Löschkern & Saga-Orchestrator)
+# contextra-erasure — Implementierungsspezifikation (Soll-Zustand)
 
-**Ebene:** E0 (Autarkes Fundament — Kern-Closure leer)  
-**Status:** Normativ  
-**Version:** 1.0  
+**Ebene:** E0 (Autarkes Fundament / Ring 0 — Löschkern)  
+**Kern-Closure:** `ids`, `env`, `durable-fs`, `privacy` (autarke Fundamente gemäß SPEC §2.1)  
+**Status:** Normativ (Soll-Zustand für Entwickler)  
+**Version:** 2.0  
 **Geltungsbereich:** `crates/contextra-erasure`  
-**Referenz:** `docs/SPEC.md` §4, §5, §6, §7, §10, §11, §12
+**Referenzdokumente:** `docs/SPEC.md` §3, §4, §5, §6, §7, §10, §11, §12, §13; `ANALYSIS-E0-CONTRADICTIONS.md` (D-01, D-05, D-07); `ALTLASTEN-AUDIT.md`  
 
 ---
 
-## 1. Zweck & Systemrolle
+## 1. Zweck & Architekturgarantien
 
-`contextra-erasure` ist der zentrale Löschkern von Contextra. Es implementiert die rechtskonforme, nachweisbare und unumkehrbare Löschung personenbezogener Daten (Art. 17 DSGVO) sowie Einschränkungen der Verarbeitung (Art. 18 DSGVO):
-- **Crypto-Shredding & Vault:** Verwaltung der Schlüsselhierarchie (MasterKey, TenantKEK, CollectionKEK, DocumentDEK, SubjectKey). Durch Vernichtung des Schlüssels werden Chiffretexte in $O(1)$ unlesbar.
-- **6-Schritte-Löschsaga:** Transaktionale, idempotente und crash-sichere Orchestrierung der Löschphasen mit genau 4 synchronen Fsync-Ankerpunkten bis zur Unlesbarkeit.
-- **ReadGate-Verwaltung:** Bereitstellung des synchronen $O(1)$ In-Memory `ReadGate` für alle Lesepfade (Fail-Closed).
-- **Physische Bereinigung:** Steuerung des asynchronen Purge-Fensters über alle Speicherschichten (`ErasureLayer`).
-- **Beweisbare Messung & Bericht:** Positivkontrolle (Canary-Scan), Ed25519-signierter Löschbericht und kryptographisch verkettetes Ledger außerhalb des Datenverzeichnisses.
+`contextra-erasure` ist der zentrale, formale **Lösch- und Quarantänekern** von Contextra (Art. 17 & Art. 18 DSGVO). Es garantiert die rechtskonforme, kryptographisch unwiderrufliche und messbare Löschung personenbezogener Daten:
+- **Zustandsmaschine der 6-Schritte-Löschsaga:** Idempotente, wiederholbare Orchestrierung mit 4 Pflicht-Fsync-Ankern.
+- **In-Memory $O(1)$ ReadGate (`SagaGate`):** Synchrone, latenzfreie Lesesperre auf dem Hot-Path vor jeder Entschlüsselung (Fail-Closed).
+- **Key-Revocation & Crypto-Shredding:** Atomare Vernichtung von Schlüsselslots im Vault; Verifikation der Unlesbarkeit.
+- **Messung mit Positivkontrolle:** Typestate-gestützter Nachweis (`Scanner<Armed>`), dass keine Datenrückstände verbleiben (`residue_matches == 0`).
+- **Beweisführung & Audit:** Ed25519-signierter Löschbericht und kryptographisch hash-verkettetes Ledger außerhalb des Datenverzeichnisses.
 
----
+### Beseitigung von Ebenen- und Typkonflikten (D-01, D-05, D-07)
+1. **E0-Fundament-Status:** `contextra-erasure` ist als E0-Fundament definiert (`package.metadata.contextra.ring = "0"`).
+2. **Eliminierung von `types_local.rs`:** Alle Typ-Dubletten werden entfernt. `ErasureId`, `GateId`, `DocId`, `SubjectRef`, `PersonalRef`, `TenantId`, `CollectionId`, `Seq` und `Timestamp` stammen kanonisch aus `contextra-ids`.
+3. **Kanonischer SagaState (D-07):** Vereinheitlichung auf `KeyRevoked` (SPEC-normativ) anstelle des historischen `KeyDestroyed`.
+4. **Keine Krypto-Dubletten:** Die Krypto-Engines für AEAD gehören nach `contextra-crypto` (E1). In `contextra-erasure` verbleiben nur Vault-Slot-Management und optional Ed25519-Signierung.
 
-## 2. Architektur & Seams (Nähte)
-
-`contextra-erasure` hängt von keinen konkreten Speicher- oder Index-Crates ab (Ring-Isolation E0). Es steuert alle Subsysteme über asynchrone Port-Traits (Seams):
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      contextra-erasure                      │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                     ErasureCore                     │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ SagaJournal (WAL)  │    │ SagaGate          │   │   │
-│   │   │ (fsync #1, #2, #4) │    │ (O(1) ReadGate)   │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ SagaVault          │    │ SagaMeasure       │   │   │
-│   │   │ (fsync #3 Key Zero)│    │ (Scanner / Armed) │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ SagaReport         │    │ SagaLedger        │   │   │
-│   │   │ (Ed25519 Signer)   │    │ (Chained Log)     │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌─────────────────────────────────────────────┐   │   │
-│   │   │ ErasureLayer-Registry (Store, Vec, Txt, ...)│   │   │
-│   │   └─────────────────────────────────────────────┘   │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+### Architekturgarantien (R1–R6, INV-9, INV-10, INV-11, INV-12)
+1. **`#![forbid(unsafe_code)]`:** Vollständig speichersicher.
+2. **Zero-Panic-Policy:** Keine Panics; alle Fehlerpfade nutzen `ErasureError`.
+3. **Leere Default-Features (R3):** `default = []`.
+4. **INV-9 (Terminale Zustände):** `Completed`, `Refused` und `Lifted` sind endgültig.
+5. **INV-10 (Gate-Irreversibilität):** Ein einmal gesetztes `ReadGate` wird im regulären Betrieb niemals zurückgenommen.
+6. **INV-11 (Zeroize):** Schlüsselspeicher werden vor dem Drop mit `0x00` überschrieben.
+7. **INV-12 (PII-Freiheit):** Logs, Traces, Receipts und signierte Berichte enthalten niemals Klartext-PII oder Inhalte des Löschziels.
 
 ---
 
-## 3. Zustandsautomat der Löschsaga
+## 2. Architektur & Subsysteme
 
 ```
-Requested ──► Gated ──► KeyRevoked ──► Purging ──► Verifying ──► Completed
-    │            │           │             │            │
-    │            └───────────┴─────────────┴────────────┴──► Pending(reason) [wiederholbar]
-    ├──► Restricted ──► Lifted  (Art. 18 DSGVO)
-    │        └──► Gated        (Einschränkung → Löschung)
-    └──► Refused               (terminal, Retention-Pflicht aktiv)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              contextra-erasure                              │
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                             SagaMachine                             │   │
+│   │              (Zustandsautomat & Idempotenzsteuerung)                │   │
+│   └───────────────┬─────────────────┬─────────────────┬─────────────────┘   │
+│                   │                 │                 │                     │
+│         ┌─────────┴───────┐ ┌───────┴───────┐ ┌───────┴─────────┐           │
+│         ▼                 ▼ ▼               ▼ ▼                 ▼           │
+│   ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐       │
+│   │ SagaGate  │     │SagaJournal│     │ SagaVault │     │SagaMeasure│       │
+│   │   (O(1)   │     │ (WAL der  │     │(Shredding,│     │ (Scanner, │       │
+│   │ ReadGate) │     │  Saga)    │     │ Zeroize)  │     │   Armed)  │       │
+│   └───────────┘     └───────────┘     └───────────┘     └───────────┘       │
+│                           │                                 │               │
+│                           ▼                                 ▼               │
+│                     ┌───────────┐                     ┌───────────┐         │
+│                     │SagaLedger │                     │SagaReport │         │
+│                     │(Chained   │                     │ (Ed25519  │         │
+│                     │ Log ext.) │                     │  Signer)  │         │
+│                     └───────────┘                     └───────────┘         │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
-
-### 3.1 Zustandsinvarianten
-- `Completed`, `Refused` und `Lifted` sind **terminale Zustände**. Kein weiterer Übergang ist erlaubt.
-- `Pending` ist nicht-terminal; Recovery erfolgt automatisch durch den Hintergrundläufer `run_purge_window`.
-- Identischer Übergang ($A \to A$) ist für jeden Zustand erlaubt (vollständige Idempotenz, ER-18).
-- Sobald `Gated` erreicht ist, liefert das `ReadGate` für betroffene Schlüssel zwingend `GateDecision::Erased`.
 
 ---
 
-## 4. Die 6 Phasen im Detail (Fsync-Disziplin)
+## 3. Zustandsautomat & Kanonische Typen
 
-### Phase 1: Validierung, Resolve & Intent-Journal (fsync #1)
-1. **Aufbewahrungsprüfung:** `RetentionAttestation` prüfen. Liegt eine aktive gesetzliche Pflicht vor (`ObligationActive`), schlägt die Löschung mit `SagaState::Refused` fehl.
-2. **Duplikaterkennung:** HMAC über Target-Bytes. Falls dieselbe Löschung bereits aktiv ist, wird das bestehende Receipt zurückgegeben.
-3. **Resolve:** Für jeden registrierten `ErasureLayer` wird `layer.resolve(&target)` aufgerufen $\to$ `LayerScope`.
-4. **Journal-Intent:** Durabler Append-Eintrag im Journal via `contextra-durable-fs` (**fsync #1**).
+### 3.1 `SagaState` (SPEC §5.2, D-07)
 
-### Phase 2: Lesesperre setzen (fsync #2)
-1. Exklusives Halten der `CommitBarrier::exclusive()` $\to$ blockiert alle nebenläufigen Schreiber.
-2. `SagaGate::add_gate(erasure_id, target)` eintrag $\to$ liefert `gated_seq`.
-3. In-Memory `ReadGate` schaltet auf `Erased`.
-4. Zustandsübergang zu `Gated` im Journal persistieren (**fsync #2**).
-5. `CommitBarrier` freigeben. Ab diesem Zeitpunkt kann kein Schreiber mehr Daten für das Ziel committen.
+```rust
+use serde::{Deserialize, Serialize};
 
-### Phase 3: Layer on_gate & Schlüsselvernichtung (fsync #3)
-1. Für alle Layer: `layer.on_gate(&scope)` ausführen (z.B. Vektor-Ausschlussmaske in-memory setzen).
-2. **Schlüsselvernichtung im Tresor (`SagaVault`):**
-   - Höchsten Schlüsselslot ermitteln (Tenant, Collection, Subject oder Document).
-   - Slot mit kryptographischen Zufallsbytes aus dem OS CSPRNG überschreiben.
-   - Slot mit `0x00` nullen (`zeroize`).
-   - `fsync` auf die Keyring-Datei (**fsync #3**).
-3. `verify_key_absent(&target)`: Lesende Gegenprüfung via Constant-Time-Vergleich. Ergibt der Slot nicht Null $\to$ Abbruch mit Fehler.
+/// Die normativen Zustände eines Löschvorgangs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SagaState {
+    /// 1. Löschauftrag erfasst und im Journal fixiert (fsync #1).
+    Requested,
 
-### Phase 4: Journal KeyRevoked & Receipt-Rückgabe (fsync #4)
-1. Zustandsübergang zu `KeyRevoked` im Journal persistieren (**fsync #4**).
-2. Observer-Event `ObservedPhase::KeyRevoked` feuern.
-3. **Return `EraseReceipt { status: KeyRevoked, ... }` an den Aufrufer.**
-   - Der Aufrufer ist aus dem synchronen Pfad entlassen.
-   - Die Daten sind ab hier unwiderruflich und kryptographisch unlesbar.
-   - Cancel-Safety ist gewährleistet (Droppen des Aufrufer-Futures ändert nichts).
+    /// 2. ReadGate aktiv: Alle Lesepfade liefern Fail-Closed `Erased` (fsync #2).
+    Gated,
+
+    /// 3. Schlüsselslot genullt und kryptographisch verifiziert (fsync #3).
+    ///    Ab hier ist das Datum unlesbar. Aufrufer erhält EraseReceipt.
+    KeyRevoked,
+
+    /// 4. Asynchrone physische Bereinigung der Schichten (Purge) läuft.
+    Purging,
+
+    /// 5. Residuen-Scan mit Positivkontrolle (Scanner<Armed>) läuft.
+    Verifying,
+
+    /// 6. Erfolgreich abgeschlossen, Bericht signiert, Ledger geschrieben (terminal).
+    Completed,
+
+    /// Zugriffsbeschränkung aktiv (Art. 18 DSGVO, D-116).
+    Restricted,
+
+    /// Zugriffsbeschränkung aufgehoben (terminal).
+    Lifted,
+
+    /// Wiederholbare Verzögerung mit Grund (z. B. I/O-Stau, Plattenreserve).
+    Pending(PendingReason),
+
+    /// Verweigert wegen aktiver gesetzlicher Aufbewahrungspflicht (terminal).
+    Refused,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PendingReason {
+    DiskReserveLow,
+    CompactionRunning,
+    IoBackoff,
+}
+
+impl SagaState {
+    /// Gibt an, ob der Zustand endgültig ist (INV-9).
+    #[inline]
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Completed | Self::Refused | Self::Lifted)
+    }
+
+    /// Prüft, ob ab diesem Zustand Lesezugriffe blockiert sind.
+    #[inline]
+    pub fn blocks_reads(&self) -> bool {
+        matches!(
+            self,
+            Self::Gated
+                | Self::KeyRevoked
+                | Self::Purging
+                | Self::Verifying
+                | Self::Completed
+                | Self::Pending(_)
+        )
+    }
+}
+```
+
+---
+
+### 3.2 Löschziel (`EraseTarget`)
+
+Kanonische Repräsentation der fachlichen und physischen Löschziele:
+
+```rust
+use contextra_ids::{CollectionId, DocId, SubjectRef, TenantId};
+
+/// Fachliches Ziel eines Löschauftrags (SPEC §5.1).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum EraseTarget {
+    /// Einzelnes Dokument (Klasse K).
+    Document {
+        tenant: TenantId,
+        collection: CollectionId,
+        doc_id: DocId,
+    },
+    /// Betroffene Person über alle Dokumente und Collections (Klasse P, atomar O(1)).
+    Subject {
+        tenant: TenantId,
+        subject: SubjectRef,
+    },
+    /// Vollständige Collection (Klasse K).
+    Collection {
+        tenant: TenantId,
+        collection: CollectionId,
+    },
+    /// Vollständiger Mandant (Offboarding).
+    Tenant {
+        tenant: TenantId,
+    },
+}
+```
+
+---
+
+### 3.3 Aufbewahrungs-Attestierung (`RetentionAttestation`)
+
+```rust
+use contextra_ids::{OperatorRef, Timestamp};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct RetentionAttestation {
+    pub code: RetentionCode,
+    pub attested_by: OperatorRef,
+    pub attested_at: Timestamp,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum RetentionCode {
+    /// Keine Pflicht bekannt.
+    NoObligation,
+    /// Pflicht bestand und ist abgelaufen.
+    ObligationExpired,
+    /// Betreiber-Direktive / behördliche Anordnung.
+    OperatorOverride,
+    /// Gesetzliche Aufbewahrungspflicht aktiv -> Löschung MUSS mit Refused enden.
+    ObligationActive,
+    /// Rechtsstreit anhängig.
+    LegalClaimsPending,
+    /// Betroffene Person verlangt Einschränkung (Art. 18 DSGVO).
+    DataSubjectRequestedRestriction,
+}
+
+impl RetentionCode {
+    #[inline]
+    pub fn blocks_erasure(&self) -> bool {
+        matches!(self, Self::ObligationActive | Self::LegalClaimsPending)
+    }
+}
+```
+
+---
+
+## 4. Die 4 Fsync-Ankerpunkte & Phasenablauf
+
+Jede Phase ist idempotent und crash-resistent. Der Zustand wird im `SagaJournal` gesichert.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Die 6 Phasen der Saga                             │
+│                                                                             │
+│  Phase 1: Validierung ──► fsync #1 (Intent im Journal)                      │
+│                               │                                             │
+│  Phase 2: Barrier & Gate ─► fsync #2 (Gated im Journal & ReadGate aktiv)    │
+│                               │                                             │
+│  Phase 3: Key Shredding ──► fsync #3 (KeySlot im Vault genullt)             │
+│                               │                                             │
+│  Phase 4: Receipt ────────► Return EraseReceipt (Aufrufer entlassen)        │
+│                               │                                             │
+│  Phase 5: Asynchroner Purge► Schichtenweiser Purge (PurgeBarrier)           │
+│                               │                                             │
+│  Phase 6: Verifikation ───► fsync #4 (Abschluss, Ledger ext., Completed)    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase 1: Intent & Aufbewahrungsprüfung (fsync #1)
+1. `retention.code.blocks_erasure()` prüfen. Bei aktiver Pflicht -> Übergang zu `SagaState::Refused` (terminal) und sofortiger Abbruch.
+2. Duplikaterkennung via HMAC über das Target. Bei laufender Saga -> bestehendes Receipt idempotent zurückgeben.
+3. Journal-Eintrag schreiben und mit `sync_data()` durabel auf Disk sichern (**fsync #1**).
+
+### Phase 2: Exklusive Lesesperre (fsync #2)
+1. Exklusiver Lock auf die `CommitBarrier` -> Schreiber werden blockiert.
+2. In-Memory `SagaGate` aktivieren: Alle Leseabfragen auf den Schlüsselraum liefern ab sofort `GateDecision::Erased`.
+3. Zustandsübergang `SagaState::Gated` im Journal schreiben und synchronisieren (**fsync #2**).
+4. `CommitBarrier` freigeben.
+
+### Phase 3: Schlüsselvernichtung (fsync #3)
+1. Schlüssel im Tresor lokalisieren (DEK, SubjectKey, CollectionKEK oder TenantKEK).
+2. Slot im Tresor mit kryptographischen Zufallsbytes überschreiben.
+3. Slot mit `0x00` nullen (`zeroize`).
+4. `fsync` auf die Keyring-Datei (**fsync #3**).
+5. `verify_key_absent`: Lesende Gegenprüfung via Constant-Time-Vergleich. Slot muss vollständig `0x00` sein.
+
+### Phase 4: Quittungsausstellung
+1. Journal-Eintrag `SagaState::KeyRevoked` schreiben.
+2. Aufrufer erhält `EraseReceipt { id, status: KeyRevoked, gated_at }`.
+3. Der synchrone Request-Pfad ist beendet. Die Daten sind kryptographisch unlesbar.
 
 ### Phase 5: Asynchrones Purge-Fenster
-Wird vom Hintergrundläufer `run_purge_window` unter exklusivem Halt der `PurgeBarrier` ausgeführt:
-1. `check_disk_reserve`: Sicherstellen, dass min. 1GB Plattenreserve frei ist.
-2. Status im Journal auf `Purging` setzen.
-3. Schichtenweise Bereinigung in normativer Reihenfolge:
-   - a) Snapshot-Widerruf (`contextra-mvcc`)
-   - b) Text-Segment-Rewrite (`contextra-text`)
-   - c) WAL-Drain & Memtable-Flush (`contextra-store`)
-   - d) SSTable-Rewrite / Kompaktion (`contextra-store`)
-   - e) HNSW-Graph-Reparatur (`contextra-vector`)
-   - f) Graph-Bereinigung (`contextra-graph`)
-   - g) Slot-Bereinigung (`contextra-crypto`)
-   - h) In-Memory Cache-Invalidierung (alle Schichten)
+Wird durch den Hintergrund-Runner unter der `PurgeBarrier` ausgeführt:
+1. `check_disk_reserve`: Sicherstellen von mindestens 1 GB Plattenreserve.
+2. Purge-Aufruf über alle Schichten in normativer Reihenfolge:
+   - a) Snapshot-Widerruf (`mvcc`)
+   - b) Inverted Index Rewrite (`text`)
+   - c) WAL-Drain & Memtable Flush (`store`)
+   - d) SSTable Compaction Rewrite (`store`)
+   - e) HNSW-Graph Reparatur (`vector`)
+   - f) GraphRAG-Bereinigung (`graph`)
+   - g) Key-Slot physisch freigeben (`crypto`)
+   - h) In-Memory Cache Invalidation (alle Schichten)
 
-### Phase 6: Messung, Bericht & Ledger
-1. Status im Journal auf `Verifying` setzen.
-2. **Positivkontrolle & Residuen-Scan:** Für jede Schicht `layer.witness(&scope, &scanner)` aufrufen.
-   - Scanner MUSS Positivkontrolle bestanden haben (`Scanner<Armed>`).
-   - Jeder Layer MUSS `residue_matches == 0` melden.
-3. **Bericht signieren:** Ed25519-Signatur über den kanonischen JSON-Löschbericht generieren (keine PII-Klartexte im Bericht!).
-4. **Ledger schreiben:** Hash-verketteter Eintrag im Ledger außerhalb des Datenverzeichnisses persistieren (`prev_hash || entry`).
-5. Status im Journal auf `Completed` setzen (terminal).
-6. Gate-Eintrag kompaktieren. Observer-Event `Completed` auslösen.
+### Phase 6: Messung, Ledger & Abschluss (fsync #4)
+1. Für jede Schicht `Scanner<Armed>` ausführen. Jeder Layer muss `residue_matches == 0` melden.
+2. Ed25519-signierten JSON-Löschbericht generieren.
+3. Hash-verketteten Eintrag im Ledger **außerhalb des Datenverzeichnisses** schreiben und synchronisieren (**fsync #4**).
+4. Journal-Zustand auf `SagaState::Completed` setzen (terminal).
+5. Gate-Eintrag kompaktieren.
 
 ---
 
-## 5. Behebung aller historischen Befunde (Normativ)
+## 5. Lesesperre (`SagaGate` & `ReadGate`)
 
-| Befund-ID | Historischer Mangel | Normative Festlegung in contextra-erasure |
-|---|---|---|
-| **E-F01** | Fallback-Schlüssel nach Löschung (`resolve_dek`) | **Verboten.** Fehlt ein Slot, MUSS `Err(ErasureError::SlotMissing)` geworfen werden. Keine BLAKE3-Ableitung. |
-| **E-F02** | `seal` nutzte XOR-Maske statt echter AEAD | **Behoben.** Strikte Verwendung von AES-256-GCM-SIV aus `contextra-crypto`. |
-| **E-F03** | Deterministische Nonces aus Schlüsseln | **Behoben.** 96-Bit Nonce zwingend zufällig aus fehlbarem OS CSPRNG. |
-| **E-F04** | Stille Fallbacks bei HKDF-Fehlern | **Beseitigt.** Jeder KDF-Fehler führt zum sofortigen Abbruch (`Err`). |
-| **E-F05** | Zufallsgenerator panikte bei Entropiemangel | **Behoben.** Nutzung von `rand::rngs::OsRng::try_fill_bytes` mit Fehlerbehandlung. |
-| **E-F06** | Null-Schlüssel `[0; 32]` als Test-Standard | **Verboten.** Test-Vaults nutzen zufällige Einweg-Schlüssel. |
-| **E-F07** | Schlüssel implementierten `Clone` | **Entfernt.** Schlüssel besitzen weder `Clone` noch `Debug`; `ZeroizeOnDrop` aktiv. |
-| **E-F08** | Master-KEK nur flüchtig im RAM | **Behoben.** Master-Schlüssel wird aus Passphrase + Salt via Argon2id persistierbar abgeleitet. |
-| **E-F11** | Typ-Dubletten zwischen ports und erasure | **Bereinigt.** Kanonische Typen stammen ausschließlich aus `contextra-ports`. |
-| **E-F15** | Gate nutzte linearen/log-Scan | **Behoben.** $O(1)$ In-Memory Lookup via atomarer Hash-Map / BitSet. |
-| **E-F16** | Positivkontrolle fälschbar | **Gehärtet.** Typestate `Scanner<Armed>` besitzt privaten Konstruktor, nur nach echtem Canary-Fund erzeugbar. |
+Der Hot-Path-Check ist synchron, nicht-blockierend und $O(1)$:
+
+```rust
+/// Entscheidung des synchronen Gate-Checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateDecision {
+    /// Datum ist freigegeben.
+    Open,
+    /// Datum ist gelöscht / gesperrt (Fail-Closed).
+    Erased,
+    /// Datum ist nach Art. 18 DSGVO eingeschränkt (Audit-Eintrag zwingend erforderlich).
+    Restricted,
+}
+
+/// Bereichsentscheidung für SSTable-Kompaktionen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeGate {
+    AllOpen,
+    ContainsErased,
+    RestrictedNeverDiscard,
+}
+
+pub trait ReadGate: Send + Sync {
+    /// Synchroner O(1) Check auf Dokument- oder Key-Ebene vor jeder Entschlüsselung.
+    fn check(&self, key: &[u8]) -> GateDecision;
+
+    /// Bereichsprüfung für LSM-Kompaktionen.
+    fn check_range(&self, start: &[u8], end: &[u8]) -> RangeGate;
+}
+```
 
 ---
 
-## 6. Invarianten
+## 6. Messung & Positivkontrolle (`Scanner<Armed>`)
 
-1. **`#![forbid(unsafe_code)]`:** Vollständig sicher.
-2. **Ring-Isolation:** Keine Importe von konkreten Speicher-Crates (`store`, `vector`, `text`, `graph`, `db`).
-3. **Fail-Closed:** Bei jedem unklaren Zustand schlägt der Lesezugriff fehl (`Erased`).
-4. **Idempotenz:** Jeder Schritt der Saga kann beliebig oft wiederholt werden, ohne Zustand zu beschädigen.
+Um sicherzustellen, dass Scanner nicht fälschlich 0 Rückstände melden, erzwingt das Typsystem eine vorherige erfolgreiche Positivkontrolle:
+
+```rust
+use std::time::Duration;
+
+pub struct Unarmed;
+pub struct Armed(());
+
+/// Nachweis über erfolgreich gefundene Positivkontrolle (Canary).
+pub struct ControlEvidence(());
+
+impl ControlEvidence {
+    #[inline]
+    pub const fn observed() -> Self {
+        Self(())
+    }
+}
+
+pub struct Scanner<State> {
+    layer_id: &'static str,
+    files_scanned: u64,
+    bytes_scanned: u64,
+    _state: State,
+}
+
+impl Scanner<Unarmed> {
+    pub fn new(layer_id: &'static str) -> Self {
+        Self {
+            layer_id,
+            files_scanned: 0,
+            bytes_scanned: 0,
+            _state: Unarmed,
+        }
+    }
+
+    /// Schärft den Scanner nach belegter Positivkontrolle.
+    pub fn arm(self, _evidence: ControlEvidence) -> Scanner<Armed> {
+        Scanner {
+            layer_id: self.layer_id,
+            files_scanned: self.files_scanned,
+            bytes_scanned: self.bytes_scanned,
+            _state: Armed(()),
+        }
+    }
+}
+
+impl Scanner<Armed> {
+    pub fn record_file(&mut self, bytes: u64) {
+        self.files_scanned += 1;
+        self.bytes_scanned += bytes;
+    }
+
+    /// Schließt die Schicht-Messung ab.
+    /// matches != 0 führt zwingend zu Err(ResidueFound).
+    pub fn finish(
+        self,
+        residue_matches: u64,
+        scan_duration: Duration,
+    ) -> Result<LayerWitness, ResidueFound> {
+        if residue_matches != 0 {
+            return Err(ResidueFound { matches: residue_matches });
+        }
+        Ok(LayerWitness {
+            layer_id: self.layer_id,
+            files_scanned: self.files_scanned,
+            bytes_scanned: self.bytes_scanned,
+            residue_matches: 0,
+            scan_duration,
+        })
+    }
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("Residue detected during verification: {matches} matches found")]
+pub struct ResidueFound {
+    pub matches: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LayerWitness {
+    pub layer_id: &'static str,
+    pub files_scanned: u64,
+    pub bytes_scanned: u64,
+    pub residue_matches: u64,
+    pub scan_duration: Duration,
+}
+```
+
+---
+
+## 7. Fehlerbehandlung (`ErasureError`)
+
+```rust
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
+pub enum ErasureError {
+    #[error("Retention obligation active: erasure refused")]
+    RetentionRefused(RetentionCode),
+
+    #[error("Key slot missing in vault for target")]
+    SlotMissing,
+
+    #[error("Cryptographic key shredding failed: verification not zeroed")]
+    ShredVerificationFailed,
+
+    #[error("Disk reserve below threshold ({available} bytes < {required} bytes)")]
+    DiskReserveExhausted { available: u64, required: u64 },
+
+    #[error("Residue matches detected in layer {layer}: {matches}")]
+    ResidueDetected { layer: &'static str, matches: u64 },
+
+    #[error("Saga journal I/O failure: {0}")]
+    JournalIo(#[from] std::io::Error),
+
+    #[error("Durable filesystem failure: {0}")]
+    DurableFs(String),
+}
+```
+
+---
+
+## 8. `Cargo.toml` Spezifikation
+
+```toml
+[package]
+name = "contextra-erasure"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Canonical GDPR deletion core, Saga state machine, ReadGate, and verifiable crypto-shredding for Contextra"
+
+[package.metadata.contextra]
+ring = "0"
+group = "foundation"
+level = 0
+
+[lints]
+workspace = true
+
+[features]
+default = []
+std = ["contextra-ids/std", "contextra-env/std"]
+signing = ["dep:ed25519-dalek"]
+
+[dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-durable-fs = { workspace = true }
+contextra-privacy = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
+ed25519-dalek = { version = "2", optional = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+```
+
+---
+
+## 9. Implementierungs-Arbeitspakete für Entwickler
+
+1. **`Cargo.toml` Bereinigung:**
+   - `ring = "0"` eintragen (E0-Status herstellen).
+   - `types_local.rs` auflösen: Abhängigkeiten zu `contextra-ids`, `contextra-env`, `contextra-durable-fs`, `contextra-privacy` etablieren.
+   - `aes-gcm-siv`, `sha2`, `hmac` aus Dependencies entfernen (gehören nach `contextra-crypto`).
+   - Default-Features leeren (`default = []`, R3).
+2. **Kanonisierung `SagaState`:**
+   - `KeyDestroyed` in allen Dateien zu `KeyRevoked` umbenennen (D-07).
+   - Invariante INV-9 für terminale Zustände prüfen.
+3. **`SagaGate` In-Memory Lookup:**
+   - Sicherstellen, dass `ReadGate::check()` O(1) ohne Lock-Contention oder I/O ausführt.
+4. **Scanner-Härtung:**
+   - Privater Konstruktor für `ControlEvidence`, sodass `Scanner<Armed>` nur nach nachweislichem Canary-Fund instanziiert werden kann.
+5. **Altlasten-Bereinigung (`ALTLASTEN-AUDIT.md`):**
+   - Entfernen aller Bezüge auf gelöschte Crates in Tests und Modulen.
+6. **Verifikation:**
+   - `cargo test -p contextra-erasure`

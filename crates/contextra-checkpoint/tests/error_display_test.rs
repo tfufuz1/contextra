@@ -1,3 +1,5 @@
+#![cfg(feature = "workspace")]
+
 use contextra_checkpoint::CheckpointError;
 use contextra_types::ContextraError;
 

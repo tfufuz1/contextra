@@ -2,7 +2,7 @@
 """
 tools/baseline/run_baseline.py
 
-Reproducible Baseline Runner for Contextra Workspace (35 members).
+Reproducible Baseline Runner for Contextra Workspace (23 members).
 Produces uncut raw logs, json summaries, root cause attribution for compiler/clippy errors,
 and test execution metrics with timeout tracking.
 
@@ -689,7 +689,7 @@ def run_self_tests():
                 {
                     "file_name": "/app/crates/contextra-types/src/types/domain/document.rs",
                     "line_start": 143,
-                    "column_start": 35,
+                    "column_start": 23,
                     "is_primary": True,
                 }
             ],

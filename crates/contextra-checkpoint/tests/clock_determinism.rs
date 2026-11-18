@@ -13,9 +13,10 @@
 //!
 //! Stellt sicher, dass keine unkontrollierten Systemaufrufe (std::time::SystemTime) genutzt werden.
 
+use contextra_checkpoint::contract::InMemorySnapshotSource;
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore, PinGuard};
-use contextra_testkit::{InMemoryStorageEngine, ManualClock};
-use contextra_types::TxId;
+use contextra_ids::TxId;
+use contextra_testkit::ManualClock;
 use std::sync::Arc;
 
 // Testet: test checkpoint store clock determinism.
@@ -25,7 +26,7 @@ async fn test_checkpoint_store_clock_determinism() {
 
     // Run 1
     let clock1 = Arc::new(ManualClock::new(start_nanos));
-    let storage1 = Arc::new(InMemoryStorageEngine::new());
+    let storage1 = Arc::new(InMemorySnapshotSource::new());
     let store1 = PersistentCheckpointStore::open(storage1.clone(), "test_ns_1")
         .await
         .unwrap()
@@ -55,7 +56,7 @@ async fn test_checkpoint_store_clock_determinism() {
 
     // Run 2 (identical start time on clock)
     let clock2 = Arc::new(ManualClock::new(start_nanos));
-    let storage2 = Arc::new(InMemoryStorageEngine::new());
+    let storage2 = Arc::new(InMemorySnapshotSource::new());
     let store2 = PersistentCheckpointStore::open(storage2.clone(), "test_ns_2")
         .await
         .unwrap()
@@ -120,7 +121,7 @@ async fn test_checkpoint_store_clock_determinism() {
 async fn test_agent_step_with_clock_determinism() {
     let start_nanos = 1_800_000_000_000_000_000;
     let clock = Arc::new(ManualClock::new(start_nanos));
-    let storage = Arc::new(InMemoryStorageEngine::new());
+    let storage = Arc::new(InMemorySnapshotSource::new());
 
     let guard = CheckpointGuard::for_agent_step_with_clock(storage, TxId::new(42), clock)
         .await

@@ -28,7 +28,7 @@ from agent_tooling_common import (
     strip_comments_and_strings,
 )
 
-ALLOWED_UNSAFE_CRATES = {"contextra-simd", "contextra-sys", "contextra-wire"}
+ALLOWED_UNSAFE_CRATES = {"contextra-simd", "contextra-sys"}
 
 
 def audit_file_unsafe(file_path: Path, crate_name: str, repo_root: Path) -> Tuple[List[Dict], bool]:

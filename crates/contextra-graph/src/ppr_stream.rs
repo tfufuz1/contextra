@@ -19,7 +19,7 @@
 // SIEHE AUCH: docs/SPEC.md, crates/contextra-graph/SPEC.md
 
 use contextra_ports::GraphIndex;
-use crate::error::{GraphError, Result};
+use contextra_types::{ContextraError, Result};
 use crate::types::{DocId, EntityId, PprConfig, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
@@ -162,7 +162,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
         match self.ranked.as_mut() {
             Some(ranked) => Ok(ranked),
-            None => Err(GraphError::Internal(
+            None => Err(ContextraError::Internal(
                 "Failed to initialize PPR stream ranking buffer".to_string(),
             )),
         }

@@ -13,8 +13,10 @@
 //!
 //! Überprüft die Erstellung von Hardlink-Klonen, Dateisystem-Fallbacks und Cross-Device-Verhalten.
 
-use contextra_checkpoint::{CheckpointHardlinkCloner, DefaultHardlinkCloner, SnapshotPinner};
-use contextra_types::ContextraError;
+use contextra_checkpoint::{
+    CheckpointError, CheckpointHardlinkCloner, CheckpointResult, DefaultHardlinkCloner,
+    SnapshotPinner,
+};
 use std::fs;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -47,17 +49,17 @@ impl SnapshotPinner for CountingPinner {
 
 // Testet: test successful hardlink clone and inode identity.
 #[tokio::test]
-async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types::Result<()> {
-    let source_dir = TempDir::new().map_err(ContextraError::Io)?;
-    let target_dir = TempDir::new().map_err(ContextraError::Io)?;
+async fn test_successful_hardlink_clone_and_inode_identity() -> CheckpointResult<()> {
+    let source_dir = TempDir::new()?;
+    let target_dir = TempDir::new()?;
 
     let file1 = source_dir.path().join("000001.sst");
     let file2 = source_dir.path().join("000002.sst");
     let other_file = source_dir.path().join("ignore.txt");
 
-    fs::write(&file1, b"sstable_data_1").map_err(ContextraError::Io)?;
-    fs::write(&file2, b"sstable_data_2").map_err(ContextraError::Io)?;
-    fs::write(&other_file, b"not_an_sstable").map_err(ContextraError::Io)?;
+    fs::write(&file1, b"sstable_data_1")?;
+    fs::write(&file2, b"sstable_data_2")?;
+    fs::write(&other_file, b"not_an_sstable")?;
 
     let pinner = CountingPinner::default();
     let cloner = DefaultHardlinkCloner::new();
@@ -77,20 +79,14 @@ async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types:
     assert!(target2.exists());
     assert!(!target_dir.path().join("ignore.txt").exists());
 
-    assert_eq!(
-        fs::read(&target1).map_err(ContextraError::Io)?,
-        b"sstable_data_1"
-    );
-    assert_eq!(
-        fs::read(&target2).map_err(ContextraError::Io)?,
-        b"sstable_data_2"
-    );
+    assert_eq!(fs::read(&target1)?, b"sstable_data_1");
+    assert_eq!(fs::read(&target2)?, b"sstable_data_2");
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        let meta_src1 = fs::metadata(&file1).map_err(ContextraError::Io)?;
-        let meta_tgt1 = fs::metadata(&target1).map_err(ContextraError::Io)?;
+        let meta_src1 = fs::metadata(&file1)?;
+        let meta_tgt1 = fs::metadata(&target1)?;
         assert_eq!(
             meta_src1.ino(),
             meta_tgt1.ino(),
@@ -103,8 +99,8 @@ async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types:
 
 // Testet: test cross device link error handling.
 #[tokio::test]
-async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> {
-    let source_dir = TempDir::new().map_err(ContextraError::Io)?;
+async fn test_cross_device_link_error_handling() -> Result<(), Box<dyn std::error::Error>> {
+    let source_dir = TempDir::new()?;
     // Mount point /dev/shm is a tmpfs mount on Linux (distinct filesystem from /rom/overlay)
     let shm_base = std::path::Path::new("/dev/shm");
     if !shm_base.exists() {
@@ -113,7 +109,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
 
     let target_dir_path = shm_base.join(format!("contextra_test_{}", std::process::id()));
     let file1 = source_dir.path().join("000001.sst");
-    fs::write(&file1, b"sst_data").map_err(ContextraError::Io)?;
+    fs::write(&file1, b"sst_data")?;
 
     let pinner = CountingPinner::default();
     let cloner = DefaultHardlinkCloner::new();
@@ -125,7 +121,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
     let _ = fs::remove_dir_all(&target_dir_path);
 
     match result {
-        Err(contextra_checkpoint::CheckpointError::CrossDeviceLink {
+        Err(CheckpointError::CrossDeviceLink {
             source_path,
             target_path,
             ..
@@ -134,9 +130,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
             assert!(target_path.contains("000001.sst"));
             Ok(())
         }
-        Err(other) => Err(ContextraError::Internal(format!(
-            "Expected CrossDeviceLink error, got: {other:?}"
-        ))),
+        Err(other) => Err(format!("Expected CrossDeviceLink error, got: {other:?}").into()),
         Ok(_) => {
             // In case /dev/shm happens to be on the same filesystem in some container environments,
             // verify hardlink created successfully
@@ -147,13 +141,12 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
 
 // Testet: test snapshot registry compaction gc exclusion during cloning.
 #[tokio::test]
-async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning(
-) -> contextra_types::Result<()> {
-    let source_dir = TempDir::new().map_err(ContextraError::Io)?;
-    let target_dir = TempDir::new().map_err(ContextraError::Io)?;
+async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning() -> CheckpointResult<()> {
+    let source_dir = TempDir::new()?;
+    let target_dir = TempDir::new()?;
 
     let file1 = source_dir.path().join("000001.sst");
-    fs::write(&file1, b"sstable_content").map_err(ContextraError::Io)?;
+    fs::write(&file1, b"sstable_content")?;
 
     let pinner = CountingPinner::default();
     assert_eq!(

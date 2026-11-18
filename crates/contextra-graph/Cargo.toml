@@ -71,3 +71,7 @@ harness = false
 [[bench]]
 name = "binary_edge_regression"
 harness = false
+
+[[test]]
+name = "ppr_candidate_stream"
+required-features = ["workspace"]

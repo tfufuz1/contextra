@@ -52,7 +52,7 @@ RING_META: dict[str, tuple[int, str, str]] = {
     "contextra-sys": (0, "Fertig", "System-Abstraktionen für mmap, mlock und Win32-ACLs (Unsafe-Insel)."),
     "contextra-durable-fs": (0, "Fertig", "Durable I/O, atomare Dateiverschiebungen und fsync-Garantien."),
     "contextra-simd": (0, "Fertig", "AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne mit Laufzeit-Dispatch (Unsafe-Insel)."),
-    "contextra-wire": (0, "Fertig", "FlatBuffers-IPC-Generat und Zero-Copy-Adapter (Unsafe-Insel)."),
+    
     "contextra-adapt": (0, "Fertig", "LinUCB-Bandit-Mathematik, Lyapunov-Drift-Wächter und PID-Regler."),
     "contextra-ingest": (0, "Fertig", "Multi-Format Dokumenten-Ingestion mit Chunking und Formaterkennung."),
     "contextra-privacy": (0, "Fertig", "Cloud-Egress Privacy Gateway, PII-Vault, Surrogat-Tokenisierung und DLP."),
@@ -76,12 +76,12 @@ RING_META: dict[str, tuple[int, str, str]] = {
     "contextra-ports": (2, "Fertig", "dyn-kompatible Trait-Definitionen (Ports) für Storage, Indizes und Embedder."),
     "contextra-router": (2, "Fertig", "SLM-Profil-Routing und MCP-Dispatch."),
     "contextra-agent": (2, "Fertig", "Agenten-Workflow-Engine mit auditierbarer State-Machine und DLQ."),
-    "contextra-cognition": (2, "Fertig", "Hintergrund-Kompaktierung, Synthese und Konsolidierungs-Scheduler."),
+    
     "contextra-engine": (2, "Fertig", "Collection-LSM-Anbindung, Multi-Index-Pläne und Schreibtransaktionen."),
     "contextra-db": (2, "Fertig", "Monolithische Übergangsfassade für Speicher-, Such- und Indexzugriffe."),
     "contextra": (2, "Fertig", "Öffentliche Haupt-Fassade und Composition Root für Rust-Anwendungen."),
     "contextra-mcp": (3, "Fertig", "Stdio-JSON-RPC MCP-Server-Protokoll-Adapter."),
-    "contextra-py": (3, "Fertig", "PyO3 Python-FFI-Bindings."),
+    
     "contextra-testkit": (3, "Fertig", "Deterministische Test-Utilities (ManualClock, InMemoryStorageEngine, FaultVfs)."),
     "contextra-bench": (3, "Fertig", "End-to-End-Benchmarks für Ingestion, Vektorsuche und Transaktionsdurchsatz."),
 }
@@ -95,19 +95,19 @@ RING_NAMES = {
 
 # Reihenfolge der Darstellung im Dokument (Ring-für-Ring, dependency-nah sortiert)
 ORDER = [
-    "contextra-types", "contextra-ports", "contextra-mvcc", "contextra-wire", "contextra-sys",
+    "contextra-types", "contextra-ports", "contextra-mvcc",  "contextra-sys",
     "contextra-simd", "contextra-crypto", "contextra-vector", "contextra-text", "contextra-graph",
     "contextra-rank", "contextra-adapt", "contextra-core", 
 
     "contextra-store", "contextra-kvcache", "contextra-checkpoint",
     "contextra-infer-candle", "contextra-infer-ollama", "contextra-infer-onnx", "contextra-sandbox",
-    "contextra-engine", "contextra-cognition", "contextra-privacy", "contextra-router",
+    "contextra-engine",  "contextra-privacy", 
     "contextra-agent", "contextra-db",
-    "contextra", "contextra-mcp", "contextra-py",
+    "contextra", "contextra-mcp", 
     "contextra-testkit",
 ]
 
-UNSAFE_ISLANDS = {"contextra-simd", "contextra-sys", "contextra-wire"}
+UNSAFE_ISLANDS = {"contextra-simd", "contextra-sys"}
 
 
 # --------------------------------------------------------------------------- #
@@ -479,7 +479,7 @@ Contextra erzwingt ein striktes 5-Ring-Schichtenmodell. Abhängigkeiten dürfen 
 | **3** | Orchestration & Cognition | Transaktions-Engine, Collection-Engine, Kompaktierung, Privacy-Gateway, Routing, Agent-Workflows | Geschäfts-/Orchestrierungslogik |
 | **4** | Boundary & Composition Roots | Öffentliche Fassade (`contextra`), MCP-Server, Python-Bindings | Einzige Composition Root |
 
-**Unsafe-Inseln:** `contextra-sys`, `contextra-simd`, `contextra-wire` (einzige Crates ohne `#![forbid(unsafe_code)]`).
+**Unsafe-Inseln:** `contextra-sys`, `contextra-simd` (einzige Crates ohne `#![forbid(unsafe_code)]`).
 
 **Locking-Disziplin:** `collections (RwLock) → kv_locks (KvKeyLocks) → embedder (RwLock)`, Shard-Indizes strikt aufsteigend akquirieren, kein `.await` unter gehaltenem Sync-Lock.
 
@@ -521,7 +521,7 @@ def render_closing(f) -> None:
 ## Anhang A — Querschnittliche Invarianten (gelten crateübergreifend)
 
 * **Zero-Panic-Doktrin:** `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable` sind workspace-weit als Clippy-Lint verboten.
-* **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd`, `contextra-wire` heben dies explizit auf.
+* **`unsafe_code = "deny"`** ist Workspace-Default; nur `contextra-sys`, `contextra-simd` heben dies explizit auf.
 * **Sync-Kern, Async-Schale (P26):** Ring-0-Crates verwenden kein `tokio`.
 * **DAG-Integrität (P5):** Aufwärtskanten sind verboten; einzige dokumentierte Restausnahme: `contextra-router → contextra-db` (Migrationsartefakt).
 * **`#[non_exhaustive]`-Disziplin** bei zentralen Fehler-Enums (u. a. `ContextraError`).

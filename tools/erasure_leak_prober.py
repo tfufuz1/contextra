@@ -3,7 +3,7 @@
 erasure_leak_prober.py — Micro-granular Deletion & GDPR Leak Prober.
 
 Enforces the strict separation between mechanical data purgers and the erasure domain (M7 / PLAN Phase 3):
-- Data-holding storage kernels (store, vector, text, graph, kvcache, checkpoint) must NOT contain:
+- Data-holding storage kernels (store, vector, text, graph, checkpoint) must NOT contain:
   - GDPR/DSGVO references or legal terminology.
   - Saga orchestration, DeletionProof creation, or Attestation signing.
   - ErasureJournal, Ledger, or Audit-reporting formats.

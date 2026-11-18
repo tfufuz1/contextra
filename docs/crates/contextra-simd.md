@@ -1,24 +1,32 @@
-# contextra-simd — Crate-Spezifikation (Hardware-Vektorkerne & SIMD-Dispatch)
+# contextra-simd — Implementierungsspezifikation (Soll-Zustand)
 
 **Ebene:** E0 (Autarkes Fundament / Ring 0 — Unsafe-Insel)  
 **Kern-Closure:** Leer (0 interne Workspace-Abhängigkeiten)  
-**Status:** Normativ  
-**Version:** 1.0  
+**Status:** Normativ (Soll-Zustand für Entwickler)  
+**Version:** 2.0  
 **Geltungsbereich:** `crates/contextra-simd`  
-**Bindung:** `docs/SPEC.md` §2.3 (R5 Unsafe-Inseln), §13 (INV-3, INV-5 Determinismus)
+**Referenzdokumente:** `docs/SPEC.md` §2.3 (R1, R5), §13 (INV-3, INV-5); `ANALYSIS-E0-CONTRADICTIONS.md` (§2.2, §10); `ALTLASTEN-AUDIT.md` (AP-15, AP-21)  
 
 ---
 
-## 1. Zweck & Systemrolle
+## 1. Zweck & Architekturgarantien
 
-`contextra-simd` ist die hardware- und architekturnahe **Unsafe-Insel** für datenparallele Vektoroperationen in Contextra. Es implementiert hochoptimierte Distanz- und Ähnlichkeitskerne für Gleitkomma- (`f32`) und quantisierte Vektoren (`u8`), die von `contextra-vector` für die HNSW-Suche genutzt werden.
+`contextra-simd` ist die hardwarenahe **Unsafe-Insel** für datenparallele Vektoroperationen in Contextra. Es implementiert optimierte Distanz- und Ähnlichkeitskerne für Gleitkomma- (`f32`) und quantisierte Vektoren (`u8`), die von `contextra-vector` (HNSW) und `contextra-rank` genutzt werden.
 
-### Die Unsafe-Insel-Regel (SPEC §2.3 R5 / INV-3)
-Neben `contextra-sys` ist `contextra-simd` das einzige Crate im gesamten Workspace mit erlaubtem `unsafe`. Die Unsafe-Blöcke dienen **ausschließlich** dem Aufruf architekturgebundener SIMD-Intrinsics (AVX2, AVX-512, NEON). Die öffentliche Schnittstelle ist zu 100 % speichersicher und validiert alle Pufferlängen und Wertebereiche vor dem Hardware-Aufruf.
+### Beseitigung des Ebenenverstoßes (R1)
+Im Altzustand existierte in `crates/contextra-simd/Cargo.toml` eine optionale Abhängigkeit auf `contextra-types` (Ebene 2) mit den Features `workspace` und `types-compat`. **Dieser Ebenenverstoß wird ersatzlos gestrichen.** `contextra-simd` operiert als reiner E0-Kernel ausschließlich auf primitiven Slices (`&[f32]`, `&[u8]`).
+
+### Unsafe-Insel-Garantien (R5, INV-3)
+1. **Unsafe-Begrenzung:** `unsafe` ist **ausschließlich** für SIMD-Intrinsics in `kernels/avx2.rs`, `kernels/avx512.rs` und `kernels/neon.rs` erlaubt.
+2. **Dokumentation:** Jeder `unsafe`-Block benötigt zwingend einen `// SAFETY:`-Kommentar.
+3. **100 % sichere API:** Alle öffentlichen Einstiegspunkte sind reguläre Safe-Rust-Funktionen (`fn`, nicht `unsafe fn`).
+4. **NaN- und Unendlich-Schutz:** Vektoren mit `f32::NAN` oder `f32::INFINITY` werden vor der Berechnung abgewiesen (`SimdError::InvalidFloat`).
+5. **Determinismus (INV-5):** Jeder SIMD-Pfad liefert bitidentische Distanzergebnisse zur skalaren IEEE-754 Referenz (`kernels/scalar.rs`).
+6. **Leere Default-Features (R3):** `default = []`.
 
 ---
 
-## 2. Architektur & Hardware-Dispatch
+## 2. Hardware-Dispatch & Architektur
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -44,65 +52,189 @@ Neben `contextra-sys` ist `contextra-simd` das einzige Crate im gesamten Workspa
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 Dynamische Erkennung (`dispatch`)
+---
 
-- Ermittelt beim Start der Anwendung die Instruktionssatz-Erweiterungen der CPU:
-  - **x86_64:** AVX-512F, AVX2 + FMA, SSE4.2.
-  - **AArch64:** ARM NEON (Advanced SIMD).
-- Setzt atomare Funktionszeiger auf den schnellsten verfügbaren, sicheren Pfad.
-- **Keine Compile-Time-Einschränkung:** Das erzeugte Binärprogramm läuft auf älteren CPUs ohne AVX2 ebenso wie auf modernen Server-CPUs mit AVX-512.
+### 2.1 Dynamischer Funktions-Dispatch
 
-### 2.2 Unterstützte Metriken & Kerne
+```rust
+use std::sync::atomic::{AtomicPtr, Ordering};
 
-| Metrik | Datentypen | Implementierte Funktionen |
-|--------|------------|---------------------------|
-| **Cosine-Distanz** | `f32`, Rohbytes, SQ8 (`u8`) | `cosine_distance`, `cosine_distance_f32_bytes`, `cosine_similarity_parts_u8` |
-| **Euklidische Distanz (L2)** | `f32`, Rohbytes, SQ8 (`u8`) | `euclidean_distance`, `euclidean_distance_f32_bytes`, `euclidean_distance_sq_u8` |
-| **Skalarprodukt (Dot)** | `f32`, Rohbytes, SQ8 (`u8`) | `dot_product_distance`, `dot_product_distance_f32_bytes`, `dot_product_u8` |
+pub type DistanceFnF32 = fn(&[f32], &[f32]) -> Result<f32, SimdError>;
+pub type DistanceFnU8 = fn(&[u8], &[u8]) -> Result<u32, SimdError>;
+
+/// Unterstützte Distanzmetriken.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VectorMetric {
+    Cosine,
+    EuclideanL2,
+    DotProduct,
+}
+
+pub struct SimdDispatcher {
+    cosine_f32: AtomicPtr<()>,
+    l2_f32: AtomicPtr<()>,
+    dot_f32: AtomicPtr<()>,
+}
+
+impl SimdDispatcher {
+    /// Initialisiert den Dispatcher basierend auf CPU-Instruktionssatz-Erkennung.
+    pub fn detect() -> Self {
+        #[cfg(target_arch = "x86_64")]
+        {
+            if is_x86_feature_detected!("avx512f") {
+                return Self::avx512();
+            }
+            if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                return Self::avx2();
+            }
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            if std::arch::is_aarch64_feature_detected!("neon") {
+                return Self::neon();
+            }
+        }
+
+        Self::scalar()
+    }
+}
+```
 
 ---
 
-## 3. Eingabe-Validierung & NaN-Schutz
+### 2.2 Distanzfunktionen & NaN-Validierung
 
-SIMD-Operationen dürfen niemals unbemerkt ungültige Gleitkommazustände propagieren:
-1. **NaN- und Unendlich-Prüfung:** Jeder Vektor wird vor der Distanzberechnung geprüft. Bei Vorkommen von `f32::NAN` oder `f32::INFINITY` bricht die Funktion mit `Err(SimdError::InvalidFloat)` ab.
-2. **Dimensions-Konsistenz:** Vektoren müssen exakt dieselbe Dimension aufweisen. Ein Mismatch führt zu `Err(SimdError::DimensionMismatch { expected, actual })`.
-3. **Alignment-Resilienz:** Byte-Puffer werden speichersicher ausgerichtet; unaligned Slices werden ohne SIGBUS oder Panic verarbeitet.
+```rust
+/// Berechnet die Cosine-Distanz zweier f32-Vektoren (1.0 - Cosine-Similarity).
+pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, SimdError> {
+    validate_slices_f32(a, b)?;
+    let sim = get_dispatcher().cosine_f32(a, b)?;
+    Ok(1.0 - sim)
+}
+
+/// Berechnet die quadratische Euklidische Distanz (L2-Squared) zweier f32-Vektoren.
+pub fn euclidean_distance_sq(a: &[f32], b: &[f32]) -> Result<f32, SimdError> {
+    validate_slices_f32(a, b)?;
+    get_dispatcher().l2_f32(a, b)
+}
+
+/// Berechnet das Skalarprodukt zweier f32-Vektoren.
+pub fn dot_product(a: &[f32], b: &[f32]) -> Result<f32, SimdError> {
+    validate_slices_f32(a, b)?;
+    get_dispatcher().dot_f32(a, b)
+}
+
+/// Schnelle Validierung auf Dimensionsübereinstimmung und ungültige Floats.
+#[inline]
+pub fn validate_slices_f32(a: &[f32], b: &[f32]) -> Result<(), SimdError> {
+    if a.len() != b.len() {
+        return Err(SimdError::DimensionMismatch {
+            expected: a.len(),
+            actual: b.len(),
+        });
+    }
+    if a.is_empty() {
+        return Err(SimdError::EmptyVector);
+    }
+    for &x in a.iter().chain(b.iter()) {
+        if x.is_nan() || x.is_infinite() {
+            return Err(SimdError::InvalidFloat);
+        }
+    }
+    Ok(())
+}
+```
 
 ---
 
-## 4. Determinismus-Invariante (INV-5)
+### 2.3 SQ8 Quantisierungs-Kerne (`u8`)
 
-Für jeden SIMD-Instruktionssatz existiert im Modul `kernels/scalar.rs` eine mathematische Referenzimplementierung.
+Für Quantized HNSW-Suche in `contextra-vector`:
 
-**Normative Regel:**
-Jeder SIMD-Pfad MUSS auf derselben Prozessorarchitektur bitidentische Ergebnisse zur skalaren Referenz liefern (innerhalb der IEEE-754 Rundungsvorschrift). Dies wird durch kontinuierliche differenzielle Proptest-Suiten sichergestellt.
-
----
-
-## 5. Abhängigkeiten
-
-| Art | Bibliothek |
-|-----|-----------|
-| **Intern** | Keine (0 interne Workspace-Abhängigkeiten) |
-| **Extern** | `bytemuck`, `thiserror`, `tracing` (optional `serde`) |
-
----
-
-## 6. Invarianten
-
-1. **Unsafe-Begrenzung:** `unsafe` ist ausschließlich für Intrinsics in `kernels/avx2.rs`, `kernels/avx512.rs` und `kernels/neon.rs` zulässig.
-2. **Sichere Signatur:** Alle öffentlichen Funktionen sind vollständig sichere Rust-Funktionen (`fn`, nicht `unsafe fn`).
-3. **Zero-Panic-Policy:** Keine `unwrap()`, keine OOB-Indexierungen, keine Panics bei fehlerhaften Slices.
+```rust
+/// Berechnet das Skalarprodukt zweier 8-Bit quantisierter Vektoren.
+pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, SimdError> {
+    if a.len() != b.len() {
+        return Err(SimdError::DimensionMismatch {
+            expected: a.len(),
+            actual: b.len(),
+        });
+    }
+    if a.is_empty() {
+        return Err(SimdError::EmptyVector);
+    }
+    get_dispatcher().dot_u8(a, b)
+}
+```
 
 ---
 
-## 7. Test-Pflichten
+## 3. Fehlerbehandlung (`SimdError`)
 
-| Test-ID | Beschreibung |
-|---------|-------------|
-| T-SIMD1 | Differenzialtest: AVX2-, AVX-512- und NEON-Pfade liefern bitidentische Distanzen zur skalaren Referenz |
-| T-SIMD2 | NaN-Schutz: Vektor mit `f32::NAN` wird sofort mit `InvalidFloat` abgewiesen |
-| T-SIMD3 | Dimensions-Mismatch: Vektoren ungleicher Länge führen zu `DimensionMismatch` |
-| T-SIMD4 | Alignment-Test: Nicht-16/32-Byte ausgerichtete Byte-Slices rechnen fehlerfrei |
-| T-SIMD5 | SQ8-Quantisierung: `cosine_similarity_parts_u8` liefert korrekte Integer-Skalierung |
+```rust
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
+pub enum SimdError {
+    #[error("Vector dimensions do not match: expected {expected}, got {actual}")]
+    DimensionMismatch { expected: usize, actual: usize },
+
+    #[error("Vector cannot be empty")]
+    EmptyVector,
+
+    #[error("Vector contains invalid floating point values (NaN or Infinity)")]
+    InvalidFloat,
+
+    #[error("Vector norm is zero, cannot compute cosine similarity")]
+    ZeroNorm,
+
+    #[error("Hardware execution failed: {0}")]
+    HardwareError(String),
+}
+```
+
+---
+
+## 4. `Cargo.toml` Spezifikation
+
+```toml
+[package]
+name = "contextra-simd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Hardware-accelerated vector distance kernels with SIMD dynamic dispatch and scalar IEEE-754 reference"
+
+[lints]
+workspace = true
+
+[features]
+default = []
+std = []
+simd-avx512 = []
+
+[dependencies]
+bytemuck = "1.25"
+thiserror = { workspace = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = "1.4"
+criterion = "0.5"
+```
+
+---
+
+## 5. Implementierungs-Arbeitspakete für Entwickler
+
+1. **`Cargo.toml`:**
+   - Entfernen der Abhängigkeit `contextra-types`.
+   - Entfernen der Features `workspace` und `types-compat`.
+   - `default = []` setzen (R3).
+2. **Kerne-Bereinigung:**
+   - In `kernels/avx2.rs`, `kernels/avx512.rs`, `kernels/neon.rs` sicherstellen, dass jeder `unsafe`-Block einen `// SAFETY:`-Kommentar trägt.
+3. **Differenzialtests (INV-5):**
+   - Proptest-Suite ausführen: Jeder AVX/NEON-Kernel liefert exakt dieselben Werte wie `scalar.rs`.
+4. **Verifikation:**
+   - `cargo test -p contextra-simd`

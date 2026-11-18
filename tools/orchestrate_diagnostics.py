@@ -25,30 +25,41 @@ import argparse
 from pathlib import Path
 
 TOOLS = [
-    ("zero_panic_analyzer.py", "Zero-Panic & Unsafe Indexing", "ZERO_PANIC_AUDIT.md", "zero_panic_audit.json"),
-    ("unsafe_boundary_auditor.py", "Unsafe Boundary & Island Compliance", "UNSAFE_BOUNDARY_AUDIT.md", "unsafe_boundary_audit.json"),
-    ("determinism_guard.py", "Determinismus (P28)", "DETERMINISM_GUARD_AUDIT.md", "determinism_guard_audit.json"),
-    ("type_registry_sync.py", "Typ-Register & Kollisionen (K3/A2)", "TYPE_REGISTRY_COLLISIONS.md", "type_registry_collisions.json"),
+    ("gate_layering.py", "Layering & Abhängigkeiten (SPEC §2.3 R1-R3)", "GATE_LAYERING.md", "gate_layering.json"),
+    ("gate_dependencies.py", "Gate G1 Closure Compliance (SPEC §2 / capabilities v3)", "GATE_DEPENDENCIES.md", "gate_dependencies.json"),
+    ("zero_panic_analyzer.py", "Zero-Panic & Unsafe Indexing (INV-4, R6)", "ZERO_PANIC_AUDIT.md", "zero_panic_audit.json"),
+    ("unsafe_boundary_tracer.py", "Unsafe Boundary & Proof Tracer (INV-3, R5)", "UNSAFE_BOUNDARY_AUDIT.md", "unsafe_boundary_audit.json"),
+    ("erasure_leak_prober.py", "DSGVO-Löschung & ReadGate Leaks (SPEC §5, §6)", "ERASURE_LEAK_AUDIT.md", "erasure_leak_audit.json"),
+    ("determinism_guard.py", "Determinismus & Zeitquellen (INV-5)", "DETERMINISM_GUARD_AUDIT.md", "determinism_guard_audit.json"),
+    ("type_registry_sync.py", "Typ-Register & Kollisionen (R4)", "TYPE_REGISTRY_COLLISIONS.md", "type_registry_collisions.json"),
     ("async_boundary_scanner.py", "Async Boundary & Lock-Across-Await (M8)", "ASYNC_BOUNDARY_REPORT.md", "async_boundary_report.json"),
     ("fsync_durability_tracer.py", "Fsync & Durability Tracer (INV-FSYNC-1)", "FSYNC_DURABILITY_AUDIT.md", "fsync_durability_audit.json"),
-    ("port_contract_auditor.py", "Port Contracts & Facade Leaks (M3/M7)", "PORT_CONTRACT_AUDIT.md", "port_contract_audit.json"),
-    ("dead_code_pruner.py", "Dead Code & Orphan Symbols", "DEAD_CODE_ANALYSIS.md", "dead_code_analysis.json"),
+    ("port_contract_auditor.py", "Port Contracts & ErasureLayer (SPEC §6, §7)", "PORT_CONTRACT_AUDIT.md", "port_contract_audit.json"),
+    ("dead_code_microprobe.py", "Dead Code & Orphan Symbols", "DEAD_CODE_ANALYSIS.md", "dead_code_analysis.json"),
     ("error_topology_mapper.py", "Error Topology & Data Leaks (INV-LOG-1)", "ERROR_TOPOLOGY_REPORT.md", "error_topology_report.json"),
     ("test_matrix_advisor.py", "Test Matrix & Pyramid Advisor", "TEST_MATRIX_ADVISOR.md", "test_matrix_advisor.json"),
 ]
 
 def run_tool(script_path: Path, workspace_root: Path, output_dir: Path):
-    cmd = [
-        sys.executable,
-        str(script_path),
-        "--workspace", str(workspace_root),
-        "--output-dir", str(output_dir)
-    ]
+    # Pass appropriate args based on script
+    cmd = [sys.executable, str(script_path)]
+    if script_path.name in ("gate_layering.py", "gate_dependencies.py"):
+        cmd.extend(["--root", str(workspace_root)])
+    elif script_path.name in ("feature_audit.py", "abhaengigkeits_budget.py", "loc.py"):
+        pass
+    else:
+        cmd.extend(["--workspace", str(workspace_root), "--output-dir", str(output_dir)])
+
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return True, res.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        return False, e.stderr.strip()
+        res = subprocess.run(cmd, cwd=workspace_root, capture_output=True, text=True)
+        if res.returncode == 0:
+            return "PASS", res.stdout.strip()
+        elif res.returncode == 1:
+            return "BEFUNDE", (res.stdout.strip() or res.stderr.strip())
+        else:
+            return "FEHLER", (res.stderr.strip() or res.stdout.strip())
+    except Exception as e:
+        return "CRASH", str(e)
 
 def main():
     parser = argparse.ArgumentParser(description="Master Diagnostics Orchestrator")
@@ -75,7 +86,7 @@ def main():
         summary.append({
             "name": script_name,
             "title": title,
-            "status": "ERFOLG" if ok else "FEHLER",
+            "status": ok,
             "md_report": str(output_dir / md_file),
             "json_report": str(output_dir / json_file),
             "output": out

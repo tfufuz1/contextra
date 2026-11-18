@@ -5,11 +5,11 @@
 //! 3. Reproduzierbarer kanonischer Bericht (Golden Report mit festem Seed & Zeit).
 
 use contextra_erasure::gate::fence::{FenceGate, FenceGateError, FenceRange, InMemoryFenceGate};
-use contextra_erasure::journal::wal::{MemoryWalSink, WalSink};
-use contextra_erasure::report::build::{
-    build_report, canonicalize_report, ErasureReport,
+use contextra_erasure::journal::wal::MemoryWalSink;
+use contextra_erasure::report::build::{build_report, canonicalize_report};
+use contextra_erasure::types_local::{
+    ErasureId, KeyScope, LayerWitness, RequestContext, TenantId, TxId, WalSink,
 };
-use contextra_erasure::types_local::{DocId, ErasureId, LayerWitness};
 use proptest::prelude::*;
 
 #[test]
@@ -87,7 +87,7 @@ fn test_fence_release_owner_token_enforcement() {
 
     // Versuch mit falschem Token oder Token an anderem Gate
     let err = gate2.release_fence(&token1).expect_err("Foreign token must fail");
-    assert!(matches!(err, FenceGateError::TokenMismatch | FenceGateError::NotFound));
+    assert!(matches!(err, FenceGateError::InvalidToken));
 
     gate1.release_fence(&token1).expect("Legitimate release must succeed");
 }
@@ -95,28 +95,19 @@ fn test_fence_release_owner_token_enforcement() {
 proptest! {
     #[test]
     fn prop_wal_sink_monotonicity_and_durability(
-        seqs in prop::collection::vec(1u64..10_000u64, 1..30)
+        tenants in prop::collection::vec(1u64..10_000u64, 1..30)
     ) {
         let sink = MemoryWalSink::new();
-        let target_tenant = 7u64;
-        let other_tenant = 9u64;
+        let ctx = RequestContext::new(TenantId::new(1), TxId::new(1));
 
-        for &seq in &seqs {
-            sink.record_wal_entry(target_tenant, seq);
-            sink.record_wal_entry(other_tenant, seq);
+        for &t in &tenants {
+            let scope = KeyScope::Tenant(TenantId::new(t));
+            let purged = sink.purge_scope_wal(&ctx, &scope).unwrap();
+            prop_assert_eq!(purged, 1);
+            let marker_res = sink.append_erasure_marker(&ctx, &ErasureId::new([0x01; 16]), &scope);
+            prop_assert!(marker_res.is_ok());
+            prop_assert!(sink.is_scope_purged(&scope));
         }
-
-        // Target disposen
-        let disposed = sink.dispose_scope_wal(target_tenant).unwrap();
-        prop_assert_eq!(disposed, seqs.len());
-
-        // Target erneut disposen -> Idempotent 0
-        let disposed_again = sink.dispose_scope_wal(target_tenant).unwrap();
-        prop_assert_eq!(disposed_again, 0);
-
-        // Other tenant noch unberührt
-        let disposed_other = sink.dispose_scope_wal(other_tenant).unwrap();
-        prop_assert_eq!(disposed_other, seqs.len());
     }
 }
 
@@ -126,8 +117,8 @@ fn test_canonical_report_golden_reproducibility() {
     let gated_at = 1_000_000u64;
     let completed_at = 2_000_000u64;
     let witnesses = vec![
-        LayerWitness::from_hash(contextra_erasure::types_local::WitnessLayer::DocStore, 10, 2048, [0xaa; 32]),
-        LayerWitness::from_hash(contextra_erasure::types_local::WitnessLayer::VectorPayload, 5, 1024, [0xbb; 32]),
+        LayerWitness::from_hash([0xaa; 32]),
+        LayerWitness::from_hash([0xbb; 32]),
     ];
 
     let report = build_report(

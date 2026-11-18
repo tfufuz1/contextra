@@ -13,9 +13,11 @@
 //!
 //! Stellt sicher, dass Transaktions-IDs auch nach unsauberen Neustarts streng monoton bleiben.
 
-use contextra_checkpoint::{CheckpointManifest, CheckpointMeta, PersistentCheckpointStore};
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_types::{Result, TxId};
+use contextra_checkpoint::{
+    CheckpointManifest, CheckpointMeta, CheckpointResult as Result, LocalBoxFuture as BoxFuture,
+    PersistentCheckpointStore, SnapshotSource,
+};
+use contextra_ids::TxId;
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -34,16 +36,9 @@ impl MockPersistentStorage {
     }
 }
 
-impl StorageEngine for MockPersistentStorage {
+impl SnapshotSource for MockPersistentStorage {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { Ok(self.data.lock().get(key).cloned().map(bytes::Bytes::from)) })
-    }
-    fn get_at_seq<'a>(
-        &'a self,
-        key: &'a [u8],
-        _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { self.get(key).await })
     }
     fn put<'a>(
         &'a self,
@@ -80,15 +75,6 @@ impl StorageEngine for MockPersistentStorage {
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { Ok(()) })
     }
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        Box::pin(async move {
-            Ok(StorageStats {
-                num_segments: 0,
-                total_size_bytes: 0,
-                memtable_size_bytes: 0,
-            })
-        })
-    }
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             self.pinned.lock().insert(seq_no);
@@ -114,14 +100,7 @@ impl StorageEngine for MockPersistentStorage {
                 .collect())
         })
     }
-    fn scan<'a>(
-        &'a self,
-        _s: std::ops::Bound<&'a [u8]>,
-        _e: std::ops::Bound<&'a [u8]>,
-        _: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move { Ok(Vec::new()) })
-    }
+}
 }
 
 /// Test 1: Monotonicity across simulated process restarts.

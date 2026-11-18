@@ -13,17 +13,19 @@
 //!
 //! Simuliert plötzliche Abstürze vor, während und nach dem Schreiben von Checkpoints.
 
-use contextra_checkpoint::PersistentCheckpointStore;
-use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
-use contextra_testkit::InMemoryStorageEngine;
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_checkpoint::contract::InMemorySnapshotSource;
+use contextra_checkpoint::{
+    CheckpointError, CheckpointResult as Result, LocalBoxFuture as BoxFuture,
+    PersistentCheckpointStore, SnapshotSource,
+};
+use contextra_ids::TxId;
 use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-/// Wrapping StorageEngine mit kontrollierter Fehlerinjektion für Crash- und Abbruchtests.
-struct FaultInjectingStorage<S: StorageEngine> {
+/// Wrapping SnapshotSource mit kontrollierter Fehlerinjektion für Crash- und Abbruchtests.
+struct FaultInjectingStorage<S: SnapshotSource> {
     inner: Arc<S>,
     fail_put: AtomicBool,
     fail_commit: AtomicBool,
@@ -32,7 +34,7 @@ struct FaultInjectingStorage<S: StorageEngine> {
     rolled_back: Mutex<Vec<TxId>>,
 }
 
-impl<S: StorageEngine> FaultInjectingStorage<S> {
+impl<S: SnapshotSource> FaultInjectingStorage<S> {
     fn new(inner: Arc<S>) -> Self {
         Self {
             inner,
@@ -45,23 +47,15 @@ impl<S: StorageEngine> FaultInjectingStorage<S> {
     }
 }
 
-impl<S: StorageEngine> StorageEngine for FaultInjectingStorage<S> {
+impl<S: SnapshotSource> SnapshotSource for FaultInjectingStorage<S> {
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         self.inner.get(key)
-    }
-
-    fn get_at_seq<'a>(
-        &'a self,
-        key: &'a [u8],
-        seq: u64,
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        self.inner.get_at_seq(key, seq)
     }
 
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_put.load(Ordering::SeqCst) {
-                return Err(ContextraError::Io(std::io::Error::other(
+                return Err(CheckpointError::Io(std::io::Error::other(
                     "Injected Put Failure",
                 )));
             }
@@ -72,7 +66,7 @@ impl<S: StorageEngine> StorageEngine for FaultInjectingStorage<S> {
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_delete.load(Ordering::SeqCst) {
-                return Err(ContextraError::Io(std::io::Error::other(
+                return Err(CheckpointError::Io(std::io::Error::other(
                     "Injected Delete Failure",
                 )));
             }
@@ -83,7 +77,7 @@ impl<S: StorageEngine> StorageEngine for FaultInjectingStorage<S> {
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_commit.load(Ordering::SeqCst) {
-                return Err(ContextraError::Io(std::io::Error::other(
+                return Err(CheckpointError::Io(std::io::Error::other(
                     "Injected Commit Failure",
                 )));
             }
@@ -114,14 +108,10 @@ impl<S: StorageEngine> StorageEngine for FaultInjectingStorage<S> {
         self.inner.flush()
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        self.inner.stats()
-    }
-
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_pin.load(Ordering::SeqCst) {
-                return Err(ContextraError::Io(std::io::Error::other(
+                return Err(CheckpointError::Io(std::io::Error::other(
                     "Injected Pin Failure",
                 )));
             }
@@ -133,21 +123,13 @@ impl<S: StorageEngine> StorageEngine for FaultInjectingStorage<S> {
         self.inner.unpin_checkpoint(seq_no)
     }
 
-    fn scan<'a>(
-        &'a self,
-        start: std::ops::Bound<&'a [u8]>,
-        end: std::ops::Bound<&'a [u8]>,
-        limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        self.inner.scan(start, end, limit)
-    }
-
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         self.inner.scan_prefix(prefix)
     }
+}
 }
 
 // Testet: systematic crash at every checkpoint io point via fault-injected storage.

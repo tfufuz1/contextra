@@ -1,24 +1,36 @@
-# contextra-graph — Crate-Spezifikation (GraphRAG-Engine)
+# contextra-graph — Implementierungsspezifikation (Soll-Zustand)
 
-**Ebene:** E1a (Kern-Closure: `ids`, `env`)  
-**Status:** Normativ  
-**Version:** 1.0  
+**Ebene:** E1 (Domänenbaustein / Ring 1)  
+**Kern-Closure:** `ids`, `env`, `durable-fs` (E0-Fundamente, max. 5)  
+**Status:** Normativ (Soll-Zustand für Entwickler)  
+**Version:** 2.0  
 **Geltungsbereich:** `crates/contextra-graph`  
-**Referenz:** `docs/SPEC.md` §2, §3, §5, §6, §7
+**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5.3 (Schritt 4f), §6, §7; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
 
 ---
 
-## 1. Zweck & Systemrolle
+## 1. Zweck & Architekturgarantien
 
-`contextra-graph` implementiert den semantischen Wissensgraphen für GraphRAG in Contextra:
-- **Entitäten & Relationen:** Speicherung von typisierten Entitäten (Knoten), gerichteten/gewichteten Beziehungen (Kanten) und n-stelligen Hyperedges.
-- **Kontextuelle Pfadsuche:** Traversierung von Wissenspfaden zur Anreicherung von Retrieval-Kontexten für LLMs.
-- **Kapselung von Personendaten:** Strikte Bindung von personenbezogenen Knoten an `SubjectRef` und Anonymisierung der Graph-Struktur.
-- **Physische Löschung:** Kaskadiertes Entfernen verwaister Kanten und Entitäten im Rahmen der DSGVO-Löschkette.
+`contextra-graph` implementiert die hochskalierbare GraphRAG-Engine (CSR — Compressed Sparse Row) für Contextra:
+- **Wissensgraph & CSR-Speicher:** Knoten, typisierte Kanten und n-stellige Hyperedges zur semantischen Modellierung komplexer Unternehmens- und Fachbeziehungen.
+- **Path-RAG & Personalisierter PageRank (PPR):** Graph-Traversierung und Relevanz-Diffusion zur Kontextanreicherung für LLM-Prompts.
+- **PII-Schutz (SPEC §3):** Personenbezogene Entitäten werden zwingend über `SubjectRef` adressiert; Kanten zu Unternehmenseinheiten nutzen `PersonalRef`.
+- **Graph-Bereinigung (DSGVO Phase 4f):** Physisches Entfernen von Entitäten, inzidenten Kanten und Reparatur betroffener Hyperedges.
+
+### Beseitigung von Ebenenverstößen & Altlasten (R1, R3)
+1. **Keine E2-Abhängigkeiten:** Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace`, `types-compat` und `ports-compat` werden vollständig entfernt.
+2. **Leere Default-Features (R3):** `default = []` (alle Funktionserweiterungen wie `session-dag`, `entity-extraction`, `hyperedge-suggest` werden opt-in).
+3. **Altlasten-Bereinigung (`AP-21`):** In `src/hyperedge.rs` (Z. 310–313) und `src/percolation.rs` (Z. 19–22) werden alle Verweise auf das entfernte `contextra-cognition` gelöscht.
+
+### Architekturgarantien (R1–R6, INV-1, INV-3, INV-4, INV-5)
+1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
+2. **Zero-Panic-Policy:** Keine Panics; alle Operationen liefern `GraphError`.
+3. **Determinismus (INV-5):** Graph-Traversierungen liefern bei identischem Stand und Seeds stets dieselbe Knotenreihenfolge.
+4. **Keine PII im Klartext:** Entitätsknoten speichern keine Klartext-PII im Graphen.
 
 ---
 
-## 2. Architektur & Datenmodell
+## 2. Architektur & Komponenten
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -29,18 +41,17 @@
 │   │                                                     │   │
 │   │     (Entity: Vertrag) ────[regelt]───► (Entity: PII)│   │
 │   │            │                                  │     │   │
-│   │            │                                  │     │   │
 │   │            ▼                                  ▼     │   │
 │   │       [Klasse K]                         [Klasse P] │   │
 │   │                                                     │   │
 │   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ AdjacencyIndex     │    │ HyperedgeTable    │   │   │
+│   │   │ CsrAdjacencyIndex  │    │ HyperedgeTable    │   │   │
 │   │   │ (Forward / Reverse)│    │ (N-ary Relations) │   │   │
 │   │   └────────────────────┘    └───────────────────┘   │   │
 │   │                                                     │   │
 │   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ GraphTraversal     │    │ ErasureLayer Impl │   │   │
-│   │   │ (BFS / DFS / A*)   │    │ (Entity-Purge)    │   │   │
+│   │   │ GraphTraversal     │    │ GraphPurger       │   │   │
+│   │   │ (PPR / Path-RAG)   │    │ (DSGVO Phase 4f)  │   │   │
 │   │   └────────────────────┘    └───────────────────┘   │   │
 │   └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -48,85 +59,118 @@
 
 ---
 
-## 3. Datenklassifikation & PII-Kapselung (SPEC §3)
-
-1. **Keine personenbezogenen Klartext-Knoten-IDs:** 
-   - Ein Knoten, der eine natürliche Person repräsentiert, MUSS als ID eine `SubjectRef` tragen (128-Bit-Zufall).
-   - Attribute mit Personenbezug (Name, Adresse) dürfen nicht im Graphen im Klartext abgelegt werden, sondern verweisen verschlüsselt auf Klasse P im Store.
-2. **Klasse K vs. Klasse P Trennung:**
-   - Kanten zwischen Unternehmenseinheiten (K) und Personen (P) referenzieren Personen über `PersonalRef`.
-   - Wird der Betroffene gelöscht, wird die Kante zur toten Referenz und in Phase 4f bereinigt.
-
----
-
-## 4. DSGVO-Löschkette: ErasureLayer-Implementierung
-
-`contextra-graph` implementiert `contextra_ports::erasure::ErasureLayer` (Priorität 4f — Graph-Bereinigung):
+## 3. DSGVO-Löschkette: Graph-Bereinigung (Phase 4f)
 
 ```rust
-impl ErasureLayer for PropertyGraph {
-    fn id(&self) -> LayerId {
-        LayerId(*b"CTX_GRAPH_RAG_01")
-    }
+use contextra_ids::{EntityId, SubjectRef};
+use std::path::Path;
 
-    fn key_coverage(&self) -> KeyCoverage {
-        KeyCoverage::Full
-    }
-
-    fn resolve(&self, target: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, String>>;
-    fn on_gate(&self, scope: &LayerScope) -> BoxFuture<'_, Result<(), String>>;
-    fn purge(&self, scope: &LayerScope, cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>>;
-    fn witness(&self, scope: &LayerScope, sc: &Scanner<Armed>) -> BoxFuture<'_, Result<LayerWitness, String>>;
+pub struct GraphPurgeOutcome {
+    pub entities_deleted: u64,
+    pub edges_removed: u64,
+    pub hyperedges_repaired: u64,
 }
-```
 
-### 4.1 Die 4 Phasen in `contextra-graph`
+pub struct GraphPurger;
 
-#### 1. `resolve(target)`
-- Identifiziert alle Entitäten-IDs und Kanten-IDs, die zu dem `EraseTarget` gehören.
-- Ermittelt Hyperedges, an denen die gelöschten Entitäten beteiligt sind.
-
-#### 2. `on_gate(scope)`
-- Markiert die Entitäten-IDs in der InMemory-Gate-Map (`gated_entities`).
-- Ab diesem Moment brechen Pfad-Traversierungen an diesen Knoten sofort ab.
-
-#### 3. `purge(scope, cx)` — Physische Graph-Bereinigung
-Unter exklusivem Halt der `PurgeBarrier`:
-- **Knoten-Löschung:** Entfernen der Knoten aus der Knotentabelle.
-- **Kanten-Bereinigung:** Alle einfallenden und ausgehenden Kanten der gelöschten Entitäten werden aus den Adjazenzlisten physisch gelöscht.
-- **Hyperedge-Reparatur:** Werden durch das Löschen einer Entität Hyperedges ungültig oder unter die Mindestanzahl an Teilnehmern reduziert, werden diese Hyperedges aufgelöst.
-- **Persistierung:** Schreiben der bereinigten Graph-Tabellen auf Platte mit anschließendem `fsync` (`contextra-durable-fs`).
-
-#### 4. `witness(scope, sc)` — Verifikation & Messung
-- Scannt Adjazenzlisten und Knotentabellen auf verbleibende Verweise auf die Ziel-IDs.
-- Bestätigt `residue_matches == 0`.
-
----
-
-## 5. Synchroner Lesepfad: ReadGate-Integration
-
-```rust
-pub fn traverse_neighbors(&self, from_entity: &EntityId) -> Result<Vec<EntityEdge>, ContextraError> {
-    // 1. Prüfe Startknoten gegen ReadGate
-    if self.read_gate.check_entity(from_entity) == GateDecision::Erased {
-        return Ok(Vec::new()); // Behandle als nicht-existent (Fail-Closed)
+impl GraphPurger {
+    /// Führt die physische Bereinigung des CSR-Graphen aus (Phase 4f).
+    ///
+    /// 1. Entfernt Knoten aus der Knotentabelle.
+    /// 2. Bereinigt alle inzidenten ein- und ausgehenden Kanten in den CSR-Adjazenzlisten.
+    /// 3. Löst unterbesetzte Hyperedges auf.
+    /// 4. Schreibt die CSR-Strukturen durabel auf Platte (contextra-durable-fs).
+    pub fn purge_entities(
+        graph_dir: &Path,
+        entities: &[EntityId],
+    ) -> Result<GraphPurgeOutcome, GraphError> {
+        // CSR In-Memory Mutationen, gefolgt von atomarem File-Sync
+        Ok(GraphPurgeOutcome {
+            entities_deleted: entities.len() as u64,
+            edges_removed: 0,
+            hyperedges_repaired: 0,
+        })
     }
-
-    // 2. Iteriere über Nachbarn
-    let mut visible_edges = Vec::new();
-    for edge in self.adjacency.get_edges(from_entity) {
-        if self.read_gate.check_entity(&edge.target) == GateDecision::Open {
-            visible_edges.push(edge);
-        }
-    }
-    Ok(visible_edges)
 }
 ```
 
 ---
 
-## 6. Invarianten
+## 4. Fehlerbehandlung (`GraphError`)
 
-1. **`#![forbid(unsafe_code)]`:** Vollständig speichersicher.
-2. **Keine Zyklen in Traversierungen:** Traversierungsalgorithmen implementieren strikte Tiefen- und Schlingen-Begrenzungen.
-3. **Keine Datenlecks:** Verwaiste Kanten dürfen niemals zu toten Entitäten führen.
+```rust
+#[non_exhaustive]
+#[derive(Debug, thiserror::Error)]
+pub enum GraphError {
+    #[error("Entity not found: {0}")]
+    EntityNotFound(u64),
+
+    #[error("Hyperedge invalid: requires at least {expected} nodes, got {actual}")]
+    HyperedgeUnderflow { expected: usize, actual: usize },
+
+    #[error("Graph storage corrupted: {0}")]
+    CorruptedStorage(String),
+
+    #[error("Traversal deadline exceeded")]
+    Timeout,
+
+    #[error("I/O error during graph persistence: {0}")]
+    Io(#[from] std::io::Error),
+}
+```
+
+---
+
+## 5. `Cargo.toml` Spezifikation
+
+```toml
+[package]
+name = "contextra-graph"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "CSR-Graph for entity-relation traversal, Hyperedges, and GraphRAG algorithms"
+
+[lints]
+workspace = true
+
+[dependencies]
+contextra-ids = { workspace = true }
+contextra-env = { workspace = true }
+contextra-durable-fs = { workspace = true }
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+ahash = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+criterion = { workspace = true }
+
+[features]
+default = []
+std = ["contextra-ids/std", "contextra-env/std"]
+tracing = ["dep:tracing"]
+session-dag = []
+entity-extraction = []
+hyperedge-suggest = []
+```
+
+---
+
+## 6. Implementierungs-Arbeitspakete für Entwickler
+
+1. **`Cargo.toml` Bereinigung:**
+   - Entfernen von `contextra-types` und `contextra-ports`.
+   - Features `workspace`, `types-compat`, `ports-compat` entfernen.
+   - `default = []` setzen (R3).
+2. **Altlasten-Bereinigung (`AP-21`):**
+   - In `src/hyperedge.rs` und `src/percolation.rs` Bezüge zu `contextra-cognition` entfernen.
+3. **Phase 4f Graph-Purge:**
+   - Kaskadierte Kanten- und Hyperedge-Bereinigung absichern.
+4. **Verifikation:**
+   - `cargo test -p contextra-graph`

@@ -18,16 +18,17 @@ from pathlib import Path
 
 # Crates that MUST remain synchronous in their core logic per M8
 SYNC_MANDATE_CRATES = {
+    "contextra-ids",
+    "contextra-env",
     "contextra-types",
     "contextra-ports",
     "contextra-mvcc",
     "contextra-crypto",
     "contextra-rank",
-    "contextra-adapt",
+    "contextra-privacy",
     "contextra-durable-fs",
     "contextra-sys",
     "contextra-simd",
-    "contextra-wire",
 }
 
 ASYNC_PATTERNS = {

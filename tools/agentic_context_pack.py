@@ -63,21 +63,16 @@ def extract_local_agents_md(crate_path: Path) -> Optional[str]:
     return None
 
 
-def extract_debt_items(repo_root: Path, crate_name: str) -> List[str]:
-    debt_file = repo_root / "DEPRECATED_DEBT.md"
-    if not debt_file.is_file():
-        return []
+def extract_spec_excerpt(repo_root: Path, crate_name: str) -> Optional[str]:
+    spec_file = repo_root / "docs" / "crates" / f"{crate_name}.md"
+    if not spec_file.is_file():
+        return None
     try:
-        txt = debt_file.read_text(encoding="utf-8")
+        lines = spec_file.read_text(encoding="utf-8").splitlines()
+        # Return first 40 lines of normative spec
+        return "\n".join(lines[:40])
     except Exception:
-        return []
-
-    lines = []
-    short_crate = crate_name.replace("contextra-", "")
-    for line in txt.splitlines():
-        if crate_name in line or short_crate in line:
-            lines.append(line.strip())
-    return lines[:20]
+        return None
 
 
 def main():
@@ -126,11 +121,11 @@ def main():
             report.add_section("2. Crate-Spezifische AGENTS.md Verträge", "_Keine separate AGENTS.md vorhanden. Es gelten die Root-AGENTS.md Regeln._")
 
         # 3. Known Debts
-        debts = extract_debt_items(repo_root, cname)
+        debts = extract_spec_excerpt(repo_root, cname)
         if debts:
-            report.add_section("3. Bekannte Technische Schulden (DEPRECATED_DEBT.md)", "\n".join(f"- {d}" for d in debts))
+            report.add_section("3. Normative Crate-Spezifikation (docs/crates/)", "\n".join(debts))
         else:
-            report.add_section("3. Bekannte Technische Schulden", "_Keine spezifischen Schulden in DEPRECATED_DEBT.md vermerkt._")
+            report.add_section("3. Normative Crate-Spezifikation", "_Keine spezifischen Schulden in DEPRECATED_DEBT.md vermerkt._")
 
         # 4. Public API surface
         pub_api = extract_crate_public_api(cmeta.path)
