@@ -120,13 +120,14 @@ mod stress_tests {
 
             readers.push(thread::spawn(move || {
                 let mut read_count = 0;
+                let mut saw_erased = false;
                 while run.load(Ordering::Relaxed) && read_count < 1000 {
                     let res = g.linearized_read(&k, || Ok("secret_document_bytes"));
-                    if g.check(&k) == GateDecision::Erased {
-                        // Wenn der Schlüssel bereits gegated ist, darf linearized_read NIEMALS Ok zurückgeben!
-                        if res.is_ok() {
-                            violations.fetch_add(1, Ordering::SeqCst);
-                        }
+                    if res == Err(GateDecision::Erased) {
+                        saw_erased = true;
+                    }
+                    if saw_erased && res.is_ok() {
+                        violations.fetch_add(1, Ordering::SeqCst);
                     }
                     read_count += 1;
                 }
