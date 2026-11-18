@@ -198,3 +198,18 @@ mod storage_engine;
 
 #[cfg(test)]
 mod tests;
+
+pub mod v2;
+pub use v2::{KeyCodecV2, DecodedKeyV2, KeyTag, KEY_VERSION_V2, DEFAULT_REGION, DEFAULT_CLUSTER};
+
+impl TenantKeyCodec {
+    /// Universelle Dekodierung der TenantId: Unterstützt transparent v1 (Text `t:...`) und v2 (Binär `0x02...`).
+    #[inline]
+    pub fn decode_any_tenant_id(key: &[u8]) -> Option<TenantId> {
+        if key.first() == Some(&KEY_VERSION_V2) {
+            KeyCodecV2::decode_tenant_id(key)
+        } else {
+            Self::decode_tenant_id(key)
+        }
+    }
+}
