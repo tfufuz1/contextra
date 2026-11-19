@@ -46,6 +46,10 @@ pub enum VectorError {
         deleted_ratio: f64,
     },
 
+    /// Graph ist nach einer Entfernung fragmentiert (INV-VEC-CONNECTIVITY-1 verletzt).
+    #[error("Graph index disconnected: connectivity repair failed")]
+    ConnectivityLoss,
+
     /// Fehler bei der Graph-Reparatur während Knotenlösung/Tombstone-Pruning.
     #[error("graph repair failed: {0}")]
     GraphRepairFailed(String),
