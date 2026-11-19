@@ -10,7 +10,7 @@ use crate::error::{Result, VectorError};
 use crate::types::DocId;
 use crate::ComputePool;
 use std::collections::BTreeMap;
-use memmap2::Mmap;
+use crate::persistence::FileBytes as Mmap;
 use parking_lot::RwLock;
 use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicU64};

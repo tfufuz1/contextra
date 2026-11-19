@@ -17,18 +17,16 @@ klasse = "A"
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-durable-fs = { workspace = true }
+contextra-mvcc = { workspace = true }
 contextra-types = { workspace = true, optional = true }
 contextra-ports = { workspace = true, optional = true }
-contextra-mvcc = { workspace = true }
 contextra-simd = { workspace = true, optional = true }
-contextra-sys = { workspace = true, optional = true }
 subtle = "2.6"
 ahash = { workspace = true }
 parking_lot = { workspace = true }
 rand = { workspace = true }
 roaring = { workspace = true }
 tracing = { workspace = true }
-memmap2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 zeroize = "1.8"
 thiserror = { workspace = true }
@@ -42,13 +40,12 @@ serde = []
 tracing = []
 inspect = []
 experimental = ["experimental-diskann", "experimental-rabitq", "experimental-predicate-augmented-search"]
-mmap = ["dep:contextra-sys"]
+mmap = []
 diskann = ["experimental-diskann"]
 quantize-rabitq = ["experimental-rabitq"]
 workspace = [
     "dep:contextra-ports",
     "dep:contextra-types",
-    "dep:contextra-sys",
     "mmap",
 ]
 ports-compat = ["workspace"]
