@@ -1,17 +1,21 @@
 [package]
 name = "contextra-env"
-version = "0.1.0"
-edition = "2021"
-license = "MIT OR Apache-2.0"
-rust-version = "1.89"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
 description = "Injectable environment (clock, rng, id generation, metrics) for Contextra"
+
+[lints]
+workspace = true
 
 [dependencies]
 
 [dev-dependencies]
 
 [features]
-default = ["std"]
+# R3: Default-Features MÜSSEN leer sein.
+default = []
 std = []
 test-utils = []
 

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)] // Testcode: R6 gilt nur für Nicht-Test-Code.
 //! Conformance and property tests for contextra-ids copied from types
 
 use contextra_ids::*;

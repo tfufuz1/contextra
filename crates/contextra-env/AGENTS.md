@@ -12,16 +12,17 @@
 
 ## 1. Zweck & Systemrolle
 
-Abstraktion von Zeitquellen, virtuellem Dateisystem und Metriken für deterministische Tests.
+Abstraktion von Zeitquellen (`Clock`), deterministischen Zufallsquellen (`Rng`), Sequenz-IDs (`IdGen`) und Metriken (`MetricsSink`) für deterministische Tests. Das virtuelle Dateisystem gehört **nicht** in dieses Crate (Entscheidung D-04, siehe `contextra-durable-fs`).
 
 ---
 
 ## 2. Kern-Richtlinien für Agenten
 
 - **Zeitabstraktion (`Clock`):** In Nicht-Test-Code darf niemals direkt `Instant::now()` oder `SystemTime::now()` aufgerufen werden. Immer `Clock` (z.B. `SystemClock` in Produktion, `ManualClock` in Tests) injizieren.
-- **Virtuelles Dateisystem (`Vfs`):** Ermöglicht speicherbasierte Crash-, Flush- und Recovery-Tests ohne Platten-I/O (`RamVfs`, `StdVfs`).
+- **Kein Dateisystem-Port:** `contextra-env` enthält keinen `Vfs`-Trait und keine I/O-Adapter. Crash-, Flush- und Recovery-Abstraktionen liegen ausschließlich in `contextra-durable-fs` (D-04).
 - **Metriken (`MetricsSink`):** Keine externen Netzwerkaufrufe für Telemetrie; rein lokale Senke.
-- **Keine globalen statischen Zustände:** Uhren und VFS-Instanzen werden stets als injizierbare `Arc<dyn Clock>` bzw. `Arc<dyn Vfs>` übergeben.
+- **Keine globalen statischen Zustände:** Uhren, RNGs und ID-Generatoren werden stets als injizierbare `Arc<dyn Clock>` bzw. generische Parameter übergeben. Auch Zähler als `static` sind unzulässig.
+- **Golden-Vektoren sind eingefroren:** `SeededRng` darf seine Ausgabefolge nicht ändern (`tests/golden/`, INV-1). Die Formel aus Spec §2.2 ist um einen Schritt versetzt und daher NICHT bit-kompatibel; maßgeblich ist die Implementierung, die die Golden-Datei erzeugt hat.
 
 ---
 

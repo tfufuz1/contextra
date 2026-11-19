@@ -81,7 +81,7 @@ pub fn rehash_durable_shard(
     if load_factor <= 0.80 {
         if let Some(pending) = erase_pending {
             if pending.load(Ordering::Acquire) {
-                return Err(ErasureError::Refused);
+                return Err(ErasureError::Internal("rehash deferred: erasure pending".into()));
             }
         }
     }

@@ -6,7 +6,7 @@ use contextra_env::{unix_ms, Clock, ManualClock};
 // SECTION: Legacy Reference Traits & Adapters
 // ANCHOR[id=differential-legacy-contracts,epic=clock,seq=10]
 // NOTE: Eingefrorene Legacy-Schnittstellen zur Sicherstellung exakter Bit-Parität (B02).
-// LINK crates/contextra-env/SPEC.md#41-clock
+// LINK docs/crates/contextra-env.md §2.1
 // =========================================================================
 
 // text/contract.rs:16

@@ -7,7 +7,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 // SECTION: Clock Port Trait
 // ANCHOR[id=clock-root,epic=clock,seq=2]
 // NOTE: Primäre Zeiterfassungsabstraktion zur Entkopplung von Systemzeit und Tests.
-// LINK crates/contextra-env/SPEC.md#41-clock
+// LINK docs/crates/contextra-env.md §2.1
 // =========================================================================
 
 /// Port trait for time operations, enabling deterministic testing by decoupling

@@ -1,8 +1,10 @@
 //! Layout-agnostischer Lese-Gate der Löschsaga (WP-E4, E-5, SPEC §5.2, §6.3).
 //!
 //! Schlüssel sind Text-Schlüssel (z. B. `t:{tenant}:{collection}:chunk:{doc}`); der Gate
-//! parst sie nicht. Lookup-Kosten sind O(1) je distinkter registrierter Präfixlänge
-//! (höchstens [`MAX_DISTINCT_PREFIX_LENGTHS`] Stück, darüber Fallback auf den Intervall-Pfad).
+//! parst sie nicht. Lookup-Kosten: Der Fast-Path ohne aktive Sperre ist ein einzelner
+//! atomarer Lesezugriff ohne Lock. Mit aktiver Sperre nimmt `check` genau ein Read-Lock
+//! und liest daraus einen konsistenten Snapshot. Der Präfix-Lookup iteriert über die
+//! distinkten registrierten Präfixlängen `L` (Kosten `O(L)`, kein Heap-Allokation).
 //! Kein I/O, kein `await`, kein globaler Zustand.
 //!
 //! Formatvermerk: keine persistierten Bytes; reiner Laufzeitzustand.
@@ -14,7 +16,8 @@ use parking_lot::RwLock;
 
 use crate::error::ErasureError;
 
-/// Obergrenze distinkter Präfixlängen für den O(1)-Pfad.
+/// Richtwert für die erwartete Anzahl distinkter Präfixlängen (Schlüsselschema mit festen
+/// Segmentlängen). Dient als Diagnosegröße; die Korrektheit hängt nicht davon ab.
 pub const MAX_DISTINCT_PREFIX_LENGTHS: usize = 16;
 
 /// Entscheidung des Lese-Gates für einen Schlüssel.
@@ -47,21 +50,72 @@ pub trait ReadGate: Send + Sync {
     fn check_range(&self, start: &[u8], end: &[u8]) -> RangeGate;
 }
 
+/// Gesamter Sperrzustand. Alle Felder werden unter einem gemeinsamen Lock gelesen bzw.
+/// geschrieben, damit `check` einen konsistenten Snapshot sieht.
 #[derive(Default)]
 struct Shard {
     erased_exact: HashSet<Vec<u8>>,
     restricted_exact: HashSet<Vec<u8>>,
     erased_prefix: HashSet<Vec<u8>>,
     restricted_prefix: HashSet<Vec<u8>>,
+    /// Anzahl der in den Präfixmengen (beide Kategorien) enthaltenen Präfixe je Länge.
+    /// Ein Eintrag existiert nur, solange mindestens ein Präfix dieser Länge gesperrt ist.
+    prefix_lengths: HashMap<usize, usize>,
+}
+
+impl Shard {
+    fn prefix_set(&self, restricted: bool) -> &HashSet<Vec<u8>> {
+        if restricted {
+            &self.restricted_prefix
+        } else {
+            &self.erased_prefix
+        }
+    }
+
+    fn prefix_set_mut(&mut self, restricted: bool) -> &mut HashSet<Vec<u8>> {
+        if restricted {
+            &mut self.restricted_prefix
+        } else {
+            &mut self.erased_prefix
+        }
+    }
+
+    /// Fügt ein Präfix hinzu. Die Längen-Zählung wird nur bei echtem Neueintrag erhöht.
+    fn insert_prefix(&mut self, prefix: &[u8], restricted: bool) {
+        if self.prefix_set_mut(restricted).insert(prefix.to_vec()) {
+            *self.prefix_lengths.entry(prefix.len()).or_insert(0) += 1;
+        }
+    }
+
+    /// Entfernt ein Präfix. Gibt `true` zurück, wenn es vorhanden war.
+    fn remove_prefix(&mut self, prefix: &[u8], restricted: bool) -> bool {
+        if !self.prefix_set_mut(restricted).remove(prefix) {
+            return false;
+        }
+        if let Some(count) = self.prefix_lengths.get_mut(&prefix.len()) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.prefix_lengths.remove(&prefix.len());
+            }
+        }
+        true
+    }
+
+    /// Prüft, ob `key` mit einem gesperrten Präfix der jeweiligen Kategorie beginnt.
+    fn prefix_hit(&self, key: &[u8], restricted: bool) -> bool {
+        let set = self.prefix_set(restricted);
+        self.prefix_lengths
+            .keys()
+            .any(|&len| key.get(..len).is_some_and(|cand| set.contains(cand)))
+    }
 }
 
 /// Produktiver Löschgate der Saga.
 pub struct SagaGate {
+    /// Fast-Path: `false` solange nichts gesperrt ist; dann entfällt jeder Lock.
     active: AtomicBool,
     registrations: AtomicUsize,
     inner: RwLock<Shard>,
-    /// Distinkte Präfixlängen (für O(1)-Lookup); Zähler je Länge.
-    prefix_lengths: RwLock<HashMap<usize, usize>>,
 }
 
 impl Default for SagaGate {
@@ -94,7 +148,6 @@ impl SagaGate {
             active: AtomicBool::new(false),
             registrations: AtomicUsize::new(0),
             inner: RwLock::new(Shard::default()),
-            prefix_lengths: RwLock::new(HashMap::new()),
         }
     }
 
@@ -117,26 +170,7 @@ impl SagaGate {
         if !is_delimiter_terminated(prefix) {
             return Err(ErasureError::Corrupt);
         }
-        {
-            let mut lens = self.prefix_lengths.write();
-            let distinct_after = if lens.contains_key(&prefix.len()) {
-                lens.len()
-            } else {
-                lens.len() + 1
-            };
-            // Über `MAX_DISTINCT_PREFIX_LENGTHS` bleibt die Registrierung korrekt (nie Ablehnung);
-            // der Lookup iteriert dann über alle registrierten Längen.
-            let _ = distinct_after;
-            *lens.entry(prefix.len()).or_insert(0) += 1;
-        }
-        let mut sh = self.inner.write();
-        let set = if restricted {
-            &mut sh.restricted_prefix
-        } else {
-            &mut sh.erased_prefix
-        };
-        set.insert(prefix.to_vec());
-        drop(sh);
+        self.inner.write().insert_prefix(prefix, restricted);
         self.touch_active();
         Ok(())
     }
@@ -162,36 +196,12 @@ impl SagaGate {
 
     /// Hebt eine eingeschränkte Präfix-Registrierung auf (nur `Restricted→Lifted`).
     pub fn lift_restricted_prefix(&self, prefix: &[u8]) {
-        if self.inner.write().restricted_prefix.remove(prefix) {
-            let mut lens = self.prefix_lengths.write();
-            if let Some(c) = lens.get_mut(&prefix.len()) {
-                *c = c.saturating_sub(1);
-                if *c == 0 {
-                    lens.remove(&prefix.len());
-                }
-            }
-        }
+        self.inner.write().remove_prefix(prefix, true);
     }
 
     /// Anzahl aktiver Registrierungen (Diagnose; kein Klartext).
     pub fn registration_count(&self) -> usize {
         self.registrations.load(Ordering::SeqCst)
-    }
-
-    fn lookup_prefix(&self, key: &[u8], restricted: bool) -> bool {
-        let lens: Vec<usize> = {
-            let lens = self.prefix_lengths.read();
-            lens.keys().copied().filter(|&l| l <= key.len()).collect()
-        };
-        for l in lens {
-            let Some(cand) = key.get(..l) else { continue };
-            let sh = self.inner.read();
-            let set = if restricted { &sh.restricted_prefix } else { &sh.erased_prefix };
-            if set.contains(cand) {
-                return true;
-            }
-        }
-        false
     }
 }
 
@@ -200,22 +210,12 @@ impl ReadGate for SagaGate {
         if !self.active.load(Ordering::SeqCst) {
             return GateDecision::Open;
         }
-        {
-            let sh = self.inner.read();
-            if sh.restricted_exact.contains(key) {
-                return GateDecision::Restricted;
-            }
-        }
-        if self.lookup_prefix(key, true) {
+        // Ein einziges Read-Lock: alle vier Prüfungen sehen denselben Zustand.
+        let sh = self.inner.read();
+        if sh.restricted_exact.contains(key) || sh.prefix_hit(key, true) {
             return GateDecision::Restricted;
         }
-        {
-            let sh = self.inner.read();
-            if sh.erased_exact.contains(key) {
-                return GateDecision::Erased;
-            }
-        }
-        if self.lookup_prefix(key, false) {
+        if sh.erased_exact.contains(key) || sh.prefix_hit(key, false) {
             return GateDecision::Erased;
         }
         GateDecision::Open
@@ -311,6 +311,26 @@ mod tests {
         assert_eq!(g.check(b"t:1:2:k"), GateDecision::Restricted);
         g.lift_restricted_key(b"t:1:2:k");
         assert_eq!(g.check(b"t:1:2:k"), GateDecision::Open);
+    }
+
+    #[test]
+    fn lift_restricted_praefix_gibt_frei_und_bereinigt_laengen() {
+        let g = SagaGate::new();
+        g.activate_restricted_prefix(b"t:3:7:").unwrap();
+        assert_eq!(g.check(b"t:3:7:x"), GateDecision::Restricted);
+        g.lift_restricted_prefix(b"t:3:7:");
+        assert_eq!(g.check(b"t:3:7:x"), GateDecision::Open);
+        // Nach dem Lift darf die Präfixlänge nicht mehr im Lookup auftauchen.
+        assert!(g.inner.read().prefix_lengths.is_empty());
+    }
+
+    #[test]
+    fn doppelte_praefix_registrierung_zaehlt_laenge_einmal() {
+        let g = SagaGate::new();
+        g.activate_prefix(b"t:3:7:").unwrap();
+        g.activate_prefix(b"t:3:7:").unwrap();
+        assert_eq!(g.inner.read().prefix_lengths.get(&6), Some(&1));
+        assert_eq!(g.registration_count(), 2);
     }
 
     #[test]
