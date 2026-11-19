@@ -1,120 +1,73 @@
-# contextra-mcp — Implementierungsspezifikation (Soll-Zustand)
+# contextra-mcp — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E3 (Endpunkte / Anwendungen)  
-**Kern-Closure:** `contextra`, `types`, `ports`, `rank`, `crypto`, `privacy`  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-mcp`  
-**Referenzdokumente:** `docs/SPEC.md` §1, §2, §3, §6; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-02 bis AP-06, AP-13d, AP-18b)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-mcp` implementiert den offiziellen Model Context Protocol (MCP) Server für Contextra:
-- **LLM-Integration:** Bereitstellung von standardisierten JSON-RPC 2.0 Tools und Ressourcen für KI-Agenten (Claude Desktop, Cursor, AGY CLI) ausschließlich über `stdio` (kein HTTP / kein Axum, ADR-010).
-- **Such- und Retrieval-Tools:** Hybride Suche (`search_hybrid`), semantische Vektorsuche, Volltextsuche und Wissensgraph-Traversierung.
-- **DSGVO-Löschverwaltung:** Werkzeuge zur Initiierung und Überprüfung von Löschsagas (`erase_subject`, `verify_erasure`).
-- **Egress-Schutz & DLP:** Filterung sensibler PII vor der Auslieferung an den MCP-Client (`contextra-privacy`).
-
-### Beseitigung aller Altlasten (AP-02 bis AP-06)
-1. **AP-02 (`protocol.rs`):** Re-Export aus `contextra-wire` wird durch lokale Definition von `JsonRpcRequest`, `JsonRpcResponse` und `JsonRpcError` ersetzt.
-2. **AP-03 (`prompt_injection.rs`):** Die Abhängigkeit auf `contextra-prompt-guard` wird durch lokale Stubs ersetzt.
-3. **AP-04 & AP-06 (`routing.rs`, `contextra-mcp-server.rs`):** Alle Referenzen auf `contextra-router` (`SlmProfile`, `DefaultRouterEngine`) werden entfernt; `setup_routing` liefert `Ok(None)`.
-4. **AP-05 (`config.rs`):** Entfernen der Provider-Branches für `candle`, `ollama` und `onnx`; Provider liefern kontrollierte Fehler (`uncompiled_provider_error`).
-5. **AP-13d & AP-18b:** Test- und Fragmentbereinigungen.
-
-### Architekturgarantien (R1–R6, INV-3, INV-4, INV-12)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Reine `stdio`-Kommunikation:** Kein Netzwerktransport, keine offenen Sockets (ADR-010).
-3. **Fail-Closed vor Datenausgabe (SPEC §6.2):** Jeder Tool-Aufruf prüft synchron das `ReadGate`. Gelöschte Dokumente sind unsichtbar.
-4. **Keine PII in Logs (INV-12):** stderr-Logging enthält niemals Payloads, Prompts oder Schlüssel.
+**Ebene:** E3 (Endpunkt)
+**Kern-Closure:** `contextra`, `types`, `ids`, `privacy`, `erasure`
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-mcp`
+**Normative Quellen:** `docs/SPEC.md` §1.2, §5.2, §5.3, §5.4, §6.3, §11, INV-7, INV-12, INV-CLAIMS-1.
 
 ---
 
-## 2. Kanonisches JSON-RPC 2.0 Protokoll (`protocol.rs`, AP-02)
+## 1. Zweck
 
-```rust
-use serde::{Deserialize, Serialize};
+`contextra-mcp` spricht MCP über stdio als JSON-RPC 2.0. Jedes Tool ruft die Façade `contextra` auf. Die Gate-Prüfung sitzt damit auf demselben Pfad wie die Rust-API (SPEC §6.3).
 
-/// JSON-RPC 2.0 Fehlerobjekt.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JsonRpcError {
-    pub code: i32,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
-}
+Das Crate startet keine eigene Saga und signiert keine Berichte. Es gibt keine Module, die Erfolg melden, ohne die Façade aufzurufen (INV-WIRING-2). Entfernte Inferenz-Crates werden nicht importiert.
 
-/// JSON-RPC 2.0 Anfrageobjekt.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JsonRpcRequest {
-    pub jsonrpc: String,
-    pub method: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub params: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<serde_json::Value>,
-}
+## 2. Architekturregeln
 
-/// JSON-RPC 2.0 Antwortobjekt.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JsonRpcResponse {
-    pub jsonrpc: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub result: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<JsonRpcError>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<serde_json::Value>,
-}
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Antworten und Logs enthalten keinen Klartext eines Löschziels (INV-12).
+3. Außentexte stammen aus der Satzbibliothek von `contextra-erasure` und nur zusammen mit dem Messwert, an den der Satz gebunden ist (INV-CLAIMS-1).
+4. `Erased` und ein unbekannter Schlüssel sind in der Antwort dasselbe Fehlerbild.
 
-impl JsonRpcResponse {
-    pub fn ok(id: Option<serde_json::Value>, result: serde_json::Value) -> Self {
-        Self {
-            jsonrpc: "2.0".to_string(),
-            result: Some(result),
-            error: None,
-            id,
-        }
-    }
-
-    pub fn err(id: Option<serde_json::Value>, code: i32, message: String) -> Self {
-        Self {
-            jsonrpc: "2.0".to_string(),
-            result: None,
-            error: Some(JsonRpcError { code, message, data: None }),
-            id,
-        }
-    }
-}
-```
-
----
-
-## 3. Bereitgestellte MCP-Tools
+## 3. Tools
 
 ### 3.1 `search_hybrid`
-- **Eingabe:** `{ "query": string, "collection": string, "top_k": int, "as_of": optional int }`
-- **Ausgabe:** Liste relevanter Dokumentensnippets.
-- **Invariante:** Ergebnisse durchlaufen zwingend das `ReadGate`. Gelöschte Dokumente tauchen niemals auf.
+
+Eingabe: `query`, `collection`, `top_k`, optionales `as_of`. Ausgabe: Treffer, die das Gate freigegeben hat. Ein gelöschtes Dokument erscheint nicht. `as_of` ändert das nicht.
 
 ### 3.2 `get_document`
-- **Eingabe:** `{ "collection": string, "doc_id": string }`
-- **Ausgabe:** Dokumentinhalt. Bei gelöschten Dokumenten `404 Not Found` (Fail-Closed).
 
-### 3.3 `erase_subject` (DSGVO Art. 17)
-- **Eingabe:** `{ "subject_ref": string, "attestation_code": string, "operator_ref": string }`
-- **Ablauf:** Startet die 6-Schritte-Löschsaga in `contextra-erasure`.
-- **Ausgabe:** Signiertes `EraseReceipt` (Status `KeyRevoked`).
+Eingabe: `collection`, `doc_id`. Ausgabe: Inhalt, wenn das Gate `Open` sagt.
+
+Fehlt das Dokument oder ist es `Erased` oder `Restricted`, lautet die JSON-RPC-Fehlermeldung `not found`. Dieselbe Meldung, derselbe Code. Die Antwort enthält kein Feld, das die beiden Fälle trennt, und keinen Status `KeyRevoked`.
+
+### 3.3 `erase_subject`
+
+Eingabe: `subject_ref`, `attestation_code`, `operator_ref`.
+
+Der Aufruf startet die Saga mit den Schritten 1 bis 9 über `Contextra::erase_subject` und kehrt nach Takt 1 zurück.
+
+Ausgabe, nur diese Felder:
+
+| Feld | Inhalt |
+|---|---|
+| `erasure_id` | `ErasureId` |
+| `state` | `Frozen`, `Restricted` oder `Refused` |
+| `seal` | `1`, wenn der Zustand `Frozen` ist, sonst keins |
+| `class` | `L`, wenn Siegel 1 vorliegt, sonst keine Klasse |
+
+Die Antwort ist kein `DeletionProof` und kein Beleg für Schlüsselvernichtung. `KeyDestroyed` ist zu diesem Zeitpunkt noch nicht erreicht. Der Name `KeyRevoked` wird nicht verwendet. Ein Satz wie „gelöscht" wird nicht gesendet.
+
+`Refused` entsteht bei einer Aufbewahrungspflicht. `Restricted` entsteht bei Legal Hold. Beides ist kein Erfolg der Vernichtung.
 
 ### 3.4 `verify_erasure`
-- **Eingabe:** `{ "erasure_id": string }`
-- **Ausgabe:** Aktueller Status der Saga (`Completed`, `Pending`, etc.).
 
----
+Eingabe: `erasure_id`. Ausgabe: der aktuelle `SagaState` aus SPEC §5.2 und, sobald ein Bericht existiert, die gemessene Klasse (`L`, `P`, `C*`, `C1`, `C2`, `C3`, `M`) und die vorliegenden Siegel.
 
-## 4. `Cargo.toml` Spezifikation
+Ein Außensatz wird nur angehängt, wenn die Satzbibliothek ihn an genau diesen Messwert bindet. Ohne bestandene Messung gibt es keinen Satz. „100 % gelöscht", „unwiederbringlich" und „DSGVO-konform" sind keine zulässigen Ausgaben.
+
+### 3.5 Weitere Löschziele
+
+`erase_document`, `drop_collection` und `drop_tenant` folgen demselben Ticket-Format wie `erase_subject`. Sie unterscheiden sich in `EraseTarget`, nicht im Statusvokabular.
+
+## 4. Fehlerbild
+
+Transportfehler sind JSON-RPC-Fehler ohne Payload-Echo. `JournalNotDurable` wird als Fehler von Takt 1 gemeldet und nicht als Ticket mit gesetzter Lesesperre. `CapabilityUnsupported` wird durchgereicht und nicht in einen Erfolg umgedeutet.
+
+## 5. `Cargo.toml`
 
 ```toml
 [package]
@@ -123,51 +76,34 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Model Context Protocol (MCP) server for Contextra (stdio transport)"
+description = "MCP stdio server for the Contextra facade"
 
 [lints]
 workspace = true
 
-[package.metadata.contextra]
-ring = "3"
-level = 3
-
 [dependencies]
 contextra = { workspace = true }
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
-contextra-rank = { workspace = true }
-contextra-crypto = { workspace = true }
+contextra-ids = { workspace = true }
 contextra-privacy = { workspace = true }
+contextra-erasure = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { version = "0.7", features = ["codec"] }
-futures-util = "0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
 
 [features]
 default = []
 ```
 
----
+Keine Abhängigkeit auf `contextra-crypto` für eine eigene Signatur. Die Signatur bleibt im Berichtspfad von `contextra-erasure` über den Port aus `contextra-crypto`.
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
+## 6. Tests
 
-1. **AP-02 (`protocol.rs`):**
-   - Wire-Importe durch lokale Structs `JsonRpcError`, `JsonRpcRequest`, `JsonRpcResponse` ersetzen.
-2. **AP-03 (`prompt_injection.rs`):**
-   - Kompletten Inhalt durch Stub-Definitionen ersetzen.
-3. **AP-04 & AP-06 (`routing.rs`, `contextra-mcp-server.rs`):**
-   - Router-Imports und Profile-Lader entfernen.
-4. **AP-05 (`config.rs`):**
-   - Unkompilierbare Inferenz-Provider-Branches (Candle, Ollama, ONNX) entfernen.
-5. **AP-13d (`tests/mcp_test.rs`):**
-   - Obsoleten Routing-Test anpassen oder entfernen.
-6. **Verifikation:**
-   - `cargo test -p contextra-mcp`
+| Pflicht | Prüfung |
+|---|---|
+| T-DEL-11 | `search_hybrid` und `get_document` liefern einen gelöschten Scope nicht aus |
+| Ticket | `erase_subject` enthält nach Takt 1 weder `KeyRevoked` noch `KeyDestroyed` noch einen `DeletionProof` |
+| INV-12 | Die Fehlermeldung von `get_document` ist für einen unbekannten und einen gelöschten Schlüssel gleich |
+| INV-CLAIMS-1 | `verify_erasure` ohne Messung enthält keinen Außensatz |
+| INV-WIRING-2 | Kein Tool-Handler liefert `Ok`, ohne die Façade aufzurufen |

@@ -14,9 +14,10 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use contextra_durable_fs::flush_dir;
+use zeroize::Zeroize;
 
 use crate::error::{Result, VectorError};
-use crate::hnsw::{GhostFreeVectorIndex, HnswIndex, VectorData};
+use crate::hnsw::{HnswIndex, VectorData};
 use crate::types::DocId;
 
 // ANCHOR[contextra-vector:PURGE-OUTCOME]
@@ -26,6 +27,10 @@ pub struct VectorPurgeOutcome {
     /// Anzahl tatsächlich entfernter Vektoren (bereits entfernte IDs zählen nicht).
     pub vectors_purged: u64,
     /// Anzahl reparierter Nachbarkanten.
+    ///
+    /// Bleibt immer null. VETO-F02 verbietet jede Neuvernetzung beim
+    /// Löschen; die Topologie wird ausschließlich durch einen
+    /// generationsweisen Neuaufbau ersetzt.
     pub edges_repaired: u64,
     /// Freigegebene Vektor-Bytes (Slots wurden genullt).
     pub bytes_reclaimed: u64,
@@ -35,19 +40,19 @@ pub struct VectorPurgeOutcome {
 pub struct VectorPurger;
 
 impl VectorPurger {
-    /// Entfernt die Vektoren `doc_ids` aus dem Index, repariert den Graphen und nullt die Slots.
+    /// Tombstoned die Vektoren `doc_ids` und nullt ihre Arena-Slots.
     ///
     /// 1. Validierung: Jede ID wird geprüft; mmap-gestützte Knoten führen zu `Unsupported`,
     ///    da ein Nur-Lese-Mapping nicht genullt werden kann. Vor der ersten Mutation.
-    /// 2. Je ID: Entfernung mit Nachbarschafts-Reparatur (`remove_with_graph_repair`).
+    /// 2. Je ID: Slot nullen und tombstonen. Kanten bleiben unverändert
+    ///    (VETO-F02); nur ein Rebuild der nächsten Generation repariert die
+    ///    Topologie.
     ///    Bereits entfernte oder unbekannte IDs sind idempotent und werden übersprungen.
-    /// 3. Konnektivitätsprüfung (INV-VEC-CONNECTIVITY-1) über den Layer-0-Graphen.
-    /// 4. Zeroize-Prüfung (INV-VEC-ZEROIZE-1): Alle betroffenen Slots sind vollständig Null.
-    /// 5. Falls `persist_to` gesetzt: Persistieren und Verzeichnis-Sync via `contextra-durable-fs`.
+    /// 3. Zeroize-Prüfung (INV-VEC-ZEROIZE-1): Alle betroffenen Slots sind vollständig Null.
+    /// 4. Falls `persist_to` gesetzt: Persistieren und Verzeichnis-Sync via `contextra-durable-fs`.
     ///
     /// # Errors
     /// - `Unsupported`, wenn ein Knoten mmap-gestützt ist.
-    /// - `ConnectivityLoss`, wenn der Graph nach der Reparatur fragmentiert ist.
     /// - `Index`, wenn ein Slot nach dem Nullen nicht Null ist.
     /// - `Io`/`Storage` bei Persistenzfehlern.
     // ANCHOR[contextra-vector:PURGE-VECTORS]
@@ -80,31 +85,47 @@ impl VectorPurger {
             dim.saturating_mul(std::mem::size_of::<f32>())
         };
 
-        // 2. Entfernung mit Graph-Reparatur.
+        // 2. Ausschließlich tombstonen und zeroizen. Das Entfernen oder
+        // Ersetzen eingehender Kanten wäre Rewiring und ist durch VETO-F02
+        // verboten. Die Slotnummer wird von `do_delete` nicht freigegeben.
         let mut outcome = VectorPurgeOutcome::default();
         let mut purged_slots: Vec<usize> = Vec::with_capacity(pending.len());
         for doc_id in pending {
-            let slot = index.node_idx_for_doc(doc_id);
-            match index.remove_with_graph_repair(doc_id) {
-                Ok(stats) => {
-                    outcome.vectors_purged += 1;
-                    outcome.edges_repaired += stats.repaired_edges as u64;
-                    outcome.bytes_reclaimed += slot_bytes as u64;
-                    if let Some(idx) = slot {
-                        purged_slots.push(idx);
-                    }
+            let Some(slot) = index.node_idx_for_doc(doc_id) else {
+                continue;
+            };
+            let Some(ram_idx) = slot.checked_sub(mmap_count) else {
+                return Err(VectorError::Unsupported(
+                    "mmap-backed vector cannot be zeroized in place; generation rebuild required"
+                        .to_string(),
+                ));
+            };
+
+            let max_layer = {
+                let mut nodes = index.inner.hot.nodes.write();
+                let node = nodes.get_mut(ram_idx).ok_or_else(|| {
+                    VectorError::CorruptedStorage("slot is absent from vector arena".to_string())
+                })?;
+                let layer = node.max_layer;
+                match &mut node.vector {
+                    VectorData::F32(values) => values.zeroize(),
+                    VectorData::U8(values) => values.zeroize(),
                 }
-                Err(VectorError::NotFound(_)) => {} // parallel entfernt: idempotent
-                Err(e) => return Err(e),
-            }
+                node.doc_id = DocId::MIN;
+                layer
+            };
+            index
+                .inner
+                .hot
+                .arena
+                .zeroize_node_connections(ram_idx, max_layer, index.inner.cold.config.m);
+            index.inner.do_delete(doc_id)?;
+            outcome.vectors_purged += 1;
+            outcome.bytes_reclaimed += slot_bytes as u64;
+            purged_slots.push(slot);
         }
 
-        // 3. Konnektivität (INV-VEC-CONNECTIVITY-1).
-        index
-            .check_connectivity()
-            .map_err(|_| VectorError::ConnectivityLoss)?;
-
-        // 4. Zeroize-Verifikation (INV-VEC-ZEROIZE-1).
+        // 3. Zeroize-Verifikation (INV-VEC-ZEROIZE-1).
         for &idx in &purged_slots {
             if !slot_is_zero(index, idx, mmap_count) {
                 return Err(VectorError::Index(format!(
@@ -113,7 +134,7 @@ impl VectorPurger {
             }
         }
 
-        // 5. Persistenz mit Verzeichnis-Sync.
+        // 4. Persistenz mit Verzeichnis-Sync.
         if let Some(path) = persist_to {
             index.save_sync(path)?;
             if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -197,26 +218,20 @@ mod tests {
     }
 
     #[test]
-    fn purge_keeps_graph_connected_and_recall_of_survivors() {
+    fn purge_does_not_rewire_the_graph() {
         let mut index = build_index();
         let purge = purge_set();
         let outcome = VectorPurger::purge_vectors(&mut index, &purge, None).expect("purge");
 
         assert_eq!(outcome.vectors_purged, purge.len() as u64);
-        assert!(outcome.edges_repaired > 0, "neighborhood repair must run");
+        assert_eq!(outcome.edges_repaired, 0, "VETO-F02 forbids rewiring");
         assert_eq!(outcome.bytes_reclaimed, (purge.len() * DIM * 4) as u64);
-        index.check_connectivity().expect("INV-VEC-CONNECTIVITY-1");
 
-        let survivors: Vec<u32> = (0..N).filter(|i| i % 8 != 0).collect();
-        let mut top1 = 0usize;
-        for &i in &survivors {
-            let hits = index.search_knn(&vector_for(i), 1, None).expect("search");
-            if hits.first().map(|h| h.doc_id) == Some(DocId::new(u64::from(i))) {
-                top1 += 1;
-            }
+        // A delete is allowed to degrade graph connectivity. The deterministic
+        // rebuild, not deletion, is the only repair path (VETO-F02).
+        for removed in purge {
+            assert_eq!(index.node_idx_for_doc(removed), None);
         }
-        let recall = top1 as f64 / survivors.len() as f64;
-        assert!(recall >= 0.95, "survivor self-recall@1 degraded: {recall}");
     }
 
     #[test]
@@ -249,7 +264,6 @@ mod tests {
         again.push(DocId::new(999_999));
         let outcome = VectorPurger::purge_vectors(&mut index, &again, None).expect("second purge");
         assert_eq!(outcome, VectorPurgeOutcome::default());
-        index.check_connectivity().expect("connectivity still holds");
     }
 
     #[test]

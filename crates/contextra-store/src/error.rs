@@ -6,6 +6,11 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum StoreError {
+    /// A durable-filesystem operation failed while preserving the required
+    /// crash-consistency boundary.
+    #[error("durable filesystem error: {0}")]
+    DurableFs(String),
+
     /// Speicherfehler im LSM-Kern.
     #[error("Storage error: {0}")]
     Storage(String),
@@ -22,6 +27,19 @@ pub enum StoreError {
         /// Detailbeschreibung.
         reason: String,
     },
+
+    /// An SSTable failed structural or integrity validation.
+    #[error("SSTable corruption detected: {0}")]
+    SstableCorrupted(String),
+
+    /// Recovery could not establish one coherent manifest generation.
+    #[error("manifest recovery failed: {0}")]
+    ManifestRecovery(String),
+
+    /// A compaction could not complete. Callers may retry this transient
+    /// failure through the purge coordinator.
+    #[error("compaction failed: {0}")]
+    CompactionFailed(String),
 
     /// Pruefsummenfehler beim Blocklesen.
     #[error("Checksum mismatch: file={path}, block={block_id}")]
@@ -114,6 +132,15 @@ pub enum StoreError {
     /// Fehler im Löschpfad (SPEC §5.3, Schritte 4c/4d): Barriere, SSTable-Rewrite oder Scrubbing.
     #[error("Erasure error: {0}")]
     Erasure(String),
+
+    /// A replaced file remains pinned by a time-travel reader and therefore
+    /// cannot be deleted yet.
+    #[error("pending delete is blocked: {0}")]
+    PendingDeleteBlocked(String),
+
+    /// A sealed WAL segment survived a completed drain attempt.
+    #[error("sealed WAL file remains after drain: {0}")]
+    WalFileRemains(String),
 }
 
 impl StoreError {

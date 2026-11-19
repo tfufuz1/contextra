@@ -72,4 +72,10 @@ impl BlockCacheBackend for LruBlockCacheBackend {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.state.read().cache.contains(key)
     }
+
+    fn clear(&self) {
+        let mut state = self.state.write();
+        state.cache.clear();
+        state.current_bytes = 0;
+    }
 }

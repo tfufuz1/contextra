@@ -1,155 +1,67 @@
-# contextra-vector — Implementierungsspezifikation (Soll-Zustand)
+# contextra-vector — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E1 (Domänenbaustein / Ring 1)  
-**Kern-Closure:** `ids`, `env`, `simd`, `durable-fs` (E0-Fundamente, max. 5)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-vector`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5.3 (Schritt 4e), §6, §7; `ANALYSIS-E0-CONTRADICTIONS.md`  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-vector` implementiert die hochskalierbare Vektorindexierung und semantische Approximate Nearest Neighbor (ANN) Suche für Contextra:
-- **Hierarchical Navigable Small World (HNSW):** Mehrschichtiger Graph für sub-lineare Suchzeiten mit hoher Recall-Garantie.
-- **Hardwarebeschleunigung:** Nutzung der SIMD-Kerne aus `contextra-simd` (AVX2, AVX-512, NEON) mit garantiert bitidentischem skalarem IEEE-754 Fallback (INV-5).
-- **Vektor-Quantisierung:** Skalare Quantisierung (SQ8, SQ4) zur Reduktion des RAM-Bedarfs bei minimalem Recall-Verlust.
-- **Graph-Reparatur & Slot-Nullung (DSGVO Phase 4e):** Heuristische Neuvernetzung isolierter Nachbarknoten zur Erhaltung der Small-World-Konnektivität und physisches Nullen von Vektor-Slots im Speicher und auf Disk.
-
-### Beseitigung von Ebenenverstößen (R1)
-Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace` und `ports-compat` werden vollständig entfernt. `contextra-vector` operiert als reiner E1-Baustein ausschließlich auf `contextra-ids`, `contextra-env`, `contextra-simd` und `contextra-durable-fs`.
-
-### Architekturgarantien (R1–R6, INV-3, INV-4, INV-5, INV-11)
-1. **`#![forbid(unsafe_code)]`:** Vollständig speichersicher.
-2. **Zero-Panic-Policy:** Alle Operationen liefern `VectorError`.
-3. **Leere Default-Features (R3):** `default = []`.
-4. **Konnektivitäts-Invariante (INV-VEC-CONNECTIVITY-1):** Das Entfernen gelöschter Vektoren darf den HNSW-Graphen nicht fragmentieren oder den Recall unbeteiligter Dokumente degradieren.
-5. **Slot-Zeroize (INV-VEC-ZEROIZE-1):** Gelöschte Vektor-Slots werden vor ihrer Reallokation physisch mit Nullen überschrieben.
+**Ebene:** E1 (Domäne)
+**Domänen-Closure:** `ids`, `env`, `simd`, `durable-fs`
+**Verträge:** `ports` (`VectorIndex`), `erasure` (`VectorLayer`). Beide zählen nicht gegen die fünf (SPEC §15). `VectorIndex` wird hier implementiert und nicht neu definiert.
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-vector`
+**Normative Quellen:** `docs/SPEC.md` §4.7, §5.3 Schritte 3 und 8, §5.9 Schicht S2, §5.10, §6.2, §6.3, §7 (`VectorLayer`), INV-5, INV-HNSW-SLOT-1, VETO-F02, INV-ARTKEY-1.
 
 ---
 
-## 2. Architektur & Komponenten
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       contextra-vector                      │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                      HnswIndex                      │   │
-│   │                                                     │   │
-│   │   Layer 2:  (•) ───────────────► (•)                │   │
-│   │              │                    │                 │   │
-│   │   Layer 1:  (•) ───► (•) ───────► (•) ───► (•)      │   │
-│   │              │        │           │        │        │   │
-│   │   Layer 0:  (•) ─► (•) ─► (•) ─► (•) ─► (•) ─► (•)  │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ VectorStorage      │    │ ExclusionFilter   │   │   │
-│   │   │ (Flat / Quantized) │    │ (RoaringBitmap)   │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ SimdDistanceEngine │    │ VectorPurger      │   │   │
-│   │   │ (contextra-simd)   │    │ (DSGVO Phase 4e)  │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+`contextra-vector` ist der HNSW-Index: ANN-Suche, skalare Quantisierung SQ8 und SQ4, Distanz über `contextra-simd` mit bitidentischem skalarem Fallback (INV-5).
 
----
+Schicht **S2**. Persistente Vektor-Payloads (fp32 und SQ8) liegen je Slot unter dem `DocDek`. Die HNSW-Topologie einer Generation liegt unter einem `ArtKey`. Die Versiegelung ruft `contextra-db` über `contextra-crypto` auf. Dieses Crate persistiert Chiffretext und hält die Arbeitsarena.
 
-## 3. DSGVO-Löschkette: HNSW-Reparatur (Phase 4e)
+## 2. Architekturregeln
 
-Unter exklusivem Halt der `PurgeBarrier`:
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf andere E1-Crates und keine Dev-Abhängigkeit auf `contextra-testkit`.
+3. `VectorLayer` implementiert `ErasureLayer` aus `contextra-erasure`.
+4. **VETO-F02.** Beim Löschen gibt es kein Rewiring und keine heuristische Neuvernetzung von Nachbarn.
+5. **INV-HNSW-SLOT-1.** Ein `Slot` (`u32`, dicht je Collection) wird erst nach dem abgeschlossenen Neuaufbau der Generation `g+1` wiederverwendet.
+6. Die `LiveMask` aus `contextra-erasure` ist der Kandidatenfilter. Eine Suche überspringt gelöschte Slots, bevor Distanz und Fusion laufen.
 
-```rust
-use contextra_ids::DocId;
-use std::path::Path;
+## 3. Rolle in der Löschsaga
 
-pub struct VectorPurgeOutcome {
-    pub vectors_purged: u64,
-    pub edges_repaired: u64,
-    pub bytes_reclaimed: u64,
-}
+Messung: `VectorScanner`, plus Black-Box-Probe des Orchestrators. Positivkontrolle `AC-1` ist Pflicht. `purge` ist idempotent (T-DEL-14).
 
-pub struct VectorPurger;
+### 3.1 Schritt 3 — Ebene A, Arena
 
-impl VectorPurger {
-    /// Führt die physische Reparatur des HNSW-Graphen und Vektorspeichers aus (Phase 4e).
-    ///
-    /// 1. Trennt alle Kanten des gelöschten Knotens auf allen HNSW-Schichten.
-    /// 2. Heuristische Wiedervernetzung: Führt k-NN Suchen für Nachbarn des gelöschten Knotens
-    ///    durch, um Konnektivitätsverluste auszugleichen (INV-VEC-CONNECTIVITY-1).
-    /// 3. Überschreibt Vektordaten im Speicher und in der .vec-Datei mit Nullen (INV-VEC-ZEROIZE-1).
-    /// 4. Synchronisiert die Datei via contextra-durable-fs.
-    pub fn purge_vectors(
-        index_dir: &Path,
-        doc_ids: &[DocId],
-    ) -> Result<VectorPurgeOutcome, VectorError> {
-        // HNSW Heuristic Re-Linking und Slot-Zeroize
-        Ok(VectorPurgeOutcome {
-            vectors_purged: doc_ids.len() as u64,
-            edges_repaired: 0,
-            bytes_reclaimed: 0,
-        })
-    }
-}
-```
+Vor dem Übergang `PlaintextPurged` im Journal:
 
----
+1. Die Slots der Einheit werden in der fp32-Arena und in der SQ8-Arena deterministisch genullt (`zeroize`).
+2. Kanten bleiben stehen. Es wird kein Nachbar neu verbunden (VETO-F02).
+3. Die Slot-Nummer bleibt bis zum Neuaufbau gesperrt.
+4. Der persistente Snapshot-Payload ist bereits unter dem `DocDek`. Seine Unlesbarkeit entsteht in Schritt 5. Schritt 3 entfernt den Klartext aus der Arena.
 
-## 4. Ähnlichkeitssuche & Ausschlussfilter
+Das Restresiduum `R-GRAPH` (Topologie ohne Nutzdaten, interne Slot-Nummern) bleibt im Bericht, bis Schritt 8 die Generation wechselt (REQ-DEL-N25).
 
-```rust
-use contextra_ids::DocId;
-use roaring::RoaringBitmap;
+### 3.2 Schritt 8 — Generation `g+1`
 
-pub struct VectorSearchHit {
-    pub doc_id: DocId,
-    pub distance: f32,
-}
+Auslöser, gemeinsam für mehrere Löschungen: Tombstone-Anteil ≥ `tombstone_rebuild_ratio` (Start 0,2), Frist `purge_rebuild_max_days` (Start 14 Tage), oder `seal-now`.
 
-pub trait VectorIndex: Send + Sync {
-    /// Führt k-NN Suche aus. Ausgeschlossene Vektoren (ReadGate / ExclusionFilter)
-    /// werden mit O(1) übersprungen.
-    fn search_knn(
-        &self,
-        query: &[f32],
-        k: usize,
-        exclusion_filter: Option<&RoaringBitmap>,
-    ) -> Result<Vec<VectorSearchHit>, VectorError>;
-}
-```
+1. Ein Hintergrundworker baut Generation `g+1` nur aus lebenden Slots. Der Aufbau ist deterministisch (INV-INDEX-APPLY-1, INV-5).
+2. Atomarer Umschalt-Commit auf `g+1` (`tmp` → `fsync` → `rename` → Verzeichnis-`fsync`).
+3. `contextra-crypto` vernichtet den `ArtKey` der Generation `g` (INV-ARTKEY-1). Danach schließt der Koordinator `R-GRAPH`.
+4. Slots der Generation `g` werden wiederverwendbar.
 
----
+`VectorScanner` prüft Rohbytes der Embeddings und die dekodierte Sicht. Ohne bestandene Positivkontrolle ist der Lauf ungültig.
 
-## 5. Fehlerbehandlung (`VectorError`)
+### 3.3 Suche
 
-```rust
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum VectorError {
-    #[error("Vector dimension mismatch: expected {expected}, got {actual}")]
-    DimensionMismatch { expected: usize, actual: usize },
+`search_knn` liest die `LiveMask` mit `SeqCst`, bevor ein Kandidat die Distanzberechnung erreicht (§6.3, §10.3). Verworfene Kandidaten zählt der Aufrufer in `contextra-db`, der die Trefferliste auf `k` auffüllt. Dieses Crate fusioniert nicht.
 
-    #[error("Vector contains invalid floating point values (NaN/Inf)")]
-    InvalidFloat,
+SQ4 ist eine Suchoptimierung. Die Löschpflicht gilt für jede persistierte Quantisierungsstufe, die Nutzbytes der Einheit enthält. SQ4-Bytes eines gelöschten Slots werden in Schritt 3 mit genullt.
 
-    #[error("Vector storage corrupted: {0}")]
-    CorruptedStorage(String),
+## 4. Fehler (`VectorError`)
 
-    #[error("Graph index disconnected: connectivity repair failed")]
-    ConnectivityLoss,
+`#[non_exhaustive]`: `DimensionMismatch`, `InvalidFloat`, `CorruptedStorage`, `Io`, `GenerationSwitchFailed`, `SlotStillLive`. Ein Konnektivitätsfehler durch unterlassenes Rewiring ist kein Fehlerbild. Der Neuaufbau ist der einzige Reparaturweg.
 
-    #[error("I/O error during index persistence: {0}")]
-    Io(#[from] std::io::Error),
-}
-```
-
----
-
-## 6. `Cargo.toml` Spezifikation
+## 5. `Cargo.toml`
 
 ```toml
 [package]
@@ -158,7 +70,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "HNSW vector index, SIMD distance acceleration, and quantized search for Contextra"
+description = "HNSW vector index with generation rebuild and LiveMask filtering"
 
 [lints]
 workspace = true
@@ -168,39 +80,31 @@ contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-simd = { workspace = true }
 contextra-durable-fs = { workspace = true }
-contextra-mvcc = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
 ahash = { workspace = true }
 parking_lot = { workspace = true }
-roaring = { workspace = true }
-serde = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
-tokio = { workspace = true, features = ["full", "test-util"] }
-criterion = { workspace = true }
 
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
-tracing = ["dep:tracing"]
 quantize = []
-diskann = []
 ```
 
----
+`quantize` schaltet SQ4 zu. Die Löschpfade von fp32 und SQ8 sind nicht feature-gesteuert (R3).
 
-## 7. Implementierungs-Arbeitspakete für Entwickler
+## 6. Tests
 
-1. **`Cargo.toml` Bereinigung:**
-   - Entfernen von `contextra-types` und `contextra-ports`.
-   - Features `workspace` und `ports-compat` entfernen.
-   - `default = []` setzen (R3).
-2. **Konnektivitäts-Heilung absichern:**
-   - Heuristische Neuverlinkung von Nachbarknoten bei Vektor-Löschung verifizieren (`INV-VEC-CONNECTIVITY-1`).
-3. **Slot-Zeroize:**
-   - Sicherstellen, dass Vektordaten vor Slot-Freigabe physisch genullt werden (`INV-VEC-ZEROIZE-1`).
-4. **Verifikation:**
-   - `cargo test -p contextra-vector`
+| Kennung | Pflicht |
+|---|---|
+| T-DEL-6 | Nach `Frozen` liefert die Vektorsuche das Dokument nicht |
+| T-DEL-14 | Zweites Arena-`purge` ist ein No-op |
+| T-DEL-17 | Rohbytes der fp32- und SQ8-Arena enthalten das Embedding nicht mehr |
+| T-DEL-19 | `remember` während gehaltener Slot-Sperre wird abgewiesen |
+
+Ein Test, der nur die `LiveMask` setzt und die Arena nicht nullt, prüft höchstens Klasse L (§12).

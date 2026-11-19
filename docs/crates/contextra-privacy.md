@@ -1,312 +1,86 @@
-# contextra-privacy — Implementierungsspezifikation (Soll-Zustand)
+# contextra-privacy — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E0 (Autarkes Fundament / Ring 0)  
-**Kern-Closure:** `ids`, `env` (erlaubte E0-Fundamente gemäß SPEC §2.1)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-privacy`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §3 (Datenklassifikation & DSGVO-Kapselung), §13; `ANALYSIS-E0-CONTRADICTIONS.md` (D-02, D-03, D-09); `ALTLASTEN-AUDIT.md` (AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-privacy` ist das fundamentale Datenschutz-, DLP- (Data Loss Prevention) und Egress-Shield-Crate von Contextra:
-- **Kanonische Datenklassifikation (`DataClass`):** Alleiniger kanonischer Besitzer der Klassifikation `K`, `P`, `D`, `E` (SPEC §3.1).
-- **Typestate-Schutz für Klasse K (`Validated<T>`):** Compile-Zeit-Garantie, dass keine unerkannte PII in Unternehmenswissens-Pfade (K) gelangt.
-- **PII-Erkennung (`EntityRecognizer`):** Hochgeschwindigkeits-Regex- und Regelwerkserkennung von IBANs, E-Mails, Telefonnummern und Steuer-IDs.
-- **Flüchtige Pseudonymisierung (`SurrogateVault`):** Ersetzen von PII durch Surrogat-Token vor externer Cloud-Inferenz; Rehydrierung bei Rückkehr.
-- **Cloud-Egress-Shield (`EgressGateway`):** Filterung, Auditierung und Schutz vor Massen-Exfiltration (`BulkExfiltrationDetector`).
-
-### Beseitigung von Typ-Dubletten (D-09)
-Gemäß SPEC §2.1 dürfen E0-Fundamente `contextra-ids` und `contextra-env` nutzen. `contextra-privacy` importiert `TenantId`, `TenantScoped`, `TenantScopeViolation` und `Clock` direkt aus den kanonischen E0-Crates. Alle lokalen Kopien in `types.rs` werden gelöscht.
-
-### Architekturgarantien (R1–R6, INV-3, INV-4, INV-11)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Zero-Panic-Policy:** Keine Panics bei bösartigen oder ungültigen Eingaben.
-3. **Leere Default-Features (R3):** `default = []`.
-4. **Schutz sensibler Daten:** `SurrogateVault` implementiert `ZeroizeOnDrop`.
-5. **Keine PII in Logs (INV-12):** Audit-Logs und Traces enthalten niemals Klartext-PII, sondern nur Regel-IDs, Token-Hashes und Byteranges.
+**Ebene:** E0 (Fundament)
+**Kern-Closure:** `ids`, `env`, `ports`
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-privacy`
+**Normative Quellen:** `docs/SPEC.md` §2.4, §2.5, §3, §5.9 Schicht S4, §13 (INV-12, INV-LINEAGE).
 
 ---
 
-## 2. Kanonische Datenklassifikation & Typestate
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              contextra-privacy                              │
-│                                                                             │
-│   ┌──────────────────────────┐             ┌────────────────────────────┐   │
-│   │        DataClass         │             │        Validated<T>        │   │
-│   │   (K, P, D, E Enums)     │             │ (Type-State Payload Guard) │   │
-│   └─────────────┬────────────┘             └─────────────┬──────────────┘   │
-│                 │                                        │                  │
-│                 ▼                                        ▼                  │
-│   ┌──────────────────────────┐             ┌────────────────────────────┐   │
-│   │     EntityRecognizer     │             │       EgressGateway        │   │
-│   │  (Regex PII Detection:   │             │   (Cloud Query Filtering,  │   │
-│   │   IBAN, Mail, Tel, PII)  │             │    Shielding & Rehydration)│   │
-│   └──────────────────────────┘             └────────────────────────────┘   │
-│                                                                             │
-│   ┌──────────────────────────┐             ┌────────────────────────────┐   │
-│   │      SurrogateVault      │             │      ContextEditAudit      │   │
-│   │ (Pseudonymisierung durch │             │ (Kryptographisch verkettete│   │
-│   │  Surrogat-Token im RAM)  │             │  Audit-Logs bei Redaction) │   │
-│   └──────────────────────────┘             └────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+`contextra-privacy` besitzt die Datenklassifikation und den Schreibschutz für Klasse K.
 
----
+Kanonisch hier (SPEC §2.5): `DataClass`, `Validated<T>`, `EntityRecognizer`.
 
-### 2.1 `DataClass` (Kanonischer Besitzer — SPEC §3.1, D-02)
+Schicht **S4**: der `SurrogateVault` hält dokumentbezogene Surrogate im Arbeitsspeicher. Er implementiert `Purgeable` aus `contextra-ports`. `contextra-db` registriert ihn beim Koordinator. Dieses Crate definiert `ErasureLayer` nicht und importiert ihn nicht.
+
+Eine Abhängigkeit auf `contextra-types` ist ausgeschlossen. `types` bindet `DataClass` aus diesem Crate. Die Gegenrichtung würde einen Zyklus schließen. Eine Abhängigkeit auf `contextra-crypto` ist ausgeschlossen (E0 hängt nicht von E1 ab). Die Schlüsseltypen bleiben in `contextra-crypto`.
+
+## 2. Architekturregeln
+
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf E1, E2 oder E3.
+3. Fehler und Logs enthalten die Regel-ID und den Bytebereich, nie den erkannten Klartext (INV-12).
+4. `Purgeable::invalidate` ohne Invalidierung und ohne `zeroize` ist verboten (INV-WIRING-2).
+
+## 3. `DataClass` (SPEC §3.1)
 
 ```rust
-/// Die vier normativen Datenklassen des Contextra-Systems (SPEC §3.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DataClass {
-    /// Klasse K: Unternehmenswissen (Verträge, Handbücher, Richtlinien).
-    /// Verschlüsselt mit Collection-KEK. Löschbar nur per Collection-Drop.
+    /// Unternehmenswissen. `DocDek` der Einheit oder `ArtKey` des Artefakts, gewrappt unter `KEK[coll, e]`.
     K,
-
-    /// Klasse P: Personenbezogene Daten natürlicher Personen (Name, E-Mail, Interaktionen).
-    /// Adressiert über `SubjectRef`, verschlüsselt mit individuellem SubjectKey.
-    /// Atomar löschbar in O(1) via Crypto-Shredding.
+    /// Personenbezogene Daten. Adressiert über `SubjectRef`, verschlüsselt mit dem `DocDek` der Einheit.
     P,
-
-    /// Klasse D: Abgeleitete Daten (Embeddings, Postings, Graph-Knoten, Caches).
-    /// Tragen verpflichtend `LineageRef` zum Quelldatum für kaskadierte Bereinigung.
+    /// Abgeleitete Daten. `ArtKey` und verpflichtende `LineageRef`.
     D,
-
-    /// Klasse E: Löschmaterial (Journal, Ledger, signierte Berichte, Attestierungen).
-    /// Verschlüsselt mit separatem ErasureKey; eigenständig nach Aufbewahrungsfrist bereinigt.
+    /// Löschmaterial. `ErasureKey` und `K_saga`.
     E,
 }
 ```
 
----
+Es gibt kein `SubjectKey`. P-Daten werden nicht mit einem aus der KEK abgeleiteten Personenschlüssel verschlüsselt (SPEC §4.1). Die Löschung einer Einheit ist die Saga in `contextra-erasure`, nicht eine Laufzeitzusage dieses Crates.
 
-### 2.2 Typestate `Validated<T>` für Klasse-K-Schreibpfade (D-03)
+K-Daten dürfen kein `SubjectRef` enthalten. Personenbezug in K läuft über `PersonalRef` (SPEC §3.2).
 
-Verhindert zur Compile-Zeit, dass unerkannte personenbezogene Daten in Klasse-K-Datenbestände gelangen:
+## 4. `Validated<T>` (SPEC §3.3)
+
+K-Schreibpfade akzeptieren nur `Validated<T>`. Der Wrapper ist nur über `validate_k_payload` erzeugbar. Ein öffentlicher Konstruktor, der die Prüfung überspringt, existiert nicht.
+
+`validate_k_payload` ruft `EntityRecognizer::find_first_pii`. Ein Treffer liefert `PersonalDataFound { entity_type, byte_range }` ohne den Substring. `into_inner` gibt den geprüften Wert an den Aufrufer in `contextra-db` zurück. Die `LineageRef` für Klasse D prüft `contextra-db` (INV-LINEAGE). Dieses Crate besitzt sie nicht.
+
+## 5. `EntityRecognizer`
+
+Mindestregeln: IBAN, E-Mail, Telefonnummer. `new` liefert `Result`. Eine ungültige Regel ist `PrivacyError::Regex`, kein Panic. `find_all_pii` sortiert nach `start` aufsteigend. Die Regelmenge ist fest. Ein Feature schaltet keine Regel ab (R3).
+
+## 6. `SurrogateVault` (Schicht S4)
+
+Der Vault liegt nur im Arbeitsspeicher. Er bildet ein Surrogat auf den Originalwert ab, damit ein Egress-Pfad Klartext-PII nicht verlässt und die Rücksubstitution nach der Rückkehr möglich ist.
 
 ```rust
-/// Typestate-Wrapper: Bezeugt, dass der innere Payload erfolgreich gegen
-/// PII-Muster geprüft wurde und keine personenbezogenen Daten enthält.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Validated<T>(T);
-
-impl<T> Validated<T> {
-    /// Liefert eine Referenz auf die validierten Daten.
-    #[inline]
-    pub fn inner(&self) -> &T {
-        &self.0
-    }
-
-    /// Verbraucht den Wrapper und gibt die validierten Daten frei.
-    #[inline]
-    pub fn into_inner(self) -> T {
-        self.0
-    }
-}
-
-/// Prüft einen Text auf PII. Bei Fund schlägt die Validierung fehl.
-pub fn validate_k_payload<T: AsRef<str>>(
-    payload: T,
-    recognizer: &EntityRecognizer,
-) -> Result<Validated<T>, PersonalDataFound> {
-    if let Some(mat) = recognizer.find_first_pii(payload.as_ref()) {
-        return Err(PersonalDataFound {
-            entity_type: mat.entity_type,
-            byte_range: mat.start..mat.end,
-        });
-    }
-    Ok(Validated(payload))
-}
-
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("Personal data detected in Class K payload: entity '{entity_type}' at range {byte_range:?}")]
-pub struct PersonalDataFound {
-    pub entity_type: &'static str,
-    pub byte_range: std::ops::Range<usize>,
+impl Purgeable for SurrogateVault {
+    fn invalidate(&self, doc_key: &[u8]) -> Result<(), PortError>;
 }
 ```
 
----
+`invalidate` nimmt `&self`. Der Vault hält die Tabelle hinter einer Sperre, entfernt jeden Eintrag des `doc_key` und zeroized den Originalwert, bevor die Sperre fällt. Ein unbekannter Schlüssel ist ein No-op und `Ok`. Ein Eintrag, der nach `invalidate` noch lesbar ist, ist ein Fehler. `Drop` zeroized die gesamte Tabelle.
 
-### 2.3 `EntityRecognizer` (Regelbasierte PII-Erkennung)
+`rehydrate` läuft nur im Prozess. Der Vault wird nicht persistiert, nicht in einen Checkpoint geschrieben und nicht geloggt.
 
-```rust
-use regex::Regex;
+## 7. Egress
 
-/// Fundstelle eines erkannten sensitiven Datums.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EntityMatch {
-    pub entity_type: &'static str,
-    pub start: usize,
-    pub end: usize,
-}
+`EgressGateway` gibt nur Werte vom Typ `GuardedPayload<Sanitized>` an einen Außenkanal. Der Übergang `Unsanitized` → `Sanitized` läuft durch den Recognizer. Ein Fund wird ersetzt oder der Versand endet mit `PrivacyError::EgressBlocked`. Ein Kanal ohne diesen Übergang existiert nicht.
 
-pub struct EntityRecognizer {
-    iban_regex: Regex,
-    email_regex: Regex,
-    phone_regex: Regex,
-}
+`ContextEditAudit` speichert Regel-ID, Bytebereich und einen Hash des Surrogats. Er speichert keinen Klartext.
 
-impl EntityRecognizer {
-    pub fn new() -> Result<Self, PrivacyError> {
-        Ok(Self {
-            iban_regex: Regex::new(r"\b[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}([A-Z0-9]?){0,16}\b")
-                .map_err(PrivacyError::Regex)?,
-            email_regex: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
-                .map_err(PrivacyError::Regex)?,
-            phone_regex: Regex::new(r"\b(?:\+?[0-9]{1,3})?[-. (]*[0-9]{2,4}[-. )]*[0-9]{3,4}[-. ]*[0-9]{3,9}\b")
-                .map_err(PrivacyError::Regex)?,
-        })
-    }
+## 8. Fehler (`PrivacyError`)
 
-    pub fn find_first_pii(&self, text: &str) -> Option<EntityMatch> {
-        if let Some(m) = self.iban_regex.find(text) {
-            return Some(EntityMatch { entity_type: "IBAN", start: m.start(), end: m.end() });
-        }
-        if let Some(m) = self.email_regex.find(text) {
-            return Some(EntityMatch { entity_type: "EMAIL", start: m.start(), end: m.end() });
-        }
-        if let Some(m) = self.phone_regex.find(text) {
-            return Some(EntityMatch { entity_type: "PHONE", start: m.start(), end: m.end() });
-        }
-        None
-    }
+`#[non_exhaustive]`: `Regex`, `PersonalDataFound`, `EgressBlocked`, `VaultPoisoned`. Keine Variante trägt den erkannten Text.
 
-    pub fn find_all_pii(&self, text: &str) -> Vec<EntityMatch> {
-        let mut matches = Vec::new();
-        for m in self.iban_regex.find_iter(text) {
-            matches.push(EntityMatch { entity_type: "IBAN", start: m.start(), end: m.end() });
-        }
-        for m in self.email_regex.find_iter(text) {
-            matches.push(EntityMatch { entity_type: "EMAIL", start: m.start(), end: m.end() });
-        }
-        for m in self.phone_regex.find_iter(text) {
-            matches.push(EntityMatch { entity_type: "PHONE", start: m.start(), end: m.end() });
-        }
-        matches.sort_by_key(|m| m.start);
-        matches
-    }
-}
-```
-
----
-
-### 2.4 Pseudonymisierung & Tresor (`SurrogateVault`)
-
-```rust
-use std::collections::HashMap;
-use zeroize::{Zeroize, ZeroizeOnDrop};
-
-/// Flüchtig im RAM gehaltener Zuordnungsspeicher für Pseudonyme.
-/// Implementiert ZeroizeOnDrop zum Schutz vor Speicherabzügen.
-#[derive(Default, Zeroize, ZeroizeOnDrop)]
-pub struct SurrogateVault {
-    surrogate_to_original: HashMap<String, String>,
-}
-
-impl SurrogateVault {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn insert(&mut self, surrogate: String, original: String) {
-        self.surrogate_to_original.insert(surrogate, original);
-    }
-
-    pub fn rehydrate(&self, text: &str) -> String {
-        let mut result = text.to_string();
-        for (surrogate, original) in &self.surrogate_to_original {
-            result = result.replace(surrogate, original);
-        }
-        result
-    }
-}
-```
-
----
-
-### 2.5 Cloud Egress Gateway & GuardedPayload
-
-Compile-Zeit Typestate für Cloud-Anfragen:
-```rust
-use std::marker::PhantomData;
-use zeroize::Zeroize;
-
-pub struct Unsanitized;
-pub struct Sanitized;
-
-#[derive(Debug)]
-pub struct GuardedPayload<State> {
-    payload: String,
-    session_id: String,
-    _state: PhantomData<State>,
-}
-
-impl<S> Drop for GuardedPayload<S> {
-    fn drop(&mut self) {
-        self.payload.zeroize();
-        self.session_id.zeroize();
-    }
-}
-
-impl GuardedPayload<Unsanitized> {
-    pub fn new(payload: String, session_id: String) -> Self {
-        Self {
-            payload,
-            session_id,
-            _state: PhantomData,
-        }
-    }
-}
-
-impl GuardedPayload<Sanitized> {
-    pub fn from_sanitized(payload: String, session_id: String) -> Self {
-        Self {
-            payload,
-            session_id,
-            _state: PhantomData,
-        }
-    }
-
-    pub fn into_inner(mut self) -> String {
-        std::mem::take(&mut self.payload)
-    }
-}
-```
-
----
-
-## 3. Fehlerbehandlung (`PrivacyError`)
-
-```rust
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum PrivacyError {
-    #[error("Personal data detected in Class K write: {0}")]
-    PersonalDataDetected(#[from] PersonalDataFound),
-
-    #[error("Regex compilation error: {0}")]
-    Regex(#[from] regex::Error),
-
-    #[error("Cloud egress blocked by policy: {0}")]
-    EgressBlocked(String),
-
-    #[error("Bulk exfiltration limit exceeded for session {0}")]
-    ExfiltrationLimitExceeded(String),
-
-    #[error("Audit chain verification failed: expected hash {expected}, got {actual}")]
-    AuditChainCorrupted { expected: String, actual: String },
-}
-```
-
----
-
-## 4. `Cargo.toml` Spezifikation
+## 9. `Cargo.toml`
 
 ```toml
 [package]
@@ -315,7 +89,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Canonical data classification, PII DLP filtering, and Cloud Egress Guard for Contextra"
+description = "Data classes, class-K validation, and the purgeable surrogate vault"
 
 [lints]
 workspace = true
@@ -323,38 +97,22 @@ workspace = true
 [dependencies]
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
+contextra-ports = { workspace = true }
+regex = "1.10"
 thiserror = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 zeroize = { version = "1.8", features = ["zeroize_derive"] }
-regex = "1"
-tracing = { workspace = true, optional = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
 
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
-tracing = ["dep:tracing"]
 ```
 
----
+## 10. Tests
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
-
-1. **`Cargo.toml` Bereinigung:**
-   - Hinzufügen von `contextra-ids` und `contextra-env` zu `[dependencies]`.
-   - Entfernen von `tokio`, `scc`, `rand` und `parking_lot` aus den Pflichtabhängigkeiten.
-   - `default = []` setzen (R3).
-2. **Kanonisches `DataClass` Enum erstellen:**
-   - Datei `src/data_class.rs` anlegen und an `lib.rs` exportieren.
-3. **`Validated<T>` Pattern implementieren:**
-   - `validate_k_payload` implementieren und mit `EntityRecognizer` verdrahten.
-4. **Typ-Dubletten in `src/types.rs` löschen:**
-   - Lokale `TenantId`, `TenantScoped`, `TenantScopeViolation` und `Clock` entfernen.
-   - Durch Re-Exports aus `contextra-ids` und `contextra-env` ersetzen.
-5. **Altlasten bereinigen (`AP-21`):**
-   - Veraltete Referenz auf `contextra-router` in `src/egress_vault.rs` Zeile 555 entfernen.
-6. **Verifikation:**
-   - `cargo test -p contextra-privacy`
+| Pflicht | Prüfung |
+|---|---|
+| Klasse K | `validate_k_payload` lehnt eine IBAN ab und der Fehler enthält die IBAN nicht |
+| Klasse K | Ein Wert ohne `Validated` ist am Typ des K-Schreibpfads nicht übergebbar |
+| S4 | Nach `invalidate` ist der Originalwert weder über `rehydrate` noch im allozierten Puffer lesbar |
+| S4 | Zweites `invalidate` desselben `doc_key` ist ein No-op |
+| Zyklus | `cargo metadata` zeigt keine Kante auf `contextra-types` oder `contextra-crypto` |

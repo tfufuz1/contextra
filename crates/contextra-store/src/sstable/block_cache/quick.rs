@@ -56,6 +56,10 @@ impl BlockCacheBackend for QuickCacheBlockCacheBackend {
         self.cache.get(key).is_some()
     }
 
+    fn clear(&self) {
+        self.cache.clear();
+    }
+
     #[inline]
     fn current_bytes(&self) -> usize {
         self.cache.weight() as usize

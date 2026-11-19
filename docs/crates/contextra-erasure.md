@@ -1,7 +1,7 @@
 # contextra-erasure — Crate-Spezifikation (Soll-Zustand, gemäß Finaler Löscharchitektur)
 
 **Ebene:** E0 (Fundament / Löschkern)
-**Normative Quellen:** `docs/SPEC.md` §4 (Schlüssel), §5 (Löschsaga), §6 (ReadGate), §7 (ErasureLayer), §10 (Barrieren), §12 (Testkatalog), §13 (Invarianten), §17 (offene Punkte). Ferner `docs/Finale Löscharchitektur.md`.
+**Normative Quellen:** `docs/SPEC.md` §4 (Schlüssel), §5 (Löschsaga), §6 (ReadGate), §7 (ErasureLayer), §10 (Barrieren), §12 (Testkatalog), §13 (Invarianten), §17 (finalisierte Entscheidungen).
 **Status:** Normativ (Soll-Zustand)
 **Geltungsbereich:** `crates/contextra-erasure`
 
@@ -137,18 +137,14 @@ Die Umbenennung der Vorfassung lautet: `Gated` → `Frozen`, `KeyRevoked` → `K
 | `RestoreBeyondHorizon` | abgelaufenes Schlüssel-Backup | verweigert |
 | `UnsupportedSubject` | Subjekt-Löschung ohne Index | fail-closed (siehe §12 Punkt 3) |
 
-## 12. Abweichungen und offene Punkte
+## 12. Verbindliche Ausführungsentscheidungen
 
-Die folgenden Punkte sind bewusst benannt. Sie entsprechen SPEC §17.
-
-1. **Concurrence und Verification-Gate:** Die Concurrence-Signatur ist im Regulated-Tier Pflicht, aber der Tier-Schalter selbst ist offen (SPEC O-K1 und Betriebsentscheidung).
-2. **Subjekt-Löschung (T-DEL-9):** Ohne Subjekt-zu-DocDek-Index liefert der `SagaGateSink` für `Subject` fail-closed `NotImplemented`. Der Index muss im Store (`contextra-db`/`contextra-store`) geliefert werden.
-3. **Karenz (`erasure_grace`):** Die Rücknahme führt nur nach `Restricted`, nie nach `Lifted`. Die rechtliche Bestätigung steht aus (SPEC O-K1).
-4. **Schichten-Implementierungen:** In diesem Crate existieren nur Test-Doubles für `ErasureLayer`. Produktive Implementierungen liegen in E1-Crates und werden in `contextra-db` verdrahtet (INV-WIRING-2).
-5. **Canary-Einfügung und -Suche:** Die Speicherschicht liefert den Port `PositiveControl`. Ohne Produktionsimplementierung ist die Messung ungültig.
-6. **Krypto-Duplikate:** `crypto_local`, `sha2`, `hmac` im Erasure-Kern sind zu entfernen (R4, Befund C-10, C-13). Die Migration persistierter Formate folgt INV-1.
-7. **Ed25519-Implementierung:** Der Port `Signer` ist nötig. Die produktive Implementierung wird in `contextra-crypto` bereitgestellt. Test-Schlüssel dürfen nicht in Produktion gelangen.
-8. **Mixed-Policy:** Die Standard-Policy `BlockAll` ist implementiert. `RedactAndRekey` und `DeleteAll` brauchen Betreiber-Eingaben und sind über die Konfiguration gesteuert.
+1. Der Regulated-Tier ist `TenantPolicy::Regulated`; dort sind `GuardPolicy::Required`, ein `ErasedSetMirror` und die Concurrence-Signatur Pflicht. Fehlt eines davon, verweigert `Contextra::open` den Start.
+2. `contextra-db` liefert den Subjekt-zu-DocDek-Index. Fehlt er zur Laufzeit, liefert der Start `CapabilityUnsupported`, bevor ein Löschauftrag angenommen wird.
+3. Nach `Frozen` gibt es weder Karenz noch Rücknahme. `Restricted` ist ausschließlich ein Hold- oder Aufbewahrungspfad vor `Frozen`.
+4. Produktive Schichten liegen bei den S1–S8-Besitzern und werden beim Öffnen durch `contextra-db` registriert. Test-Doubles sind nur Tests; ein Erfolg meldender Ersatz ist ein Build-Fehler (INV-WIRING-2).
+5. Ohne produktive `PositiveControl` ist eine Messung ungültig. Ohne `Signer` aus `contextra-crypto` ist das Erstellen eines Berichts ungültig.
+6. `BlockAll` ist die einzige Mixed-Policy. Ersatzdaten entstehen außerhalb der Saga als neuer regulärer Schreibvorgang.
 
 ## 13. Testabdeckung (SPEC §12)
 

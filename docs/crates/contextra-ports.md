@@ -1,132 +1,146 @@
-# contextra-ports — Implementierungsspezifikation (Soll-Zustand)
+# contextra-ports — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E0 (Fundament & Schnittstellenverträge / Ring 0)  
-**Kern-Closure:** `ids`, `env`, `types`  
-**Status:** Normativ (Soll-Zustand)  
-**Version:** 2.2  
-**Geltungsbereich:** `crates/contextra-ports`  
-**Referenzdokumente:** `docs/SPEC.md` §2.1, §2.4, §5, §6, §7, §10
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-ports` definiert systemweite, trait-basierte Schnittstellenverträge (Ports) nach dem Prinzip der hexagonalen Architektur (Ports & Adapters):
-- **Schichtentrennung (E0):** Als Fundamentbaustein auf Ebene E0 hängt `contextra-ports` ausschließlich von `contextra-env`, `contextra-types` und `contextra-ids` ab.
-- **Entkopplung der Schichten:** Ermöglicht den E1-Domänenbausteinen (`store`, `vector`, `text`, `graph`), standardisierte Schnittstellen zu implementieren, und dem E2-Orchestrator (`contextra-db`), diese homogen zu steuern.
-- **Synchronisationsverträge:** Definition von Barrieren (`CommitBarrier`, `PurgeBarrier`).
-- **EmbeddingEngine-Port:** Abstrahiert Text- und Vektoreinbettungen.
-
-### Architekturgarantien (R1–R6)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Object Safety (Dyn-Kompatibilität):** Alle Port-Traits sind objekt-sicher (`Box<dyn Port>`).
-3. **Keine konkreten Speicherschichten:** Importiert niemals `store`, `vector`, `text`, `graph`, `db`.
-4. **Leere Default-Features (R3):** `default = []`.
-5. **R1-Konformität:** Keine Aufwärtsabhängigkeiten (E0 hängt von keinem E1/E2/E3 ab).
+**Ebene:** E0 (Fundament und Ports)
+**Kern-Closure:** `env`, `ids` (SPEC §2.4). Keine Kante auf `types`.
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-ports`
+**Normative Quellen:** `docs/SPEC.md` §2.4, §2.5, §4.2, §4.3, §10.1, §10.2, §11.
 
 ---
 
-## 2. Kanonische Port-Traits
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       contextra-ports                       │
-│                                                             │
-│   ┌──────────────────────────┐ ┌──────────────────────────┐ │
-│   │      CommitBarrier       │ │       PurgeBarrier       │ │
-│   │ shared() / exclusive()   │ │ compaction() / purge()   │ │
-│   │                          │ │ purge_waiting() -> bool  │ │
-│   └──────────────────────────┘ └──────────────────────────┘ │
-│                                                             │
-│   ┌──────────────────────────┐                             │
-│   │     EmbeddingEngine      │                             │
-│   │ embed_query, embed_batch │                             │
-│   └──────────────────────────┘                             │
-│                                                             │
-│  ⚠ ErasureLayer, ReadGate, LayerWitness, Scanner<Armed>    │
-│    sind in contextra-erasure (E0) definiert, nicht hier.   │
-└─────────────────────────────────────────────────────────────┘
-```
+`contextra-ports` hält die Trait-Verträge, die E1 implementiert und die `contextra-db` verdrahtet.
 
----
+Kanonisch hier (SPEC §2.5):
+
+- `StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`
+- `CommitBarrier`, `PurgeBarrier`
+- `EffaceableKeySlot`, `KeyAnchor`, `Custody`, `WrappedBlob`, `DestroyAttestation`, `SlotGeneration`
+
+`ErasureLayer`, `ReadGate`, `LayerWitness`, `Scanner<Armed>`, `PurgeCx` und `PurgeOutcome` sind in `contextra-erasure` definiert. Dieses Crate importiert sie nicht und definiert sie nicht (SPEC §7). Eine Abhängigkeit auf `contextra-erasure` ist ausgeschlossen.
+
+Eine Abhängigkeit auf `contextra-types` ist ebenfalls ausgeschlossen. `types` bindet `privacy`, und `privacy` bindet `Purgeable` aus diesem Crate. `ports → types` würde den Zyklus `types → privacy → ports → types` schließen.
+
+## 2. Architekturregeln
+
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf E1, E2 oder E3. Keine Abhängigkeit auf `types`, `privacy` oder `erasure`. Identitätstypen kommen aus `ids`.
+3. Traits, die `contextra-db` als `dyn` hält, sind objekt-sicher.
+4. Kein konkreter Speicher, kein konkretes AEAD, kein Saga-Koordinator.
+
+## 3. Index-Ports
+
+Die Traits beschreiben die fachlichen Operationen. Die Gate-Prüfung sitzt nicht in diesen Traits. Sie sitzt in `TenantScopedStorage` (`contextra-db`, SPEC §6.1). Ein Index darf die `LiveMask` als vom Aufrufer gesetztes Filterkriterium lesen. Er entscheidet den Saga-Zustand nicht.
 
 ```rust
-use contextra_erasure::{EraseTarget, LayerWitness, Scanner, Armed};
-use futures_util::future::BoxFuture;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LayerId(pub [u8; 16]);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeyCoverage {
-    Full,
-    None,
+pub trait StorageEngine: Send + Sync {
+    fn put(&self, key: &[u8], sealed_record: &[u8]) -> Result<(), PortError>;
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, PortError>;
+    fn scan(&self, start: &[u8], end: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, PortError>;
 }
 
-pub struct LayerScope {
-    pub layer_id: LayerId,
-    pub affected_items: u64,
+pub trait VectorIndex: Send + Sync {
+    fn search_knn(&self, query: &[f32], k: usize) -> Result<Vec<ScoredId>, PortError>;
 }
 
-pub struct PurgeCx {
-    pub disk_reserve_bytes: u64,
+pub trait TextIndex: Send + Sync {
+    fn search(&self, terms: &[String], k: usize) -> Result<Vec<ScoredId>, PortError>;
 }
 
-pub struct PurgeOutcome {
-    pub items_purged: u64,
-    pub bytes_reclaimed: u64,
-}
-
-pub trait ErasureLayer: Send + Sync {
-    /// Eindeutige Schicht-Identifikation (z. B. "CTX_STORE_LSM_01").
-    fn id(&self) -> LayerId;
-
-    /// Gibt an, ob diese Schicht direkte Schlüsselabdeckung besitzt.
-    fn key_coverage(&self) -> KeyCoverage;
-
-    /// Phase 1: Ermittelt betroffene Segmente/Dateien für das EraseTarget.
-    fn resolve(&self, target: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, PortError>>;
-
-    /// Phase 2: Bereitet In-Memory Ausschlussmasken vor (z. B. RoaringBitmap).
-    fn on_gate(&self, scope: &LayerScope) -> BoxFuture<'_, Result<(), PortError>>;
-
-    /// Phase 5: Physische Bereinigung unter der PurgeBarrier.
-    fn purge(&self, scope: &LayerScope, cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, PortError>>;
-
-    /// Phase 6: Verifikation mittels Positivkontrolle (Scanner<Armed>).
-    fn witness(&self, scope: &LayerScope, sc: &Scanner<Armed>) -> BoxFuture<'_, Result<LayerWitness, PortError>>;
+pub trait GraphIndex: Send + Sync {
+    fn traverse(&self, start: &[u8], max_hops: u32) -> Result<Vec<ScoredId>, PortError>;
 }
 ```
 
----
-
-### 2.1 Synchronisations-Barrieren (`barrier.rs`)
+`ScoredId` ist port-lokal: Schlüsselbytes und `f32`. `SearchHit` bleibt in `contextra-types` (R4). `contextra-db` mappt `ScoredId` auf `SearchHit`.
 
 ```rust
-pub trait SharedPermit: Send + Sync {}
-pub trait ExclusivePermit: Send + Sync {}
+pub struct ScoredId {
+    pub key: Vec<u8>,
+    pub score: f32,
+}
+```
 
-/// Schutz des synchronen Gate-Commits gegen parallele Schreiber.
+## 4. Barrieren (SPEC §10)
+
+### 4.1 `CommitBarrier`
+
+`shared` erlaubt parallele Schreiber. `exclusive` wartet auf alle `shared`-Permits und blockiert neue. Der Saga-Koordinator nimmt `exclusive` für den Gate-Commit in Takt 1.
+
+```rust
 pub trait CommitBarrier: Send + Sync {
-    fn shared(&self) -> BoxFuture<'_, Box<dyn SharedPermit>>;
-    fn exclusive(&self) -> BoxFuture<'_, Box<dyn ExclusivePermit>>;
+    fn shared(&self) -> BoxFuture<'_, Result<SharedPermit, PortError>>;
+    fn exclusive(&self) -> BoxFuture<'_, Result<ExclusivePermit, PortError>>;
 }
+```
 
-pub trait CompactionPermit: Send + Sync {}
-pub trait PurgePermit: Send + Sync {}
+Die Permits sind RAII-Typen dieses Crates. Ihr Drop gibt den Slot frei. Die Methoden liefern `Result`. Ein vergifteter Barrier-Zustand ist ein Fehler, kein Erfolg.
 
-/// Schutz des physischen Purges gegen parallele LSM-Kompaktionen.
+### 4.2 `PurgeBarrier`
+
+`compaction` und `purge` schließen sich aus. `purge_waiting` ist ein nicht blockierendes Signal an laufende Kompaktionen, den Slot freizugeben. Der exklusive Purge gilt für die Purge-Compaction in Schritt 8.
+
+```rust
 pub trait PurgeBarrier: Send + Sync {
-    fn compaction(&self) -> BoxFuture<'_, Box<dyn CompactionPermit>>;
-    fn purge(&self) -> BoxFuture<'_, Box<dyn PurgePermit>>;
-    /// Signalisiert wartenden Kompaktionen, dass ein Purge ansteht.
+    fn compaction(&self) -> BoxFuture<'_, Result<CompactionPermit, PortError>>;
+    fn purge(&self) -> BoxFuture<'_, Result<PurgePermit, PortError>>;
     fn purge_waiting(&self) -> bool;
 }
 ```
 
----
+## 5. Schlüsselanker (SPEC §4.3)
 
-## 3. EmbeddingEngine (`embedding.rs`)
+```rust
+pub enum Custody {
+    K1,
+    K2,
+    K3,
+}
+
+pub struct WrappedBlob {
+    pub bytes: Vec<u8>,
+}
+
+pub struct SlotGeneration(pub u64);
+
+pub struct DestroyAttestation {
+    pub custody: Custody,
+    pub generation: SlotGeneration,
+    pub at_unix_nanos: u64,
+}
+
+pub trait EffaceableKeySlot: Send + Sync {
+    fn custody(&self) -> Custody;
+    fn wrap(&self, material: &Zeroizing<[u8; 32]>, ad: &[u8]) -> Result<WrappedBlob, KeyError>;
+    fn unwrap(&self, blob: &WrappedBlob, ad: &[u8]) -> Result<Zeroizing<[u8; 32]>, KeyError>;
+    fn rotate(&self) -> Result<SlotGeneration, KeyError>;
+    fn destroy(&self, generation: SlotGeneration) -> Result<DestroyAttestation, KeyError>;
+}
+
+pub trait KeyAnchor: EffaceableKeySlot {}
+```
+
+`Custody::K0` ist kein Slot. K0 bedeutet, dass kein `EffaceableKeySlot` gesetzt ist und Klasse C unerreichbar bleibt. K2 und K3 geben `KeyError::CapabilityUnsupported` zurück, solange die Konformitätssuite fehlt. Der Zeitstempel in `DestroyAttestation` kommt vom Aufrufer aus `Clock`. Dieses Crate liest keine Systemuhr.
+
+`KeyError` ist `#[non_exhaustive]`: `WrapFailed`, `UnwrapFailed`, `CapabilityUnsupported`, `GenerationUnknown`.
+
+## 6. `Purgeable` (Schicht S4)
+
+Caches, die Nutzdaten oder dokumentbezogene Zwischenwerte halten, implementieren diesen Vertrag. Die Saga ruft ihn in Schritt 3 auf. Die Implementierung invalidiert den Scope und zeroized die Werte. Ein leeres `Ok(())` ohne Invalidierung ist ein Stub und verboten (INV-WIRING-2).
+
+```rust
+pub trait Purgeable: Send + Sync {
+    fn invalidate(&self, doc_key: &[u8]) -> Result<(), PortError>;
+}
+```
+
+Bekannte Implementierungen: Block-Cache in `contextra-store`, `er_cache` in `contextra-rank`, Surrogat-Vault in `contextra-privacy`. `contextra-db` registriert sie beim Koordinator.
+
+## 7. `EmbeddingEngine`
+
+Der Port bleibt für einen vom Betreiber gelieferten Embedder. Die entfernten Inferenz-Crates werden hier nicht erwähnt und nicht importiert (SPEC §2.2, Gate `G-REACTIVATE`).
 
 ```rust
 pub trait EmbeddingEngine: Send + Sync {
@@ -136,34 +150,13 @@ pub trait EmbeddingEngine: Send + Sync {
 }
 ```
 
----
+Embeddings personenbezogener Texte sind Klasse D und brauchen eine `LineageRef`. Die Pflicht prüft `contextra-db`, nicht dieser Port.
 
-## 4. Fehlerbehandlung (`PortError`)
+## 8. Fehler (`PortError`)
 
-```rust
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum PortError {
-    #[error("Layer resolution failed: {0}")]
-    ResolutionFailed(String),
+`#[non_exhaustive]`: `Storage`, `Index`, `Barrier`, `Timeout`, `Key(KeyError)`. Es gibt keine Varianten `OnGateFailed` oder `WitnessFailed`. Diese Fehler leben in `ErasureError`.
 
-    #[error("OnGate preparation failed: {0}")]
-    OnGateFailed(String),
-
-    #[error("Purge execution failed: {0}")]
-    PurgeFailed(String),
-
-    #[error("Verification witness scan failed: {0}")]
-    WitnessFailed(String),
-
-    #[error("Port timeout exceeded")]
-    Timeout,
-}
-```
-
----
-
-## 5. `Cargo.toml` Spezifikation
+## 9. `Cargo.toml`
 
 ```toml
 [package]
@@ -172,36 +165,24 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Canonical dyn-compatible port traits for Contextra subsystems"
+description = "Port traits: storage, indexes, barriers, and the effaceable key slot"
 
 [lints]
 workspace = true
 
 [dependencies]
-contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
-contextra-erasure = { workspace = true }
-contextra-types = { workspace = true }
-futures-util = "0.3"
+contextra-ids = { workspace = true }
+futures-util = { version = "0.3", default-features = false }
 thiserror = { workspace = true }
-serde = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-proptest = "1.4"
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
 
 [features]
 default = []
-std = ["contextra-ids/std", "contextra-env/std"]
 ```
 
----
+## 10. Abnahme
 
-## 6. Implementierungs-Arbeitspakete für Entwickler
-
-1. **ErasureLayer entfernen:** `src/erasure.rs` löschen. `ErasureLayer`, `ReadGate`, `Scanner<Armed>`, `LayerWitness` werden aus `contextra-erasure` importiert, nicht in `contextra-ports` definiert.
-2. **Signatur-Härtung:** Alle Rückgabetypen von `Result<_, String>` auf `Result<_, PortError>` migrieren.
-3. **Altlasten-Bereinigung:** In `src/embedding.rs` Referenzen auf `infer-candle` und `infer-ollama` entfernen.
-4. **Verifikation:**
-   - `cargo clippy -p contextra-ports -- -D warnings`
-   - `cargo test -p contextra-ports`
+1. Kein Typ aus SPEC §2.5, dessen Besitzer `contextra-erasure` oder `contextra-types` ist, wird hier definiert.
+2. `cargo metadata` zeigt keine Kante auf `contextra-types`.
+3. `Purgeable::invalidate` hat keine Implementierung, die ohne Seiteneffekt `Ok(())` liefert.

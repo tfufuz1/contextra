@@ -126,6 +126,13 @@ impl LsmStorage {
     /// vor diesem Aufruf abgeschlossen haben. Der Purge ist fail-closed: Jeder Fehler lässt den
     /// Store in einem konsistenten Zustand zurück, und der Aufruf kann wiederholt werden.
     pub async fn purge_prefix(&self, target_prefix: &[u8]) -> StoreResult<PurgeReport> {
+        if !self.flush_purge_fence.enter_purge() {
+            return Err(StoreError::PendingDeleteBlocked(
+                "a flush currently owns the purge fence; retry purge".into(),
+            ));
+        }
+        let _purge_fence = PurgeFenceGuard(&self.flush_purge_fence);
+
         if self.snapshot_registry.min_active_seqno() != u64::MAX {
             return Err(StoreError::Erasure(
                 "purge blocked by open snapshot in SnapshotRegistry".into(),
@@ -270,11 +277,25 @@ impl LsmStorage {
             scrub_strict(&path, reader_alive, &mut report)?;
         }
 
+        // A cache entry does not carry enough scope information to evict just
+        // one record safely. Invalidating the shared cache is conservative and
+        // prevents replaced table blocks from surviving a successful purge.
+        self.block_cache().clear();
+
         vfs.sync_dir(&data_dir).map_err(|e| {
             StoreError::Erasure(format!("directory sync after SSTable scrub failed: {e}"))
         })?;
 
         Ok(report)
+    }
+}
+
+/// Releases the purge side of the flush/purge fence on every return path.
+struct PurgeFenceGuard<'a>(&'a super::fence::FlushPurgeFence);
+
+impl Drop for PurgeFenceGuard<'_> {
+    fn drop(&mut self) {
+        self.0.leave_purge();
     }
 }
 

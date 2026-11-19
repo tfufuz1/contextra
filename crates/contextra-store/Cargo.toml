@@ -31,6 +31,9 @@ contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-durable-fs = { workspace = true }
+# The erasure-chain contract is an explicit cross-ring contract, not part of
+# the store domain closure.
+contextra-erasure = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }

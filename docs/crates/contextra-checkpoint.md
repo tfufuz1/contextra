@@ -1,189 +1,71 @@
-# contextra-checkpoint — Implementierungsspezifikation (Soll-Zustand)
+# contextra-checkpoint — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E1 (Domänenbaustein / Ring 1)  
-**Kern-Closure:** `ids`, `env`, `durable-fs` (E0-Fundamente, max. 5)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-checkpoint`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §4, §5; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-checkpoint` stellt leichtgewichtige Point-in-Time Checkpoints und Verzweigungen (Branching/Forking) für Contextra bereit:
-- **Zero-Copy Checkpoints:** Momentaufnahmen des Datenbestands via Dateisystem-Hardlinks auf unveränderliche SSTables (`.sst`).
-- **Atomare Manifest-Kopie:** Konsistente Sicherung des LSM-Manifests zum Checkpoint-Zeitpunkt.
-- **Krypto-Shredding Sicherheit (SPEC §4):** Checkpoints teilen physische Datenblöcke mit dem Primärspeicher. Die Zerstörung des Schlüssels im Tresor macht Daten in allen Checkpoints unverzüglich $O(1)$ unlesbar.
-- **Waisen- & Fragment-Bereinigung:** Erkennung und Bereinigung verwaister temporärer Checkpoint-Verzeichnisse nach Systemabstürzen.
-
-### Beseitigung von Ebenen- und Dev-Dependency-Verstößen (R1, R2)
-1. **Keine E2-Abhängigkeiten:** Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace`, `types-compat` und `ports-compat` werden ersatzlos gestrichen.
-2. **Keine E3-Dev-Abhängigkeiten (R2):** Die Dev-Abhängigkeit auf `contextra-testkit` (Ebene 3) in `Cargo.toml` ist ein Verstoß gegen R2 (*„Dev-Abhängigkeiten auf höhere Ebenen sind verboten"*) und wird entfernt.
-3. **Altlasten-Bereinigung (`AP-21`):** In `src/lib.rs` Zeile 34 wird die Referenz auf das entfernte `contextra-agent` gelöscht.
-
-### Architekturgarantien (R1–R6, INV-1, INV-3, INV-4)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Zero-Panic-Policy:** Alle Operationen liefern `CheckpointError`.
-3. **Leere Default-Features (R3):** `default = []`.
-4. **Keine Klartext-Kopien:** Checkpoint-Dateien bleiben stets exakt so verschlüsselt wie die Original-SSTables.
+**Ebene:** E1 (Domäne)
+**Domänen-Closure:** `ids`, `env`, `durable-fs`
+**Verträge:** `erasure` (`CheckpointLayer`). Zählt nicht gegen die fünf (SPEC §15).
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-checkpoint`
+**Normative Quellen:** `docs/SPEC.md` §5.3 Schritt 8, §5.9 Schicht S6, §5.11, §6.3, §7, INV-12.
 
 ---
 
-## 2. Architektur & Komponenten
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    contextra-checkpoint                     │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                  CheckpointManager                  │   │
-│   │                                                     │   │
-│   │   Primary Storage Dir            Checkpoint Dir     │   │
-│   │   ┌─────────────────┐            ┌────────────────┐ │   │
-│   │   │ Manifest        │──Copy─────►│ Manifest       │ │   │
-│   │   │ sst-001.sst ────┼──Hardlink──┼► sst-001.sst   │ │   │
-│   │   │ sst-002.sst ────┼──Hardlink──┼► sst-002.sst   │ │   │
-│   │   └─────────────────┘            └────────────────┘ │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │   HardlinkCloner   │    │   OrphanCleaner   │   │   │
-│   │   │  (Atomic Linker)   │    │(Crash Recovery)   │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+`contextra-checkpoint` erzeugt Point-in-Time-Abbilder über Hardlinks auf unveränderliche SSTables und eine kopierte Manifest-Datei.
 
----
+Schicht **S6**. `CheckpointLayer` implementiert `ErasureLayer` aus `contextra-erasure`. Die Messung heißt `CheckpointScanner`.
 
-## 3. Kanonische Schnittstellen & Typen
+Ein Checkpoint ist eine Datenkopie im Sinn von Spur D (SPEC §5.11). Er enthält Chiffretext. Er enthält keine `KeyTable`, keinen Keystore, kein `master.salt` und keinen Wrap-Blob. Ein Lauf, der eine dieser Dateien verlinkt oder kopiert, endet mit `CheckpointError::KeyMaterialRefused`.
 
-### 3.1 `CheckpointManager` & Optionen
+Die Vernichtung eines `DocDek` macht den Chiffretext in jedem Hardlink unlesbar. Das ersetzt den Sweep nicht. Hardlinks teilen die Blöcke der Quelldatei nicht mehr, sobald die Quelle neu geschrieben wurde. Der Sweep muss jeden Checkpoint selbst bereinigen (SPEC §5.3 Schritt 8).
 
-```rust
-use std::path::{Path, PathBuf};
-use contextra_ids::Seq;
+## 2. Architekturregeln
 
-#[derive(Debug, Clone)]
-pub struct CheckpointOptions {
-    /// Erlaubt Fallback auf physische Dateikopie, falls Hardlinks nicht unterstützt werden (z. B. Cross-Device).
-    pub allow_copy_fallback: bool,
-    /// Erzwingt einen synchronen Fsync auf das Checkpoint-Manifest.
-    pub fsync_manifest: bool,
-}
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf `contextra-store`, `contextra-crypto`, `contextra-mvcc` oder ein anderes E1-Crate. Keine Dev-Abhängigkeit auf `contextra-testkit`.
+3. Kein `unwrap` und kein `expect` in Beispielen und Bibliothekscode. Metadaten-Fehler sind `Result`.
+4. Logs nennen keine Nutzbytes des Löschziels (INV-12).
 
-impl Default for CheckpointOptions {
-    fn default() -> Self {
-        Self {
-            allow_copy_fallback: false,
-            fsync_manifest: true,
-        }
-    }
-}
+## 3. Anlegen
 
-#[derive(Debug, Clone)]
-pub struct CheckpointInfo {
-    pub checkpoint_dir: PathBuf,
-    pub seq: Seq,
-    pub file_count: usize,
-    pub bytes_linked: u64,
-}
+`create_checkpoint` legt das Zielverzeichnis an, verlinkt Dateien mit der Endung `sst` und kopiert das Manifest. Die Kopie des Manifests wird mit `fsync` abgeschlossen, danach das Verzeichnis.
 
-pub struct CheckpointManager;
+`allow_copy_fallback` darf eine SSTable nur dann kopieren, wenn `hard_link` mit einem Fehler scheitert, der kein bereits geschriebenes Ziel hinterlässt. Die Kopie ist Chiffretext derselben Bytes. Ein Fallback, der entschlüsselt, existiert nicht.
 
-impl CheckpointManager {
-    /// Erstellt einen atomaren Checkpoint aller SSTables und des Manifests.
-    pub fn create_checkpoint(
-        src_dir: &Path,
-        dst_dir: &Path,
-        current_seq: Seq,
-        opts: &CheckpointOptions,
-    ) -> Result<CheckpointInfo, CheckpointError> {
-        if dst_dir.exists() {
-            return Err(CheckpointError::DestinationAlreadyExists(dst_dir.to_path_buf()));
-        }
+Dateinamen aus der Schlüsselverwaltung (`keytable`, `keystore`, `master.salt` und ihre temporären Geschwister) werden nicht übernommen.
 
-        std::fs::create_dir_all(dst_dir).map_err(CheckpointError::Io)?;
+Verwaiste Zielverzeichnisse nach einem Crash löscht der `OrphanCleaner` nur, wenn kein Manifest-`fsync` abgeschlossen wurde. Ein abgeschlossener Checkpoint bleibt stehen, bis der Sweep ihn erfasst.
 
-        let mut file_count = 0;
-        let mut bytes_linked = 0;
+## 4. Policies (SPEC §5.9 S6)
 
-        for entry in std::fs::read_dir(src_dir).map_err(CheckpointError::Io)? {
-            let entry = entry.map_err(CheckpointError::Io)?;
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                    let file_name = entry.file_name();
-                    let target_path = dst_dir.join(&file_name);
+| Policy | Wirkung |
+|---|---|
+| `Rewrite` | Standard. Jeder Checkpoint, der den Scope enthält, wird ohne den Scope neu geschrieben und ausgetauscht. |
+| `ExpireNow` | Der Checkpoint wird gelöscht, sobald kein Leser ihn mehr pinnt. |
+| `ExpireAfterHold` | Nur zulässig, solange die Saga `Restricted` ist. Nach `Lifted` oder nach dem Wechsel auf `Frozen` gilt wieder `Rewrite`. |
 
-                    if ext == "sst" {
-                        // Hardlink für unveränderliche SSTable
-                        match std::fs::hard_link(&path, &target_path) {
-                            Ok(()) => {
-                                file_count += 1;
-                                bytes_linked += entry.metadata().map(|m| m.len()).unwrap_or(0);
-                            }
-                            Err(e) if opts.allow_copy_fallback => {
-                                std::fs::copy(&path, &target_path).map_err(CheckpointError::Io)?;
-                                file_count += 1;
-                                bytes_linked += entry.metadata().map(|m| m.len()).unwrap_or(0);
-                            }
-                            Err(e) => return Err(CheckpointError::HardlinkFailed { src: path, err: e }),
-                        }
-                    } else if ext == "manifest" {
-                        // Manifest wird kopiert und gesynct
-                        std::fs::copy(&path, &target_path).map_err(CheckpointError::Io)?;
-                        if opts.fsync_manifest {
-                            let f = std::fs::File::open(&target_path).map_err(CheckpointError::Io)?;
-                            f.sync_all().map_err(CheckpointError::Io)?;
-                        }
-                        file_count += 1;
-                    }
-                }
-            }
-        }
+`ExpireAfterHold` auf einer Saga, die nicht `Restricted` ist, liefert `CheckpointError::PolicyNotApplicable`. Ein Checkpoint gilt erst nach abgeschlossenem `Rewrite` oder nach nachgewiesenem `ExpireNow` als bereinigt. Bis dahin bleibt er ein Residuum im Bericht. Die Klasse M vergibt der Koordinator.
 
-        Ok(CheckpointInfo {
-            checkpoint_dir: dst_dir.to_path_buf(),
-            seq: current_seq,
-            file_count,
-            bytes_linked,
-        })
-    }
-}
-```
+`purge` ist idempotent (T-DEL-14).
 
----
+## 5. Sweep und Restore
 
-## 4. Fehlerbehandlung (`CheckpointError`)
+Schritt 8 ruft `CheckpointLayer::purge` unter der Policy der Collection auf. Der Austausch eines neu geschriebenen Checkpoints läuft über `contextra-durable-fs`: `tmp` → `fsync` → `rename` → Verzeichnis-`fsync`. Ersetzte Dateien, die eine offene Zeitreise noch pinnt, gehen in `PendingDelete`.
 
-```rust
-use std::path::PathBuf;
+Restore ist an das aktuelle `ReadGate` gebunden (SPEC §6.3):
 
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum CheckpointError {
-    #[error("Destination checkpoint directory already exists: {0:?}")]
-    DestinationAlreadyExists(PathBuf),
+1. Vor dem ersten Lesen eines wiederhergestellten Bytes ruft der Restore `ReadGate::check` für jeden Scope des Checkpoints auf.
+2. `Erased` verweigert die Wiederherstellung dieses Scopes. Die übrigen Scopes dürfen nur gelesen werden, wenn der Restore-Guard in `contextra-db` `restore_reapplied` geschrieben hat.
+3. Ein Checkpoint wird nicht als Quelle einer `KeyTable` eingespielt.
 
-    #[error("Failed to create hardlink from {src:?}: {err}")]
-    HardlinkFailed {
-        src: PathBuf,
-        #[source]
-        err: std::io::Error,
-    },
+Der Guard selbst liegt in `contextra-db` und `contextra-erasure` (SPEC §5.11). Dieses Crate stellt die Dateien bereit und verweigert den Lesezugriff, wenn das Gate `Erased` oder `Restricted` ohne Audit sagt.
 
-    #[error("Underlying I/O error: {0}")]
-    Io(#[from] std::io::Error),
+## 6. Fehler (`CheckpointError`)
 
-    #[error("Durable filesystem error: {0}")]
-    DurableFs(String),
-}
-```
+`#[non_exhaustive]`: `DestinationAlreadyExists`, `HardlinkFailed`, `Io`, `DurableFs`, `KeyMaterialRefused`, `PolicyNotApplicable`, `RestoreBlocked`, `PendingDeleteBlocked`.
 
----
-
-## 5. `Cargo.toml` Spezifikation
+## 7. `Cargo.toml`
 
 ```toml
 [package]
@@ -192,7 +74,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Backup, zero-copy checkpointing, and branch management for Contextra storage"
+description = "Hardlink checkpoints and erasure sweep under Rewrite, ExpireNow, ExpireAfterHold"
 
 [lints]
 workspace = true
@@ -201,29 +83,23 @@ workspace = true
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-durable-fs = { workspace = true }
+contextra-erasure = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-proptest = "1.4"
 
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
-tracing = ["dep:tracing"]
 ```
 
----
+## 8. Tests
 
-## 6. Implementierungs-Arbeitspakete für Entwickler
-
-1. **`Cargo.toml` Bereinigung:**
-   - Entfernen von `contextra-types` und `contextra-ports` aus `[dependencies]`.
-   - Entfernen von `contextra-testkit` aus `[dev-dependencies]` (R2-Verstoß).
-   - Features `workspace`, `types-compat`, `ports-compat` entfernen.
-   - `default = []` setzen (R3).
-2. **Altlasten-Bereinigung (`AP-21`):**
-   - Referenz auf `contextra-agent` in `src/lib.rs` Zeile 34 bereinigen.
-3. **Verifikation:**
-   - `cargo test -p contextra-checkpoint`
+| Kennung | Pflicht |
+|---|---|
+| T-DEL-14 | Zweites `purge` derselben Policy ist ein No-op |
+| T-DEL-17 | Nach `Rewrite` enthält die Checkpoint-Datei den Klartext-Canary nicht |
+| T-DEL-18 | Restore eines Checkpoints von vor der Löschung bleibt am Gate gesperrt |
+| S6 | Ein Lauf, der `keytable` verlinken würde, liefert `KeyMaterialRefused` |
+| Policy | `ExpireAfterHold` außerhalb von `Restricted` liefert `PolicyNotApplicable` |

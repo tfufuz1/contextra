@@ -18,6 +18,22 @@ use thiserror::Error;
 #[derive(Debug, Error, PartialEq, Clone)]
 #[non_exhaustive]
 pub enum VectorError {
+    /// A vector contains a NaN or an infinite component.
+    #[error("invalid floating-point value")]
+    InvalidFloat,
+
+    /// The on-disk representation is malformed or fails integrity validation.
+    #[error("corrupted vector storage: {0}")]
+    CorruptedStorage(String),
+
+    /// Switching the active, rebuilt generation did not complete atomically.
+    #[error("vector generation switch failed: {0}")]
+    GenerationSwitchFailed(String),
+
+    /// A slot is still part of the active generation and cannot yet be reused.
+    #[error("vector slot is still live: {0}")]
+    SlotStillLive(u32),
+
     /// Ungültige Eingabe oder Konfigurationsparameter.
     #[error("Invalid input: {0}")]
     InvalidInput(String),

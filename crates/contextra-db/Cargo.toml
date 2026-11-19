@@ -7,69 +7,30 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Contextra — Embedded hybrid-search for AI agents"
-
-[package.metadata.contextra]
-ring = "2"
+description = "Hybrid-search orchestration, lineage, and erasure wiring"
 
 [dependencies]
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-privacy = { workspace = true }
 contextra-erasure = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-store = { workspace = true }
+contextra-vector = { workspace = true }
+contextra-text = { workspace = true }
+contextra-graph = { workspace = true }
+contextra-rank = { workspace = true }
 contextra-mvcc = { workspace = true }
-contextra-store = { workspace = true, features = ["workspace"] }
-contextra-vector = { workspace = true, features = ["workspace"] }
-contextra-text = { workspace = true, features = ["workspace"] }
-contextra-checkpoint = { workspace = true, features = ["workspace"] }
-contextra-rank = { workspace = true, features = ["workspace"] }
-contextra-graph = { workspace = true, features = ["workspace"] }
-bytes = { workspace = true }
-ahash = { workspace = true }
-serde_json = { workspace = true }
-serde = { workspace = true }
+contextra-checkpoint = { workspace = true }
+contextra-durable-fs = { workspace = true }
 tokio = { workspace = true }
-tracing = { workspace = true }
-parking_lot = { workspace = true }
-tokio-util = { version = "0.7.18", features = ["rt"] }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
-criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
-contextra-vector = { workspace = true }
-contextra-store = { workspace = true, features = ["workspace"] }
-contextra-graph = { workspace = true }
-contextra-text = { workspace = true }
-contextra-checkpoint = { workspace = true, features = ["workspace"] }
 
 [features]
 default = []
-bench = []
-reranking = []
-experimental-diskann = ["contextra-vector/experimental-diskann"]
-background-maintenance = []
-graph-connectivity-health = ["contextra-graph/graph-connectivity-health"]
-coherence-bonus-fusion = []
-volatile-vault = []
-edge-reinforcement-learning = []
-exp-extraction = []
-entity-extraction = ["exp-extraction"]
-auto-extraction-opt-out = []
-license = []
-
-[[example]]
-name = "quickstart"
-
-[[example]]
-name = "hybrid_search"
-
-[[test]]
-name = "diskann_collection_fallback"
-required-features = ["experimental-diskann"]
-
-[[example]]
-name = "collections"

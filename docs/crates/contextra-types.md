@@ -1,94 +1,91 @@
-# contextra-types — Implementierungsspezifikation (Soll-Zustand)
+# contextra-types — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E0 (Fundament / Ring 0)  
-**Kern-Closure:** `ids` (0 weitere Workspace-Abhängigkeiten)  
-**Status:** Normativ (Soll-Zustand)  
-**Version:** 2.2  
-**Geltungsbereich:** `crates/contextra-types`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5, §11, §13, §14  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-types` ist das zentrale Integrations-Typenpaket für Contextra. Es definiert die übergeordneten Datenmodelle, Retrieval-Strukturen, DTOs und die kanonische Fehler-Hierarchie (`ContextraError`) für die Integrations- und Endpunktebene (E2/E3):
-- **Zentrale Fehlerarchitektur (`ContextraError`):** Einheitliche Fehlerbehandlung für alle Schichten mit klaren Fehlerursachen (Erased, Crypto, Storage, Input, SnapshotRevoked).
-- **Retrieval- & Suchstrukturen:** Kanonische Definition von Suchanfragen, Filtern, Aggregationen und Dokumentenrepräsentationen.
-- **Bereinigte Re-Exports:** Re-Exportiert Identitätstypen aus `contextra-ids`, Datenklassen aus `contextra-privacy` und Saga-Zustände aus `contextra-erasure` ohne Typ-Dubletten (R4).
-
-### Bereinigung der Migrations-Altlasten (D-01, D-07, R4)
-1. **Löschung von `src/erasure.rs`:** Das historische, komplett mit `#[deprecated]` markierte Modul `erasure.rs` (mit Duplikaten von `EraseTarget`, `Scanner`, `LayerWitness`, `RetentionAttestation`) wird **vollständig gelöscht**.
-2. **Löschung veralteter ID-Duplikate:** Die veralteten `ErasureId` und `GateId` in `src/ids.rs` werden entfernt; stattdessen erfolgt ein sauberer Re-Export aus `contextra-ids`.
-3. **Altlasten-Bereinigung (`AP-21`):** In `src/error.rs` (Z. 122), `src/error_dto.rs` (Z. 6), `src/retrieval_strategy.rs` (Z. 9) und `src/types/domain/misc.rs` (Z. 92) werden alle Referenzen auf `contextra-py` und `contextra-router` gelöscht.
-
-### Architekturgarantien (R1–R6, INV-3, INV-4)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Reines Datenmodell:** Keine I/O-, Netzwerk- oder asynchronen Laufzeit-Abhängigkeiten (kein `tokio`).
-3. **Zero-Panic-Policy:** Keine unkontrollierten Panics.
-4. **Leere Default-Features (R3):** `default = []`.
+**Ebene:** E0 (Fundament)
+**Kern-Closure:** `ids`, `privacy`, `erasure`, `ports`
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-types`
+**Normative Quellen:** `docs/SPEC.md` §2.4, §2.5, §4.9, §6.1, §6.3, §11, §14, INV-12.
 
 ---
 
-## 2. Kanonische Fehlertypen: `ContextraError`
+## 1. Zweck
+
+`contextra-types` hält die integrationsweiten Datenmodelle ohne I/O.
+
+Kanonisch hier (SPEC §2.5): `ContextraError`, `DocumentRecord`, `SearchHit`.
+
+Zusätzlich, weil §2.5 sie keinem anderen Crate gibt und sie kein I/O enthalten: `ContextraConfig` und die Typen aus SPEC §14 (`EncryptionConfig`, `SecretString`, `GuardPolicy`, `DataClassPolicy`, `TenantPolicy`, `ErasureConfig`, `CustodyProfile`, `MixedPolicy`).
+
+`ports` hängt von diesem Crate nicht ab. Die Kante zeigt nur hierher: `types` nutzt `ports::Custody` nicht als zweiten Schlüsseltyp. `CustodyProfile` ist die Konfigurationswahl K0–K3. `ports::Custody` bleibt der Slot und kennt K1–K3. `contextra-db` mappt `CustodyProfile::K1` auf `Custody::K1` und so weiter. `K0` erzeugt keinen Slot.
+
+Saga-Typen (`SagaState`, `EraseTarget`, `ErasureError`, `ErasureTicket`) bleiben in `contextra-erasure`. Dieses Crate definiert sie nicht. Es bettet `ErasureError` ein.
+
+## 2. Architekturregeln
+
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`. Kein `tokio`.
+2. Keine Abhängigkeit auf E1, E2 oder E3. Keine Abhängigkeit auf `contextra-crypto`.
+3. `Erased` und `NotFound` sind auf dem Lesepfad ununterscheidbar (SPEC §6.1, INV-12). `Display` und `Debug` beider Varianten sind die Zeichenkette `not found`.
+4. Kein Freitext in einem Fehler, der ein Löschziel, eine Dokument-ID oder einen Pfad des Ziels nennt.
+5. `Restricted` und `RestrictedReadAuditRequired` bleiben eigene Varianten, damit T-DEL-13 den Audit-Fehler benennen kann. Ihr Text ist die feste Zeichenkette `restricted` und nennt kein Ziel. MCP bildet alle vier Varianten auf `not found` ab.
+
+## 3. `ContextraError`
+
+`Debug` ist von Hand implementiert. `Erased` und `NotFound` schreiben beide nur `not found`. Ein abgeleitetes `Debug`, das den Variantennamen zeigt, ist für diese beiden Varianten verboten.
 
 ```rust
-use std::path::PathBuf;
-use contextra_ids::{DocId, Seq};
-
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 #[non_exhaustive]
 pub enum ContextraError {
-    #[error("Document or key erased (DSGVO / ReadGate): {0}")]
-    Erased(String),
+    #[error("not found")]
+    Erased,
 
-    #[error("Access restricted (Art. 18 DSGVO): {0}")]
-    Restricted(String),
+    #[error("not found")]
+    NotFound,
 
-    #[error("Restricted read requires audit entry")]
+    #[error("restricted")]
+    Restricted,
+
+    #[error("restricted")]
     RestrictedReadAuditRequired,
 
-    #[error("Data class violation: {0}")]
-    ClassViolation(String),
+    #[error("data class rejected")]
+    ClassViolation,
 
-    #[error("Storage engine failure: {0}")]
-    Storage(String),
+    #[error("storage failure")]
+    Storage,
 
-    #[error("Cryptographic operation failed: {0}")]
-    Crypto(String),
+    #[error("cryptographic operation failed")]
+    Crypto,
 
-    #[error("Invalid input or parameters: {0}")]
-    InvalidInput(String),
+    #[error("invalid input")]
+    InvalidInput,
 
-    #[error("Entity or document not found: {0:?}")]
-    NotFound(String),
+    #[error("snapshot unavailable")]
+    SnapshotRevoked,
 
-    #[error("Snapshot at sequence {seq} revoked by erasure operation")]
-    SnapshotRevoked { seq: Seq },
+    #[error("io failure")]
+    Io(#[source] std::io::Error),
 
-    #[error("Underlying I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("erasure failure")]
+    Erasure(#[source] contextra_erasure::ErasureError),
 
-    #[error("Erasure saga error: {0}")]
-    Erasure(String),
-
-    #[error("Index corruption detected in {path:?}: {reason}")]
-    CorruptedIndex { path: PathBuf, reason: String },
+    #[error("index corrupted")]
+    CorruptedIndex,
 }
-
-pub type Result<T> = std::result::Result<T, ContextraError>;
 ```
 
----
+Keine Variante trägt `String`, `DocId`, Pfad oder Grundtext.
 
-## 3. Dokument- & Metadatenmodelle
+`ErasureError` bleibt typisiert. `ShredVerificationFailed`, `CapabilityUnsupported`, `JournalNotDurable`, `PositiveControlFailed`, `RestoreBeyondHorizon` und die übrigen Varianten aus SPEC §11 leben in `contextra-erasure` und werden nicht hier nachgebaut (R4).
+
+Der Lesepfad in `contextra-db` gibt für einen fehlenden und für einen gelöschten Schlüssel `ContextraError::Erased` zurück (SPEC §6.3). Aufrufer dürfen die beiden Fälle nicht auseinanderhalten. `NotFound` bleibt für interne Pfade, die nie ein Gate gesehen haben, und hat nach außen dasselbe Bild.
+
+`From<ErasureError>` existiert. Eine Umwandlung nach `String` existiert nicht.
+
+## 4. Dokumente und Treffer
 
 ```rust
-use contextra_ids::{CollectionId, DocId, TenantId};
-use contextra_privacy::DataClass;
-use serde::{Deserialize, Serialize};
-
-/// Ein im System gespeichertes Dokument mit Metadaten und Versionierung.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocumentRecord {
     pub tenant_id: TenantId,
     pub collection_id: CollectionId,
@@ -99,8 +96,6 @@ pub struct DocumentRecord {
     pub created_at_millis: u64,
 }
 
-/// Suchergebnis mit Ähnlichkeits- und Relevanz-Scores.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchHit {
     pub doc_id: DocId,
     pub score: f32,
@@ -108,9 +103,30 @@ pub struct SearchHit {
 }
 ```
 
----
+`SearchHit` beschreibt einen Treffer, den das `ReadGate` bereits freigegeben hat. Ein gelöschtes Dokument wird kein `SearchHit`. `snippet` darf keinen Text eines anderen, gesperrten Dokuments enthalten.
 
-## 4. `Cargo.toml` Spezifikation
+`DocumentRecord` ist das Klartextmodell vor der Versiegelung. Persistiert wird es nur als Chiffretext durch `contextra-db`.
+
+## 5. Konfiguration (SPEC §14)
+
+`SecretString` implementiert `Zeroize` und `ZeroizeOnDrop`. Es hat kein `Clone`, kein `Debug`, kein `Serialize`.
+
+```rust
+pub enum EncryptionConfig {
+    None,
+    Required { passphrase: SecretString },
+}
+```
+
+`encryption_passphrase: Option<String>` ist kein Feld dieses Crates und kein gültiger Ersatz (SPEC §4.9).
+
+`ErasureConfig` enthält die Felder aus SPEC §14, einschließlich `ledger_dir`, `disk_reserve_bytes`, `custody`, `mixed_policy`, `kek_epoch_len`, `seal_after_deletion_max`, `purge_rebuild_max_days`, `key_backup_max_age`, `group_commit_window_ms`, `epoch_window`, `epoch_max`, `epoch_set_threshold`, `tombstone_rebuild_ratio`, `min_record_bytes` und `erased_set_mirror`.
+
+`CustodyProfile` ist `{ K0, K1, K2, K3 }`. Die Validierung der Grenzwerte führt `Contextra::open` aus. Dieses Crate prüft keine Pfade.
+
+`MixedPolicy` besitzt in Version 2.1 ausschließlich `BlockAll`. Persistierte Werte für andere Varianten werden beim Öffnen mit `ContextraError::InvalidInput` abgewiesen.
+
+## 6. `Cargo.toml`
 
 ```toml
 [package]
@@ -119,52 +135,32 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Canonical domain models, identifiers, search hits, and ContextraError"
+description = "Shared models, ContextraError, and ContextraConfig"
 
 [lints]
 workspace = true
 
 [dependencies]
 contextra-ids = { workspace = true }
-contextra-env = { workspace = true }
 contextra-privacy = { workspace = true }
 contextra-erasure = { workspace = true }
+contextra-ports = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-ahash = { workspace = true }
-bytes = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }
-proptest = "1.4"
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
 
 [features]
 default = []
-std = [
-    "contextra-ids/std",
-    "contextra-env/std",
-    "contextra-privacy/std",
-    "contextra-erasure/std",
-]
+std = ["contextra-ids/std", "contextra-privacy/std", "contextra-erasure/std"]
 ```
 
----
+Keine Abhängigkeit auf `serde` für `SecretString`. `DocumentRecord` und `SearchHit` dürfen `serde` nur hinter einem opt-in Feature `serde` serialisieren, und `SecretString` bleibt davon ausgenommen.
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
+## 7. Tests
 
-> **Kritischer Befund (Befund 2.2):** `contextra-db` verwendet `encryption_passphrase: Option<String>` — kein `SecretString`, nicht zeroisiert. Das ist ein INV-11-Verstoß und muss durch die kanonischen Konfigurationstypen aus dieser Spezifikation ersetzt werden.
-
-1. **`ContextraConfig` und `EncryptionConfig` implementieren:**
-   - `SecretString` als `ZeroizeOnDrop`-Wrapper ohne `Debug`, `Clone`, `Serialize` implementieren.
-   - `EncryptionConfig::Required { passphrase: SecretString }` als einzigen Modus mit Verschlüsselung.
-   - `encryption_passphrase: Option<String>` in `contextra-db` vollständig ersetzen.
-2. **Veraltetes Modul `src/erasure.rs` löschen:**
-   - Kanonische Löschtypen (`EraseTarget`, `SagaState`, `RetentionAttestation`) aus `contextra-erasure` re-exportieren.
-3. **`src/ids.rs` bereinigen:**
-   - Doppelte `ErasureId` und `GateId` entfernen.
-4. **Altlasten-Bereinigung:**
-   - Alle Bezüge auf `contextra-py` und `contextra-router` entfernen.
-5. **Verifikation:**
-   - `cargo clippy -p contextra-types -- -D warnings`
-   - `cargo test -p contextra-types`
+| Pflicht | Prüfung |
+|---|---|
+| INV-12 | `format!("{:?}", ContextraError::Erased)` ist `not found` und gleich dem Text von `NotFound` |
+| INV-12 | Keine Fehler-Variante hat ein Feldfeld vom Typ `String` für ein Löschziel |
+| R4 | `SagaState` ist in diesem Crate nicht definiert |
+| §4.9 | `SecretString` implementiert `ZeroizeOnDrop` und ist nicht `Debug` |
+| Zyklus | `contextra-ports` hängt in `cargo metadata` nicht von diesem Crate ab |

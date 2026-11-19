@@ -79,7 +79,7 @@ Der aktive Workspace umfasst **23 Crates** in 4 Ebenen:
 | **E2 — Integration** | `db`, `engine` (deprecated Re-Export), `contextra` |
 | **E3 — Endpunkte** | `mcp`, `testkit`, `bench` |
 
-**Excluded:** `vault` (dormant, Funktionalität in `erasure` aufgegangen, darf nicht reaktiviert werden ohne G-REACTIVATE). Siehe §17, Punkt O-V1 zur Ist-Präsenz des Verzeichnisses `crates/contextra-vault`.
+**Excluded:** `vault` (dormant; darf nicht reaktiviert werden ohne G-REACTIVATE). Seine frühere Schlüsselverwahrung liegt bei `KeyAnchor` und `contextra-crypto`.
 
 ### 2.2 Entfernte Crates (nicht reaktivieren ohne Gate G-REACTIVATE)
 
@@ -131,7 +131,8 @@ contextra-kv-cache
 
 - `contextra-types` und `contextra-ports` liegen normativ auf **Ebene E0 (Fundament & Ports)**.
 - `types` enthält kanonische Typen, IDs und Datenstrukturen (`DocId`, `ScoredDocument`, `ContextraError`) ohne interne I/O- oder Laufzeitabhängigkeiten.
-- `ports` enthält die standardisierten Trait-Verträge (`StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`, `CommitBarrier`, `PurgeBarrier`, `KeyAnchor`) und hängt ausschließlich von `env` und `types` ab.
+- `ports` enthält die standardisierten Trait-Verträge (`StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`, `CommitBarrier`, `PurgeBarrier`, `KeyAnchor`, `Purgeable`) und hängt ausschließlich von `env` und `ids` ab.
+- `ports` hängt nicht von `types` ab. `types` erreicht `privacy` (`DataClass`, `Validated<T>`). `privacy` erreicht `ports` (`Purgeable` für den Surrogat-Vault). Eine Kante `ports → types` würde den Zyklus `types → privacy → ports → types` schließen. Port-lokale Typen (`ScoredId`, `PortError`, `KeyError`) sind keine zweiten Definitionen von `SearchHit` oder `ContextraError` (R4). `contextra-db` mappt sie.
 - E1-Crates implementieren die Traits aus `ports` und nutzen Typen aus `types`. Alle Kanten zeigen strikt abwärts (R1).
 
 ### 2.5 Kanonische Typbesitzer (R4)
@@ -376,7 +377,7 @@ Jeder nicht-terminale Zustand → Pending(reason) → Resume-Zustand
 **Invarianten:**
 - Ab `Frozen` ist das Datum für alle Lesepfade unsichtbar (INV-10).
 - Ab `KeyDestroyed` ist es kryptographisch unlesbar.
-- Beides ist irreversibel. Zur Karenz siehe §5.3 Schritt 5 und §17, O-K1.
+- Beide Wirkungen sind irreversibel.
 
 ### 5.3 Die Löschsaga (Schritte 1–9)
 
@@ -421,7 +422,7 @@ Vor jeder Bereinigung wird der Übergang nach `PlaintextPurged` im Journal proto
 
 #### Schritt 5 — Idempotente Schlüsselvernichtung (Takt 2)
 
-1. **Optionale Karenz.** Ist `erasure_grace` konfiguriert (Startwert 0 h, Obergrenze 72 h, im Regulated-Tier ohne Standardwert, REQ-DEL-N26), wartet die Saga vor der Vernichtung das Karenzfenster ab. Während der Karenz bleibt die Lesesperre aktiv und `legal_state = Eingeschränkt`. Die Rücknahme ist nur über `Restricted` zulässig, nicht über `Lifted` (siehe §17, O-K1).
+1. **Keine Karenz nach `Frozen`.** Nach dem erfolgreichen Journal-Commit in Schritt 1 wird der Löschpfad ohne konfigurierbare Wartezeit fortgesetzt. `Restricted` ist ausschließlich der Pfad für einen Hold oder eine Aufbewahrungspflicht vor `Frozen`; er ist keine Rücknahme eines autorisierten Löschauftrags.
 2. **Journal-Intent (Regel J1).** Der unwiderrufliche Vernichtungs-Intent wird durabel im Journal festgehalten (`fsync`), einschließlich der 96-Bit-Wrap-Nonce des zu vernichtenden `DocDek` für den Nadelscan.
 3. **Atomares Replace.** Der gewrappte `DocDek` wird im Speicher (`Zeroizing`) genullt, in der `KeyTable` mit Nullen überschrieben (`fsync`), und die `KeyTable`-Segmentdatei wird atomar ohne den vernichteten Eintrag neu geschrieben (`tmp` → `fsync` → `rename` → Verzeichnis-`fsync`).
 4. **Registrierung.** Die `KeyRegistry` protokolliert `destroyed` mit Referenz-Hash, ohne Schlüsselmaterial.
@@ -477,7 +478,7 @@ Die Hygiene läuft asynchron, ist aber durch `purge_rebuild_max_days` (Startwert
 
 **Klassenbedingungen (REQ-DEL-N3):** Klasse C darf nur ausgewiesen werden, wenn Nadelscan, Inventar, Kanarien-Probe und Epoch Seal bestanden sind. Vor dem Seal ist nur `C*` zulässig.
 
-**Zielwerte der Fristen (intern, keine Außenzusage):** Klasse L sofort, Klasse P ≤ 1 Stunde, `C*` unmittelbar nach P zuzüglich `erasure_grace`, Epoch Seal ≤ 7 Tage, Klasse M ≤ `purge_rebuild_max_days` (14 Tage).
+**Zielwerte der Fristen (intern, keine Außenzusage):** Klasse L sofort, Klasse P ≤ 1 Stunde, `C*` unmittelbar nach P, Epoch Seal ≤ 7 Tage, Klasse M ≤ `purge_rebuild_max_days` (14 Tage).
 
 ### 5.5 Recovery nach Crash
 
@@ -512,15 +513,12 @@ Alle Schritte sind idempotent. Der Journal-Zustand ist der Wahrheitsspeicher.
 | Segmentart bei Löschung für Betroffenen A | Behandlung |
 |---|---|
 | Menge = {A} | `DocDek` vernichten |
-| Menge enthält A und andere (Mixed) | Standard `BlockAll`: Segment bleibt gesperrt, `Partial{ReviewRequired}` mit Frist. Der Betreiber entscheidet |
+| Menge enthält A und andere (Mixed) | `BlockAll`: Segment bleibt gesperrt, `Partial{ReviewRequired}` mit Frist. |
 | Menge enthält A nicht | unberührt |
 
-**Mixed-Policy** (je Collection, Betreiberentscheidung):
-- `BlockAll` (fail-closed, Standard)
-- `RedactAndRekey`: Der Betreiber liefert den redigierten Text. Neuer `DocDek`, Re-Embedding, alter `DocDek` wird vernichtet.
-- `DeleteAll`: Segment vollständig löschen (Betreiber trägt die Verantwortung für Kollateral).
+**Mixed-Policy:** Version 2.1 unterstützt ausschließlich `BlockAll`. Ein Mixed-Segment bleibt gesperrt und der Vorgang `Partial{ReviewRequired}`, bis eine neue, separat spezifizierte Betreiberaktion einen Ersatzdatensatz als neuen regulären Schreibvorgang anlegt. Diese Aktion ist kein Teil einer Löschsaga und darf den ursprünglichen `DocDek` nicht wiederverwenden. `RedactAndRekey` und `DeleteAll` sind keine konfigurierbaren Modi dieser Version.
 
-Mixed-Segmente dürfen **nicht** automatisch freigegeben oder gelöscht werden (REQ-DEL-N17). Contextra entscheidet nie selbst, ob ein Mixed-Segment nach Entfernung von A noch personenbezogen ist. Das ist eine Rechtsfrage (Art. 17 Abs. 3).
+Mixed-Segmente dürfen nicht automatisch freigegeben oder gelöscht werden (REQ-DEL-N17). Contextra entscheidet nicht, ob ein Mixed-Segment nach Entfernung von A noch personenbezogen ist.
 
 **Ableitungen** kaskadieren über die Lineage (INV-DERIVED-1). **Collection-Löschung (Akte):** Alle `DocDek`s, `ArtKey`s und `KEK[coll, *]` werden in einer Saga vernichtet. Die Index-Dateien der Collection entfallen.
 
@@ -530,7 +528,7 @@ Bei Aufbewahrungspflicht (Art. 17 Abs. 3) oder Legal Hold geht die Saga in `Rest
 
 Ein Hold betrifft die Saga, nicht die Lesesperre. Er wird im `RevocationLog` und in der Audit geführt. Checkpoint-Policy `ExpireAfterHold` gilt nur für Checkpoints.
 
-**Trennung ist normativ:** Die reversible Einschränkung (Art. 18) und die irreversible Löschung (Art. 17) bleiben strikt getrennt. Eine „Karenz" nach Sperrung der Lesbarkeit darf nicht mit der Pflicht zur unverzüglichen Löschung kollidieren (§17, O-K1).
+**Trennung ist normativ:** Die reversible Einschränkung (Art. 18) und die irreversible Löschung (Art. 17) bleiben strikt getrennt. `Restricted` wird vor `Frozen` entschieden und ist keine Rücknahme einer Löschung.
 
 ### 5.8 Messung und Nachweis
 
@@ -570,8 +568,8 @@ Ein Selbsttest prüft, dass im Klartext keine Nutzerschlüssel, Dokument-IDs ode
 | **S1b** Blob-Segmente | `store` | B | Records unter `DocDek`. Hygiene: Segment-Rewrite | `LsmScanner` |
 | **S2** Vektorindex | `vector` | A, B | Arena-Slots (fp32, SQ8) nullen. Snapshot-Payload unter `DocDek`. Graph unter `ArtKey`, Neuaufbau nach Tombstone-Anteil ≥ 0,2 oder `purge_rebuild_max_days`. Keine Slot-Wiederverwendung vor Neuaufbau (INV-HNSW-SLOT-1). Kein Rewiring (VETO-F02) | `VectorScanner` |
 | **S3** Textindex | `text` | A, B | Segmente neu schreiben, neuer `ArtKey`, alter sofort vernichtet. Terme des Scopes aus dem Wörterbuch entfernen. Statistik neu berechnen | `TextScanner` |
-| **S4** Caches | `store`, `engine`, `privacy` | A | Block-, Embedding-, RRF-, Antwort-Cache und Surrogat-Vault invalidieren und zeroizen (REQ-DEL-N7) | `CacheScanner` |
-| **S5** Lineage und Ableitungen | `engine` | A | Kaskade (INV-DERIVED-1) | `LineageScanner` |
+| **S4** Caches | `store`, `rank`, `privacy` | A | Block-Cache (`store`), dokumentbezogener RRF-Cache `er_cache` (`rank`), Surrogat-Vault (`privacy`). Embedding- und Antwort-Cache registriert `db` als `Purgeable`, sobald sie existieren. Invalidieren und zeroizen (REQ-DEL-N7). `engine` hält keinen Cache | `CacheScanner` |
+| **S5** Lineage und Ableitungen | `db` | A | `LineageIndex` und Kaskade (INV-DERIVED-1). `engine` re-exportiert `db` und implementiert keine Schicht | `LineageScanner` |
 | **S6** Checkpoints | `checkpoint` | B | Policy `Rewrite` (Standard), `ExpireNow`, `ExpireAfterHold` nur unter Hold. Sauber erst nach Rewrite | `CheckpointScanner` |
 | **S7** Sidecars | `crypto` | – | Nur Referenz-Hashes, keine Nutzinhalte, keine Schlüssel | `SidecarScanner` |
 | **S8** Externe Sicherungen | – | – | Ausweisen als `ExternalBackups`. Daten-Backups aus Contextra fallen unter §5.11 | keine Messung |
@@ -595,7 +593,7 @@ Mehrere Löschungen teilen sich einen Neuaufbau (Batch). Auslöser: Tombstone-An
 
 - **Zwei-Spuren-Backup (Spur D und Spur K).** Daten-Backups (Spur D) enthalten ausschließlich Chiffrate ohne `KeyTable` und ohne Keystore (REQ-DEL-N18). Schlüssel-Backups (Spur K) tragen ein signiertes Ablaufdatum `valid_until` (`key_backup_max_age`, Startwert 30 Tage) und werden nach Ablauf verweigert (`RestoreBeyondHorizon`).
 - **Restore-Guard.** Bei jedem Restore gleicht der Guard vor dem ersten Lesezugriff das lokale `ErasedSet` sowie den externen `ErasedSetMirror` ab, vernichtet wiederhergestellte `DocDek`s gelöschter Einheiten sofort erneut und protokolliert `restore_reapplied` im Audit (REQ-DEL-N11).
-- **`ErasedSetMirror`.** Im Regulated-Tier Pflicht. Restore ohne aktuellen Mirror nur mit `--accept-unguarded`, und dann im Bericht ausgewiesen (REQ-DEL-N19).
+- **`ErasedSetMirror`.** Im Regulated-Tier Pflicht. Ein fehlender oder veralteter Mirror verweigert Restore. Im Standard-Tier ist ein unguarded Restore nur mit der expliziten lokalen Option `--accept-unguarded` zulässig und wird im Bericht ausgewiesen (REQ-DEL-N19).
 - **Aufbewahrung des `ErasedSet`.** Der `ErasedSet`-Eintrag bleibt für die Dauer der Aufbewahrung des Berichts erhalten. Er enthält nur Referenz-Hashes.
 - **Backup-Test.** Backup vor Löschung, Löschung, Restore mit altem und mit frischem Schlüssel-Backup. Der Scope bleibt gesperrt, keine lesbaren Reste (T-DEL-18).
 
@@ -606,7 +604,7 @@ Mehrere Löschungen teilen sich einen Neuaufbau (Batch). Auslöser: Tombstone-An
 | Beantwortung Betroffenenanfrage | Art. 12 Abs. 3 DSGVO | ein Monat, Verlängerung um zwei Monate mit Mitteilung binnen eines Monats |
 | `Frozen` (Klasse L) | intern | sofort nach Autorisierung |
 | Klasse P | intern, Zielgröße | ≤ 1 Stunde |
-| Klasse C\* | intern | unmittelbar nach P, zuzüglich `erasure_grace` |
+| Klasse C\* | intern | unmittelbar nach P |
 | Epoch Seal | intern | ≤ 7 Tage nach Vernichtung |
 | Hygiene (Klasse M) | intern | ≤ `purge_rebuild_max_days` (14 Tage) |
 | Alarm bei `Partial` | intern | 24 h |
@@ -714,8 +712,8 @@ pub trait ErasureLayer: Send + Sync {
 | StoreLayer | `contextra-store` | Schritt 3 (MemTable, WAL), Schritt 8 (SSTable, WAL-Scrub) |
 | TextLayer | `contextra-text` | Schritt 3 (Segment-Neuschreibung) |
 | VectorLayer | `contextra-vector` | Schritt 3 (Arena), Schritt 8 (Graph-Neuaufbau) |
-| CacheLayer | `contextra-store`, `contextra-engine`, `contextra-privacy` | Schritt 3 (S4) |
-| LineageLayer | `contextra-engine` / `contextra-db` | Schritt 2 (Kaskade) |
+| CacheLayer | `contextra-store`, `contextra-rank`, `contextra-privacy`, registriert in `contextra-db` | Schritt 3 (S4) |
+| LineageLayer | `contextra-db` | Schritt 2 (Kaskade) |
 | CheckpointLayer | `contextra-checkpoint` | Schritt 8 (Sweep) |
 | SnapshotRevoker | `contextra-mvcc` | Schritt 1 (Zeitreisen ausschließen) |
 | CryptoLayer | `contextra-crypto` | Schritt 5 (`KeyTable`, Sidecars) |
@@ -861,7 +859,7 @@ Der Zustand wird erst nach erfolgreichem Journal-Append (`fsync`) geändert.
 | **T-DEL-17** | Rohdatei-Forensik: Nach Löschung durchsuchen Rohsicht und entschlüsselte Sicht alle Dateien nach Kanarien-Klartext und Wrap-Nonce | Integration |
 | **T-DEL-18** | Backup/Restore: Scope bleibt gesperrt, keine lesbaren Reste; abgelaufenes Schlüssel-Backup wird verweigert; Restore ohne Mirror wird ausgewiesen | Integration |
 | **T-DEL-19** | Gleichzeitigkeit (loom): `remember` und `forget` auf derselben Einheit, Epoch Seal | Loom |
-| **T-DEL-20** | Mixed-Segmente: `BlockAll`, `RedactAndRekey`, `DeleteAll` | Integration |
+| **T-DEL-20** | Mixed-Segment bleibt `BlockAll`; eine automatische Freigabe oder Kollaterallöschung ist ausgeschlossen | Integration |
 | **T-DEL-21** | Propertytests: Nach Seal und Hygiene enthält keine Datei die Nonce eines vernichteten Schlüssels; kein Schlüssel hat mehr als einen Zweck | Property |
 | **T-DEL-22** | Berichts-Negativsuite: Bit-Flip je Feld, Feldvertauschung, Downgrade, falscher Schlüssel, fehlende Ausschlüsse, Klasse ohne Annahmen, gefälschtes Siegel | Unit |
 | **T-DEL-23** | Mutation (AC-2): eine Konstante statt Messung lässt einen Test fehlschlagen | Mutation |
@@ -888,7 +886,7 @@ Der Zustand wird erst nach erfolgreichem Journal-Append (`fsync`) geändert.
 | **INV-7** | Keine Compliance-Aussagen. „Gelöscht" nur mit gemessener Stufe. Keine Skalierungsbehauptung ohne belegten Bench-Lauf. |
 | **INV-8** | Abhängigkeitskanten nur abwärts (R1). |
 | **INV-9** | `Completed`, `Refused` und `Lifted` sind terminale Saga-Zustände. |
-| **INV-10** | Ab `Frozen` wird die Lesesperre nicht aufgehoben. Eine Rücknahme vor Schritt 5 führt ausschließlich nach `Restricted` (siehe §17, O-K1). |
+| **INV-10** | Ab `Frozen` wird die Lesesperre nicht aufgehoben. Ein Löschauftrag kehrt nicht in `Restricted` oder `Lifted` zurück. |
 | **INV-11** | Schlüsselbytes werden mit `zeroize` genullt vor Drop. Kein `Clone` für Schlüsseltypen. |
 | **INV-12** | Logs und Traces enthalten nie Klartextinhalte des Löschziels oder PII. |
 | **INV-DEL-ORDER-1** | Purge (Schritt 3 und 4) liegt vor der Schlüsselvernichtung (Schritt 5). Die Vorgängerreihenfolge „Schlüssel zuerst" ist verboten. |
@@ -905,8 +903,7 @@ Der Zustand wird erst nach erfolgreichem Journal-Append (`fsync`) geändert.
 | **INV-WIRING-2** | Löschkette ist produktiv verdrahtet, ohne Stubs, die Erfolg melden. |
 | **INV-ORACLE-1** | Berichte werden von einem unabhängigen Referenz-Prüfer verifiziert. |
 | **VETO-F02** | Kein Rewiring im HNSW-Graph beim Löschen. |
-| **REQ-DEL-N1–N27** | Verbindliche Löschanforderungen gemäß §5 und §17 der Finalen Löscharchitektur (siehe §17, O-N1). |
-| **N-01–N-29** | Verbindliche Architekturanforderungen der Umsetzungsprüfung (siehe §17, O-N1). |
+| **REQ-DEL-N1–N27** | Verbindliche Löschanforderungen gemäß §5 der Finalen Löscharchitektur. |
 
 ---
 
@@ -942,12 +939,27 @@ pub enum DataClassPolicy {
     Enforced,  // Jeder Schreibvorgang MUSS Klasse deklarieren
 }
 
+pub enum TenantPolicy {
+    Standard,
+    Regulated,
+}
+
+pub enum CustodyProfile {
+    K0,
+    K1,
+    K2,
+    K3,
+}
+
+pub enum MixedPolicy {
+    BlockAll,
+}
+
 pub struct ErasureConfig {
     pub ledger_dir: PathBuf,              // MUSS außerhalb von data_dir liegen
     pub disk_reserve_bytes: u64,          // Mindest-Plattenreserve vor Purge, min. 1 GB
-    pub custody: CustodyProfile,          // K0 | K1 | K2 | K3
-    pub mixed_policy: MixedPolicy,        // BlockAll (Standard) | RedactAndRekey | DeleteAll
-    pub erasure_grace: Duration,          // 0 bis 72 h; im Regulated-Tier ohne Standard
+    pub custody: CustodyProfile,          // K0 | K1; K2/K3 werden abgewiesen
+    pub mixed_policy: MixedPolicy,        // ausschließlich BlockAll
     pub kek_epoch_len: Duration,          // Startwert 30 Tage
     pub seal_after_deletion_max: Duration,// Startwert 7 Tage
     pub purge_rebuild_max_days: u32,      // Startwert 14 Tage
@@ -967,9 +979,9 @@ pub struct ErasureConfig {
 - `erasure.ledger_dir` ist kein Unterverzeichnis von `data_dir`.
 - `erasure.disk_reserve_bytes >= 1_073_741_824` (1 GB).
 - Bei `EncryptionConfig::Required`: Passphrase ist nicht leer.
-- `erasure.erasure_grace <= 72 h`.
-- Im Regulated-Tier: `erasure_grace` und `erased_set_mirror` sind gesetzt (REQ-DEL-N26, REQ-DEL-N19).
-- Bei `custody = K2` oder `K3`: Konformitätssuite bestanden, sonst `CapabilityUnsupported`.
+- `erasure.mixed_policy == MixedPolicy::BlockAll`.
+- Im Regulated-Tier gilt `EncryptionConfig::Required`, `GuardPolicy::Required` und ein gesetzter `erased_set_mirror` (REQ-DEL-N19); die Concurrence-Signatur ist für jeden Bericht erforderlich.
+- `custody == K0` oder `K1`. K2 und K3 führen immer zu `CapabilityUnsupported`.
 
 Alle Zielwerte sind in `benchmarks/budgets.toml` zu hinterlegen (O-24).
 
@@ -981,7 +993,7 @@ Das Layering-Gate ist kein externes Python-Skript, sondern ein Cargo-Integration
 
 1. Für jede Crate: `default = []` (R3).
 2. Für jede E0/E1-Crate: keine Abhängigkeit auf E2/E3-Crates (R1), auch nicht über Feature-Unifikation.
-3. Für E1-Crates: Kern-Closure ⊆ E0, höchstens 5 Mitglieder.
+3. Für E1-Crates: domänenspezifische Kern-Closure ⊆ E0, höchstens 5 Mitglieder. `contextra-ports` und `contextra-erasure` zählen nicht in die fünf. Jede Schicht, die einen Port oder `ErasureLayer` implementiert, darf beide zusätzlich nutzen. Beispiel: `contextra-store` hat die Domänen-Closure `ids`, `env`, `sys`, `durable-fs`. `contextra-vector` hat `ids`, `env`, `simd`, `durable-fs`. `contextra-crypto` und `contextra-mvcc` sind keine zulässigen Abhängigkeiten einer anderen E1-Crate.
 4. Für alle Crates: `[lints] workspace = true` ist gesetzt.
 5. Kein Crate aus der Entfernt-Liste (§2.2) ist als Workspace-Member aktiv.
 6. Die Gates `surface-coverage`, `claim-generator` und `deletion-honesty` sind im CI eingebunden (INV-WIRING-2).
@@ -1017,26 +1029,21 @@ Der Gate-Test läuft in CI als separater Schritt vor dem Build. Schlägt er fehl
 | **Slot** | Dichte `u32`-Adresse einer Einheit innerhalb einer Collection |
 | **SubjectRef** | 128-Bit-Zufalls-ID, die einen Betroffenen identifiziert |
 | **Verification / Validation** | Technischer Lauf bzw. Abnahme durch den Betreiber, getrennt ausgewiesen |
-| **Vault** | Dateibasierter persistenter Schlüsselspeicher, Funktionalität in `erasure` (siehe §17, O-V1) |
+| **Vault** | Historischer Name. Schlüsselverwahrung liegt bei `KeyAnchor` und `contextra-crypto`; `contextra-vault` bleibt ausgeschlossen. |
 
 ---
 
-## 17 Offene Entscheidungen, Abweichungen und Quellenlage
+## 17 Finalisierte Architekturentscheidungen
 
-Dieser Abschnitt hält fest, was die Finale Löscharchitektur offen lässt oder mit anderen Quellen in Konflikt steht. Er ist Teil der Spezifikation und muss vor Umsetzung entschieden werden.
+| Thema | Entscheidung für Version 2.1 |
+|---|---|
+| Irreversibilität | Nach `Frozen` gibt es keine Karenz und keinen Rückweg. `Restricted` entsteht nur vor `Frozen` durch Hold oder Aufbewahrungspflicht. |
+| Custody | Ausgeliefert sind K0 und K1. K2 und K3 werden abgewiesen, bis eine spätere Version Konformitätssuite und Implementierung gemeinsam liefert. |
+| K1 | Argon2id verwendet mindestens 64 MiB, drei Iterationen und 250 ms; höhere Zielwerte werden nur über Benchmarks angehoben. |
+| Schlüssel und Nachweis | Ed25519 ist Pflicht. Referenz-Hashes sind BLAKE3-keyed unter `K_ref`. `REQ-DEL-N1` bis `N27` bleiben die einzigen normativen Anforderungskennungen; `N-01` bis `N-29` werden nicht verwendet. |
+| Lineage | Jede persistierte D-Ableitung, einschließlich Embeddings, Textpostings, Graph-Snapshots, Cache-Snapshots und Exporte, trägt mindestens eine vollständige Quellreferenz. Mehrere Quellen werden kanonisch sortiert und dedupliziert gespeichert. |
+| Mixed-Segmente | Ausschließlich `BlockAll`; keine automatische Redaction oder Kollaterallöschung. |
+| Vault | `contextra-vault` bleibt dauerhaft aus dem Workspace ausgeschlossen. Eine Reaktivierung erfordert G-REACTIVATE; seine frühere Funktion ist nicht Teil von `erasure`. |
+| Quellarchiv | `docs/delete/` bleibt ein nichtnormatives Archiv. Es darf keine Links aus der Produktdokumentation und keine CI-Eingaben erhalten. |
 
-| ID | Thema | Befund | Festlegung in 2.1 | Status |
-|---|---|---|---|---|
-| **O-K1** | Karenz und Gate-Reversibilität | Finale §2.2 und v3.1 §6.3 erlauben `Unfreeze` bis Schritt 5. INV-10 verbietet das Aufheben eines Gates. Die Governance-Analyse nennt die Konfliktlage rechtlich relevant (Pflicht zur unverzüglichen Löschung). | Rücknahme nur nach `Restricted` (Lesesperre bleibt), nie nach `Lifted`. `erasure_grace` bleibt konfigurierbar. | **Rechtsprüfung ausstehend** (Fachanwalt) |
-| **O-N1** | IDs `N-01..N-29` | Die Finale Löscharchitektur verweist auf `N-01..N-29` und `REQ-DEL-N1..N27`. `REQ-DEL-N1..N27` sind in v3.1 §17 definiert. `N-01..N-29` sind in keiner Quelle im Repository definiert. | Nicht erfunden. Die Liste bleibt als offene Anforderung markiert. | **Offen**, Quelle klären |
-| **O-K2** | Custody K2 und K3 | Konformitätssuite und Spike S-K2 sind nicht geliefert. | `CapabilityUnsupported`, bis Suite besteht (REQ-DEL-N14). | Offen |
-| **O-K3** | Argon2id-Parameter | Version 2.0: m = 256 MB, t = 4. v3.1 und Finale: m ≥ 64 MiB, t ≥ 3. | v3.1-Werte übernommen. Parameter sind Untergrenzen, Zielwert per Benchmark. | Festgelegt |
-| **O-K4** | Signatur-Feature | Version 2.0 nennt Feature `signing`. R3 verbietet feature-gesteuerte Löschpfade. | Ed25519 ist Pflicht, kein Feature. | Festgelegt |
-| **O-K5** | Referenz-Hash | Finale nennt `HMAC-SHA256` und `BLAKE3-keyed` parallel. Umsetzungsprüfung und Implementierungsspezifikation verwenden BLAKE3-keyed. | BLAKE3-keyed unter `K_ref`. | Festgelegt |
-| **O-V1** | Vault-Verzeichnis | `crates/contextra-vault` existiert, ist laut §2.1 excluded. Die Funktionalität ist in `erasure` aufgegangen. | Verzeichnis muss entfernt oder per G-REACTIVATE begründet werden. | Offen |
-| **O-R1** | Reihenfolge Purge vor Schlüssel | Version 2.0 nennt Schlüssel zuerst, Finale und v3.1 Purge zuerst. Code HEAD folgt 2.0. | Purge zuerst (INV-DEL-ORDER-1). Code-Anpassung ist Umsetzungsaufgabe. | Festgelegt |
-| **O-L1** | Lineage-Umfang | Umsetzungsprüfung: „Produktentscheid vor v1.0". | Lineage-Kaskade ist Pflicht für D-Klasse (INV-LINEAGE). | Festgelegt, Umfang bestätigen |
-| **O-T1** | Kanarien-Probe | Sie belegt Scanner und Vernichtungsweg, nicht die Vernichtung des konkreten Schlüssels (F-05). | Nadelscan und Inventar sind Pflicht für den Nachweis. | Festgelegt |
-| **O-D1** | Delete-Quellarchiv | `docs/delete/` ist nach der Extraktion nicht normativ. | Archivieren, nicht löschen. | Offen |
-
-**Quellenhierarchie innerhalb der Löschkette:** `docs/Finale Löscharchitektur.md` vor `docs/delete/Contextra_Spezifikation_v3.1_Loescharchitektur.md` vor `docs/delete/Contextra – Neukonzeption der Löschkette.md` vor den übrigen `docs/delete/`-Dateien. Die Umsetzungsprüfung dient als Befundbasis, nicht als Vorgabe.
+Abweichende historische Texte sind nicht normativ. Eine Änderung dieser Entscheidungen erfordert eine neue SPEC-Version und eine Migration für jedes persistierte Format gemäß INV-1.

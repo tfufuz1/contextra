@@ -1,366 +1,167 @@
-# contextra-crypto — Implementierungsspezifikation (Soll-Zustand)
+# contextra-crypto — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E1 (Domänenbaustein / Ring 1)  
-**Kern-Closure:** `ids`, `env` (E0-Fundamente, max. 5)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-crypto`  
-**Referenzdokumente:** `docs/SPEC.md` §4 (Schlüsselhierarchie), §5 (Löschkette), §13; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-crypto` ist der fundamentale kryptographische Dienstleister des Contextra-Systems. Es implementiert die gesamte kryptographische Pyramide für Authenticated Encryption with Associated Data (AEAD), deterministische Key Derivation (KDF) und Zeroize-geschützte Schlüsselverwaltung:
-- **AEAD Verschlüsselung:** AES-256-GCM-SIV (RFC 8452) für Chiffrierung im Ruhezustand (Data at Rest) für die Datenklassen K und P.
-- **Hierarchische Schlüsselableitung:** HKDF-SHA-256 (RFC 5869) mit kryptographischer Domänentrennung.
-- **Passphrase KDF:** Argon2id (RFC 9106) für die Ableitung des MasterKey aus Passphrase und persistiertem Salt.
-- **Crypto-Shredding Unterstützung:** Atomare Nullung (`zeroize`) von DEKs und SubjectKeys für den DSGVO-Löschpfad.
-
-### Beseitigung von Ebenenverstößen & Altlasten (R1, R3, R4)
-1. **Keine Abhängigkeiten auf E2:** Die optionalen Abhängigkeiten auf `contextra-types` und `contextra-ports` sowie die Features `workspace`, `types-compat` und `ports-compat` werden **vollständig entfernt**.
-2. **Workspace-Lints einbinden:** Die lokaen Clippy-Overrides (`unwrap_used = "allow"`, `panic = "allow"`) werden entfernt und durch `[lints] workspace = true` ersetzt (INV-4 Zero-Panic).
-3. **Leere Default-Features (R3):** `default = []` (Entfernung von `default = ["kv-encryption"]`).
-4. **Altlasten-Bereinigung (`AP-21`):** Entfernung aller Referenzen auf `contextra-kvcache`, `contextra-infer-candle` in `lib.rs` und `kv_cipher.rs`.
-
-### Architekturgarantien (R1–R6, INV-3, INV-4, INV-11)
-1. **`#![forbid(unsafe_code)]`:** Vollständig sicheres Rust.
-2. **Zero-Panic-Policy:** Keine Panics; alle kryptographischen Fehler liefern `CryptoError`.
-3. **Fail-Closed (SPEC §4.3):** Fehlt ein Schlüssel oder scheitert AEAD, bricht die Operation sofort mit Fehler ab. Es gibt **keine stillen Fallbacks**, keine XOR-Masken, keine deterministischen Notfallschlüssel.
-4. **ZeroizeOnDrop (INV-11):** Jede Datenstruktur, die Schlüsselmaterial hält, implementiert `Zeroize` und `ZeroizeOnDrop`.
-5. **Kein `Clone`, kein `Debug`, kein `Serialize` für Schlüssel:** Verhindert Speicherduplizierung und Log-Leaks.
-6. **Fehlbare Zufallszahlen:** Nonces (96 Bit) werden ausnahmslos via `rand::rngs::OsRng::try_fill_bytes` generiert.
+**Ebene:** E1 (Domäne)
+**Kern-Closure:** `ids`, `env`, `ports`, `erasure` (E0, höchstens 5)
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-crypto`
+**Normative Quellen:** `docs/SPEC.md` §4, §5.1, §5.3 Schritte 5 und 7, §5.9 Schicht S7, §7 (`CryptoLayer`), §11, §13 (INV-11, INV-KEYPURPOSE-1, INV-PROOF-KEY-1, INV-EPOCH-SEAL-1, INV-ARTKEY-1).
 
 ---
 
-## 2. Schlüsselhierarchie & Domänentrennung (SPEC §4)
+## 1. Zweck
+
+`contextra-crypto` ist der einzige Besitzer der kryptographischen Primitive und der Schlüsselhierarchie (R4, §4.10).
+
+- AEAD `AES-256-GCM-SIV` für Records und für den Schlüssel-Wrap.
+- HKDF-SHA-256 ausschließlich für strukturelle Schlüssel (`K_eng`, `K_sc/*`).
+- Argon2id für die K1-Wurzel.
+- Ed25519-Signatur der Löschberichte über den Port `Signer`, den `contextra-erasure` aufruft. Der Signaturschlüssel ist kein Datenschlüssel (INV-PROOF-KEY-1). Ed25519 ist Pflicht und kein Feature (R3).
+- `KeyTable`, `KeyRegistry` und der Epoch Seal.
+- Schicht **S7** (Sidecars) und `CryptoLayer` (Saga-Schritt 5).
+
+`SubjectKey` und `SubjectDocDEK` gibt es in Version 2.1 nicht. Die Betroffenen-Einheit trägt einen zufälligen `DocDek` (§2.5, §3.2).
+
+## 2. Architekturregeln
+
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf E2 oder E3. Keine Abhängigkeit auf `store`, `vector`, `text`, `graph`, `db`.
+3. Schlüsseltypen: `Zeroize` und `ZeroizeOnDrop`. Kein `Clone`, kein `Debug`, kein `Serialize` (INV-11).
+4. Fehlender Schlüssel oder fehlgeschlagenes AEAD ergibt `Err`. Kein Klartext-Fallback, kein Null-Schlüssel, keine Notfall-Passphrase (§11.2).
+5. Nonces entstehen über `OsRng::try_fill_bytes`. Ein RNG-Fehler erzeugt keinen Chiffretext.
+6. Jeder Schlüssel hat genau einen Zweck und ein Label im Zweckregister (INV-KEYPURPOSE-1).
+7. `aes-gcm-siv`, `sha2`, `hmac`, `argon2`, `ed25519` dürfen nur in diesem Crate als direkte Dependency stehen (§4.10).
+
+## 3. Schlüsselhierarchie (SPEC §4.1)
 
 ```
-MasterKey (Passphrase → Argon2id → 256 Bit)
-    │
-    ├── HKDF-Expand(info="contextra/tenant/v1" || tenant_id)
-    │       │
-    │       └── TenantKEK(tenant_id)
-    │               │
-    │               ├── HKDF-Expand(info="contextra/collection/v1" || collection_id || epoch)
-    │               │       │
-    │               │       ├── HKDF-Expand(info="contextra/doc/v1" || doc_id || version)
-    │               │       │       │
-    │               │       │       └── DocumentDEK (Klasse K) ──► AEAD Payload
-    │               │       │
-    │               │       └── HKDF-Expand(info="contextra/subject/v1" || subject_ref)
-    │               │               │
-    │               │               └── SubjectKey(subject_ref)
-    │               │                       │
-    │               │                       └── HKDF-Expand(info="contextra/subject_doc/v1" || doc_id || version)
-    │               │                               │
-    │               │                               └── SubjectDocDEK (Klasse P) ──► AEAD P-Payload
-    │               │
-    │               └── (Epochenrotation bei Collection-Neuanlage nach Drop)
-    │
-    └── HKDF-Expand(info="contextra/erasure/v1")
-            └── ErasureKey (für Journal, Ledger, Berichte)
+Wurzel (Custody-Slot K1 | K2 | K3)
+ └─ KEK[coll, e]        je Collection und Epoche, 32 Byte zufällig, gewrappt unter der Wurzel
+     ├─ DocDek[einheit] je Betroffenen-Einheit, 32 Byte zufällig, gewrappt unter KEK
+     └─ ArtKey[artefakt] je Index-Artefakt, 32 Byte zufällig, gewrappt unter KEK
+K_eng                   Struktur und Integrität, HKDF aus der Wurzel, keine Nutzdaten
+K_ref[tenant, e]        Referenz-Hashes, zufällig, gewrappt unter KEK
+K_sc/*                  Sidecar-Zweckschlüssel, HKDF aus K_eng
+K_saga[erasure_id]      ephemer, verschlüsselt den ScopeDescriptor
+ErasureKey              Journal, Ledger, Berichte, getrennt von Datenschlüsseln
 ```
 
----
+Zwischenschlüssel (`KEK`, `DocDek`, `ArtKey`, `K_ref`) werden niemals per HKDF aus einem übergeordneten Schlüssel abgeleitet. Nur die Vernichtung des konkreten Schlüssels macht die zugehörigen Chiffrate unlesbar. HKDF ist auf `K_eng` und `K_sc/*` beschränkt.
 
-## 3. Kanonische Datenstrukturen & Algorithmen
+### 3.1 Custody (SPEC §4.2, §4.3)
 
-### 3.1 Schlüsseltypen (`secret.rs`)
+| Stufe | Wurzel | Klasse nach Seal |
+|---|---|---|
+| K0 | keine Verschlüsselung, nur Entwicklung, `doctor` rot | nur L und P |
+| K1 | Argon2id, Software-Keystore | C1 mit Annahme `A-FLASH` |
+| K2 | TPM, HSM oder OS-Keyring, nicht exportierbar | C2 nach bestandener Konformitätssuite |
+| K3 | externer KMS mit Vernichtungsattest | C3 mit Anbieter-Attest |
 
-```rust
-use zeroize::{Zeroize, ZeroizeOnDrop};
+Das Crate implementiert den Port `EffaceableKeySlot` nur für K1. K2 und K3 sind in Version 2.1 nicht auswählbar und liefern `CapabilityUnsupported` (REQ-DEL-N14). Ein Stub, der Erfolg meldet, ist verboten (INV-WIRING-2).
 
-/// 256-Bit geheimer Schlüssel mit garantierter Speicherbereinigung.
-/// Implementiert bewusst WEDER Clone, Debug NOCH Serialize.
-#[derive(Zeroize, ZeroizeOnDrop)]
-pub struct SecretKey([u8; 32]);
+`DestroyAttestation` enthält Custody, Verfahren (Zeroization), Zeitpunkt aus `Clock` und den Implementierungsbeleg. K1 liefert einen lokalen Beleg ohne Dritt-Attest.
 
-impl SecretKey {
-    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
-        Self(bytes)
-    }
+### 3.2 Argon2id (K1)
 
-    #[inline]
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
+Untergrenzen: Speicher `m ≥ 64 MiB`, Iterationen `t ≥ 3`, Parallelität `p = 1`, Laufzeit ≥ 250 ms. Die Ausgabe ist 32 Byte. Leere Passphrase ist `CryptoError::EmptyPassphrase`. Der Salt liegt in `<data_dir>/master.salt` und ist kein Geheimnis. Die Parameter sind Untergrenzen. Der Zielwert steht in `benchmarks/budgets.toml`.
 
-/// Stark typisierte Schlüssel-Rollen zur Verhinderung von Verwechslungen im Typsystem:
-pub struct MasterKey(SecretKey);
-pub struct TenantKek(SecretKey);
-pub struct CollectionKek(SecretKey);
-pub struct DocumentDek(SecretKey);
-pub struct SubjectKey(SecretKey);
-pub struct SubjectDocDek(SecretKey);
-pub struct ErasureKey(SecretKey);
+### 3.3 Schlüsseltypen
 
-macro_rules! impl_key_wrapper {
-    ($name:ident) => {
-        impl $name {
-            #[inline]
-            pub const fn from_secret(key: SecretKey) -> Self {
-                Self(key)
-            }
-            #[inline]
-            pub fn as_bytes(&self) -> &[u8; 32] {
-                self.0.as_bytes()
-            }
-        }
-    };
-}
+`SecretKey([u8; 32])` ist der einzige Rohcontainer. Darauf sitzen getrennte Newtypes: `MasterKey`, `Kek`, `DocDek`, `ArtKey`, `ErasureKey`, `StructuralKey` (`K_eng`, `K_sc`). Ein Newtype ist nicht in ein anderes umwandelbar. `SubjectKey` wird nicht definiert.
 
-impl_key_wrapper!(MasterKey);
-impl_key_wrapper!(TenantKek);
-impl_key_wrapper!(CollectionKek);
-impl_key_wrapper!(DocumentDek);
-impl_key_wrapper!(SubjectKey);
-impl_key_wrapper!(SubjectDocDek);
-impl_key_wrapper!(ErasureKey);
-```
+## 4. Record- und Wrap-Format (SPEC §4.6)
 
----
+- **Nutzdaten-AEAD:** `AES-256-GCM-SIV`, Nonce 96 Bit zufällig, Tag 128 Bit. AD = `scope_id ‖ doc_key_id ‖ record_version`.
+- **Padding:** Padmé, Overhead höchstens 12 %. Mindestlänge `min_record_bytes` (Startwert 256).
+- **Header:** `doc_key_id` und Sequenz stehen innerhalb des unter `K_eng` verschlüsselten Blocks (REQ-DEL-N15).
+- **Schlüssel-Wrap:** `AES-256-GCM-SIV`, zufällige 96-Bit-Nonce, AD = `key_id ‖ kek_epoch`. Diese Nonce ist das Suchmuster des Nadelscans (§5.8).
+- Jedes persistierte kryptographische Objekt trägt Algorithmus- und Formatkennung (INV-1). Ein Wechsel läuft über Re-Wrap oder Kompaktion. `doctor crypto-drill` übt das Notfallverfahren halbjährlich.
 
-### 3.2 Master-Key Ableitung via Argon2id (`kdf.rs`)
+`encrypt_aead` gibt `Nonce ‖ Ciphertext ‖ Tag` zurück. `decrypt_aead` liefert bei Tag-Fehler einen einheitlichen `DecryptionFailed`. Der Lesepfad der Engine mappt einen fehlenden Schlüssel auf `Erased` (§11.1). Dieses Crate unterscheidet intern `KeyAbsent` und `DecryptionFailed`, damit die Entschlüsselungsprobe in Schritt 6 `KeyAbsent` prüfen kann.
 
-```rust
-use argon2::{Algorithm, Argon2, Params, Version};
+## 5. KeyTable und KeyRegistry (SPEC §4.8)
 
-/// Leitet den MasterKey aus einer Passphrase und einem 32-Byte Salt ab (SPEC §4.4).
-/// Parameter: m=256MB, t=4, p=1.
-pub fn derive_master_key(passphrase: &[u8], salt: &[u8; 32]) -> Result<MasterKey, CryptoError> {
-    if passphrase.is_empty() {
-        return Err(CryptoError::EmptyPassphrase);
-    }
+- `KeyTable` hat Ersetzen-Semantik. Der gewrappte `DocDek` und der gewrappte `ArtKey` liegen hier, nicht in einem Append-Log.
+- Nach jeder Vernichtung und nach jedem Seal wird die Segmentdatei ohne die vernichteten Einträge neu geschrieben: `tmp` → `fsync` → `rename` → Verzeichnis-`fsync` (REQ-DEL-N4). Die Primitive kommen aus `contextra-durable-fs`.
+- `KeyRegistry` (`MFKR`) führt `created`, `destroyed`, `sealed` mit Referenz-Hash `BLAKE3-keyed(K_ref, scope)`. Es enthält kein Schlüsselmaterial und keinen Wrap-Blob (REQ-DEL-N5).
 
-    let params = Params::new(
-        256 * 1024, // 256 MB RAM
-        4,          // 4 Iterationen
-        1,          // 1 Thread / Parallelism
-        Some(32),   // 32 Byte Key Output
-    ).map_err(|e| CryptoError::Argon2Config(e.to_string()))?;
+## 6. Rolle in der Löschsaga
 
-    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
-    let mut key_bytes = [0u8; 32];
+Die Saga-Reihenfolge ist normativ (INV-DEL-ORDER-1). Dieses Crate handelt in Schritt 5 und Schritt 7. Ebene-A-Purge (Schritte 3 und 4) liegt davor und liegt bei den Index-Crates.
 
-    argon2
-        .hash_password_into(passphrase, salt, &mut key_bytes)
-        .map_err(|e| CryptoError::Argon2Derivation(e.to_string()))?;
+### 6.1 Schritt 5 — Schlüsselvernichtung (`CryptoLayer`)
 
-    Ok(MasterKey::from_secret(SecretKey::from_bytes(key_bytes)))
-}
-```
+`CryptoLayer` implementiert `ErasureLayer` aus `contextra-erasure`.
 
----
+1. Nach `Frozen` gibt es keine Karenz. Die Vernichtung beginnt nach der erfolgreichen Ebene-A-Messung unmittelbar.
+2. Journal-Intent J1, durabel, inklusive der 96-Bit-Wrap-Nonce des `DocDek`.
+3. `DocDek` im `Zeroizing`-Speicher nullen. KeyTable-Eintrag mit Nullen überschreiben, `fsync`, Segment atomar ohne den Eintrag ersetzen.
+4. `KeyRegistry` schreibt `destroyed` mit Referenz-Hash.
+5. Ist der `DocDek` nach protokolliertem Intent nicht mehr in der `KeyTable`, gilt die Vernichtung als vollzogen (idempotent, T-DEL-14).
+6. Der Key-Lock der Einheit wird vom Koordinator bis einschließlich dieses Schritts gehalten. Dieses Crate gibt ihn nicht früher frei.
 
-### 3.3 HKDF-Schlüsselableitung (`kdf.rs`)
+Löschziele (SPEC §5.1):
 
-```rust
-use hkdf::Hkdf;
-use sha2::Sha256;
-use contextra_ids::{CollectionId, DocId, SubjectRef, TenantId};
+| Ziel | Vernichtete Schlüssel |
+|---|---|
+| Betroffenen-Einheit | `DocDek` der Einheit |
+| Betroffener | jeder `DocDek`, den der Subjekt-Index für das `SubjectRef` liefert |
+| Collection | `KEK[coll, *]`, alle `DocDek` und `ArtKey` der Collection |
+| Mandant | alle `KEK` des Mandanten |
 
-/// Leitet den TenantKEK aus dem MasterKey ab.
-pub fn derive_tenant_kek(master: &MasterKey, tenant_id: TenantId) -> Result<TenantKek, CryptoError> {
-    let hk = Hkdf::<Sha256>::new(None, master.as_bytes());
-    let mut okm = [0u8; 32];
-    let info = [b"contextra/tenant/v1".as_slice(), &tenant_id.as_u64().to_le_bytes()].concat();
-    hk.expand(&info, &mut okm).map_err(|_| CryptoError::HkdfExpandFailed)?;
-    Ok(TenantKek::from_secret(SecretKey::from_bytes(okm)))
-}
+`verify_key_absent` gelingt nur, wenn der Slot vollständig `0x00` ist (T-DEL-15). Ein Fehlschlag ist `ShredVerificationFailed`. Der Saga-Zustand bleibt `Frozen` (§11.1).
 
-/// Leitet den CollectionKEK aus dem TenantKEK ab.
-pub fn derive_collection_kek(
-    tenant_kek: &TenantKek,
-    collection_id: CollectionId,
-    epoch: u64,
-) -> Result<CollectionKek, CryptoError> {
-    let hk = Hkdf::<Sha256>::new(None, tenant_kek.as_bytes());
-    let mut okm = [0u8; 32];
-    let info = [
-        b"contextra/collection/v1".as_slice(),
-        &collection_id.as_u64().to_le_bytes(),
-        &epoch.to_le_bytes(),
-    ].concat();
-    hk.expand(&info, &mut okm).map_err(|_| CryptoError::HkdfExpandFailed)?;
-    Ok(CollectionKek::from_secret(SecretKey::from_bytes(okm)))
-}
+### 6.2 Schritt 6 — Beiträge zur Messung
 
-/// Leitet den DocumentDEK (Klasse K) aus dem CollectionKEK ab.
-pub fn derive_document_dek(
-    coll_kek: &CollectionKek,
-    doc_id: DocId,
-    version: u64,
-) -> Result<DocumentDek, CryptoError> {
-    let hk = Hkdf::<Sha256>::new(None, coll_kek.as_bytes());
-    let mut okm = [0u8; 32];
-    let info = [
-        b"contextra/doc/v1".as_slice(),
-        &doc_id.as_u64().to_le_bytes(),
-        &version.to_le_bytes(),
-    ].concat();
-    hk.expand(&info, &mut okm).map_err(|_| CryptoError::HkdfExpandFailed)?;
-    Ok(DocumentDek::from_secret(SecretKey::from_bytes(okm)))
-}
+Dieses Crate liefert der Messung:
 
-/// Leitet den SubjectKey (Klasse P) aus dem CollectionKEK ab.
-pub fn derive_subject_key(
-    coll_kek: &CollectionKek,
-    subject_ref: &SubjectRef,
-) -> Result<SubjectKey, CryptoError> {
-    let hk = Hkdf::<Sha256>::new(None, coll_kek.as_bytes());
-    let mut okm = [0u8; 32];
-    let info = [
-        b"contextra/subject/v1".as_slice(),
-        subject_ref.as_bytes().as_slice(),
-    ].concat();
-    hk.expand(&info, &mut okm).map_err(|_| CryptoError::HkdfExpandFailed)?;
-    Ok(SubjectKey::from_secret(SecretKey::from_bytes(okm)))
-}
+- die Wrap-Nonce für den Nadelscan (0 Treffer erwartet),
+- eine echte `unwrap`-Probe, die mit `KeyAbsent` endet,
+- die Kanarien-Vernichtung über denselben Pfad. Die Kanarie belegt den Weg, nicht die Vernichtung des konkreten `DocDek`.
 
-/// Leitet den SubjectDocDEK (Klasse P) aus dem SubjectKey ab.
-pub fn derive_subject_doc_dek(
-    subject_key: &SubjectKey,
-    doc_id: DocId,
-    version: u64,
-) -> Result<SubjectDocDek, CryptoError> {
-    let hk = Hkdf::<Sha256>::new(None, subject_key.as_bytes());
-    let mut okm = [0u8; 32];
-    let info = [
-        b"contextra/subject_doc/v1".as_slice(),
-        &doc_id.as_u64().to_le_bytes(),
-        &version.to_le_bytes(),
-    ].concat();
-    hk.expand(&info, &mut okm).map_err(|_| CryptoError::HkdfExpandFailed)?;
-    Ok(SubjectDocDek::from_secret(SecretKey::from_bytes(okm)))
-}
-```
+`C1` bis `C3` werden hier nicht vergeben. Vor dem Seal ist nur `C*` zulässig (INV-EPOCH-SEAL-1).
 
----
+### 6.3 Schritt 7 — Epoch Seal (SPEC §4.4)
 
-### 3.4 Authenticated Encryption mit AES-256-GCM-SIV (`aead.rs`)
+`EpochSeal` in `contextra-erasure` ruft dieses Crate auf:
 
-```rust
-use aes_gcm_siv::{
-    aead::{Aead, KeyInit, Payload},
-    Aes256GcmSiv, Nonce,
-};
-use contextra_ids::{CollectionId, DocId, TenantId};
-use rand::RngCore;
+1. `KEK[coll, e+1]` zufällig erzeugen und unter der Wurzel wrappen.
+2. Alle lebenden `DocDek` und `ArtKey` unter `KEK[e+1]` neu wrappen. Kein Daten-Rewrite. Aufwand O(Anzahl Schlüssel).
+3. `KeyTable` atomar ersetzen.
+4. `KEK[e]` und seine Wrap-Kopie vernichten.
+5. K1 mit `rotate_passphrase_on_seal`: neuer Argon2id-Lauf, alte Wurzel nicht mehr ableitbar.
+6. K2 und K3: `rotate` und `destroy` am `EffaceableKeySlot`.
 
-/// AAD-Kontextkonstruktion (SPEC §4.3).
-#[inline]
-pub fn build_aad(tenant: TenantId, collection: CollectionId, doc: DocId, version: u64) -> [u8; 32] {
-    let mut aad = [0u8; 32];
-    aad[0..8].copy_from_slice(&tenant.as_u64().to_le_bytes());
-    aad[8..16].copy_from_slice(&collection.as_u64().to_le_bytes());
-    aad[16..24].copy_from_slice(&doc.as_u64().to_le_bytes());
-    aad[24..32].copy_from_slice(&version.to_le_bytes());
-    aad
-}
+Ein Absturz mitten im Seal lässt `KEK[e]` und `KEK[e+1]` koexistieren. Recovery setzt den Re-Wrap fort (§5.5). `KeyRegistry` schreibt `sealed`.
 
-/// Verschlüsselt Payload mit AES-256-GCM-SIV und bindet AAD ein.
-/// Nonce (96-Bit) wird zwingend zufällig aus dem OS CSPRNG gezogen.
-pub fn encrypt_aead(
-    key: &SecretKey,
-    aad: &[u8],
-    plaintext: &[u8],
-) -> Result<Vec<u8>, CryptoError> {
-    let cipher = Aes256GcmSiv::new_from_slice(key.as_bytes())
-        .map_err(|e| CryptoError::CipherInit(e.to_string()))?;
+Auslöser: `kek_epoch_len` (Start 30 Tage), `seal-now`, und `seal_after_deletion_max` (Start 7 Tage) nach einer Löschung. Löschungen derselben Collection und Epoche teilen sich einen Seal.
 
-    let mut nonce_bytes = [0u8; 12];
-    rand::rngs::OsRng
-        .try_fill_bytes(&mut nonce_bytes)
-        .map_err(|e| CryptoError::RngFailure(e.to_string()))?;
+### 6.4 Schicht S7 — Sidecars
 
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    let payload = Payload {
-        msg: plaintext,
-        aad,
-    };
+Sidecars enthalten Referenz-Hashes, keine Nutzinhalte und keine Schlüssel. `SidecarScanner` misst das. Ein Sidecar mit Wrap-Blob oder Payload ist ein Fehler.
 
-    let ciphertext = cipher
-        .encrypt(nonce, payload)
-        .map_err(|_| CryptoError::EncryptionFailed)?;
+### 6.5 ArtKey-Regel (INV-ARTKEY-1)
 
-    // Format: Nonce (12 Bytes) || Ciphertext mit Tag
-    let mut result = Vec::with_capacity(12 + ciphertext.len());
-    result.extend_from_slice(&nonce_bytes);
-    result.extend_from_slice(&ciphertext);
-    Ok(result)
-}
+Wenn `text` oder `vector` ein Artefakt neu schreibt, vernichtet dieses Crate den alten `ArtKey` sofort, bevor der neue Artefakt-Commit als abgeschlossen gilt. Der neue `ArtKey` ist zufällig und wird unter der aktuellen `KEK` gewrappt.
 
-/// Entschlüsselt einen AES-256-GCM-SIV Chiffretext unter Validierung der AAD.
-pub fn decrypt_aead(
-    key: &SecretKey,
-    aad: &[u8],
-    encrypted_blob: &[u8],
-) -> Result<Vec<u8>, CryptoError> {
-    if encrypted_blob.len() < 12 + 16 {
-        return Err(CryptoError::CiphertextTooShort);
-    }
+## 7. Fehler (`CryptoError`)
 
-    let (nonce_bytes, ciphertext) = encrypted_blob.split_at(12);
-    let cipher = Aes256GcmSiv::new_from_slice(key.as_bytes())
-        .map_err(|e| CryptoError::CipherInit(e.to_string()))?;
+`#[non_exhaustive]`. Mindestens:
 
-    let nonce = Nonce::from_slice(nonce_bytes);
-    let payload = Payload {
-        msg: ciphertext,
-        aad,
-    };
+| Variante | Bedeutung |
+|---|---|
+| `EmptyPassphrase` | K1-Ableitung verweigert |
+| `Argon2Config`, `Argon2Derivation` | Parameter oder Ableitung |
+| `HkdfExpandFailed` | nur für `K_eng` und `K_sc/*` |
+| `RngFailure` | kein Chiffretext wurde erzeugt |
+| `CipherInit`, `EncryptionFailed`, `DecryptionFailed` | AEAD, einheitlich nach außen |
+| `CiphertextTooShort` | Blob ohne Nonce oder Tag |
+| `KeyAbsent` | Unwrap eines vernichteten Schlüssels, erwartetes Ergebnis der Probe |
+| `SlotNotZeroed` | `verify_key_absent` |
+| `CapabilityUnsupported` | K2 oder K3 ohne Suite |
+| `KeyPurposeViolation` | zweiter Zweck für einen Schlüssel |
 
-    cipher
-        .decrypt(nonce, payload)
-        .map_err(|_| CryptoError::DecryptionFailed)
-}
-```
-
----
-
-## 4. Fehlerbehandlung (`CryptoError`)
-
-```rust
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum CryptoError {
-    #[error("Passphrase cannot be empty")]
-    EmptyPassphrase,
-
-    #[error("Argon2 configuration error: {0}")]
-    Argon2Config(String),
-
-    #[error("Argon2 key derivation failed: {0}")]
-    Argon2Derivation(String),
-
-    #[error("HKDF expansion failed: output length invalid or key rejected")]
-    HkdfExpandFailed,
-
-    #[error("Cipher initialization failed: {0}")]
-    CipherInit(String),
-
-    #[error("OS CSPRNG failure: {0}")]
-    RngFailure(String),
-
-    #[error("AEAD encryption operation failed")]
-    EncryptionFailed,
-
-    #[error("AEAD decryption failed: tag mismatch, corrupted data, or invalid AAD context")]
-    DecryptionFailed,
-
-    #[error("Ciphertext blob too short (missing 12-byte nonce or 16-byte tag)")]
-    CiphertextTooShort,
-
-    #[error("Key slot verification failed: slot is not zeroed")]
-    SlotNotZeroed,
-}
-```
-
----
-
-## 5. `Cargo.toml` Spezifikation
+## 8. `Cargo.toml`
 
 ```toml
 [package]
@@ -369,7 +170,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Cryptographic primitives, AES-256-GCM-SIV AEAD, HKDF key derivation, and Argon2id for Contextra"
+description = "AEAD, key hierarchy, KeyTable, epoch seal, and Ed25519 report signing for Contextra"
 
 [lints]
 workspace = true
@@ -377,15 +178,19 @@ workspace = true
 [dependencies]
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
+contextra-durable-fs = { workspace = true }
 thiserror = { workspace = true }
 aes-gcm-siv = "0.11"
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 hkdf = "0.12"
 sha2 = "0.10"
+blake3 = { workspace = true }
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc", "zeroize"] }
 subtle = "2.6"
 zeroize = { version = "1.8", features = ["zeroize_derive"] }
 rand = { workspace = true }
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -394,21 +199,19 @@ proptest = "1.4"
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
-tracing = ["dep:tracing"]
 ```
 
----
+`ed25519` ist keine Feature-Weiche. Die Signatur ist immer gebaut.
 
-## 6. Implementierungs-Arbeitspakete für Entwickler
+## 9. Tests
 
-1. **`Cargo.toml` Bereinigung:**
-   - Entfernen von `contextra-types` und `contextra-ports` aus `[dependencies]` und `[dev-dependencies]`.
-   - Entfernen der Features `workspace`, `types-compat`, `ports-compat`, `kv-encryption`, `cloud-egress-guard`.
-   - `default = []` setzen (R3).
-   - Clippy-Lints durch `[lints] workspace = true` ersetzen (Zero-Panic INV-4).
-2. **Altlasten-Bereinigung (`AP-21`):**
-   - Veraltete Bezüge auf `contextra-kvcache` und `contextra-infer-candle` in `src/lib.rs` und `src/kv_cipher.rs` entfernen.
-3. **Schlüsselhierarchie-Implementierung:**
-   - Typisierte Ableitungsfunktionen `derive_tenant_kek`, `derive_collection_kek`, `derive_document_dek`, `derive_subject_key`, `derive_subject_doc_dek` etablieren.
-4. **Verifikation:**
-   - `cargo test -p contextra-crypto`
+| Kennung | Pflicht in diesem Crate |
+|---|---|
+| T-DEL-3 | Berichtsprüfung scheitert mit falschem Ed25519-Schlüssel |
+| T-DEL-5 | Unter Custody K0 ist Klasse C nicht erreichbar |
+| T-DEL-8 | Collection-Saga vernichtet `KEK[coll, *]` |
+| T-DEL-15 | `verify_key_absent` nur nach vollständiger Nullung |
+| T-DEL-21 | Nach Seal und Hygiene enthält keine Datei die Nonce eines vernichteten Schlüssels. Kein Schlüssel hat zwei Zwecke |
+| T-DEL-22 | Bit-Flip und falscher Signaturschlüssel scheitern |
+
+Zusätzlich: HKDF erzeugt keinen `DocDek`. Ein RNG-Fehler lässt `encrypt_aead` mit `RngFailure` enden und schreibt keine Bytes.

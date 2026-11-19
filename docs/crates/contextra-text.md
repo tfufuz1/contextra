@@ -1,148 +1,65 @@
-# contextra-text — Implementierungsspezifikation (Soll-Zustand)
+# contextra-text — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E1 (Domänenbaustein / Ring 1)  
-**Kern-Closure:** `ids`, `env`, `durable-fs` (E0-Fundamente, max. 5)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-text`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5.3 (Schritt 4b), §6, §7; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-text` implementiert die hochperformante Volltext-Suchmaschine von Contextra mit speziellem Fokus auf die deutsche Sprache und Rechts-/Medizinkorpora:
-- **Deutsche Morphologie & Kompositazerlegung:** Deterministische Zerlegung deutscher Bandwurmwörter (z. B. „Schadensersatzanspruch“ → [schaden, ersatz, anspruch]), Umlaut-Normalisierung und Stemming.
-- **Invertierte Indizes & Block-Max WAND (BMW):** Speichereffiziente Posting-Listen mit dynamischem Pruning für Sub-Millisekunden-Top-K-Suchen.
-- **BM25 / BM25F Relevanzbewertung:** Konfigurierbare Parameter ($k_1$, $b$) und Feldgewichtungen (Titel, Body, Annotationen).
-- **Physisches Segment-Rewrite (DSGVO Phase 4b):** Vollständiges Umschreiben von Posting-Dateien ohne gelöschte `DocId`s und Bereinigung von Term-Statistiken.
-
-### Beseitigung von Ebenenverstößen & Altlasten (R1, R3)
-1. **Keine E2-Abhängigkeiten:** Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace`, `types-compat` und `ports-compat` werden vollständig entfernt.
-2. **Leere Default-Features (R3):** `default = []`.
-3. **Altlasten-Bereinigung (`AP-21`):** In `src/lib.rs` Zeile 25 werden alle Bezüge zu `contextra-router` und `contextra-agent` gelöscht.
-
-### Architekturgarantien (R1–R6, INV-1, INV-3, INV-4, INV-5)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Zero-Panic-Policy:** Alle Operationen liefern `TextError`.
-3. **Deterministisches Ranking (INV-5):** Exakt gleiche Scores und Tie-Breaking nach `DocId` aufsteigend.
-4. **Schutz abgeleiteter Daten (Klasse D):** Posting-Listen unterliegen als abgeleitete Daten der kaskadierten Löschung.
+**Ebene:** E1 (Domäne)
+**Domänen-Closure:** `ids`, `env`, `durable-fs`
+**Verträge:** `ports` (`TextIndex`), `erasure` (`TextLayer`)
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-text`
+**Normative Quellen:** `docs/SPEC.md` §4.7, §5.3 Schritt 3, §5.9 Schicht S3, §5.10, §6.3, §7 (`TextLayer`), INV-5, INV-ARTKEY-1, INV-DERIVED-1.
 
 ---
 
-## 2. Architektur & Komponenten
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        contextra-text                       │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                    InvertedIndex                    │   │
-│   │                                                     │   │
-│   │   ┌───────────────────┐     ┌───────────────────┐   │   │
-│   │   │  GermanTokenizer  │     │ CompoundSplitter  │   │   │
-│   │   │ (Unicode Segment.)│     │ (Wörterbuch-Trie) │   │   │
-│   │   └─────────┬─────────┘     └─────────┬─────────┘   │   │
-│   │             │                         │             │   │
-│   │             ▼                         ▼             │   │
-│   │   ┌─────────────────────────────────────────────┐   │   │
-│   │   │ Inverted Segments (Disk / Memmap)           │   │   │
-│   │   │ Term: "haftung"   ──► [doc_1, doc_4, ...]   │   │   │
-│   │   │ Term: "ausschluss"──► [doc_1, doc_9, ...]   │   │   │
-│   │   └─────────────────────────────────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌───────────────────┐     ┌───────────────────┐   │   │
-│   │   │  Block-Max-WAND   │     │  SegmentRewriter  │   │   │
-│   │   │  Query Evaluator  │     │ (DSGVO Phase 4b)  │   │   │
-│   │   └───────────────────┘     └───────────────────┘   │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+`contextra-text` ist der invertierte Volltextindex: deutscher Tokenizer, Kompositazerlegung, BM25 und BM25F, Block-Max-WAND.
 
----
+Postings, Term-Wörterbuch und Dokumentlängen sind Index-Artefakte der Klasse D. Sie liegen je Segment unter einem zufälligen `ArtKey` und tragen eine `LineageRef` auf das Quelldokument. Die Versiegelung und die Vernichtung des `ArtKey` führt `contextra-crypto` aus, aufgerufen von `contextra-db`.
 
-## 3. DSGVO-Löschkette: Text-Segment-Rewrite (Phase 4b)
+Ranking ist deterministisch. Bei gleichem BM25-Score gewinnt die kleinere `DocId` (INV-5).
 
-Posting-Listen dürfen nach einer Löschung keine Reste der gelöschten Dokumente enthalten:
+## 2. Architekturregeln
 
-```rust
-use contextra_ids::DocId;
-use std::path::{Path, PathBuf};
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf andere E1-Crates. Keine Dev-Abhängigkeit auf `contextra-testkit`.
+3. `TextLayer` implementiert `ErasureLayer` aus `contextra-erasure`.
+4. Posting-Iteratoren prüfen die `LiveMask`, bevor ein Treffer die Fusionsstufe erreicht (§6.2, §6.3).
 
-pub struct SegmentRewritePlan {
-    pub segment_id: u64,
-    pub doc_ids_to_purge: Vec<DocId>,
-}
+## 3. BM25
 
-pub struct SegmentRewriteOutcome {
-    pub segment_id: u64,
-    pub postings_removed: u64,
-    pub bytes_reclaimed: u64,
-}
+$$BM25(D, Q) = \sum_{t \in Q} IDF(t) \cdot \frac{f(t, D) \cdot (k_1 + 1)}{f(t, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\mathrm{avgdl}}\right)}$$
 
-pub struct TextSegmentRewriter;
+Startwerte: $k_1 = 1{,}2$, $b = 0{,}75$. IDF, Dokumentlängen und Zähler liegen im Segment und werden bei jeder Neuschreibung neu berechnet (§5.10).
 
-impl TextSegmentRewriter {
-    /// Führt das physische Umschreiben eines Posting-Segments aus (Phase 4b).
-    ///
-    /// 1. Schreibt neue Posting-Listen in temporäre Datei (ohne doc_ids_to_purge).
-    /// 2. Passt Dokumentfrequenzen (df) und Feldlängen an.
-    /// 3. Führt atomares Rename und Directory-Fsync aus (contextra-durable-fs).
-    /// 4. Überschreibt alte Segment-Datei mit Nullen (Scrubbing).
-    pub fn rewrite_segment(
-        segment_path: &Path,
-        docs_to_purge: &[DocId],
-    ) -> Result<SegmentRewriteOutcome, TextError> {
-        // Implementierung des atomaren Rewrites
-        let parent = segment_path.parent().ok_or(TextError::InvalidPath)?;
-        let tmp_path = parent.join(format!(".{}.rewrite.tmp", segment_path.file_name().unwrap().to_str().unwrap()));
+## 4. Rolle in der Löschsaga
 
-        // Iteration über Postings, Ausschluss von docs_to_purge, Schreiben nach tmp_path
-        // Atomares Rename via contextra-durable-fs
-        Ok(SegmentRewriteOutcome {
-            segment_id: 1,
-            postings_removed: docs_to_purge.len() as u64,
-            bytes_reclaimed: 0,
-        })
-    }
-}
-```
+Schicht **S3**, Ebene A und Ebene B. Messung: `TextScanner` (Rohbyte-Scan kanonischer Terme und dekodierte Sicht) plus Black-Box-Probe. Positivkontrolle `AC-1`. `purge` ist idempotent.
 
----
+### 4.1 Schritt 3 — Segment-Neuschreibung
 
-## 4. Relevanz-Scoring (BM25)
+Nach dem Journal-Übergang `PlaintextPurged`:
 
-$$BM25(D, Q) = \sum_{t \in Q} IDF(t) \cdot \frac{f(t, D) \cdot (k_1 + 1)}{f(t, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}$$
+1. Das betroffene Segment wird ohne den Scope neu geschrieben.
+2. Terme, die nur im gelöschten Scope vorkamen, verlassen das Wörterbuch.
+3. BM25-Statistik (IDF, Längen, Zähler) wird neu berechnet.
+4. Das neue Segment wird unter einem frisch erzeugten `ArtKey` versiegelt. Der alte `ArtKey` wird sofort vernichtet (INV-ARTKEY-1).
+5. Austausch über `contextra-durable-fs`: `tmp` → `fsync` → `rename` → Verzeichnis-`fsync`.
 
-- $k_1 = 1.2$: Term-Frequenz-Sättigung.
-- $b = 0.75$: Dokumentlängen-Normalisierung.
-- Tie-Breaking: Bei identischem BM25-Score gewinnt stets die kleinere `DocId`.
+Die Neuschreibung ist der Löschschritt dieses Crates. Ein bloßes Ausblenden im Iterator reicht für Klasse P nicht.
 
----
+### 4.2 Schritt 2 — Lineage
 
-## 5. Fehlerbehandlung (`TextError`)
+Die Kaskade selbst liegt in `contextra-db` (`LineageIndex`, INV-DERIVED-1). `TextLayer::resolve` liefert die Segmente, deren `LineageRef` auf den Scope zeigt. Ableitungen mit weiteren, nicht gelöschten Quellen werden als `stale` markiert oder mit dem neuen Segment neu aufgebaut. Dieses Crate entscheidet das nicht allein. Es setzt die Markierung um, die der Koordinator übergibt.
 
-```rust
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum TextError {
-    #[error("Segment file corrupted: {0}")]
-    CorruptedSegment(String),
+### 4.3 Suche
 
-    #[error("Tokenizer error: {0}")]
-    Tokenizer(String),
+Ein Posting, dessen Slot in der `LiveMask` gelöscht ist, wird übersprungen. Die Statistik des noch nicht neu geschriebenen Segments kann bis zum Abschluss von Schritt 3 ein Restkanal sein. Nach der Neuschreibung ist die Statistik neu berechnet. Treffermengen sind bis dahin nur klassenweise zugesichert (§5.10).
 
-    #[error("Invalid segment path")]
-    InvalidPath,
+## 5. Fehler (`TextError`)
 
-    #[error("I/O error during index operation: {0}")]
-    Io(#[from] std::io::Error),
-}
-```
+`#[non_exhaustive]`: `CorruptedSegment`, `Tokenizer`, `InvalidPath`, `Io`, `ArtKeyRotationIncomplete`. Ein unvollständiger `ArtKey`-Wechsel lässt `purge` mit Fehler enden. Der Saga-Zustand bleibt unverändert, bis das Journal einen erfolgreichen Abschluss sieht (§11.1).
 
----
-
-## 6. `Cargo.toml` Spezifikation
+## 6. `Cargo.toml`
 
 ```toml
 [package]
@@ -151,7 +68,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Inverted fulltext index, BM25, Block-Max WAND, and German morphological decompounding for Contextra"
+description = "Inverted fulltext index, BM25, and segment rewrite under ArtKey"
 
 [lints]
 workspace = true
@@ -160,37 +77,31 @@ workspace = true
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-durable-fs = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
 bytes = { workspace = true }
 unicode-segmentation = "1.11.0"
 regex = "1.10"
 ahash = { workspace = true }
-serde = { workspace = true }
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
-criterion = { workspace = true }
 
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
-tracing = ["dep:tracing"]
 ```
 
----
+## 7. Tests
 
-## 7. Implementierungs-Arbeitspakete für Entwickler
+| Kennung | Pflicht |
+|---|---|
+| T-DEL-6 | Volltextsuche findet das Dokument nach `Frozen` nicht, und nach Schritt 3 auch nicht in der Rohsicht des neuen Segments |
+| T-DEL-10 | Segment mit `LineageRef` auf das Quelldatum wird in Schritt 2 aufgelöst und in Schritt 3 neu geschrieben |
+| T-DEL-14 | Zweites `purge` desselben Segments ist ein No-op |
+| T-DEL-17 | Kanonische Terme, die nur im Scope vorkamen, fehlen in der Segmentdatei |
 
-1. **`Cargo.toml` Bereinigung:**
-   - Entfernen von `contextra-types` und `contextra-ports`.
-   - Features `workspace`, `types-compat`, `ports-compat` entfernen.
-   - `default = []` setzen (R3).
-2. **Altlasten-Bereinigung (`AP-21`):**
-   - Veraltete Kommentare zu `contextra-router` und `contextra-agent` in `src/lib.rs` Zeile 25 bereinigen.
-3. **DSGVO Phase 4b Integration:**
-   - Segment-Rewrite Engine gegen `contextra-durable-fs` absichern.
-4. **Verifikation:**
-   - `cargo test -p contextra-text`
+Der Beispielcode eines Rewrites enthält kein `unwrap` und kein `expect` (INV-4).

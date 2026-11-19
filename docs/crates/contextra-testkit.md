@@ -1,105 +1,65 @@
-# contextra-testkit — Implementierungsspezifikation (Soll-Zustand)
+# contextra-testkit — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E3 (Endpunkte / Testwerkzeuge)  
-**Kern-Closure:** `ports`, `types`, `ids`, `env`, `erasure`  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-testkit`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §12 (Testkatalog); `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-testkit` stellt die gemeinsame Testinfrastruktur, In-Memory-Testdoppel, Fehlersimulatoren und Konformitätssuiten für das Contextra-System bereit:
-- **In-Memory Port-Testdoppel:** Schnelle RAM-Implementierungen aller Port-Traits (`InMemoryStore`, `InMemoryVector`, `InMemoryText`, `InMemoryGraph`).
-- **Fehlersimulatoren (Fault Injection):** Gezielte Injektion von I/O-Fehlern, Disk-Voll-Zuständen (`DiskReserveLow`) und Handle-Poisoning zur Verifikation von Crash-Konsistenz.
-- **Canary-Orakel & Positivkontrolle (T-DEL-7):** Erzeugung kryptographisch eindeutiger Canaries zur Kalibrierung des `Scanner<Armed>` im DSGVO-Testkatalog (T-DEL-1 bis T-DEL-13).
-- **Deterministische Korpora:** Reproduzierbare synthetische Dokumente und Vektoren für Regressions- und Differenzialtests.
-
-### Beseitigung von Altlasten & Richtlinien (R2, R3, AP-21)
-1. **R2-Abhängigkeitsregel:** `contextra-testkit` ist eine reine E3-Komponente. Kern-Crates der Ebenen E0 und E1 dürfen `contextra-testkit` **weder in dependencies noch in dev-dependencies** einbinden.
-2. **Leere Default-Features (R3):** `default = []` (Entfernung von `default = ["testkit", "erasure-conformance"]`).
-3. **Altlasten-Bereinigung (`AP-21`):** In `src/lib.rs` (Z. 27–28) und `src/conformance/routing_ports.rs` werden alle Referenzen auf `contextra-agent`, `contextra-cognition` und `contextra-router` gelöscht.
-
-### Architekturgarantien (R1–R6, INV-3, INV-4)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Zero-Panic-Policy:** Test-Frameworks und Mocks schlagen kontrolliert mit Fehlern fehl; keine unkontrollierten Panics in Helfern.
+**Ebene:** E3 (Endpunkt, Erasure Lab)
+**Kern-Closure:** `ids`, `env`, `types`, `ports`, `erasure`, `durable-fs`
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-testkit`
+**Normative Quellen:** `docs/SPEC.md` §5.8, §12, §15, INV-WITNESS-MINT-1, INV-WIRING-2, R2.
 
 ---
 
-## 2. Architektur & Test-Module
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      contextra-testkit                      │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                 FaultInjectionEngine                │   │
-│   │   ├── FaultVfs (simuliert Dateisystem-Fehler)       │   │
-│   │   └── PoisonSimulator (triggert INV-FSYNC-1)        │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                 InMemoryTestDoubles                 │   │
-│   │   ├── InMemoryStorageEngine                         │   │
-│   │   ├── InMemoryVectorIndex                           │   │
-│   │   ├── InMemoryTextIndex                             │   │
-│   │   └── InMemoryGraph                                 │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                ErasureTestingHarness                │   │
-│   │   ├── CanaryGenerator (T-DEL-1 bis T-DEL-13)        │   │
-│   │   └── PositiveControlArming (Scanner<Armed>)        │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+`contextra-testkit` ist das Erasure Lab und die gemeinsame Testinfrastruktur.
 
----
+- In-Memory-Doubles der Ports `StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`.
+- Fehlerinjektion für I/O, volle Platte und Handle-Poisoning.
+- Canary-Erzeugung für die Positivkontrolle `AC-1`.
+- Der Layering-Gate-Test `tests/layering.rs` (SPEC §15).
+- Synthetische Korpora mit festem Seed.
 
-## 3. Test-Harness für die Löschkette (T-DEL-1 bis T-DEL-13)
+E0- und E1-Crates binden dieses Crate weder als Abhängigkeit noch als Dev-Abhängigkeit (R2).
 
-```rust
-use std::path::Path;
+## 2. Architekturregeln
 
-pub struct CanaryPattern {
-    pub bytes: [u8; 32],
-}
+1. `#![forbid(unsafe_code)]`. Zero-Panic in Hilfscode, der von Tests als Bibliothek aufgerufen wird. `default = []`.
+2. `Scanner<Armed>` wird hier nicht konstruiert. Der einzige Übergang von `Scanner<Unarmed>` zu `Scanner<Armed>` ist `Chain::verify_control` nach bestandener Positivkontrolle (INV-WITNESS-MINT-1).
+3. Ein Double, das `purge` oder `witness` mit `Ok` beantwortet, ohne den Canary zu entfernen oder die Messung wirklich auszuführen, ist ein Stub und darf nicht als Schichtregistrierung dienen (INV-WIRING-2).
+4. Kein Test gilt als Löschtest, wenn er nur das Gate setzt. Der Katalog verlangt den Durchlauf der Saga einschließlich Purge (SPEC §12). Ein reiner Gate-Test prüft höchstens Klasse L.
 
-impl CanaryPattern {
-    pub fn generate() -> Self {
-        use rand::RngCore;
-        let mut b = [0u8; 32];
-        rand::rngs::OsRng.fill_bytes(&mut b);
-        Self { bytes: b }
-    }
-}
+## 3. Positivkontrolle
 
-pub struct CanaryScanner;
+`CanaryPattern` ist 32 Byte. `generate` füllt sie über `OsRng::try_fill_bytes` und liefert `Err`, wenn der RNG scheitert. `fill_bytes` ohne Fehlerpfad wird nicht verwendet.
 
-impl CanaryScanner {
-    /// Scannt ein Dateisystem-Verzeichnis rekursiv nach dem Canary-Muster.
-    /// Liefert die Anzahl gefundener Vorkommen im Klartext.
-    pub fn scan_dir(dir: &Path, canary: &CanaryPattern) -> Result<u64, std::io::Error> {
-        let mut count = 0;
-        for entry in walkdir::WalkDir::new(dir) {
-            let entry = entry?;
-            if entry.file_type().is_file() {
-                let data = std::fs::read(entry.path())?;
-                if data.windows(32).any(|w| w == canary.bytes) {
-                    count += 1;
-                }
-            }
-        }
-        Ok(count)
-    }
-}
-```
+Der Canary wird über den Schreibpfad der zu messenden Schicht eingefügt, nicht nachträglich in eine Datei gepatcht.
 
----
+`CanaryScanner::scan_dir` zählt Rohbyte-Treffer. Das Ergebnis ist eine Zahl. Es ist kein `LayerWitness` und kein `Scanner<Armed>`. Ein Test, der nur `scan_dir` aufruft, hat `AC-1` nicht bestanden.
 
-## 4. `Cargo.toml` Spezifikation
+T-DEL-7 ist erfüllt, wenn ein `Scanner<Unarmed>` den eingefügten Canary findet und `Chain::verify_control` danach einen `Scanner<Armed>` erzeugt. Schlägt das Finden fehl, bleibt der Scanner unbewaffnet und der Messlauf ist ungültig.
+
+Ein Compile-Fail-Test zeigt, dass `Scanner<Armed>` außerhalb von `contextra-erasure` nicht konstruierbar ist.
+
+## 4. Doubles
+
+Ein In-Memory-Double speichert, was der Test geschrieben hat, und entfernt es in `purge`, wenn es als Schicht-Double auftritt. `witness` liest den Speicher und meldet `residue_matches`. Ein leerer Speicher ohne vorherigen Canary-Fund ist kein bestandener Lauf.
+
+`FaultVfs` implementiert `Vfs` aus `contextra-durable-fs`, einschließlich `scrub_if_safe` und `enqueue_pending_delete`. Ein injizierter Fehler am Journal-Flush muss beim Aufrufer `JournalNotDurable` ergeben, ohne dass der Double eine Lesesperre setzt.
+
+## 5. Layering-Gate
+
+`crates/contextra-testkit/tests/layering.rs` nutzt `cargo metadata` und prüft SPEC §15:
+
+1. Jedes Crate hat `default = []`.
+2. Keine E0- oder E1-Crate hängt von E2 oder E3 ab.
+3. Die Domänen-Closure jeder E1-Crate ist eine Teilmenge von E0 und hat höchstens fünf Mitglieder. `contextra-ports` und `contextra-erasure` zählen nicht mit.
+4. `[lints] workspace = true` ist gesetzt.
+5. Kein Crate aus SPEC §2.2 ist Workspace-Member.
+6. Die Gates `surface-coverage`, `claim-generator` und `deletion-honesty` sind im CI-Auftrag referenziert.
+
+`contextra-store` darf in diesem Test nicht von `contextra-crypto` oder `contextra-mvcc` abhängen. `contextra-vector` darf nicht von `contextra-mvcc` abhängen. `contextra-ports` darf nicht von `contextra-types` abhängen.
+
+## 6. `Cargo.toml`
 
 ```toml
 [package]
@@ -108,14 +68,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Deterministic test utilities, in-memory port doubles, and fault injection for Contextra"
+description = "Erasure lab, fault injection, and the layering gate"
 
 [lints]
 workspace = true
-
-[package.metadata.contextra]
-ring = "tooling"
-level = 3
 
 [dependencies]
 contextra-ids = { workspace = true }
@@ -123,30 +79,19 @@ contextra-env = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-erasure = { workspace = true }
-bytes = { workspace = true }
-parking_lot = { workspace = true }
-tracing = { workspace = true }
-walkdir = "2.4"
+contextra-durable-fs = { workspace = true }
 rand = { workspace = true }
-
-[dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt"] }
-tempfile = { workspace = true }
+thiserror = { workspace = true }
 
 [features]
 default = []
-testkit = []
-erasure-conformance = []
 ```
 
----
+## 7. Tests
 
-## 5. Implementierungs-Arbeitspakete für Entwickler
-
-1. **`Cargo.toml` Bereinigung:**
-   - Default-Features leeren (`default = []`, R3).
-2. **Altlasten-Bereinigung (`AP-21`):**
-   - In `src/lib.rs` (Z. 27–28) Referenzen auf `contextra-agent` und `contextra-cognition` entfernen.
-   - In `src/conformance/routing_ports.rs` Bezüge zu `contextra-router` bereinigen.
-3. **Verifikation:**
-   - `cargo test -p contextra-testkit`
+| Kennung | Pflicht |
+|---|---|
+| T-DEL-7 | Positivkontrolle bewaffnet den Scanner. Ein fehlender Canary bewaffnet ihn nicht |
+| INV-WITNESS-MINT-1 | `Scanner::<Armed>::new` ist außerhalb von `contextra-erasure` ein Compile-Fehler |
+| T-DEL-23 | Eine Konstante anstelle der Messung lässt den Lab-Test fehlschlagen |
+| §15 | `layering.rs` bricht ab, wenn `ports` von `types` abhängt oder `store` von `crypto` abhängt |

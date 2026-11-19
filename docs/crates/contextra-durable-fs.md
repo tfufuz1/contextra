@@ -76,11 +76,31 @@ pub trait Vfs: Send + Sync {
     /// Entfernt eine Datei sicher und verzeichnet den Intent bei Bedarf im PendingDeleteJournal.
     fn remove_file(&self, path: &Path) -> Result<(), DurableFsError>;
 
+    /// Plant eine Datei zur verzögerten Entfernung, bis kein Snapshot-Pin sie mehr referenziert.
+    fn pending_delete(&self, path: &Path, min_seq: u64) -> Result<PendingDelete, DurableFsError>;
+
+    /// Überschreibt Dateiinhalt nur, wenn Exklusivität und Dateisystem dies sicher erlauben.
+    /// Liefert ScrubSkipped statt Erfolg, wenn die Voraussetzung nicht erfüllt ist.
+    fn scrub_if_safe(&self, path: &Path) -> Result<ScrubOutcome, DurableFsError>;
+
     /// Prüft die Existenz eines Pfades.
     fn exists(&self, path: &Path) -> bool;
 
     /// Benennt eine Datei atomar um und synchronisiert das Elternverzeichnis.
     fn rename_durably(&self, from: &Path, to: &Path) -> Result<(), DurableFsError>;
+}
+
+/// Eintrag des PendingDelete-Journals. Physische Entfernung wartet auf `min_seq`.
+pub struct PendingDelete {
+    pub path: PathBuf,
+    pub min_seq: u64,
+}
+
+/// Ergebnis einer sicheren Scrub-Prüfung. `Skipped` ist kein Löschbeleg.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrubOutcome {
+    Scrubbed { bytes: u64 },
+    Skipped,
 }
 
 /// Standard-Implementierung auf echtem Betriebssystem-Dateisystem.
@@ -259,13 +279,11 @@ pub fn scrub_file(path: &Path, policy: ScrubPolicy) -> Result<ScrubReceipt, Dura
 
 ---
 
-### 2.4 Die 4 Fsync-Ankerpunkte der Löschkette (SPEC §5.3)
+### 2.4 Durabilität der neun Saga-Schritte (SPEC §5.3)
 
-`contextra-durable-fs` sichert die 4 Pflicht-Ankerpunkte des Erasure-Journals ab:
-1. **fsync #1 (Intent):** Löschauftrag und Attestierung im Journal fixiert.
-2. **fsync #2 (Gated):** Exklusiver Gate-Zustand festgeschrieben.
-3. **fsync #3 (KeyRevoked):** Nach Slot-Nullung im Tresor wird der Widerruf synchron festgeschrieben.
-4. **fsync #4 (Abschluss & Ledger):** Signierter Bericht und Hash-Ledger außerhalb des Datenverzeichnisses persistiert.
+Der durabele Journal-Intent aus Schritt 1 wird vor Aktivierung der `LiveMask` synchronisiert. Zustandsübergänge werden jeweils vor dem zugehörigen destruktiven Schritt protokolliert. Ebene-A-Purge und Messung (Schritte 3–4) erfolgen vor Schlüsselvernichtung (Schritt 5); es gibt keinen alten `KeyRevoked`-Anker. `KeyTable`-Replace, Epoch Seal, Hygiene und Bericht verwenden Datei- und Verzeichnis-`fsync` gemäß ihrer jeweiligen atomaren Transaktion. Der Bericht und das Ledger werden erst nach Schritt 9 geschrieben.
+
+Die `Vfs`-Schnittstelle stellt `PendingDelete` für verzögerte Dateientfernung sowie `scrub_if_safe` bereit. `scrub_if_safe` überschreibt nur exklusiv und sicher beschreibbare Dateien. Ist Scrubbing nicht sicher möglich, wird der Rest als solcher gemeldet; die Operation darf keinen erfolgreichen Scrub vortäuschen.
 
 ---
 

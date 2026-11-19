@@ -114,6 +114,14 @@ impl BlockCacheBackend for SieveCacheBackend {
         self.state.read().map.len()
     }
 
+    fn clear(&self) {
+        let mut state = self.state.write();
+        state.map.clear();
+        state.nodes.clear();
+        state.hand = 0;
+        state.current_bytes = 0;
+    }
+
     #[inline]
     fn current_bytes(&self) -> usize {
         self.state.read().current_bytes

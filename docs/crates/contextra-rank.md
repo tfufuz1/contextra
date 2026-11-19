@@ -1,15 +1,18 @@
-# contextra-rank — Implementierungsspezifikation (Soll-Zustand)
+# contextra-rank — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E1 (Domänenbaustein / Ring 1)  
-**Kern-Closure:** `ids`, `env` (E0-Fundamente, max. 5)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-rank`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §6, §13 (INV-4, INV-5); `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
+**Ebene:** E1 (Domänenbaustein / Ring 1)
+**Domänen-Closure:** `ids`, `env`
+**Verträge:** `ports` (`Purgeable`) und `erasure` (S4-Registrierung); zählen nicht gegen fünf (SPEC §15).
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-rank`
+**Referenzdokumente:** `docs/SPEC.md` §2, §6, §13 (INV-4, INV-5); `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)
 
 ---
 
 ## 1. Zweck & Architekturgarantien
+
+`contextra-rank` besitzt den dokumentbezogenen RRF-Cache `er_cache` (SPEC §5.9 S4). Der Cache enthält nur flüchtige Zwischenwerte, wird über `Purgeable` beim Koordinator registriert und invalidiert sowie zeroized, bevor Schritt 3 abgeschlossen wird. Er ist kein Persistenzformat und darf einen gelöschten Kandidaten nicht wieder in die Rangfolge einführen.
 
 `contextra-rank` ist die mathematische Fusions-, Kalibrierungs- und Reranking-Komponente für das hybride Retrieval (Hybrid-Search) in Contextra:
 - **Score-Fusion:** Reciprocal Rank Fusion (RRF) und gewichtete Signalkombination über Vektor-, Volltext- und Graph-Treffer.
@@ -18,7 +21,7 @@
 - **Datenschutz-Invarianz (Z-E8):** Mathematische Garantie, dass gelöschte oder gesperrte Dokumente weder Rangfolge noch relative Relevanzbewertung freigegebener Dokumente verzerren.
 
 ### Beseitigung von Ebenenverstößen & Altlasten (R1, R3)
-1. **Keine E2-Abhängigkeiten:** Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace`, `types-compat` und `ports-compat` werden vollständig entfernt.
+1. Keine Abhängigkeit auf E1/E2/E3. `contextra-ports` und `contextra-erasure` sind E0-Verträge, die für den S4-Cache genutzt werden; `contextra-types` wird nicht benötigt.
 2. **Kanonische Fundament-Einbindung:** `contextra-rank` bindet direkt `contextra-ids` (für `DocId`) und `contextra-env` (für `Clock`) ein.
 3. **Leere Default-Features (R3):** `default = []` (alle experimentellen Features wie `exp-dibud`, `exp-resonance` werden opt-in).
 4. **Altlasten-Bereinigung (`AP-21`):** In `src/lib.rs` Zeilen 27-28 werden alle Referenzen auf `infer-candle`, `infer-ollama`, `infer-onnx` und `py` entfernt.
@@ -209,6 +212,8 @@ workspace = true
 [dependencies]
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
 ahash = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
@@ -231,7 +236,7 @@ resonance = []
 ## 6. Implementierungs-Arbeitspakete für Entwickler
 
 1. **`Cargo.toml` Bereinigung:**
-   - Entfernen von `contextra-types` und `contextra-ports`.
+   - `contextra-types` entfernen; `contextra-ports` und `contextra-erasure` nur für den dokumentbezogenen S4-Cache einbinden.
    - `contextra-ids` und `contextra-env` zu `[dependencies]` hinzufügen.
    - Features `workspace`, `types-compat`, `ports-compat` entfernen.
    - Default-Features leeren (`default = []`, R3).

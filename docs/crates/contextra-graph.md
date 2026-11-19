@@ -1,127 +1,63 @@
-# contextra-graph — Implementierungsspezifikation (Soll-Zustand)
+# contextra-graph — Crate-Spezifikation (Soll-Zustand, SPEC 2.1)
 
-**Ebene:** E1 (Domänenbaustein / Ring 1)  
-**Kern-Closure:** `ids`, `env`, `durable-fs` (E0-Fundamente, max. 5)  
-**Status:** Normativ (Soll-Zustand für Entwickler)  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-graph`  
-**Referenzdokumente:** `docs/SPEC.md` §2, §3, §5.3 (Schritt 4f), §6, §7; `ANALYSIS-E0-CONTRADICTIONS.md`; `ALTLASTEN-AUDIT.md` (AP-21)  
-
----
-
-## 1. Zweck & Architekturgarantien
-
-`contextra-graph` implementiert die hochskalierbare GraphRAG-Engine (CSR — Compressed Sparse Row) für Contextra:
-- **Wissensgraph & CSR-Speicher:** Knoten, typisierte Kanten und n-stellige Hyperedges zur semantischen Modellierung komplexer Unternehmens- und Fachbeziehungen.
-- **Path-RAG & Personalisierter PageRank (PPR):** Graph-Traversierung und Relevanz-Diffusion zur Kontextanreicherung für LLM-Prompts.
-- **PII-Schutz (SPEC §3):** Personenbezogene Entitäten werden zwingend über `SubjectRef` adressiert; Kanten zu Unternehmenseinheiten nutzen `PersonalRef`.
-- **Graph-Bereinigung (DSGVO Phase 4f):** Physisches Entfernen von Entitäten, inzidenten Kanten und Reparatur betroffener Hyperedges.
-
-### Beseitigung von Ebenenverstößen & Altlasten (R1, R3)
-1. **Keine E2-Abhängigkeiten:** Die optionalen Abhängigkeiten zu `contextra-types` und `contextra-ports` sowie die Features `workspace`, `types-compat` und `ports-compat` werden vollständig entfernt.
-2. **Leere Default-Features (R3):** `default = []` (alle Funktionserweiterungen wie `session-dag`, `entity-extraction`, `hyperedge-suggest` werden opt-in).
-3. **Altlasten-Bereinigung (`AP-21`):** In `src/hyperedge.rs` (Z. 310–313) und `src/percolation.rs` (Z. 19–22) werden alle Verweise auf das entfernte `contextra-cognition` gelöscht.
-
-### Architekturgarantien (R1–R6, INV-1, INV-3, INV-4, INV-5)
-1. **`#![forbid(unsafe_code)]`:** 100 % speichersicher.
-2. **Zero-Panic-Policy:** Keine Panics; alle Operationen liefern `GraphError`.
-3. **Determinismus (INV-5):** Graph-Traversierungen liefern bei identischem Stand und Seeds stets dieselbe Knotenreihenfolge.
-4. **Keine PII im Klartext:** Entitätsknoten speichern keine Klartext-PII im Graphen.
+**Ebene:** E1 (Domäne)
+**Domänen-Closure:** `ids`, `env`, `durable-fs`
+**Verträge:** `ports` (`GraphIndex`), `erasure` (`GraphLayer`). `GraphIndex` wird hier implementiert und nicht neu definiert.
+**Status:** Normativ (Soll-Zustand)
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-graph`
+**Normative Quellen:** `docs/SPEC.md` §3.2, §4.7, §5.3 Schritt 8, §5.10, §6.3, §7, INV-5, INV-ARTKEY-1, INV-12.
 
 ---
 
-## 2. Architektur & Komponenten
+## 1. Zweck
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       contextra-graph                       │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                    PropertyGraph                    │   │
-│   │                                                     │   │
-│   │     (Entity: Vertrag) ────[regelt]───► (Entity: PII)│   │
-│   │            │                                  │     │   │
-│   │            ▼                                  ▼     │   │
-│   │       [Klasse K]                         [Klasse P] │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ CsrAdjacencyIndex  │    │ HyperedgeTable    │   │   │
-│   │   │ (Forward / Reverse)│    │ (N-ary Relations) │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   │                                                     │   │
-│   │   ┌────────────────────┐    ┌───────────────────┐   │   │
-│   │   │ GraphTraversal     │    │ GraphPurger       │   │   │
-│   │   │ (PPR / Path-RAG)   │    │ (DSGVO Phase 4f)  │   │   │
-│   │   └────────────────────┘    └───────────────────┘   │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+`contextra-graph` ist der Property-Graph für GraphRAG: Knoten, typisierte Kanten, Hyperedges, Traversierung.
 
----
+Personenbezogene Knoten werden über `SubjectRef` adressiert. Kanten aus Klasse-K-Knoten auf Personen verwenden `PersonalRef`. Klartext-PII liegt nicht im Graphen.
 
-## 3. DSGVO-Löschkette: Graph-Bereinigung (Phase 4f)
+## 2. Einordnung in die Löschkette
 
-```rust
-use contextra_ids::{EntityId, SubjectRef};
-use std::path::Path;
+SPEC §7 führt keine eigene Graph-Schicht neben `VectorLayer`. Die HNSW-Topologie gehört zu Schicht S2 in `contextra-vector` und trägt das Residuum `R-GRAPH`.
 
-pub struct GraphPurgeOutcome {
-    pub entities_deleted: u64,
-    pub edges_removed: u64,
-    pub hyperedges_repaired: u64,
-}
+Dieses Crate besitzt die **Property-Graph-Snapshots**. SPEC §4.7 behandelt Graph-Snapshots als Index-Artefakt unter einem `ArtKey` je Generation: Neuaufbau, danach Vernichtung des `ArtKey`. Dieselbe Regel gilt für die CSR-Dateien. Sie stehen im Format-Register. Eine Dateiklasse ohne Zuordnung bricht das Gate `surface-coverage` (REQ-DEL-N24). Bis SPEC §5.9 eine eigene Zeile nennt, registriert `contextra-db` diese Dateien unter dem Graph-Snapshot aus §4.7 und misst sie mit dem Generationswechsel in Schritt 8.
 
-pub struct GraphPurger;
+`GraphLayer` implementiert dafür `ErasureLayer` aus `contextra-erasure`. Der `LayerId` bezeichnet die Property-Graph-Generation. Er ist kein zweites S2 und ersetzt `VectorLayer` nicht.
 
-impl GraphPurger {
-    /// Führt die physische Bereinigung des CSR-Graphen aus (Phase 4f).
-    ///
-    /// 1. Entfernt Knoten aus der Knotentabelle.
-    /// 2. Bereinigt alle inzidenten ein- und ausgehenden Kanten in den CSR-Adjazenzlisten.
-    /// 3. Löst unterbesetzte Hyperedges auf.
-    /// 4. Schreibt die CSR-Strukturen durabel auf Platte (contextra-durable-fs).
-    pub fn purge_entities(
-        graph_dir: &Path,
-        entities: &[EntityId],
-    ) -> Result<GraphPurgeOutcome, GraphError> {
-        // CSR In-Memory Mutationen, gefolgt von atomarem File-Sync
-        Ok(GraphPurgeOutcome {
-            entities_deleted: entities.len() as u64,
-            edges_removed: 0,
-            hyperedges_repaired: 0,
-        })
-    }
-}
-```
+## 3. Architekturregeln
 
----
+1. `#![forbid(unsafe_code)]`. Zero-Panic. `default = []`.
+2. Keine Abhängigkeit auf andere E1-Crates. Keine Dev-Abhängigkeit auf `contextra-testkit`.
+3. Traversierung ist deterministisch bei gleichem Stand und gleichem Seed (INV-5). Tie-Break nach `DocId` aufsteigend.
+4. Kein Klartext des Löschziels in Logs (INV-12).
 
-## 4. Fehlerbehandlung (`GraphError`)
+## 4. Rolle in der Löschsaga
 
-```rust
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum GraphError {
-    #[error("Entity not found: {0}")]
-    EntityNotFound(u64),
+### 4.1 Lesepfad (jeder Zeitpunkt ab `Frozen`)
 
-    #[error("Hyperedge invalid: requires at least {expected} nodes, got {actual}")]
-    HyperedgeUnderflow { expected: usize, actual: usize },
+Jede Kante und jeder Zielknoten wird gegen das aktuelle `ReadGate` geprüft (§6.3). `Erased` bricht den Pfad ab. `Restricted` hat Vorrang und braucht einen Audit-Eintrag. Die Prüfung gilt für `as_of` und für offene Snapshots gegen den aktuellen Stand (§9.2).
 
-    #[error("Graph storage corrupted: {0}")]
-    CorruptedStorage(String),
+### 4.2 Schritt 2
 
-    #[error("Traversal deadline exceeded")]
-    Timeout,
+`resolve` liefert Knoten, Kanten und Hyperedges, deren `LineageRef` auf den Scope zeigt. Die Kaskadenentscheidung trifft der Koordinator in `contextra-db`.
 
-    #[error("I/O error during graph persistence: {0}")]
-    Io(#[from] std::io::Error),
-}
-```
+### 4.3 Schritt 8 — Generation
 
----
+1. Ein Hintergrundlauf baut Generation `g+1` nur aus Knoten und Kanten, die das `ReadGate` als `Open` sieht.
+2. Hyperedges, die nach dem Entfernen unter ihre Mindestgröße fallen, werden nicht repariert und nicht geraten. Sie entfallen in `g+1`.
+3. Atomarer Commit der CSR-Dateien über `contextra-durable-fs`.
+4. Der `ArtKey` der Generation `g` wird sofort vernichtet (INV-ARTKEY-1).
+5. Mehrere Löschungen teilen sich einen Neuaufbau. Auslöser wie bei S2: Tombstone-Anteil ≥ 0,2, Frist, `seal-now`.
 
-## 5. `Cargo.toml` Spezifikation
+Bis zum Umschalten bleibt die Topologie ein ausgewiesenes Residuum im Bericht, analog zu `R-GRAPH`, mit Frist. Das Crate vergibt die Klasse M nicht selbst.
+
+`purge` ist idempotent (T-DEL-14). Ein zweiter Lauf auf einer bereits aktuellen Generation ist ein No-op.
+
+## 5. Fehler (`GraphError`)
+
+`#[non_exhaustive]`: `EntityNotFound`, `HyperedgeUnderflow`, `CorruptedStorage`, `Timeout`, `Io`, `GenerationSwitchFailed`. `EntityNotFound` ist das Bild eines Knotens, den das Gate als `Erased` meldet, sobald der Aufrufer das auf den öffentlichen Pfad mappt. Intern bleibt `GateDecision` erhalten, damit der Koordinator messen kann.
+
+## 6. `Cargo.toml`
 
 ```toml
 [package]
@@ -130,7 +66,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "CSR-Graph for entity-relation traversal, Hyperedges, and GraphRAG algorithms"
+description = "Property graph, traversal, and generation rebuild under ArtKey"
 
 [lints]
 workspace = true
@@ -139,38 +75,27 @@ workspace = true
 contextra-ids = { workspace = true }
 contextra-env = { workspace = true }
 contextra-durable-fs = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-erasure = { workspace = true }
 bytes = { workspace = true }
 parking_lot = { workspace = true }
 ahash = { workspace = true }
-serde = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 proptest = "1.4"
-criterion = { workspace = true }
 
 [features]
 default = []
 std = ["contextra-ids/std", "contextra-env/std"]
-tracing = ["dep:tracing"]
-session-dag = []
-entity-extraction = []
-hyperedge-suggest = []
 ```
 
----
+## 7. Tests
 
-## 6. Implementierungs-Arbeitspakete für Entwickler
-
-1. **`Cargo.toml` Bereinigung:**
-   - Entfernen von `contextra-types` und `contextra-ports`.
-   - Features `workspace`, `types-compat`, `ports-compat` entfernen.
-   - `default = []` setzen (R3).
-2. **Altlasten-Bereinigung (`AP-21`):**
-   - In `src/hyperedge.rs` und `src/percolation.rs` Bezüge zu `contextra-cognition` entfernen.
-3. **Phase 4f Graph-Purge:**
-   - Kaskadierte Kanten- und Hyperedge-Bereinigung absichern.
-4. **Verifikation:**
-   - `cargo test -p contextra-graph`
+| Kennung | Pflicht |
+|---|---|
+| T-DEL-6 | Traversierung erreicht das gelöschte Dokument nicht |
+| T-DEL-10 | Knoten mit `LineageRef` werden in Schritt 2 aufgelöst und fehlen in Generation `g+1` |
+| T-DEL-11 | Jede Kante und jeder Zielknoten prüft das Gate |
+| T-DEL-14 | Zweites `purge` ist ein No-op |

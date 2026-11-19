@@ -1,25 +1,19 @@
-# contextra-engine — Implementierungsspezifikation (Soll-Zustand)
+# contextra-engine — Crate-Spezifikation (Deprecated Façade, SPEC 2.1)
 
-**Ebene:** E2 (Integration — Deprecated Façade)  
-**Kern-Closure:** `contextra-db`  
-**Status:** Veraltet / Deprecated Re-Export Façade  
-**Version:** 2.0  
-**Geltungsbereich:** `crates/contextra-engine`  
-**Referenzdokumente:** `docs/SPEC.md` §2, ADR-0122; `ALTLASTEN-AUDIT.md` (AP-13, AP-18)  
+**Ebene:** E2 (Integration — Deprecated Façade)
+**Kern-Closure:** `contextra-db`
+**Status:** Veraltet / Deprecated Re-Export Façade
+**Version:** 2.1
+**Geltungsbereich:** `crates/contextra-engine`
+**Normative Quellen:** `docs/SPEC.md` §2.4, §5.9.
 
 ---
 
 ## 1. Zweck & Systemrolle
 
-`contextra-engine` ist die historische Integrationsschicht von Contextra. Gemäß ADR-0122 und der Konsolidierung in `docs/SPEC.md` v1.0 ist das Crate vollständig in `contextra-db` aufgegangen.
-Es dient ausschließlich als Übergangs-Façade (`pub use contextra_db::*;`), um bestehende Tests und externe Konsumenten bis zum endgültigen API-Freeze nicht zu brechen.
+`contextra-engine` ist ausschließlich die deprecated Re-Export-Façade `pub use contextra_db::*;`. Es ist keine Schicht, hält keine Caches, besitzt keine Lineage und implementiert kein `ErasureLayer`. S4 liegt in `store`, `rank`, `privacy` sowie registrierten Caches in `db`; S5 liegt in `db` (SPEC §5.9).
 
-### Bereinigung von Altlasten (AP-13, AP-18)
-1. **AP-13a (`proof_regulators_vs_adapt.rs`):** Die Testdatei importiert das entfernte `contextra-adapt` und wird **vollständig gelöscht**.
-2. **AP-13b (`proof_chunker_vs_ingest.rs`):** Die Testdatei vergleicht mit dem entfernten `contextra-ingest` und wird **vollständig gelöscht**.
-3. **AP-13e & AP-13f:** Bereinigung veralteter Kommentare in `chunker_parity_ingest.rs` und `s64_public_surface.rs`.
-4. **AP-18a (`capabilities.fragment.toml`):** Entfernen aller Bezüge auf `contextra-adapt`, `contextra-infer-onnx`, `contextra-sandbox` und `contextra-ingest`.
-5. **R2-Konformität:** `contextra-testkit` (E3) wird aus den `[dev-dependencies]` entfernt.
+Das Crate enthält keine eigenen Schichten, Worker, Cache-Register oder Löschzustände. S4 liegt bei `store`, `rank`, `privacy` und registrierten Caches in `db`; S5 liegt in `db`. `contextra-testkit` (E3) ist keine Dev-Abhängigkeit.
 
 ---
 
@@ -79,13 +73,6 @@ default = []
 
 ---
 
-## 4. Implementierungs-Arbeitspakete für Entwickler
+## 4. Abnahme
 
-1. **Obsolete Testdateien löschen (`AP-13a`, `AP-13b`):**
-   - `tests/proof_regulators_vs_adapt.rs` entfernen.
-   - `tests/proof_chunker_vs_ingest.rs` entfernen.
-2. **`Cargo.toml` bereinigen:**
-   - `contextra-testkit` aus `[dev-dependencies]` entfernen.
-   - `features = ["workspace"]` bei `contextra-vector` entfernen.
-3. **Verifikation:**
-   - `cargo test -p contextra-engine`
+Die Façade exportiert ausschließlich `contextra_db::*`. Sie ist in SPEC §5.9 keiner Löschschicht zugeordnet.

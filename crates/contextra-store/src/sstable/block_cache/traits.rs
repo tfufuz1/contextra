@@ -30,6 +30,10 @@ pub trait BlockCacheBackend: Send + Sync {
         self.get(key).is_some()
     }
 
+    /// Drops every cached block. This is used when a table is replaced during
+    /// purge so stale decrypted blocks cannot be served afterwards.
+    fn clear(&self);
+
     /// Returns the current memory usage in bytes.
     fn current_bytes(&self) -> usize;
 

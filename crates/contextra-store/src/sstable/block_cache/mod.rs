@@ -109,6 +109,14 @@ impl BlockCache {
         self.len() == 0
     }
 
+    /// Invalidates all blocks. Purge calls this after swapping SSTables; a
+    /// cache is an acceleration layer, never an authority for erased data.
+    pub fn clear(&self) {
+        for shard in &self.shards {
+            shard.clear();
+        }
+    }
+
     #[inline]
     pub fn contains(&self, file_id: u64, offset: u64) -> bool {
         self.shard(file_id, offset).contains(&(file_id, offset))

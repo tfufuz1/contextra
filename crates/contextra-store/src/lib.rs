@@ -63,6 +63,8 @@ pub mod key_source;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
+pub mod store_layer;
+#[cfg(not(loom))]
 pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
@@ -93,6 +95,8 @@ pub use lsm::{
     CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalEntryRef, WalObserver, WriteOrigin,
     DEFAULT_MAX_OBSERVER_LATENCY,
 };
+#[cfg(not(loom))]
+pub use store_layer::StoreLayer;
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
 #[cfg(not(loom))]
